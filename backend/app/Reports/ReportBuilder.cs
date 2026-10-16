@@ -93,7 +93,7 @@ public sealed partial class ReportBuilder(IClock clock)
             ]));
         }
         return Make(ReportIds.Register, "Register status", "Where does every document stand?",
-            "The master document register: for the project manager or the client, weekly.",
+            "The master document register: for whoever runs the project, or the client, weekly.",
             [
                 new("Documents", docs.Count.ToString()),
                 new("Released", $"{Percent(tally["released"], docs.Count)}%", "good"),
@@ -202,7 +202,7 @@ public sealed partial class ReportBuilder(IClock clock)
             var age = Period.Between(opened, _today, PeriodUnits.Days).Days;
             // Whoever the step waits on: the people who have not answered, or the other organization.
             var waitingOn = x.Step.ByProxy
-                ? [x.Step.DispatchedAt is null ? "Document Control (to send)" : x.Step.PartyName ?? "Another organization"]
+                ? [x.Step.DispatchedAt is null ? "The control function (to send)" : x.Step.PartyName ?? "Another organization"]
                 : x.Step.Participants.Where(p => p.AnsweredAt is null).Select(p => p.UserName).ToList();
             foreach (var who in waitingOn)
             {
@@ -299,7 +299,7 @@ public sealed partial class ReportBuilder(IClock clock)
             var inApp = t.Recipients.Where(r => r.UserId != null).ToList();
             var unacknowledged = inApp.Count(r => r.AcknowledgedAt is null);
             Cell waiting =
-                toSend > 0 ? new Cell($"Document Control: {toSend} to send", "warn")
+                toSend > 0 ? new Cell($"The control function: {toSend} to send", "warn")
                 : t.ReviewStepId is { } step && !answered.Contains(step) && t.ResponseDue is { } due
                     ? due < _today ? new Cell($"Their answer: overdue since {due:yyyy-MM-dd}", "bad") : new Cell($"Their answer: due {due:yyyy-MM-dd}")
                 : unacknowledged > 0 ? new Cell($"{unacknowledged} to acknowledge")
@@ -318,7 +318,7 @@ public sealed partial class ReportBuilder(IClock clock)
             [
                 new Cell($"{revision.Number} rev {revision.Value}" + (number > 1 ? $" ({number})" : ""), Kind: "document", Id: revision.DocumentId), "In",
                 Date(at), parties.GetValueOrDefault(revision.AuthoredByParty!, revision.AuthoredByParty!), "Submission", "1", "—",
-                toCheck ? new Cell("Document Control: check and accept", "warn") : "—",
+                toCheck ? new Cell("The control function: check and accept", "warn") : "—",
             ]));
         }
         var waitingSend = sent.Count(t => t.Recipients.Any(r => r.AwaitsDispatch));

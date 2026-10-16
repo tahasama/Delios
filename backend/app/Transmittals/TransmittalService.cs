@@ -11,7 +11,7 @@ using NodaTime;
 
 namespace Delios.Host.Transmittals;
 
-/// <summary>Who a revision should go to, and why. Asked by people, carried out by Document Control.</summary>
+/// <summary>Who a revision should go to, and why. Asked by people, carried out by the control function.</summary>
 /// <param name="Delegated">Leave it to whoever started the review to say who receives it: they are told, and ask themselves.</param>
 /// <param name="ApproverPartyId">An outside party that must approve it first: release waits for them, or a released revision is held.</param>
 public sealed record IssueAsk(

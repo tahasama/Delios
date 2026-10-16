@@ -244,7 +244,7 @@ public sealed class ActivityDecision
     public string? ConfirmedByName { get; set; }
     public Instant? ConfirmedAt { get; set; }
     public string? ConfirmNote { get; set; }
-    /// <summary>Document Control took the decision back, with why. It then no longer counts.</summary>
+    /// <summary>The control function took the decision back, with why. It then no longer counts.</summary>
     public string? ReversedByName { get; set; }
     public Instant? ReversedAt { get; set; }
     public string? ReversedReason { get; set; }

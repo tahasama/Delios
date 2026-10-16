@@ -109,8 +109,8 @@ public static partial class ProjectRecordEndpoints
 
     private static Actor Who(ProjectAccess a) => new(a.UserId, a.UserName);
 
-    /// <summary>Document Control on this project, or whoever configures the organization.</summary>
+    /// <summary>The control function on this project, or whoever configures the organization.</summary>
     private static async Task<bool> KeepsAsync(HttpContext h, ProjectAccess a) => a.Holds(Verbs.Control) || await Keepers.ConfiguresAsync(h);
 
-    private static IResult KeepersOnly(string what) => Problems.Forbidden("CONTROL_ONLY", $"Document Control keeps {what}.");
+    private static IResult KeepersOnly(string what) => Problems.Forbidden("CONTROL_ONLY", $"The control function keeps {what}.");
 }

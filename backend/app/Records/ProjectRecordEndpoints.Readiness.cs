@@ -19,7 +19,7 @@ public static partial class ProjectRecordEndpoints
         Notifications.Notifier notifier, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control issues the calls to departments.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function issues the calls to departments.");
         var departments = r.Departments?.Select(d => d.Trim().ToUpperInvariant()).Where(d => d.Length > 0).Distinct().ToList() ?? [];
         if (departments.Count == 0) return Problems.Invalid("DEPARTMENTS_REQUIRED", "Choose the departments to ask.");
         if (r.DueOn is not { } due || LocalDate.FromDateOnly(due) < WorkingCalendar.Today(clock, access.Project.TimeZone))
@@ -63,7 +63,7 @@ public static partial class ProjectRecordEndpoints
         Notifications.Notifier notifier, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control sends reminders.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function sends reminders.");
         var call = await db.Set<RequirementCall>().SingleOrDefaultAsync(x => x.Id == callId && x.ProjectId == access.Project.Id, c);
         if (call is null) return Problems.NotFound("CALL_NOT_FOUND", "No such call.");
         if (call.AnsweredAt is not null) return Problems.Conflict("CALL_ANSWERED", "That department has answered.");
@@ -82,7 +82,7 @@ public static partial class ProjectRecordEndpoints
         CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control records the answer.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function records the answer.");
         var call = await db.Set<RequirementCall>().SingleOrDefaultAsync(x => x.Id == callId && x.ProjectId == access.Project.Id, c);
         if (call is null) return Problems.NotFound("CALL_NOT_FOUND", "No such call.");
         if (call.AnsweredAt is not null) return Problems.Conflict("CALL_ANSWERED", "That department has answered.");
@@ -105,7 +105,7 @@ public static partial class ProjectRecordEndpoints
         var mine = await db.Memberships.AnyAsync(m => m.ProjectId == access.Project.Id && m.UserId == access.UserId && m.Active && m.Department == department, c);
         if (!mine && !access.Holds(Verbs.Control)) return Problems.Forbidden("NOT_YOUR_DEPARTMENT", $"Someone who answers for {department} confirms its documents.");
         var note = Blank(r.Note);
-        if (!r.Available && note is null) return Problems.Invalid("NOTE_REQUIRED", "Say what is missing and why: Document Control is alerted with it.");
+        if (!r.Available && note is null) return Problems.Invalid("NOTE_REQUIRED", "Say what is missing and why: The control function is alerted with it.");
         // After the day a confirmation is still taken, and always says why it comes late.
         var today = WorkingCalendar.Today(clock, access.Project.TimeZone);
         if (activity.Start is { } day && day < today && note is null)
@@ -148,14 +148,14 @@ public static partial class ProjectRecordEndpoints
     }
 
     /// <summary>
-    /// Document Control takes a person's confirmation back (an honest mistake), with a reason. The row stays, marked,
+    /// The control function takes a person's confirmation back (an honest mistake), with a reason. The row stays, marked,
     /// so the record shows both; the department then counts as not confirmed and answers again.
     /// </summary>
     private static async Task<IResult> RevokeReadinessAsync(Guid activityId, RevokeReadinessRequest r, HttpContext h, DeliosDbContext db,
         AuditLog audit, IClock clock, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control takes a confirmation back.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function takes a confirmation back.");
         var reason = Blank(r.Reason);
         if (reason is null) return Problems.Invalid("REASON_REQUIRED", "Say why the confirmation is taken back.");
         var department = r.Department?.Trim().ToUpperInvariant() ?? "";
@@ -177,7 +177,7 @@ public static partial class ProjectRecordEndpoints
         Notifications.Notifier notifier, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        if (!await KeepsAsync(h, access)) return Problems.Forbidden("CONTROL_ONLY", "Document Control tells the departments where they stand.");
+        if (!await KeepsAsync(h, access)) return Problems.Forbidden("CONTROL_ONLY", "The control function tells the departments where they stand.");
         var activity = await db.Activities.AsNoTracking().Include(a => a.Requirements)
             .SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, c);
         if (activity is null) return Problems.NotFound("ACTIVITY_NOT_FOUND", "No such activity.");
@@ -203,11 +203,11 @@ public static partial class ProjectRecordEndpoints
     private sealed record PendingPerson(Guid MembershipId, Guid UserId, string Name, string? Organization, string Function, string? Department,
         DateTimeOffset Since, string? ProposedBy, Guid? ConfirmerId, string? ConfirmerName, bool Mine);
 
-    /// <summary>GET /people/pending: the people added to the project who wait for management's confirmation.</summary>
+    /// <summary>GET /people/pending: the people added to the project who wait to be confirmed.</summary>
     private static async Task<IResult> PendingPeopleAsync(HttpContext h, DeliosDbContext db, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        var manages = access.Holds(Verbs.Manage);
+        var manages = await Identity.JoinRequests.AnswersAsync(db, access, c);
         var rows = await (from m in db.Memberships.AsNoTracking()
                           join u in db.Users.AsNoTracking() on m.UserId equals u.Id
                           join f in db.Functions.AsNoTracking() on m.FunctionId equals f.Id
@@ -220,8 +220,9 @@ public static partial class ProjectRecordEndpoints
     }
 
     /// <summary>
-    /// Management confirms a person on the project (they join), or refuses with why (they do not; it stays on the
-    /// record). Whoever was named, or anyone holding Manage when nobody was. Whoever added them is told.
+    /// Whoever is asked confirms a person on the project (they join), or refuses with why (they do not; it stays on the
+    /// record): whoever was named, else anyone holding Manage (or the control function, where no confirmation is asked
+    /// and it alone adds). Whoever added them is told.
     /// </summary>
     private static async Task<IResult> SettlePersonAsync(Guid membershipId, string? refusal, HttpContext h, DeliosDbContext db, AuditLog audit,
         IClock clock, Notifications.Notifier notifier, Transmittals.TransmittalService transmittals, CancellationToken c)
@@ -230,8 +231,8 @@ public static partial class ProjectRecordEndpoints
         var membership = await db.Memberships.SingleOrDefaultAsync(m => m.Id == membershipId && m.ProjectId == access.Project.Id, c);
         if (membership is null) return Problems.NotFound("PERSON_NOT_FOUND", "No such person waiting on this project.");
         if (membership.PendingSince is null) return Problems.Conflict("NOT_PENDING", "They are not waiting for a confirmation.");
-        if (!(membership.ConfirmerId == access.UserId || (membership.ConfirmerId is null && access.Holds(Verbs.Manage))))
-            return Problems.Forbidden("NOT_YOURS", $"{membership.ConfirmerName ?? "Management"} confirms them.");
+        if (!(membership.ConfirmerId == access.UserId || (membership.ConfirmerId is null && await Identity.JoinRequests.AnswersAsync(db, access, c))))
+            return Problems.Forbidden("NOT_YOURS", $"{membership.ConfirmerName ?? "Whoever holds Manage"} confirms them.");
         if (refusal is not null && refusal.Trim().Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why; whoever added them reads it.");
         var person = await db.Users.AsNoTracking().SingleAsync(u => u.Id == membership.UserId, c);
         var now = clock.GetCurrentInstant();
@@ -271,7 +272,7 @@ public static partial class ProjectRecordEndpoints
             asked?.Subject ?? $"{person.Name} to confirm on {access.Project.Code}", said, adder, [], asked?.Id, c);
         var told = new List<Guid>();
         if (letter is null) told.AddRange(adder);
-        // Document Control keeps who is on the project: told of every answer.
+        // The control function keeps who is on the project: told of every answer.
         told.AddRange(await notifier.ControlHoldersAsync(access.Project.Id, c));
         told.RemoveAll(id => id == access.UserId || id == person.Id);
         if (told.Count > 0)
@@ -289,10 +290,10 @@ public static partial class ProjectRecordEndpoints
         Transmittals.TransmittalService transmittals, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        // Document Control tags by hand; whoever plans only by uploading the disciplines-per-action list.
+        // The control function tags by hand; whoever plans only by uploading the disciplines-per-action list.
         var body = await h.Request.ReadFromJsonAsync<DepartmentsRequest>(c);
         if (!await KeepsAsync(h, access) && !(body?.FromList == true && access.Holds(Verbs.Plan)))
-            return Problems.Forbidden("CONTROL_ONLY", "Document Control tags activities; whoever plans does it with the disciplines-per-action list.");
+            return Problems.Forbidden("CONTROL_ONLY", "The control function tags activities; whoever plans does it with the disciplines-per-action list.");
         var activity = await db.Activities.SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, c);
         if (activity is null) return Problems.NotFound("ACTIVITY_NOT_FOUND", "No such activity.");
         var departments = body?.Departments?.Select(d => d.Trim().ToUpperInvariant()).Where(d => d.Length > 0).Distinct().OrderBy(d => d).ToArray() ?? [];
@@ -307,7 +308,7 @@ public static partial class ProjectRecordEndpoints
             if (ask is null) return Problems.NotFound("REQUEST_NOT_FOUND", $"No request about {activity.Code} by that number.");
             if (ask.ActivityAnsweredAt is not null) return Problems.Conflict("ALREADY_ANSWERED", $"{ask.ActivityAnsweredByName} already answered {ask.Number}.");
             if (ask.ActivityConfirm)
-                return Problems.Conflict("NEEDS_CONFIRMATION", $"{ask.Number} needs management's confirmation: check it and send it on; it is applied once confirmed.");
+                return Problems.Conflict("NEEDS_CONFIRMATION", $"{ask.Number} needs confirming by whoever holds Manage: check it and send it on; it is applied once confirmed.");
         }
         var was = string.Join(", ", activity.Departments);
         activity.Departments = departments;
@@ -324,7 +325,7 @@ public static partial class ProjectRecordEndpoints
         Notifications.Notifier notifier, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control issues the list to senders.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function issues the list to senders.");
         var sender = r.Sender?.Trim() ?? "";
         if (sender.Length == 0) return Problems.Invalid("SENDER_REQUIRED", "Say who it goes to.");
         var department = sender.StartsWith("DEPT:", StringComparison.Ordinal) ? sender[5..] : null;
@@ -353,7 +354,7 @@ public static partial class ProjectRecordEndpoints
                      where m.ProjectId == access.Project.Id && m.Active && u.Active && u.Party != null && u.Party.Code == sender
                      select u.Id).ToListAsync(c);
         await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, people, Notifications.NotificationKinds.General,
-            $"The documents you are to send: {needs.Count}", "Document Control issued the requirements list; each has a date it is needed by.",
+            $"The documents you are to send: {needs.Count}", "The control function issued the requirements list; each has a date it is needed by.",
             "/actions/requirements", c);
         await audit.WriteAsync(Who(access), "REQUIREMENTS_ISSUED", "SenderIssue", row.Id, sender, $"{needs.Count} documents.", access.Project.Id, c);
         await db.SaveChangesAsync(c);

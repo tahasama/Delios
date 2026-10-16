@@ -8,21 +8,21 @@ using NodaTime;
 
 namespace Delios.Host.Reviews;
 
-/// <summary>Body of the arrival request: Document Control's outcome code and an optional note (required when returning).</summary>
+/// <summary>Body of the arrival request: The control function's outcome code and an optional note (required when returning).</summary>
 /// <param name="Outcome">One of the organization's control outcomes; empty takes the first one that fits the act.</param>
 /// <param name="Return">On arrival, send it back to the sender even where no "return" outcome is published.</param>
 public sealed record ControlRequest(string? Outcome = null, string? Note = null, bool Return = false);
 
 /// <summary>
-/// Document Control's own acts on a revision, kept apart from review verdicts: a
-/// verdict is about what the document says, Document Control's check is about
+/// The control function's own acts on a revision, kept apart from review verdicts: a
+/// verdict is about what the document says, the control function's check is about
 /// whether the submission is in order. A submission that is not in order goes
 /// back to be corrected under the same revision; only a change to what it says
 /// needs a new one.
 /// </summary>
 public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock clock, Notifications.Notifier notifier)
 {
-    /// <summary>The acts Document Control performs; a control outcome's published <c>act</c> property names one of them.</summary>
+    /// <summary>The acts the control function performs; a control outcome's published <c>act</c> property names one of them.</summary>
     public const string Accept = "accept", Return = "return", Release = "release";
 
     /// <summary>
@@ -61,7 +61,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
     public static bool NeedsNewRevision(Catalog catalog, string code) =>
         catalog.Prop(ReviewSets.ControlOutcomes, code, "newRevision") is { ValueKind: JsonValueKind.True };
 
-    /// <summary>Document Control's outcome, on the revision and on the submission it judged.</summary>
+    /// <summary>The control function's outcome, on the revision and on the submission it judged.</summary>
     public void Record(Revision revision, string? outcome, string? note, string by)
     {
         revision.ControlOutcome = outcome ?? revision.ControlOutcome;
@@ -91,7 +91,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
             .SingleOrDefaultAsync(d => d.Id == revision.DocumentId, cancellationToken);
         if (revision is null || document is null) return (null, Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
         if (!access.Allows(Verbs.Control, document.Facts))
-            return (null, Problems.Forbidden("CONTROL_ONLY", "Accepting what arrives is Document Control's act."));
+            return (null, Problems.Forbidden("CONTROL_ONLY", "Accepting what arrives is the control function's act."));
         if (revision.State != RevisionStates.Received)
         {
             return (null, Problems.Conflict("NOT_AWAITING_ACCEPTANCE", $"Revision {revision.Value} is not waiting to be accepted.",
@@ -151,7 +151,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
     }
 
     /// <summary>
-    /// One entry in a person's to-do list about a revision. <c>Kind</c>: ACCEPT_SUBMISSION (Document Control checks
+    /// One entry in a person's to-do list about a revision. <c>Kind</c>: ACCEPT_SUBMISSION (the control function checks
     /// what arrived), CORRECT_AND_RESUBMIT (returned to its sender for a correction), RETURNED_BY_REVIEW (its review
     /// sent it back to its author; the next revision replaces it), NEXT_REVISION_DUE (a supplier's document released
     /// with comments for their next revision, theirs to send), TO_ROUTE (accepted from another organization, not
@@ -234,11 +234,11 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
                 RevisionStates.Released => "NEXT_REVISION_DUE",
                 _ => control && fromOutside ? "TO_ROUTE" : "DRAFT",
             };
-            // Sent to the supplier again after Document Control took it back, rather than returned by its check.
+            // Sent to the supplier again after the control function took it back, rather than returned by its check.
             var resent = kind == "CORRECT_AND_RESUBMIT" && x.ResentAt is { } sentAgain && (x.ReturnedAt is not { } back || sentAgain > back);
             var note = kind switch
             {
-                // Sent to them again after Document Control took it back: what they were told; else why it was returned.
+                // Sent to them again after the control function took it back: what they were told; else why it was returned.
                 "CORRECT_AND_RESUBMIT" => resent ? x.ResentNote : x.ReturnedReason,
                 "RETURNED_BY_REVIEW" => x.ReturnedReason ?? x.ControlOutcome,
                 "NEXT_REVISION_DUE" => x.ControlOutcome ?? "Released with comments, or for update: take them into the next revision.",

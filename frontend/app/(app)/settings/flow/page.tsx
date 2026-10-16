@@ -4,6 +4,10 @@ import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Chip, StateChip } from "@/components/ui";
 import { ProjectSettings } from "./project-settings";
+import { ActionForm } from "@/components/form";
+import { SearchPick } from "@/components/search-pick";
+import { api, projectPath } from "@/lib/client";
+import { setControlPeopleAction } from "@/lib/settings/forms-people";
 import { controlSettings, policies, PROJECT_MODE_LABEL, CONTROL_ACTIVITIES, SKIPPABLE } from "@/lib/settings/control-activities";
 import { holdersOf } from "@/lib/core/permissions";
 import { REV_STATE_COLOR, type RevState } from "@/lib/core/standard";
@@ -362,6 +366,14 @@ export default async function ControlRoomPage() {
     partiesWithAnswers().then((all) => all.filter((one) => one.active).map((one) => ({ kind: one.kind }))).catch(() => []),
   ]);
 
+  const directory = await api<{
+    people: { id: string; name: string; partyId: string | null; organization: string | null; function: string; control: boolean; actsAsControl: boolean }[];
+    organizations: { id: string; kind: string }[];
+    mayNameControl: boolean;
+  }>(projectPath(ctx, "/people/directory")).catch(() => null);
+  const ours = new Set(directory?.organizations.filter((o) => o.kind === "OURS").map((o) => o.id) ?? []);
+  const ourPeople = (directory?.people ?? []).filter((p) => p.partyId === null || ours.has(p.partyId));
+  const byFunction = ourPeople.filter((p) => p.control && !p.actsAsControl);
   const gate = holders.length > 0;
   const together = chosen.find((one) => one.policy.key === "POLICY_RELEASE")?.value === "TOGETHER";
   const actRow = new Map(settings.rows.map((row) => [row.activity.key, row]));
@@ -538,7 +550,8 @@ export default async function ControlRoomPage() {
           <div className="px-5 py-3 sm:px-6">
             <p className="stencil text-slate-500">Control function</p>
             <p className="mt-1 text-[13px] font-medium text-slate-900">{gate ? `${holders.length} ${holders.length === 1 ? "person" : "people"}` : "Nobody"}</p>
-            <p className="text-[11px] text-slate-500">{gate ? "Document Control stands between the work and the register." : "The people doing the work run the register."}</p>
+            <p className="text-[11px] text-slate-500">{gate ? "The control function stands between the work and the register." : "The people doing the work run the register."}</p>
+            <a href="#control-people" className="text-[11px] font-semibold text-link hover:underline">Who acts as it</a>
           </div>
           <div className="px-5 py-3 sm:px-6">
             <p className="stencil text-slate-500">Who does what</p>
@@ -566,6 +579,37 @@ export default async function ControlRoomPage() {
               <SetLine key={one.key} setKey={one.key} set={one} values={values.filter((value) => value.setKey === one.key)} />
             ))}
           </ul>
+        </section>
+      ) : null}
+
+      {/* Who acts as the control function: named here, whatever their function. */}
+      {directory ? (
+        <section className="register register-sheet register-sheet-open scroll-mt-24" id="control-people" aria-labelledby="control-people-head">
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+            <span id="control-people-head" className="stencil mr-1 text-slate-500">Who acts as the control function</span>
+            <span className="text-[11px] text-slate-500">whatever their function: they keep the register, check what arrives, add people…</span>
+          </div>
+          <div className="space-y-3 px-5 py-4 sm:px-6">
+            {byFunction.length ? (
+              <p className="text-xs leading-5 text-slate-600">
+                By their function: {byFunction.map((p) => `${p.name} (${p.function})`).join(", ")}. Changed in{" "}
+                <Link href="/settings/functions" className="font-semibold text-link hover:underline">Functions</Link>.
+              </p>
+            ) : null}
+            {directory.mayNameControl ? (
+              <ActionForm action={setControlPeopleAction} submitLabel="Save" size="sm">
+                <div className="max-w-xl">
+                  <SearchPick name="userIds" label={`Named on ${ctx.project.code}`} hint="people of ours on the project; each is told"
+                    items={ourPeople.filter((p) => !byFunction.some((b) => b.id === p.id)).map((p) => ({ id: p.id, name: p.name, detail: p.function }))}
+                    initial={ourPeople.filter((p) => p.actsAsControl).map((p) => p.id)} placeholder="Find someone" />
+                </div>
+              </ActionForm>
+            ) : (
+              <p className="text-xs leading-5 text-slate-600">
+                {ourPeople.filter((p) => p.actsAsControl).map((p) => p.name).join(", ") || "Nobody named"}. An administrator, or whoever acts as the control function, names them.
+              </p>
+            )}
+          </div>
         </section>
       ) : null}
 

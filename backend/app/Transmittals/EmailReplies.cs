@@ -30,7 +30,7 @@ public sealed class ReplyAddress
 }
 
 /// <summary>
-/// A reply by email to one of our transmittals, waiting for Document Control: recorded as received (a transmittal
+/// A reply by email to one of our transmittals, waiting for the control function: recorded as received (a transmittal
 /// that follows it, its files to check), or set aside with why. Nothing of it is filed by itself.
 /// </summary>
 public sealed class EmailReply
@@ -88,7 +88,7 @@ internal sealed class EmailReplyConfiguration : IEntityTypeConfiguration<ReplyAd
 /// <summary>One file that came with a reply, by name.</summary>
 public sealed record EmailReplyFile(Guid Id, string Name, long Size);
 
-/// <summary>A reply by email as Document Control reads it.</summary>
+/// <summary>A reply by email as the control function reads it.</summary>
 public sealed record EmailReplyView(Guid Id, Guid TransmittalId, string TransmittalNumber, string Organization, string FromAddress, string? FromName,
     string Subject, string Text, DateTimeOffset ReceivedAt, IReadOnlyList<EmailReplyFile> Files, string State, Guid? RecordedTransmittalId,
     string? HandledByName, DateTimeOffset? HandledAt, string? SetAsideReason);
@@ -99,7 +99,7 @@ public sealed record SetAsideRequest(string? Reason);
 /// <summary>
 /// Replies by email (docs/ORGANIZATIONS.md, "Not on DELIOS"). A transmittal to an organization nobody of which signs
 /// in here is emailed to its contact address, with its files, and answers to an address of its own. A reply that
-/// comes back from that address waits on the transmittal and on Document Control's Home: recorded as received it
+/// comes back from that address waits on the transmittal and on the control function's Home: recorded as received it
 /// becomes a transmittal that follows ours, its files checked as anything else that arrives; or it is set aside, with
 /// why. Mail from anyone else, or to no transmittal, is not taken in: the sender is told how to answer.
 /// </summary>
@@ -139,9 +139,9 @@ public sealed class EmailReplies(
             var body = new StringBuilder(text);
             body.AppendLine().AppendLine();
             if (files.Count > 0)
-                body.AppendLine(attach ? $"Files attached ({files.Count})." : $"The files ({files.Count}, {size / 1048576} MB) are too large to attach: Document Control sends them to you.");
+                body.AppendLine(attach ? $"Files attached ({files.Count})." : $"The files ({files.Count}, {size / 1048576} MB) are too large to attach: The control function sends them to you.");
             body.Append(replyTo is null
-                ? "To answer, reply to Document Control."
+                ? "To answer, reply to the control function."
                 : "To answer, reply to this email, with your files attached. Your reply is kept with this transmittal. Anything else: write to us as usual.");
             notifier.Queue(project.TenantId, project.Id, EmailKinds.Transmittal, party.ContactEmail!, party.Name,
                 $"{transmittal.Number}: {transmittal.Subject}", body.ToString(), "Transmittal", transmittal.Id, replyTo,
@@ -220,7 +220,7 @@ public sealed class EmailReplies(
                 if (from.Contains('@'))
                     mailer.Queue(route.TenantId, route.ProjectId, EmailKinds.Transmittal, from, fromName, $"Not received: {subject}",
                         $"Your email to the reply address of {transmittal.Number} was not taken in: that address takes replies from {party.Name}'s "
-                        + "address we wrote to only. Please ask them to reply, or write to Document Control.", "Transmittal", transmittal.Id);
+                        + "address we wrote to only. Please ask them to reply, or write to the control function.", "Transmittal", transmittal.Id);
                 await here.SaveChangesAsync(cancellationToken);
                 return;
             }
@@ -251,7 +251,7 @@ public sealed class EmailReplies(
             reply.FileIds = [.. kept];
             here.Add(reply);
             await services.GetRequiredService<AuditLog>().WriteAsync(Actor.System, "EMAIL_REPLY_RECEIVED", "Transmittal", transmittal.Id, transmittal.Number,
-                $"Reply by email from {party.Name} ({from}), {kept.Count} file(s); waiting for Document Control.", route.ProjectId, cancellationToken);
+                $"Reply by email from {party.Name} ({from}), {kept.Count} file(s); waiting for the control function.", route.ProjectId, cancellationToken);
             await mailer.NotifyAsync(route.TenantId, route.ProjectId, await mailer.ControlHoldersAsync(route.ProjectId, cancellationToken),
                 NotificationKinds.IncomingArrived, $"{transmittal.Number}: {party.Name} replied by email",
                 $"{subject}\n{(kept.Count == 0 ? "No files." : $"{kept.Count} file(s).")} Record it as received, or set it aside.",
@@ -261,7 +261,7 @@ public sealed class EmailReplies(
         return Results.Accepted();
     }
 
-    // ── Document Control's answer ─────────────────────────────────────────────
+    // ── the control function's answer ─────────────────────────────────────────────
 
     /// <summary>The replies by email on one transmittal, or (no transmittal) those waiting on the project.</summary>
     public async Task<List<EmailReplyView>> ListAsync(ProjectAccess access, Guid? transmittalId, CancellationToken cancellationToken)
@@ -282,17 +282,17 @@ public sealed class EmailReplies(
     }
 
     /// <summary>
-    /// Document Control records a reply as received: a transmittal from that organization following ours, its words
+    /// The control function records a reply as received: a transmittal from that organization following ours, its words
     /// the message, each file an item to check, received the day the email came.
     /// </summary>
     public async Task<(Guid? TransmittalId, IResult? Problem)> RecordAsync(ProjectAccess access, IncomingService incoming, Guid replyId,
         CancellationToken cancellationToken)
     {
-        if (!access.Holds(Verbs.Control)) return (null, Problems.Forbidden("CONTROL_ONLY", "Document Control records what arrived."));
+        if (!access.Holds(Verbs.Control)) return (null, Problems.Forbidden("CONTROL_ONLY", "The control function records what arrived."));
         var reply = await db.Set<EmailReply>().SingleOrDefaultAsync(r => r.Id == replyId && r.ProjectId == access.Project.Id, cancellationToken);
         if (reply is null) return (null, Problems.NotFound("REPLY_NOT_FOUND", "No such reply."));
         if (reply.State != EmailReplyStates.Waiting) return (null, Problems.Conflict("REPLY_HANDLED", "This reply was already answered."));
-        // Recorded by Document Control: the files are theirs to hand to the check.
+        // Recorded by the control function: the files are theirs to hand to the check.
         var files = await db.StoredFiles.Where(f => reply.FileIds.Contains(f.Id)).ToListAsync(cancellationToken);
         foreach (var file in files) file.UploadedById = access.UserId;
         await db.SaveChangesAsync(cancellationToken);
@@ -315,10 +315,10 @@ public sealed class EmailReplies(
         return (recorded.Id, null);
     }
 
-    /// <summary>Document Control sets a reply aside, with why: not about this transmittal, a mistake, a duplicate. It is kept.</summary>
+    /// <summary>The control function sets a reply aside, with why: not about this transmittal, a mistake, a duplicate. It is kept.</summary>
     public async Task<IResult?> SetAsideAsync(ProjectAccess access, Guid replyId, SetAsideRequest request, CancellationToken cancellationToken)
     {
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control answers what arrived.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function answers what arrived.");
         var why = request.Reason?.Trim() ?? "";
         if (why.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why it is set aside.");
         var reply = await db.Set<EmailReply>().SingleOrDefaultAsync(r => r.Id == replyId && r.ProjectId == access.Project.Id, cancellationToken);
@@ -395,7 +395,7 @@ public sealed class EmailReplies(
     private static string? Clip(string? text, int length) => text is null ? null : text.Length <= length ? text : text[..(length - 1)] + "…";
 }
 
-/// <summary>The door replies by email come in by, and Document Control's answer to each.</summary>
+/// <summary>The door replies by email come in by, and the control function's answer to each.</summary>
 public static class EmailReplyEndpoints
 {
     public static void MapEmailReplyEndpoints(IEndpointRouteBuilder app)

@@ -37,7 +37,7 @@ public sealed partial class TransmittalService
 
     /// <summary>
     /// Tells the people it is for again, those who have not acknowledged it (or the ones named). Whoever issued it,
-    /// or Document Control.
+    /// or the control function.
     /// </summary>
     public async Task<(Transmittal? Transmittal, IResult? Problem)> NotifyAgainAsync(
         ProjectAccess access, Guid id, Guid[]? recipientIds, CancellationToken cancellationToken)
@@ -46,7 +46,7 @@ public sealed partial class TransmittalService
             .SingleOrDefaultAsync(t => t.Id == id, cancellationToken);
         if (transmittal is null) return (null, NotFound());
         if (transmittal.IssuedById != access.UserId && !access.Holds(Verbs.Control))
-            return (null, Problems.Forbidden("NOT_YOURS", "Whoever issued it, or Document Control, tells people again."));
+            return (null, Problems.Forbidden("NOT_YOURS", "Whoever issued it, or the control function, tells people again."));
         var chosen = transmittal.Recipients.Where(r => r.UserId is not null && r.Kind == RecipientKinds.To && r.AcknowledgedAt is null
             && (recipientIds is not { Length: > 0 } || recipientIds.Contains(r.Id))).ToList();
         if (chosen.Count == 0) return (null, Problems.Conflict("NOBODY_TO_TELL", "Everybody it is for has acknowledged it."));

@@ -377,8 +377,21 @@ public static class IdentityEndpoints
                     r.Family,
                     r.Verbs,
                 }).ToList(),
+                m.ActsAsControl,
             })
             .ToListAsync(cancellationToken);
-        return Results.Ok(new { user = me, tenant = organization, projects });
+        // Named on a project to act as the control function: CONTROL on every document of it, as the backend reads it.
+        var shown = projects.Select(p => new
+        {
+            p.Id, p.Code, p.Name, p.TimeZone, p.ContractRole, p.Kind, p.Status, p.Department, p.Function,
+            Verbs = p.ActsAsControl && !p.Verbs.Contains(Verbs.Control) ? [.. p.Verbs, Verbs.Control] : p.Verbs,
+            Rules = p.ActsAsControl
+                ? [.. p.Rules.Select(r => new { r.DeliverableType, r.DocType, r.Discipline, r.Criticality, r.Confidentiality, r.ProjectRole, r.Family, r.Verbs }),
+                    new { DeliverableType = (string?)null, DocType = (string?)null, Discipline = (string?)null, Criticality = (string?)null,
+                        Confidentiality = (string?)null, ProjectRole = (string?)null, Family = (string?)null, Verbs = new[] { Verbs.Control } }]
+                : p.Rules,
+            p.ActsAsControl,
+        });
+        return Results.Ok(new { user = me, tenant = organization, projects = shown });
     }
 }

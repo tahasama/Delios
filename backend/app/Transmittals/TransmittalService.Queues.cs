@@ -109,7 +109,7 @@ public sealed partial class TransmittalService
                 x.Reason, x.Name, x.ResponseDue?.ToDateOnly(), x.IssuedAt.ToDateTimeOffset())));
         }
 
-        // What came in unplanned waits for Document Control to put it in the register.
+        // What came in unplanned waits for the control function to put it in the register.
         if (access.IsInternal && access.Holds(Verbs.Control))
         {
             var unplanned = await (
@@ -122,7 +122,7 @@ public sealed partial class TransmittalService
                 x.DocumentNumber.Length > 0 ? $"{x.DocumentNumber} {x.Title}" : x.Title, x.Number, x.FromName, null,
                 x.IssuedAt.ToDateTimeOffset())));
 
-            // A supplier asks for one of their documents back to update it: Document Control answers.
+            // A supplier asks for one of their documents back to update it: The control function answers.
             var asksToUs = await (from a in db.HandBackRequests
                                   join d in db.Documents on a.DocumentId equals d.Id
                                   where a.ProjectId == projectId && a.FromSupplier && a.AnsweredAt == null

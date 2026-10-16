@@ -18,8 +18,8 @@ public sealed partial class KeepingService
     /// <summary>
     /// Voids the newest revision of a document: one released in error, or one never
     /// reviewed. What was released is voided by the authority that decided it or by
-    /// Document Control (or, where the people doing the work carry this out, its
-    /// author); what was never reviewed, by its author or Document Control. Whoever
+    /// The control function (or, where the people doing the work carry this out, its
+    /// author); what was never reviewed, by its author or the control function. Whoever
     /// received it is told to stop using it.
     /// </summary>
     public async Task<(Revision? Revision, IResult? Problem)> VoidAsync(
@@ -58,8 +58,8 @@ public sealed partial class KeepingService
         if (!allowed)
         {
             return (null, Problems.Forbidden("VOID_NOT_ALLOWED", neverReviewed
-                ? "Its author or Document Control voids a revision nobody reviewed."
-                : "Voiding what was issued is decided by the authority that approved it, or Document Control."));
+                ? "Its author or the control function voids a revision nobody reviewed."
+                : "Voiding what was issued is decided by the authority that approved it, or the control function."));
         }
 
         var now = clock.GetCurrentInstant();
@@ -93,7 +93,7 @@ public sealed partial class KeepingService
     /// <summary>
     /// Takes a void back, with a reason: the revision returns to what it was (released, or in preparation) and the people
     /// who received it are told it counts again. Only while it is still the newest revision and the document is not on hold.
-    /// Document Control's, as the one who answers for what is in force.
+    /// The control function's, as the one who answers for what is in force.
     /// </summary>
     public async Task<(Revision? Revision, IResult? Problem)> UnvoidAsync(
         HttpContext http, ProjectAccess access, Guid documentId, Guid revisionId, VoidRequest request, CancellationToken cancellationToken)
@@ -107,7 +107,7 @@ public sealed partial class KeepingService
         if (reason.Length == 0) return (null, Problems.Invalid("REASON_REQUIRED", "Taking a void back is recorded with a reason."));
         if (document.LegalHold) return (null, OnHold(document));
         if (!access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http))
-            return (null, Problems.Forbidden("CONTROL_ONLY", "Document Control takes a void back."));
+            return (null, Problems.Forbidden("CONTROL_ONLY", "The control function takes a void back."));
         if (document.State is not (DocumentStates.Planned or DocumentStates.Active))
             return (null, Problems.Conflict("DOCUMENT_NOT_OPEN", $"The document is {document.State.ToLowerInvariant()}: reinstate it first."));
         var newer = await db.Revisions.AsNoTracking().Where(r => r.DocumentId == documentId && r.CreatedAt > revision.CreatedAt)

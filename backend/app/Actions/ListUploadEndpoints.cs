@@ -19,7 +19,7 @@ public sealed record ListUploadRequest(string Kind, string FileName, string Cont
 
 /// <summary>
 /// The schedule's three lists — the schedule, the disciplines per action, the document requirements — are documents
-/// in the register; their revisions are made, reviewed and released there, never here. Here Document Control uploads
+/// in the register; their revisions are made, reviewed and released there, never here. Here the control function uploads
 /// the spreadsheet of the revision in force: it is read and applied at once, all or nothing, and recorded against that
 /// revision. The uploader confirms the file is that revision's list as released, taking responsibility for it
 /// matching, or says why it differs. Where a project has no such
@@ -52,7 +52,7 @@ public static class ListUploadEndpoints
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.IsInternal || !(access.Holds(Verbs.Control) || access.Holds(Verbs.Plan)))
-            return Problems.Forbidden("PLAN_NOT_ALLOWED", "Your function does not upload the schedule's lists. Document Control, or a function given Plan, does.");
+            return Problems.Forbidden("PLAN_NOT_ALLOWED", "Your function does not upload the schedule's lists. The control function, or a function given Plan, does.");
         if (!Lists.TryGetValue(request.Kind ?? "", out var list)) return Problems.Invalid("LIST_UNKNOWN", "Choose the schedule, the disciplines per action or the document requirements.");
         var project = access.Project;
         var reason = request.Reason?.Trim() ?? "";

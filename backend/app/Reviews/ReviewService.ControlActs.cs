@@ -12,11 +12,11 @@ namespace Delios.Host.Reviews;
 
 public sealed partial class ReviewService
 {
-    // ── Document Control's acts ───────────────────────────────────────────────
+    // ── the control function's acts ───────────────────────────────────────────────
 
     /// <summary>
-    /// Document Control releases a decided review whose verdict lets the revision proceed, when no blocking comment is open, at the status the deciding step granted.
-    /// Records Document Control's outcome on the revision. Called by the release endpoint.
+    /// The control function releases a decided review whose verdict lets the revision proceed, when no blocking comment is open, at the status the deciding step granted.
+    /// Records the control function's outcome on the revision. Called by the release endpoint.
     /// </summary>
     public async Task<(Review? Review, IResult? Problem)> ReleaseAsync(
         ProjectAccess access, Guid reviewId, ReleaseRequest request, CancellationToken cancellationToken)
@@ -25,7 +25,7 @@ public sealed partial class ReviewService
         if (review is null) return (null, NotFound());
         if (!await MayActForControlAsync(access, review, cancellationToken))
         {
-            return (null, Problems.Forbidden("CONTROL_ONLY", "Releasing is Document Control's act."));
+            return (null, Problems.Forbidden("CONTROL_ONLY", "Releasing is the control function's act."));
         }
         if (review.State != ReviewStates.Decided)
         {
@@ -47,7 +47,7 @@ public sealed partial class ReviewService
         if (status != review.GrantedStatus)
         {
             return (null, Problems.Conflict("STATUS_NOT_GRANTED",
-                $"The deciding step granted {review.GrantedStatus}. Document Control releases what was decided.",
+                $"The deciding step granted {review.GrantedStatus}. The control function releases what was decided.",
                 new { granted = review.GrantedStatus }));
         }
 
@@ -88,7 +88,7 @@ public sealed partial class ReviewService
     }
 
     /// <summary>
-    /// Releasing, Document Control may take people or organizations off what was asked (never add to a request; it
+    /// Releasing, the control function may take people or organizations off what was asked (never add to a request; it
     /// names others on the release itself). The request keeps who asked and why, and says who was taken off, by whom
     /// and when. A request left naming nobody is closed as cancelled, with the same note.
     /// </summary>
@@ -131,7 +131,7 @@ public sealed partial class ReviewService
     }
 
     /// <summary>
-    /// Document Control sends a review back: with no <c>ToStep</c>, the revision goes back to its author (replaced by a new revision if the verdict asked for changes or the outcome says so, otherwise corrected under the same revision);
+    /// The control function sends a review back: with no <c>ToStep</c>, the revision goes back to its author (replaced by a new revision if the verdict asked for changes or the outcome says so, otherwise corrected under the same revision);
     /// with a <c>ToStep</c>, the route restarts from that step. Called by the return endpoint.
     /// </summary>
     public async Task<(Review? Review, IResult? Problem)> ReturnAsync(
@@ -141,7 +141,7 @@ public sealed partial class ReviewService
         if (review is null) return (null, NotFound());
         if (!await MayActForControlAsync(access, review, cancellationToken))
         {
-            return (null, Problems.Forbidden("CONTROL_ONLY", "Sending a revision back is Document Control's act."));
+            return (null, Problems.Forbidden("CONTROL_ONLY", "Sending a revision back is the control function's act."));
         }
         if (review.State is not (ReviewStates.Decided or ReviewStates.InProgress))
         {
@@ -159,7 +159,7 @@ public sealed partial class ReviewService
 
         if (request.ToStep is null)
         {
-            // Whatever the verdict, a problem Document Control finds in the submission
+            // Whatever the verdict, a problem the control function finds in the submission
             // comes back corrected under the same revision. A verdict that asked for
             // changes is different: what the document says must change, so the next
             // revision replaces it.

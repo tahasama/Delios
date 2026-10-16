@@ -16,7 +16,7 @@ public sealed partial class KeepingService
     // ── A supplier's document: who holds it, handing it over, asking for it back ──
 
     /// <summary>
-    /// Document Control (or an administrator) sends a supplier's document we hold to the supplier, for them to update
+    /// The control function (or an administrator) sends a supplier's document we hold to the supplier, for them to update
     /// it: they hold it from then on. A revision not yet reviewed goes as it is and comes back under the same value;
     /// only a release, or a review that returns it, makes their next one a new revision.
     /// </summary>
@@ -27,7 +27,7 @@ public sealed partial class KeepingService
         if (document is null || await VisibleAsync(access, documentId, cancellationToken) is null)
             return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         if (!access.IsInternal || (!access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http)))
-            return Problems.Forbidden("CONTROL_ONLY", "Document Control sends a document to its supplier.");
+            return Problems.Forbidden("CONTROL_ONLY", "The control function sends a document to its supplier.");
         var supplier = await SupplierOfAsync(document, cancellationToken);
         if (supplier is null || document.WithSupplier is null)
             return Problems.Conflict("NOT_EXCHANGED", "Only a document asked of a supplier is sent to them for an update.");
@@ -44,7 +44,7 @@ public sealed partial class KeepingService
 
     /// <summary>
     /// The side that does not hold a supplier's document asks the holder to hand it back for an update (RETURN_FOR_UPDATE),
-    /// saying why. On our side Document Control (or an administrator) asks; on theirs, whoever of the supplier may
+    /// saying why. On our side the control function (or an administrator) asks; on theirs, whoever of the supplier may
     /// upload. One ask open at a time; the holder is told, and answers on the document or from their Home.
     /// </summary>
     public async Task<IResult> AskBackAsync(
@@ -59,7 +59,7 @@ public sealed partial class KeepingService
         if (fromSupplier && !await SupplierMayAsync(access, document))
             return Problems.Forbidden("NOT_ALLOWED", $"Whoever of {supplier.Name} may upload asks for it back.");
         if (!fromSupplier && !access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http))
-            return Problems.Forbidden("CONTROL_ONLY", "Document Control asks a supplier to hand a document back.");
+            return Problems.Forbidden("CONTROL_ONLY", "The control function asks a supplier to hand a document back.");
         // Asked of the side that holds it: the supplier asks us when we hold it, we ask them when they do.
         if (document.WithSupplier == fromSupplier)
             return Problems.Conflict("ALREADY_YOURS", "It is with you already: change it, then send it.");
@@ -110,7 +110,7 @@ public sealed partial class KeepingService
             ? access.IsInternal && (access.Allows(Verbs.Control, document.Facts) || await Keepers.ConfiguresAsync(http))
             : !access.IsInternal && await SupplierMayAsync(access, document);
         if (!mayAnswer)
-            return Problems.Forbidden("NOT_THE_HOLDER", ask.FromSupplier ? "Document Control answers this." : $"{supplier.Name} answers this.");
+            return Problems.Forbidden("NOT_THE_HOLDER", ask.FromSupplier ? "The control function answers this." : $"{supplier.Name} answers this.");
         var answer = request.Answer?.Trim() is { Length: > 0 } written ? written : null;
         if (!request.Accept && answer is null) return Problems.Invalid("REASON_REQUIRED", "Say why it is refused.");
         if (answer is { Length: > 2000 }) return Problems.Invalid("ANSWER_TOO_LONG", "Keep the answer under 2000 characters.");
@@ -188,7 +188,7 @@ public sealed partial class KeepingService
         return (sent.Number, null);
     }
 
-    /// <summary>Whoever answers for the side holding the document: Document Control for us, the supplier's uploaders for them.</summary>
+    /// <summary>Whoever answers for the side holding the document: The control function for us, the supplier's uploaders for them.</summary>
     private async Task<List<Guid>> HoldersAsync(Document document, Party supplier, bool supplierHolds, CancellationToken cancellationToken) =>
         supplierHolds
             ? await db.Users.AsNoTracking().Where(u => u.PartyId == supplier.Id && u.Active).Select(u => u.Id).ToListAsync(cancellationToken)

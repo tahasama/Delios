@@ -48,7 +48,7 @@ public sealed record SettingView(string Key, string Value, DateTimeOffset Update
 
 /// <summary>
 /// GET and PUT the organization's answers (<c>/api/settings</c>) and a project's (<c>/api/projects/{id}/settings</c>).
-/// Anyone signed in reads them; an administrator changes the organization's, and an administrator or Document Control
+/// Anyone signed in reads them; an administrator changes the organization's, and an administrator or the control function
 /// a project's.
 /// </summary>
 public static class SettingEndpoints
@@ -72,7 +72,7 @@ public static class SettingEndpoints
         {
             var access = ProjectAccessFilter.Of(h);
             if (!await Keepers.ConfiguresAsync(h) && !access.Holds(Verbs.Control))
-                return Problems.Forbidden("CONTROL_ONLY", "An administrator or Document Control answers for the project.");
+                return Problems.Forbidden("CONTROL_ONLY", "An administrator or the control function answers for the project.");
             return await SetAsync(db, audit, clock, access.Project.TenantId, access.Project.Id, key, r.Value, access.UserId, access.UserName, c);
         });
     }
@@ -125,28 +125,32 @@ public static class ProjectAnswers
         db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == projectId).ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
 
     /// <summary>
-    /// Whether Document Control carries out this act on the project. Unanswered, it follows the project: Document
+    /// Whether the control function carries out this act on the project. Unanswered, it follows the project: Document
     /// Control does it where somebody holds the control function.
     /// </summary>
     public static async Task<bool> ControlDoesAsync(DeliosDbContext db, Guid projectId, string act, CancellationToken cancellationToken)
     {
         var answers = await AllAsync(db, projectId, cancellationToken);
+        // Who adds people (owner): only the control function (the default: a project is taken to have one), or everyone
+        // on the project. Its own switch, whatever the project answers for the other acts.
+        if (act == "PROJECT_PEOPLE") return answers.GetValueOrDefault(act) != "SELF";
         var all = answers.GetValueOrDefault("__ALL__");
         if (all == "CONTROL") return true;
         if (all == "SELF") return false;
         if (all == "CUSTOM" && answers.GetValueOrDefault(act) is { } own && own is "CONTROL" or "SELF") return own == "CONTROL";
         return await db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
-            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))
+            && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
     }
 
     /// <summary>
-    /// Whether a request for this act, carried out by Document Control, needs management's confirmation first
-    /// (<c>CONFIRM:{act}</c> = ON). Without Document Control nothing is confirmed.
+    /// Whether a request for this act, carried out by the control function, needs management's confirmation first
+    /// (<c>CONFIRM:{act}</c> = ON). Without the control function nothing is confirmed.
     /// </summary>
     public static async Task<bool> NeedsConfirmationAsync(DeliosDbContext db, Guid projectId, string act, CancellationToken cancellationToken) =>
         ((await AllAsync(db, projectId, cancellationToken)).GetValueOrDefault($"CONFIRM:{act}") ?? DefaultConfirm(act)) == "ON"
-        && await ControlDoesAsync(db, projectId, act, cancellationToken);
+        // Joining a project is confirmed whoever adds (the control function, or everyone on the project).
+        && (act == "PROJECT_PEOPLE" || await ControlDoesAsync(db, projectId, act, cancellationToken));
 
     /// <summary>
     /// Whether an act asks management to confirm when the project said nothing: joining a project does (owner's

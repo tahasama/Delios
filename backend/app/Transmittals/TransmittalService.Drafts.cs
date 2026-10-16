@@ -35,7 +35,7 @@ public sealed partial class TransmittalService
         return (draft, null);
     }
 
-    /// <summary>A draft the caller may see: their own, or any for Document Control. Null otherwise.</summary>
+    /// <summary>A draft the caller may see: their own, or any for the control function. Null otherwise.</summary>
     public Task<TransmittalDraft?> DraftAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken) =>
         db.Set<TransmittalDraft>().SingleOrDefaultAsync(d => d.Id == id && d.ProjectId == access.Project.Id
             && (d.CreatedById == access.UserId || access.Holds(Verbs.Control)), cancellationToken);

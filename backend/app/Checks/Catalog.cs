@@ -48,7 +48,7 @@ public abstract record Outcome
 /// at the moment somebody tries (a typed number, a revision value used twice, a
 /// record revised) are not checks: they cannot reach the register to be found.
 /// </summary>
-/// <param name="Owner">CF Document Control · OR whoever produced it · RV the reviewer · OG the organization.</param>
+/// <param name="Owner">CF the control function · OR whoever produced it · RV the reviewer · OG the organization.</param>
 public sealed record CheckDef(string Id, string Phase, string Condition, string Method, string Severity, string Owner,
     Func<CheckContext, Task<Outcome>> Run);
 

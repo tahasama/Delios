@@ -63,7 +63,7 @@ public sealed class DocumentService(
         {
             return Fail(Problems.Forbidden("CREATE_NOT_ALLOWED", access.IsInternal
                 ? "Your function on this project cannot register this kind of document."
-                : "Another party cannot register documents. Document Control issues a placeholder to your organization first."));
+                : "Another party cannot register documents. The control function issues a placeholder to your organization first."));
         }
 
         // Every coded value must be one the organization has published, and still active.
@@ -312,7 +312,7 @@ public sealed class DocumentService(
 
     /// <summary>
     /// Ends a document's life: withdrawn (no longer wanted), cancelled (never to be produced) or archived. Recorded
-    /// with the reason and who decided. Document Control decides, or whoever registered it.
+    /// with the reason and who decided. The control function decides, or whoever registered it.
     /// </summary>
     public async Task<(Document? Document, IResult? Problem)> EndAsync(
         ProjectAccess access, Guid documentId, EndDocumentRequest request, CancellationToken cancellationToken)
@@ -321,7 +321,7 @@ public sealed class DocumentService(
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
         if (!access.Allows(Verbs.Control, document.Facts) && document.CreatedById != access.UserId)
-            return Fail(Problems.Forbidden("END_NOT_ALLOWED", "Document Control, or whoever registered it, ends a document."));
+            return Fail(Problems.Forbidden("END_NOT_ALLOWED", "The control function, or whoever registered it, ends a document."));
         var state = request.State?.Trim().ToUpperInvariant();
         if (state == DocumentStates.Archived)
             return Fail(Problems.Invalid("ARCHIVED_WITH_PROJECT", "A document is archived with its project, when the project is closed; not on its own."));
@@ -370,7 +370,7 @@ public sealed class DocumentService(
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
         if (!access.Allows(Verbs.Control, document.Facts) && document.CreatedById != access.UserId)
-            return Fail(Problems.Forbidden("END_NOT_ALLOWED", "Document Control, or whoever registered it, reinstates a document."));
+            return Fail(Problems.Forbidden("END_NOT_ALLOWED", "The control function, or whoever registered it, reinstates a document."));
         if (document.State is not (DocumentStates.Cancelled or DocumentStates.Withdrawn))
             return Fail(Problems.Conflict("NOT_ENDED", "Only a cancelled or withdrawn document is reinstated.", new { state = document.State }));
         var reason = Blank(request.Reason);
@@ -397,7 +397,7 @@ public sealed class DocumentService(
     public async Task<(UploadTicket? Ticket, IResult? Problem)> RequestUploadAsync(
         ProjectAccess access, Guid documentId, UploadRequest request, CancellationToken cancellationToken)
     {
-        // Another organization uploads here and then sends on a transmittal; Document Control may upload what such an
+        // Another organization uploads here and then sends on a transmittal; The control function may upload what such an
         // organization sent outside the system, to record it for them.
         var (document, problem) = await ContributableAsync(access, documentId, cancellationToken,
             access.IsInternal ? null : new Incoming(null, null));
@@ -567,7 +567,7 @@ public sealed class DocumentService(
 
     /// <summary>
     /// Updates the files of a revision still in preparation: a new submission of the same revision, carrying the new
-    /// files; the earlier ones stay with the submission they came with. Its author or Document Control only.
+    /// files; the earlier ones stay with the submission they came with. Its author or the control function only.
     /// </summary>
     public async Task<(Revision? Revision, IResult? Problem)> UpdateFilesAsync(
         ProjectAccess access, Guid documentId, Guid revisionId, StartRevisionRequest request, CancellationToken cancellationToken)
@@ -578,7 +578,7 @@ public sealed class DocumentService(
             .SingleOrDefaultAsync(r => r.Id == revisionId && r.DocumentId == documentId, cancellationToken);
         if (revision is null) return (null, Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
         if (revision.AuthoredById != access.UserId && !access.Holds(Verbs.Control))
-            return (null, Problems.Forbidden("AUTHOR_OR_CONTROL", "Its author or Document Control updates a revision's files."));
+            return (null, Problems.Forbidden("AUTHOR_OR_CONTROL", "Its author or the control function updates a revision's files."));
         if (revision.State != RevisionStates.InPreparation)
             return (null, Problems.Conflict("REVISION_NOT_IN_PREPARATION",
                 $"Revision {revision.Value} is {revision.State.ToLowerInvariant().Replace('_', ' ')}; its files are updated until it is released.", new { state = revision.State }));
@@ -629,7 +629,7 @@ public sealed class DocumentService(
 
     /// <summary>
     /// Makes the first revision of a document just registered from files that came in unplanned on a transmittal and
-    /// were already scanned. Document Control registered it, so it needs no check on arrival: it is in preparation.
+    /// were already scanned. The control function registered it, so it needs no check on arrival: it is in preparation.
     /// </summary>
     public async Task<(Revision? Revision, IResult? Problem)> AdoptAsync(
         ProjectAccess access, Document document, List<StoredFile> files, string? party, string? status, Instant sentAt, string sentBy,
@@ -683,7 +683,7 @@ public sealed class DocumentService(
     }
 
     /// <summary>
-    /// Send corrected files for a revision Document Control returned without
+    /// Send corrected files for a revision the control function returned without
     /// asking for a new one. The returned submission is kept; this one replaces
     /// it under the same revision value.
     /// </summary>
@@ -764,13 +764,13 @@ public sealed class DocumentService(
     }
 
     /// <summary>
-    /// What another organization sends in is accepted by Document Control before
+    /// What another organization sends in is accepted by the control function before
     /// anybody reviews it. Where nobody holds that function there is nobody to
     /// accept it, and it goes straight on.
     /// </summary>
     private async Task<bool> NeedsAcceptanceAsync(ProjectAccess access, Incoming? incoming, CancellationToken cancellationToken) =>
         (!access.IsInternal || incoming?.OnBehalfOf is not null) && await db.Memberships.AnyAsync(m => m.ProjectId == access.Project.Id && m.Active && m.Function!.Active
-            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))
+            && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
 
     /// <summary>
@@ -801,7 +801,7 @@ public sealed class DocumentService(
                 $"The document is {document.State.ToLowerInvariant()}.", new { state = document.State }));
         }
         // A supplier's document while the supplier holds it: only they change it, sending it on a transmittal (or
-        // Document Control recording what they sent). Ours to change again once it is handed back to us.
+        // The control function recording what they sent). Ours to change again once it is handed back to us.
         if (incoming is null && access.IsInternal && await HeldBySupplierAsync(document, cancellationToken) is { } supplier)
         {
             return (null, Problems.Conflict("ASKED_OF_SUPPLIER",
@@ -866,7 +866,7 @@ public sealed class DocumentService(
 }
 
 /// <summary>
-/// A revision coming in on an incoming transmittal: the status the sender proposes for it, and, when Document Control
+/// A revision coming in on an incoming transmittal: the status the sender proposes for it, and, when the control function
 /// records it for an organization that works in its own system, that organization's code.
 /// </summary>
 public sealed record Incoming(string? Status, string? OnBehalfOf);
@@ -881,7 +881,7 @@ public static class DocumentQueries
     /// The documents of the project this person may read. Another party sees what
     /// it produces once asked of it (or sent by it), and what was transmitted to its people. A restricted
     /// confidentiality level is read by the people named on the document, its
-    /// creator, whoever it was transmitted to, and Document Control.
+    /// creator, whoever it was transmitted to, and the control function.
     /// </summary>
     public static IQueryable<Document> Visible(DeliosDbContext db, ProjectAccess access, IReadOnlyList<string> restricted)
     {

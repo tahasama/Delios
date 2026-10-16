@@ -88,7 +88,7 @@ public sealed partial class ReviewService
 
     /// <summary>
     /// The party answered. Approved: what was asked is an ordinary request again, and
-    /// Document Control releases (or lifts the hold); where nobody holds that function,
+    /// The control function releases (or lifts the hold); where nobody holds that function,
     /// that happens now. Not approved: release stays blocked until it is sent back.
     /// </summary>
     private async Task SettleApprovalAsync(ProjectAccess access, Review review, Catalog catalog, CancellationToken cancellationToken)
@@ -114,7 +114,7 @@ public sealed partial class ReviewService
         var label = TransmittalService.Label(document, revision);
         var next = approved ? revision.HeldAt is null ? "release and issue it" : "lift the hold" : "send it back";
         await audit.WriteAsync(Audit.Actor.System, approved ? "OUTSIDE_APPROVED" : "OUTSIDE_REFUSED", "Revision", revision.Id, label,
-            $"{party} {(approved ? "approved it" : "did not approve it")} ({review.Verdict}), with Document Control to {next}.",
+            $"{party} {(approved ? "approved it" : "did not approve it")} ({review.Verdict}), with the control function to {next}.",
             review.ProjectId, cancellationToken);
         var controllers = await notifier.ControlHoldersAsync(review.ProjectId, cancellationToken);
         await TellAsync(review, controllers, Notifications.NotificationKinds.ReviewDecided,
@@ -150,7 +150,7 @@ public sealed partial class ReviewService
         return owed.ApprovalState == ApprovalStates.Refused
             ? Problems.Conflict("OUTSIDE_REFUSED", $"{owed.Name} did not approve this revision. Send it back.")
             : Problems.Conflict("AWAITING_OUTSIDE_APPROVAL",
-                $"{owed.Name} has to approve this revision first. Document Control releases and issues it when their answer comes back.");
+                $"{owed.Name} has to approve this revision first. The control function releases and issues it when their answer comes back.");
     }
 
     /// <summary>The revision is going back: an outside approval still being asked for it ends.</summary>
@@ -170,7 +170,7 @@ public sealed partial class ReviewService
     }
 
     /// <summary>
-    /// The outside approval came back yes: Document Control lifts the hold, the
+    /// The outside approval came back yes: The control function lifts the hold, the
     /// revision is in use again, and whatever was asked for it is sent.
     /// </summary>
     public async Task<IResult?> LiftHoldAsync(ProjectAccess access, Guid revisionId, CancellationToken cancellationToken)
@@ -237,7 +237,7 @@ public sealed partial class ReviewService
         if (revision is null || document is null) return (null, null, Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
         var control = access.Allows(Verbs.Control, document.Facts)
             || (await ControlHoldersAsync(access.Project.Id, cancellationToken) == 0 && revision.AuthoredById == access.UserId);
-        if (!control) return (null, null, Problems.Forbidden("CONTROL_ONLY", $"Document Control {act}."));
+        if (!control) return (null, null, Problems.Forbidden("CONTROL_ONLY", $"The control function {act}."));
         if (revision.HeldAt is null) return (null, null, Problems.Conflict("NOT_HELD", "This revision is not on hold."));
         return (revision, document, null);
     }

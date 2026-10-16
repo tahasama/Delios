@@ -26,7 +26,7 @@ public sealed record RequirementsImportRequested(Guid TenantId, Guid RevisionId)
 /// activity needs: one row per document, with its department, required status and, if given, the day it is needed.
 /// For every (activity, department) the list mentions, the list is the whole truth: what it no longer lists is no
 /// longer needed. A document not in the register is registered as a placeholder. The list is read whole or not at
-/// all: if any row is wrong, nothing changes and Document Control is told what to fix.
+/// all: if any row is wrong, nothing changes and the control function is told what to fix.
 /// </summary>
 public sealed class RequirementsImporter(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, DocumentService documents, AuditLog audit, IClock clock,
@@ -140,7 +140,7 @@ public sealed class RequirementsImporter(
         return await ApplyAsync(project, parsed, $"{fileName} (uploaded)", cancellationToken);
     }
 
-    /// <summary>The list's history among the uploaded lists, the audit trail, and Document Control told.</summary>
+    /// <summary>The list's history among the uploaded lists, the audit trail, and the control function told.</summary>
     private async Task RecordAsync(Project project, Document document, Revision revision, StoredFile? file, string label, string? summary,
         IReadOnlyList<string> problems, CancellationToken cancellationToken)
     {
@@ -396,15 +396,15 @@ public sealed class RequirementsImporter(
         return (string.Join(", ", parts) + ".", []);
     }
 
-    /// <summary>Who registers the placeholders the list names: a holder of Document Control on the project.</summary>
+    /// <summary>Who registers the placeholders the list names: a holder of the control function on the project.</summary>
     private async Task<ProjectAccess?> RegistrarAsync(Project project, CancellationToken cancellationToken)
     {
         var membership = await db.Memberships.AsNoTracking().Include(m => m.Function!).ThenInclude(f => f.Rules)
-            .Where(m => m.ProjectId == project.Id && m.Active && m.Function!.Active && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
+            .Where(m => m.ProjectId == project.Id && m.Active && m.Function!.Active && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))))
             .OrderBy(m => m.UserId).FirstOrDefaultAsync(cancellationToken);
         if (membership is null) return null;
         var name = await db.Users.AsNoTracking().Where(u => u.Id == membership.UserId).Select(u => u.Name).SingleAsync(cancellationToken);
-        return ProjectAccess.OfFunction(project, membership.Function!, membership.UserId, name);
+        return ProjectAccess.OfFunction(project, membership.Function!, membership.UserId, name, membership.ActsAsControl);
     }
 
     private static string MessageOf(IResult problem) =>

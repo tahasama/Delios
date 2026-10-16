@@ -37,7 +37,7 @@ public static class HolderEndpoints
         return Results.Ok(members
             .Where(x =>
             {
-                var their = ProjectAccess.OfFunction(access.Project, x.m.Function!, x.m.UserId, x.Name);
+                var their = ProjectAccess.OfFunction(access.Project, x.m.Function!, x.m.UserId, x.Name, x.m.ActsAsControl);
                 return asked is null ? their.Holds(verb) : their.Allows(verb, facts);
             })
             .OrderBy(x => x.Name)

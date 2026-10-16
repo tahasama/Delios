@@ -73,7 +73,7 @@ public sealed class Defect
     public Guid ProjectId { get; set; }
     public required string CheckId { get; set; }
     public required string Severity { get; set; }
-    /// <summary>Who fixes it: CF Document Control, OR whoever produced it, RV the reviewer, OG the organization.</summary>
+    /// <summary>Who fixes it: CF the control function, OR whoever produced it, RV the reviewer, OG the organization.</summary>
     public required string Owner { get; set; }
     /// <summary>What it is about, stable from run to run: "document:{id}", "settings:STATUSES"…</summary>
     public required string EntityKey { get; set; }

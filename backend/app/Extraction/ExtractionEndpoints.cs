@@ -77,7 +77,7 @@ public static class ExtractionEndpoints
         var access = ProjectAccessFilter.Of(http);
         if (await RefusedAsync(access, db, options.Value, cancellationToken) is { } refused) return refused;
         if (!access.Holds(Verbs.Control))
-            return Problems.Forbidden("CONTROL_ONLY", "Reading a whole project is Document Control's to ask.");
+            return Problems.Forbidden("CONTROL_ONLY", "Reading a whole project is the control function's to ask.");
         var files = await db.StoredFiles.AsNoTracking()
             .Where(f => f.ProjectId == access.Project.Id && f.RevisionId != null && f.Status == FileStatuses.Clean
                 && (f.Kind == FileKinds.Native || f.Kind == FileKinds.Rendition)

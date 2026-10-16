@@ -7,6 +7,8 @@ import {
   MODE_LABEL,
   CONFIRMABLE,
   CONFIRM_KEY,
+  PEOPLE_KEY,
+  PEOPLE_MODE_LABEL,
   PROJECT_KEY,
   effectiveAnswer,
   PROJECT_MODE_LABEL,
@@ -101,29 +103,34 @@ export function HowItWorks({
                     </p>
                     <p className="mt-0.5 text-xs leading-5 text-slate-600">{activity.text}</p>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
-                      <span className="font-semibold text-slate-700">{controlDoes ? "Document Control" : "The people doing the work"}:</span>{" "}
+                      <span className="font-semibold text-slate-700">{activity.key === PEOPLE_KEY ? PEOPLE_MODE_LABEL[controlDoes ? "CONTROL" : "SELF"] : controlDoes ? "The control function" : "The people doing the work"}:</span>{" "}
                       {controlDoes ? activity.control : activity.self}
                     </p>
                   </div>
                   <select
                     name={`mode:${activity.key}`}
-                    defaultValue={mode === "FOLLOW" ? (follows ? "CONTROL" : "SELF") : mode}
+                    defaultValue={mode === "FOLLOW" ? (activity.key === PEOPLE_KEY || follows ? "CONTROL" : "SELF") : mode}
                     className={`${inputCls} w-full sm:w-56`}
                     aria-label={`Who carries out ${activity.title}`}
                   >
                     {(["CONTROL", "SELF"] as ControlMode[]).map((one) => (
-                      <option key={one} value={one}>{MODE_LABEL[one]}</option>
+                      <option key={one} value={one}>{activity.key === PEOPLE_KEY ? PEOPLE_MODE_LABEL[one] : MODE_LABEL[one]}</option>
                     ))}
                   </select>
                 </div>
-                {/* With Document Control, a request may also need management's say. */}
+                {/* A request may also need the say of whoever holds Manage. */}
                 {CONFIRMABLE[activity.key] ? (
                   <label className="flex cursor-pointer items-start gap-2 rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 ring-1 ring-line">
                     <input type="checkbox" name={`confirm:${activity.key}`} defaultChecked={confirm} className="mt-1" />
                     <span className="min-w-0 flex-1">
-                      <span className="font-semibold text-slate-800">Requests need management confirmation</span>
+                      <span className="font-semibold text-slate-800">
+                        {activity.key === PEOPLE_KEY ? "Confirmation by whoever holds Manage is necessary" : "Requests need confirming by whoever holds Manage"}
+                      </span>
                       <span className="block text-slate-600">
-                        {CONFIRMABLE[activity.key]} Only with Document Control{controlDoes ? "" : " — not used while the people doing the work carry it out"}.
+                        {CONFIRMABLE[activity.key]}
+                        {activity.key === PEOPLE_KEY
+                          ? " Unticked: not necessary, they are on at once."
+                          : ` Only with the control function${controlDoes ? "" : " — not used while the people doing the work carry it out"}.`}
                         {" "}Whoever holds Manage is proposed first.
                       </span>
                     </span>

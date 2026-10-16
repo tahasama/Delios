@@ -19,7 +19,7 @@ public sealed partial class KeepingService
     internal static IResult OnHold(Document document) => Problems.Conflict("ON_LEGAL_HOLD",
         $"It is on legal hold since {document.LegalHoldAt?.ToDateTimeUtc():d MMM yyyy}{(document.LegalHoldByName is null ? "" : $", by {document.LegalHoldByName}")}: {document.LegalHoldReason ?? "no reason given"}. Lift the hold first.");
 
-    /// <summary>Document Control or an administrator puts a document on legal hold, or lifts it. A reason is required both ways.
+    /// <summary>The control function or an administrator puts a document on legal hold, or lifts it. A reason is required both ways.
     /// While held, the document cannot be retired and no revision of it voided; new revisions and reviews go on.</summary>
     public async Task<IResult> LegalHoldAsync(
         HttpContext http, ProjectAccess access, Guid documentId, LegalHoldRequest request, CancellationToken cancellationToken)

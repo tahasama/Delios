@@ -209,10 +209,10 @@ public sealed class Notifier(DeliosDbContext db, IClock clock, IOptions<EmailOpt
         }
     }
 
-    /// <summary>Everyone holding Document Control on the project: who is told when something waits on the register.</summary>
+    /// <summary>Everyone acting as the control function on the project: who is told when something waits on the register.</summary>
     public Task<List<Guid>> ControlHoldersAsync(Guid projectId, CancellationToken cancellationToken) =>
         db.Memberships.AsNoTracking()
-            .Where(m => m.ProjectId == projectId && m.Active && m.Function!.Active && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
+            .Where(m => m.ProjectId == projectId && m.Active && m.Function!.Active && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))))
             .Select(m => m.UserId).Distinct().ToListAsync(cancellationToken);
 
     /// <summary>Queues one email (or records it as not sent, when that kind of email is off).</summary>

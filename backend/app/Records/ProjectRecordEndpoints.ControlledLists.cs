@@ -54,19 +54,19 @@ public static partial class ProjectRecordEndpoints
         SupersededAt = v.SupersededAt?.ToDateTimeOffset(),
     };
 
-    /// <summary>Who keeps controlled lists: whoever configures the organization, or Document Control on some project.</summary>
+    /// <summary>Who keeps controlled lists: whoever configures the organization, or the control function on some project.</summary>
     private static async Task<bool> MayControlAsync(HttpContext h, DeliosDbContext db, Guid? projectId)
     {
         if (await Keepers.ConfiguresAsync(h)) return true;
         var me = h.User.UserId();
         return await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && (projectId == null || m.ProjectId == projectId)
-            && m.Function!.Active && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)), h.RequestAborted);
+            && m.Function!.Active && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))), h.RequestAborted);
     }
 
     private static async Task<IResult> UploadAsync(HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, Guid? projectId,
         ControlledUpload r, CancellationToken c)
     {
-        if (!await MayControlAsync(h, db, projectId)) return Problems.Forbidden("CONTROL_ONLY", "Document Control or an administrator uploads a controlled list.");
+        if (!await MayControlAsync(h, db, projectId)) return Problems.Forbidden("CONTROL_ONLY", "The control function or an administrator uploads a controlled list.");
         var kind = r.Kind?.Trim() ?? "";
         var key = string.IsNullOrWhiteSpace(r.Key) ? "default" : r.Key.Trim();
         if (kind.Length == 0) return Problems.Invalid("KIND_REQUIRED", "Say which list this is.");
@@ -113,7 +113,7 @@ public static partial class ProjectRecordEndpoints
     {
         var version = await db.Set<ControlledVersion>().SingleOrDefaultAsync(v => v.Id == id, c);
         if (version is null) return (null, null, Problems.NotFound("VERSION_NOT_FOUND", "No such version."));
-        if (!await MayControlAsync(h, db, version.ProjectId)) return (null, null, Problems.Forbidden("CONTROL_ONLY", "Document Control or an administrator decides a controlled list."));
+        if (!await MayControlAsync(h, db, version.ProjectId)) return (null, null, Problems.Forbidden("CONTROL_ONLY", "The control function or an administrator decides a controlled list."));
         var me = await db.Users.AsNoTracking().SingleAsync(u => u.Id == h.User.UserId(), c);
         return (version, me, null);
     }

@@ -80,7 +80,7 @@ public sealed class Party
     /// answer here. BY_PROXY: one of ours carries the exchange and records their answer.
     /// </summary>
     public string Participation { get; set; } = Participations.InApp;
-    /// <summary>The function of ours that carries the exchange for a party that answers by proxy. Empty: Document Control.</summary>
+    /// <summary>The function of ours that carries the exchange for a party that answers by proxy. Empty: The control function.</summary>
     public string? CustodianFunction { get; set; }
     /// <summary>Their own EDMS or portal, where they impose one, so the record says where it went.</summary>
     public string? ExternalSystem { get; set; }
@@ -186,7 +186,7 @@ public sealed class Project
     public Instant CreatedAt { get; set; }
 }
 
-/// <summary>A job as the organization names it: Lead Electrical Engineer, Document Control.</summary>
+/// <summary>A job as the organization names it: Lead Electrical Engineer, the control function.</summary>
 public sealed class Function
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
@@ -267,6 +267,11 @@ public sealed class Membership
     /// confirms them, never before; refused, it never goes.
     /// </summary>
     public bool InviteOnJoin { get; set; }
+    /// <summary>
+    /// Named in the project's configuration to act as the control function, whatever their function: holds CONTROL on
+    /// the whole project, as if their function carried it.
+    /// </summary>
+    public bool ActsAsControl { get; set; }
 }
 
 /// <summary>A signed-in browser. The cookie holds a random token; only its hash is stored.</summary>
@@ -300,7 +305,7 @@ public static class Verbs
     public const string Receive = "RECEIVE";
     public const string Accept = "ACCEPT";
     /// <summary>
-    /// Document Control rights: act on any document of the project, not only one's own (registers, transmittals, schedules).
+    /// The control function rights: act on any document of the project, not only one's own (registers, transmittals, schedules).
     /// </summary>
     public const string Control = "CONTROL";
     public const string Configure = "CONFIGURE";
@@ -309,11 +314,11 @@ public static class Verbs
     /// <summary>
     /// Management (project, construction, engineering manager…): proposed first when a request needs management's
     /// confirmation — a change to an action's documents or disciplines, a person added to the project — and adds
-    /// people to the project where there is no Document Control.
+    /// people to the project where there is no control function.
     /// </summary>
     public const string Manage = "MANAGE";
 
-    /// <summary>Every verb in one set; the demo data uses it to give Document Control every right.</summary>
+    /// <summary>Every verb in one set; the demo data uses it to give the control function every right.</summary>
     public static readonly IReadOnlySet<string> All = new HashSet<string>
     {
         Read, Create, Revise, Review, Approve, Transmit, Receive, Accept, Control, Configure, Plan, Manage,

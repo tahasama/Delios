@@ -46,7 +46,7 @@ public sealed record FileView(
     Guid Id, string Name, string Kind, string ContentType, long Size, string Sha256, string Status,
     string? StatusDetail, string? DetectedType, DateTimeOffset CreatedAt, Guid? DerivedFromId, int Submission);
 
-/// <summary>One set of files sent in under a revision, and Document Control's outcome on it.</summary>
+/// <summary>One set of files sent in under a revision, and the control function's outcome on it.</summary>
 public sealed record SubmissionView(int Number, DateTimeOffset SubmittedAt, string SubmittedBy, string? Outcome, string? Note,
     string? DecidedBy, DateTimeOffset? DecidedAt);
 
@@ -62,7 +62,7 @@ public sealed record RevisionView(
 
 /// <summary>
 /// What a revision amounts to, said once for every screen. <c>AwaitingCheck</c>: sent in by another organization and
-/// not accepted by Document Control's check yet, or sent back by it; its files then belong to the transmittal it came
+/// not accepted by the control function's check yet, or sent back by it; its files then belong to the transmittal it came
 /// on, and the document keeps <c>KeptSubmission</c>'s (a placeholder: none, 0; handed back for an update: the
 /// submission accepted before). <c>Decided</c>: its review is decided and it waits for release, carrying what the
 /// decider granted (<c>Granted</c>). <c>IssuedAt</c>: when it first went out on a transmittal (not for a review step).

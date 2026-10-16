@@ -10,7 +10,7 @@ namespace Delios.Host.Seeding;
 /// <summary>
 /// <c>grant-all &lt;email&gt;</c>: gives one person every right in their organization, for the app's owner.
 /// The person is made an administrator, unlocked and reactivated, and put on every project with the
-/// organization's Document Control function (the first function holding Control); that function is given
+/// organization's control function (the first function holding Control); that function is given
 /// every verb it lacks, so rights added since it was made (Plan, for one) are there too. With
 /// DELIOS_ADMIN_PASSWORD set, the password is replaced and two-step sign-in is turned off. Logged.
 /// </summary>
@@ -41,7 +41,7 @@ public sealed class GrantAll(DeliosDbContext db, TenantContext tenant, AuditLog 
         var control = await db.Functions.Include(f => f.Rules)
             .Where(f => f.Active && f.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
             .OrderBy(f => f.Code).FirstOrDefaultAsync(cancellationToken);
-        if (control is null) return "No function holds Control in this organization; create Document Control in Settings first.";
+        if (control is null) return "No function holds Control in this organization; give a function the Control permission in Settings first.";
         var everywhere = control.Rules.FirstOrDefault(r => r.DeliverableType == null && r.DocType == null && r.Discipline == null
             && r.Criticality == null && r.Confidentiality == null && r.ProjectRole == null);
         if (everywhere is null)

@@ -89,7 +89,7 @@ public sealed class PackageService(
 
         var owners = request.OwnerIds?.Distinct().ToArray() ?? [];
         var acceptors = request.AcceptorIds?.Distinct().ToArray() ?? [];
-        // A supplier's package is Document Control's: nobody accepts it, it is never delivered.
+        // A supplier's package is the control function's: nobody accepts it, it is never delivered.
         if (supply && owners.Length == 0) owners = [access.UserId];
         if (owners.Length == 0 || (!supply && acceptors.Length == 0))
             return Fail(Problems.Invalid("ROLES_REQUIRED", "Name who puts it together and who accepts it."));
@@ -289,7 +289,7 @@ public sealed class PackageService(
     }
 
     /// <summary>
-    /// Document Control shares a supplier's package with that supplier, once and for good: from then on its people see
+    /// The control function shares a supplier's package with that supplier, once and for good: from then on its people see
     /// it, with the documents asked of them on a transmittal and nothing else. Its people are told.
     /// </summary>
     public async Task<(Package? Package, IResult? Problem)> ShareAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
@@ -317,7 +317,7 @@ public sealed class PackageService(
 
     /// <summary>
     /// Changes a package while it is open: its name and description, and for a delivery package its date, the statuses
-    /// it needs, who it goes to, who puts it together and who accepts it. Document Control (and above) does this; those
+    /// it needs, who it goes to, who puts it together and who accepts it. The control function (and above) does this; those
     /// putting it together only add and take out its documents. A change to what it needs or who accepts it makes the
     /// last readiness check, and anything agreed on it, stale.
     /// </summary>
@@ -857,14 +857,14 @@ public sealed class PackageService(
     {
         var package = await LoadAsync(access, id, cancellationToken);
         if (package is null) return (null, NotFound());
-        // Those putting it together add and take out its documents; everything else is Document Control's (and above).
+        // Those putting it together add and take out its documents; everything else is the control function's (and above).
         if (!access.IsInternal || !(access.Holds(Verbs.Control) || (members && package.OwnerIds.Contains(access.UserId))))
             return (null, members
-                ? Problems.Forbidden("OWNER_ONLY", "Those putting it together, or Document Control, add and take out its documents.")
-                : Problems.Forbidden("CONTROL_ONLY", "Document Control looks after a package; those putting it together add and take out its documents."));
-        // A supplier's package is Document Control's alone.
+                ? Problems.Forbidden("OWNER_ONLY", "Those putting it together, or the control function, add and take out its documents.")
+                : Problems.Forbidden("CONTROL_ONLY", "The control function looks after a package; those putting it together add and take out its documents."));
+        // A supplier's package is the control function's alone.
         if (package.Kind == PackageKinds.Supply && !access.Holds(Verbs.Control))
-            return (null, Problems.Forbidden("CONTROL_ONLY", "Document Control looks after a supplier's package."));
+            return (null, Problems.Forbidden("CONTROL_ONLY", "The control function looks after a supplier's package."));
         if (package.State != PackageStates.Open) return (null, Closed(package));
         return (package, null);
     }

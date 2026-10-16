@@ -14,7 +14,7 @@ type Pending = {
 };
 
 /**
- * The people added to this project who join once management confirms them.
+ * The people added to this project who join once they are confirmed.
  * Whoever was named confirms, or anyone holding Manage when nobody was; the
  * others are listed with who they wait for.
  */
@@ -54,7 +54,7 @@ export default async function PeopleToConfirmPage() {
                     </details>
                   </div>
                 ) : (
-                  <p className="text-xs text-amber-800">Waiting for {one.confirmerName ?? "management"} to confirm.</p>
+                  <p className="text-xs text-amber-800">Waiting for {one.confirmerName ?? "whoever holds Manage"} to confirm.</p>
                 )}
               </li>
             ))}

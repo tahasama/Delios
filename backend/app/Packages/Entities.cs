@@ -22,7 +22,7 @@ public sealed class Package
     /// <summary>For a supply package: the purchase order it is under, as written on it. Optional.</summary>
     public string? PurchaseOrder { get; set; }
     /// <summary>
-    /// For a supply package: when Document Control shared it with its supplier, once and for good. Until then the
+    /// For a supply package: when the control function shared it with its supplier, once and for good. Until then the
     /// supplier does not see it; after, it sees the documents asked of it on a transmittal, and nothing else.
     /// </summary>
     public Instant? SharedAt { get; set; }

@@ -84,7 +84,7 @@ public sealed record TransmittalView(Guid Id, string Number, string Direction, s
     IReadOnlyList<TransmittalRef>? FollowedBy = null, string? ReceiptNote = null, System.Text.Json.JsonElement? Extras = null,
     string? FollowKind = null, ActivityAsk? Activity = null, string? Answer = null);
 
-/// <summary>A transmittal's ask to add a document to a schedule action, and how Document Control answered it, if it has.</summary>
+/// <summary>A transmittal's ask to add a document to a schedule action, and how the control function answered it, if it has.</summary>
 public sealed record ActivityAsk(Guid Id, DateTimeOffset? AnsweredAt, string? AnsweredBy, string? Answer, string Kind = "DOCUMENT",
     bool Confirm = false, DateTimeOffset? CheckedAt = null, string? CheckedBy = null, Guid? ConfirmerId = null, string? ConfirmerName = null,
     Actions.ActivityProposal? Proposal = null);
@@ -206,7 +206,7 @@ public static class TransmittalEndpoints
             Outcome(request!, sent));
     }
 
-    /// <summary>POST carry-out: Document Control turns an open issue request into transmittals.</summary>
+    /// <summary>POST carry-out: The control function turns an open issue request into transmittals.</summary>
     private static async Task<IResult> CarryOutAsync(
         Guid requestId, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
     {
@@ -215,7 +215,7 @@ public static class TransmittalEndpoints
     }
 
     /// <summary>
-    /// POST cancel: withdraws an open issue request. Allowed to whoever raised it or Document Control.
+    /// POST cancel: withdraws an open issue request. Allowed to whoever raised it or the control function.
     /// </summary>
     private static async Task<IResult> CancelAsync(
         Guid requestId, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
@@ -232,7 +232,7 @@ public static class TransmittalEndpoints
         return Results.Ok(await transmittals.NotIssuedAsync(access, cancellationToken));
     }
 
-    /// <summary><c>POST /transmittals</c>: Document Control issues released revisions directly; one transmittal per destination.</summary>
+    /// <summary><c>POST /transmittals</c>: The control function issues released revisions directly; one transmittal per destination.</summary>
     private static async Task<IResult> ComposeAsync(
         TransmittalService.ComposeRequest request, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
     {
@@ -266,7 +266,7 @@ public static class TransmittalEndpoints
         Results.Ok(await transmittals.ListAsync(ProjectAccessFilter.Of(http), cancellationToken));
 
     /// <summary>
-    /// POST an incoming transmittal: another organization (or Document Control for one) sends filled placeholders,
+    /// POST an incoming transmittal: another organization (or the control function for one) sends filled placeholders,
     /// corrections and unplanned items. 201 with the transmittal; it is received, and its receipt exists, from now.
     /// </summary>
     private static async Task<IResult> SendIncomingAsync(
@@ -278,7 +278,7 @@ public static class TransmittalEndpoints
             View(t, await transmittals.ItemFilesAsync(t, cancellationToken)));
     }
 
-    /// <summary>POST: Document Control puts an unplanned item of an incoming transmittal in the register, under our numbering.</summary>
+    /// <summary>POST: The control function puts an unplanned item of an incoming transmittal in the register, under our numbering.</summary>
     private static async Task<IResult> RegisterItemAsync(
         Guid transmittalId, Guid itemId, RegisterDocumentRequest request, HttpContext http, IncomingService incoming,
         TransmittalService transmittals, CancellationToken cancellationToken)
@@ -301,7 +301,7 @@ public static class TransmittalEndpoints
         var access = ProjectAccessFilter.Of(http);
         if (await transmittals.ReadAsync(access, transmittalId, cancellationToken) is { } t)
             return Results.Ok(View(t, await transmittals.ItemFilesAsync(t, cancellationToken), await transmittals.ThreadAsync(access, t, cancellationToken)));
-        // A draft has no number yet; whoever wrote it, and Document Control, see it.
+        // A draft has no number yet; whoever wrote it, and the control function, see it.
         return await transmittals.DraftAsync(access, transmittalId, cancellationToken) is { IssuedAt: null } draft
             ? Results.Ok(await transmittals.DraftViewAsync(access, draft, cancellationToken))
             : Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal.");

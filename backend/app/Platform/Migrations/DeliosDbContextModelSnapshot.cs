@@ -2177,6 +2177,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("function_id");
 
+                    b.Property<bool>("ActsAsControl")
+                        .HasColumnType("boolean")
+                        .HasColumnName("acts_as_control");
+
                     b.Property<bool>("InviteOnJoin")
                         .HasColumnType("boolean")
                         .HasColumnName("invite_on_join");

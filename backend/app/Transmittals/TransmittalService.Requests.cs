@@ -31,7 +31,7 @@ public sealed partial class TransmittalService
         if (!await HasStandingAsync(access, document, revision, cancellationToken))
         {
             return (null, [], Problems.Forbidden("ISSUE_NOT_ALLOWED",
-                "Whoever wrote the revision, started its review or sat on it asks for it to be issued, or Document Control."));
+                "Whoever wrote the revision, started its review or sat on it asks for it to be issued, or the control function."));
         }
         var awaitingRelease = revision.State == RevisionStates.InReview && await DecidedToProceedAsync(revision.Id, cancellationToken);
         if (revision.State != RevisionStates.Released && !awaitingRelease)
@@ -73,7 +73,7 @@ public sealed partial class TransmittalService
         }
         else
         {
-            // Not sent at once: Document Control sends it, so they are told what was asked for.
+            // Not sent at once: The control function sends it, so they are told what was asked for.
             await notifier.NotifyAsync(document.TenantId, document.ProjectId, await notifier.ControlHoldersAsync(document.ProjectId, cancellationToken),
                 Notifications.NotificationKinds.IssueRequested, $"{Label(document, revision)}: asked to send it {request.Reason.ToLowerInvariant()}",
                 $"{access.UserName} asked.{(request.Note is null ? "" : $" {request.Note}")}", $"/documents/{document.Id}", cancellationToken);
@@ -146,7 +146,7 @@ public sealed partial class TransmittalService
     }
 
     /// <summary>
-    /// Carries out an open issue request on Document Control's say-so: checks the request is still open and the
+    /// Carries out an open issue request on the control function's say-so: checks the request is still open and the
     /// revision released, then raises its transmittals. Called by the carry-out endpoint.
     /// </summary>
     public async Task<(IssueRequest? Request, IReadOnlyList<Transmittal> Sent, IResult? Problem)> CarryOutAsync(
@@ -155,7 +155,7 @@ public sealed partial class TransmittalService
         var (request, document, revision) = await LoadRequestAsync(access, requestId, cancellationToken);
         if (request is null) return (null, [], RequestNotFound());
         if (!await MayCarryOutAsync(access, document!, request, cancellationToken))
-            return (null, [], Problems.Forbidden("CONTROL_ONLY", "Document Control sends what was asked for."));
+            return (null, [], Problems.Forbidden("CONTROL_ONLY", "The control function sends what was asked for."));
         if (request.Status != IssueRequestStatuses.Open)
             return (null, [], Problems.Conflict("REQUEST_CLOSED", "That request has already been dealt with.", new { status = request.Status }));
         if (revision!.State != RevisionStates.Released)
@@ -183,7 +183,7 @@ public sealed partial class TransmittalService
         var (request, document, _) = await LoadRequestAsync(access, requestId, cancellationToken);
         if (request is null) return (null, RequestNotFound());
         if (request.RaisedById != access.UserId && !access.Allows(Verbs.Control, document!.Facts))
-            return (null, Problems.Forbidden("CANCEL_NOT_ALLOWED", "Whoever asked, or Document Control, withdraws a request."));
+            return (null, Problems.Forbidden("CANCEL_NOT_ALLOWED", "Whoever asked, or the control function, withdraws a request."));
         if (request.Status != IssueRequestStatuses.Open)
             return (null, Problems.Conflict("REQUEST_CLOSED", "That request has already been dealt with.", new { status = request.Status }));
         Close(request, IssueRequestStatuses.Cancelled, access.UserName);
@@ -212,7 +212,7 @@ public sealed partial class TransmittalService
 
     /// <summary>
     /// Release carries out what was asked before it. Called by the release, as
-    /// Document Control or, where nobody holds that, as the system.
+    /// The control function or, where nobody holds that, as the system.
     /// </summary>
     public async Task<IReadOnlyList<Transmittal>> CarryOutOpenAsync(
         Project project, Actor actor, Revision revision, Document document, CancellationToken cancellationToken)

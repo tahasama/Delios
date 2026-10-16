@@ -274,7 +274,7 @@ public static class RegisterEndpoints
         if (f.Released == true) query = query.Where(d => db.Revisions.Any(r => r.DocumentId == d.Id && r.State == RevisionStates.Released));
         if (Has(f.State)) query = query.Where(d => d.State == f.State);
         if (f.Rev == "NONE") query = query.Where(d => d.LatestRevisionId == null);
-        // Reviewed and not yet released: the route is finished, Document Control has not published it.
+        // Reviewed and not yet released: the route is finished, the control function has not published it.
         else if (f.Rev is "NOT_RELEASED" or "FOR_RELEASE")
             query = query.Where(d => d.LatestRevisionState == RevisionStates.InReview
                 && db.Reviews.Any(r => r.RevisionId == d.LatestRevisionId && r.State == Reviews.ReviewStates.Decided));

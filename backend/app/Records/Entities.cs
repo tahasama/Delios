@@ -80,7 +80,7 @@ public sealed class NumberRange
     public Instant CreatedAt { get; set; }
 }
 
-/// <summary>Document Control asks a department what documents the activities it is tagged on need, by a date.</summary>
+/// <summary>The control function asks a department what documents the activities it is tagged on need, by a date.</summary>
 public sealed class RequirementCall
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
@@ -115,7 +115,7 @@ public sealed class ReadinessConfirmation
     /// activity's day passed. Kept as it was then, whatever happens to the documents afterwards.
     /// </summary>
     public bool Automatic { get; set; }
-    /// <summary>Document Control took a person's confirmation back (an honest mistake): when, who and why. It then counts as not confirmed.</summary>
+    /// <summary>The control function took a person's confirmation back (an honest mistake): when, who and why. It then counts as not confirmed.</summary>
     public Instant? RevokedAt { get; set; }
     public string? RevokedByName { get; set; }
     public string? RevokedReason { get; set; }

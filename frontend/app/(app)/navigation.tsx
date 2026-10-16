@@ -22,6 +22,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  UsersRound,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
@@ -94,6 +95,8 @@ function moreNav(p: NavPermissions): NavItem[] {
       { href: "/assets", label: "Assets & tags", icon: Boxes, when: !p.external },
       { href: "/distribution", label: "Distribution matrix", icon: Network, when: p.canRead && !p.external },
       { href: "/reports", label: "Reports", icon: ListChecks, when: p.canRead },
+      // Everyone on the project reads who takes part.
+      { href: "/directory", label: "Project directory", icon: UsersRound, also: ["/people/ask"] },
       { href: "/conformance/checks", label: "Assurance", icon: ShieldCheck, also: ["/conformance", "/exposures"], when: p.canControl && !p.external },
       { href: "/import", label: "Import & export", icon: Import, when: (p.canControl || p.canConfigure) && !p.external },
     ] as NavItem[]

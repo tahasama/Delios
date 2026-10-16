@@ -330,6 +330,7 @@ public static class PlatformSetup
             app.MapAdminEndpoints();
             app.MapDirectoryEndpoints();
             Identity.JoinRequests.MapJoinRequestEndpoints(app);
+        Identity.ProjectDirectory.MapProjectDirectoryEndpoints(app);
             Organizations.OrganizationEndpoints.MapOrganizationEndpoints(app);
             Seeding.SignUpEndpoints.MapSignUpEndpoints(app);
             Notifications.NotificationEndpoints.MapNotificationEndpoints(app);

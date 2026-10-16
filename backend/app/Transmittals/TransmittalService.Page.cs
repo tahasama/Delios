@@ -31,7 +31,7 @@ public sealed record CarriedReview(Guid Id, DateTimeOffset StartedAt, bool Open)
 public sealed record CarriedRequest(Guid Id, string Reason, string? Note);
 public sealed record PartyHabits(string? ExternalSystem, bool EvidenceRequired);
 
-/// <summary>A file that came with what arrived, or that Document Control kept with it later; who kept it, when.</summary>
+/// <summary>A file that came with what arrived, or that the control function kept with it later; who kept it, when.</summary>
 public sealed record ArrivedFile(Guid Id, string Name, long Size, string Sha256, string KeptBy, DateTimeOffset KeptAt);
 
 public static class TransmittalStatuses

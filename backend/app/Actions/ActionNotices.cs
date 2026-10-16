@@ -61,10 +61,14 @@ public static class NoticeLog
          where m.ProjectId == projectId && m.Active && u.Active && m.Department == department
          select u.Id).Distinct().ToListAsync(cancellationToken);
 
-    /// <summary>Everyone on the project whose function holds the verb outright (Plan: whoever plans the schedule).</summary>
+    /// <summary>
+    /// Everyone on the project whose function holds the verb outright (Plan: whoever plans the schedule); for CONTROL, also
+    /// whoever is named to act as the control function.
+    /// </summary>
     public static Task<List<Guid>> HoldersAsync(DeliosDbContext db, Guid projectId, string verb, CancellationToken cancellationToken) =>
         db.Memberships.AsNoTracking()
-            .Where(m => m.ProjectId == projectId && m.Active && m.Function!.Active && m.Function.Rules.Any(r => r.Verbs.Contains(verb)))
+            .Where(m => m.ProjectId == projectId && m.Active && m.Function!.Active
+                && ((verb == Identity.Verbs.Control && m.ActsAsControl) || m.Function.Rules.Any(r => r.Verbs.Contains(verb))))
             .Select(m => m.UserId).Distinct().ToListAsync(cancellationToken);
 
     /// <summary>The departments of an activity still short of a document: a need with no department counts against every one.</summary>
@@ -220,7 +224,7 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
                 if (await NoticeLog.SentAsync(db, projectId, subject, cancellationToken))
                 {
                     // Told when the day passed, and still no answer some working days later: the discipline, management
-                    // and Document Control are all told, once.
+                    // and the control function are all told, once.
                     if (passed && WorkingCalendar.AddWorkingDays(day, escalateAfter, project.WeekendDays) <= today)
                         told += await EscalateAsync(db, notifier, clock, project, activity, department, missing[department], escalateAfter, cancellationToken);
                     continue;
@@ -249,7 +253,7 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
 
     /// <summary>
     /// A discipline still short of its documents and silent some working days after the action's day: its people,
-    /// whoever holds Manage, and Document Control are told, once. Nothing on the action is marked; the notice is the record.
+    /// whoever holds Manage, and the control function are told, once. Nothing on the action is marked; the notice is the record.
     /// </summary>
     private static async Task<int> EscalateAsync(DeliosDbContext db, Notifications.Notifier notifier, IClock clock, Identity.Project project,
         Activity activity, string department, int missing, int after, CancellationToken cancellationToken)

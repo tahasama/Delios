@@ -19,6 +19,7 @@ import {
   SKIP_KEY,
   CONFIRMABLE,
   CONFIRM_KEY,
+  PEOPLE_KEY,
   actIsOff,
   effectiveAnswer,
   MODE_LABEL,
@@ -106,10 +107,14 @@ export async function setControlActivitiesAction(_prev: State | undefined, formD
   const wanted: [string, string | null][] = [[PROJECT_KEY, asked === "FOLLOW" ? null : asked]];
   if (asked === "CUSTOM") {
     for (const activity of CONTROL_ACTIVITIES) {
+      if (activity.key === PEOPLE_KEY) continue;
       const value = String(formData.get(`mode:${activity.key}`) ?? "") as ControlMode;
       if (ACT_MODES.includes(value)) wanted.push([activity.key, value]);
     }
   }
+  // Who adds people is its own switch, saved whatever the answer above.
+  const people = String(formData.get(`mode:${PEOPLE_KEY}`) ?? "") as ControlMode;
+  if (ACT_MODES.includes(people)) wanted.push([PEOPLE_KEY, people]);
   // Management's confirmation is its own answer, kept whichever way the acts are carried out.
   for (const key of Object.keys(CONFIRMABLE)) wanted.push([CONFIRM_KEY(key), formData.get(`confirm:${key}`) === "on" ? "ON" : "OFF"]);
   let changed: number;

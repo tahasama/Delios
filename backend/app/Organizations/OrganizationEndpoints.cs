@@ -20,7 +20,7 @@ public static class OrganizationEndpoints
 {
     public static void MapOrganizationEndpoints(this IEndpointRouteBuilder app)
     {
-        // Document Control and administrators look after the organizations we work with.
+        // The control function and administrators look after the organizations we work with.
         var keepers = app.MapGroup("/api/admin").WithTags("Organizations")
             .AddEndpointFilter<TransactionFilter>().AddEndpointFilter(Keepers.Filter);
         keepers.MapPost("/parties/{partyId:guid}/link", async (Guid partyId, LinkRequest request, HttpContext http, OrganizationService orgs,
@@ -49,7 +49,7 @@ public static class OrganizationEndpoints
             OrganizationService orgs, DeliosDbContext db, CancellationToken c) =>
             await orgs.BringOverAsync(await ActorAsync(http, db, c), linkId, hostUserId, c) ?? Results.NoContent());
 
-        // Ending a link: either side; ours as host is Document Control's too.
+        // Ending a link: either side; ours as host is the control function's too.
         app.MapPost("/api/organization/links/{linkId:guid}/end", async (Guid linkId, NoteRequest request, HttpContext http,
             OrganizationService orgs, DeliosDbContext db, CancellationToken c) =>
             await orgs.EndAsync(await ActorAsync(http, db, c), linkId, request, c) ?? Results.NoContent())
@@ -65,7 +65,7 @@ public static class OrganizationEndpoints
         {
             var access = ProjectAccessFilter.Of(http);
             if (!access.IsInternal || !(access.Holds(Verbs.Control) || await Keepers.ConfiguresAsync(http)))
-                return Problems.Forbidden("CONTROL_ONLY", "Document Control says which organizations take part in the project.");
+                return Problems.Forbidden("CONTROL_ONLY", "The control function says which organizations take part in the project.");
             return await orgs.SetProjectPartyAsync(await ActorAsync(http, db, c), projectId, partyId, request, c) ?? Results.NoContent();
         });
 

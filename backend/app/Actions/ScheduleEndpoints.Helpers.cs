@@ -53,7 +53,7 @@ public static partial class ScheduleEndpoints
         }).ToList(),
     };
 
-    /// <summary>True when the caller may waive or un-waive this need: Document Control, or an active member of the department that owns the need.</summary>
+    /// <summary>True when the caller may waive or un-waive this need: The control function, or an active member of the department that owns the need.</summary>
     private static async Task<bool> MayWaiveAsync(DeliosDbContext db, ProjectAccess access, Requirement need, CancellationToken cancellationToken) =>
         access.Holds(Verbs.Control)
         || (need.Department is not null && await db.Memberships.AnyAsync(m => m.ProjectId == access.Project.Id && m.UserId == access.UserId

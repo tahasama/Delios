@@ -55,7 +55,7 @@ public sealed partial class TransmittalService
     }
 
     /// <summary>
-    /// Document Control sends. Where nobody on the project holds it, whoever asked
+    /// The control function sends. Where nobody on the project holds it, whoever asked
     /// sends it themselves.
     /// </summary>
     private async Task<bool> MayCarryOutAsync(ProjectAccess access, Document document, IssueRequest request, CancellationToken cancellationToken)
@@ -82,7 +82,7 @@ public sealed partial class TransmittalService
             .Select(p => p.Id).ToListAsync(cancellationToken);
     }
 
-    /// <summary>The people who carry the exchange with a party: its custodian function, else Document Control.</summary>
+    /// <summary>The people who carry the exchange with a party: its custodian function, else the control function.</summary>
     public async Task<List<User>> CustodiansAsync(Guid projectId, Party party, CancellationToken cancellationToken)
     {
         var ours = from m in db.Memberships
@@ -92,13 +92,13 @@ public sealed partial class TransmittalService
                    select new { m, u };
         ours = party.CustodianFunction is { } code
             ? ours.Where(x => x.m.Function!.Code == code)
-            : ours.Where(x => x.m.Function!.Rules.Any(r => r.Verbs.Contains(Verbs.Control)));
+            : ours.Where(x => (x.m.ActsAsControl || x.m.Function!.Rules.Any(r => r.Verbs.Contains(Verbs.Control))));
         return await ours.OrderBy(x => x.u.Name).Select(x => x.u).ToListAsync(cancellationToken);
     }
 
-    /// <summary>Whether anyone active on the project holds the Control permission (Document Control).</summary>
+    /// <summary>Whether anyone active on the project holds CONTROL (the control function).</summary>
     private Task<bool> AnyControlHolderAsync(Guid projectId, CancellationToken cancellationToken) =>
         db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
-            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))
+            && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
 }

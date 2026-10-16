@@ -1150,6 +1150,17 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
 
 ---
 
+## 59 · The control function is a role on the project, never a job title
+
+- The Standard speaks of "Document Control" as a department. DELIOS names no function or job title in its rules: the
+  **control function** is whoever holds CONTROL on the project, by their function or because the project's
+  configuration names them to act as it (whatever their function). Confirmations are given by **whoever holds
+  Manage**. The names people read are the organization's own functions.
+- Who joins a project is a project's choice: only the control function adds people (the default), or everyone on the
+  project; and each addition is confirmed by whoever holds Manage (the default) or not. Asking for someone new is an
+  information transmittal (Request), answered on the same thread.
+- Everyone on a project reads its directory: the organizations taking part and their people.
+
 ## Still open — decided in conversation, not yet built
 
 - **Every transmittal and every notification also goes by email**, showing what

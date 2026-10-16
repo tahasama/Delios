@@ -11,7 +11,7 @@ namespace Delios.Host.Packages;
 
 /// <summary>
 /// Every document another organization owes us is in that supplier's package, by supplier and purchase order. The
-/// package is made by itself with the first such document; Document Control may then rename it, renumber it before it
+/// package is made by itself with the first such document; The control function may then rename it, renumber it before it
 /// is shared, and add what the rule missed. Nothing is asked of the supplier by being filed: asking is a transmittal.
 /// </summary>
 public sealed class SupplyFiling(DeliosDbContext db, Numbering numbering, AuditLog audit, IClock clock)
@@ -53,7 +53,7 @@ public sealed class SupplyFiling(DeliosDbContext db, Numbering numbering, AuditL
         {
             var catalog = await Catalog.LoadAsync(db, cancellationToken);
             // What a supplier is asked for: approval where the organization publishes it; needed at a status that lets
-            // work go ahead. Document Control changes either on the package.
+            // work go ahead. The control function changes either on the package.
             var reasons = catalog.Active(TransmittalSets.Reasons);
             var reason = reasons.FirstOrDefault(r => r.Code.Contains("APPROV", StringComparison.OrdinalIgnoreCase)).Code
                 ?? reasons.Select(r => r.Code).FirstOrDefault(c => catalog.Prop(TransmittalSets.Reasons, c, "response") is { ValueKind: System.Text.Json.JsonValueKind.True })

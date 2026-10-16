@@ -208,7 +208,7 @@ public sealed partial class ReviewService
 
     /// <summary>
     /// Closes a step once answered: works out the step's answer (the most restrictive verdict, or the most severe advice), closes comments this step was named to settle, and opens the next step.
-    /// After the deciding step the review becomes decided; if the project has nobody with the Document Control role, it is released or returned automatically. Called by <see cref="AnswerAsync"/>.
+    /// After the deciding step the review becomes decided; if the project has nobody with the control function role, it is released or returned automatically. Called by <see cref="AnswerAsync"/>.
     /// </summary>
     private async Task CompleteStepAsync(
         ProjectAccess access, Review review, ReviewStep step, Catalog catalog, CancellationToken cancellationToken)
@@ -265,7 +265,7 @@ public sealed partial class ReviewService
         await audit.WriteAsync(Audit.Actor.System, "REVIEW_DECIDED", "Review", review.Id, review.Number,
             $"Verdict {review.Verdict}{(review.GrantedStatus is null ? "" : $", granting {review.GrantedStatus}")}.",
             review.ProjectId, cancellationToken);
-        // Everyone it concerns: the route, those copied in, Document Control, its author, and another organization's people.
+        // Everyone it concerns: the route, those copied in, the control function, its author, and another organization's people.
         var (decidedDocument, decidedRevision) = await SubjectAsync(review, cancellationToken);
         await TellAsync(review, await InvolvedAsync(review, decidedDocument, decidedRevision, cancellationToken), Notifications.NotificationKinds.ReviewDecided,
             $"{TransmittalService.Label(decidedDocument, decidedRevision)} decided: {review.Verdict}",

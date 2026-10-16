@@ -23,7 +23,7 @@ public sealed partial class ReviewService
         string RevisionValue, string Kind, string? StepTitle, DateOnly? DueDate, DateTimeOffset Since, bool Deciding = false,
         string? Verdict = null, string? Status = null);
 
-    /// <summary>What this person has waiting: their open steps, and Document Control's gate.</summary>
+    /// <summary>What this person has waiting: their open steps, and the control function's gate.</summary>
     public async Task<object> WorkAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
         var me = access.UserId;

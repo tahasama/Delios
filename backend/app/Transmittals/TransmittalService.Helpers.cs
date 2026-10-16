@@ -48,7 +48,7 @@ public sealed partial class TransmittalService
     }
 
     /// <summary>
-    /// The transmittals this person may see: all of them for Document Control and senders; otherwise those they issued,
+    /// The transmittals this person may see: all of them for the control function and senders; otherwise those they issued,
     /// those sent to them, and those to parties whose custodian function is theirs.
     /// </summary>
     public IQueryable<Transmittal> Visible(ProjectAccess access)

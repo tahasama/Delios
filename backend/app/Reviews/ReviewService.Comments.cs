@@ -69,7 +69,7 @@ public sealed partial class ReviewService
         return (comment, null);
     }
 
-    /// <summary>Closes an open comment with a resolution. Only its author or Document Control may close it. Returns null on success, or the problem.</summary>
+    /// <summary>Closes an open comment with a resolution. Only its author or the control function may close it. Returns null on success, or the problem.</summary>
     public async Task<IResult?> CloseCommentAsync(
         ProjectAccess access, Guid reviewId, Guid commentId, CloseCommentRequest request, CancellationToken cancellationToken)
     {
@@ -79,7 +79,7 @@ public sealed partial class ReviewService
         if (comment.Status != CommentStatuses.Open) return Problems.Conflict("COMMENT_CLOSED", "The comment is already closed.");
         if (comment.AuthorId != access.UserId && !await HoldsControlAsync(access, review, cancellationToken))
         {
-            return Problems.Forbidden("CLOSE_NOT_ALLOWED", "Its author or Document Control closes a comment.");
+            return Problems.Forbidden("CLOSE_NOT_ALLOWED", "Its author or the control function closes a comment.");
         }
         var resolution = request.Resolution?.Trim() ?? "";
         if (resolution.Length == 0) return Problems.Invalid("RESOLUTION_REQUIRED", "Say how the comment was settled.");

@@ -63,7 +63,7 @@ public sealed partial class ReviewService
 
     /// <summary>
     /// Everyone a review concerns, told of its decision, release or return: whoever started it, the revision's author,
-    /// everyone on its route (each step's people and whoever answered), those copied in, Document Control, and, for a
+    /// everyone on its route (each step's people and whoever answered), those copied in, the control function, and, for a
     /// document of another organization's (its originator, or whoever sent the revision), that organization's people.
     /// </summary>
     private async Task<List<Guid>> InvolvedAsync(Review review, Document document, Revision revision, CancellationToken cancellationToken)
@@ -72,7 +72,7 @@ public sealed partial class ReviewService
         var stepIds = steps.Select(s => s.Id).ToList();
         var answered = await db.ReviewParticipants.AsNoTracking().Where(p => stepIds.Contains(p.StepId)).Select(p => p.UserId).ToListAsync(cancellationToken);
         var controllers = await db.Memberships.AsNoTracking()
-            .Where(m => m.ProjectId == review.ProjectId && m.Active && m.Function!.Active && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
+            .Where(m => m.ProjectId == review.ProjectId && m.Active && m.Function!.Active && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))))
             .Select(m => m.UserId).ToListAsync(cancellationToken);
         var party = revision.AuthoredByParty ?? document.Originator;
         var outside = party is not null && await db.Parties.AnyAsync(p => p.Code == party && !p.IsInternal, cancellationToken)
@@ -161,7 +161,7 @@ public sealed partial class ReviewService
     }
 
     /// <summary>
-    /// The author or Document Control takes a revision back out of its review to update its files: the review closes
+    /// The author or the control function takes a revision back out of its review to update its files: the review closes
     /// as withdrawn, with its comments kept; open steps end, open transmittals lapse, and everyone on the route is told.
     /// The revision is in preparation again, to be sent once its new files are in. Returns a problem when no review is open.
     /// </summary>
@@ -171,9 +171,9 @@ public sealed partial class ReviewService
             .Where(r => r.RevisionId == revisionId && (r.State == ReviewStates.InProgress || r.State == ReviewStates.Decided))
             .OrderByDescending(r => r.StartedAt).FirstOrDefaultAsync(cancellationToken);
         if (review is null) return Problems.Conflict("NO_OPEN_REVIEW", "This revision has no open review to withdraw.");
-        // Whoever started the review, or Document Control (and above): never anyone else, and always with why.
+        // Whoever started the review, or the control function (and above): never anyone else, and always with why.
         if (review.StartedById != access.UserId && !access.Holds(Verbs.Control))
-            return Problems.Forbidden("STARTER_OR_CONTROL", "Whoever started the review, or Document Control, takes a revision out of it.");
+            return Problems.Forbidden("STARTER_OR_CONTROL", "Whoever started the review, or the control function, takes a revision out of it.");
         var now = clock.GetCurrentInstant();
         var revision = await db.Revisions.SingleAsync(r => r.Id == revisionId, cancellationToken);
         var document = await db.Documents.SingleAsync(d => d.Id == review.DocumentId, cancellationToken);

@@ -21,11 +21,11 @@ public sealed record NeedRequest(
     Guid DocumentId, string? Purpose, string[]? RequiredStatuses = null, string? Anchor = null, int? OffsetDays = null,
     DateOnly? FixedDate = null, string? Department = null, Guid? TransmittalId = null, bool FromList = false);
 
-/// <summary>Document Control's answer to a request to add a document to an action, when nothing is added: why.</summary>
+/// <summary>The control function's answer to a request to add a document to an action, when nothing is added: why.</summary>
 public sealed record ActivityAskAnswer(string? Note);
 
 /// <summary>
-/// What a request will change once management confirms it, as Document Control checked it: the documents and the
+/// What a request will change once management confirms it, as the control function checked it: the documents and the
 /// discipline needing them (with the purpose and statuses the need takes), or the disciplines the action concerns.
 /// </summary>
 public sealed record ActivityProposal(Guid[]? DocumentIds = null, string? Department = null, string[]? Departments = null,
@@ -36,7 +36,7 @@ public sealed record ActivityRequestView(Guid Id, string Number, string From, Da
     bool Confirm, DateTimeOffset? CheckedAt, string? CheckedBy, Guid? ConfirmerId, string? ConfirmerName, ActivityProposal? Proposal,
     IReadOnlyList<Guid> DocumentIds);
 
-/// <summary>Document Control's check of a request that management confirms: what will change, and who confirms it.</summary>
+/// <summary>The control function's check of a request that management confirms: what will change, and who confirms it.</summary>
 public sealed record ActivityCheckRequest(Guid? ConfirmerId, Guid[]? DocumentIds = null, string? Department = null,
     string[]? Departments = null, string? Purpose = null, string[]? Statuses = null);
 
@@ -80,7 +80,7 @@ public sealed record NoticeRequest(string? Subject, string? Title, string? Body,
 /// <summary>One notice as the screens list it.</summary>
 public sealed record NoticeView(Guid Id, string Subject, bool Automatic, string Title, string? Body, string[] Recipients, string SentBy, DateTimeOffset SentAt);
 
-/// <summary>A postponement confirmed by whoever plans, or taken back by Document Control: the words that go with it.</summary>
+/// <summary>A postponement confirmed by whoever plans, or taken back by the control function: the words that go with it.</summary>
 public sealed record DecisionNoteRequest(string? Note);
 
 /// <summary>

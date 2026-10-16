@@ -454,22 +454,34 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - People & access never asks a password: our people and someone of another organization with no DELIOS get the
   7-day link to choose their own (email off: the link is shown to whoever added them). Someone whose company has its
   own DELIOS is never added there: link the organizations; their administrator puts them on the project.
-- Joining a project (owner): a request management confirms, on by default (`CONFIRM:PROJECT_PEOPLE`, backend
-  `DefaultConfirm`; a project may untick it in the Control room). Anyone of ours asks ("Ask for someone to join", in
-  the account menu, `/people/ask`; or People & access): someone with an account, or someone new (an account is made,
-  its invitation waits); function, department, why (required), who confirms (managers recommended; none chosen:
-  every manager). Document Control may attach the email or letter it came on, kept as proof on the request
-  (`POST /people/requests`, `JoinRequests`). It travels as an information transmittal (Request); confirmed on People
-  to confirm, they are put on by themselves (a new account's invitation goes then), Document Control is told, and the
-  person is told by notification and email. Refused: they stay off, with why. Document Control reminds whoever
-  confirms with Notify (People & access, "Waiting for management"). Where nothing is asked (unticked, or an
-  administrator), they go straight on and are told. Nobody holding Manage: refused (NO_MANAGER), say who confirms.
+- Joining a project (owner): two switches of the project (Control room, "Adding people to the project"): who adds,
+  **only the control function** (the default: a project is taken to have one) or **everyone on the project**
+  (`PROJECT_PEOPLE` = CONTROL / SELF, its own switch whatever the other acts answer); and **confirmation by whoever
+  holds Manage**, necessary (the default, `CONFIRM:PROJECT_PEOPLE`, backend `DefaultConfirm`) or not, in both modes.
+  "Ask for someone to join" is always for someone new (first name, last name, email, function, department, an
+  optional message; closed until opened): an information transmittal (Request) to whoever answers it (who is named;
+  else whoever holds Manage; else, where no confirmation is asked, the control function). "Add someone" (someone with
+  an account, the shared search field, function, department) is the control function's, in People & access; it shows
+  on the directory only where everyone adds. `POST /people/requests` (`JoinRequests`, `MayAddAsync`, `AnswersAsync`).
+  The control function may attach the email or letter a request came on, kept as proof. Confirmed on People to
+  confirm, they are put on by themselves (a new account's invitation goes then), the control function is told, and
+  the person is told by notification and email. Refused: they stay off, with why. The control function reminds whoever
+  confirms with Notify (People & access, "Waiting to be confirmed"). Nobody to answer: refused (NOBODY_ANSWERS).
+- **Project directory** (`/directory`, in the menu for everyone; `GET /people/directory`): the organizations taking
+  part (role, how they work with us, who answers for each, people) and the people on the project (organization,
+  function, department, control function / confirms); emails for our own readers only. Its only act is "Ask for
+  someone to join" ("Add someone" too where everyone adds). Not in the account menu; `/people/ask` redirects here.
+- **Who acts as the control function** is named in the project's configuration (Control room, "Who acts as the
+  control function", `PUT /people/control`, `Membership.ActsAsControl`): anyone of ours on the project, whatever their
+  function, holds CONTROL on the whole project, as if their function carried it (`ProjectAccess.WithControl`, every
+  CONTROL holder lookup, `/api/me`). Those whose function carries CONTROL count too. An administrator or whoever acts
+  as it names them; each is told; never nobody left (NO_CONTROL_LEFT).
 - People & access, in the reference style: masthead (on the project · waiting · refused, and how joining works here),
-  "Someone joins <project>" (the one form), "Waiting for management" (with Remind), and Everyone (organization and
-  project chips; each person's Change: function, department, name and email unless linked, "Can sign in" on every
-  project, "Take off <project>", asked first). A linked account (works here from its own DELIOS) changes only its
-  function and department here. The organization's own extra fields on a person (Forms & fields) are no longer asked
-  when adding (they were checked on the screen only).
+  "Someone joins <project>" ("Add someone", "Ask for someone to join"), "Waiting to be confirmed" (with Remind), and
+  Everyone (organization and project chips; each person's Change: function, department, name and email unless
+  linked, "Can sign in" on every project, "Take off <project>", asked first). A linked account (works here from its
+  own DELIOS) changes only its function and department here. The organization's own extra fields on a person (Forms
+  & fields) are no longer asked when adding (they were checked on the screen only).
 - A list's "Used on" counts the project's documents carrying each value (backend `GET /register/usage`), and opens
   them in the register; a value in use keeps its code. Values are retired, never deleted: the bulk "Delete" (which
   only retired) is removed.
@@ -793,6 +805,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   of today, or the dates the user filtered on. Never the whole schedule.
 
 ### Backend — limits and steps that bit before
+- **Never hardcode a function or a job title** (owner): no "Document Control", "management", "project manager" in
+  backend code, messages or comments. Functions are the organization's data. Say **the control function** (whoever
+  holds CONTROL on the project) and **whoever holds Manage** (or another verb); a name shown is read from the data
+  (the function's own name). The demo data's starter functions are data, not code.
 - An outbox routing key is at most 16 characters; `ControlledVersion.VersionLabel` too.
 - Migrations: `dotnet ef migrations add Name -p app -s app -o Platform/Migrations`
   (from `backend/`). Each new table gets `RowLevelSecurity.Enable(migrationBuilder, "<table>")`.

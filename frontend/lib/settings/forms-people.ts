@@ -6,7 +6,7 @@ import { api, projectPath, refusal } from "@/lib/client";
 
 type State = { error?: string; ok?: string };
 
-/** Management confirms someone on the project: they join. */
+/** Whoever is asked confirms someone on the project: they join. */
 export async function confirmPersonAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
   const id = String(formData.get("membershipId") ?? "");
@@ -21,7 +21,7 @@ export async function confirmPersonAction(_prev: State | undefined, formData: Fo
   return { ok: "Confirmed: they are on the project." };
 }
 
-/** Management refuses someone, with why: they do not join, and whoever added them reads why. */
+/** Whoever is asked refuses someone, with why: they do not join, and whoever added them reads why. */
 export async function refusePersonAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
   const id = String(formData.get("membershipId") ?? "");
@@ -39,10 +39,10 @@ export async function refusePersonAction(_prev: State | undefined, formData: For
 }
 
 /**
- * Asks for someone to join this project: someone with an account (`userId`) or someone new (name, email,
- * organization), with their function, department, why, who confirms, and (Document Control) the email or letter the
- * request came on, kept with it as proof. The backend decides whether it is put on now or asked of management first
- * (`POST /people/requests`), and says which.
+ * Asks for someone to join this project ("Ask for someone to join": someone new, first and last name, email) or adds
+ * someone with an account ("Add someone": `userId`), with their function, department, an optional message, who
+ * confirms, and (the control function) the email or letter the request came on, kept with it as proof. The backend
+ * decides whether it is put on now or asked first (`POST /people/requests`), and says which.
  */
 export async function askToJoinAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
@@ -55,12 +55,12 @@ export async function askToJoinAction(_prev: State | undefined, formData: FormDa
     result = await api(projectPath(ctx, "/people/requests"), {
       body: {
         userId: text("userId") || null,
-        name: text("name") || null,
+        name: [text("firstName"), text("lastName")].filter(Boolean).join(" ") || text("name") || null,
         email: text("email").toLowerCase() || null,
         partyId: text("partyId") || null,
         functionId: text("functionId"),
         department: text("department") || null,
-        why: text("why"),
+        why: text("why") || null,
         confirmerId: text("confirmerId") || null,
         proofFileId,
       },
@@ -69,10 +69,27 @@ export async function askToJoinAction(_prev: State | undefined, formData: FormDa
     return { error: refusal(e).message };
   }
   revalidatePath("/settings/users");
-  revalidatePath("/people/ask");
+  revalidatePath("/directory");
   revalidatePath("/people/confirm");
   if (result.held) return { ok: `Asked: ${result.said}. They join once confirmed, and are told then.` };
   return {
     ok: `Done: ${result.said}. They are told by notification and email.${result.link ? ` Email is off here: give them this link to choose their password (7 days, once): ${result.link}` : ""}`,
   };
+}
+
+/**
+ * Names who acts as the control function on this project, whatever their function (`PUT /people/control`): everyone
+ * ticked, and nobody else.
+ */
+export async function setControlPeopleAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const userIds = formData.getAll("userIds").map(String).filter(Boolean);
+  try {
+    await api(projectPath(ctx, "/people/control"), { method: "PUT", body: { userIds } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath("/settings/flow");
+  revalidatePath("/directory");
+  return { ok: userIds.length ? `${userIds.length} ${userIds.length === 1 ? "person acts" : "people act"} as the control function.` : "Nobody named: the control function is whoever holds it by their function." };
 }

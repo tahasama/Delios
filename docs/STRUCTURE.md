@@ -129,7 +129,7 @@ frontend/
 └── Dockerfile            builds the screens into an image
 ```
 
-`+ import/`, `+ exposures/`, `+ needed/`, `+ reports/`, `+ distribution/`, `+ people/`: pages whose web
+`+ import/`, `+ exposures/`, `+ needed/`, `+ reports/`, `+ distribution/`, `+ people/`, `+ directory/` (the project directory, Identity: `ProjectDirectory.cs`): pages whose web
 address must stay as it is. They sit beside their area, and belong to it.
 
 Inside a `lib/` area folder, the same names every time:

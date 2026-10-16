@@ -22,8 +22,8 @@ public sealed record UnplannedItem(string? Title, string? DocType, string? Refer
 
 /// <summary>
 /// Body of an incoming transmittal. <c>Planned</c> fills placeholders; <c>Unplanned</c> sends files that wait for
-/// Document Control to register them; <c>RevisionIds</c> attaches revisions of the sender's own documents already
-/// here. <c>FromPartyId</c> and <c>ProofFileId</c> are for Document Control recording what an organization working
+/// The control function to register them; <c>RevisionIds</c> attaches revisions of the sender's own documents already
+/// here. <c>FromPartyId</c> and <c>ProofFileId</c> are for the control function recording what an organization working
 /// in its own system sent.
 /// </summary>
 public sealed record IncomingRequest(
@@ -41,8 +41,8 @@ public sealed record LooseUploadRequest(string? FileName, long Size, string? Con
 /// <summary>
 /// What another organization sends us. Every submission comes on a transmittal, numbered in the sender's series and
 /// received the moment it is sent: that moment, with the exact files and their SHA-256, is the receipt. Placeholders
-/// filled update our register straight away (Document Control then checks them on arrival); anything unplanned waits
-/// on the transmittal until Document Control registers it under our numbering.
+/// filled update our register straight away (the control function then checks them on arrival); anything unplanned waits
+/// on the transmittal until the control function registers it under our numbering.
 /// </summary>
 public sealed class IncomingService(
     DeliosDbContext db, DocumentService documents, TransmittalService transmittals, Numbering numbering, FileStorage storage,
@@ -54,14 +54,14 @@ public sealed class IncomingService(
 
     /// <summary>
     /// An upload link for a file that belongs to no document yet: an unplanned item's file, sent by another
-    /// organization or by Document Control for one; or (<c>Proof</c>) the covering letter Document Control files
+    /// organization or by the control function for one; or (<c>Proof</c>) the covering letter the control function files
     /// when recording what such an organization sent.
     /// </summary>
     public async Task<(UploadTicket? Ticket, IResult? Problem)> UploadAsync(
         ProjectAccess access, LooseUploadRequest request, CancellationToken cancellationToken)
     {
         if (!MaySend(access))
-            return (null, Problems.Forbidden("SEND_NOT_ALLOWED", "Only another organization, or Document Control for one, sends to us."));
+            return (null, Problems.Forbidden("SEND_NOT_ALLOWED", "Only another organization, or the control function for one, sends to us."));
         var (declared, invalid) = Uploads.Check(new UploadRequest(request.FileName, request.Size, request.ContentType, request.Sha256),
             storageOptions.Value.MaxFileBytes);
         if (invalid is not null) return (null, invalid);
@@ -158,12 +158,12 @@ public sealed class IncomingService(
             UserId = m.UserId,
             Name = m.Name,
             Organization = m.PartyName,
-            // Told it came, for their information: what arrived is Document Control's to check, not theirs to acknowledge.
+            // Told it came, for their information: what arrived is the control function's to check, not theirs to acknowledge.
             Kind = RecipientKinds.Cc,
             NotifiedAt = now,
         }).ToList();
 
-        // Placeholders filled, or corrections of what Document Control returned: our register is updated now.
+        // Placeholders filled, or corrections of what the control function returned: our register is updated now.
         foreach (var item in planned)
         {
             var status = item.Status?.Trim() ?? "";
@@ -209,7 +209,7 @@ public sealed class IncomingService(
             foreach (var r in revisions) transmittal.Items.Add(Item(transmittal, TransmittalItemKinds.Revision, owned[r.DocumentId], r, r.StatusCode, null));
         }
 
-        // Unplanned: kept on the transmittal until Document Control registers them.
+        // Unplanned: kept on the transmittal until the control function registers them.
         foreach (var other in unplanned)
         {
             var title = other.Title?.Trim() ?? "";
@@ -247,7 +247,7 @@ public sealed class IncomingService(
 
         var ours = await db.Parties.AsNoTracking().Where(p => p.IsInternal && p.Active).OrderBy(p => p.Code).FirstOrDefaultAsync(cancellationToken);
         transmittal.ToPartyId = ours?.Id;
-        transmittal.ToName = ours?.Name ?? "Document Control";
+        transmittal.ToName = ours?.Name ?? "The control function";
         transmittal.Number = await numbering.RecordAsync(access.Project.TenantId, access.Project.Id, RecordKinds.Transmittal,
             NumberFields.ForRecord(access.Project.Code, party.Code, ours?.Code), "TR", cancellationToken);
         transmittal.Subject = Blank(request.Subject)
@@ -258,7 +258,7 @@ public sealed class IncomingService(
             $"From {party.Name}{(transmittal.TheirReference is null ? "" : $" (their {transmittal.TheirReference})")}: "
             + string.Join(", ", transmittal.Items.Select(Label)) + ".",
             access.Project.Id, cancellationToken);
-        // Document Control checks what arrived; whoever it is for is told it came.
+        // The control function checks what arrived; whoever it is for is told it came.
         await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id,
             [.. await notifier.ControlHoldersAsync(access.Project.Id, cancellationToken), .. forPeople.Select(m => m.UserId)],
             Notifications.NotificationKinds.IncomingArrived, $"{transmittal.Number} from {party.Name}: {transmittal.Subject}",
@@ -271,14 +271,14 @@ public sealed class IncomingService(
     // ── Registering what came unplanned ───────────────────────────────────────
 
     /// <summary>
-    /// Document Control puts an unplanned item in our register: a new document under our numbering, originated by the
+    /// The control function puts an unplanned item in our register: a new document under our numbering, originated by the
     /// sender, whose first revision is the files that came. The item then points at it.
     /// </summary>
     public async Task<(Transmittal? Transmittal, IResult? Problem)> RegisterAsync(
         ProjectAccess access, Guid transmittalId, Guid itemId, RegisterDocumentRequest request, CancellationToken cancellationToken)
     {
         if (!access.IsInternal || !access.Holds(Verbs.Control))
-            return (null, Problems.Forbidden("CONTROL_ONLY", "Document Control decides what goes into the register."));
+            return (null, Problems.Forbidden("CONTROL_ONLY", "The control function decides what goes into the register."));
         var transmittal = await transmittals.Visible(access).Include(t => t.Items).Include(t => t.Recipients).AsSplitQuery()
             .SingleOrDefaultAsync(t => t.Id == transmittalId, cancellationToken);
         var item = transmittal?.Items.SingleOrDefault(i => i.Id == itemId);
@@ -379,7 +379,7 @@ public sealed class IncomingService(
             y += 4;
         }
         y += 8;
-        Line("This receipt records what arrived and when. Document Control's check on arrival follows; what it decides is recorded on each document.", small);
+        Line("This receipt records what arrived and when. The control function's check on arrival follows; what it decides is recorded on each document.", small);
         gfx.Dispose();
         using var output = new MemoryStream();
         pdf.Save(output);
@@ -388,18 +388,18 @@ public sealed class IncomingService(
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /// <summary>Another organization's people send to us; Document Control may record what one sent outside the system.</summary>
+    /// <summary>Another organization's people send to us; The control function may record what one sent outside the system.</summary>
     private static bool MaySend(ProjectAccess access) =>
         access.Holds(Verbs.Read) && (!access.IsInternal || access.Holds(Verbs.Control));
 
     /// <summary>
-    /// Who is sending: the caller's own organization, or, for Document Control recording it, the organization named.
+    /// Who is sending: the caller's own organization, or, for the control function recording it, the organization named.
     /// </summary>
     private async Task<(Party? Party, bool OnBehalf, IResult? Problem)> SenderAsync(
         ProjectAccess access, Guid? fromPartyId, CancellationToken cancellationToken)
     {
         if (!MaySend(access))
-            return (null, false, Problems.Forbidden("SEND_NOT_ALLOWED", "Only another organization, or Document Control for one, sends to us."));
+            return (null, false, Problems.Forbidden("SEND_NOT_ALLOWED", "Only another organization, or the control function for one, sends to us."));
         if (!access.IsInternal)
         {
             var own = await db.Parties.AsNoTracking().SingleOrDefaultAsync(p => p.Code == access.PartyCode, cancellationToken);
@@ -416,13 +416,13 @@ public sealed class IncomingService(
     }
 
     /// <summary>
-    /// Document Control keeps further files with something received, after it was recorded: the letter that
+    /// The control function keeps further files with something received, after it was recorded: the letter that
     /// followed, a corrected cover sheet. They are kept apart from what arrived, whose record is its receipt.
     /// </summary>
     public async Task<(Transmittal? Transmittal, IResult? Problem)> AttachAsync(
         ProjectAccess access, Guid transmittalId, AttachFilesRequest request, CancellationToken cancellationToken)
     {
-        if (!access.Holds(Verbs.Control)) return (null, Problems.Forbidden("CONTROL_ONLY", "Document Control keeps what arrived."));
+        if (!access.Holds(Verbs.Control)) return (null, Problems.Forbidden("CONTROL_ONLY", "The control function keeps what arrived."));
         var transmittal = await db.Transmittals.Include(t => t.Items).Include(t => t.Recipients).AsSplitQuery()
             .SingleOrDefaultAsync(t => t.Id == transmittalId && t.ProjectId == access.Project.Id, cancellationToken);
         if (transmittal is null) return (null, Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal."));

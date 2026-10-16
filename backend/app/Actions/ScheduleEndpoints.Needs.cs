@@ -35,17 +35,17 @@ public static partial class ScheduleEndpoints
             if (ask is null) return Problems.NotFound("REQUEST_NOT_FOUND", $"No request to add a document to {activity.Code} by that number.");
             if (ask.ActivityAnsweredAt is not null) return Problems.Conflict("ALREADY_ANSWERED", $"{ask.ActivityAnsweredByName} already answered {ask.Number}.");
             if (ask.ActivityConfirm)
-                return Problems.Conflict("NEEDS_CONFIRMATION", $"{ask.Number} needs management's confirmation: check it and send it on; it is applied once confirmed.");
+                return Problems.Conflict("NEEDS_CONFIRMATION", $"{ask.Number} needs confirming by whoever holds Manage: check it and send it on; it is applied once confirmed.");
         }
         var (need, document, problem) = await NewNeedAsync(db, clock, access, activity, request, cancellationToken);
         if (problem is not null) return problem;
-        // Document Control adds for any discipline; whoever plans only by uploading the requirements list. Without
-        // Document Control, the people of a discipline add for their own discipline only.
+        // The control function adds for any discipline; whoever plans only by uploading the requirements list. Without
+        // The control function, the people of a discipline add for their own discipline only.
         var self = !access.Holds(Verbs.Control) && !(request.FromList && access.Holds(Verbs.Plan));
         if (self)
         {
             if (await Delios.Host.Settings.ProjectAnswers.ControlDoesAsync(db, access.Project.Id, "ACTION_LINKS", cancellationToken))
-                return Problems.Forbidden("CONTROL_ONLY", "On this project Document Control adds documents to actions: ask them.");
+                return Problems.Forbidden("CONTROL_ONLY", "On this project the control function adds documents to actions: ask them.");
             var own = await OwnDepartmentAsync(db, access, cancellationToken);
             if (own is null || need!.Department != own)
                 return Problems.Forbidden("OWN_DISCIPLINE_ONLY", "You add documents for your own discipline only.");
@@ -111,14 +111,14 @@ public static partial class ScheduleEndpoints
     }
 
     /// <summary>
-    /// Document Control answers a request to add a document to an action without adding one (already there, not
+    /// The control function answers a request to add a document to an action without adding one (already there, not
     /// the right action…), saying why. Whoever asked is told, as when a document is added.
     /// </summary>
     private static async Task<IResult> AnswerActivityAskAsync(Guid transmittalId, ActivityAskAnswer request, HttpContext http,
         DeliosDbContext db, IClock clock, AuditLog audit, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control answers a request to add a document to an action.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function answers a request to add a document to an action.");
         var note = request.Note?.Trim() ?? "";
         if (note.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why nothing is added; whoever asked reads it.");
         var ask = await db.Transmittals.SingleOrDefaultAsync(t => t.Id == transmittalId && t.ProjectId == access.Project.Id, cancellationToken);
@@ -148,7 +148,7 @@ public static partial class ScheduleEndpoints
     }
 
     /// <summary>
-    /// Document Control checks a request management confirms: the right documents for a discipline the action
+    /// The control function checks a request management confirms: the right documents for a discipline the action
     /// concerns, or the disciplines it should concern, and who confirms it (management is proposed first; anyone on
     /// the project may be chosen). Nothing changes yet; whoever confirms is told.
     /// </summary>
@@ -156,10 +156,10 @@ public static partial class ScheduleEndpoints
         DeliosDbContext db, IClock clock, AuditLog audit, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control checks these requests.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function checks these requests.");
         var ask = await db.Transmittals.SingleOrDefaultAsync(t => t.Id == transmittalId && t.ProjectId == access.Project.Id, cancellationToken);
         if (ask?.ActivityId is not { } activityId) return NotFound();
-        if (!ask.ActivityConfirm) return Problems.Conflict("NO_CONFIRMATION", "This request does not need management's confirmation: apply it.");
+        if (!ask.ActivityConfirm) return Problems.Conflict("NO_CONFIRMATION", "This request does not need confirming: apply it.");
         if (ask.ActivityAnsweredAt is not null) return Problems.Conflict("ALREADY_ANSWERED", $"{ask.ActivityAnsweredByName} already answered it.");
         if (ask.ActivityCheckedAt is not null) return Problems.Conflict("ALREADY_CHECKED", $"{ask.ActivityCheckedByName} already checked it; it is with {ask.ActivityConfirmerName}.");
         var activity = await db.Activities.AsNoTracking().SingleAsync(a => a.Id == activityId, cancellationToken);
@@ -211,8 +211,8 @@ public static partial class ScheduleEndpoints
     }
 
     /// <summary>
-    /// Whoever was asked confirms the request: what Document Control checked is applied by itself, and whoever asked,
-    /// and Document Control, are told.
+    /// Whoever was asked confirms the request: what the control function checked is applied by itself, and whoever asked,
+    /// and the control function, are told.
     /// </summary>
     private static async Task<IResult> ConfirmActivityAskAsync(Guid transmittalId, HttpContext http,
         DeliosDbContext db, IClock clock, AuditLog audit, TransmittalService transmittals, CancellationToken cancellationToken)
@@ -257,7 +257,7 @@ public static partial class ScheduleEndpoints
         return Results.NoContent();
     }
 
-    /// <summary>Whoever was asked refuses the request, saying why: nothing changes, and whoever asked and Document Control are told.</summary>
+    /// <summary>Whoever was asked refuses the request, saying why: nothing changes, and whoever asked and the control function are told.</summary>
     private static async Task<IResult> RefuseActivityAskAsync(Guid transmittalId, ActivityAskAnswer request, HttpContext http,
         DeliosDbContext db, IClock clock, AuditLog audit, TransmittalService transmittals, CancellationToken cancellationToken)
     {
@@ -280,7 +280,7 @@ public static partial class ScheduleEndpoints
         if (ask?.ActivityId is not { } activityId) return (null, null, NotFound());
         if (ask.ActivityAnsweredAt is not null) return (null, null, Problems.Conflict("ALREADY_ANSWERED", $"{ask.ActivityAnsweredByName} already answered it."));
         if (ask.ActivityCheckedAt is null || ask.ActivityProposal is null)
-            return (null, null, Problems.Conflict("NOT_CHECKED", "Document Control has not checked it yet."));
+            return (null, null, Problems.Conflict("NOT_CHECKED", "The control function has not checked it yet."));
         if (ask.ActivityConfirmerId != access.UserId)
             return (null, null, Problems.Forbidden("NOT_YOURS", $"{ask.ActivityConfirmerName} was asked to confirm it."));
         var activity = await db.Activities.SingleAsync(a => a.Id == activityId, cancellationToken);
@@ -288,7 +288,7 @@ public static partial class ScheduleEndpoints
     }
 
     /// <summary>
-    /// POST /activities/{id}/departments/own: without Document Control, someone whose discipline the action should
+    /// POST /activities/{id}/departments/own: without the control function, someone whose discipline the action should
     /// concern adds it themselves. Their own discipline only; whoever plans the project is told.
     /// </summary>
     private static async Task<IResult> AddOwnDepartmentAsync(Guid activityId, HttpContext http, DeliosDbContext db, AuditLog audit,
@@ -296,7 +296,7 @@ public static partial class ScheduleEndpoints
     {
         var access = ProjectAccessFilter.Of(http);
         if (await Delios.Host.Settings.ProjectAnswers.ControlDoesAsync(db, access.Project.Id, "ACTION_LINKS", cancellationToken))
-            return Problems.Forbidden("CONTROL_ONLY", "On this project Document Control adds disciplines to actions: ask them.");
+            return Problems.Forbidden("CONTROL_ONLY", "On this project the control function adds disciplines to actions: ask them.");
         var own = await OwnDepartmentAsync(db, access, cancellationToken);
         if (own is null) return Problems.Forbidden("NO_DISCIPLINE", "You answer for no discipline on this project.");
         var activity = await db.Activities.SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
@@ -328,7 +328,7 @@ public static partial class ScheduleEndpoints
 
     /// <summary>
     /// Closes a request about an action with what was done, and answers whoever asked on a transmittal replying to
-    /// theirs (Document Control copied in when <paramref name="copyControl"/>: a request it checked was settled by somebody else).
+    /// theirs (the control function copied in when <paramref name="copyControl"/>: a request it checked was settled by somebody else).
     /// </summary>
     internal static async Task AnswerAsync(DeliosDbContext db, TransmittalService transmittals, IClock clock, ProjectAccess access,
         Transmittal ask, Activity activity, string answer, CancellationToken cancellationToken, string reason = ActionLetters.Answer,
@@ -343,7 +343,7 @@ public static partial class ScheduleEndpoints
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>DELETE /activities/{activityId}/needs/{needId}: removes a need (by whoever added it, or Document Control) and recomputes the activity's readiness.</summary>
+    /// <summary>DELETE /activities/{activityId}/needs/{needId}: removes a need (by whoever added it, or the control function) and recomputes the activity's readiness.</summary>
     private static async Task<IResult> RemoveNeedAsync(
         Guid activityId, Guid needId, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit, CancellationToken cancellationToken)
     {
@@ -351,7 +351,7 @@ public static partial class ScheduleEndpoints
         var need = await db.Requirements.SingleOrDefaultAsync(r => r.Id == needId && r.ActivityId == activityId && r.ProjectId == access.Project.Id, cancellationToken);
         if (need is null) return NotFound();
         if (!access.Holds(Verbs.Control) && need.CreatedByName != access.UserName)
-            return Problems.Forbidden("CONTROL_ONLY", "Whoever added a need, or Document Control, removes it.");
+            return Problems.Forbidden("CONTROL_ONLY", "Whoever added a need, or the control function, removes it.");
         db.Requirements.Remove(need);
         await db.SaveChangesAsync(cancellationToken);
         await Readiness.RestateAsync(db, clock, [activityId], cancellationToken);
@@ -361,7 +361,7 @@ public static partial class ScheduleEndpoints
     }
 
     /// <summary>
-    /// The concerned department, or Document Control, says the activity can go without
+    /// The concerned department, or the control function, says the activity can go without
     /// the document, on its own responsibility, and why. The activity turns green but
     /// keeps the mark until the document comes.
     /// </summary>
@@ -373,7 +373,7 @@ public static partial class ScheduleEndpoints
         var need = await db.Requirements.SingleOrDefaultAsync(r => r.Id == needId && r.ActivityId == activityId && r.ProjectId == access.Project.Id, cancellationToken);
         if (need is null) return NotFound();
         if (!await MayWaiveAsync(db, access, need, cancellationToken))
-            return Problems.Forbidden("WAIVER_NOT_ALLOWED", "The department concerned, or Document Control, waives a need.");
+            return Problems.Forbidden("WAIVER_NOT_ALLOWED", "The department concerned, or the control function, waives a need.");
         if (need.State == RequirementStates.Met) return Problems.Conflict("NEED_MET", "The document is already there.");
         var note = request.Note?.Trim() ?? "";
         if (note.Length == 0) return Problems.Invalid("NOTE_REQUIRED", "Say why the activity can go without it.");
@@ -394,7 +394,7 @@ public static partial class ScheduleEndpoints
         var need = await db.Requirements.SingleOrDefaultAsync(r => r.Id == needId && r.ActivityId == activityId && r.ProjectId == access.Project.Id, cancellationToken);
         if (need is null) return NotFound();
         if (!await MayWaiveAsync(db, access, need, cancellationToken))
-            return Problems.Forbidden("WAIVER_NOT_ALLOWED", "The department concerned, or Document Control, withdraws a waiver.");
+            return Problems.Forbidden("WAIVER_NOT_ALLOWED", "The department concerned, or the control function, withdraws a waiver.");
         need.WaiverNote = null;
         need.WaivedByName = null;
         need.WaivedAt = null;

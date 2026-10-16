@@ -5,7 +5,7 @@ namespace Delios.Host.Transmittals;
 /// <summary>
 /// Somebody asking for a released revision to be sent: to whom, and why.
 /// Releasing a revision and telling people about it are two acts; the second is
-/// always asked for. Document Control carries a request out, or, on a project
+/// always asked for. The control function carries a request out, or, on a project
 /// where nobody holds that function, the person who asked.
 /// </summary>
 public sealed class IssueRequest
@@ -41,7 +41,7 @@ public sealed class IssueRequest
     /// <summary>When it was carried out or cancelled; empty while it is still open.</summary>
     public Instant? ClosedAt { get; set; }
     public string? ClosedByName { get; set; }
-    /// <summary>Who Document Control took off it when releasing, by whom and when; kept beside what was asked.</summary>
+    /// <summary>Who the control function took off it when releasing, by whom and when; kept beside what was asked.</summary>
     public string? ReleaseNote { get; set; }
     /// <summary>
     /// Row version kept by the database; EF Core uses it to detect two people changing the same request at once.
@@ -88,7 +88,7 @@ public sealed class Transmittal
     /// <summary>Incoming: the sender's own number for it, when they quote one.</summary>
     public string? TheirReference { get; set; }
     /// <summary>
-    /// Incoming, recorded by Document Control for an organization that works in its own system: their covering
+    /// Incoming, recorded by the control function for an organization that works in its own system: their covering
     /// letter or e-mail, as proof of what came in.
     /// </summary>
     public Guid? ProofFileId { get; set; }
@@ -119,7 +119,7 @@ public sealed class Transmittal
     public Guid? FollowsId { get; set; }
     public string? FollowKind { get; set; }
     /// <summary>
-    /// The schedule action it asks a document to be added to. Document Control answers it on the action's page:
+    /// The schedule action it asks a document to be added to. The control function answers it on the action's page:
     /// the document added there (or a reason it is not) closes the request, with who and when.
     /// </summary>
     public Guid? ActivityId { get; set; }
@@ -129,7 +129,7 @@ public sealed class Transmittal
     public string? ActivityAnsweredByName { get; set; }
     public string? ActivityAnswer { get; set; }
     /// <summary>
-    /// Raised where the project wants management to confirm these requests: Document Control checks it and says
+    /// Raised where the project wants management to confirm these requests: The control function checks it and says
     /// exactly what would change (<see cref="ActivityProposal"/>, JSON), management confirms or refuses, and the
     /// change is applied by itself on confirmation. Fixed when raised, so a later change of setting leaves it be.
     /// </summary>
@@ -167,7 +167,7 @@ public static class TransmittalItemKinds
     public const string Submission = "SUBMISSION";
     /// <summary>
     /// Incoming: something not planned (an RFI, an NCR, minutes…), files with the sender's reference. It stays on the
-    /// transmittal until Document Control registers it.
+    /// transmittal until the control function registers it.
     /// </summary>
     public const string Unplanned = "UNPLANNED";
     /// <summary>Files kept with something received after it was recorded, apart from what arrived.</summary>
@@ -202,7 +202,7 @@ public sealed class TransmittalItem
     public int? Submission { get; set; }
     /// <summary>Unplanned: what the sender says it is, from the document types (RFI, NCR, MOM…).</summary>
     public string? DocType { get; set; }
-    /// <summary>Unplanned: when Document Control put it in our register, and by whom. DocumentId is then set.</summary>
+    /// <summary>Unplanned: when the control function put it in our register, and by whom. DocumentId is then set.</summary>
     public Instant? RegisteredAt { get; set; }
     public string? RegisteredByName { get; set; }
 }

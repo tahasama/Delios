@@ -77,7 +77,7 @@ public static class GovernanceEndpoints
     }
 
     /// <summary>
-    /// Document Control withdraws the approval a released revision stands on. The review is kept as it was, marked;
+    /// The control function withdraws the approval a released revision stands on. The review is kept as it was, marked;
     /// the document is withdrawn until a replacement is released; its author is told.
     /// </summary>
     private static async Task<IResult> WithdrawApprovalAsync(Guid revisionId, WithdrawApprovalRequest r, HttpContext h, DeliosDbContext db,

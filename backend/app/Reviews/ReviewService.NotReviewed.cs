@@ -18,7 +18,7 @@ public sealed partial class ReviewService
     /// A revision of a document type the organization does not review (its
     /// published <c>review</c> property is false) goes from preparation straight to
     /// release. Whoever would have sent it for review settles its status here, and
-    /// who receives it. It waits for Document Control as a decided review would, on
+    /// who receives it. It waits for the control function as a decided review would, on
     /// a review with no steps; where nobody holds that function, it is released at once.
     /// </summary>
     public async Task<(Review? Review, IResult? Problem)> SendOnAsync(
@@ -30,7 +30,7 @@ public sealed partial class ReviewService
         if (!access.Allows(Verbs.Create, document.Facts) && !access.Allows(Verbs.Revise, document.Facts)
             && revision.AuthoredById != access.UserId && !access.Allows(Verbs.Control, document.Facts))
         {
-            return Fail(Problems.Forbidden("SEND_ON_NOT_ALLOWED", "Only the author, someone who may revise it, or Document Control sends it on."));
+            return Fail(Problems.Forbidden("SEND_ON_NOT_ALLOWED", "Only the author, someone who may revise it, or the control function sends it on."));
         }
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         if (catalog.Prop(ValueSets.DocumentTypes, document.DocType, "review") is not { ValueKind: JsonValueKind.False })

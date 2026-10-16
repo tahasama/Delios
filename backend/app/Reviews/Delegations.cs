@@ -21,16 +21,16 @@ public sealed record DelegationView(Guid Id, int Step, Guid FromUserId, string F
 /// <summary>Somebody a step can be handed to. <c>InMatrix</c>: the matrix names them for the act on this document.</summary>
 public sealed record DelegationCandidate(Guid Id, string Name, string FunctionName, bool InMatrix);
 
-/// <summary>What the hand-over form needs: who may take it, whether Document Control puts it in force, and whether the matrix binds.</summary>
+/// <summary>What the hand-over form needs: who may take it, whether the control function puts it in force, and whether the matrix binds.</summary>
 public sealed record DelegationOptions(IReadOnlyList<DelegationCandidate> Candidates, bool ThroughControl, bool Strict, bool Off);
 
 /// <summary>
 /// Handing a review step to somebody else until a date. Whoever sits on the open
-/// step hands it over; where Document Control carries this act out (the
+/// step hands it over; where the control function carries this act out (the
 /// project's DELEGATE answer) the hand-over waits for them, otherwise it is in
 /// force at once. The matrix recommends who: somebody it does not name for the
 /// act is flagged, and refused only where the project makes the matrix the only
-/// rule (<c>POLICY_MATRIX</c> = STRICT). Document Control and administrators are
+/// rule (<c>POLICY_MATRIX</c> = STRICT). The control function and administrators are
 /// never offered: they hold every verb for emergencies, not to review.
 /// </summary>
 public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock clock, Notifications.Notifier notifier)
@@ -98,7 +98,7 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
         if (takes is null)
         {
             return (null, Problems.Invalid("NOT_A_CANDIDATE",
-                "That person cannot take this step: they are not active on the project, already sit on it, or hold Document Control or administration for emergencies."));
+                "That person cannot take this step: they are not active on the project, already sit on it, or hold the control function or administration for emergencies."));
         }
         var verb = step.Deciding ? Verbs.Approve : Verbs.Review;
         var act = step.Deciding ? "decide" : "advise";
@@ -150,7 +150,7 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
         return (View(row), null);
     }
 
-    /// <summary>Document Control puts an asked-for hand-over in force. The matrix is applied as it stands now.</summary>
+    /// <summary>The control function puts an asked-for hand-over in force. The matrix is applied as it stands now.</summary>
     public async Task<(DelegationView? Delegation, IResult? Problem)> GrantAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
     {
         var (row, review, problem) = await AnswerableAsync(access, id, "lets a hand-over start", cancellationToken);
@@ -173,13 +173,13 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
         row.GrantedByName = access.UserName;
         row.GrantedAt = clock.GetCurrentInstant();
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "DELEGATION_GRANTED", "Review", review.Id, review.Number,
-            $"{row.FromName} → {row.ToName}: started, let by Document Control.", review.ProjectId, cancellationToken);
+            $"{row.FromName} → {row.ToName}: started, let by the control function.", review.ProjectId, cancellationToken);
         await TellAsync(review, [row.ToUserId], $"You answer review {review.Number} for {row.FromName}", $"Until {row.EndDate:yyyy-MM-dd}.", cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return (View(row), null);
     }
 
-    /// <summary>Document Control declines an asked-for hand-over, saying why.</summary>
+    /// <summary>The control function declines an asked-for hand-over, saying why.</summary>
     public async Task<(DelegationView? Delegation, IResult? Problem)> RefuseAsync(
         ProjectAccess access, Guid id, RefuseDelegationRequest request, CancellationToken cancellationToken)
     {
@@ -198,14 +198,14 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
         return (View(row), null);
     }
 
-    /// <summary>The person who gave it, or Document Control, ends a hand-over before its date.</summary>
+    /// <summary>The person who gave it, or the control function, ends a hand-over before its date.</summary>
     public async Task<(DelegationView? Delegation, IResult? Problem)> EndAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
     {
         var row = await db.Set<ReviewDelegation>().SingleOrDefaultAsync(d => d.Id == id && d.ProjectId == access.Project.Id, cancellationToken);
         if (row is null) return (null, Problems.NotFound("DELEGATION_NOT_FOUND", "No such delegation."));
         if (row.FromUserId != access.UserId && !access.Holds(Verbs.Control))
         {
-            return (null, Problems.Forbidden("NOT_YOURS", "Only the person who handed the step over, or Document Control, ends it."));
+            return (null, Problems.Forbidden("NOT_YOURS", "Only the person who handed the step over, or the control function, ends it."));
         }
         if (row.Status is not (DelegationStates.Open or DelegationStates.Active)) return (null, Problems.Conflict("NOT_IN_FORCE", "It has not started."));
         row.Status = DelegationStates.Withdrawn;
@@ -217,13 +217,13 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
         return (View(row), null);
     }
 
-    /// <summary>An asked-for hand-over Document Control may answer now.</summary>
+    /// <summary>An asked-for hand-over the control function may answer now.</summary>
     private async Task<(ReviewDelegation? Row, Review? Review, IResult? Problem)> AnswerableAsync(
         ProjectAccess access, Guid id, string act, CancellationToken cancellationToken)
     {
         var row = await db.Set<ReviewDelegation>().SingleOrDefaultAsync(d => d.Id == id && d.ProjectId == access.Project.Id, cancellationToken);
         if (row is null) return (null, null, Problems.NotFound("DELEGATION_NOT_FOUND", "No such delegation."));
-        if (!access.Holds(Verbs.Control)) return (null, null, Problems.Forbidden("CONTROL_ONLY", $"Document Control {act}."));
+        if (!access.Holds(Verbs.Control)) return (null, null, Problems.Forbidden("CONTROL_ONLY", $"The control function {act}."));
         if (row.Status != DelegationStates.Open) return (null, null, Problems.Conflict("ALREADY_ANSWERED", "That request has already been answered."));
         var review = await LoadAsync(access, row.ReviewId, cancellationToken);
         return (row, review, null);
@@ -231,7 +231,7 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
 
     /// <summary>
     /// Everybody active on the project who could take this step, the matrix's people first: never the one handing it
-    /// over, never somebody already on the step, never a holder of Document Control or administration.
+    /// over, never somebody already on the step, never a holder of the control function or administration.
     /// </summary>
     private async Task<List<DelegationCandidate>> CandidatesAsync(
         ProjectAccess access, Review review, ReviewStep step, CancellationToken cancellationToken, Guid? from = null)
@@ -247,7 +247,7 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
             .ToListAsync(cancellationToken);
         return members
             .Where(x => x.m.UserId != giver && !seated.Contains(x.m.UserId))
-            .Select(x => new { x, their = ProjectAccess.OfFunction(access.Project, x.m.Function!, x.m.UserId, x.Name) })
+            .Select(x => new { x, their = ProjectAccess.OfFunction(access.Project, x.m.Function!, x.m.UserId, x.Name, x.m.ActsAsControl) })
             .Where(y => !y.their.Holds(Verbs.Control) && !y.their.Holds(Verbs.Configure))
             .Select(y => new DelegationCandidate(y.x.m.UserId, y.x.Name, y.x.m.Function!.Name, y.their.Allows(verb, document.Facts)))
             .OrderByDescending(c => c.InMatrix).ThenBy(c => c.Name)

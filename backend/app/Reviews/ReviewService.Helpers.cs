@@ -101,17 +101,17 @@ public sealed partial class ReviewService
     /// <summary>How many people hold a function with the CONTROL verb on the project.</summary>
     private Task<int> ControlHoldersAsync(Guid projectId, CancellationToken cancellationToken) =>
         db.Memberships.CountAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
-            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))
+            && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
 
-    /// <summary>Whether the caller has the Document Control verb on the review's document.</summary>
+    /// <summary>Whether the caller has the CONTROL verb on the review's document.</summary>
     private async Task<bool> HoldsControlAsync(ProjectAccess access, Review review, CancellationToken cancellationToken)
     {
         var document = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == review.DocumentId, cancellationToken);
         return access.Allows(Verbs.Control, document.Facts);
     }
 
-    /// <summary>Document Control, or, where the project has nobody in that role, the people who decided.</summary>
+    /// <summary>The control function, or, where the project has nobody in that role, the people who decided.</summary>
     private async Task<bool> MayActForControlAsync(ProjectAccess access, Review review, CancellationToken cancellationToken)
     {
         if (await HoldsControlAsync(access, review, cancellationToken)) return true;
@@ -126,11 +126,11 @@ public sealed partial class ReviewService
         ProjectAccess.OfFunction(project, function).Allows(verb, facts);
 
     /// <summary>The review's step that is open now, or null when none is.</summary>
-    /// <summary>What the caller may do on this review now: answer the open step, act as Document Control on it.</summary>
+    /// <summary>What the caller may do on this review now: answer the open step, act as the control function on it.</summary>
     /// <param name="OnBehalfOf">When the caller answers in somebody else's place, by a hand-over in force: that person's name.</param>
     public sealed record ReviewMe(bool Seated, bool Answered, bool Control, string? OnBehalfOf = null);
 
-    /// <summary>For the review page: whether the caller sits on the open step (and has answered), and whether they act for Document Control. Null when they cannot see it.</summary>
+    /// <summary>For the review page: whether the caller sits on the open step (and has answered), and whether they act for the control function. Null when they cannot see it.</summary>
     public async Task<ReviewMe?> MeAsync(ProjectAccess access, Guid reviewId, CancellationToken cancellationToken)
     {
         var review = await LoadAsync(access, reviewId, cancellationToken);

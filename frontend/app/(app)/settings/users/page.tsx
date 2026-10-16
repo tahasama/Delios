@@ -18,7 +18,7 @@ import { noticesAbout, noticeHistory } from "@/lib/actions/api";
 import { NotifyPanel } from "@/components/notify-panel";
 import { fromToday } from "@/lib/core/days";
 import { NoAccess } from "../no-access";
-import { JoinForm } from "./join-form";
+import { AddSomeoneForm, AskToJoinForm } from "./join-form";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "People & access" };
@@ -29,11 +29,12 @@ type Pending = {
 };
 
 /**
- * Who is on the project, in which function and department; and how someone joins it. Joining is a request
- * management confirms (on by default; a project may untick it in the Control room), raised here by Document Control
- * (or management, where the project has none), with the email or letter it came on as proof, and by anyone of ours
- * from "Ask for someone to join". Confirmed, they are put on by themselves and told; Document Control may remind
- * whoever confirms. The list: everyone, narrowed by organization and project, each with their place here.
+ * Who is on the project, in which function and department; and how someone joins it. Two switches of the project
+ * (Control room): who adds (only the control function, the default, or everyone on the project, from the directory)
+ * and whether whoever holds Manage confirms (necessary by default). Here: "Add someone" with an account, and "Ask for
+ * someone to join" for someone new, with the email or letter it came on as proof. Confirmed, they are put on by
+ * themselves and told; the control function may remind whoever confirms. The list: everyone, narrowed by organization
+ * and project, each with their place here.
  */
 export default async function PeoplePage({ searchParams }: { searchParams: Promise<{ org?: string; project?: string }> }) {
   const ctx = await requireScope();
@@ -46,7 +47,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   const [people, parties, projects, functions, disciplines, answers, managers, taking, pending] = await Promise.all([
     adminUsers(),
     adminParties(),
-    // Document Control works on the projects it is on; an administrator on any.
+    // The control function works on the projects it is on; an administrator on any.
     adminProjects().catch(async () => (await getMe())?.projects ?? []).then((all) => all.filter((one) => one.status === "ACTIVE")),
     adminFunctions().then((all) => all.filter((one) => one.active).sort((a, b) => a.name.localeCompare(b.name))),
     getActiveSet("DISCIPLINES").then((all) => all.map((one) => ({ code: one.code, label: one.label })).sort((x, y) => x.label.localeCompare(y.label))),
@@ -56,11 +57,11 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
     api<Pending[]>(projectPath(ctx, "/people/pending")).catch(() => [] as Pending[]),
   ]);
 
-  // Whether someone put on here goes straight on, or management is asked first (the backend decides the same way).
+  // Whether someone put on here goes straight on, or is asked first (the backend decides the same way).
   const admin = isAdmin(me);
-  const mayAdd = admin || (withControl ? ctx.can("CONTROL") : ctx.can("MANAGE") || ctx.can("CONTROL"));
+  const mayAdd = admin || ctx.can("CONTROL") || (!withControl && me.isInternal);
   const confirmOn = effectiveAnswer(CONFIRM_KEY("PROJECT_PEOPLE"), answers.get(CONFIRM_KEY("PROJECT_PEOPLE"))) === "ON";
-  const asks = !admin && (!mayAdd || (withControl && confirmOn));
+  const asks = !admin && (!mayAdd || confirmOn);
 
   const deptLabel = (code: string) => disciplines.find((d) => d.code === code)?.label ?? code;
   const takesPart = new Set(taking.filter((one) => one.active).map((one) => one.partyId));
@@ -103,15 +104,14 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
             <h1 className="plate-title text-slate-950">People &amp; access</h1>
             <p className="plate-meta mt-2">
               {onProject.length} on {project.code}
-              {pending.length ? <> · <span className="text-amber-800">{pending.length} waiting for management</span></> : null}
+              {pending.length ? <> · <span className="text-amber-800">{pending.length} waiting to be confirmed</span></> : null}
               {refused ? <> · {refused} refused</> : null}
             </p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-              {withControl && confirmOn
-                ? `Joining ${project.code} is a request management confirms; confirmed, they are put on by themselves and told by notification and email.`
-                : withControl
-                  ? `On ${project.code} Document Control puts people on directly; they are told by notification and email.`
-                  : `${project.code} has no Document Control: management puts people on; anyone else asks management.`}
+              {withControl ? `On ${project.code} only the control function adds people` : `On ${project.code} everyone on the project adds people, from the project directory`}
+              {confirmOn
+                ? "; whoever holds Manage confirms each one, and once confirmed they are put on by themselves and told by notification and email."
+                : "; no confirmation: they are on at once, and told by notification and email."}
               {admin ? " As an administrator, what you add goes straight on." : ""}
               {" "}<Link href="/settings/flow#how-it-works" className="font-semibold text-link hover:underline">Change it in the Control room</Link>.
             </p>
@@ -122,26 +122,37 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
         </div>
       </section>
 
-      {/* Someone joins: the one form, with or without management first. */}
+      {/* Someone joins: someone with an account, or someone new. */}
       <section className="register register-sheet register-sheet-open scroll-mt-24" id="join" aria-labelledby="join-head">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span id="join-head" className="stencil mr-1 text-slate-500">Someone joins {project.code}</span>
           <span className="text-[11px] text-slate-500">
-            {asks ? "management confirms; confirmed, they are put on and told" : "they are put on at once and told"}
+            {asks ? "asked first; confirmed, they are put on and told" : "they are put on at once and told"}
           </span>
         </div>
         <div className="px-5 py-4 sm:px-6">
-          <JoinForm
-            projectCode={project.code}
-            people={notHere.map((u) => ({ id: u.id, name: u.name, detail: [u.partyName, u.email].filter(Boolean).join(" · ") }))}
-            ourParties={ourParties.map((p) => ({ value: p.id, label: p.name }))}
-            guestParties={guestParties.map((p) => ({ value: p.id, label: `${p.name}${takesPart.has(p.id) ? "" : ` (not taking part in ${project.code} yet)`}` }))}
-            functions={functions.map((f) => ({ value: f.id, label: f.name }))}
-            disciplines={disciplines.map((d) => ({ value: d.code, label: d.label }))}
-            confirmers={confirmers}
-            asks={asks}
-            mayKeepProof={ctx.can("CONTROL")}
-          />
+          <div className="space-y-3">
+            {mayAdd ? (
+              <AddSomeoneForm
+                projectCode={project.code}
+                people={notHere.map((u) => ({ id: u.id, name: u.name, detail: [u.partyName, u.email].filter(Boolean).join(" · ") }))}
+                functions={functions.map((f) => ({ value: f.id, label: f.name }))}
+                disciplines={disciplines.map((d) => ({ value: d.code, label: d.label }))}
+                confirmers={confirmers}
+                asks={asks}
+              />
+            ) : null}
+            <AskToJoinForm
+              projectCode={project.code}
+              ourParties={ourParties.map((p) => ({ value: p.id, label: p.name }))}
+              guestParties={guestParties.map((p) => ({ value: p.id, label: `${p.name}${takesPart.has(p.id) ? "" : ` (not taking part in ${project.code} yet)`}` }))}
+              functions={functions.map((f) => ({ value: f.id, label: f.name }))}
+              disciplines={disciplines.map((d) => ({ value: d.code, label: d.label }))}
+              confirmers={confirmers}
+              asks={asks}
+              mayKeepProof={ctx.can("CONTROL")}
+            />
+          </div>
           <p className="mt-3 text-[11px] leading-4 text-slate-500">
             Someone whose company has its own DELIOS is not added here: link the two organizations on{" "}
             <Link href="/settings/parties" className="font-semibold text-link hover:underline">Organizations</Link>; their administrator puts them on.
@@ -149,11 +160,11 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
         </div>
       </section>
 
-      {/* Waiting for management: who, as what, since when, who confirms; Document Control may remind them. */}
+      {/* Waiting to be confirmed: who, as what, since when, who confirms; the control function may remind them. */}
       {pending.length ? (
         <section className="register register-sheet register-sheet-open" aria-labelledby="pending-head">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-            <span id="pending-head" className="stencil mr-1 text-slate-500">Waiting for management</span>
+            <span id="pending-head" className="stencil mr-1 text-slate-500">Waiting to be confirmed</span>
             <span className="text-[11px] text-slate-500">they join once confirmed, on People to confirm</span>
           </div>
           <ul className="divide-y divide-line">
@@ -167,7 +178,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                       {one.name}
                       <span className="ml-1.5 text-xs font-normal text-slate-500">{[one.organization, one.function, one.department ? deptLabel(one.department) : null].filter(Boolean).join(" · ")}</span>
                     </p>
-                    <ToneChip tone="waiting">waiting for {one.confirmerName ?? "management"}</ToneChip>
+                    <ToneChip tone="waiting">waiting for {one.confirmerName ?? "whoever holds Manage"}</ToneChip>
                   </div>
                   <p className="text-xs leading-5 text-slate-600">
                     Asked by {one.proposedBy ?? "someone"}, {fromToday(one.since.slice(0, 10))?.toLowerCase() ?? one.since.slice(0, 10)}.{" "}
@@ -237,7 +248,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                 <Td className="text-xs">{u.partyName ?? "—"}</Td>
                 <Td className="text-xs">
                   {here ? here.functionName
-                    : u.held?.pendingSince ? <ToneChip tone="waiting">{u.held.functionName} · waiting for {u.held.confirmerName ?? "management"}</ToneChip>
+                    : u.held?.pendingSince ? <ToneChip tone="waiting">{u.held.functionName} · waiting for {u.held.confirmerName ?? "whoever holds Manage"}</ToneChip>
                     : u.held?.refusedAt ? <span className="whitespace-pre-line text-red-700">{u.held.functionName} · refused by {u.held.refusedByName}: {u.held.refusedReason}</span>
                     : <span className="text-slate-500">not on it</span>}
                 </Td>

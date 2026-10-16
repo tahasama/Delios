@@ -27,19 +27,19 @@ public sealed record CloseCommentRequest(string? Resolution);
 public sealed record AnswerRequest(string? Verdict = null, string? Status = null, string? Note = null, IssueAsk? Issue = null,
     string? ForeignAnswer = null, Guid? EvidenceFileId = null, int? ClosesWithStep = null);
 /// <summary>Body of a release request. <c>Status</c>, if given, must equal the status the deciding step granted.</summary>
-/// <param name="Outcome">Document Control's outcome to record, from its own published set.</param>
+/// <param name="Outcome">the control function's outcome to record, from its own published set.</param>
 public sealed record ReleaseRequest(string? Status = null, string? Outcome = null, Transmittals.IssueAsk? Issue = null,
     IReadOnlyList<KeptRecipients>? Kept = null);
 
 /// <summary>
-/// Of an open request asking who receives the revision, the people and organizations Document Control keeps when
+/// Of an open request asking who receives the revision, the people and organizations the control function keeps when
 /// releasing. Anyone left out is taken off that request, and the request says so; nobody is added this way.
 /// </summary>
 public sealed record KeptRecipients(Guid RequestId, Guid[]? UserIds, Guid[]? PartyIds);
-/// <summary>Body of a return request: Document Control sends the revision back to its author, or the route back to a step. <c>Note</c> is required; <c>Reason</c> is required when going back to a step.</summary>
+/// <summary>Body of a return request: The control function sends the revision back to its author, or the route back to a step. <c>Note</c> is required; <c>Reason</c> is required when going back to a step.</summary>
 /// <param name="ToStep">Null sends the revision back to its author; a step number (from 1) sends the route back to that step.</param>
 /// <param name="Outcome">
-/// Document Control's outcome, from its own published set. Whether the revision
+/// The control function's outcome, from its own published set. Whether the revision
 /// comes back corrected under the same value or is replaced by a new one follows
 /// from it, and from the verdict: one that asked for changes always needs a new revision.
 /// </param>
@@ -52,7 +52,7 @@ public sealed record RewindRequest(int ToStep, string? Reason, string? Note);
 /// <summary>
 /// A review is a route of steps over one revision. Each step is answered by the
 /// people holding a function on the project; the last step decides, the ones
-/// before it advise. Document Control then releases what was decided, or sends it
+/// before it advise. The control function then releases what was decided, or sends it
 /// back, and may never decide. A revision that comes back is replaced by the next
 /// one, never corrected.
 /// </summary>

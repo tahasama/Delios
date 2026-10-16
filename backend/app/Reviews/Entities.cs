@@ -102,7 +102,7 @@ public sealed class Review
     /// request: its one step is theirs, and its answer settles the request, not the revision.
     /// </summary>
     public Guid? IssueRequestId { get; set; }
-    /// <summary>The approval this review gave, withdrawn afterwards by Document Control: when, by whom, why. The review itself is kept as it was.</summary>
+    /// <summary>The approval this review gave, withdrawn afterwards by the control function: when, by whom, why. The review itself is kept as it was.</summary>
     public Instant? ApprovalWithdrawnAt { get; set; }
     public string? ApprovalWithdrawnByName { get; set; }
     public string? ApprovalWithdrawnReason { get; set; }
@@ -122,13 +122,13 @@ public static class ReviewStates
 {
     /// <summary>Steps are answering.</summary>
     public const string InProgress = "IN_PROGRESS";
-    /// <summary>The deciding step has answered; Document Control releases or sends back.</summary>
+    /// <summary>The deciding step has answered; The control function releases or sends back.</summary>
     public const string Decided = "DECIDED";
-    /// <summary>Document Control released the revision; the review is closed.</summary>
+    /// <summary>The control function released the revision; the review is closed.</summary>
     public const string Released = "RELEASED";
     /// <summary>The revision was sent back to its author or sender; the review is closed.</summary>
     public const string Returned = "RETURNED";
-    /// <summary>The author or Document Control took the revision back out of review to change it; the reason is the review's note.</summary>
+    /// <summary>The author or the control function took the revision back out of review to change it; the reason is the review's note.</summary>
     public const string Withdrawn = "WITHDRAWN";
 }
 
@@ -292,13 +292,13 @@ public sealed class ReviewDelegation
 /// <summary>Where a <see cref="ReviewDelegation"/> stands.</summary>
 public static class DelegationStates
 {
-    /// <summary>Asked for; Document Control has not put it in force.</summary>
+    /// <summary>Asked for; The control function has not put it in force.</summary>
     public const string Open = "OPEN";
     /// <summary>In force until its end date.</summary>
     public const string Active = "ACTIVE";
-    /// <summary>Document Control declined it, with a reason.</summary>
+    /// <summary>The control function declined it, with a reason.</summary>
     public const string Refused = "REFUSED";
-    /// <summary>Ended before its date, by the person who gave it or by Document Control.</summary>
+    /// <summary>Ended before its date, by the person who gave it or by the control function.</summary>
     public const string Withdrawn = "WITHDRAWN";
 }
 
@@ -319,7 +319,7 @@ public static class ReviewSets
     /// <summary>Why a review is sent back to one of its steps.</summary>
     public const string ReturnReasons = "RETURN_REASONS";
     /// <summary>
-    /// Document Control's own outcomes, never a review verdict. Props: act = accept
+    /// The control function's own outcomes, never a review verdict. Props: act = accept
     /// (on arrival) | return | release; newRevision (bool): whether what it returns
     /// needs a new revision or comes back corrected under the same one.
     /// </summary>

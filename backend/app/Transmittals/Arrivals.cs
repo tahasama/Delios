@@ -4,11 +4,11 @@ using Delios.Host.Reviews;
 
 namespace Delios.Host.Transmittals;
 
-/// <summary>What Document Control's check on arrival said of one submission: still to check, returned, or accepted; who, when, why.</summary>
+/// <summary>What the control function's check on arrival said of one submission: still to check, returned, or accepted; who, when, why.</summary>
 public sealed record ArrivalView(string State, string? By, DateTimeOffset? At, string? Note);
 
 /// <summary>
-/// Where a submission another organization sent stands with Document Control's check on arrival, said once for the
+/// Where a submission another organization sent stands with the control function's check on arrival, said once for the
 /// transmittal list and the transmittal page. The check is kept on the submission itself (<see cref="SubmissionRecord.Check"/>);
 /// a submission checked before that was kept is read from the revision: still received is to check, back with the
 /// sender is returned, and an older submission is returned when its outcome is a return.

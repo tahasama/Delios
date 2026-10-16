@@ -96,9 +96,9 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
   {
     key: "PROJECT_PEOPLE",
     title: "Adding people to the project",
-    text: "Somebody new joins the project, with a function and a discipline.",
-    control: "Document Control adds them.",
-    self: "Management adds them.",
+    text: "Somebody joins the project, with a function and a department. Anyone of ours may always ask for someone new, from the project directory.",
+    control: "Only the control function adds them (People & access).",
+    self: "Everyone on the project adds them, from the project directory.",
   },
   {
     key: "VOID",
@@ -136,10 +136,19 @@ export const SKIP_KEY = (key: string) => `SKIP:${key}`;
  */
 export const CONFIRMABLE: Record<string, string> = {
   ACTION_LINKS: "Document Control checks the request, then management confirms or refuses it; once confirmed it is applied by itself.",
-  PROJECT_PEOPLE: "Document Control adds them, then management confirms or refuses; until confirmed they are not on the project.",
+  PROJECT_PEOPLE: "Whoever holds Manage confirms or refuses each addition; until confirmed they are not on the project.",
 };
 
 export const CONFIRM_KEY = (key: string) => `CONFIRM:${key}`;
+
+/** Who adds people to the project: a switch of its own (only the control function, or everyone on the project). */
+export const PEOPLE_KEY = "PROJECT_PEOPLE";
+/** The two answers of that switch, in the project's words. */
+export const PEOPLE_MODE_LABEL: Record<ControlMode, string> = {
+  CONTROL: "Only the control function",
+  SELF: "Everyone on the project",
+  FOLLOW: "Only the control function",
+};
 
 /** Has the organization left this act out? */
 export async function actIsOff(t: Tenant, key: string): Promise<boolean> {
@@ -201,6 +210,9 @@ const answers = cache(async (t: Tenant): Promise<Map<string, string>> => project
 
 export async function controlDoes(t: Tenant, key: string): Promise<boolean> {
   const rows = [...(await answers(t))].map(([k, mode]) => ({ key: k, mode }));
+  // Who adds people: its own switch, only the control function unless the project lets everyone add (a project is
+  // taken to have one), whatever the project answers for the other acts. As the backend reads it.
+  if (key === PEOPLE_KEY) return rows.find((one) => one.key === key)?.mode !== "SELF";
   const all = rows.find((one) => one.key === PROJECT_KEY)?.mode;
   if (all === "CONTROL") return true;
   if (all === "SELF") return false;
@@ -402,15 +414,16 @@ export function controlFrom(byKey: Map<string, string>, follows: boolean): Contr
     set,
     rows: CONTROL_ACTIVITIES.map((activity) => {
       const own = (byKey.get(activity.key) ?? "FOLLOW") as ControlMode;
-      const mine = own === "CONTROL" ? true : own === "SELF" ? false : activity.workByDefault ? false : follows;
+      const mine = own === "CONTROL" ? true : own === "SELF" ? false : activity.workByDefault ? false
+        : activity.key === PEOPLE_KEY ? true : follows;
       return {
         activity,
         mode: own,
         // Until the project answers for everything, each act reads its own
         // default — which for most is the project's control function.
-        controlDoes: !set ? mine : projectMode === "CONTROL" ? true : projectMode === "SELF" ? false : mine,
+        controlDoes: !set || activity.key === PEOPLE_KEY ? mine : projectMode === "CONTROL" ? true : projectMode === "SELF" ? false : mine,
         off: !!SKIPPABLE[activity.key] && byKey.get(SKIP_KEY(activity.key)) === "OFF",
-        confirm: !!CONFIRMABLE[activity.key] && byKey.get(CONFIRM_KEY(activity.key)) === "ON",
+        confirm: !!CONFIRMABLE[activity.key] && effectiveAnswer(CONFIRM_KEY(activity.key), byKey.get(CONFIRM_KEY(activity.key))) === "ON",
       };
     }),
   };

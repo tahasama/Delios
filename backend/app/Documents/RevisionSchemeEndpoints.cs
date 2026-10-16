@@ -27,7 +27,7 @@ public static class RevisionSchemeEndpoints
 {
     public static void MapRevisionSchemeEndpoints(this IEndpointRouteBuilder app)
     {
-        // Document Control keeps these, as well as administrators: the same as numbering.
+        // The control function keeps these, as well as administrators: the same as numbering.
         var keepers = app.MapGroup("/api/admin/revisions").WithTags("Administration")
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter(Keepers.Filter);

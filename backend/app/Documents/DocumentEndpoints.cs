@@ -175,7 +175,7 @@ public static class DocumentEndpoints
             $"/api/projects/{access.Project.Id}/documents/{documentId}", View(revision!));
     }
 
-    /// <summary>POST .../revisions/{revisionId}/submissions: sends corrected files for a revision Document Control returned.</summary>
+    /// <summary>POST .../revisions/{revisionId}/submissions: sends corrected files for a revision the control function returned.</summary>
     private static async Task<IResult> ResubmitAsync(
         Guid documentId, Guid revisionId, StartRevisionRequest request, HttpContext http, DocumentService documents,
         CancellationToken cancellationToken)
@@ -222,7 +222,7 @@ public static class DocumentEndpoints
         var revision = await db.Revisions.AsNoTracking().SingleOrDefaultAsync(r => r.Id == revisionId && r.DocumentId == documentId, cancellationToken);
         if (revision is null) return Problems.NotFound("REVISION_NOT_FOUND", "No such revision.");
         if (revision.AuthoredById != access.UserId && !access.Holds(Verbs.Control))
-            return Problems.Forbidden("AUTHOR_OR_CONTROL", "Its author or Document Control updates a revision's files.");
+            return Problems.Forbidden("AUTHOR_OR_CONTROL", "Its author or the control function updates a revision's files.");
         if (revision.State == RevisionStates.InReview)
         {
             var reason = request.ChangeDescription?.Trim() ?? "";
@@ -235,7 +235,7 @@ public static class DocumentEndpoints
     }
 
     /// <summary>
-    /// POST .../revisions/{revisionId}/withdraw: its author or Document Control takes a revision out of its review to
+    /// POST .../revisions/{revisionId}/withdraw: its author or the control function takes a revision out of its review to
     /// edit it. The review closes as withdrawn, comments kept, everyone on it told; the revision is in preparation again.
     /// </summary>
     private static async Task<IResult> WithdrawAsync(

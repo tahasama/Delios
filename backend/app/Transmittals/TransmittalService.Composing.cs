@@ -16,7 +16,7 @@ public sealed partial class TransmittalService
     // ── Composing ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Body of a transmittal Document Control composes itself: released revisions, the people and outside parties
+    /// Body of a transmittal the control function composes itself: released revisions, the people and outside parties
     /// it goes to, why (a reason for issue), a subject, a message, and when an answer is due if one is wanted.
     /// </summary>
     public sealed record ComposeRequest(
@@ -142,7 +142,7 @@ public sealed partial class TransmittalService
         var ask = request.ActivityId is null ? null : request.ActivityAsk == "DISCIPLINE" ? "DISCIPLINE" : "DOCUMENT";
 
         // Placeholders: the one exception to "only released revisions travel" — a supplier's document with nothing
-        // released yet, asked of that supplier (theirs alone, from Document Control), with the day it is due.
+        // released yet, asked of that supplier (theirs alone, from the control function), with the day it is due.
         var placeholders = new List<(Document Document, LocalDate? Due)>();
         Party? supplierTo = null;
         if (placeholderIds.Count > 0)
@@ -152,7 +152,7 @@ public sealed partial class TransmittalService
             if (asked.Count != placeholderIds.Count)
                 return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "A document chosen does not exist or is not yours to see."));
             if (asked.FirstOrDefault(d => !access.Allows(Verbs.Control, d.Facts)) is { } notControl)
-                return Fail(Problems.Forbidden("CONTROL_ONLY", $"Document Control asks a supplier for {notControl.Number}."));
+                return Fail(Problems.Forbidden("CONTROL_ONLY", $"The control function asks a supplier for {notControl.Number}."));
             var owners = asked.Select(d => d.Originator).Distinct().ToList();
             var owner = owners.Count == 1 && owners[0] is { } code
                 ? await db.Parties.AsNoTracking().FirstOrDefaultAsync(p => p.Code == code && !p.IsInternal && p.Active, cancellationToken) : null;

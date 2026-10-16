@@ -122,7 +122,7 @@ public static partial class ScheduleEndpoints
                 named[d.ActivityId].Code, named[d.ActivityId].Name, d.PlannedStart?.ToDateOnly(), null, 1, d.RecordedAt.ToDateTimeOffset())));
         }
 
-        // Requests to add a document to an action: Document Control answers each one.
+        // Requests to add a document to an action: The control function answers each one.
         if (access.Holds(Verbs.Control))
         {
             var asks = await (from t in db.Transmittals.AsNoTracking()
@@ -153,7 +153,7 @@ public static partial class ScheduleEndpoints
         if (joining.Count > 0)
             work.Add(new ActionWork("CONFIRM_PERSON", null, null, null, null, null, joining.Count, joining[0]!.Value.ToDateTimeOffset()));
 
-        // The schedule's own upkeep: Document Control, or whoever plans.
+        // The schedule's own upkeep: The control function, or whoever plans.
         if (access.Holds(Verbs.Control) || access.Holds(Verbs.Plan))
         {
             var untagged = await db.Activities.CountAsync(a => a.ProjectId == projectId && a.State == ActivityStates.Active && a.Departments.Length == 0, cancellationToken);
@@ -176,18 +176,18 @@ public static partial class ScheduleEndpoints
         return Results.Ok(rows.Select(n => new NoticeView(n.Id, n.Subject, n.Automatic, n.Title, n.Body, n.RecipientNames, n.SentByName, n.SentAt.ToDateTimeOffset())));
     }
 
-    /// <summary>POST /notices: a person tells the people they chose. Document Control, or whoever plans the project.</summary>
+    /// <summary>POST /notices: a person tells the people they chose. The control function, or whoever plans the project.</summary>
     private static async Task<IResult> SendNoticeAsync(NoticeRequest request, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit,
         Notifications.Notifier notifier, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         var subject = request.Subject?.Trim() ?? "";
-        // Document Control or whoever plans the project; and, about a review, whoever started it.
+        // The control function or whoever plans the project; and, about a review, whoever started it.
         var mayTell = access.Holds(Verbs.Control) || access.Holds(Verbs.Plan)
             || (subject.StartsWith("review:") && Guid.TryParse(subject.Split(':')[1], out var reviewId)
                 && await db.Reviews.AnyAsync(r => r.Id == reviewId && r.ProjectId == access.Project.Id && r.StartedById == access.UserId, cancellationToken));
         if (!mayTell)
-            return Problems.Forbidden("NOTICE_NOT_ALLOWED", "Document Control, whoever plans the project, or whoever started the review sends these notices.");
+            return Problems.Forbidden("NOTICE_NOT_ALLOWED", "The control function, whoever plans the project, or whoever started the review sends these notices.");
         var title = request.Title?.Trim() ?? "";
         if (subject.Length == 0 || title.Length == 0) return Problems.Invalid("NOTICE_INCOMPLETE", "Say what the notice is about.");
         // What is written is kept whole: too long is refused, never cut.
@@ -218,7 +218,7 @@ public static partial class ScheduleEndpoints
 
     /// <summary>
     /// Whoever plans the project confirms a postponement, saying what changes, so a new schedule revision can be
-    /// expected. Everyone concerned and Document Control are told.
+    /// expected. Everyone concerned and the control function are told.
     /// </summary>
     private static async Task<IResult> ConfirmPostponementAsync(Guid activityId, Guid decisionId, DecisionNoteRequest request, HttpContext http,
         DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, TransmittalService transmittals, CancellationToken cancellationToken)
@@ -251,12 +251,12 @@ public static partial class ScheduleEndpoints
         return await ActivityAsync(activityId, http, db, clock, cancellationToken);
     }
 
-    /// <summary>Document Control takes a decision back, with why (a planner who would not confirm, a mistake). Kept, marked.</summary>
+    /// <summary>The control function takes a decision back, with why (a planner who would not confirm, a mistake). Kept, marked.</summary>
     private static async Task<IResult> ReverseDecisionAsync(Guid activityId, Guid decisionId, DecisionNoteRequest request, HttpContext http,
         DeliosDbContext db, IClock clock, AuditLog audit, Notifications.Notifier notifier, TransmittalService transmittals, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control takes a decision back.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function takes a decision back.");
         var reason = request.Note?.Trim() ?? "";
         if (reason.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why it is taken back.");
         var activity = await db.Activities.AsNoTracking().SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
@@ -339,11 +339,11 @@ public static partial class ScheduleEndpoints
             }
             if (together)
                 // One act: done when it went out, which is the release itself.
-                checkpoints.Add(Point(today, zone, "Release & issue", "Action's day", released, issued, "Document Control"));
+                checkpoints.Add(Point(today, zone, "Release & issue", "Action's day", released, issued, "The control function"));
             else
             {
-                checkpoints.Add(Point(today, zone, "Release", "Action's day", released, revision?.ReleasedAt, "Document Control"));
-                checkpoints.Add(Point(today, zone, "Issue", "Action's day", released, issued, "Document Control"));
+                checkpoints.Add(Point(today, zone, "Release", "Action's day", released, revision?.ReleasedAt, "The control function"));
+                checkpoints.Add(Point(today, zone, "Issue", "Action's day", released, issued, "The control function"));
             }
             result.Add(new NeedLateness(need.Id, document.Number, need.State, checkpoints, checkpoints.FirstOrDefault(c => c.Late)));
         }

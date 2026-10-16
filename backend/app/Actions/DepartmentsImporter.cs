@@ -21,7 +21,7 @@ public sealed record DepartmentsImportRequested(Guid TenantId, Guid RevisionId)
 /// The project manager's list of which disciplines each activity concerns, as a controlled document. A document
 /// whose type is marked as such a list is reviewed like any other; once a revision is released, the spreadsheet
 /// attached to it is read: each row names an activity and its disciplines. Activities the list does not name keep
-/// what they had. The list is read whole or not at all: one wrong row and nothing changes, and Document Control is
+/// what they had. The list is read whole or not at all: one wrong row and nothing changes, and the control function is
 /// told what to fix.
 /// </summary>
 public sealed class DepartmentsImporter(
@@ -163,7 +163,7 @@ public sealed class DepartmentsImporter(
         return (string.Join(", ", parts) + ".", []);
     }
 
-    /// <summary>The list's history among the uploaded lists, the audit trail, and Document Control told.</summary>
+    /// <summary>The list's history among the uploaded lists, the audit trail, and the control function told.</summary>
     private async Task RecordAsync(Project project, Document document, Revision revision, StoredFile? file, string label, string? summary,
         IReadOnlyList<string> problems, CancellationToken cancellationToken)
     {

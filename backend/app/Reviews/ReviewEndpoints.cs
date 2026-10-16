@@ -179,12 +179,12 @@ public static class ReviewEndpoints
         Guid reviewId, AnswerRequest request, HttpContext http, ReviewService reviews, CancellationToken cancellationToken) =>
         Result(await reviews.AnswerAsync(ProjectAccessFilter.Of(http), reviewId, request, cancellationToken));
 
-    /// <summary>POST <c>/reviews/{reviewId}/release</c>: Document Control releases the revision after a positive verdict.</summary>
+    /// <summary>POST <c>/reviews/{reviewId}/release</c>: The control function releases the revision after a positive verdict.</summary>
     private static async Task<IResult> ReleaseAsync(
         Guid reviewId, ReleaseRequest request, HttpContext http, ReviewService reviews, CancellationToken cancellationToken) =>
         Result(await reviews.ReleaseAsync(ProjectAccessFilter.Of(http), reviewId, request, cancellationToken));
 
-    /// <summary>POST <c>/reviews/{reviewId}/return</c>: Document Control returns the revision to its author after the verdict.</summary>
+    /// <summary>POST <c>/reviews/{reviewId}/return</c>: The control function returns the revision to its author after the verdict.</summary>
     private static async Task<IResult> ReturnAsync(
         Guid reviewId, ReturnRequest request, HttpContext http, ReviewService reviews, CancellationToken cancellationToken) =>
         Result(await reviews.ReturnAsync(ProjectAccessFilter.Of(http), reviewId, request, cancellationToken));
@@ -208,7 +208,7 @@ public static class ReviewEndpoints
         return problem ?? Results.Ok(ticket);
     }
 
-    /// <summary>POST <c>/revisions/{revisionId}/arrival</c>: Document Control accepts or returns a revision another organization sent in. See <see cref="ControlService.ArrivalAsync"/>.</summary>
+    /// <summary>POST <c>/revisions/{revisionId}/arrival</c>: The control function accepts or returns a revision another organization sent in. See <see cref="ControlService.ArrivalAsync"/>.</summary>
     private static async Task<IResult> ArrivalAsync(
         Guid revisionId, ControlRequest request, HttpContext http, ControlService control, CancellationToken cancellationToken)
     {

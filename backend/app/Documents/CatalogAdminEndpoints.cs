@@ -42,7 +42,7 @@ public static class CatalogAdminEndpoints
         admin.MapGet("/value-sets", SetsAsync);
         admin.MapPut("/values", ValueAsync);
 
-        // Document Control keeps these day to day, as well as administrators.
+        // The control function keeps these day to day, as well as administrators.
         var keepers = app.MapGroup("/api/admin").WithTags("Administration")
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter(Keepers.Filter);

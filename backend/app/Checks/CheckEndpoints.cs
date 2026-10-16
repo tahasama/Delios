@@ -67,11 +67,11 @@ public static class CheckEndpoints
         });
     }
 
-    /// <summary>POST /checks/run: queues a check run now (Document Control only). The worker runs it; answers 409 if one is already queued or running.</summary>
+    /// <summary>POST /checks/run: queues a check run now (the control function only). The worker runs it; answers 409 if one is already queued or running.</summary>
     private static async Task<IResult> RunAsync(HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control runs the checks.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function runs the checks.");
         var run = await CheckScheduler.RequestAsync(db, clock, access.Project.TenantId, access.Project.Id, access.UserName,
             onlyIfDue: false, cancellationToken);
         return run is null
@@ -92,7 +92,7 @@ public static class CheckEndpoints
         CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control decides which checks the project answers to.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function decides which checks the project answers to.");
         if (CheckCatalog.Find(checkId) is null) return Problems.NotFound("CHECK_NOT_FOUND", "No such check.");
         var reason = request.Reason?.Trim() ?? "";
         if (reason.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why the project does not answer to this check.");
@@ -121,12 +121,12 @@ public static class CheckEndpoints
         return Results.NoContent();
     }
 
-    /// <summary>DELETE /checks/{checkId}/opt-out: switches a check back on for the project (Document Control only) and records that in the audit trail.</summary>
+    /// <summary>DELETE /checks/{checkId}/opt-out: switches a check back on for the project (the control function only) and records that in the audit trail.</summary>
     private static async Task<IResult> OptInAsync(
         string checkId, HttpContext http, DeliosDbContext db, Audit.AuditLog audit, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control decides which checks the project answers to.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function decides which checks the project answers to.");
         var removed = await db.CheckOptOuts.Where(o => o.ProjectId == access.Project.Id && o.CheckId == checkId).ExecuteDeleteAsync(cancellationToken);
         if (removed > 0)
         {
@@ -163,7 +163,7 @@ public static class CheckEndpoints
         CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "Document Control accepts a defect as it is.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function accepts a defect as it is.");
         var defect = await db.Defects.SingleOrDefaultAsync(d => d.Id == defectId && d.ProjectId == access.Project.Id, cancellationToken);
         if (defect is null) return Problems.NotFound("DEFECT_NOT_FOUND", "No such defect.");
         if (defect.Status != DefectStatuses.Open) return Problems.Conflict("DEFECT_NOT_OPEN", "Only an open defect is accepted.", new { status = defect.Status });

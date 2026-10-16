@@ -10,20 +10,21 @@ namespace Delios.Host.Identity;
 
 /// <summary>
 /// Body of asking for someone to join a project: someone who has an account (<c>UserId</c>), or someone new (name,
-/// email and organization), with the function and department they would hold, why, who is asked to confirm (empty:
-/// every manager), and the file the request came on (an email from outside, uploaded as proof).
+/// email and organization), with the function and department they would hold, an optional message, who is asked to
+/// confirm (empty: whoever holds Manage), and the file the request came on (an email from outside, uploaded as proof).
 /// </summary>
 public sealed record JoinRequest(
     Guid? UserId, string? Name, string? Email, Guid? PartyId, Guid FunctionId, string? Department, string? Why,
     Guid? ConfirmerId = null, Guid? ProofFileId = null);
 
 /// <summary>
-/// Joining a project (owner's decision): a request management confirms. Anyone of ours on the project asks, for
-/// someone with an account or someone new; it travels as an information transmittal (Request) to whoever confirms,
-/// with why and, for something that came outside the system, its proof. Confirmed, they are put on by itself and
-/// told; a new account's invitation goes then, never before. Document Control (or management, where the project has
-/// no Document Control) adds directly where the project does not ask for confirmation; an administrator setting a
-/// project up is never held.
+/// Joining a project (owner's decision). Two switches of the project: who adds people (only the control function, the
+/// default, or everyone of ours on the project: <c>PROJECT_PEOPLE</c>), and whether whoever holds Manage confirms each
+/// addition (necessary by default: <c>CONFIRM:PROJECT_PEOPLE</c>). Anyone of ours asks for someone new; it travels as
+/// an information transmittal (Request) to whoever answers it. Confirmed, they are put on by itself and told; a new
+/// account's invitation goes then, never before. Whoever may add, where no confirmation is asked, puts them on at once;
+/// an ask by someone who may not goes to the control function. An administrator setting a project up is never held.
+/// No function or job title is named here: the control function is whoever holds CONTROL on the project.
 /// </summary>
 public static class JoinRequests
 {
@@ -38,13 +39,14 @@ public static class JoinRequests
     /// <summary>
     /// <c>GET /people/join-options</c>: what anyone of ours needs to ask for someone to join: the functions, our
     /// organizations and the guest ones, the people with an account who are not on the project (nor waiting), and who
-    /// may confirm (managers first). Whether this person's ask is put on at once or asked of management.
+    /// may confirm (holders of Manage first). Whether this person's ask is put on at once or asked first, and whether
+    /// they may add someone with an account.
     /// </summary>
     private static async Task<IResult> OptionsAsync(HttpContext http, DeliosDbContext db, Organizations.OrganizationService organizations,
         CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!access.IsInternal) return Problems.Forbidden("OURS_ONLY", "Ask Document Control.");
+        if (!access.IsInternal) return Problems.Forbidden("OURS_ONLY", "People join this project at the request of the organization it belongs to.");
         var projectId = access.Project.Id;
         var functions = await db.Functions.AsNoTracking().Where(f => f.Active).OrderBy(f => f.Name).Select(f => new { f.Id, f.Name }).ToListAsync(cancellationToken);
         var links = await organizations.PartyLinksAsync(cancellationToken);
@@ -60,8 +62,7 @@ public static class JoinRequests
             .Join(db.Users.AsNoTracking().Where(u => u.Active), m => m.UserId, u => u.Id, (m, u) => new { u.Id, u.Name, Function = m.Function!.Name })
             .OrderBy(x => x.Name).ToListAsync(cancellationToken);
         var admin = await Keepers.ConfiguresAsync(http);
-        var withControl = await Settings.ProjectAnswers.ControlDoesAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken);
-        var mayAdd = admin || (withControl ? access.Holds(Verbs.Control) : access.Holds(Verbs.Manage) || access.Holds(Verbs.Control));
+        var mayAdd = admin || await MayAddAsync(db, access, cancellationToken);
         var asks = !admin && (!mayAdd || await Settings.ProjectAnswers.NeedsConfirmationAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken));
         return Results.Ok(new
         {
@@ -72,6 +73,8 @@ public static class JoinRequests
             Confirmers = onProject.Select(p => new { p.Id, p.Name, p.Function, Manager = managers.Contains(p.Id) })
                 .OrderByDescending(p => p.Manager).ThenBy(p => p.Name),
             Asks = asks,
+            MayAdd = mayAdd,
+            Everyone = !await Settings.ProjectAnswers.ControlDoesAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken),
             MayKeepProof = access.Holds(Verbs.Control),
         });
     }
@@ -82,24 +85,29 @@ public static class JoinRequests
     {
         var access = ProjectAccessFilter.Of(http);
         var project = access.Project;
-        if (!access.IsInternal) return Problems.Forbidden("OURS_ONLY", "Ask Document Control: people join a project at the organization's request.");
-        var why = request.Why?.Trim();
-        if (string.IsNullOrEmpty(why)) return Problems.Invalid("WHY_REQUIRED", "Say why they should join: whoever confirms reads it.", new { field = "why" });
+        if (!access.IsInternal) return Problems.Forbidden("OURS_ONLY", "People join this project at the request of the organization it belongs to.");
+        var why = string.IsNullOrWhiteSpace(request.Why) ? null : request.Why.Trim();
         var function = await db.Functions.AsNoTracking().SingleOrDefaultAsync(f => f.Id == request.FunctionId && f.Active, cancellationToken);
         if (function is null) return Problems.Invalid("FUNCTION_REQUIRED", "Choose the function they would hold.", new { field = "functionId" });
         var department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim().ToUpperInvariant();
         if (department is not null && !(await Catalog.LoadAsync(db, cancellationToken)).IsActive(ValueSets.Disciplines, department))
             return Problems.Invalid("VALUE_NOT_PUBLISHED", $"{department} is not a published discipline.", new { field = "department" });
 
-        // Who may add directly, and whether this project still asks management first.
+        // Who may add directly, and whether this project asks whoever holds Manage first.
         var admin = await Keepers.ConfiguresAsync(http);
-        var withControl = await Settings.ProjectAnswers.ControlDoesAsync(db, project.Id, "PROJECT_PEOPLE", cancellationToken);
-        var mayAdd = admin || (withControl ? access.Holds(Verbs.Control) : access.Holds(Verbs.Manage) || access.Holds(Verbs.Control));
-        var held = !admin && (!mayAdd || await Settings.ProjectAnswers.NeedsConfirmationAsync(db, project.Id, "PROJECT_PEOPLE", cancellationToken));
-        if (held && request.ConfirmerId is null && (await Actions.NoticeLog.HoldersAsync(db, project.Id, Verbs.Manage, cancellationToken)).Count == 0)
-            return Problems.Conflict("NO_MANAGER", $"Nobody holds Manage on {project.Code}, so nobody can confirm. Give a manager's function the Manage permission, or name who confirms.");
+        var mayAdd = admin || await MayAddAsync(db, access, cancellationToken);
+        var confirms = await Settings.ProjectAnswers.NeedsConfirmationAsync(db, project.Id, "PROJECT_PEOPLE", cancellationToken);
+        var held = !admin && (!mayAdd || confirms);
+        // Asked of: whoever is named, else whoever holds Manage (a confirmation), else the control function (only it adds).
+        var answeredBy = confirms ? Verbs.Manage : Verbs.Control;
+        if (held && request.ConfirmerId is null && (await Actions.NoticeLog.HoldersAsync(db, project.Id, answeredBy, cancellationToken)).Count == 0)
+            return Problems.Conflict("NOBODY_ANSWERS", answeredBy == Verbs.Manage
+                ? $"Nobody holds Manage on {project.Code}, so nobody can confirm. Give a function the Manage permission, or name who confirms."
+                : $"Nobody acts as the control function on {project.Code}, so nobody can add them. Name who answers.");
         if (request.ProofFileId is not null && !access.Holds(Verbs.Control))
-            return Problems.Forbidden("CONTROL_ONLY", "Document Control keeps what came from outside the system.");
+            return Problems.Forbidden("CONTROL_ONLY", "The control function keeps what came from outside the system.");
+        if (request.UserId is not null && !mayAdd)
+            return Problems.Forbidden("PEOPLE_NOT_YOURS", $"On {project.Code} the control function adds people with an account; ask for someone new instead.");
 
         // Someone with an account, or someone new (their account is made now; the invitation waits for the yes).
         User? user;
@@ -117,7 +125,7 @@ public static class JoinRequests
             if (!email.Contains('@') || email.Length > 254) return Problems.Invalid("EMAIL_INVALID", "Give a valid email address.", new { field = "email" });
             var normalized = email.ToUpperInvariant();
             if (await db.SignInNames.AnyAsync(n => n.NormalizedEmail == normalized, cancellationToken))
-                return Problems.Conflict("EMAIL_TAKEN", $"{email} already has an account: choose them under “Someone with an account”.", new { field = "email" });
+                return Problems.Conflict("EMAIL_TAKEN", $"{email} already has an account: they are added with “Add someone”.", new { field = "email" });
             var party = request.PartyId is { } pid ? await db.Parties.AsNoTracking().SingleOrDefaultAsync(p => p.Id == pid && p.Active, cancellationToken) : null;
             if (request.PartyId is not null && party is null) return Problems.Invalid("PARTY_UNKNOWN", "Choose one of the organizations.", new { field = "partyId" });
             if (party is { IsInternal: false } && party.Participation == "BY_PROXY")
@@ -133,7 +141,7 @@ public static class JoinRequests
         var membership = await db.Memberships.SingleOrDefaultAsync(m => m.ProjectId == project.Id && m.UserId == user.Id, cancellationToken);
         if (membership is { Active: true }) return Problems.Conflict("ALREADY_ON", $"{user.Name} is already on {project.Code}.");
         if (membership is { PendingSince: not null })
-            return Problems.Conflict("PENDING", $"{user.Name} already waits for {membership.ConfirmerName ?? "management"} to confirm them on {project.Code}.");
+            return Problems.Conflict("PENDING", $"{user.Name} already waits for {membership.ConfirmerName ?? "an answer"} to join {project.Code}.");
         if (membership is null)
         {
             membership = new Membership { TenantId = project.TenantId, ProjectId = project.Id, UserId = user.Id, FunctionId = function.Id };
@@ -148,7 +156,7 @@ public static class JoinRequests
         if (held)
         {
             membership.InviteOnJoin = newAccount;
-            said = await DirectoryEndpoints.HoldForConfirmationAsync(db, http, membership, request.ConfirmerId, cancellationToken, why);
+            said = await DirectoryEndpoints.HoldForConfirmationAsync(db, http, membership, request.ConfirmerId, cancellationToken, why, answeredBy);
             // What the request came on (an email from outside, say) stays with it, as proof.
             if (request.ProofFileId is { } proof && membership.ConfirmTransmittalId is { } letterId
                 && db.Transmittals.Local.FirstOrDefault(t => t.Id == letterId) is { } letter
@@ -162,11 +170,27 @@ public static class JoinRequests
         }
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "MEMBERSHIP_CHANGED", "User", user.Id, user.Name,
-            $"{said}. Why: {why}", project.Id, cancellationToken);
+            why is null ? $"{said}." : $"{said}. Message: {why}", project.Id, cancellationToken);
         if (!held) await TellJoinedAsync(db, notifier, project, membership, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Results.Ok(new { user.Id, Held = held, Said = said, Invited = !held && newAccount && link is null, Link = link });
     }
+
+    /// <summary>
+    /// Whether this person puts people on the project themselves: whoever acts as the control function, or, where the
+    /// project lets everyone add, anyone of ours on it.
+    /// </summary>
+    public static async Task<bool> MayAddAsync(DeliosDbContext db, ProjectAccess access, CancellationToken cancellationToken) =>
+        access.Holds(Verbs.Control)
+        || (access.IsInternal && !await Settings.ProjectAnswers.ControlDoesAsync(db, access.Project.Id, "PROJECT_PEOPLE", cancellationToken));
+
+    /// <summary>
+    /// Whether this person answers a request to join that names nobody: whoever holds Manage, or, where the project asks
+    /// no confirmation (the request came from someone who may not add), the control function.
+    /// </summary>
+    public static async Task<bool> AnswersAsync(DeliosDbContext db, ProjectAccess access, CancellationToken cancellationToken) =>
+        access.Holds(Verbs.Manage)
+        || (access.Holds(Verbs.Control) && !await Settings.ProjectAnswers.NeedsConfirmationAsync(db, access.Project.Id, "PROJECT_PEOPLE", cancellationToken));
 
     /// <summary>
     /// Sends a new account its invitation: the link to choose its own password (7 days, once). Email off on this

@@ -42,15 +42,26 @@ public sealed class ProjectAccess
         && Matches(r.Confidentiality, document.Confidentiality));
 
     /// <summary>What a function may do on a project, whoever holds it: for asking about someone other than the caller.</summary>
-    public static ProjectAccess OfFunction(Project project, Function function, Guid userId = default, string userName = "") => new()
+    public static ProjectAccess OfFunction(Project project, Function function, Guid userId = default, string userName = "",
+        bool actsAsControl = false) => new()
     {
         Project = project,
         UserId = userId,
         UserName = userName,
         Function = function,
         IsInternal = true,
-        Rules = function.Rules.Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole).ToList(),
+        Rules = WithControl(function.Rules.Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole).ToList(), actsAsControl),
     };
+
+    /// <summary>
+    /// Someone named on the project to act as the control function holds CONTROL on every document of it, whatever
+    /// their function carries.
+    /// </summary>
+    public static IReadOnlyList<PermissionRule> WithControl(List<PermissionRule> rules, bool actsAsControl)
+    {
+        if (actsAsControl) rules.Add(new PermissionRule { Verbs = [Delios.Host.Identity.Verbs.Control], Note = "Acts as the control function on this project" });
+        return rules;
+    }
 
     /// <summary>A rule selector matches when it is null (any value) or exactly equal to the document's value.</summary>
     private static bool Matches(string? selector, string? value) =>
@@ -89,9 +100,9 @@ public sealed class ProjectAccessLoader(DeliosDbContext db)
             UserId = userId,
             UserName = principal.Identity?.Name ?? "",
             Function = membership.Function!,
-            Rules = membership.Function!.Rules
+            Rules = ProjectAccess.WithControl(membership.Function!.Rules
                 .Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole)
-                .ToList(),
+                .ToList(), membership.ActsAsControl),
             IsInternal = party is null || party.IsInternal,
             PartyCode = party?.Code,
             AboveClearance = above,

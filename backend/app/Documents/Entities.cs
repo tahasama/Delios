@@ -186,7 +186,7 @@ public sealed class Document
     /// <summary>
     /// Who holds a document asked of a supplier, the only side that may change it: true the supplier, false us, null
     /// a document not exchanged with a supplier (no placeholder sent). Handed over by each send — our placeholder or
-    /// our send to them, their submission — by Document Control's check returning it, by the review (a verdict with
+    /// our send to them, their submission — by the control function's check returning it, by the review (a verdict with
     /// comments to take into the next revision, or one that sends it back, hands it to them), and by an ask to hand
     /// it back that the holder accepts (<see cref="HandBackRequest"/>).
     /// </summary>
@@ -280,19 +280,19 @@ public sealed class Revision
     public string? UnvoidedByName { get; set; }
     public string? UnvoidReason { get; set; }
     /// <summary>
-    /// Sent to its supplier again after Document Control took it back: who, when and what was said. The supplier's
+    /// Sent to its supplier again after the control function took it back: who, when and what was said. The supplier's
     /// next submission comes under the same revision. Kept afterwards.
     /// </summary>
     public Instant? ResentAt { get; set; }
     public string? ResentByName { get; set; }
     public string? ResentNote { get; set; }
     /// <summary>
-    /// Which set of files is the revision's now. A submission Document Control
+    /// Which set of files is the revision's now. A submission the control function
     /// returned for a correction is replaced by the next one under the same
     /// revision value; it is kept, never overwritten.
     /// </summary>
     public int Submission { get; set; } = 1;
-    /// <summary>Document Control's last outcome on it, from the organization's control outcomes. Not a review verdict.</summary>
+    /// <summary>The control function's last outcome on it, from the organization's control outcomes. Not a review verdict.</summary>
     public string? ControlOutcome { get; set; }
     /// <summary>Every submission so far, oldest first. Stored as JSON inside the revision's row.</summary>
     public List<SubmissionRecord> Submissions { get; set; } = [];
@@ -360,19 +360,19 @@ public sealed class RevisionSchemeRouting
     public RevisionScheme? Scheme { get; set; }
 }
 
-/// <summary>One set of files sent in under a revision, and what Document Control said of it.</summary>
+/// <summary>One set of files sent in under a revision, and what the control function said of it.</summary>
 public sealed class SubmissionRecord
 {
     public int Number { get; set; }
     public Instant SubmittedAt { get; set; }
     public required string SubmittedByName { get; set; }
-    /// <summary>Document Control's outcome on this submission; null until decided.</summary>
+    /// <summary>The control function's outcome on this submission; null until decided.</summary>
     public string? Outcome { get; set; }
     public string? Note { get; set; }
     public string? DecidedByName { get; set; }
     public Instant? DecidedAt { get; set; }
     /// <summary>
-    /// Document Control's check on arrival, kept apart from the outcome above, which a later release or return
+    /// The control function's check on arrival, kept apart from the outcome above, which a later release or return
     /// overwrites: ACCEPTED or RETURNED (<see cref="Transmittals.Arrivals"/>), who, when, and why when returned.
     /// </summary>
     public string? Check { get; set; }
@@ -384,9 +384,9 @@ public sealed class SubmissionRecord
 /// <summary>The states a <see cref="Revision"/> can be in.</summary>
 public static class RevisionStates
 {
-    /// <summary>Sent in by another organization; Document Control accepts it before anybody reviews it.</summary>
+    /// <summary>Sent in by another organization; The control function accepts it before anybody reviews it.</summary>
     public const string Received = "RECEIVED";
-    /// <summary>Document Control returned it for a correction that changes nothing it says: the same revision comes back.</summary>
+    /// <summary>The control function returned it for a correction that changes nothing it says: the same revision comes back.</summary>
     public const string Correcting = "CORRECTING";
     public const string InPreparation = "IN_PREPARATION";
     public const string InReview = "IN_REVIEW";

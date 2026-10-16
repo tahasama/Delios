@@ -50,7 +50,7 @@ public static class TransmittalLogEndpoints
     public static class States
     {
         public const string ToSend = "TO_SEND", Overdue = "OVERDUE", AwaitingReply = "AWAITING_REPLY", AwaitingAck = "AWAITING_ACK", Complete = "COMPLETE";
-        /// <summary>Incoming, with something unplanned Document Control has not registered yet.</summary>
+        /// <summary>Incoming, with something unplanned the control function has not registered yet.</summary>
         public const string ToRegister = "TO_REGISTER";
     }
 
@@ -214,7 +214,7 @@ public static class TransmittalLogEndpoints
             ? (stepDone.TryGetValue(step, out var at) ? at : null)
             : replies.Where(a => a.InReplyToId == t.Id || (a.FollowsId == t.Id && a.IssuedById != t.IssuedById))
                 .Select(a => (Instant?)a.IssuedAt).OrderBy(a => a).FirstOrDefault();
-        // What Document Control's check said of what came in, read from each submission it carried (Arrivals).
+        // What the control function's check said of what came in, read from each submission it carried (Arrivals).
         var sentIn = list.Values.Where(t => t.Direction == TransmittalDirections.Incoming)
             .SelectMany(t => t.Items).Where(i => i.Kind == TransmittalItemKinds.Submission && i.RevisionId != null)
             .Select(i => i.RevisionId!.Value).Distinct().ToList();
