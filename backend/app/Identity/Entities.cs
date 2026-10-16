@@ -184,6 +184,10 @@ public sealed class Project
     public string ContentExtraction { get; set; } = "OFF";
     /// <summary>When the row was created; filled in by the database (<c>now()</c>).</summary>
     public Instant CreatedAt { get; set; }
+    /// <summary>Why it was last archived, reopened or set on hold, by whom and when: shown on its line in Projects.</summary>
+    public string? StatusReason { get; set; }
+    public string? StatusChangedByName { get; set; }
+    public Instant? StatusChangedAt { get; set; }
 }
 
 /// <summary>A job as the organization names it: Lead Electrical Engineer, the control function.</summary>

@@ -27,6 +27,8 @@ type AdminUser = {
 type AdminProject = {
   id: string; code: string; name: string; contractRole: string; kind?: string; status: string; timeZone: string; weekendDays: number[];
   contentExtraction: string; createdAt: string; members: number; documents: number;
+  /** Why it was last archived or reopened, by whom, when. */
+  statusReason?: string | null; statusChangedByName?: string | null; statusChangedAt?: string | null;
 };
 
 export type AdminRule = {

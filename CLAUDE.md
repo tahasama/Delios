@@ -538,6 +538,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   title; a function's own name is shown only as read from the data.
 - The plan's starter values are added in one go ("Add them"); Controlled changes no longer exist.
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
+- **Projects** (administrators), People & access's way: plate (open · archived; each project has its own register,
+  counters, people and settings, a new one starting from the organization's defaults); "Open a new project" one sheet
+  (`?new=1`: band, grey fields, "Where approval sits under each role", carry over people, Cancel / Open project); the
+  table, code and name opening the project, a pencil opening its line (`?edit=<id>`: name, code, type, our role, start,
+  end, scope; Cancel / Save). Archive and Reopen sit in the opened line and always ask why (backend REASON_REQUIRED,
+  kept on the project: `StatusReason`, by whom, when, shown on its line).
 - Settings pages use the reference boxes (`rounded-md`, `ring-line`, `bg-tint-soft`), the shared control size, and no
   text under 11px.
 

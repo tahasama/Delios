@@ -2423,6 +2423,18 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("status");
 
+                    b.Property<Instant?>("StatusChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("status_changed_at");
+
+                    b.Property<string>("StatusChangedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("status_changed_by_name");
+
+                    b.Property<string>("StatusReason")
+                        .HasColumnType("text")
+                        .HasColumnName("status_reason");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");

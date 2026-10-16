@@ -8,7 +8,7 @@ import { requireAdminScope, setActiveProject } from "@/lib/core/scope";
 import { PROJECT_KINDS } from "@/lib/settings/profiles";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { api, refusal } from "@/lib/client";
-import { setProjectSetting } from "@/lib/settings/api";
+import { projectSettings, setProjectSetting } from "@/lib/settings/api";
 import { adminProjects, adminUsers } from "@/lib/settings/api-admin";
 
 type ProjectState = { error?: string; ok?: string };
@@ -76,12 +76,14 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
   return { ok: `${code} opened${carried ? ` with ${carried} person(s) carried over` : ""}. Switch to it from the picker at the top left.` };
 }
 
-/** Archive a project, or bring it back. Nothing is deleted. */
+/** Archive a project, or bring it back, always with why (kept on its line). Nothing is deleted. */
 export async function setProjectStatusAction(_prev: ProjectState | undefined, formData: FormData): Promise<ProjectState> {
   await requireAdminScope();
   const projectId = String(formData.get("projectId") ?? "");
   const status = String(formData.get("status") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
   if (status !== "ACTIVE" && status !== "ARCHIVED") return { error: "Choose active or archived." };
+  if (!reason) return { error: "Say why: it is kept on the project's line." };
   const projects = await adminProjects();
   const project = projects.find((one) => one.id === projectId);
   if (!project) return { error: "That project is not in your organization." };
@@ -89,7 +91,7 @@ export async function setProjectStatusAction(_prev: ProjectState | undefined, fo
     return { error: "This is your only active project — archiving it would leave nobody anywhere to work." };
   }
   try {
-    await api(`/api/admin/projects/${projectId}`, { method: "PUT", body: { status } });
+    await api(`/api/admin/projects/${projectId}`, { method: "PUT", body: { status, reason } });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -106,26 +108,39 @@ export async function openProjectAction(formData: FormData): Promise<void> {
 }
 
 /**
- * Rename a project, or change its code. The code appears inside every document
- * number already allocated, so those numbers do not change: the code only
- * decides what new numbers look like. Saying so out loud is the point of the
- * warning on the form.
+ * Change a project's line: its name and code, type and our role, dates and scope statement. The code appears inside
+ * every document number already allocated, so those numbers do not change: the code only decides what new numbers
+ * look like, and the form says so.
  */
-export async function renameProjectAction(_prev: ProjectState | undefined, formData: FormData): Promise<ProjectState> {
+export async function saveProjectAction(_prev: ProjectState | undefined, formData: FormData): Promise<ProjectState> {
   await requireAdminScope();
   const projectId = String(formData.get("projectId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim().toUpperCase();
+  const kind = String(formData.get("kind") ?? "GENERIC");
+  const role = String(formData.get("role") ?? "GENERIC");
+  const startDate = String(formData.get("startDate") ?? "").trim();
+  const endDate = String(formData.get("endDate") ?? "").trim();
+  const scopeStatement = String(formData.get("scopeStatement") ?? "").trim();
   if (!name) return { error: "A project needs a name." };
   if (!CODE.test(code)) return { error: "A code is letters, digits and hyphens — up to 16 characters, e.g. NP1." };
+  if (!PROJECT_KINDS.some((k) => k.code === kind)) return { error: "Choose a project type." };
+  if (!(await contractRoleOptions()).some((r) => r.code === role)) return { error: "Choose what this organization does on the project." };
+  if (startDate && endDate && endDate < startDate) return { error: "The end date cannot fall before the start date." };
   const project = (await adminProjects()).find((one) => one.id === projectId);
-  if (!project) return { error: "Project not found." };
+  if (!project) return { error: "That project is not in your organization." };
   try {
-    await api(`/api/admin/projects/${projectId}`, { method: "PUT", body: { code, name } });
+    await api(`/api/admin/projects/${projectId}`, { method: "PUT", body: { code, name, contractRole: role, kind } });
+    let info: Record<string, unknown> = {};
+    try { info = JSON.parse((await projectSettings(projectId)).get(PROJECT_INFO) ?? "{}"); } catch { info = {}; }
+    await setProjectSetting(projectId, PROJECT_INFO, JSON.stringify({
+      ...info, kind, startDate: startDate || info.startDate || project.createdAt.slice(0, 10), endDate: endDate || null,
+      scopeStatement: scopeStatement || `All controlled information produced or received for ${name}, in any medium.`,
+    }));
   } catch (e) {
     return { error: refusal(e).message };
   }
   revalidatePath("/settings/projects");
   revalidatePath("/");
-  return { ok: code !== project.code ? `Renamed. New numbers will use ${code}; documents already numbered keep ${project.code}.` : "Renamed." };
+  return { ok: code !== project.code ? `Saved. New numbers will use ${code}; documents already numbered keep ${project.code}.` : "Saved." };
 }

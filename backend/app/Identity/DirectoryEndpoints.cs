@@ -26,7 +26,7 @@ public sealed record CreateProjectRequest(string? Code, string? Name, string? Co
 /// <remarks>A new <c>Code</c> shapes new numbers only; numbers already given keep the old one.</remarks>
 public sealed record UpdateProjectRequest(
     string? Code = null, string? Name = null, string? ContractRole = null, string? Status = null, string? TimeZone = null, int[]? WeekendDays = null,
-    string? Kind = null);
+    string? Kind = null, string? Reason = null);
 
 /// <summary>Body of putting a person on a project, or changing their place on it: one function per person per project.</summary>
 public sealed record MembershipRequest(Guid UserId, Guid? FunctionId, string? Department = null, bool Active = true, Guid? ConfirmerId = null);
@@ -343,6 +343,9 @@ public static class DirectoryEndpoints
             p.ContractRole,
             p.Kind,
             p.Status,
+            p.StatusReason,
+            p.StatusChangedByName,
+            StatusChangedAt = p.StatusChangedAt?.ToDateTimeOffset(),
             p.TimeZone,
             p.WeekendDays,
             p.ContentExtraction,
@@ -410,7 +413,13 @@ public static class DirectoryEndpoints
         {
             if (status is not ("ACTIVE" or "CLOSED" or "ON_HOLD" or "ARCHIVED"))
                 return Problems.Invalid("STATUS_INVALID", "A project is ACTIVE, ON_HOLD, CLOSED or ARCHIVED.");
-            changes.Add($"status → {status}");
+            // Archiving puts every document of it away, reopening brings them back: always with why, kept on the project.
+            var reason = Blank(request.Reason);
+            if (reason is null) return Problems.Invalid("REASON_REQUIRED", "Say why: it is kept on the project's line.", new { field = "reason" });
+            changes.Add($"status → {status}: {reason}");
+            project.StatusReason = reason;
+            project.StatusChangedByName = (await ActorAsync(http, db, cancellationToken)).Name;
+            project.StatusChangedAt = SystemClock.Instance.GetCurrentInstant();
             // A document is archived with its project, never on its own; reopening the project brings them back.
             if (status == "ARCHIVED")
             {
