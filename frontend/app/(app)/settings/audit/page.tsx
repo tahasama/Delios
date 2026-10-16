@@ -4,6 +4,7 @@ import { adminAudit, adminProjects, orEmpty } from "@/lib/settings/api-admin";
 import { Logbook, readingLine } from "@/components/logbook";
 import { AUDIT_KINDS } from "@/lib/core/rails";
 import Link from "next/link";
+import { inputCls } from "@/components/ui";
 import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
@@ -48,13 +49,10 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       find={{
         q: sp.q, from: sp.from, to: sp.to, hidden: { kind: sp.kind, action: sp.action }, clear: address({ kind: sp.kind, action: sp.action }),
         extra: projects.length > 1 ? (
-          <>
-            <p className="slip-label mt-4">Project</p>
-            <select name="project" defaultValue={sp.project ?? ""} className="plain mt-2 w-full" aria-label="Project">
-              <option value="">Every project</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-            </select>
-          </>
+          <select name="project" defaultValue={sp.project ?? ""} className={inputCls} aria-label="Project">
+            <option value="">Every project</option>
+            {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+          </select>
         ) : null,
       }}
       paging={{ page: log?.page ?? 1, pages: log?.pages ?? 1, total: log?.total ?? 0 }}

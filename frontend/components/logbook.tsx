@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ChevronRight, Search } from "lucide-react";
+import { inputCls } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { DateWindow } from "@/components/date-window";
 import { activityLink, activityWords, readableDetail } from "@/lib/settings/activity-words";
@@ -71,9 +73,29 @@ export function LogbookSide({ counts, chosen, href, find, categoriesOnly = false
   const total = counts.reduce((n, c) => n + c.count, 0);
   const kinds = AUDIT_KINDS.map((k) => ({ ...k, acts: counts.filter((c) => c.kind === k.key), count: counts.filter((c) => c.kind === k.key).reduce((n, c) => n + c.count, 0) }))
     .filter((k) => k.count > 0 || chosen.kind === k.key);
+  const narrowed = !!(find.q || find.from || find.to);
   return (
     <>
-    <nav aria-label="Kinds of act">
+    {/* Find first, on a white box so its fields stand out from the page: words, then the day and Show on one line. */}
+    <form className="space-y-2 rounded-md bg-surface p-2.5 ring-1 ring-line">
+      {Object.entries(find.hidden).map(([name, value]) => (value ? <input key={name} type="hidden" name={name} value={value} /> : null))}
+      <label className="relative block">
+        <span className="sr-only">Find in the log</span>
+        <Search aria-hidden className="absolute top-1/2 left-0.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+        <input name="q" defaultValue={find.q ?? ""} placeholder="A number, a person, a detail" className={`${inputCls} pl-5.5`} />
+      </label>
+      {find.extra}
+      <div className="flex items-center gap-2">
+        <span className="register block min-w-0 flex-1">
+          <DateWindow fields={[{ code: "ts", label: "The day it happened" }]} on={find.from ? "ts" : ""} from={find.from ?? ""} to={find.to ?? ""} />
+        </span>
+        <button className="ask shrink-0" data-on={narrowed ? "true" : "false"}>Show</button>
+      </div>
+      {narrowed ? <Link href={find.clear} className="block text-[12px] font-semibold text-link hover:underline">Clear</Link> : null}
+    </form>
+
+    {/* The menu scrolls on its own, without a bar, so the log beside it keeps its place. */}
+    <nav aria-label="Kinds of act" className="scroll-quiet mt-3 max-h-[calc(100vh-14rem)] overflow-y-auto">
       <Link
         href={href({})}
         aria-current={!chosen.kind && !chosen.action ? "page" : undefined}
@@ -84,27 +106,34 @@ export function LogbookSide({ counts, chosen, href, find, categoriesOnly = false
       </Link>
       {kinds.map((k) => {
         const on = chosen.kind === k.key && !chosen.action;
+        const row = (
+          <Link
+            href={href({ kind: k.key })}
+            aria-current={on ? "page" : undefined}
+            className={`flex min-w-0 flex-1 items-baseline gap-2.5 rounded px-2 py-1.5 text-[13px] ${on ? "bg-canvas-deep font-semibold text-slate-900" : "text-slate-700 hover:text-slate-900"}`}
+          >
+            <span aria-hidden className={`${AUDIT_RAIL[k.key] ?? "rail-none"} h-3 w-1 shrink-0 self-center rounded-full bg-(--rail)`} />
+            <span className="min-w-0 truncate">{k.label}</span>
+            <span className="ml-auto font-mono text-[11.5px] text-slate-500">{k.count.toLocaleString("en-GB")}</span>
+          </Link>
+        );
+        if (categoriesOnly || !k.acts.length) return <div key={k.key} className="mt-1 flex border-t border-line pt-1 pl-1">{row}</div>;
+        // Each kind folds: its acts open under it, the chosen kind open by itself.
         return (
-          <div key={k.key} className="mt-1 border-t border-line pt-1">
-            <Link
-              href={href({ kind: k.key })}
-              aria-current={on ? "page" : undefined}
-              className={`flex items-baseline gap-2.5 rounded px-3 py-1.5 text-[13px] ${on ? "bg-canvas-deep font-semibold text-slate-900" : "text-slate-700 hover:text-slate-900"}`}
-            >
-              <span aria-hidden className={`${AUDIT_RAIL[k.key] ?? "rail-none"} h-3 w-1 shrink-0 self-center rounded-full bg-(--rail)`} />
-              <span className="min-w-0 truncate">{k.label}</span>
-              <span className="ml-auto font-mono text-[11.5px] text-slate-500">{k.count.toLocaleString("en-GB")}</span>
-            </Link>
-            {/* Every act of that kind, so nothing done in the app is hidden behind a heading. */}
+          <details key={k.key} open={chosen.kind === k.key} className="group mt-1 border-t border-line pt-1">
+            <summary className="flex cursor-pointer list-none items-center [&::-webkit-details-marker]:hidden">
+              <ChevronRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-open:rotate-90" />
+              {row}
+            </summary>
             <ul>
-              {(categoriesOnly ? [] : k.acts).map((a) => {
+              {k.acts.map((a) => {
                 const mine = chosen.action === a.action;
                 return (
                   <li key={a.action}>
                     <Link
                       href={href({ kind: k.key, action: a.action })}
                       aria-current={mine ? "page" : undefined}
-                      className={`flex items-baseline gap-3 rounded py-1 pr-3 pl-6.5 text-[12px] ${mine ? "bg-canvas-deep font-semibold text-slate-900" : "text-slate-500 hover:text-slate-900"}`}
+                      className={`flex items-baseline gap-3 rounded py-1 pr-3 pl-7.5 text-[12px] ${mine ? "bg-canvas-deep font-semibold text-slate-900" : "text-slate-500 hover:text-slate-900"}`}
                     >
                       <span className="min-w-0 truncate">{activityWords(a.action)}</span>
                       <span className="ml-auto font-mono text-[11px] text-slate-400">{a.count.toLocaleString("en-GB")}</span>
@@ -113,25 +142,10 @@ export function LogbookSide({ counts, chosen, href, find, categoriesOnly = false
                 );
               })}
             </ul>
-          </div>
+          </details>
         );
       })}
     </nav>
-
-    <form className="asking mt-5 px-3">
-      {Object.entries(find.hidden).map(([name, value]) => (value ? <input key={name} type="hidden" name={name} value={value} /> : null))}
-      <p className="slip-label">Find</p>
-      <input name="q" defaultValue={find.q ?? ""} placeholder="number, person, detail" className="plain mt-2 w-full" />
-      {find.extra}
-      <p className="slip-label mt-4">When</p>
-      <span className="register mt-2 block">
-        <DateWindow fields={[{ code: "ts", label: "The day it happened" }]} on={find.from ? "ts" : ""} from={find.from ?? ""} to={find.to ?? ""} />
-      </span>
-      <div className="mt-2.5 flex items-center gap-3">
-        <button className="ask" data-on={find.q || find.from || find.to ? "true" : "false"}>Show</button>
-        {find.q || find.from || find.to ? <Link href={find.clear} className="text-[12px] font-semibold text-link hover:underline">Clear</Link> : null}
-      </div>
-    </form>
     </>
   );
 }

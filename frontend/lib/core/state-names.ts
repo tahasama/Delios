@@ -117,7 +117,7 @@ export function supplierStageName(names: StateNames, stage: SupplierStage, relea
 const SUPPLIER_STAMP: Record<SupplierStage, { ours: string; theirs: string }> = {
   SENT: { ours: "sent to supplier", theirs: "to be transmitted" },
   RECEIVED: { ours: "received, to check", theirs: "transmitted" },
-  ACCEPTED: { ours: "accepted, to send for review", theirs: "accepted" },
+  ACCEPTED: { ours: "accepted", theirs: "accepted" },
   RETURNED_CHECK: { ours: "returned to correct", theirs: "to correct" },
   IN_REVIEW: { ours: "in review", theirs: "in review" },
   RELEASED: { ours: "released", theirs: "released" },

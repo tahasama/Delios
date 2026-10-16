@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { inputCls } from "@/components/ui";
 import { ArrowLeft } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
@@ -80,13 +81,10 @@ export default async function PersonActivityPage({ params, searchParams }: { par
       find={{
         q: sp.q, from: sp.from, to: sp.to, hidden: { kind: sp.kind, action: sp.action }, clear: address({ kind: sp.kind, action: sp.action }),
         extra: projects.length > 1 ? (
-          <>
-            <p className="slip-label mt-4">Project</p>
-            <select name="project" defaultValue={sp.project ?? ""} className="plain mt-2 w-full" aria-label="Project">
-              <option value="">Every project</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-            </select>
-          </>
+          <select name="project" defaultValue={sp.project ?? ""} className={inputCls} aria-label="Project">
+            <option value="">Every project</option>
+            {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+          </select>
         ) : null,
       }}
       paging={{ page: activity?.page ?? 1, pages: activity?.pages ?? 1, total: activity?.total ?? 0 }}

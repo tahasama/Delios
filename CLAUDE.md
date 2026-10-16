@@ -529,6 +529,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the control function and administrators), the project's work only: sign-ins, opened and downloaded, and people and
   settings are left out (the administrators' trail). Its menu is on the left (`LogbookSide categoriesOnly`: the kinds,
   not every act; then Find), the days beside it, the page's right column away while the log is open.
+  The log's menu: Find first, on a white box (words; the day and Show on one line; no labels), then the kinds, which
+  scroll on their own without a bar; on the Audit trail and a person's page each kind folds open on its acts.
 - A form never sits in a box inside a box: a sheet that opens a form becomes that form (`SomeoneJoins`), and a line
   of a table opened for editing goes on as the row itself (grey fields, then the strip with Cancel and the act), the
   new-document form's way.
