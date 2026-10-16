@@ -389,7 +389,7 @@ public static class CatalogAdminEndpoints
             per,
             pages = Math.Max(1, (total + per - 1) / per),
             kinds,
-            actions = actions.OrderByDescending(x => x.Count),
+            actions = actions.OrderByDescending(x => x.Count).Select(x => new { x.Action, x.Count, Kind = AuditKinds.Of(x.Action) }),
             rows = rows.Select(e => new
             {
                 e.Id,

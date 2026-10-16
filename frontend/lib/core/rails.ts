@@ -72,6 +72,20 @@ export const RAILS = [
   ] },
 ] as const;
 
+/** The kinds of act, in the order the logbook lists them, in the screens' words (the kind is worked out by the backend). */
+export const AUDIT_KINDS: { key: string; label: string }[] = [
+  { key: "REVIEW", label: "Reviews and decisions" },
+  { key: "RELEASE", label: "Releases and issues" },
+  { key: "RETURN", label: "Returns, holds and ends" },
+  { key: "TRANSMITTAL", label: "Transmittals" },
+  { key: "PACKAGE", label: "Packages" },
+  { key: "SCHEDULE", label: "Schedule" },
+  { key: "REGISTER", label: "The register" },
+  { key: "PEOPLE", label: "People and settings" },
+  { key: "READING", label: "Opened and downloaded" },
+  { key: "SIGN_IN", label: "Sign-ins and security" },
+];
+
 /** The side colour of each kind of act in the audit trail (kinds worked out by the backend, `AuditKinds`). */
 export const AUDIT_RAIL: Record<string, string> = {
   REVIEW: "rail-review",

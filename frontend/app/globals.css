@@ -796,6 +796,8 @@ summary::-webkit-details-marker {
   .edge-back { --edge: var(--color-amber-700); }
   .edge-send { --edge: var(--color-violet-700); }
   .edge-keep { --edge: var(--color-slate-400); }
+  /* A slip of the audit trail takes its kind's side colour, from the key (lib/core/rails.ts, AUDIT_RAIL). */
+  .logbook .slip[class*="rail-"] { --edge: var(--rail); }
 
   .dark .dispatch {
     --paper: #0f1218;

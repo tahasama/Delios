@@ -70,7 +70,7 @@ type AdminRoute = {
 };
 
 export type AuditPage = {
-  total: number; page: number; per: number; pages: number; actions: { action: string; count: number }[];
+  total: number; page: number; per: number; pages: number; actions: { action: string; count: number; kind: string }[];
   /** The kinds of act (worked out by the backend, `AuditKinds`), each counted. */
   kinds: { key: string; label: string; count: number }[];
   rows: { id: number; at: string; actorId: string | null; actorName: string; action: string; kind: string; entityType: string | null; entityId: string | null;

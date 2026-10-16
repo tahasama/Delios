@@ -515,11 +515,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `Settings.Tracking`; shown read-only in the Control room): acts on documents always; reading (opened a document,
   downloaded a file, `TRACK_READING`) kept unless switched off; sign-ins always kept for security, shown on a person's
   activity only when switched on (`TRACK_SIGN_INS` = ON).
-- **Audit trail** (Settings, administrators): the Schedule's way — plate, the narrowing (kind of act with its count,
-  project, words, dates) answered by the backend (`GET /api/admin/audit` `kind`, `actorId`), then the table (when, who
-  → their activity, what in plain words, on what → its page, project, detail), paged by 50. Kinds of act are worked out
-  once in the backend (`AuditKinds`), each with its own side colour (`AUDIT_RAIL`, the "Audit trail" area of the key);
-  a person's activity uses the same colours.
+- **Audit trail** (Settings, administrators) keeps its logbook look (owner: the agreement was on content, not styling):
+  the day as a rule, each act a slip, the kinds beside it. Shared with a person's activity (`components/logbook.tsx`).
+  Beside the log: the whole log, then each kind of act with its count and every act it holds (plain words, counts), so
+  nothing done in the app hides behind a heading; Find (words, project, dates). Every narrowing is answered by the
+  backend (`GET /api/admin/audit` `kind`, `action`, `projectId`; the activity endpoint the same), paged by 50 ("Earlier
+  acts"). Kinds are worked out once in the backend (`AuditKinds`, every code the app writes named there), each slip in
+  its kind's side colour (`AUDIT_RAIL`, the "Audit trail" area of the key); plain words for every act in
+  `lib/settings/activity-words.ts`. Who opens their activity; what opens its page.
 - A form never sits in a box inside a box: a sheet that opens a form becomes that form (`SomeoneJoins`), and a line
   of a table opened for editing goes on as the row itself (grey fields, then the strip with Cancel and the act), the
   new-document form's way.
