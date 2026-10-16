@@ -526,8 +526,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   document, `documentId` from the backend; an action, a package, a review, a list in Settings…: `activityLink`). Only
   the side takes the kind's colour; the title stays ink. A detail kept as data reads as the fields that changed, "was →
   now" (`readableDetail`), never as raw data. Home's Log tab is the same logbook for its project (backend `GET /log`,
-  the control function and administrators): the days in the main column, the kinds and every act beside it, nothing
-  else in that column.
+  the control function and administrators), the project's work only: sign-ins, opened and downloaded, and people and
+  settings are left out (the administrators' trail). Its menu is on the left (`LogbookSide categoriesOnly`: the kinds,
+  not every act; then Find), the days beside it, the page's right column away while the log is open.
 - A form never sits in a box inside a box: a sheet that opens a form becomes that form (`SomeoneJoins`), and a line
   of a table opened for editing goes on as the row itself (grey fields, then the strip with Cancel and the act), the
   new-document form's way.

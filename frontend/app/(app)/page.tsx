@@ -378,10 +378,21 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         ) : null}
       </nav>
 
-      <div className="mt-3 grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,1fr)_296px] xl:items-start">
+      <div className={`mt-3 grid grid-cols-1 gap-3.5 xl:items-start ${view === "log" ? "" : "xl:grid-cols-[minmax(0,1fr)_296px]"}`}>
         <main className="@container min-w-0">
           {view === "log" ? (
-            <section className="dispatch logbook home-rise min-w-0 space-y-5" style={rise()}>
+            <section className="dispatch logbook home-rise grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[232px_minmax(0,1fr)] lg:items-start" style={rise()}>
+              {/* The menu, always on the left: the kinds of act only, then Find. */}
+              <aside className="lg:sticky lg:top-22">
+                <LogbookSide
+                  categoriesOnly
+                  counts={log?.actions ?? []}
+                  chosen={{ kind: sp.kind, action: sp.action }}
+                  href={logHref}
+                  find={{ q: sp.q, from: sp.from, to: sp.to, hidden: { view: "log", kind: sp.kind, action: sp.action }, clear: `/?${new URLSearchParams(Object.entries({ view: "log", kind: sp.kind, action: sp.action }).filter((e): e is [string, string] => !!e[1]))}` }}
+                />
+              </aside>
+              <div className="min-w-0 space-y-5">
               {readingLine({ from: sp.from, to: sp.to, kindLabel: AUDIT_KINDS.find((k) => k.key === sp.kind)?.label, q: sp.q }) ? (
                 <p className="slip-note">{readingLine({ from: sp.from, to: sp.to, kindLabel: AUDIT_KINDS.find((k) => k.key === sp.kind)?.label, q: sp.q })}</p>
               ) : null}
@@ -390,6 +401,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               ) : (
                 <p className="slip px-4 py-6 text-[13px] text-(--ink-soft)">The log could not be read just now. Try again in a moment.</p>
               )}
+              </div>
             </section>
           ) : opened ? (
             <Queue aspect={opened} rows={rows[opened.id]} style={rise()} />
@@ -406,18 +418,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           )}
         </main>
 
-        <aside className="grid min-w-0 gap-3 xl:sticky xl:top-22">
-          {/* The log's own side: its kinds and every act, then Find; nothing else beside it. */}
-          {view === "log" ? (
-            <div className="dispatch logbook home-rise min-w-0" style={rise()}>
-              <LogbookSide
-                counts={log?.actions ?? []}
-                chosen={{ kind: sp.kind, action: sp.action }}
-                href={logHref}
-                find={{ q: sp.q, from: sp.from, to: sp.to, hidden: { view: "log", kind: sp.kind, action: sp.action }, clear: `/?${new URLSearchParams(Object.entries({ view: "log", kind: sp.kind, action: sp.action }).filter((e): e is [string, string] => !!e[1]))}` }}
-              />
-            </div>
-          ) : null}
+        <aside className={`grid min-w-0 gap-3 xl:sticky xl:top-22 ${view === "log" ? "hidden" : ""}`}>
           {journal.length && view !== "log" ? (
             <section className="home-rise register register-sheet register-sheet-open px-4 py-3" style={rise()}>
               <h2 className="mb-2.5 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">{older.length ? "Lately" : `Since ${weekday(since)}`}</h2>

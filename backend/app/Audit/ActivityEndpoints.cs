@@ -73,8 +73,8 @@ public static class ActivityEndpoints
     /// GET <c>/log</c>: Home's log, the project's whole trail on the logbook (the control function's and the
     /// administrator's): every act of this project, newest first, a page at a time, narrowed by a kind
     /// (<see cref="AuditKinds"/>), an act, words, and whole days in the project's time zone. Each act says its kind and,
-    /// for a revision or a file, its document; the acts come with their counts. Reading is left out where the
-    /// organization does not keep it.
+    /// for a revision or a file, its document; the acts come with their counts. Only the project's work: sign-ins,
+    /// reading, and people and settings are left out (they are the administrators' trail).
     /// </summary>
     private static async Task<IResult> LogAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken,
         string? kind = null, string? action = null, string? q = null, DateOnly? from = null, DateOnly? to = null, int page = 1, int per = 50)
@@ -84,7 +84,11 @@ public static class ActivityEndpoints
             return Problems.Forbidden("CONTROL_ONLY", "The log is read by the control function and administrators.");
         per = Math.Clamp(per, 10, 200);
         page = Math.Max(1, page);
-        var hidden = await Settings.Tracking.KeepsReadingAsync(db, cancellationToken) ? [] : Settings.Tracking.Reading;
+        // The project's work only: who signed in, who opened or downloaded what, and people and settings stay in the
+        // administrators' trail (Settings, Audit trail; a person's activity), never on Home.
+        var outside = await db.AuditEvents.AsNoTracking().Where(e => e.ProjectId == access.Project.Id).Select(e => e.Action).Distinct()
+            .ToListAsync(cancellationToken);
+        var hidden = outside.Where(code => AuditKinds.Of(code) is "PEOPLE" or "READING" or "SIGN_IN").ToArray();
         var query = db.AuditEvents.AsNoTracking().Where(e => e.ProjectId == access.Project.Id && !hidden.Contains(e.Action));
         var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(access.Project.TimeZone) ?? DateTimeZone.Utc;
         if (from is { } f) { var start = LocalDate.FromDateOnly(f).AtStartOfDayInZone(zone).ToInstant(); query = query.Where(e => e.At >= start); }

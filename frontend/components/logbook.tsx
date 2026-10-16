@@ -63,7 +63,11 @@ export function Logbook({
 }
 
 /** Beside the log: the whole log, each kind of act with its count and every act it holds, then Find (words, dates). */
-export function LogbookSide({ counts, chosen, href, find }: { counts: Counts; chosen: Chosen; href: Href; find: Find }) {
+export function LogbookSide({ counts, chosen, href, find, categoriesOnly = false }: {
+  counts: Counts; chosen: Chosen; href: Href; find: Find;
+  /** Only the kinds, without every act under each (Home). */
+  categoriesOnly?: boolean;
+}) {
   const total = counts.reduce((n, c) => n + c.count, 0);
   const kinds = AUDIT_KINDS.map((k) => ({ ...k, acts: counts.filter((c) => c.kind === k.key), count: counts.filter((c) => c.kind === k.key).reduce((n, c) => n + c.count, 0) }))
     .filter((k) => k.count > 0 || chosen.kind === k.key);
@@ -93,7 +97,7 @@ export function LogbookSide({ counts, chosen, href, find }: { counts: Counts; ch
             </Link>
             {/* Every act of that kind, so nothing done in the app is hidden behind a heading. */}
             <ul>
-              {k.acts.map((a) => {
+              {(categoriesOnly ? [] : k.acts).map((a) => {
                 const mine = chosen.action === a.action;
                 return (
                   <li key={a.action}>
