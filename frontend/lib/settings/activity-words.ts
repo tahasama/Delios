@@ -230,7 +230,7 @@ export function activityLink(entityType: string | null, entityId: string | null,
     case "Function": return "/settings/functions";
     case "Party":
     case "OrganizationLink": return "/settings/parties";
-    case "Project": return "/settings/projects";
+    case "Project": return "/organization/projects";
     case "ReviewRoute": return "/settings/workflow-templates";
     case "NumberingScheme":
     case "SchemeRouting":

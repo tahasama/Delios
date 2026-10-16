@@ -12,7 +12,8 @@ const text = (formData: FormData, name: string) => String(formData.get(name) ?? 
 
 /**
  * Registers or changes an organization we exchange documents with. The organization itself is the whole
- * organization's record (its code never changes: documents and transmittals were issued under it); who answers for
+ * organization's record, and DELIOS's: one code and one name everywhere, each changed once at most (a mistake put
+ * right; numbers already given keep the old code), and how it works with us changed once too; who answers for
  * it is said per project, so the control function of the project keeps it (`PARTY:<id>`, a project setting). An
  * organization is never removed: its access is switched off instead, and every record keeps meaning what it meant.
  */
@@ -39,11 +40,17 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
       const active = formData.get("active") === "on";
       if (!name) return { error: "Give the organization its name." };
       if (party.isInternal && !active) return { error: "Your own organization cannot be switched off." };
+      // Only what changes is sent: a code, a name or how it works with us is changed once at most.
+      const recode = code && code !== party.code ? code : undefined;
+      const rename = name !== party.name ? name : undefined;
       await api(`/api/admin/parties/${id}`, {
         method: "PUT",
         body: party.isInternal
-          ? { name, active }
-          : { name, active, participation, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail },
+          ? { code: recode, name: rename, active }
+          : {
+            code: recode, name: rename, active, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail,
+            participation: participation !== party.participation ? participation : undefined,
+          },
       });
     } else {
       // What this organization asks when it adds another one.

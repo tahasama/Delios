@@ -50,6 +50,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             issuing |= await EnsureUpdateStatusAsync(existing.Id, cancellationToken);
             issuing |= await EnsurePropNamesAsync(cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            await Organizations.Registry.EnsureTenantAsync(db, existing.Id, cancellationToken);
             await upgrade.CommitAsync(cancellationToken);
             logger.LogInformation(reviews || issuing ? "The demo tenant exists; what it lacked was added" : "The demo tenant already exists; nothing to do");
             return;
@@ -105,6 +106,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         await db.SaveChangesAsync(cancellationToken);
         await EnsureCorrespondenceSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await Organizations.Registry.EnsureTenantAsync(db, t, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         logger.LogInformation("Demo tenant '{Slug}' created; every password is {Password}", Slug, Password);
     }
@@ -149,7 +151,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         var tenant = await setup.CreateAsync(slug, organizationName, email, adminName, password, cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var t = tenant.Id;
-        var own = new Party { TenantId = t, Code = "OUR-ORG", Name = organizationName, IsInternal = true };
+        // Its code is its own across DELIOS: one nobody has had yet, from its name.
+        var own = new Party { TenantId = t, Code = await Organizations.Registry.FreeOrganizationCodeAsync(db, organizationName, cancellationToken), Name = organizationName, IsInternal = true };
         db.Parties.Add(own);
         var (control, _, _, _, _) = AddFunctions(t);
         var admin = await db.Users.SingleAsync(u => u.NormalizedEmail == email.Trim().ToUpperInvariant(), cancellationToken);
@@ -180,6 +183,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             db.Memberships.Add(new Membership { TenantId = t, ProjectId = project.Id, UserId = admin.Id, FunctionId = control.Id });
         }
         await db.SaveChangesAsync(cancellationToken);
+        await Organizations.Registry.EnsureTenantAsync(db, t, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (tenant, admin.Id);
     }

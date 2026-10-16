@@ -29,5 +29,7 @@ public static class DatabaseMigrator
         await db.Database.MigrateAsync();
         var applied = (await db.Database.GetAppliedMigrationsAsync()).Count();
         logger.LogInformation("Database is up to date with {Count} migration(s)", applied);
+        // What is unique across DELIOS: what each organization already holds goes in the register, once.
+        await Organizations.Registry.EnsureAllAsync(services, CancellationToken.None);
     }
 }

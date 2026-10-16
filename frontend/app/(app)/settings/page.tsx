@@ -85,7 +85,7 @@ export default async function AdminPage() {
   const lists = verdictLists ?? [];
   const noMeaning = lists.flatMap((l) => l.verdicts).filter((v) => v.status === "ACTIVE" && !v.meaning).length;
   const figure: Record<string, { text: string; attention?: boolean }> = {
-    "/settings/projects": { text: plural(projects, "open project") },
+    "/settings/projects": { text: ctx.project.code },
     "/settings/parties": { text: `yours + ${plural(outside, "other")}` },
     "/settings/dmp": { text: "written from these settings" },
     "/settings/config": emptyLists ? { text: `${plural(emptyLists, "essential list")} still empty`, attention: true } : { text: plural(sets, "list") },

@@ -62,7 +62,8 @@ Our organization (host)                         Their organization (collaborator
 
 ```
 Projects          ours (we opened them) and joined (another organization's), with our role in each,
-                  status, our people on it. Open, archive, reopen ours.
+                  status, our people on it. Open, change, archive, reopen ours (/organization/projects,
+                  always with why). A project's Settings shows only that project.
 People            everyone in our organization, which projects each is on (ours and joined),
                   two-step sign-in, last sign-in. Invite, switch off, unlock.
                   Choose which of our people work on a joined project.
@@ -77,6 +78,19 @@ Defaults          the configuration a new project of ours starts with: who does 
                   A project we join follows its owner's configuration.
 Security, audit   sign-in rules for the whole organization; the audit trail of all its projects.
 ```
+
+## One code and one name across DELIOS
+
+An organization is one row in DELIOS's register (`OrganizationIdentity`, `Organizations/Registry.cs`, kept outside every
+organization's data): one code and one name, the same in every list that holds it. Adding an organization already known
+takes its code and name; a code or name of another is refused. The code and the name change once each (a mistake put
+right), carried to every list holding it; an organization on DELIOS alone changes its own. Every value ever used (project
+codes and names, organization codes and names, contract numbers) stays reserved to what used it (`reserved_values`).
+Each organization taking part in a project carries the number of its contract with the project's organization
+(`ProjectParty.ContractNumber`), unique on DELIOS, changed once.
+
+Not yet joined up: an organization known in others' lists before it came onto DELIOS itself, and a collaborator linked
+under a different code, are not merged into one row by themselves.
 
 ## Our role in a project
 

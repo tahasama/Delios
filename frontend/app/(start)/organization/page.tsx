@@ -80,7 +80,7 @@ export default async function OrganizationPage() {
           </Card>
         ) : null}
 
-        <Card title="Projects">
+        <Card title="Projects" actions={<Link href="/organization/projects" className="text-xs font-semibold text-link hover:underline">Open a new project, change or archive one</Link>}>
           <p className="mb-3 text-xs text-slate-500">Ours, opened by us, and those of other organizations we take part in.</p>
           <DataTable head={<tr><Th>Project</Th><Th>Whose</Th><Th>Our role</Th><Th>Status</Th><Th>Our people on it</Th></tr>}>
             {projects.map((p) => (

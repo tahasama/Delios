@@ -91,6 +91,12 @@ public sealed class Party
     /// the only address whose replies are taken in. Empty: one of ours sends them, as the dispatch records.
     /// </summary>
     public string? ContactEmail { get; set; }
+    /// <summary>The organization it is, as all of DELIOS knows it (one code and one name everywhere): <c>Organizations.Registry</c>.</summary>
+    public Guid? OrganizationId { get; set; }
+    /// <summary>How it worked with us before its one change of it, by whom and when; once changed it is fixed.</summary>
+    public string? PreviousParticipation { get; set; }
+    public Instant? ParticipationChangedAt { get; set; }
+    public string? ParticipationChangedByName { get; set; }
 }
 
 /// <summary>The allowed values of <c>Party.Participation</c>.</summary>
@@ -188,6 +194,10 @@ public sealed class Project
     public string? StatusReason { get; set; }
     public string? StatusChangedByName { get; set; }
     public Instant? StatusChangedAt { get; set; }
+    /// <summary>Its code before its one change (a mistake put right), by whom and when; once changed it is fixed.</summary>
+    public string? PreviousCode { get; set; }
+    public Instant? CodeChangedAt { get; set; }
+    public string? CodeChangedByName { get; set; }
 }
 
 /// <summary>A job as the organization names it: Lead Electrical Engineer, the control function.</summary>

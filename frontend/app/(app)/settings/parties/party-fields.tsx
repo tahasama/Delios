@@ -13,8 +13,10 @@ import Link from "next/link";
  * not names the function of ours that carries it. The question changes as the
  * choice is made, rather than after saving.
  */
-export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, people, functions, access, contactEmail = "" }: {
+export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, people, functions, access, contactEmail = "", fixed }: {
   kind: string;
+  /** How they work with us was changed once already: it is shown, fixed (the words say when and by whom). */
+  fixed?: string;
   /** Not on DELIOS: their address for our transmittals, and the only one whose replies are taken in. */
   contactEmail?: string;
   contactId: string;
@@ -35,13 +37,20 @@ export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, pe
   return (
     <>
       {/* A collaborator is linked to its own DELIOS, never chosen here: guest or not on DELIOS until it links. */}
-      {chosen === "COLLABORATOR" ? (
+      {fixed && chosen !== "COLLABORATOR" ? (
+        <>
+          <input type="hidden" name="kind" value={chosen} />
+          <Field label="How they work with us" hint={fixed}>
+            <input value={PARTY_KINDS.find((item) => item.value === chosen)?.label ?? chosen} readOnly className={`${inputCls} bg-tint-soft text-slate-600`} />
+          </Field>
+        </>
+      ) : chosen === "COLLABORATOR" ? (
         <>
           <input type="hidden" name="kind" value="COLLABORATOR" />
           <p className="text-xs text-slate-600">{PARTY_KINDS[0].label}: {PARTY_KINDS[0].hint}.</p>
         </>
       ) : (
-        <Field label="How they work with us" required>
+        <Field label="How they work with us" required hint={access ? "changed once only, for a mistake" : undefined}>
           <select name="kind" value={chosen} onChange={(event) => setChosen(event.target.value)} className={inputCls}>
             {PARTY_KINDS.filter((item) => item.value !== "COLLABORATOR").map((item) => <option key={item.value} value={item.value}>{item.label} — {item.hint}</option>)}
           </select>

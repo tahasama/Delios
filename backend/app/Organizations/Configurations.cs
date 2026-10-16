@@ -44,5 +44,8 @@ internal sealed class ProjectPartyConfiguration : IEntityTypeConfiguration<Proje
         b.Property(x => x.Role).HasMaxLength(32);
         b.Property(x => x.AddedByName).HasMaxLength(200);
         b.Property(x => x.AddedAt).HasDefaultValueSql("now()");
+        b.Property(x => x.ContractNumber).HasMaxLength(64);
+        b.Property(x => x.PreviousContractNumber).HasMaxLength(64);
+        b.Property(x => x.ContractChangedByName).HasMaxLength(200);
     }
 }

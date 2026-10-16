@@ -1161,6 +1161,20 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
   information transmittal (Request), answered on the same thread.
 - Everyone on a project reads its directory: the organizations taking part and their people.
 
+## 60 · One code and one name for everything, across every organization
+
+- The Standard makes codes unique within one register. DELIOS keeps them unique across every organization on it, and
+  never reuses one: a project's code and name, an organization's code and name, a contract number belong to one thing
+  for good, even after it changes, so every record carrying the old one keeps meaning it.
+- An organization has one code and one name everywhere: the history of what it sent and received reads under one name
+  in every organization working with it.
+- A code is changed once, for a mistake (a project's, an organization's), and so are an organization's name, how it
+  works with us and a contract's number; what was numbered with the old code keeps it. A project is renamed as often as
+  needed. Settings are kept at two levels: the organization's (its projects, opened, archived and reopened there) and
+  each project's.
+- A contract is between two organizations: the one signing it is known on the project by the project's code, the other
+  by its contract number.
+
 ## Still open — decided in conversation, not yet built
 
 - **Every transmittal and every notification also goes by email**, showing what

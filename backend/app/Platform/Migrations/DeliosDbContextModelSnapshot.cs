@@ -2298,12 +2298,33 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Instant?>("ParticipationChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("participation_changed_at");
+
+                    b.Property<string>("ParticipationChangedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("participation_changed_by_name");
+
+                    b.Property<string>("PreviousParticipation")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("previous_participation");
+
                     b.HasKey("Id")
                         .HasName("pk_parties");
 
                     b.HasIndex("TenantId", "Code")
                         .IsUnique()
                         .HasDatabaseName("ix_parties_tenant_id_code");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("ix_parties_organization_id");
 
                     b.ToTable("parties", (string)null);
                 });
@@ -2449,6 +2470,20 @@ namespace Delios.Host.Platform.Migrations
                         .IsRequired()
                         .HasColumnType("integer[]")
                         .HasColumnName("weekend_days");
+
+                    b.Property<Instant?>("CodeChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("code_changed_at");
+
+                    b.Property<string>("CodeChangedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("code_changed_by_name");
+
+                    b.Property<string>("PreviousCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("previous_code");
 
                     b.HasKey("Id")
                         .HasName("pk_projects");
@@ -3111,6 +3146,129 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("organization_links", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Organizations.OrganizationHolder", b =>
+                {
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("party_id");
+
+                    b.HasKey("OrganizationId", "TenantId")
+                        .HasName("pk_organization_holders");
+
+                    b.ToTable("organization_holders", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Organizations.OrganizationIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("code");
+
+                    b.Property<Instant?>("CodeChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("code_changed_at");
+
+                    b.Property<string>("CodeChangedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("code_changed_by_name");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<Instant?>("NameChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("name_changed_at");
+
+                    b.Property<string>("NameChangedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name_changed_by_name");
+
+                    b.Property<string>("PreviousCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("previous_code");
+
+                    b.Property<string>("PreviousName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("previous_name");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_organization_identities");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_organization_identities_code");
+
+                    b.ToTable("organization_identities", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Organizations.ReservedValue", b =>
+                {
+                    b.Property<string>("Kind")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Value")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("value");
+
+                    b.Property<Guid>("HolderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("holder_id");
+
+                    b.Property<Instant>("ReservedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reserved_at");
+
+                    b.Property<string>("Shown")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("shown");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Kind", "Value")
+                        .HasName("pk_reserved_values");
+
+                    b.HasIndex("HolderId")
+                        .HasDatabaseName("ix_reserved_values_holder_id");
+
+                    b.ToTable("reserved_values", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Organizations.ProjectParty", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3153,6 +3311,25 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<Instant?>("ContractChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("contract_changed_at");
+
+                    b.Property<string>("ContractChangedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("contract_changed_by_name");
+
+                    b.Property<string>("ContractNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("contract_number");
+
+                    b.Property<string>("PreviousContractNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("previous_contract_number");
 
                     b.HasKey("Id")
                         .HasName("pk_project_parties");

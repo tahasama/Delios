@@ -73,4 +73,12 @@ public sealed class ProjectParty
     public bool Active { get; set; } = true;
     public Instant AddedAt { get; set; }
     public required string AddedByName { get; set; }
+    /// <summary>
+    /// The contract between the project's organization (which signs it, under the project's code) and this one: its
+    /// number, unique across DELIOS. Changed once at most; the previous one stays reserved to it.
+    /// </summary>
+    public string? ContractNumber { get; set; }
+    public string? PreviousContractNumber { get; set; }
+    public Instant? ContractChangedAt { get; set; }
+    public string? ContractChangedByName { get; set; }
 }

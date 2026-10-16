@@ -90,7 +90,11 @@ export async function setProjectOrganizationAction(_prev: Result | undefined, fo
   try {
     await api(projectPath(ctx, `/organizations/${partyId}`), {
       method: "PUT",
-      body: { role: text(formData, "role") || null, startFunctionId: text(formData, "startFunctionId") || null, active: text(formData, "active") !== "off" },
+      body: {
+        role: text(formData, "role") || null, startFunctionId: text(formData, "startFunctionId") || null, active: text(formData, "active") !== "off",
+        // The contract between us and them: unique across DELIOS, changed once at most (a fixed one is shown, not sent).
+        contractNumber: text(formData, "contractNumber") || null,
+      },
     });
   } catch (e) {
     return failed(e);

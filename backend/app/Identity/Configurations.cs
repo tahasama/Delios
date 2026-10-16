@@ -57,6 +57,9 @@ internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
         b.Property(x => x.CustodianFunction).HasMaxLength(32);
         b.Property(x => x.ExternalSystem).HasMaxLength(200);
         b.Property(x => x.ContactEmail).HasMaxLength(254);
+        b.Property(x => x.PreviousParticipation).HasMaxLength(16);
+        b.Property(x => x.ParticipationChangedByName).HasMaxLength(200);
+        b.HasIndex(x => x.OrganizationId);
     }
 }
 
@@ -95,6 +98,8 @@ internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         b.Property(x => x.TimeZone).HasMaxLength(64);
         b.Property(x => x.ContentExtraction).HasMaxLength(16);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
+        b.Property(x => x.PreviousCode).HasMaxLength(32);
+        b.Property(x => x.CodeChangedByName).HasMaxLength(200);
     }
 }
 

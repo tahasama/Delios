@@ -488,8 +488,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   only retired) is removed.
 - Organizations: the list is the organization's, shared by every project; who takes part in a project (role, the
   function a collaborator's people start with) and who answers for each there (`PARTY:<id>`, a project setting, so
-  Document Control keeps it) are the project's. Who answers is optional and never blocks a save. A code is shown, never
-  edited. An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
+  Document Control keeps it) are the project's. Who answers is optional and never blocks a save. Its code, name and
+  how it works with us change once each (above). An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
 - Layered settings (owner's decision, to build): the app gives defaults; the organization makes the originals; a
   project may change only what is marked as open to change for projects. An administrator changes the organization's;
@@ -538,12 +538,26 @@ a screen only words it. A new rule goes in the backend, never in a page.
   title; a function's own name is shown only as read from the data.
 - The plan's starter values are added in one go ("Add them"); Controlled changes no longer exist.
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
-- **Projects** (administrators), People & access's way: plate (open · archived; each project has its own register,
-  counters, people and settings, a new one starting from the organization's defaults); "Open a new project" one sheet
-  (`?new=1`: band, grey fields, "Where approval sits under each role", carry over people, Cancel / Open project); the
-  table, code and name opening the project, a pencil opening its line (`?edit=<id>`: name, code, type, our role, start,
-  end, scope; Cancel / Save). Archive and Reopen sit in the opened line and always ask why (backend REASON_REQUIRED,
-  kept on the project: `StatusReason`, by whom, when, shown on its line).
+- **Two levels of settings** (owner): the organization's (`/organization`, its portal) and the project's (Settings).
+  Every project, opening one, archiving and reopening are the organization's: **Projects** (`/organization/projects`,
+  administrators), People & access's way: plate (open · archived); "Open a new project" one sheet (`?new=1`: band, grey
+  fields, "Where approval sits under each role", whose people it starts with, Cancel / Open project; it starts from the
+  organization's defaults); the table, code and name opening a project one is on, a pencil opening its line
+  (`?edit=<id>`: name, code, type, our role, start, end, scope; Cancel / Save). Archive and Reopen sit in the opened line
+  and always ask why (backend REASON_REQUIRED, kept on the project: `StatusReason`, by whom, when, shown on its line).
+  Settings → **This project** (`/settings/projects`) is the project one is in only: what it is, and the same line to
+  change; no "Open a new project" there.
+- **Unique across DELIOS, never reused** (owner): a project's code and name, an organization's code and name, a
+  contract number belong to one thing in every organization's data together (`Organizations.Registry`,
+  `reserved_values`, no row-level security, filled from what exists after migrating). A value once used stays with what
+  used it, even after a change, so the records carrying it keep meaning it. An organization has **one code and one
+  name everywhere** (`OrganizationIdentity`): given ACME, it is ACME in every list that holds it; another organization
+  adds it under the same code and name, and a code or name of another is refused. Changed **once** each, for a mistake
+  (backend CHANGED_ONCE; numbers already given keep the old code), carried to every list holding it; an organization on
+  DELIOS alone changes its own (THEIR_OWN). A project's code changes once in its life (CODE_CHANGED_ONCE); its name as
+  often as needed, each name kept its own. "How they work with us" changes once. The **contract** is between two
+  organizations: the one signing it (the project's) is known by the project's code, the other by its contract number
+  (`ProjectParty.ContractNumber`, Organizations, "On <project>"), unique on DELIOS, changed once.
 - Settings pages use the reference boxes (`rounded-md`, `ring-line`, `bg-tint-soft`), the shared control size, and no
   text under 11px.
 

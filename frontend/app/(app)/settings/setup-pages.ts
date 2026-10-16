@@ -46,8 +46,8 @@ export function maySetup(user: { verbs?: string[]; role?: string; isInternal?: b
 export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/settings/projects",
-    title: "Projects",
-    text: "Open, archive and switch between the projects your organization runs.",
+    title: "This project",
+    text: "What it is: its name, code, type, our role, dates and scope. Every project is on the organization's page.",
     group: "Organization",
   },
   {

@@ -4,7 +4,7 @@ import { applyDefaults } from "@/lib/organization/defaults";
 
 import { revalidatePath } from "next/cache";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";
-import { requireAdminScope, setActiveProject } from "@/lib/core/scope";
+import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { PROJECT_KINDS } from "@/lib/settings/profiles";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { api, refusal } from "@/lib/client";
@@ -18,16 +18,20 @@ const CODE = /^[A-Z0-9][A-Z0-9-]{0,15}$/;
 /** What a project says about itself that the backend has no column for: its type, dates and scope statement, in its settings. */
 const PROJECT_INFO = "PROJECT_INFO";
 
+/** Where the organization's projects are kept: its own page, never a project's Settings. */
+function revalidateProjects() {
+  revalidatePath("/organization", "layout");
+  revalidatePath("/settings/projects");
+  revalidatePath("/", "layout");
+}
+
 /**
- * Open a project. Everything controlled lives in one, so this is the act that
- * creates a register — with its own numbering counters, its own scope
- * statement (§1.6) and its own people.
- *
- * Configuration is not copied: value sets, schemes and the permission matrix
- * are published once per organization and shared by every project it runs.
+ * Open a project, from the organization's page (Projects). Everything controlled lives in one, so this is the act
+ * that creates a register — with its own numbering counters, its own scope statement (§1.6) and its own people. It
+ * starts from the organization's defaults; its code and name are its own across DELIOS, for good.
  */
 export async function createProjectAction(_prev: ProjectState | undefined, formData: FormData): Promise<ProjectState> {
-  const ctx = await requireAdminScope();
+  const ctx = await requireOrgAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim().toUpperCase();
   const kind = String(formData.get("kind") ?? "GENERIC");
@@ -35,7 +39,7 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
   const startDate = String(formData.get("startDate") ?? "").trim();
   const endDate = String(formData.get("endDate") ?? "").trim();
   const scopeStatement = String(formData.get("scopeStatement") ?? "").trim();
-  const copyPeople = formData.get("copyPeople") === "on";
+  const copyFrom = String(formData.get("copyFrom") ?? "");
   if (!name) return { error: "A project needs a name." };
   if (!CODE.test(code)) return { error: "A code is letters, digits and hyphens — up to 16 characters, e.g. NP1." };
   if (!PROJECT_KINDS.some((k) => k.code === kind)) return { error: "Choose a project type." };
@@ -43,7 +47,7 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
   if (!chosenRole) return { error: "Choose what this organization does on the project." };
   if (startDate && endDate && endDate < startDate) return { error: "The end date cannot fall before the start date." };
   // What this organization asks of a project.
-  const policy = await formPolicy(ctx, "PROJECT");
+  const policy = await formPolicy({ orgId: ctx.orgId, projectId: "" }, "PROJECT");
   const asked = checkForm("PROJECT", policy, { code, name, kind, role, startDate, endDate, scopeStatement }, (n) => String(formData.get(n) ?? ""));
   if (asked.error) return { error: asked.error };
 
@@ -57,11 +61,11 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
     }));
     // The organization's defaults: who does what and how a project works, until the project changes them.
     await applyDefaults(project.id);
-    if (copyPeople) {
+    if (copyFrom) {
       // Same people, same functions, on the new project. Far quicker than adding
       // a project team one row at a time, and easy to prune afterwards.
       for (const person of await adminUsers()) {
-        const seat = person.memberships.find((m) => m.projectId === ctx.projectId && m.active);
+        const seat = person.memberships.find((m) => m.projectId === copyFrom && m.active);
         if (!seat || person.id === ctx.user.id) continue;
         await api(`/api/admin/projects/${project.id}/members`, {
           method: "PUT", body: { userId: person.id, functionId: seat.functionId, department: seat.department, active: true },
@@ -72,13 +76,13 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
   } catch (e) {
     return { error: refusal(e).message };
   }
-  revalidatePath("/settings/projects", "layout");
-  return { ok: `${code} opened${carried ? ` with ${carried} person(s) carried over` : ""}. Switch to it from the picker at the top left.` };
+  revalidateProjects();
+  return { ok: `${code} opened${carried ? ` with ${carried} person(s) carried over` : ""}. Open it from its line.` };
 }
 
 /** Archive a project, or bring it back, always with why (kept on its line). Nothing is deleted. */
 export async function setProjectStatusAction(_prev: ProjectState | undefined, formData: FormData): Promise<ProjectState> {
-  await requireAdminScope();
+  await requireOrgAdmin();
   const projectId = String(formData.get("projectId") ?? "");
   const status = String(formData.get("status") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
@@ -95,28 +99,23 @@ export async function setProjectStatusAction(_prev: ProjectState | undefined, fo
   } catch (e) {
     return { error: refusal(e).message };
   }
-  revalidatePath("/settings/projects", "layout");
+  revalidateProjects();
   return { ok: `${project.code} is now ${status.toLowerCase()}.` };
 }
 
-/** Switch to a project straight from the list. */
-export async function openProjectAction(formData: FormData): Promise<void> {
-  const ctx = await requireAdminScope();
-  const projectId = String(formData.get("projectId") ?? "");
-  await setActiveProject(projectId, ctx.user.id);
-  revalidatePath("/", "layout");
-}
-
 /**
- * Change a project's line: its name and code, type and our role, dates and scope statement. The code appears inside
- * every document number already allocated, so those numbers do not change: the code only decides what new numbers
- * look like, and the form says so.
+ * Change a project's line: its name, type and our role, dates and scope statement, and its code once in its life (a
+ * mistake put right; the backend refuses a second change). The code appears inside every document number already
+ * allocated, so those numbers do not change: the code only decides what new numbers look like, and the form says so.
  */
 export async function saveProjectAction(_prev: ProjectState | undefined, formData: FormData): Promise<ProjectState> {
-  await requireAdminScope();
+  await requireOrgAdmin();
   const projectId = String(formData.get("projectId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  const code = String(formData.get("code") ?? "").trim().toUpperCase();
+  const project = (await adminProjects()).find((one) => one.id === projectId);
+  if (!project) return { error: "That project is not in your organization." };
+  // A code changed once is fixed: its field is shown, not sent.
+  const code = (String(formData.get("code") ?? "").trim() || project.code).toUpperCase();
   const kind = String(formData.get("kind") ?? "GENERIC");
   const role = String(formData.get("role") ?? "GENERIC");
   const startDate = String(formData.get("startDate") ?? "").trim();
@@ -127,8 +126,6 @@ export async function saveProjectAction(_prev: ProjectState | undefined, formDat
   if (!PROJECT_KINDS.some((k) => k.code === kind)) return { error: "Choose a project type." };
   if (!(await contractRoleOptions()).some((r) => r.code === role)) return { error: "Choose what this organization does on the project." };
   if (startDate && endDate && endDate < startDate) return { error: "The end date cannot fall before the start date." };
-  const project = (await adminProjects()).find((one) => one.id === projectId);
-  if (!project) return { error: "That project is not in your organization." };
   try {
     await api(`/api/admin/projects/${projectId}`, { method: "PUT", body: { code, name, contractRole: role, kind } });
     let info: Record<string, unknown> = {};
@@ -140,7 +137,6 @@ export async function saveProjectAction(_prev: ProjectState | undefined, formDat
   } catch (e) {
     return { error: refusal(e).message };
   }
-  revalidatePath("/settings/projects");
-  revalidatePath("/");
+  revalidateProjects();
   return { ok: code !== project.code ? `Saved. New numbers will use ${code}; documents already numbered keep ${project.code}.` : "Saved." };
 }

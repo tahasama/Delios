@@ -26,6 +26,8 @@ export type JoinedProject = {
 export type ProjectOrganization = {
   partyId: string; code: string; name: string; kind: "COLLABORATOR" | "GUEST" | "NOT_ON_DELIOS"; linkedOrganization: string | null;
   role: string | null; startFunctionId: string | null; startFunction: string | null; active: boolean; people: number;
+  /** The contract between the project's organization and this one; changed once at most. */
+  contractNumber?: string | null; previousContractNumber?: string | null; contractChangedByName?: string | null; contractChangedAt?: string | null;
 };
 
 /** Another organization the signed-in person can switch into (or back home), with their projects there. */

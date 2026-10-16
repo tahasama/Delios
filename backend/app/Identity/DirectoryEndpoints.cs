@@ -346,6 +346,9 @@ public static class DirectoryEndpoints
             p.StatusReason,
             p.StatusChangedByName,
             StatusChangedAt = p.StatusChangedAt?.ToDateTimeOffset(),
+            p.PreviousCode,
+            p.CodeChangedByName,
+            CodeChangedAt = p.CodeChangedAt?.ToDateTimeOffset(),
             p.TimeZone,
             p.WeekendDays,
             p.ContentExtraction,
@@ -363,8 +366,6 @@ public static class DirectoryEndpoints
         var name = Blank(request.Name);
         if (code is null || name is null) return Problems.Invalid("CODE_AND_NAME_REQUIRED", "A project has a code and a name.");
         if (code.Length > 32) return Problems.Invalid("CODE_TOO_LONG", "A project code has at most 32 characters.");
-        if (await db.Projects.AnyAsync(p => p.Code == code, cancellationToken))
-            return Problems.Conflict("PROJECT_CODE_TAKEN", $"{code} is already a project.");
         var zone = Blank(request.TimeZone) ?? "UTC";
         if (DateTimeZoneProviders.Tzdb.GetZoneOrNull(zone) is null) return Problems.Invalid("TIME_ZONE_UNKNOWN", $"{zone} is not a time zone.");
         var project = new Project
@@ -376,6 +377,11 @@ public static class DirectoryEndpoints
             Kind = Blank(request.Kind)?.ToUpperInvariant() ?? "GENERIC",
             TimeZone = zone,
         };
+        // A project's code and name are its own across DELIOS, for good: never given to another.
+        if (!await Organizations.Registry.ReserveAsync(db, Organizations.ReservedKinds.ProjectCode, code, project.Id, project.TenantId, cancellationToken))
+            return Problems.Conflict("PROJECT_CODE_TAKEN", $"{code} is already a project's code on DELIOS, or was: a code is never used twice.", new { field = "code" });
+        if (!await Organizations.Registry.ReserveAsync(db, Organizations.ReservedKinds.ProjectName, name, project.Id, project.TenantId, cancellationToken))
+            return Problems.Conflict("PROJECT_NAME_TAKEN", $"{name} is already a project's name on DELIOS, or was: choose another.", new { field = "name" });
         db.Projects.Add(project);
         await ProjectCodes.EnsurePublishedAsync(db, project.TenantId, project.Code, project.Name, cancellationToken);
         var control = await db.Functions.Where(f => f.Active && f.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
@@ -399,14 +405,29 @@ public static class DirectoryEndpoints
         var changes = new List<string>();
         if (Blank(request.Code)?.ToUpperInvariant() is { } code && code != project.Code)
         {
+            // Changed once in the project's life, for a mistake: the old code stays its own, on what was numbered with it.
+            if (project.CodeChangedAt is not null)
+                return Problems.Conflict("CODE_CHANGED_ONCE",
+                    $"{project.Code}'s code was already changed once (from {project.PreviousCode}, by {project.CodeChangedByName}): it is fixed now.",
+                    new { field = "code" });
             if (code.Length > 32) return Problems.Invalid("CODE_TOO_LONG", "A project code has at most 32 characters.");
-            if (await db.Projects.AnyAsync(p => p.Code == code && p.Id != projectId, cancellationToken))
-                return Problems.Conflict("PROJECT_CODE_TAKEN", $"{code} is already a project.");
+            if (!await Organizations.Registry.ReserveAsync(db, Organizations.ReservedKinds.ProjectCode, code, project.Id, project.TenantId, cancellationToken))
+                return Problems.Conflict("PROJECT_CODE_TAKEN", $"{code} is already a project's code on DELIOS, or was: a code is never used twice.", new { field = "code" });
             changes.Add($"code {project.Code} → {code}; numbers already given keep {project.Code}");
+            project.PreviousCode = project.Code;
+            project.CodeChangedAt = SystemClock.Instance.GetCurrentInstant();
+            project.CodeChangedByName = (await ActorAsync(http, db, cancellationToken)).Name;
             project.Code = code;
             await ProjectCodes.EnsurePublishedAsync(db, project.TenantId, code, Blank(request.Name) ?? project.Name, cancellationToken);
         }
-        if (Blank(request.Name) is { } name && name != project.Name) { changes.Add($"name → {name}"); project.Name = name; }
+        if (Blank(request.Name) is { } name && name != project.Name)
+        {
+            // Renamed as often as needed; each name it had stays its own.
+            if (!await Organizations.Registry.ReserveAsync(db, Organizations.ReservedKinds.ProjectName, name, project.Id, project.TenantId, cancellationToken))
+                return Problems.Conflict("PROJECT_NAME_TAKEN", $"{name} is already a project's name on DELIOS, or was: choose another.", new { field = "name" });
+            changes.Add($"name → {name}");
+            project.Name = name;
+        }
         if (Blank(request.ContractRole)?.ToUpperInvariant() is { } role && role != project.ContractRole) { changes.Add($"contract role → {role}"); project.ContractRole = role; }
         if (Blank(request.Kind)?.ToUpperInvariant() is { } kind && kind != project.Kind) { changes.Add($"kind → {kind}"); project.Kind = kind; }
         if (Blank(request.Status)?.ToUpperInvariant() is { } status && status != project.Status)
@@ -698,6 +719,8 @@ public static class DirectoryEndpoints
     {
         var links = await organizations.PartyLinksAsync(cancellationToken);
         var parties = await db.Parties.AsNoTracking().OrderBy(p => p.Name).ToListAsync(cancellationToken);
+        var identityIds = parties.Where(p => p.OrganizationId != null).Select(p => p.OrganizationId!.Value).ToList();
+        var identities = await db.OrganizationIdentities.AsNoTracking().Where(o => identityIds.Contains(o.Id)).ToDictionaryAsync(o => o.Id, cancellationToken);
         var people = await db.Users.AsNoTracking().Where(u => u.PartyId != null && u.Active).GroupBy(u => u.PartyId)
             .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
         return Results.Ok(parties.Select(p => new
@@ -712,6 +735,15 @@ public static class DirectoryEndpoints
             p.ExternalSystem,
             p.EvidenceRequired,
             p.ContactEmail,
+            // What was changed once and is fixed now: its code and name (the same everywhere on DELIOS), how it works with us.
+            Changed = p.OrganizationId is { } oid && identities.TryGetValue(oid, out var o) ? new
+            {
+                Code = o.CodeChangedAt is null ? null : new { Was = o.PreviousCode, By = o.CodeChangedByName, At = o.CodeChangedAt.Value.ToDateTimeOffset() },
+                Name = o.NameChangedAt is null ? null : new { Was = o.PreviousName, By = o.NameChangedByName, At = o.NameChangedAt.Value.ToDateTimeOffset() },
+                Participation = p.ParticipationChangedAt is null ? null : new { Was = p.PreviousParticipation, By = p.ParticipationChangedByName, At = p.ParticipationChangedAt.Value.ToDateTimeOffset() },
+                // Another organization on DELIOS keeps its own code and name: only it changes them.
+                Theirs = o.TenantId is { } own && own != p.TenantId,
+            } : null,
             People = people.FirstOrDefault(c => c.Key == p.Id)?.Count ?? 0,
             // Collaborator (linked to its own organization), guest, or not on DELIOS (docs/ORGANIZATIONS.md).
             Kind = p.IsInternal ? null : Organizations.OrganizationService.KindOf(p, links.TryGetValue(p.Id, out var l) && l.State == Organizations.LinkStates.Linked),
@@ -719,7 +751,10 @@ public static class DirectoryEndpoints
         }));
     }
 
-    /// <summary><c>POST /api/admin/parties</c>: a new organization taking part.</summary>
+    /// <summary>
+    /// <c>POST /api/admin/parties</c>: a new organization taking part. An organization has one code and one name across
+    /// DELIOS: one already known is added under its own; a code or name of another is refused.
+    /// </summary>
     private static async Task<IResult> CreatePartyAsync(
         PartyRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
@@ -727,42 +762,79 @@ public static class DirectoryEndpoints
         var name = Blank(request.Name);
         if (code is null || name is null) return Problems.Invalid("CODE_AND_NAME_REQUIRED", "An organization has a code and a name.");
         if (await db.Parties.AnyAsync(p => p.Code == code, cancellationToken))
-            return Problems.Conflict("PARTY_CODE_TAKEN", $"{code} is already an organization.");
-        var party = new Party { TenantId = http.User.TenantId(), Code = code, Name = name };
-        var problem = Apply(party, request with { Code = null, Name = null }, []);
+            return Problems.Conflict("PARTY_CODE_TAKEN", $"{code} is already in your list of organizations.", new { field = "code" });
+        var tenantId = http.User.TenantId();
+        var (identity, refused) = await Organizations.Registry.OrganizationForAsync(db, code, name, tenantId,
+            request.IsInternal == true ? tenantId : null, cancellationToken);
+        if (refused is not null) return refused;
+        var party = new Party { TenantId = tenantId, Code = identity!.Code, Name = identity.Name };
+        var problem = Apply(party, request with { Code = null, Name = null }, [], creating: true);
         if (problem is not null) return problem;
         db.Parties.Add(party);
+        await Organizations.Registry.HoldAsync(db, identity, party, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "PARTY_CREATED", "Party", party.Id, party.Name, code,
             cancellationToken: cancellationToken);
         return Results.Created($"/api/admin/parties/{party.Id}", new { party.Id });
     }
 
-    /// <summary><c>PUT /api/admin/parties/{id}</c>: name, how it takes part, who carries its exchange, revoked or not. The code never changes.</summary>
+    /// <summary>
+    /// <c>PUT /api/admin/parties/{id}</c>: how it takes part, who carries its exchange, revoked or not; and, once each,
+    /// for a mistake, its code, its name (the same everywhere on DELIOS: carried to every list holding it) and how it
+    /// works with us. What was changed once is fixed.
+    /// </summary>
     private static async Task<IResult> UpdatePartyAsync(
-        Guid partyId, PartyRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
+        Guid partyId, PartyRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IServiceScopeFactory scopes,
+        CancellationToken cancellationToken)
     {
         var party = await db.Parties.SingleOrDefaultAsync(p => p.Id == partyId, cancellationToken);
         if (party is null) return Problems.NotFound("PARTY_NOT_FOUND", "No such organization.");
         var changes = new List<string>();
-        var problem = Apply(party, request with { Code = null }, changes);
+        var actor = await ActorAsync(http, db, cancellationToken);
+        Organizations.OrganizationIdentity? identity = null;
+        IReadOnlyList<Organizations.OrganizationHolder> elsewhere = [];
+        var code = Blank(request.Code)?.ToUpperInvariant();
+        var name = Blank(request.Name);
+        if ((code is not null && code != party.Code) || (name is not null && name != party.Name))
+        {
+            if (code is not null && code != party.Code && await db.Parties.AnyAsync(p => p.Code == code && p.Id != partyId, cancellationToken))
+                return Problems.Conflict("PARTY_CODE_TAKEN", $"{code} is already in your list of organizations.", new { field = "code" });
+            identity = party.OrganizationId is { } oid ? await Organizations.Registry.IdentityAsync(db, oid, cancellationToken) : null;
+            if (identity is null) return Problems.Conflict("NOT_REGISTERED", "This organization is not in DELIOS's register yet: try again in a moment.");
+            var (others, refused) = await Organizations.Registry.ChangeAsync(db, identity, code, name, party.TenantId, actor.Name, changes, cancellationToken);
+            if (refused is not null) return refused;
+            elsewhere = others;
+            party.Code = identity.Code;
+            party.Name = identity.Name;
+        }
+        var problem = Apply(party, request with { Code = null, Name = null }, changes, creating: false, actor.Name);
         if (problem is not null) return problem;
         if (changes.Count == 0) return Results.NoContent();
         await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "PARTY_UPDATED", "Party", party.Id, party.Name,
-            string.Join("; ", changes), cancellationToken: cancellationToken);
+        await audit.WriteAsync(actor, "PARTY_UPDATED", "Party", party.Id, party.Name, string.Join("; ", changes), cancellationToken: cancellationToken);
+        if (identity is not null && elsewhere.Count > 0) await Organizations.Registry.CarryAsync(scopes, identity, elsewhere, cancellationToken);
         return Results.NoContent();
     }
 
-    private static IResult? Apply(Party party, PartyRequest request, List<string> changes)
+    private static IResult? Apply(Party party, PartyRequest request, List<string> changes, bool creating, string? actorName = null)
     {
-        if (Blank(request.Name) is { } name && name != party.Name) { changes.Add($"name → {name}"); party.Name = name; }
         if (request.IsInternal is { } inside && inside != party.IsInternal) { changes.Add(inside ? "one of ours" : "outside"); party.IsInternal = inside; }
         if (request.Active is { } active && active != party.Active) { changes.Add(active ? "restored" : "revoked"); party.Active = active; }
         if (Blank(request.Participation)?.ToUpperInvariant() is { } participation && participation != party.Participation)
         {
             if (participation is not (Participations.InApp or Participations.ByProxy))
                 return Problems.Invalid("PARTICIPATION_INVALID", "An organization answers here (IN_APP) or through one of ours (BY_PROXY).");
+            // How it works with us changes once, for a mistake; then it is fixed.
+            if (!creating)
+            {
+                if (party.ParticipationChangedAt is not null)
+                    return Problems.Conflict("CHANGED_ONCE",
+                        $"How {party.Name} works with us was already changed once (by {party.ParticipationChangedByName}): it is fixed now.",
+                        new { field = "participation" });
+                party.PreviousParticipation = party.Participation;
+                party.ParticipationChangedAt = SystemClock.Instance.GetCurrentInstant();
+                party.ParticipationChangedByName = actorName;
+            }
             changes.Add($"participation → {participation}");
             party.Participation = participation;
         }

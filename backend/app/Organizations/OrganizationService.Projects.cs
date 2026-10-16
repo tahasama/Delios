@@ -7,11 +7,16 @@ using Microsoft.EntityFrameworkCore;
 namespace Delios.Host.Organizations;
 
 /// <summary>Body of an organization's part in one of our projects: its role, and the function a collaborator's people start with.</summary>
-public sealed record ProjectPartyRequest(string? Role, Guid? StartFunctionId, bool Active = true);
+/// <remarks>
+/// <c>ContractNumber</c>: the contract between the project's organization and this one (null leaves it as it is). Unique
+/// across DELIOS; once given, it is changed once at most.
+/// </remarks>
+public sealed record ProjectPartyRequest(string? Role, Guid? StartFunctionId, bool Active = true, string? ContractNumber = null);
 
 /// <summary>An organization taking part in our project, as our project reads it.</summary>
 public sealed record ProjectPartyView(Guid PartyId, string Code, string Name, string Kind, string? LinkedOrganization, string? Role,
-    Guid? StartFunctionId, string? StartFunction, bool Active, int People);
+    Guid? StartFunctionId, string? StartFunction, bool Active, int People, string? ContractNumber = null,
+    string? PreviousContractNumber = null, string? ContractChangedByName = null, DateTimeOffset? ContractChangedAt = null);
 
 /// <summary>Someone of ours on a project of another organization's: their own account, and the function they hold there.</summary>
 public sealed record JoinedPerson(Guid UserId, string Name, string Function, bool Active);
@@ -47,7 +52,8 @@ public sealed partial class OrganizationService
             var linked = links.TryGetValue(r.PartyId, out var link) && link.State == LinkStates.Linked;
             return new ProjectPartyView(r.PartyId, party.Code, party.Name, KindOf(party, linked), linked ? link.Organization : null, r.Role,
                 r.StartFunctionId, r.StartFunctionId is { } f ? functions.GetValueOrDefault(f) : null, r.Active,
-                people.FirstOrDefault(p => p.Key == r.PartyId)?.Count ?? 0);
+                people.FirstOrDefault(p => p.Key == r.PartyId)?.Count ?? 0, r.ContractNumber, r.PreviousContractNumber, r.ContractChangedByName,
+                r.ContractChangedAt?.ToDateTimeOffset());
         }).OrderBy(v => v.Name).ToList();
     }
 
@@ -70,6 +76,27 @@ public sealed partial class OrganizationService
         {
             row = new ProjectParty { TenantId = tenant.Required, ProjectId = projectId, PartyId = partyId, AddedAt = clock.GetCurrentInstant(), AddedByName = actor.Name };
             db.ProjectParties.Add(row);
+        }
+        // The contract between us and them: its number is its own across DELIOS, and changed once at most.
+        if (Blank(request.ContractNumber) is { } contract && contract != row.ContractNumber)
+        {
+            if (row.ContractNumber is not null && row.ContractChangedAt is not null)
+                return Problems.Conflict("CHANGED_ONCE",
+                    $"The contract number was already changed once (from {row.PreviousContractNumber}, by {row.ContractChangedByName}): it is fixed now.",
+                    new { field = "contractNumber" });
+            if (!await Registry.ReserveAsync(db, ReservedKinds.Contract, contract, row.Id, tenant.Required, cancellationToken))
+                return Problems.Conflict("CONTRACT_TAKEN", $"{contract} is already a contract's number on DELIOS, or was: a number is never used twice.",
+                    new { field = "contractNumber" });
+            if (row.ContractNumber is not null)
+            {
+                row.PreviousContractNumber = row.ContractNumber;
+                row.ContractChangedAt = clock.GetCurrentInstant();
+                row.ContractChangedByName = actor.Name;
+            }
+            await audit.WriteAsync(actor, "PROJECT_PARTY_SET", "Project", projectId, project.Code,
+                row.ContractNumber is null ? $"{party.Name}: contract {contract}." : $"{party.Name}: contract {row.ContractNumber} → {contract}.",
+                projectId, cancellationToken);
+            row.ContractNumber = contract;
         }
         row.Role = role;
         row.StartFunctionId = request.StartFunctionId;

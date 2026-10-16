@@ -43,7 +43,8 @@ backend/
 │   ├── Reports/          reports
 │   ├── Search/           full-text search
 │   ├── Identity/         people, sign-in, functions, organizations, who may do what
-│   ├── Organizations/    organizations working together: links, linked accounts, switching
+│   ├── Organizations/    organizations working together: links, linked accounts, switching; Registry (what is
+│   │                     unique across DELIOS: codes, names, contract numbers; changed once)
 │   ├── Settings/         the organization's and the project's settings and lists
 │   ├── Notifications/    notifications, email, pop-ups
 │   ├── Audit/            the audit trail

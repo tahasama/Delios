@@ -13,6 +13,7 @@ import { projectOrganizations } from "@/lib/organization/api";
 import { inviteOrganizationAction, endLinkAction, setProjectOrganizationAction } from "@/lib/organization/forms";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { NoAccess } from "../no-access";
+import { fmtDate } from "@/lib/core/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Organizations" };
@@ -38,6 +39,17 @@ export default async function AdminPartiesPage() {
   const signingIn = (partyId: string) => people.filter((person) => person.partyId === partyId).length;
   /** Collaborator, guest or not on DELIOS, as the backend reads it. */
   const kindOf = (party: { kind: string }) => party.kind;
+  type Changed = { changed?: { code: { was: string; by: string; at: string } | null; name: { was: string; by: string; at: string } | null; theirs: boolean } | null };
+  /** Its code or name can no longer change here: changed once already, or another organization on DELIOS keeps its own. */
+  const fixedOf = (party: Changed, what: "code" | "name") => !!party.changed?.theirs || !!party.changed?.[what];
+  const onceHint = (party: Changed & { name: string }, what: "code" | "name") => {
+    const once = party.changed?.[what];
+    if (once) return `fixed: changed once, from ${once.was}, by ${once.by}, ${fmtDate(once.at)}`;
+    if (party.changed?.theirs) return `${party.name} is on DELIOS: only it changes its own ${what}`;
+    return what === "code"
+      ? "the same everywhere on DELIOS; changed once only, for a mistake (numbers already given keep the old one)"
+      : "the same everywhere on DELIOS; changed once only, for a mistake";
+  };
 
   return (
     <div className="space-y-4">
@@ -86,9 +98,13 @@ export default async function AdminPartiesPage() {
                       <summary className="cursor-pointer text-xs font-semibold text-link">Edit</summary>
                       <div className="mt-2 w-[min(85vw,20rem)]">
                         <ActionForm action={savePartyAction} submitLabel="Save" size="sm" hidden={{ id: p.id }}>
-                          <Field label="Name" required><input name="name" required defaultValue={p.name} className={inputCls} /></Field>
-                          <Field label="Code" hint="never changes: documents and transmittals were issued under it">
-                            <input value={p.code} readOnly className={`${inputCls} bg-tint-soft font-mono text-slate-600`} />
+                          {/* One code and one name across DELIOS, each changed once at most; another organization on DELIOS changes its own. */}
+                          <Field label="Name" required hint={onceHint(p, "name")}>
+                            <input name="name" required defaultValue={p.name} readOnly={fixedOf(p, "name")} className={fixedOf(p, "name") ? `${inputCls} bg-tint-soft text-slate-600` : inputCls} />
+                          </Field>
+                          <Field label="Code" required hint={onceHint(p, "code")}>
+                            <input name="code" required defaultValue={p.code} readOnly={fixedOf(p, "code")} maxLength={20}
+                              className={fixedOf(p, "code") ? `${inputCls} bg-tint-soft font-mono text-slate-600` : `${inputCls} font-mono uppercase`} />
                           </Field>
                           {p.isInternal ? null : (
                             <PartyKindFields
@@ -100,6 +116,7 @@ export default async function AdminPartiesPage() {
                               people={people.filter((u) => u.partyId === p.id)}
                               functions={functions}
                               access={{ active: p.active, signingIn: signingIn(p.id) }}
+                              fixed={p.changed?.participation ? `changed once, by ${p.changed.participation.by}, ${fmtDate(p.changed.participation.at)}: fixed now` : undefined}
                             />
                           )}
                           {p.isInternal ? <input type="hidden" name="active" value="on" /> : null}
@@ -137,12 +154,16 @@ export default async function AdminPartiesPage() {
         {/* Which organizations take part in this project, the role each plays, and the function a collaborator's people start with. */}
         <Card title={`On ${ctx.project.code}: organizations taking part (${onProject.filter((one) => one.active).length})`}>
           {onProject.length ? (
-            <DataTable head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Role here</Th><Th>Their people start as</Th><Th>People here</Th><Th></Th></tr>}>
+            <DataTable head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Role here</Th><Th>Contract</Th><Th>Their people start as</Th><Th>People here</Th><Th></Th></tr>}>
               {onProject.map((one) => (
                 <tr key={one.partyId} className={one.active ? "align-top" : "align-top opacity-60"}>
                   <Td><span className="font-mono text-xs font-semibold">{one.code}</span> <span className="text-xs text-slate-600">{one.name}</span></Td>
                   <Td className="text-xs">{KINDS.find((k) => k.value === (one.kind === "NOT_ON_DELIOS" ? "OFFLINE" : one.kind))?.label}{one.linkedOrganization ? <span className="block text-[11px] text-slate-500">{one.linkedOrganization}</span> : null}</Td>
                   <Td className="text-xs">{one.role ? roles.find((r) => r.code === one.role)?.label ?? one.role : <span className="text-slate-500">not stated</span>}</Td>
+                  <Td className="text-xs">
+                    {one.contractNumber ? <span className="font-mono">{one.contractNumber}</span> : <span className="text-slate-500">not given</span>}
+                    {one.previousContractNumber ? <span className="block text-[11px] text-slate-500">was {one.previousContractNumber}</span> : null}
+                  </Td>
                   <Td className="text-xs">{one.startFunction ?? (one.kind === "COLLABORATOR" ? <span className="font-semibold text-amber-700">not said yet</span> : <span className="text-slate-500">—</span>)}</Td>
                   <Td className="tabular-nums text-xs">{one.people}</Td>
                   <Td>
@@ -151,6 +172,14 @@ export default async function AdminPartiesPage() {
                       <div className="mt-2 w-[min(85vw,18rem)]">
                         <ActionForm action={setProjectOrganizationAction} submitLabel="Save" size="sm" hidden={{ partyId: one.partyId }}>
                           <Field label="Role here" hint="optional"><select name="role" defaultValue={one.role ?? ""} className={inputCls}><option value="">Not stated</option>{roles.filter((r) => r.code !== "GENERIC").map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select></Field>
+                          <Field label="Contract number"
+                            hint={one.contractChangedAt
+                              ? `fixed: changed once, from ${one.previousContractNumber}, by ${one.contractChangedByName}, ${fmtDate(one.contractChangedAt)}`
+                              : `the contract between ${ctx.project.code} and them; unique on DELIOS, changed once only`}>
+                            {one.contractChangedAt
+                              ? <input defaultValue={one.contractNumber ?? ""} disabled className={`${inputCls} bg-tint-soft font-mono text-slate-600`} aria-label="Contract number (fixed)" />
+                              : <input name="contractNumber" defaultValue={one.contractNumber ?? ""} maxLength={64} className={`${inputCls} font-mono`} />}
+                          </Field>
                           <Field label="Their people start as" hint="a collaborator's administrator puts their people on; this is the function they get"><select name="startFunctionId" defaultValue={one.startFunctionId ?? ""} className={inputCls}><option value="">Not said</option>{allFunctions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></Field>
                           <Field label="Takes part"><select name="active" defaultValue={one.active ? "on" : "off"} className={inputCls}><option value="on">Yes</option><option value="off">No longer</option></select></Field>
                         </ActionForm>
@@ -166,6 +195,9 @@ export default async function AdminPartiesPage() {
               <ActionForm action={setProjectOrganizationAction} submitLabel="Add" size="sm">
                 <Field label="Organization" required><select name="partyId" required defaultValue="" className={inputCls}><option value="" disabled>Choose…</option>{parties.filter((p) => !p.isInternal && p.active && !onProject.some((o) => o.partyId === p.id)).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}</select></Field>
                 <Field label="Role here" hint="optional"><select name="role" defaultValue="" className={inputCls}><option value="">Not stated</option>{roles.filter((r) => r.code !== "GENERIC").map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select></Field>
+                <Field label="Contract number" hint={`the contract between ${ctx.project.code} and them; unique on DELIOS, changed once only`}>
+                  <input name="contractNumber" maxLength={64} className={`${inputCls} font-mono`} />
+                </Field>
                 <Field label="Their people start as" hint="for a collaborator: the function its people get here"><select name="startFunctionId" defaultValue="" className={inputCls}><option value="">Not said</option>{allFunctions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></Field>
               </ActionForm>
             </div>
@@ -178,7 +210,7 @@ export default async function AdminPartiesPage() {
               Another organization you exchange documents with. Yours is already here, registered once at setup.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Asked policy={policy} field="code" hint="short and unique, e.g. ACME; it never changes">
+              <Asked policy={policy} field="code" hint="short, e.g. ACME; its code everywhere on DELIOS, changed once only">
                 {({ required }) => <input name="code" required={required} maxLength={20} className={inputCls} />}
               </Asked>
               <Asked policy={policy} field="name">

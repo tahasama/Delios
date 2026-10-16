@@ -29,6 +29,8 @@ type AdminProject = {
   contentExtraction: string; createdAt: string; members: number; documents: number;
   /** Why it was last archived or reopened, by whom, when. */
   statusReason?: string | null; statusChangedByName?: string | null; statusChangedAt?: string | null;
+  /** Its code before its one change, by whom, when: once changed, the code is fixed. */
+  previousCode?: string | null; codeChangedByName?: string | null; codeChangedAt?: string | null;
 };
 
 export type AdminRule = {
@@ -49,6 +51,14 @@ type AdminParty = {
   kind?: "COLLABORATOR" | "GUEST" | "NOT_ON_DELIOS" | null;
   /** Its open link with its own DELIOS organization: invited, or linked. */
   link?: { id: string; state: "INVITED" | "LINKED"; organization: string } | null;
+  /**
+   * What was changed once and is fixed now: its code and name (one of each across DELIOS), how it works with us; and
+   * whether it is another organization on DELIOS, which alone changes its own code and name.
+   */
+  changed?: {
+    code: { was: string; by: string; at: string } | null; name: { was: string; by: string; at: string } | null;
+    participation: { was: string; by: string; at: string } | null; theirs: boolean;
+  } | null;
 };
 
 type SchemeField = { label: string; source: string; value: string | null; digits: number | null };
