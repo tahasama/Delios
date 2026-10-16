@@ -465,6 +465,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
 ### Reports
 - No overview tab: a page repeating the tabs' figures was removed (the owner: no use to anyone). Every tab adds
   something of its own.
+- DCIOM (governance measures, advice, health score) is on hold by the owner: build nothing of it until they come back
+  to it; where the conversation stood is in `docs/gaps/dciom.md`. Where real projects differ from what the Standard
+  assumes (plans move, obligations run both ways, waiting is never compliant…) is `docs/STANDARD-CHANGES.md` §58.
 - Each chart is drawn as fits its question (`Chart.Kind`): bars per name; columns per period, oldest left (Transmittal
   log per month, Progress per week); a timeline for Activity readiness (each action placed on the calendar, today to
   the look-ahead). Reviews waiting shows the longest waits, each bar as long as the days waited (`Unit` "days"; the

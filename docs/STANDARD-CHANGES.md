@@ -1083,11 +1083,70 @@ text. Each list can be taken out as it stands, and as an empty template.
 **Clause:** §16.4 (reports), Q8 "what was current on a date".
 
 **Must say:** the register can be read as it stood at the end of any past day: for each document registered by
-then, the revision current that day (the latest released by then, not void on that day), its status, and what is
-current now. It is worked out from the record, never kept as a copy, and never answered when it cannot be. Another
-organization taking part reads its own deliveries against plan, and nothing else of the reports.
+then, the revision current that day (the latest released by then, not void on that day), its status, what is
+current now, and when and how each moved on since (replaced, released for the first time, put out of use). It is
+worked out from the record, never kept as a copy, and never answered when it cannot be. Another organization taking
+part reads its own deliveries against plan and what it owes and is owed (documents and answers), and nothing else of
+the reports.
 
-**Depends on it:** `ReportBuilder.AsOfAsync`, `ReportIds.AsOf`, `ReportIds.Outside`, `ReportOptions.Party`.
+**Depends on it:** `ReportBuilder.AsOfAsync`, `ReportBuilder.ExchangeAsync`, `ReportIds.AsOf`, `ReportIds.Outside`,
+`ReportOptions.Party`.
+
+---
+
+## 58 · Where the Standard describes an ideal project, and real ones differ
+
+Not changes to match the application: places where the Standard assumes a project that behaves as planned, and
+practice does not. Each was met while building against real flows; the Standard should say what happens in practice,
+then what control asks of it.
+
+**58.1 · Plans move; lateness must say which plan it is measured against.**
+*Assumes:* a document has a due date, and late means after it. *In practice:* every schedule revision moves dates;
+a document "late" against March's plan may be early against June's. A figure that does not say which plan it uses
+is not evidence. *Must say:* the record keeps each planned date with the day it was set (the baseline and every
+change since); lateness is stated against a named plan (the baseline, or the plan as it stood on a given day), and a
+report says which. Until that history is kept, a past week can only be read against today's plan, and must say so.
+
+**58.2 · Obligations run both ways.**
+*Assumes:* performance is the supplier's or the author's: did they deliver on time? *In practice:* the project team
+owes as much as it is owed: submissions waiting for our check, reviews waiting on our reviewers, answers we were
+asked for and have not given. Those delays are the most common cause of a supplier's "late" next revision, and the
+Standard measures none of them. *Must say:* what each party owes the other is measured with the same clock on both
+sides (since when, due when, late or not), and each party may read its own side.
+
+**58.3 · Waiting is never compliant.**
+*Assumes:* a review inside its allowed days is in order. *In practice:* a document waiting is a document nobody can
+build from; "inside the period" hides a queue that grows until it is suddenly late. *Must say:* time waiting is
+reported as under way, never as good; what is in order is what has been answered.
+
+**58.4 · "What was current on that day" is asked to find out what changed since.**
+*Assumes:* the question is a snapshot. *In practice:* it is asked in claims, disputes and rework: "we built from
+this on 1 March, what moved after that, and when?" *Must say:* the record answers both: what was current that day,
+and each change since with its date and kind (replaced, first released, withdrawn or voided).
+
+**58.5 · Reports answer one question for one meeting, and are read on paper.**
+*Assumes:* a dashboard of indicators, kept and refreshed. *In practice:* reports are taken to a weekly meeting
+(engineering, expediting, site coordination, the client's monthly), printed or attached, and each meeting asks one
+question. A single page of every indicator is read by nobody. Indicators kept as stored figures go stale and are
+then disputed. *Must say:* each report states its question and who it is for, is counted from the record when it
+is read (never a stored figure), carries the lines behind its numbers, prints, and can be taken out as a list.
+History (week by week) is worked out from the dates the record already keeps, not from snapshots someone must remember
+to take.
+
+**58.6 · Not every party works in the system.**
+*Assumes:* every organization on the project uses the system. *In practice:* some suppliers and clients will only
+ever email, and none can be forced to register (§55). *Must say:* control does not depend on the other party being
+on the system: what goes to them leaves a record, what comes back is checked before it counts, and their side of
+"who owes what" is kept by us.
+
+**58.7 · Registers arrive as spreadsheets.**
+*Assumes:* documents are registered one by one, by whoever produces them. *In practice:* the deliverable list, the
+team and the matrix arrive as spreadsheets, often hundreds of lines, edited outside and sent back. *Must say:* a list
+brought in is held to the same rules as a single entry, checked before anything is written, and what cannot be
+written is said and returned to be fixed (§56).
+
+**Depends on it:** `ReportBuilder` (`ProgressAsync`, `ExchangeAsync`, `AsOfAsync`), `Chart.Kind`, `Figure.Change`,
+reports print (`.report-print`). Not yet built: 58.1's planned-date history (`docs/gaps/conformance-reports.md`).
 
 ---
 
@@ -1127,3 +1186,8 @@ organization taking part reads its own deliveries against plan, and nothing else
   document details, revisions, reviews, storage, schedule, packages), not by
   the standard's clauses.
 - **A supplier package can be delivered** like any delivery package.
+- **Planned dates keep their history** (58.1): each change of a document's planned date kept with the day it was
+  set, so lateness can be read against the baseline or the plan of any day. Today a past week is read against the
+  plan as it stands now, and says so.
+- **DCIOM** (a governance framework of measures, thresholds and advice) is on hold by the owner's choice: nothing
+  of it is built. Notes in `docs/gaps/dciom.md`.

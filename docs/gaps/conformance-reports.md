@@ -51,3 +51,18 @@ Kept in the project's settings store, because the backend has no table for them:
   "overdue" uses each document's planned day as it stands now (said on the chart). Want, if it matters: the planned
   day kept with each change (a history of `Document.PlannedDate`), then each week read against the plan of its day.
 
+## Reports: what is left open (end of the reports round)
+
+- **Planned-date history** (above, and Standard §58.1): without it, Progress by week reads past weeks against
+  today's plan, and says so.
+- **Register on a date, its chart** (when the register moved on from that day) has not been seen with real changes:
+  the demo's documents were all registered and released on the same day or the day before, so there is nothing to
+  draw yet. The counting was checked by reading it; the drawing is the same column chart the other reports use.
+- **Progress by week** in the demo shows one tall column (everything happened this week); it fills in as a project
+  runs.
+- **Who owes what** counts answers owed on transmittals by the organization a transmittal names (`ToPartyId`,
+  `FromPartyId`) or by the party of whoever issued it. A transmittal sent only to named people of another
+  organization, with no organization on it, is not counted as owed by them.
+- **Print** was checked as the browser's print preview; not on a printer.
+- **Reports by email** (a report sent each week to who it is for) was not asked and is not built.
+
