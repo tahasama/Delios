@@ -20,7 +20,7 @@ import { noticesAbout, noticeHistory } from "@/lib/actions/api";
 import { NotifyPanel } from "@/components/notify-panel";
 import { fromToday } from "@/lib/core/days";
 import { NoAccess } from "../no-access";
-import { AddSomeoneForm, AskToJoinForm } from "./join-form";
+import { SomeoneJoins } from "./join-form";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "People & access" };
@@ -125,44 +125,22 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
         </div>
       </section>
 
-      {/* Someone joins: someone with an account, or someone new. */}
-      <section className="register register-sheet register-sheet-open scroll-mt-24" id="join" aria-labelledby="join-head">
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-          <span id="join-head" className="stencil mr-1 text-slate-500">Someone joins {project.code}</span>
-          <span className="text-[11px] text-slate-500">
-            {asks ? "asked first; confirmed, they are put on and told" : "they are put on at once and told"}
-          </span>
-        </div>
-        <div className="px-5 py-4 sm:px-6">
-          {/* One row of acts; an opened one takes the whole width under them. */}
-          <div className="flex flex-wrap items-start gap-2">
-            {mayAdd ? (
-              <AddSomeoneForm
-                projectCode={project.code}
-                people={notHere.map((u) => ({ id: u.id, name: u.name, detail: [u.partyName, u.email].filter(Boolean).join(" · ") }))}
-                functions={functions.map((f) => ({ value: f.id, label: f.name }))}
-                disciplines={disciplines.map((d) => ({ value: d.code, label: d.label }))}
-                confirmers={confirmers}
-                asks={asks}
-              />
-            ) : null}
-            <AskToJoinForm
-              projectCode={project.code}
-              ourParties={ourParties.map((p) => ({ value: p.id, label: p.name }))}
-              guestParties={guestParties.map((p) => ({ value: p.id, label: `${p.name}${takesPart.has(p.id) ? "" : ` (not taking part in ${project.code} yet)`}` }))}
-              functions={functions.map((f) => ({ value: f.id, label: f.name }))}
-              disciplines={disciplines.map((d) => ({ value: d.code, label: d.label }))}
-              confirmers={confirmers}
-              asks={asks}
-              mayKeepProof={ctx.can("CONTROL")}
-            />
-          </div>
-          <p className="mt-3 text-[11px] leading-4 text-slate-500">
-            Someone whose company has its own DELIOS is not added here: link the two organizations on{" "}
-            <Link href="/settings/parties" className="font-semibold text-link hover:underline">Organizations</Link>; their administrator puts them on.
-          </p>
-        </div>
-      </section>
+      {/* Someone joins: one sheet; the act chosen turns it into its form. */}
+      <SomeoneJoins
+        projectCode={project.code}
+        sentence={asks ? "asked first; confirmed, they are put on and told" : "they are put on at once and told"}
+        mayAdd={mayAdd}
+        people={notHere.map((u) => ({ id: u.id, name: u.name, detail: [u.partyName, u.email].filter(Boolean).join(" · ") }))}
+        ourParties={ourParties.map((p) => ({ value: p.id, label: p.name }))}
+        guestParties={guestParties.map((p) => ({ value: p.id, label: `${p.name}${takesPart.has(p.id) ? "" : ` (not taking part in ${project.code} yet)`}` }))}
+        functions={functions.map((f) => ({ value: f.id, label: f.name }))}
+        disciplines={disciplines.map((d) => ({ value: d.code, label: d.label }))}
+        confirmers={confirmers}
+        asks={asks}
+        mayKeepProof={ctx.can("CONTROL")}
+        footnote={<>Someone whose company has its own DELIOS is not added here: link the two organizations on{" "}
+          <Link href="/settings/parties" className="font-semibold text-link hover:underline">Organizations</Link>; their administrator puts them on.</>}
+      />
 
       {/* Waiting to be confirmed: who, as what, since when, who confirms; the control function may remind them. */}
       {pending.length ? (
@@ -279,64 +257,61 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                   </Td>
                 </tr>
                 {open && here ? (
-                  // The person's line opened under it as a sheet, the new-document form's way: band, grey fields side
-                  // by side, then the strip with Cancel on the left and Save on the right.
+                  // The person's line opened under it: the row itself goes on, the new-document form's way (grey
+                  // fields side by side, then the strip with Cancel and Save), never a box inside the table.
                   <tr>
-                    <td colSpan={6} className="border-b border-line px-5 py-4 sm:px-6">
-                      <section className="register register-sheet register-sheet-open">
-                        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
-                          <span className="stencil mr-1 text-slate-400">Change {u.name}</span>
-                          <span className="text-[11px] text-slate-400">
-                            {u.linked ? `works here from their own DELIOS: only their place on ${project.code} changes here` : `their place on ${project.code}, and their account`}
-                          </span>
-                        </div>
-                        <ActionForm id={`person-form-${u.id}`} action={savePersonAction} hideSubmit hidden={{ userId: u.id, partyId: u.partyId ?? "" }}
-                          className="asking space-y-5 px-5 py-5 sm:px-6">
-                          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                            {u.linked ? null : (
-                              <>
-                                <Field label="Name" required><input name="name" required defaultValue={u.name} autoComplete="off" className="plain w-full" /></Field>
-                                <Field label="Email" required hint="where their notices go"><input type="email" name="email" required defaultValue={u.email} autoComplete="off" className="plain w-full" /></Field>
-                              </>
-                            )}
-                            <Field label={`Function on ${project.code}`} required>
-                              <select name="functionId" defaultValue={here.functionId} className="plain w-full">
-                                {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                              </select>
-                            </Field>
-                            <Field label="Department" hint="their discipline: told about actions, confirms going ahead">
-                              <select name="department" defaultValue={here.department ?? ""} className="plain w-full">
-                                <option value="">None</option>
-                                {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
-                              </select>
-                            </Field>
-                          </div>
-                          {u.linked ? null : (
-                            <label className="flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-700">
-                              <input type="checkbox" name="active" defaultChecked={u.active} />
-                              Can sign in <span className="font-normal text-slate-400">— untick to switch their account off on every project</span>
-                            </label>
-                          )}
-                        </ActionForm>
-                        {u.id !== me.id ? (
-                          <details className="border-t border-line px-5 py-3 sm:px-6">
-                            <summary className="w-fit cursor-pointer list-none text-xs font-semibold text-slate-500 hover:text-slate-800 [&::-webkit-details-marker]:hidden">
-                              Take {u.name} off {project.code}
-                            </summary>
-                            <ActionForm action={takeOffProjectAction} hideSubmit id={`take-off-${u.id}`} hidden={{ userId: u.id }} className="mt-3 space-y-3"
-                              confirmText={`Take ${u.name} off ${project.code}? Their account and their other projects stay, and everything they did here keeps their name.`}>
-                              <p className="text-xs leading-5 text-slate-600">
-                                They leave {project.code} only. Their account and their other projects stay, and everything they did here keeps their name.
-                              </p>
-                              <button type="submit" className="ask">Take them off</button>
-                            </ActionForm>
-                          </details>
+                    <td colSpan={6} className="border-b border-line p-0">
+                      <ActionForm id={`person-form-${u.id}`} action={savePersonAction} hideSubmit hidden={{ userId: u.id, partyId: u.partyId ?? "" }}
+                        className="asking space-y-5 px-5 py-5 sm:px-6">
+                        {u.linked ? (
+                          <p className="text-xs leading-5 text-slate-600">
+                            {u.name} works here from their own organization&rsquo;s DELIOS: their name, email and sign-in are theirs. Only their place on {project.code} changes here.
+                          </p>
                         ) : null}
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
-                          <Link href={lineHref()} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
-                          <button type="submit" form={`person-form-${u.id}`} data-on="true" className="ask">Save</button>
+                        <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                          {u.linked ? null : (
+                            <>
+                              <Field label="Name" required><input name="name" required defaultValue={u.name} autoComplete="off" className="plain w-full" /></Field>
+                              <Field label="Email" required hint="where their notices go"><input type="email" name="email" required defaultValue={u.email} autoComplete="off" className="plain w-full" /></Field>
+                            </>
+                          )}
+                          <Field label={`Function on ${project.code}`} required>
+                            <select name="functionId" defaultValue={here.functionId} className="plain w-full">
+                              {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                            </select>
+                          </Field>
+                          <Field label="Department" hint="their discipline: told about actions, confirms going ahead">
+                            <select name="department" defaultValue={here.department ?? ""} className="plain w-full">
+                              <option value="">None</option>
+                              {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+                            </select>
+                          </Field>
                         </div>
-                      </section>
+                        {u.linked ? null : (
+                          <label className="flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-700">
+                            <input type="checkbox" name="active" defaultChecked={u.active} />
+                            Can sign in <span className="font-normal text-slate-500">— untick to switch their account off on every project</span>
+                          </label>
+                        )}
+                      </ActionForm>
+                      {u.id !== me.id ? (
+                        <details className="border-t border-line px-5 py-3 sm:px-6">
+                          <summary className="w-fit cursor-pointer list-none text-xs font-semibold text-slate-500 hover:text-slate-800 [&::-webkit-details-marker]:hidden">
+                            Take {u.name} off {project.code}
+                          </summary>
+                          <ActionForm action={takeOffProjectAction} hideSubmit hidden={{ userId: u.id }} className="mt-3 space-y-3"
+                            confirmText={`Take ${u.name} off ${project.code}? Their account and their other projects stay, and everything they did here keeps their name.`}>
+                            <p className="text-xs leading-5 text-slate-600">
+                              They leave {project.code} only. Their account and their other projects stay, and everything they did here keeps their name.
+                            </p>
+                            <button type="submit" className="ask">Take them off</button>
+                          </ActionForm>
+                        </details>
+                      ) : null}
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
+                        <Link href={lineHref()} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                        <button type="submit" form={`person-form-${u.id}`} data-on="true" className="ask">Save</button>
+                      </div>
                     </td>
                   </tr>
                 ) : null}

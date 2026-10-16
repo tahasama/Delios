@@ -4,7 +4,7 @@ import { api, projectPath } from "@/lib/client";
 import { getActiveSet } from "@/lib/settings/config";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { DataTable, Th, Td, ToneChip } from "@/components/ui";
-import { AddSomeoneForm, AskToJoinForm } from "@/app/(app)/settings/users/join-form";
+import { SomeoneJoins } from "@/app/(app)/settings/users/join-form";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Project directory" };
@@ -73,36 +73,24 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
             <p role="alert" className="mt-2 w-fit rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-800 ring-1 ring-red-200">The directory could not be read just now. Try again in a moment.</p>
           ) : null}
         </div>
-        {options ? (
-          <div className="flex flex-wrap items-start gap-2 border-t border-line px-5 py-3.5 sm:px-6">
-            <p className="basis-full text-[11px] leading-4 text-slate-500">
-              {options.asks
-                ? "It goes as a request; once confirmed they are put on by themselves and told by notification and email, and you read the answer on the same thread."
-                : "They are put on at once, and told by notification and email."}
-            </p>
-            <AskToJoinForm
-              projectCode={project.code}
-              ourParties={options.ours.map((p) => ({ value: p.id, label: p.name }))}
-              guestParties={options.guests.map((p) => ({ value: p.id, label: p.name }))}
-              functions={options.functions.map((f) => ({ value: f.id, label: f.name }))}
-              disciplines={disciplines}
-              confirmers={confirmers}
-              asks={options.asks}
-              mayKeepProof={false}
-            />
-            {options.everyone && options.mayAdd ? (
-              <AddSomeoneForm
-                projectCode={project.code}
-                people={options.people.map((p) => ({ id: p.id, name: p.name, detail: p.organization }))}
-                functions={options.functions.map((f) => ({ value: f.id, label: f.name }))}
-                disciplines={disciplines}
-                confirmers={confirmers}
-                asks={options.asks}
-              />
-            ) : null}
-          </div>
-        ) : null}
       </section>
+
+      {/* The one act here: a sheet of its own, never inside the plate. */}
+      {options ? (
+        <SomeoneJoins
+          projectCode={project.code}
+          sentence={options.asks ? "it goes as a request; once confirmed they are put on and told, and you read the answer on the same thread" : "they are put on at once, and told"}
+          mayAdd={options.everyone && options.mayAdd}
+          people={options.people.map((p) => ({ id: p.id, name: p.name, detail: p.organization }))}
+          ourParties={options.ours.map((p) => ({ value: p.id, label: p.name }))}
+          guestParties={options.guests.map((p) => ({ value: p.id, label: p.name }))}
+          functions={options.functions.map((f) => ({ value: f.id, label: f.name }))}
+          disciplines={disciplines}
+          confirmers={confirmers}
+          asks={options.asks}
+          mayKeepProof={false}
+        />
+      ) : null}
 
       {directory ? (
         <>
