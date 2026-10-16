@@ -207,9 +207,13 @@ export function asMatrixRules(rules: AdminRule[]) {
 export const PARTY_KEY = "PARTY:";
 type PartyAnswers = { contactId?: string | null; backupId?: string | null };
 
-export async function partiesWithAnswers() {
-  const { orgSettings } = await import("@/lib/settings/api");
-  const [parties, users, answers] = await Promise.all([adminParties(), adminUsers(), orgSettings()]);
+/** The organizations, with who answers for each on this project (said per project; an older organization-wide answer still counts). */
+export async function partiesWithAnswers(projectId?: string) {
+  const { orgSettings, projectSettings } = await import("@/lib/settings/api");
+  const [parties, users, org, here] = await Promise.all([
+    adminParties(), adminUsers(), orgSettings(), projectId ? projectSettings(projectId).catch(() => new Map<string, string>()) : Promise.resolve(new Map<string, string>()),
+  ]);
+  const answers = { get: (key: string) => here.get(key) ?? org.get(key) };
   const person = (id: string | null | undefined) => {
     const one = id ? users.find((u) => u.id === id) : null;
     return one ? { id: one.id, name: one.name, email: one.email } : null;

@@ -4,7 +4,8 @@ import { PageHeader, Card, DataTable, Th, Td, Chip, Field, inputCls } from "@/co
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/settings/field-policy";
-import { savePartyAction, deletePartyAction } from "@/lib/reviews/forms";
+import Link from "next/link";
+import { savePartyAction } from "@/lib/settings/forms-parties";
 import { PartyKindFields } from "./party-fields";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
 import { adminFunctions, adminUsers, partiesWithAnswers } from "@/lib/settings/api-admin";
@@ -23,7 +24,7 @@ export default async function AdminPartiesPage() {
   const policy = await formPolicy(ctx, "PARTY");
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/parties")!)) return <NoAccess title="Organizations" who="control" />;
   const [parties, onProject, roles] = await Promise.all([
-    partiesWithAnswers(),
+    partiesWithAnswers(ctx.projectId),
     projectOrganizations(ctx),
     contractRoleOptions(),
   ]);
@@ -42,12 +43,12 @@ export default async function AdminPartiesPage() {
     <div className="space-y-4">
       <PageHeader
         title="Organizations"
-        subtitle="Yours, and the others you exchange documents with. Their people are added in People & access."
+        subtitle={`Yours, and the others you exchange documents with. The list is your organization's, shared by every project; who takes part in ${ctx.project.code}, and who answers for each here, is this project's.`}
       />
       <div className="space-y-4">
         <div className="space-y-4">
           <Card title={`Organizations (${parties.length})`}>
-            <DataTable head={<tr><Th>Code</Th><Th>Name</Th><Th>Type</Th><Th label="How they work with us">How they work with us</Th><Th>Who answers for it</Th><Th>People</Th><Th></Th></tr>}>
+            <DataTable head={<tr><Th>Code</Th><Th>Name</Th><Th>Type</Th><Th label="How they work with us">How they work with us</Th><Th>Who answers for it here</Th><Th>People</Th><Th></Th></tr>}>
               {parties.map((p) => (
                 <tr key={p.id} id={`party-${p.id}`} className={p.active ? "scroll-mt-20 align-top target:bg-tint-soft" : "scroll-mt-20 align-top opacity-60 target:bg-tint-soft"}>
                   <Td className="font-mono text-xs font-semibold">{p.code}</Td>
@@ -69,25 +70,25 @@ export default async function AdminPartiesPage() {
                   <Td className="text-xs">
                     {p.contact ? (
                       <>
-                        <a href={`/settings/users#${p.contact.id}`} className="font-semibold text-link hover:underline">{p.contact.name}</a>
+                        <Link href={`/settings/users#person-${p.contact.id}`} className="font-semibold text-link hover:underline">{p.contact.name}</Link>
                         {p.backup ? <span className="block text-[11px] text-slate-500">backup: {p.backup.name}</span> : <span className="block text-[11px] text-slate-500">no backup</span>}
                       </>
-                    ) : p.isInternal ? <span className="text-slate-500">—</span> : <span className="font-semibold text-amber-700">nobody named</span>}
+                    ) : <span className="text-slate-500">—</span>}
                   </Td>
                   <Td className="tabular-nums text-xs">
                     {p._count.users
-                      ? <a href={`/settings/users?org=${p.id}`} className="font-semibold text-link hover:underline">{p._count.users}</a>
+                      ? <Link href={`/settings/users?org=${p.id}`} className="font-semibold text-link hover:underline">{p._count.users}</Link>
                       : <span className="text-slate-500">0</span>}
-                    {p.active ? null : <span className="block text-[11px] font-semibold text-red-700">access revoked</span>}
+                    {p.active ? null : <span className="block text-[11px] font-semibold text-red-700">switched off</span>}
                   </Td>
                   <Td>
                     <details>
                       <summary className="cursor-pointer text-xs font-semibold text-link">Edit</summary>
-                      <div className="mt-2 w-80">
+                      <div className="mt-2 w-[min(85vw,20rem)]">
                         <ActionForm action={savePartyAction} submitLabel="Save" size="sm" hidden={{ id: p.id }}>
                           <Field label="Name" required><input name="name" required defaultValue={p.name} className={inputCls} /></Field>
-                          <Field label="Code" required hint="documents and transmittals already issued keep the old code — only what comes next uses this one">
-                            <input name="code" required maxLength={20} defaultValue={p.code} className={inputCls} />
+                          <Field label="Code" hint="never changes: documents and transmittals were issued under it">
+                            <input value={p.code} readOnly className={`${inputCls} bg-tint-soft font-mono text-slate-600`} />
                           </Field>
                           {p.isInternal ? null : (
                             <PartyKindFields
@@ -125,13 +126,6 @@ export default async function AdminPartiesPage() {
                             )}
                           </div>
                         ) : null}
-                        {!p.isInternal && p._count.users === 0 ? (
-                          <div className="mt-3 border-t border-line pt-3">
-                            <ActionForm action={deletePartyAction} submitLabel="Remove this organization" size="sm" variant="danger" hidden={{ id: p.id }}>
-                              <p className="text-xs text-slate-500">It has nobody, so it can be removed outright. Once it holds a person, a step, a document or a transmittal, revoke its access instead.</p>
-                            </ActionForm>
-                          </div>
-                        ) : null}
                       </div>
                     </details>
                   </Td>
@@ -154,7 +148,7 @@ export default async function AdminPartiesPage() {
                   <Td>
                     <details>
                       <summary className="cursor-pointer text-xs font-semibold text-link">Edit</summary>
-                      <div className="mt-2 w-72">
+                      <div className="mt-2 w-[min(85vw,18rem)]">
                         <ActionForm action={setProjectOrganizationAction} submitLabel="Save" size="sm" hidden={{ partyId: one.partyId }}>
                           <Field label="Role here" hint="optional"><select name="role" defaultValue={one.role ?? ""} className={inputCls}><option value="">Not stated</option>{roles.filter((r) => r.code !== "GENERIC").map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select></Field>
                           <Field label="Their people start as" hint="a collaborator's administrator puts their people on; this is the function they get"><select name="startFunctionId" defaultValue={one.startFunctionId ?? ""} className={inputCls}><option value="">Not said</option>{allFunctions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select></Field>
@@ -184,7 +178,7 @@ export default async function AdminPartiesPage() {
               Another organization you exchange documents with. Yours is already here, registered once at setup.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Asked policy={policy} field="code" hint="short, unique — e.g. Acme Pumps">
+              <Asked policy={policy} field="code" hint="short and unique, e.g. ACME; it never changes">
                 {({ required }) => <input name="code" required={required} maxLength={20} className={inputCls} />}
               </Asked>
               <Asked policy={policy} field="name">
@@ -194,8 +188,9 @@ export default async function AdminPartiesPage() {
             </div>
             <PartyKindFields kind="OFFLINE" contactId="" backupId="" liaisonFunction="" people={[]} functions={functions} />
             <p className="text-[11px] leading-4 text-slate-500">
-              A collaborator or a guest needs accounts, created in <a href="/settings/users" className="font-semibold text-link hover:underline">People &amp; access</a> and attached to this organization; then you name the one who answers for it.
-              An organization that is not on the EDMS needs nobody here: one of our functions carries it, and fills in its review, comments and answer with proof each time.
+              A guest&rsquo;s people get accounts we make, in <Link href="/settings/users" className="font-semibold text-link hover:underline">People &amp; access</Link>.
+              An organization with its own DELIOS is invited to link from its row once registered; its administrator then puts its people on the project.
+              One not on DELIOS needs nobody here: one of our functions carries it, and records its review, comments and answer, with proof each time.
             </p>
           </ActionForm>
         </div></details>

@@ -7,9 +7,7 @@ import { api, projectPath, refusal } from "@/lib/client";
 import { backendRevision, backendReview } from "@/lib/documents/api";
 import { upload, filesOf } from "@/lib/documents/api-uploads";
 import { requestFromForm, issueAsk } from "@/lib/transmittals/issue-requests";
-import { formPolicy, checkForm } from "@/lib/settings/field-policy";
-import { setOrgSetting } from "@/lib/settings/api";
-import { adminParties, backendRoute, PARTY_KEY, type EditorRouteStep } from "@/lib/settings/api-admin";
+import { backendRoute, type EditorRouteStep } from "@/lib/settings/api-admin";
 import { hasVerb } from "@/lib/core/auth";
 
 /**
@@ -148,63 +146,6 @@ async function answer(runId: string, formData: FormData, note: string | null): P
 export async function recordStepOutcomeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   if (!text(formData, "outcome")) return { error: "Choose the verdict." };
   return answer(text(formData, "runId"), formData, text(formData, "comment") || null);
-}
-
-// ── Parties (§0.3) ───────────────────────────────────────────────────────────
-
-/** A party is never deleted: revoking it ends its people's access and keeps every record meaning what it meant. */
-export async function deletePartyAction(_prev: { error?: string } | undefined, _formData: FormData): Promise<{ error?: string }> {
-  return { error: "An organization is not removed: revoke its access instead, and the record keeps its name." };
-}
-
-export async function savePartyAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
-  const ctx = await requireScope();
-  const id = text(formData, "id");
-  const code = text(formData, "code").toUpperCase();
-  const name = text(formData, "name");
-  const contactId = text(formData, "contactId") || null;
-  const backupId = text(formData, "backupId") || null;
-  // How this party takes part in a review route, and who carries it when they do not answer here.
-  const kind = ["COLLABORATOR", "GUEST", "OFFLINE"].includes(text(formData, "kind")) ? text(formData, "kind") : "GUEST";
-  const participation = kind === "OFFLINE" ? "BY_PROXY" : "IN_APP";
-  const custodianFunction = text(formData, "liaisonFunction");
-  // Not on DELIOS: where our transmittals go by email (empty: one of ours sends them).
-  const contactEmail = kind === "OFFLINE" ? text(formData, "contactEmail") : undefined;
-  if (contactId && backupId && contactId === backupId) return { error: "The backup has to be someone other than the contact." };
-  try {
-    let partyId = id;
-    if (id) {
-      const party = (await adminParties()).find((one) => one.id === id);
-      if (!party) return { error: "That party no longer exists." };
-      if (code && code !== party.code) return { error: "An organization's code does not change: documents and transmittals were issued under it." };
-      const active = formData.get("active") === "on";
-      if (!name) return { error: "A party needs a name." };
-      if (party.isInternal && !active) return { error: "Your own organization cannot be switched off." };
-      // Somebody of theirs answers for a party that signs in; one not on DELIOS is carried by a function of ours.
-      if (!party.isInternal && active && kind !== "OFFLINE" && !contactId) return { error: `Name the person who answers for ${name}. The backup is optional.` };
-      await api(`/api/admin/parties/${id}`, {
-        method: "PUT",
-        body: party.isInternal
-          ? { name, active }
-          : { name, active, participation, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail },
-      });
-    } else {
-      // What this organization asks of an organization it adds.
-      const policy = await formPolicy(ctx, "PARTY");
-      const asked = checkForm("PARTY", policy, { code, name, kind, contactId, backupId, liaisonFunction: custodianFunction || null }, (n) => String(formData.get(n) ?? ""));
-      if (asked.error) return { error: asked.error };
-      const created = await api<{ id: string }>("/api/admin/parties", {
-        body: { code, name, isInternal: false, participation, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail },
-      });
-      partyId = created.id;
-    }
-    await setOrgSetting(PARTY_KEY + partyId, JSON.stringify({ contactId, backupId }));
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/parties");
-  revalidatePath("/settings/users");
-  return {};
 }
 
 /**

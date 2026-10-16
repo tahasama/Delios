@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Field, inputCls } from "@/components/ui";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
 import { SearchPick } from "@/components/search-pick";
+import Link from "next/link";
 
 
 /**
@@ -66,8 +67,8 @@ export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, pe
             name="contactId"
             items={people.map((person) => ({ id: person.id, name: person.name, detail: person.email ?? null }))}
             initial={contactId ? [contactId] : []}
-            label="Who answers for it"
-            hint="one of their own people"
+            label="Who answers for it here"
+            hint="optional — one of their people, so we know whom to ask"
             placeholder="Nobody yet"
           />
           <SearchPick
@@ -81,16 +82,22 @@ export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, pe
           />
         </>
       ) : (
-        <p className="text-xs text-amber-800">
-          Nobody of theirs is here yet. Add their people in <a href="/settings/users" className="font-semibold text-link hover:underline">People &amp; access</a>, then name the one who answers.
+        <p className="text-xs text-slate-600">
+          {chosen === "COLLABORATOR"
+            ? "Nobody of theirs is on the project yet: their administrator puts them on."
+            : <>Nobody of theirs has an account yet. Add them in <Link href="/settings/users" className="font-semibold text-link hover:underline">People &amp; access</Link> when they need one.</>}
         </p>
       )}
 
-      {access && !offline && access.signingIn ? (
+      {access ? (
         <div className="mt-1 border-t border-line pt-3">
           <label className="flex items-start gap-2 text-xs text-slate-600">
             <input type="checkbox" name="active" defaultChecked={access.active} className="mt-0.5" />
-            <span>Has access — untick to revoke; its {access.signingIn} {access.signingIn === 1 ? "person" : "people"} can no longer sign in</span>
+            <span>
+              In use — untick to switch it off: it is no longer offered for new documents, transmittals or routes
+              {access.signingIn ? `, and its ${access.signingIn} ${access.signingIn === 1 ? "person" : "people"} can no longer sign in` : ""}.
+              Everything already done under it stays.
+            </span>
           </label>
         </div>
       ) : <input type="hidden" name="active" value="on" />}

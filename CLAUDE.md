@@ -457,6 +457,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A list's "Used on" counts the project's documents carrying each value (backend `GET /register/usage`), and opens
   them in the register; a value in use keeps its code. Values are retired, never deleted: the bulk "Delete" (which
   only retired) is removed.
+- Organizations: the list is the organization's, shared by every project; who takes part in a project (role, the
+  function a collaborator's people start with) and who answers for each there (`PARTY:<id>`, a project setting, so
+  Document Control keeps it) are the project's. Who answers is optional and never blocks a save. A code is shown, never
+  edited. An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
+  sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
+- Layered settings (owner's decision, to build): the app gives defaults; the organization may change them for itself;
+  a project may change them for itself; each level is changed by whoever holds the clearance for it. Until built, a
+  page says plainly what is the organization's and what is the project's.
+- Document families come back (owner): each document type belongs to a family (internal drawings like DWG, supplier
+  documents like A109…); the family tells types apart and recommends a criticality. They were lost when the demo data
+  was renewed.
 - The plan's starter values are added in one go ("Add them"); Controlled changes no longer exist.
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
 - Settings pages use the reference boxes (`rounded-md`, `ring-line`, `bg-tint-soft`), the shared control size, and no

@@ -166,8 +166,8 @@ const FIELDS: FieldDef[] = [
   // ── Adding an organization ──
   { control: "TEXT", kind: "PARTY", key: "code", label: "Code", text: "The short code that stands for them in a document number.", fallback: "REQUIRED", fixed: "Supplier numbers are built from it." },
   { control: "TEXT", kind: "PARTY", key: "name", label: "Name", text: "Their name as it appears on a transmittal.", fallback: "REQUIRED", fixed: "A transmittal has to say who it is addressed to." },
-  { control: "CHOICE", setKey: "PARTY_KINDS", kind: "PARTY", key: "kind", label: "How they work with us", text: "Client, contractor, vendor, authority.", fallback: "OPTIONAL" },
-  { control: "PEOPLE", kind: "PARTY", key: "contactId", label: "Who answers for it", text: "The person transmittals are addressed to when nothing else says.", fallback: "OPTIONAL" },
+  { control: "CHOICE", kind: "PARTY", key: "kind", label: "How they work with us", text: "Collaborator (their own DELIOS, linked), guest (accounts we make) or not on DELIOS (one of ours records for them).", fallback: "OPTIONAL", fixed: "Always asked: it decides how they take part." },
+  { control: "PEOPLE", kind: "PARTY", key: "contactId", label: "Who answers for it here", text: "One of their people we ask first on this project.", fallback: "OPTIONAL" },
   { control: "PEOPLE", kind: "PARTY", key: "backupId", label: "Backup", text: "Who answers when the first is away.", fallback: "OPTIONAL" },
   { control: "CHOICE", kind: "PARTY", key: "liaisonFunction", label: "Who carries it", text: "The function on our side that deals with them.", fallback: "OPTIONAL" },
 
