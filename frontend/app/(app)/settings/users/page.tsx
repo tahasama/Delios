@@ -1,6 +1,8 @@
 import { controlDoes, CONFIRM_KEY, effectiveAnswer } from "@/lib/settings/control-activities";
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import { Fragment } from "react";
+import { cn } from "@/lib/core/utils";
+import { Bell, Pencil, X } from "lucide-react";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
 import { DataTable, Th, Td, Field, inputCls, ToneChip } from "@/components/ui";
@@ -36,7 +38,7 @@ type Pending = {
  * themselves and told; the control function may remind whoever confirms. The list: everyone, narrowed by organization
  * and project, each with their place here.
  */
-export default async function PeoplePage({ searchParams }: { searchParams: Promise<{ org?: string; project?: string }> }) {
+export default async function PeoplePage({ searchParams }: { searchParams: Promise<{ org?: string; project?: string; edit?: string }> }) {
   const ctx = await requireScope();
   const { user: me, projectId, project } = ctx;
   const sp = await searchParams;
@@ -90,6 +92,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
 
   // Reminding whoever confirms: one notice history per person waiting.
   const reminders = await Promise.all(pending.map(async (one) => ({ id: one.membershipId, history: noticeHistory(await noticesAbout(ctx, `join:${one.membershipId}`)) })));
+  const editing = sp.edit ?? null;
   const chip = (q: Record<string, string | undefined>) => {
     const next = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1]));
     return `/settings/users${next.size ? `?${next}` : ""}`;
@@ -237,41 +240,62 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
           {shown.map((u) => {
             const here = u.seats.find((m) => m.projectId === projectId);
             const elsewhere = u.seats.filter((m) => m.projectId !== projectId);
+            const open = !!here && editing === u.id;
+            // Opening or closing a person's line keeps the narrowing as it is.
+            const lineHref = (edit?: string) => `${chip({ org: shownOrg?.id, project: projectFilter || undefined, edit })}#person-${u.id}`;
             return (
-              <tr key={u.id} id={`person-${u.id}`} className={u.active ? "scroll-mt-20 align-top target:bg-tint-soft" : "scroll-mt-20 align-top opacity-60 target:bg-tint-soft"}>
-                <Td>
-                  <span className="font-medium text-slate-800">{u.name}</span>{u.id === me.id ? <span className="ml-1 text-xs text-slate-500">(you)</span> : null}
-                  <span className="block text-[11px] text-slate-500">
-                    {u.email}{u.linked ? " · works here from their own DELIOS" : ""}{u.active ? "" : " · can no longer sign in"}
-                  </span>
-                </Td>
-                <Td className="text-xs">{u.partyName ?? "—"}</Td>
-                <Td className="text-xs">
-                  {here ? here.functionName
-                    : u.held?.pendingSince ? <ToneChip tone="waiting">{u.held.functionName} · waiting for {u.held.confirmerName ?? "whoever holds Manage"}</ToneChip>
-                    : u.held?.refusedAt ? <span className="whitespace-pre-line text-red-700">{u.held.functionName} · refused by {u.held.refusedByName}: {u.held.refusedReason}</span>
-                    : <span className="text-slate-500">not on it</span>}
-                </Td>
-                <Td className="text-xs">{here?.department ? deptLabel(here.department) : "—"}</Td>
-                <Td className="text-xs">{elsewhere.length ? elsewhere.map((m) => `${m.projectCode} · ${m.functionName}`).join(", ") : "—"}</Td>
-                <Td>
-                  {here ? (
-                    <details>
-                      <summary className="cursor-pointer text-xs font-semibold text-link">Change</summary>
-                      <div className="mt-2 w-[min(85vw,34rem)] space-y-3">
+              <Fragment key={u.id}>
+                <tr id={`person-${u.id}`} className={cn("scroll-mt-20 align-top target:bg-tint-soft", !u.active && "opacity-60", open && "bg-tint-soft")}>
+                  <Td>
+                    <span className="font-medium text-slate-800">{u.name}</span>{u.id === me.id ? <span className="ml-1 text-xs text-slate-500">(you)</span> : null}
+                    <span className="block text-[11px] text-slate-500">
+                      {u.email}{u.linked ? " · works here from their own DELIOS" : ""}{u.active ? "" : " · can no longer sign in"}
+                    </span>
+                  </Td>
+                  <Td className="text-xs">{u.partyName ?? "—"}</Td>
+                  <Td className="text-xs">
+                    {here ? here.functionName
+                      : u.held?.pendingSince ? <ToneChip tone="waiting">{u.held.functionName} · waiting for {u.held.confirmerName ?? "whoever holds Manage"}</ToneChip>
+                      : u.held?.refusedAt ? <span className="whitespace-pre-line text-red-700">{u.held.functionName} · refused by {u.held.refusedByName}: {u.held.refusedReason}</span>
+                      : <span className="text-slate-500">not on it</span>}
+                  </Td>
+                  <Td className="text-xs">{here?.department ? deptLabel(here.department) : "—"}</Td>
+                  <Td className="text-xs">{elsewhere.length ? elsewhere.map((m) => `${m.projectCode} · ${m.functionName}`).join(", ") : "—"}</Td>
+                  <Td className="w-px whitespace-nowrap text-right">
+                    {here ? (
+                      open ? (
+                        <Link href={lineHref()} scroll={false} className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Close">
+                          <X aria-label={`Close ${u.name}`} className="h-4 w-4" />
+                        </Link>
+                      ) : (
+                        <Link href={lineHref(u.id)} scroll={false} className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title={`Change ${u.name}`}>
+                          <Pencil aria-label={`Change ${u.name}`} className="h-4 w-4" />
+                        </Link>
+                      )
+                    ) : u.held?.pendingSince ? null : u.active ? (
+                      <Link href="#join" className="text-xs font-semibold text-link hover:underline">Ask for them to join</Link>
+                    ) : null}
+                  </Td>
+                </tr>
+                {open && here ? (
+                  // The person's line opened under it, the width of the table: field beside field, then the acts.
+                  <tr className="bg-tint-soft">
+                    <td colSpan={6} className="border-b border-line px-5 pt-1 pb-4 sm:px-6">
+                      <div className="rounded-md bg-surface px-4 py-4 ring-1 ring-line">
                         <ActionForm action={savePersonAction} submitLabel="Save" size="sm" hidden={{ userId: u.id, partyId: u.partyId ?? "" }}>
-                          <div className="grid grid-cols-1 gap-x-3 gap-y-3 sm:grid-cols-2">
-                            {u.linked ? (
-                              <p className="text-xs text-slate-600 sm:col-span-2">
-                                {u.name} works here from their own organization&rsquo;s DELIOS: their name, email and sign-in are theirs.
-                              </p>
-                            ) : (
+                          {u.linked ? (
+                            <p className="text-xs leading-5 text-slate-600">
+                              {u.name} works here from their own organization&rsquo;s DELIOS: their name, email and sign-in are theirs. Only their place on {project.code} changes here.
+                            </p>
+                          ) : null}
+                          <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
+                            {u.linked ? null : (
                               <>
-                                <Field label="Name" required><input name="name" required defaultValue={u.name} className={inputCls} /></Field>
-                                <Field label="Email" required><input type="email" name="email" required defaultValue={u.email} className={inputCls} /></Field>
+                                <Field label="Name" required><input name="name" required defaultValue={u.name} autoComplete="off" className={inputCls} /></Field>
+                                <Field label="Email" required hint="where their notices go"><input type="email" name="email" required defaultValue={u.email} autoComplete="off" className={inputCls} /></Field>
                               </>
                             )}
-                            <Field label={`Function on ${project.code}`}>
+                            <Field label={`Function on ${project.code}`} required>
                               <select name="functionId" defaultValue={here.functionId} className={inputCls}>
                                 {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                               </select>
@@ -282,29 +306,34 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                                 {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
                               </select>
                             </Field>
-                            {u.linked ? null : (
-                              <label className="flex items-start gap-2 text-xs text-slate-600 sm:col-span-2">
-                                <input type="checkbox" name="active" defaultChecked={u.active} className="mt-0.5" />
-                                <span>Can sign in — untick to switch their account off on every project</span>
-                              </label>
-                            )}
                           </div>
+                          {u.linked ? null : (
+                            <label className="flex w-fit cursor-pointer items-start gap-2 text-xs leading-5 text-slate-600">
+                              <input type="checkbox" name="active" defaultChecked={u.active} className="mt-1" />
+                              <span><span className="font-semibold text-slate-800">Can sign in</span> — untick to switch their account off on every project</span>
+                            </label>
+                          )}
                         </ActionForm>
                         {u.id !== me.id ? (
-                          <div className="border-t border-line pt-3">
-                            <ActionForm action={takeOffProjectAction} submitLabel={`Take off ${project.code}`} size="sm" variant="secondary" hidden={{ userId: u.id }}
-                              confirmText={`Take ${u.name} off ${project.code}? Their account and their other projects stay, and everything they did here keeps their name.`}>
-                              <p className="text-xs text-slate-600">They leave {project.code} only; their account and other projects stay.</p>
-                            </ActionForm>
-                          </div>
+                          <details className="group mt-4 border-t border-line pt-3">
+                            <summary className="w-fit cursor-pointer list-none text-xs font-semibold text-link hover:underline [&::-webkit-details-marker]:hidden">
+                              Should {u.name} leave {project.code}? Take them off
+                            </summary>
+                            <div className="mt-3">
+                              <ActionForm action={takeOffProjectAction} submitLabel={`Take off ${project.code}`} size="sm" variant="danger" hidden={{ userId: u.id }}
+                                confirmText={`Take ${u.name} off ${project.code}? Their account and their other projects stay, and everything they did here keeps their name.`}>
+                                <p className="text-xs leading-5 text-slate-600">
+                                  They leave {project.code} only. Their account and their other projects stay, and everything they did here keeps their name.
+                                </p>
+                              </ActionForm>
+                            </div>
+                          </details>
                         ) : null}
                       </div>
-                    </details>
-                  ) : u.held?.pendingSince ? null : u.active ? (
-                    <Link href="#join" className="text-xs font-semibold text-link hover:underline">Ask for them to join</Link>
-                  ) : null}
-                </Td>
-              </tr>
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
             );
           })}
         </DataTable>
