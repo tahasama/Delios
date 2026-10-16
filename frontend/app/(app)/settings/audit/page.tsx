@@ -1,243 +1,151 @@
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
-import { PageHeader } from "@/components/ui";
-import { fmtDate, fmtDateTime } from "@/lib/core/utils";
+import { DataTable, Th, Td } from "@/components/ui";
+import { fmtDate } from "@/lib/core/utils";
+import { fromToday } from "@/lib/core/days";
 import { DateWindow } from "@/components/date-window";
-import { adminAudit } from "@/lib/settings/api-admin";
+import { adminAudit, adminProjects, orEmpty } from "@/lib/settings/api-admin";
+import { activityLink, activityWords } from "@/lib/settings/activity-words";
+import { AUDIT_RAIL } from "@/lib/core/rails";
 import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Audit trail" };
 
-/**
- * The log: what was done, to what, by whom, on the day it happened.
- *
- * An audit trail is correspondence rather than data — somebody did something
- * to something, and a reader arrives asking what happened, not asking to sort
- * a column. So it is filed the way the dispatch log is filed: the day is a
- * rule across the page, each act is a slip of paper with a coloured edge
- * saying what kind of act it was, and the families of act stand in a list
- * beside it rather than as a row of pills above it.
- */
-
-/** What kind of act this was, and how it is drawn. */
-type Family = { id: string; label: string; edge: string; actions: string[] };
-
-const FAMILIES: Family[] = [
-  {
-    id: "review",
-    label: "Reviews and decisions",
-    edge: "edge-move",
-    actions: ["WORKFLOW_STARTED", "STEP_DISPATCHED", "REVIEW_OUTCOME", "APPROVAL", "WORKFLOW_COMPLETED", "REVIEW_COMMENT", "COMMENT_RECLASSIFIED", "CONDITION_SETTLED", "DELEGATION_REQUESTED", "DELEGATION_GRANTED", "DELEGATION_REFUSED", "DELEGATION_WITHDRAWN"],
-  },
-  {
-    id: "release",
-    label: "Releases",
-    edge: "edge-settle",
-    actions: ["RELEASE", "REGISTER_ENTRY", "REVISION_ESTABLISHED", "STATE_TRANSITION"],
-  },
-  {
-    id: "return",
-    label: "Returns and rewinds",
-    edge: "edge-back",
-    actions: ["WORKFLOW_RETURNED", "ROUTE_REWOUND", "SHORTFALL_ISSUED", "REQUIREMENTS_REMINDER"],
-  },
-  {
-    id: "transmittal",
-    label: "Transmittals and issues",
-    edge: "edge-send",
-    actions: ["TRANSMITTAL_RAISED", "TRANSMITTAL_OPENED", "CUSTODY", "ISSUE", "ISSUED", "ISSUE_REQUESTED", "ISSUE_REQUEST_CANCELLED", "SHORTFALL_ACCEPTED", "REQUIREMENTS_ISSUED"],
-  },
-  {
-    id: "keeping",
-    label: "Record keeping",
-    edge: "edge-keep",
-    actions: ["METADATA_CHANGE", "FILE_UPLOADED", "CHECK_RUN", "PACKAGE_CREATED", "RELATIONSHIP", "TEMPLATE_SAVED", "TEMPLATE_REMOVED", "CONFIG_VALUE_RETIRED", "PERMISSION_RULE_PUBLISHED", "SCOPE_UPDATED", "CONTROL_SETTING_CHANGED", "PROJECT_OPENED", "USER_CREATED", "USER_UPDATED", "VISITOR_CREATED"],
-  },
-  { id: "access", label: "Who read what", edge: "edge-keep", actions: ["DOWNLOAD", "LOGIN", "SIGN_IN", "SIGN_IN_MFA", "SIGN_IN_FAILED", "ACCOUNT_LOCKED", "ACCESS_GRANTED", "ACCESS_WITHDRAWN", "ACCESS_REFUSED", "PASSWORD_RESET_ASKED", "PASSWORD_RESET", "MFA_ENABLED", "MFA_DISABLED", "MFA_RESET", "SECURITY_POLICY_CHANGED"] },
-];
-
-const familyOf = (action: string) => FAMILIES.find((f) => f.actions.includes(action));
+type Search = { q?: string; kind?: string; project?: string; from?: string; to?: string; page?: string };
 
 /**
- * A date from the address, as the day it names. The end of a window is the end
- * of that day, so asking for the 3rd to the 3rd returns the 3rd.
+ * The audit trail: every act kept, newest first, the Schedule's way — the plate saying what it holds, the narrowing
+ * (kind of act, project, words, dates) answered by the backend, then the table with each act's side colour by its
+ * kind (`AuditKinds`, the key on Help), paged by 50. Who did it opens their activity; what it was done to opens it.
+ * Administrators only.
  */
-function day(said: string | undefined, end = false): Date | null {
-  if (!said) return null;
-  const at = new Date(said);
-  if (Number.isNaN(at.getTime())) return null;
-  at.setHours(end ? 23 : 0, end ? 59 : 0, end ? 59 : 0, end ? 999 : 0);
-  return at;
-}
-
-/** The act, in the words a person would use for it. */
-function said(action: string): string {
-  return action.replaceAll("_", " ").toLowerCase();
-}
-
-export default async function AuditPage({ searchParams }: { searchParams: Promise<{ q?: string; family?: string; from?: string; to?: string }> }) {
+export default async function AuditPage({ searchParams }: { searchParams: Promise<Search> }) {
   const { user } = await requireScope();
-  if (!isAdmin(user)) {
-    return <NoAccess title="Audit trail" who="admin" />;
-  }
+  if (!isAdmin(user)) return <NoAccess title="Audit trail" who="admin" />;
   const sp = await searchParams;
-  const family = FAMILIES.find((f) => f.id === sp.family);
-  // A date names a whole day: "from the 3rd" means from midnight, "to the 3rd"
-  // means until the end of it, which is what a reader asking for one day
-  // expects to get back.
-  const from = day(sp.from);
-  const to = day(sp.to, true);
-
-  // The backend filters by words and dates; the family of act is picked from what comes back.
-  const page = await adminAudit({ q: sp.q, from: sp.from, to: sp.to, per: 200 });
-  const events = page.rows
-    .filter((e) => !family || family.actions.includes(e.action))
-    .map((e) => ({ ...e, id: String(e.id), ts: new Date(e.at), field: null as string | null, oldValue: null as string | null, newValue: null as string | null }));
-  const counts = page.actions.map((one) => ({ action: one.action, _count: one.count }));
-
-  const countOf = (f: Family) => counts.filter((c) => f.actions.includes(c.action)).reduce((n, c) => n + c._count, 0);
-  const total = counts.reduce((n, c) => n + c._count, 0);
-
-  // Filed by the day it happened: correspondence is remembered by its day, and
-  // a day with nothing in it is not a heading.
-  const days: { day: string; when: Date; acts: typeof events }[] = [];
-  for (const e of events) {
-    const day = e.ts.toDateString();
-    const last = days[days.length - 1];
-    if (last?.day === day) last.acts.push(e);
-    else days.push({ day, when: e.ts, acts: [e] });
-  }
+  const page = Math.max(1, Number(sp.page) || 1);
+  const [log, projects] = await Promise.all([
+    adminAudit({ q: sp.q, kind: sp.kind, projectId: sp.project, from: sp.from, to: sp.to, page, per: 50 }).catch(() => null),
+    orEmpty(adminProjects),
+  ]);
+  const href = (q: Search) => {
+    const next = new URLSearchParams(Object.entries({ ...q, page: q.page && q.page !== "1" ? q.page : undefined })
+      .filter((e): e is [string, string] => !!e[1]));
+    return `/settings/audit${next.size ? `?${next}` : ""}`;
+  };
+  const keep = { q: sp.q, kind: sp.kind, project: sp.project, from: sp.from, to: sp.to };
+  const all = log?.kinds.reduce((n, k) => n + k.count, 0) ?? 0;
+  const narrowed = !!(sp.q || sp.from || sp.to || sp.kind || sp.project);
+  const from = log ? (log.page - 1) * log.per + 1 : 0;
+  const to = log ? Math.min(log.total, log.page * log.per) : 0;
 
   return (
-    <div className="dispatch logbook space-y-5">
-      <header className="dispatch-head px-6 py-5">
-        <h1 className="dispatch-title">Audit trail</h1>
-        <p className="dispatch-lede mt-1.5 max-w-2xl">
-          Every controlled act, in the order it happened: who did it, what it was done to, and what changed.
-          The evidence for one document is on the document; this is the project's whole memory.
-        </p>
-        {from || to ? (
-          <p className="slip-note mt-2.5">
-            Reading {from ? fmtDate(from) : "the beginning"} to {to ? fmtDate(to) : "now"}
-            {family ? ` · ${family.label.toLowerCase()}` : ""}
-            {sp.q ? ` · “${sp.q}”` : ""}
+    <div className="space-y-4">
+      <section className="register register-sheet register-sheet-open">
+        {/* The plate: what it holds. */}
+        <div className="px-5 pt-6 pb-4 sm:px-6">
+          <h1 className="plate-title text-slate-950">Audit trail</h1>
+          <p className="plate-meta mt-2">
+            {log ? `${all.toLocaleString("en-GB")} acts${narrowed ? " match" : " kept"} · every project of the organization` : "—"}
           </p>
-        ) : null}
-      </header>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+            Every act kept, newest first: who did it, what to, and when. Nothing in it can be changed or taken out. What
+            is kept about reading and sign-ins is the organization&rsquo;s choice (<Link href="/organization#tracking" className="font-semibold text-link hover:underline">organization&rsquo;s page</Link>).
+          </p>
+          {!log ? (
+            <p role="alert" className="mt-2 w-fit rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-800 ring-1 ring-red-200">The audit trail could not be read just now. Try again in a moment.</p>
+          ) : null}
+        </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[212px_minmax(0,1fr)] lg:items-start">
-        <aside className="lg:sticky lg:top-22">
-          <nav aria-label="Kinds of act">
-            {FAMILIES.map((f) => (
-              <Link
-                key={f.id}
-                href={sp.family === f.id ? "/settings/audit" : `/settings/audit?family=${f.id}`}
-                aria-current={sp.family === f.id ? "page" : undefined}
-                className={`flex items-baseline gap-3 rounded px-3 py-2 text-[13px] ${
-                  sp.family === f.id ? "bg-canvas-deep font-semibold text-slate-900" : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <span className="min-w-0 truncate">{f.label}</span>
-                <span className="ml-auto font-mono text-[11.5px] text-slate-500">{countOf(f)}</span>
-              </Link>
-            ))}
-            <Link
-              href="/settings/audit"
-              aria-current={!sp.family ? "page" : undefined}
-              className={`mt-1 flex items-baseline gap-3 rounded border-t border-line px-3 py-2 text-[13px] ${
-                !sp.family ? "bg-canvas-deep font-semibold text-slate-900" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <span>The whole log</span>
-              <span className="ml-auto font-mono text-[11.5px] text-slate-500">{total}</span>
-            </Link>
-          </nav>
-
-          <form className="asking mt-5 px-3">
-            <p className="slip-label">Find</p>
-            <input
-              name="q"
-              defaultValue={sp.q ?? ""}
-              placeholder="number, person, detail"
-              className="plain mt-2 w-full"
-            />
-
-            <p className="slip-label mt-4">When</p>
-            <span className="register mt-2 block">
-              <DateWindow fields={[{ code: "ts", label: "The day it happened" }]} on={sp.from ? "ts" : ""} from={sp.from ?? ""} to={sp.to ?? ""} />
-            </span>
-
-            {sp.family ? <input type="hidden" name="family" value={sp.family} /> : null}
-            <div className="mt-2.5 flex items-center gap-3">
-              <button className="ask" data-on={sp.q || sp.from || sp.to ? "true" : "false"}>Show</button>
-              {sp.q || sp.from || sp.to ? (
-                <Link href={sp.family ? `/settings/audit?family=${sp.family}` : "/settings/audit"} className="text-[12px] font-semibold text-link hover:underline">
-                  Clear
+        {log ? (
+          <>
+            {/* The narrowing: the kind of act, each with its side colour and count; the project; words and dates. */}
+            <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-2.5 text-xs sm:px-6">
+              <span className="stencil mr-1 text-slate-500">What</span>
+              <Link href={href({ ...keep, kind: undefined })} data-on={!sp.kind} className="ask">All</Link>
+              {log.kinds.filter((k) => k.count > 0 || sp.kind === k.key).map((k) => (
+                <Link key={k.key} href={href({ ...keep, kind: k.key })} data-on={sp.kind === k.key} className="ask">
+                  <span aria-hidden className={`${AUDIT_RAIL[k.key] ?? "rail-none"} h-2.5 w-1 rounded-full bg-(--rail)`} />
+                  {k.label} <span className="font-mono tabular-nums opacity-70">{k.count.toLocaleString("en-GB")}</span>
                 </Link>
-              ) : null}
+              ))}
             </div>
-          </form>
-        </aside>
-
-        <main className="min-w-0 space-y-5">
-          {days.map(({ day, when, acts }) => (
-            <section key={day}>
-              <div className="day-rule mb-2.5">
-                <span className="font-mono text-[12.5px]">{when.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })}</span>
-                <span className="day-name">{when.toLocaleDateString("en-GB", { weekday: "long" })}</span>
+            {projects.length > 1 ? (
+              <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-2.5 text-xs sm:px-6">
+                <span className="stencil mr-1 text-slate-500">Project</span>
+                <Link href={href({ ...keep, project: undefined })} data-on={!sp.project} className="ask">Any</Link>
+                {projects.map((p) => (
+                  <Link key={p.id} href={href({ ...keep, project: p.id })} data-on={sp.project === p.id} className="ask">{p.code}</Link>
+                ))}
               </div>
+            ) : null}
+            <form className="asking flex flex-wrap items-center gap-2 border-t border-line px-5 py-2.5 text-xs sm:px-6">
+              {sp.kind ? <input type="hidden" name="kind" value={sp.kind} /> : null}
+              {sp.project ? <input type="hidden" name="project" value={sp.project} /> : null}
+              <span className="stencil mr-1 text-slate-500">Find</span>
+              <input name="q" defaultValue={sp.q ?? ""} placeholder="a number, a person, words in the detail" aria-label="Find in the audit trail" className="plain w-72 max-w-full" />
+              <DateWindow fields={[{ code: "ts", label: "The day it happened" }]} on={sp.from ? "ts" : ""} from={sp.from ?? ""} to={sp.to ?? ""} />
+              <button className="ask" data-on={sp.q || sp.from || sp.to ? "true" : "false"}>Find</button>
+              {sp.q || sp.from || sp.to ? <Link href={href({ kind: sp.kind, project: sp.project })} className="font-semibold text-link hover:underline">Clear</Link> : null}
+            </form>
 
-              <ul className="space-y-2">
-                {acts.map((e) => {
-                  const kind = familyOf(e.action);
-                  return (
-                    <li key={e.id} className={`slip ${kind?.edge ?? "edge-keep"}`}>
-                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="slip-number">{e.entityLabel ?? e.entityType ?? "—"}</span>
-                        <span className="postmark">{said(e.action)}</span>
-                        <span className="slip-note ml-auto whitespace-nowrap">{fmtDateTime(e.ts)}</span>
-                      </div>
+            {/* The table directly under it, each act on the side colour of its kind. */}
+            <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
+              head={<tr><Th className="rail-head">When</Th><Th>Who</Th><Th>What</Th><Th>On</Th><Th>Project</Th><Th>More</Th></tr>}>
+              {log.rows.length ? log.rows.map((e) => {
+                const link = activityLink(e.entityType, e.entityId);
+                return (
+                  <tr key={e.id} className="align-top">
+                    <Td className={`rail ${AUDIT_RAIL[e.kind] ?? "rail-none"} whitespace-nowrap text-xs`}>
+                      <span title={new Date(e.at).toLocaleString("en-GB")}>{fromToday(e.at.slice(0, 10)) ?? fmtDate(e.at)}</span>
+                      <span className="block font-mono text-[11px] tabular-nums text-slate-500">{new Date(e.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>
+                    </Td>
+                    <Td className="text-xs">
+                      {e.actorId
+                        ? <Link href={`/settings/users/${e.actorId}`} className="font-medium text-slate-800 hover:text-link hover:underline" title={`What ${e.actorName} did`}>{e.actorName}</Link>
+                        : <span className="text-slate-500">{e.actorName}</span>}
+                    </Td>
+                    <Td className="text-xs font-medium text-slate-800">{activityWords(e.action)}</Td>
+                    <Td className="text-xs">
+                      {e.entityLabel
+                        ? link ? <Link href={link} className="font-mono font-semibold text-brand-ink hover:underline">{e.entityLabel}</Link> : <span className="font-mono">{e.entityLabel}</span>
+                        : "—"}
+                    </Td>
+                    <Td className="text-xs">{e.project ?? "—"}</Td>
+                    <Td className="whitespace-pre-line text-xs leading-5 text-slate-600">{e.detail ?? "—"}</Td>
+                  </tr>
+                );
+              }) : (
+                <tr><Td colSpan={6} className="text-xs text-slate-500">{narrowed ? "Nothing kept matches this." : "Nothing kept yet: acts appear here as they happen."}</Td></tr>
+              )}
+            </DataTable>
 
-                      {e.field ? (
-                        <p className="slip-subject mt-1.5">
-                          {e.field}
-                          <span className="text-[15px] text-(--ink-faint)"> — </span>
-                          <span className="font-mono text-[14px] line-through opacity-70">{e.oldValue ?? "—"}</span>
-                          <span className="text-(--ink-faint)"> to </span>
-                          <span className="font-mono text-[14px]">{e.newValue ?? "—"}</span>
-                        </p>
-                      ) : e.detail ? (
-                        <p className="slip-subject mt-1.5">{e.detail}</p>
-                      ) : null}
-
-                      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="route">
-                          <span className="route-party">{e.actorName}</span>
-                          <span className="route-line" aria-hidden="true" />
-                          <span className="min-w-0 truncate">{e.entityType ?? "the project"}</span>
-                        </span>
-                        {kind ? <span className="slip-note ml-auto">{kind.label}</span> : null}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
-
-          {!days.length ? (
-            <p className="slip px-4 py-6 text-[13px] text-(--ink-soft)">
-              Nothing in the log answers that. {sp.q ? "Try another number or name." : "Acts appear here as they happen."}
-            </p>
-          ) : null}
-
-          {events.length === 200 ? (
-            <p className="slip-note px-1">The last 200 acts. Narrow it with a search or a kind to see further back.</p>
-          ) : null}
-        </main>
-      </div>
+            {log.total > 0 ? (
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
+                <p className="font-mono text-[11px] tabular-nums text-slate-500">
+                  {from.toLocaleString("en-GB")}–{to.toLocaleString("en-GB")}
+                  <span className="ml-1.5 font-sans text-slate-500">of {log.total.toLocaleString("en-GB")}</span>
+                </p>
+                {log.pages > 1 ? (
+                  <span className="flex items-center gap-2">
+                    {log.page > 1
+                      ? <Link href={href({ ...keep, page: String(log.page - 1) })} aria-label="Previous page" className="rounded-sm p-1 text-slate-500 hover:bg-slate-100 hover:text-brand-ink"><ChevronLeft className="h-4 w-4" /></Link>
+                      : <span className="p-1 text-slate-300"><ChevronLeft className="h-4 w-4" /></span>}
+                    <span className="font-mono text-[11px] tabular-nums text-slate-500">{log.page} of {log.pages}</span>
+                    {log.page < log.pages
+                      ? <Link href={href({ ...keep, page: String(log.page + 1) })} aria-label="Next page" className="rounded-sm p-1 text-slate-500 hover:bg-slate-100 hover:text-brand-ink"><ChevronRight className="h-4 w-4" /></Link>
+                      : <span className="p-1 text-slate-300"><ChevronRight className="h-4 w-4" /></span>}
+                  </span>
+                ) : <span />}
+                <span />
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </section>
     </div>
   );
 }

@@ -136,7 +136,7 @@ public static class DirectoryEndpoints
             kinds,
             rows = rows.Select(e => new
             {
-                e.Id, At = e.At.ToDateTimeOffset(), e.Action, e.EntityType, e.EntityId, e.EntityLabel, e.Detail, e.ProjectId,
+                e.Id, At = e.At.ToDateTimeOffset(), e.Action, Kind = AuditKinds.Of(e.Action), e.EntityType, e.EntityId, e.EntityLabel, e.Detail, e.ProjectId,
                 Project = e.ProjectId is { } pid ? projects.GetValueOrDefault(pid) : null,
             }),
         });

@@ -69,10 +69,12 @@ type AdminRoute = {
   steps: RouteStepView[];
 };
 
-type AuditPage = {
+export type AuditPage = {
   total: number; page: number; per: number; pages: number; actions: { action: string; count: number }[];
-  rows: { id: number; at: string; actorId: string | null; actorName: string; action: string; entityType: string | null; entityId: string | null;
-    entityLabel: string | null; detail: string | null; projectId: string | null }[];
+  /** The kinds of act (worked out by the backend, `AuditKinds`), each counted. */
+  kinds: { key: string; label: string; count: number }[];
+  rows: { id: number; at: string; actorId: string | null; actorName: string; action: string; kind: string; entityType: string | null; entityId: string | null;
+    entityLabel: string | null; detail: string | null; projectId: string | null; project: string | null }[];
 };
 
 export const adminUsers = cache(async () => api<AdminUser[]>("/api/admin/users"));
@@ -90,7 +92,7 @@ export const adminNumbering = cache(async () => api<AdminNumbering>("/api/admin/
 export const adminRoutes = cache(async () => api<AdminRoute[]>("/api/admin/routes"));
 export const adminValueSets = cache(async () => api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets"));
 
-export async function adminAudit(query: { q?: string; action?: string; entityType?: string; projectId?: string; from?: string; to?: string; page?: number; per?: number }) {
+export async function adminAudit(query: { q?: string; kind?: string; action?: string; entityType?: string; projectId?: string; actorId?: string; from?: string; to?: string; page?: number; per?: number }) {
   return api<AuditPage>("/api/admin/audit", { query });
 }
 

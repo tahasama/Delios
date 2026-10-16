@@ -7,6 +7,7 @@ import { DataTable, Th, Td, ToneChip } from "@/components/ui";
 import { fromToday } from "@/lib/core/days";
 import { fmtDate } from "@/lib/core/utils";
 import { activityLink, activityWords } from "@/lib/settings/activity-words";
+import { AUDIT_RAIL } from "@/lib/core/rails";
 import { adminProjects, orEmpty } from "@/lib/settings/api-admin";
 import { NoAccess } from "../../no-access";
 
@@ -18,7 +19,7 @@ type Activity = {
   total: number; page: number; per: number; pages: number;
   first: string | null; lastSignIn: string | null; keepsReading: boolean; showsSignIns: boolean;
   kinds: { action: string; count: number }[];
-  rows: { id: number; at: string; action: string; entityType: string | null; entityId: string | null; entityLabel: string | null; detail: string | null; projectId: string | null; project: string | null }[];
+  rows: { id: number; at: string; action: string; kind: string; entityType: string | null; entityId: string | null; entityLabel: string | null; detail: string | null; projectId: string | null; project: string | null }[];
 };
 
 /**
@@ -110,12 +111,12 @@ export default async function PersonActivityPage({ params, searchParams }: {
 
         {/* The table directly under it. */}
         <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
-          head={<tr><Th>When</Th><Th>What</Th><Th>On</Th><Th>Project</Th><Th>More</Th></tr>}>
+          head={<tr><Th className="rail-head">When</Th><Th>What</Th><Th>On</Th><Th>Project</Th><Th>More</Th></tr>}>
           {activity.rows.length ? activity.rows.map((e) => {
             const link = activityLink(e.entityType, e.entityId);
             return (
               <tr key={e.id} className="align-top">
-                <Td className="whitespace-nowrap text-xs">
+                <Td className={`rail ${AUDIT_RAIL[e.kind] ?? "rail-none"} whitespace-nowrap text-xs`}>
                   <span title={new Date(e.at).toLocaleString("en-GB")}>{fromToday(day(e.at)) ?? fmtDate(e.at)}</span>
                   <span className="block font-mono text-[11px] tabular-nums text-slate-500">{new Date(e.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>
                 </Td>

@@ -58,4 +58,30 @@ export const RAILS = [
     { rail: "rail-delivered", name: "Delivered, to accept" },
     { rail: "rail-done", name: "Accepted" },
   ] },
+  { area: "Audit trail", items: [
+    { rail: "rail-review", name: "Reviews and decisions" },
+    { rail: "rail-released", name: "Releases and issues" },
+    { rail: "rail-returned", name: "Returns, holds and ends" },
+    { rail: "rail-sent", name: "Transmittals" },
+    { rail: "rail-delivered", name: "Packages" },
+    { rail: "rail-schedule", name: "Schedule" },
+    { rail: "rail-prep", name: "The register (registered, details, files)" },
+    { rail: "rail-people", name: "People and settings" },
+    { rail: "rail-reading", name: "Opened and downloaded" },
+    { rail: "rail-signin", name: "Sign-ins and security" },
+  ] },
 ] as const;
+
+/** The side colour of each kind of act in the audit trail (kinds worked out by the backend, `AuditKinds`). */
+export const AUDIT_RAIL: Record<string, string> = {
+  REVIEW: "rail-review",
+  RELEASE: "rail-released",
+  RETURN: "rail-returned",
+  TRANSMITTAL: "rail-sent",
+  PACKAGE: "rail-delivered",
+  SCHEDULE: "rail-schedule",
+  REGISTER: "rail-prep",
+  PEOPLE: "rail-people",
+  READING: "rail-reading",
+  SIGN_IN: "rail-signin",
+};

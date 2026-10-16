@@ -292,6 +292,10 @@ summary::-webkit-details-marker {
   .rail-shortfall { --rail: var(--color-orange-400); }
   .rail-check { --rail: var(--color-yellow-500); }
   .rail-issue { --rail: var(--color-indigo-400); }
+  .rail-schedule { --rail: var(--color-teal-500); }
+  .rail-people { --rail: var(--color-purple-500); }
+  .rail-reading { --rail: var(--color-lime-500); }
+  .rail-signin { --rail: var(--color-pink-400); }
 
   /* Denser rows than the rest of the app: this table is read for hours. */
   .register .dt-td { padding-block: 0.55rem; font-size: 0.8125rem; vertical-align: middle; overflow: visible; border-bottom: 1px solid var(--hair); }

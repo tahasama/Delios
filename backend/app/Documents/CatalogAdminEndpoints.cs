@@ -347,19 +347,20 @@ public static class CatalogAdminEndpoints
     // ── The audit trail ─────────────────────────────────────────────────────
 
     /// <summary>
-    /// <c>GET /api/admin/audit</c>: the organization's audit trail, newest first, a page at a time. Filters: free text
-    /// (who, what, detail), an action, an entity type, a project, and a date range (UTC days).
+    /// <c>GET /api/admin/audit</c>: the organization's audit trail, newest first, a page at a time. Narrowed here, never
+    /// on the screen: free text (who, what, detail), a kind of act (<see cref="AuditKinds"/>), an act, an entity type,
+    /// a project, a person, and a date range (UTC days). Each row says its kind; the kinds come with their counts.
     /// </summary>
     private static async Task<IResult> AuditAsync(
-        DeliosDbContext db, CancellationToken cancellationToken, string? q = null, string? action = null, string? entityType = null,
-        Guid? projectId = null, DateOnly? from = null, DateOnly? to = null, int page = 1, int per = 50)
+        DeliosDbContext db, CancellationToken cancellationToken, string? q = null, string? kind = null, string? action = null, string? entityType = null,
+        Guid? projectId = null, Guid? actorId = null, DateOnly? from = null, DateOnly? to = null, int page = 1, int per = 50)
     {
         per = Math.Clamp(per, 10, 200);
         page = Math.Max(1, page);
         var query = db.AuditEvents.AsNoTracking();
-        if (Blank(action) is { } a) query = query.Where(e => e.Action == a);
         if (Blank(entityType) is { } t) query = query.Where(e => e.EntityType == t);
         if (projectId is { } p) query = query.Where(e => e.ProjectId == p);
+        if (actorId is { } who) query = query.Where(e => e.ActorId == who);
         if (from is { } f) { var start = LocalDate.FromDateOnly(f).AtStartOfDayInZone(DateTimeZone.Utc).ToInstant(); query = query.Where(e => e.At >= start); }
         if (to is { } u) { var end = LocalDate.FromDateOnly(u).PlusDays(1).AtStartOfDayInZone(DateTimeZone.Utc).ToInstant(); query = query.Where(e => e.At < end); }
         if (Blank(q) is { } text)
@@ -368,17 +369,27 @@ public static class CatalogAdminEndpoints
             query = query.Where(e => EF.Functions.ILike(e.ActorName, pattern) || EF.Functions.ILike(e.Action, pattern)
                 || (e.EntityLabel != null && EF.Functions.ILike(e.EntityLabel, pattern)) || (e.Detail != null && EF.Functions.ILike(e.Detail, pattern)));
         }
+        // The kinds, counted over everything narrowed so far but the kind itself, so each count says what choosing it gives.
+        var actions = await query.GroupBy(e => e.Action).Select(g => new { Action = g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
+        var kinds = AuditKinds.All.Select(k => new { k.Key, k.Label, Count = actions.Where(a => AuditKinds.Of(a.Action) == k.Key).Sum(a => a.Count) })
+            .ToList();
+        if (Blank(kind) is { } chosen)
+        {
+            var codes = actions.Where(a => AuditKinds.Of(a.Action) == chosen).Select(a => a.Action).ToArray();
+            query = query.Where(e => codes.Contains(e.Action));
+        }
+        if (Blank(action) is { } a) query = query.Where(e => e.Action == a);
         var total = await query.CountAsync(cancellationToken);
         var rows = await query.OrderByDescending(e => e.Id).Skip((page - 1) * per).Take(per).ToListAsync(cancellationToken);
-        var actions = await db.AuditEvents.AsNoTracking().GroupBy(e => e.Action).Select(g => new { Action = g.Key, Count = g.Count() })
-            .OrderByDescending(g => g.Count).ToListAsync(cancellationToken);
+        var projects = await db.Projects.AsNoTracking().Select(x => new { x.Id, x.Code }).ToDictionaryAsync(x => x.Id, x => x.Code, cancellationToken);
         return Results.Ok(new
         {
             total,
             page,
             per,
             pages = Math.Max(1, (total + per - 1) / per),
-            actions,
+            kinds,
+            actions = actions.OrderByDescending(x => x.Count),
             rows = rows.Select(e => new
             {
                 e.Id,
@@ -386,11 +397,13 @@ public static class CatalogAdminEndpoints
                 e.ActorId,
                 e.ActorName,
                 e.Action,
+                Kind = AuditKinds.Of(e.Action),
                 e.EntityType,
                 e.EntityId,
                 e.EntityLabel,
                 e.Detail,
                 e.ProjectId,
+                Project = e.ProjectId is { } pid ? projects.GetValueOrDefault(pid) : null,
             }),
         });
     }
