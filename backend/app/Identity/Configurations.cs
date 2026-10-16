@@ -172,6 +172,8 @@ internal sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEv
         b.HasIndex(x => new { x.TenantId, x.Id });
         b.HasIndex(x => new { x.EntityType, x.EntityId });
         b.HasIndex(x => x.ProjectId);
+        // A person's own record (Settings, People & access), newest first.
+        b.HasIndex(x => new { x.ActorId, x.Id });
         b.Property(x => x.Action).HasMaxLength(64);
         b.Property(x => x.EntityType).HasMaxLength(64);
     }

@@ -3,6 +3,7 @@ using Prometheus;
 using Delios.Host.Identity;
 using Delios.Host.Platform;
 using Delios.Host.Tenancy;
+using NodaTime;
 using Microsoft.EntityFrameworkCore;
 
 namespace Delios.Host.Documents;
@@ -97,7 +98,8 @@ public static class DocumentEndpoints
 
     /// <summary>GET /documents/{documentId}: one document with all its revisions, submissions and files, if the caller may see it.</summary>
     private static async Task<IResult> GetAsync(
-        Guid documentId, HttpContext http, DeliosDbContext db, DocumentService documents, CancellationToken cancellationToken)
+        Guid documentId, HttpContext http, DeliosDbContext db, DocumentService documents, AuditLog audit, IClock clock,
+        CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Read)) return Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register.");
@@ -108,6 +110,12 @@ public static class DocumentEndpoints
             .AsSplitQuery()
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
+        // Who opened it, and when (owner): in the audit trail, once per person and document every half hour, so a page
+        // asking several times reads as one look.
+        var since = clock.GetCurrentInstant() - Duration.FromMinutes(30);
+        if (!await db.AuditEvents.AnyAsync(e => e.ActorId == access.UserId && e.EntityId == documentId && e.Action == "DOCUMENT_VIEWED" && e.At > since, cancellationToken))
+            await audit.WriteAsync(http.User.Actor(), "DOCUMENT_VIEWED", "Document", documentId, document.Number,
+                projectId: access.Project.Id, cancellationToken: cancellationToken);
         // Decided and waiting for release (with what the decider granted), and when each revision first went out.
         var decided = await db.Reviews.AsNoTracking().Where(r => r.DocumentId == documentId && r.State == Reviews.ReviewStates.Decided)
             .Select(r => new { r.RevisionId, r.GrantedStatus }).ToListAsync(cancellationToken);

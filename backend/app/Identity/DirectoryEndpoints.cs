@@ -80,11 +80,60 @@ public static class DirectoryEndpoints
         people.MapPut("/projects/{projectId:guid}/members", MemberAsync);
         // Reading the functions and organizations is open to whoever holds Manage too: People & access chooses from them.
         people.MapGet("/functions", FunctionsAsync);
+        keepers.MapGet("/users/{userId:guid}/activity", ActivityAsync);
         keepers.MapPost("/functions", CreateFunctionAsync);
         keepers.MapPut("/functions/{functionId:guid}", UpdateFunctionAsync);
         people.MapGet("/parties", PartiesAsync);
         keepers.MapPost("/parties", CreatePartyAsync);
         keepers.MapPut("/parties/{partyId:guid}", UpdatePartyAsync);
+    }
+
+    /// <summary>
+    /// <c>GET /api/admin/users/{userId}/activity</c>: everything a person did in the app, newest first, read from the
+    /// audit trail (signed in, opened, downloaded, reviewed, released, sent…), a page at a time, narrowed to a project or
+    /// a kind of act. An administrator or the control function only (Settings, never the directory): it is the record
+    /// kept for the integrity of the register, read by those who answer for it.
+    /// </summary>
+    private static async Task<IResult> ActivityAsync(Guid userId, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken,
+        Guid? projectId = null, string? action = null, int page = 1, int per = 50)
+    {
+        var user = await db.Users.AsNoTracking().Where(u => u.Id == userId)
+            .Select(u => new { u.Id, u.Name, u.Email, u.Active, Party = u.Party == null ? null : u.Party.Name, Linked = u.HomeTenantId != null })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (user is null) return Problems.NotFound("USER_NOT_FOUND", "No such person.");
+        per = Math.Clamp(per, 10, 200);
+        page = Math.Max(1, page);
+        var mine = db.AuditEvents.AsNoTracking().Where(e => e.ActorId == userId);
+        var query = mine;
+        if (projectId is { } p) query = query.Where(e => e.ProjectId == p);
+        if (!string.IsNullOrWhiteSpace(action)) query = query.Where(e => e.Action == action);
+        var total = await query.CountAsync(cancellationToken);
+        var rows = await query.OrderByDescending(e => e.Id).Skip((page - 1) * per).Take(per).ToListAsync(cancellationToken);
+        var kinds = await mine.GroupBy(e => e.Action).Select(g => new { Action = g.Key, Count = g.Count() })
+            .OrderByDescending(g => g.Count).ToListAsync(cancellationToken);
+        var first = await mine.OrderBy(e => e.Id).Select(e => (Instant?)e.At).FirstOrDefaultAsync(cancellationToken);
+        var lastSignIn = await mine.Where(e => e.Action.StartsWith("SIGN_IN") && e.Action != "SIGN_IN_FAILED")
+            .OrderByDescending(e => e.Id).Select(e => (Instant?)e.At).FirstOrDefaultAsync(cancellationToken);
+        var projects = await db.Projects.AsNoTracking().Select(x => new { x.Id, x.Code }).ToDictionaryAsync(x => x.Id, x => x.Code, cancellationToken);
+        // Reading someone's record is itself recorded: who looked, and when.
+        await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "ACTIVITY_READ", "User", user.Id, user.Name,
+            projectId is null ? null : $"on {projects.GetValueOrDefault(projectId.Value)}", projectId, cancellationToken);
+        return Results.Ok(new
+        {
+            user,
+            total,
+            page,
+            per,
+            pages = Math.Max(1, (total + per - 1) / per),
+            first = first?.ToDateTimeOffset(),
+            lastSignIn = lastSignIn?.ToDateTimeOffset(),
+            kinds,
+            rows = rows.Select(e => new
+            {
+                e.Id, At = e.At.ToDateTimeOffset(), e.Action, e.EntityType, e.EntityId, e.EntityLabel, e.Detail, e.ProjectId,
+                Project = e.ProjectId is { } pid ? projects.GetValueOrDefault(pid) : null,
+            }),
+        });
     }
 
     private static async Task<Actor> ActorAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)

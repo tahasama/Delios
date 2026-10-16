@@ -504,6 +504,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   what, releasing, adding people), opening on "Open the Control room". Everyone of ours reads it (`read: true`, "See
   how it works"); an administrator or the control function changes it (`mayChangeControlRoom`; read only otherwise:
   switches shown, nothing chosen). Every page below is what it is built from.
+- **A person's activity** (owner): in People & access, a name opens `/settings/users/<id>`: who they are, then everything
+  they did in the app with its day and time (signed in, opened a document, downloaded, reviewed, released, sent…), read
+  from the audit trail (`GET /api/admin/users/{id}/activity`, narrowed by act and project, 50 a page). Opening a
+  document is recorded (`DOCUMENT_VIEWED`, once per person and document every half hour). An administrator or the
+  control function only, in Settings only, never on the directory; reading it is itself recorded (`ACTIVITY_READ`).
+  Lawful as the register's integrity record, provided people are told it is kept (privacy notice), it is read only for
+  that purpose, and the organization sets how long it is kept; some countries also ask staff representatives first.
+- A form never sits in a box inside a box: a sheet that opens a form becomes that form (`SomeoneJoins`), and a line
+  of a table opened for editing goes on as the row itself (grey fields, then the strip with Cancel and the act), the
+  new-document form's way.
 - Screens and the backend say "the control function" and "whoever holds Manage" (or "whoever plans"), never a job
   title; a function's own name is shown only as read from the data.
 - The plan's starter values are added in one go ("Add them"); Controlled changes no longer exist.

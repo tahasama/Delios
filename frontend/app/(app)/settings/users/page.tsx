@@ -93,6 +93,8 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   // Reminding whoever confirms: one notice history per person waiting.
   const reminders = await Promise.all(pending.map(async (one) => ({ id: one.membershipId, history: noticeHistory(await noticesAbout(ctx, `join:${one.membershipId}`)) })));
   const editing = sp.edit ?? null;
+  // A person's activity (everything they did, with its day) is read by an administrator or the control function.
+  const mayReadActivity = admin || ctx.can("CONTROL");
   const chip = (q: Record<string, string | undefined>) => {
     const next = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1]));
     return `/settings/users${next.size ? `?${next}` : ""}`;
@@ -226,7 +228,10 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
               <Fragment key={u.id}>
                 <tr id={`person-${u.id}`} className={cn("scroll-mt-20 align-top target:bg-tint-soft", !u.active && "opacity-60", open && "[&>td]:border-b-0")}>
                   <Td>
-                    <span className="font-medium text-slate-800">{u.name}</span>{u.id === me.id ? <span className="ml-1 text-xs text-slate-500">(you)</span> : null}
+                    {mayReadActivity
+                      ? <Link href={`/settings/users/${u.id}`} className="font-medium text-slate-800 hover:text-link hover:underline" title={`What ${u.name} did in the app`}>{u.name}</Link>
+                      : <span className="font-medium text-slate-800">{u.name}</span>}
+                    {u.id === me.id ? <span className="ml-1 text-xs text-slate-500">(you)</span> : null}
                     <span className="block text-[11px] text-slate-500">
                       {u.email}{u.linked ? " · works here from their own DELIOS" : ""}{u.active ? "" : " · can no longer sign in"}
                     </span>
