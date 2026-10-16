@@ -487,7 +487,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   people read Deliveries against plan and Who owes what, narrowed by the backend to their own documents
   (`ReportIds.Outside`, options `Party`); asking for another report gives them the first.
 - Each report: the plate is its own title and question, who it is for and when it was counted; tabs are the report
-  titles; Download what is shown as CSV or Excel. Figures, one chart, then the lines behind it, always shown (paged
+  titles; one Excel button downloads what is shown (no CSV button, no "Download these lines" label; the CSV
+  endpoint stays for other tools). Figures, one chart, then the lines behind it, always shown (paged
   by 50), with a link to where the same lines are worked on.
 - Every control sits beside what it changes and acts at once: how the chart is cut (`by`: Deliveries "By who sends it /
   By discipline", Reviews "Longest waits / By reviewer", Progress what the weeks show) and its window ("Next 7 · 14 · 30 · 60 · 90 days", "Last 1 · 3 · 6 · 12 months") are side-by-side
@@ -506,7 +507,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Its chart is when the register moved on from that day, not a count of what was current (the owner: no use): each
   document once, in the week (month, past 16 weeks) of its first change since: replaced by a new revision, released
   for the first time, put out of use. A column narrows the lines to what changed then; the lines list the changed
-  first, in the order they changed ("Changed on"). Nothing moved: no chart, said so.
+  first, in the order they changed ("Changed on"). Before that day, up to 8 periods (left of a dashed line, paler)
+  say what was moving then, every change counted; each opens the register as it stood at its end (`on=`). The legend
+  counts from the day on. Nothing moved since: the chart stays, with "Nothing has moved since that day". Nothing
+  moved at all: no chart, said so.
 
 ### Home
 - Home's to-do lists everything the signed-in person has to do, whatever it

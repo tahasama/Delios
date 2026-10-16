@@ -390,7 +390,9 @@ public sealed partial class ReportBuilder(IClock clock)
     /// was current (the latest released by then, not void on that day), its status, and what is current now. For audits,
     /// claims and "what did we build from?". The chart says when the register moved on from that day, and how: each
     /// document counted once, in the week (or month, over 16 weeks) of its first change since: replaced by a new
-    /// revision, released for the first time, or put out of use (withdrawn, cancelled, its revision voided).
+    /// revision, released for the first time, or put out of use (withdrawn, cancelled, its revision voided). Before that
+    /// day, up to 8 periods say what was moving then (every change counted), so the chart is never blank for a day
+    /// nothing has moved since; each of them opens the register as it stood at its end.
     /// </summary>
     private async Task<Report> AsOfAsync(ReportOptions options, CancellationToken cancellationToken)
     {
@@ -418,8 +420,38 @@ public sealed partial class ReportBuilder(IClock clock)
             : new LocalDate(d.Year, d.Month, 1);
         string Said(LocalDate start) => start.ToString(weekly ? "d MMM" : "MMM yy", System.Globalization.CultureInfo.InvariantCulture);
         var periods = new List<Bar>();
-        for (var p = PeriodOf(day); p <= _today; p = weekly ? p.PlusWeeks(1) : p.PlusMonths(1)) periods.Add(new Bar(Said(p), []));
+        for (var p = PeriodOf(day); p <= _today; p = weekly ? p.PlusWeeks(1) : p.PlusMonths(1))
+            periods.Add(new Bar(Said(p), [], p.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)));
         var periodIndex = periods.Select((bar, i) => (bar.Label, i)).ToDictionary(x => x.Label, x => x.i);
+        LocalDate Next(LocalDate p) => weekly ? p.PlusWeeks(1) : p.PlusMonths(1);
+        string Iso(LocalDate d) => d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+        // Before that day, for context: what moved in each of the 8 periods leading up to it (each release, first or
+        // new revision, and each document put out of use), every change counted. Each period opens the register as it
+        // stood at its end. Empty periods before the first change are left out.
+        var dayPeriod = PeriodOf(day);
+        var earlier = new List<Bar>();
+        for (var p = weekly ? dayPeriod.PlusWeeks(-8) : dayPeriod.PlusMonths(-8); p < dayPeriod; p = Next(p))
+            earlier.Add(new Bar(Said(p), [], Iso(p), Iso(Next(p).PlusDays(-1))));
+        var startOfEarlier = (weekly ? dayPeriod.PlusWeeks(-8) : dayPeriod.PlusMonths(-8)).AtStartOfDayInZone(_zone).ToInstant();
+        var startOfDayPeriod = dayPeriod.AtStartOfDayInZone(_zone).ToInstant();
+        void Before(Instant? at, string key)
+        {
+            if (at is not { } a || a < startOfEarlier || a >= startOfDayPeriod) return;
+            var start = PeriodOf(a.InZone(_zone).Date);
+            earlier.FirstOrDefault(b => b.From == Iso(start))?.Add(key);
+        }
+        foreach (var d in docs)
+        {
+            var firstRelease = d.Revisions.Min(r => r.ReleasedAt);
+            foreach (var r in d.Revisions)
+            {
+                Before(r.ReleasedAt, r.ReleasedAt == firstRelease ? "first" : "replaced");
+                Before(r.VoidedAt, "out");
+            }
+            Before(d.EndedAt, "out");
+        }
+        while (earlier.Count > 0 && earlier[0].Values.Count == 0) earlier.RemoveAt(0);
 
         // Void on that day: voided by then and not taken back by then.
         bool VoidOn(Instant? voided, Instant? unvoided) => voided < end && (unvoided is null || unvoided >= end);
@@ -466,9 +498,9 @@ public sealed partial class ReportBuilder(IClock clock)
                 new("Changed since", changed.ToString(), changed > 0 ? "warn" : "good"),
                 new("As it was", tally["same"].ToString()),
             ],
-            // Nothing moved (or the day is today): no chart, the figures say so.
-            new Chart($"When the register moved on from {label}, {(weekly ? "week" : "month")} by {(weekly ? "week" : "month")}", segments,
-                changed == 0 ? [] : periods, ChartKinds.Columns),
+            // The periods before that day, then from it on (From: the day). Nothing moved at all: no chart.
+            new Chart($"How the register moved around {label}, {(weekly ? "week" : "month")} by {(weekly ? "week" : "month")}", segments,
+                changed == 0 && earlier.Count == 0 ? [] : [.. earlier, .. periods], ChartKinds.Columns, From: Iso(day)),
             ["Document", "Title", "Discipline", $"Current on {day:yyyy-MM-dd}", "Status then", "Released", "Current now", "Since then", "Changed on"],
             // What changed first, in the order it changed; then the rest by number.
             [.. rows.OrderBy(x => x.Moved is null).ThenBy(x => x.Moved).Select(x => (x.Bar, x.Row))], $"No document was registered by {label}.");

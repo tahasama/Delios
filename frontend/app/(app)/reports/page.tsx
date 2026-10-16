@@ -66,7 +66,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     for (const [key, value] of Object.entries(over)) value ? next.set(key, String(value)) : next.delete(key);
     return `?${next}`;
   };
-  const download = (format: "csv" | "xlsx") => `/api/reports/${current}${link({ format } as Partial<Search>, ["rq", "bar", "on", "window", "by"])}`;
+  const download = (format: "xlsx") => `/api/reports/${current}${link({ format } as Partial<Search>, ["rq", "bar", "on", "window", "by"])}`;
   const narrowed = !!(asked.rq || asked.bar);
 
   const page = Math.max(1, Number(sp.page) || 1);
@@ -92,9 +92,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </div>
           {report ? (
             <div className="no-print flex shrink-0 flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-500">{narrowed ? "Download the lines shown:" : "Download these lines:"}</span>
-              <a href={download("csv")} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" aria-hidden="true" /> CSV</a>
-              <a href={download("xlsx")} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" aria-hidden="true" /> Excel</a>
+              <a href={download("xlsx")} title={narrowed ? "The lines shown, in Excel" : "The lines below, in Excel"}
+                className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" aria-hidden="true" /> Excel</a>
               <PrintButton />
             </div>
           ) : null}
@@ -139,7 +138,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <section className="register register-sheet register-sheet-open" aria-labelledby="chart-head">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
                 <span id="chart-head" className="stencil text-slate-500">{report.chart.title}</span>
-                <span className="no-print text-[11px] text-slate-500">{report.chart.kind === "columns" ? "click a column" : "click a name"} to see only its lines below</span>
+                <span className="no-print text-[11px] text-slate-500">
+                  {current === "asof" ? "before the day, a column opens the register as it stood then; from the day, it shows only its lines below"
+                    : `${report.chart.kind === "columns" ? "click a column" : "click a name"} to see only its lines below`}
+                </span>
                 {/* What the chart shows, chosen right here: each choice applies at once. */}
                 <span className="no-print ml-auto flex flex-wrap items-center gap-3">
                   {cuts && (current !== "deliveries" || ctx.user.isInternal) ? (
@@ -153,11 +155,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   ) : null}
                 </span>
               </div>
-              <ChartView chart={report.chart} chosen={asked.bar} hrefOf={(label) => link({ bar: label === asked.bar ? undefined : label, page: undefined })} />
+              {current === "asof" && !report.chart.bars.some((b) => sinceTheDay(report.chart, b) && totalOf(report.chart.segments, b)) ? (
+                <p className="border-b border-line px-5 py-2.5 text-xs leading-5 text-slate-700 sm:px-6">
+                  Nothing has moved since that day: no document was replaced, released for the first time or put out of use.
+                </p>
+              ) : null}
+              <ChartView chart={report.chart} chosen={asked.bar} hrefOf={(label) => link({ bar: label === asked.bar ? undefined : label, page: undefined })}
+                readOn={(day) => link({ on: day, bar: undefined, page: undefined })} />
             </section>
           ) : current === "asof" ? (
             <p className="rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
-              Nothing has moved since that day: no document was replaced, released for the first time or put out of use.
+              Nothing has moved, before or since that day: no document was released or put out of use.
             </p>
           ) : null}
 
@@ -221,7 +229,12 @@ function renderCell(cell: Cell) {
   return cell.text;
 }
 
-type ChartProps = { chart: Chart; chosen?: string; hrefOf: (label: string) => string };
+/**
+ * A chart may start before its day (`from`, Register on a date): the periods ending before it are context, each opening
+ * the register as it stood at its end (`readOn`); the rest narrow the lines.
+ */
+type ChartProps = { chart: Chart; chosen?: string; hrefOf: (label: string) => string; readOn?: (day: string) => string };
+const sinceTheDay = (chart: Chart, b: Bar) => !chart.from || !b.to || b.to >= chart.from;
 
 /** Draws the report's chart the way that fits its question: bars per name, columns per period, or a timeline. */
 function ChartView(props: ChartProps) {
@@ -305,9 +318,12 @@ function BarChart({ chart, chosen, hrefOf }: ChartProps) {
  * A column narrows the lines below to its period. With many periods, only some are named under the axis; each column
  * still says its own on hover.
  */
-function ColumnChart({ chart, chosen, hrefOf }: ChartProps) {
+function ColumnChart({ chart, chosen, hrefOf, readOn }: ChartProps) {
   const { segments, bars } = chart;
   const max = Math.max(1, ...bars.map((b) => totalOf(segments, b)));
+  // Started before its day: the legend counts from the day on, and a line marks where the day falls.
+  const firstSince = bars.findIndex((b) => sinceTheDay(chart, b));
+  const before = chart.from && firstSince > 0;
   // Only some periods are named under the axis: about 5 on a phone, 13 wider; the last always.
   const narrow = Math.max(1, Math.ceil(bars.length / 5));
   const wide = Math.max(1, Math.ceil(bars.length / 13));
@@ -316,15 +332,23 @@ function ColumnChart({ chart, chosen, hrefOf }: ChartProps) {
   const crowded = bars.length > 13;
   return (
     <figure className="px-5 py-4 sm:px-6">
-      <Legend chart={chart} />
+      <Legend chart={before ? { ...chart, bars: bars.slice(firstSince) } : chart} />
+      {before ? (
+        <p className="-mt-1 mb-3 text-[11px] text-slate-500">
+          The counts above are from the day on. Left of the dashed line, what was moving before it: every change counted.
+        </p>
+      ) : null}
       <div className="grid items-end gap-1 sm:gap-1.5" style={{ gridTemplateColumns: `repeat(${bars.length}, minmax(0, 1fr))` }}>
         {bars.map((b, i) => {
-          const on = chosen === b.label;
+          const earlier = before && i < firstSince;
+          const on = !earlier && chosen === b.label;
           const total = totalOf(segments, b);
           const counts = segments.filter((s) => b.values[s.key]).map((s) => `${s.label}: ${b.values[s.key]}`).join(", ") || "nothing";
+          const href = earlier && readOn ? readOn(b.to!) : hrefOf(b.label);
           return (
-            <Link key={b.label} href={hrefOf(b.label)} scroll={false} aria-current={on ? "true" : undefined} title={`${b.label}: ${counts}`}
-              className={`group mx-auto flex h-44 w-full max-w-16 min-w-0 flex-col items-stretch justify-end ${chosen && !on ? "opacity-50" : ""}`}>
+            <Link key={b.label} href={href} scroll={false} aria-current={on ? "true" : undefined}
+              title={earlier ? `${b.label}: ${counts}. Open the register as it stood on ${b.to}` : `${b.label}: ${counts}`}
+              className={`group mx-auto flex h-44 w-full max-w-16 min-w-0 flex-col items-stretch justify-end ${before && i === firstSince ? "border-l border-dashed border-line-strong pl-1" : ""} ${chosen && !on ? "opacity-50" : earlier ? "opacity-70" : ""}`}>
               <span className={`mb-1 text-center text-[11px] font-semibold tabular-nums ${total ? "text-slate-700" : "text-slate-400"} ${crowded ? (total ? "hidden sm:block" : "invisible") : ""}`}>{total}</span>
               <span className="flex flex-col-reverse overflow-hidden rounded-t-sm bg-tint-soft group-hover:ring-1 group-hover:ring-line-strong"
                 style={{ height: `${Math.max(2, (total / max) * 100)}%` }} role="img" aria-label={`${b.label}: ${counts}`}>
