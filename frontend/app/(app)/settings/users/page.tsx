@@ -134,7 +134,8 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
           </span>
         </div>
         <div className="px-5 py-4 sm:px-6">
-          <div className="space-y-3">
+          {/* One row of acts; an opened one takes the whole width under them. */}
+          <div className="flex flex-wrap items-start gap-2">
             {mayAdd ? (
               <AddSomeoneForm
                 projectCode={project.code}
@@ -278,55 +279,64 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                   </Td>
                 </tr>
                 {open && here ? (
-                  // The person's line opened under it, the width of the table, as a row of a sheet: the fields side
-                  // by side, then one row of acts; an opened act takes the whole width under them.
+                  // The person's line opened under it as a sheet, the new-document form's way: band, grey fields side
+                  // by side, then the strip with Cancel on the left and Save on the right.
                   <tr>
-                    <td colSpan={6} className="space-y-3 border-b border-line px-5 py-4 sm:px-6">
-                      <p className="text-xs leading-5 text-slate-600">
-                        {u.linked
-                          ? `${u.name} works here from their own organization’s DELIOS: their name, email and sign-in are theirs. Only their place on ${project.code} changes here.`
-                          : `What ${u.name} is on ${project.code}, and their account.`}
-                      </p>
-                      <ActionForm action={savePersonAction} submitLabel="Save" hidden={{ userId: u.id, partyId: u.partyId ?? "" }} className="space-y-3">
-                        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
-                          {u.linked ? null : (
-                            <>
-                              <Field label="Name" required><input name="name" required defaultValue={u.name} autoComplete="off" className={inputCls} /></Field>
-                              <Field label="Email" required hint="where their notices go"><input type="email" name="email" required defaultValue={u.email} autoComplete="off" className={inputCls} /></Field>
-                            </>
-                          )}
-                          <Field label={`Function on ${project.code}`} required>
-                            <select name="functionId" defaultValue={here.functionId} className={inputCls}>
-                              {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                            </select>
-                          </Field>
-                          <Field label="Department" hint="their discipline: told about actions, confirms going ahead">
-                            <select name="department" defaultValue={here.department ?? ""} className={inputCls}>
-                              <option value="">None</option>
-                              {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
-                            </select>
-                          </Field>
+                    <td colSpan={6} className="border-b border-line px-5 py-4 sm:px-6">
+                      <section className="register register-sheet register-sheet-open">
+                        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+                          <span className="stencil mr-1 text-slate-400">Change {u.name}</span>
+                          <span className="text-[11px] text-slate-400">
+                            {u.linked ? `works here from their own DELIOS: only their place on ${project.code} changes here` : `their place on ${project.code}, and their account`}
+                          </span>
                         </div>
-                        {u.linked ? null : (
-                          <label className="flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-700">
-                            <input type="checkbox" name="active" defaultChecked={u.active} />
-                            Can sign in <span className="font-normal text-slate-500">— untick to switch their account off on every project</span>
-                          </label>
-                        )}
-                      </ActionForm>
-                      {u.id !== me.id ? (
-                        <div className="flex flex-wrap items-start gap-2 border-t border-line pt-3">
-                          <details className="group text-xs open:basis-full">
-                            <summary className="ask cursor-pointer list-none [&::-webkit-details-marker]:hidden">Take off {project.code}</summary>
-                            <ActionForm action={takeOffProjectAction} submitLabel={`Take ${u.name} off`} hidden={{ userId: u.id }} className="mt-3 space-y-3"
+                        <ActionForm id={`person-form-${u.id}`} action={savePersonAction} hideSubmit hidden={{ userId: u.id, partyId: u.partyId ?? "" }}
+                          className="asking space-y-5 px-5 py-5 sm:px-6">
+                          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                            {u.linked ? null : (
+                              <>
+                                <Field label="Name" required><input name="name" required defaultValue={u.name} autoComplete="off" className="plain w-full" /></Field>
+                                <Field label="Email" required hint="where their notices go"><input type="email" name="email" required defaultValue={u.email} autoComplete="off" className="plain w-full" /></Field>
+                              </>
+                            )}
+                            <Field label={`Function on ${project.code}`} required>
+                              <select name="functionId" defaultValue={here.functionId} className="plain w-full">
+                                {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                              </select>
+                            </Field>
+                            <Field label="Department" hint="their discipline: told about actions, confirms going ahead">
+                              <select name="department" defaultValue={here.department ?? ""} className="plain w-full">
+                                <option value="">None</option>
+                                {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+                              </select>
+                            </Field>
+                          </div>
+                          {u.linked ? null : (
+                            <label className="flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-700">
+                              <input type="checkbox" name="active" defaultChecked={u.active} />
+                              Can sign in <span className="font-normal text-slate-400">— untick to switch their account off on every project</span>
+                            </label>
+                          )}
+                        </ActionForm>
+                        {u.id !== me.id ? (
+                          <details className="border-t border-line px-5 py-3 sm:px-6">
+                            <summary className="w-fit cursor-pointer list-none text-xs font-semibold text-slate-500 hover:text-slate-800 [&::-webkit-details-marker]:hidden">
+                              Take {u.name} off {project.code}
+                            </summary>
+                            <ActionForm action={takeOffProjectAction} hideSubmit id={`take-off-${u.id}`} hidden={{ userId: u.id }} className="mt-3 space-y-3"
                               confirmText={`Take ${u.name} off ${project.code}? Their account and their other projects stay, and everything they did here keeps their name.`}>
                               <p className="text-xs leading-5 text-slate-600">
                                 They leave {project.code} only. Their account and their other projects stay, and everything they did here keeps their name.
                               </p>
+                              <button type="submit" className="ask">Take them off</button>
                             </ActionForm>
                           </details>
+                        ) : null}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
+                          <Link href={lineHref()} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                          <button type="submit" form={`person-form-${u.id}`} data-on="true" className="ask">Save</button>
                         </div>
-                      ) : null}
+                      </section>
                     </td>
                   </tr>
                 ) : null}

@@ -74,8 +74,8 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
           ) : null}
         </div>
         {options ? (
-          <div className="space-y-3 border-t border-line px-5 py-3.5 sm:px-6">
-            <p className="text-[11px] leading-4 text-slate-500">
+          <div className="flex flex-wrap items-start gap-2 border-t border-line px-5 py-3.5 sm:px-6">
+            <p className="basis-full text-[11px] leading-4 text-slate-500">
               {options.asks
                 ? "It goes as a request; once confirmed they are put on by themselves and told by notification and email, and you read the answer on the same thread."
                 : "They are put on at once, and told by notification and email."}
