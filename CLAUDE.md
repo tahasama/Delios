@@ -498,10 +498,20 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Deliveries against plan has "One bar per": who sends it (each organization, and us as one) or discipline
   (`ReportOptions.By`); the lines carry both. Waiting is never shown as good: a review not late yet is blue
   (under way), not green.
-- A review's wait is judged by its step's own due day, never a fixed number of days (`LateSegments` / `LateKey`):
-  Not late yet (due today or later, blue), Late (amber), Late over 7 days (`WarnDays`, red), No due day (grey, the
-  step has no days). Reviews waiting colours and counts each wait so (figure "Late"); Progress by week judges each
-  review open at a week's end by its steps open then, the latest of them.
+- A review's wait is judged by its step's own due day, never a fixed number of days (`LateSegments` / `LateKey`), as
+  the reviews' key on Help says it: In time (blue), Due today or tomorrow (amber, at risk), Late (red, past its due
+  day), No due day (grey, the step has no days). Reviews waiting colours and counts each wait so (figure "Late");
+  Progress by week judges each review open at a week's end by its steps open then, the latest of them.
+- Report colours follow the app's key (`lib/core/rails.ts`): blue is under way, never late (in review, not late yet),
+  amber is being prepared or at risk, red is late; a state's colour is the same in the chart and in the table's chip
+  (`Stage` keeps blue; `TONE_OF` info → moving).
+- Progress by week starts on "All" (first of its choices): every measure at once, one strip of columns each
+  (`ChartKinds.Panels`, `Segment.Group`), on the same weeks; then Released, Delivered, Overdue, Reviews open, Sent &
+  received one at a time. Its windows read "8 weeks · 12 weeks · 26 weeks · 52 weeks".
+- Printed, a report keeps its chart's colours, every day reads as its date, the count says when it was made, and a
+  list longer than a page says "Lines 1–50 of N; the full list is in the Excel" (`.print-only`).
+- Another organization reading Deliveries against plan sees its documents by discipline (never one bar of its own
+  name), no "Sender" column ("Sent" for delivered), and the plate in its words.
 - Bar names start at the same point, left-aligned, with room for the action's name.
 - Numbers are never printed on the bars: the legend gives each state's total, the end of each bar its count.
   Dates in the lines read from today ("3 days ago"), the day itself on hover.
@@ -511,10 +521,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Its chart is when the register moved on from that day, not a count of what was current (the owner: no use): each
   document once, in the week (month, past 16 weeks) of its first change since: replaced by a new revision, released
   for the first time, put out of use. A column narrows the lines to what changed then; the lines list the changed
-  first, in the order they changed ("Changed on"). Before that day, up to 8 periods (left of a dashed line, paler)
-  say what was moving then, every change counted; each opens the register as it stood at its end (`on=`). The legend
-  counts from the day on. Nothing moved since: the chart stays, with "Nothing has moved since that day". Nothing
-  moved at all: no chart, said so.
+  first, in the order they changed ("Changed on"); documents registered since count too (no line: they did not exist
+  then). Before that day, at least 8 periods, back to the last change when none moved in those (a year by week, 3 by
+  month), left of a dashed line and paler, say what was moving then, every change counted, registrations included;
+  each opens the register as it stood at its end (`on=`). So the chart always shows something once anything was
+  registered. The legend counts from the day on. Nothing moved since: the chart stays, with "Nothing has moved since
+  that day". Nothing registered by then and nothing since: no chart, said so.
 
 ### Home
 - Home's to-do lists everything the signed-in person has to do, whatever it

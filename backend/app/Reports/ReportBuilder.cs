@@ -65,7 +65,7 @@ public sealed partial class ReportBuilder(IClock clock)
             .ToListAsync(cancellationToken);
         Segment[] segments =
         [
-            new("planned", "Not started", "muted"), new("work", "In work", "info"), new("review", "In review", "warn"),
+            new("planned", "Not started", "muted"), new("work", "In work", "warn"), new("review", "In review", "info"),
             new("released", "Released", "good"), new("out", "Out of use", "bad"),
         ];
         string StageOf(string state, IReadOnlyList<string> revisionStates) =>
@@ -127,6 +127,10 @@ public sealed partial class ReportBuilder(IClock clock)
             new("overdue", "Overdue", "bad"), new("coming", "Not due yet", "muted"),
         ];
         var order = new Dictionary<string, int> { ["overdue"] = 0, ["late"] = 1, ["coming"] = 2, ["onTime"] = 3 };
+        // Another organization reads its own documents only: one bar per discipline (per sender would be one bar, its
+        // own name), no "Sender" column, and the plate in its words.
+        var outside = options.Party is not null;
+        var byDiscipline = outside || options.By == "discipline";
         var bars = new SortedDictionary<string, Bar>(StringComparer.Ordinal);
         var tally = segments.ToDictionary(s => s.Key, _ => 0);
         var lines = new List<(int Order, LocalDate Due, string Bar, IReadOnlyList<Cell> Row)>();
@@ -136,31 +140,33 @@ public sealed partial class ReportBuilder(IClock clock)
             if (due is not { } dueDate) continue;
             // Who sends it: an organization, or us as one. By discipline, whoever sends it.
             var sender = d.Originator is null ? "Us" : parties.GetValueOrDefault(d.Originator, d.Originator);
-            var group = options.By == "discipline" ? _catalog.Label(ValueSets.Disciplines, d.Discipline) : sender;
+            var group = byDiscipline ? _catalog.Label(ValueSets.Disciplines, d.Discipline) : sender;
             LocalDate? sent = firstSent.TryGetValue(d.Id, out var at) ? at.InZone(_zone).Date : null;
             var state = sent is { } s ? (s <= dueDate ? "onTime" : "late") : dueDate < _today ? "overdue" : "coming";
             tally[state]++;
             (bars.TryGetValue(group, out var bar) ? bar : bars[group] = new Bar(group, [])).Add(state);
             var lateBy = Period.Between(dueDate, sent ?? _today, PeriodUnits.Days).Days;
             // How late, said once: the state beside it carries the colour.
-            lines.Add((order[state], dueDate, group,
+            IReadOnlyList<Cell> row =
             [
                 Doc(d.Id, d.Number), d.Title, sender, _catalog.Label(ValueSets.Disciplines, d.Discipline), dueDate.ToString("yyyy-MM-dd", null), sent?.ToString("yyyy-MM-dd", null) ?? "",
                 state is "late" or "overdue" ? $"{lateBy} d" : "", Stage(segments, state),
-            ]));
+            ];
+            lines.Add((order[state], dueDate, group, outside ? [.. row.Where((_, i) => i != 2)] : row));
         }
         var delivered = tally["onTime"] + tally["late"];
         var onTime = Percent(tally["onTime"], delivered);
-        return Make(ReportIds.Deliveries, "Deliveries against plan", "Who is delivering on time, and what is overdue?",
-            "Supplier and discipline follow-up: for expediting meetings.",
+        return Make(ReportIds.Deliveries, "Deliveries against plan",
+            outside ? "Are your documents sent on time, and what is overdue?" : "Who is delivering on time, and what is overdue?",
+            outside ? "Your documents against the day each is needed, as the project plans it." : "Supplier and discipline follow-up: for expediting meetings.",
             [
                 new("Planned", lines.Count.ToString()),
                 new("Delivered", delivered.ToString()),
                 new("On time", $"{onTime}%", delivered == 0 ? null : onTime >= options.OnTimeTarget ? "good" : "warn"),
                 new("Overdue now", tally["overdue"].ToString(), tally["overdue"] > 0 ? "bad" : "good"),
             ],
-            new Chart(options.By == "discipline" ? "Documents by discipline" : "Documents by sender", segments, [.. bars.Values]),
-            ["Document", "Title", "Sender", "Discipline", "Due", "Delivered", "Late by", "State"],
+            new Chart(byDiscipline ? (outside ? "Your documents by discipline" : "Documents by discipline") : "Documents by sender", segments, [.. bars.Values]),
+            outside ? ["Document", "Title", "Discipline", "Due", "Sent", "Late by", "State"] : ["Document", "Title", "Sender", "Discipline", "Due", "Delivered", "Late by", "State"],
             [.. lines.OrderBy(l => l.Order).ThenBy(l => l.Due).Select(l => ((string?)l.Bar, l.Row))],
             options.Party is null ? "No document has a planned date, and no activity needs one yet." : "None of your documents is planned yet.");
     }
@@ -185,7 +191,7 @@ public sealed partial class ReportBuilder(IClock clock)
             .Select(r => new { r.StartedAt, r.DecidedAt }).ToListAsync(cancellationToken);
 
         // Each wait is judged by its step's own due day, never by a fixed number of days.
-        var segments = LateSegments(options);
+        var segments = LateSegments;
         // The longest waits, one bar each, as long as the days waited; or one bar per reviewer, counting their waits.
         var perReviewer = options.By == "reviewer";
         var bars = new Dictionary<string, Bar>();
@@ -201,7 +207,7 @@ public sealed partial class ReportBuilder(IClock clock)
             foreach (var who in waitingOn)
             {
                 var name = who;
-                var key = LateKey(x.Step.DueDate, _today, options);
+                var key = LateKey(x.Step.DueDate, _today);
                 if (perReviewer) (bars.TryGetValue(who, out var bar) ? bar : bars[who] = new Bar(who, [])).Add(key);
                 else
                 {
@@ -213,12 +219,12 @@ public sealed partial class ReportBuilder(IClock clock)
                 [
                     Doc(x.DocumentId, x.DocumentNumber), x.Title, $"rev {x.Value}", new Cell(x.Number, Kind: "review", Id: x.ReviewId), x.Step.Title, who,
                     Date(x.Step.OpenedAt), x.Step.DueDate is { } due ? new Cell(due.ToString("yyyy-MM-dd", null), due < _today ? "bad" : null) : "—",
-                    new Cell($"{age} d", key == "old" ? "bad" : key == "week" ? "warn" : null),
+                    new Cell($"{age} d", key == "late" ? "bad" : key == "risk" ? "warn" : null),
                 ]));
             }
         }
         var turnaround = decided.Count == 0 ? (double?)null : decided.Average(r => (r.DecidedAt!.Value - r.StartedAt).TotalDays);
-        var late = lines.Count(l => l.Key is "week" or "old");
+        var late = lines.Count(l => l.Key == "late");
         return Make(ReportIds.Reviews, "Reviews waiting", "What is with reviewers, and for how long?",
             "Chasing reviewers: for the weekly engineering meeting.",
             [
@@ -236,19 +242,19 @@ public sealed partial class ReportBuilder(IClock clock)
     }
 
     /// <summary>
-    /// How late a review step is, by its own due day: not late yet (due today or later), late, late over
-    /// <see cref="ReportOptions.WarnDays"/> days; a step with no due day says so. Waiting is never "good": not late
-    /// yet reads as under way. Reviews waiting and Progress by week judge it the same way.
+    /// Where a review step stands against its own due day, as the reviews' key says it everywhere (Help, "What the
+    /// colours say"): in time (blue), due today or tomorrow (amber, at risk), late (red, past its due day); a step with
+    /// no due day says so (grey). Waiting is never "good". Reviews waiting and Progress by week judge it the same way.
     /// </summary>
-    private static Segment[] LateSegments(ReportOptions options) =>
+    private static readonly Segment[] LateSegments =
     [
-        new("fresh", "Not late yet", "info"), new("week", "Late", "warn"),
-        new("old", $"Late over {options.WarnDays} days", "bad"), new("none", "No due day", "muted"),
+        new("intime", "In time", "info"), new("risk", "Due today or tomorrow", "warn"),
+        new("late", "Late", "bad"), new("none", "No due day", "muted"),
     ];
 
     /// <inheritdoc cref="LateSegments"/>
-    private static string LateKey(LocalDate? due, LocalDate on, ReportOptions options) =>
-        due is not { } d ? "none" : d >= on ? "fresh" : Period.Between(d, on, PeriodUnits.Days).Days > options.WarnDays ? "old" : "week";
+    private static string LateKey(LocalDate? due, LocalDate on) =>
+        due is not { } d ? "none" : d < on ? "late" : d <= on.PlusDays(1) ? "risk" : "intime";
 
     // ── Transmittal log ───────────────────────────────────────────────────────
 
@@ -350,8 +356,8 @@ public sealed partial class ReportBuilder(IClock clock)
 
         Segment[] segments =
         [
-            new("met", "There", "good"), new("waived", "Waived, still followed up", "info"),
-            new("coming", "Not yet, not late", "warn"), new("late", "Missing and late", "bad"),
+            new("met", "There", "good"), new("waived", "Waived, still followed up", "muted"),
+            new("coming", "Not yet, not late", "info"), new("late", "Missing and late", "bad"),
         ];
         var bars = new List<Bar>();
         var rows = new List<(string?, IReadOnlyList<Cell>)>();
@@ -401,8 +407,9 @@ public sealed partial class ReportBuilder(IClock clock)
     /// claims and "what did we build from?". The chart says when the register moved on from that day, and how: each
     /// document counted once, in the week (or month, over 16 weeks) of its first change since: replaced by a new
     /// revision, released for the first time, or put out of use (withdrawn, cancelled, its revision voided). Before that
-    /// day, up to 8 periods say what was moving then (every change counted), so the chart is never blank for a day
-    /// nothing has moved since; each of them opens the register as it stood at its end.
+    /// day, at least 8 periods (back to the last change, when none moved in those) say what was moving then, every
+    /// change counted, documents registered included, so the chart is never blank once anything was registered; each of
+    /// them opens the register as it stood at its end. Documents registered since are counted too, with no line.
     /// </summary>
     private async Task<Report> AsOfAsync(ReportOptions options, CancellationToken cancellationToken)
     {
@@ -411,7 +418,7 @@ public sealed partial class ReportBuilder(IClock clock)
         var docs = await db.Documents.AsNoTracking().Where(d => d.ProjectId == _project.Id && d.CreatedAt < end).OrderBy(d => d.Number)
             .Select(d => new
             {
-                d.Id, d.Number, d.Title, d.Discipline, d.EndedAt, d.ReinstatedAt,
+                d.Id, d.Number, d.Title, d.Discipline, d.CreatedAt, d.EndedAt, d.ReinstatedAt,
                 Revisions = d.Revisions.Where(r => r.ReleasedAt != null)
                     .Select(r => new { r.Value, r.StatusCode, r.ReleasedAt, r.VoidedAt, r.UnvoidedAt, r.State }).ToList(),
             })
@@ -419,9 +426,9 @@ public sealed partial class ReportBuilder(IClock clock)
         Segment[] segments =
         [
             new("replaced", "Replaced by a new revision", "info"), new("first", "Released for the first time", "good"),
-            new("out", "Put out of use", "bad"),
+            new("out", "Put out of use", "bad"), new("registered", "Registered", "muted"),
         ];
-        Segment[] stages = [.. segments, new("same", "As it was", "muted"), new("none", "Nothing released yet", "muted"), new("before", "Already out of use", "muted")];
+        Segment[] stages = [.. segments.SkipLast(1), new("same", "As it was", "muted"), new("none", "Nothing released yet", "muted"), new("before", "Already out of use", "muted")];
 
         // The periods from that day to today: weeks (starting Monday) up to 16 of them, else months.
         var weekly = Period.Between(day, _today, PeriodUnits.Days).Days <= 16 * 7;
@@ -436,32 +443,45 @@ public sealed partial class ReportBuilder(IClock clock)
         LocalDate Next(LocalDate p) => weekly ? p.PlusWeeks(1) : p.PlusMonths(1);
         string Iso(LocalDate d) => d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
-        // Before that day, for context: what moved in each of the 8 periods leading up to it (each release, first or
-        // new revision, and each document put out of use), every change counted. Each period opens the register as it
-        // stood at its end. Empty periods before the first change are left out.
+        // Before that day, for context: what moved in the periods leading up to it (each document registered, each
+        // release, first or new revision, each document put out of use), every change counted. At least 8 periods, and
+        // back to the last change when nothing moved in those (up to a year, or 3 years by month), so the chart always
+        // shows something once anything was registered. Each period opens the register as it stood at its end. Empty
+        // periods before the first change are left out.
         var dayPeriod = PeriodOf(day);
-        var earlier = new List<Bar>();
-        for (var p = weekly ? dayPeriod.PlusWeeks(-8) : dayPeriod.PlusMonths(-8); p < dayPeriod; p = Next(p))
-            earlier.Add(new Bar(Said(p), [], Iso(p), Iso(Next(p).PlusDays(-1))));
-        var startOfEarlier = (weekly ? dayPeriod.PlusWeeks(-8) : dayPeriod.PlusMonths(-8)).AtStartOfDayInZone(_zone).ToInstant();
         var startOfDayPeriod = dayPeriod.AtStartOfDayInZone(_zone).ToInstant();
-        void Before(Instant? at, string key)
-        {
-            if (at is not { } a || a < startOfEarlier || a >= startOfDayPeriod) return;
-            var start = PeriodOf(a.InZone(_zone).Date);
-            earlier.FirstOrDefault(b => b.From == Iso(start))?.Add(key);
-        }
+        var events = new List<(Instant At, string Key)>();
         foreach (var d in docs)
         {
+            events.Add((d.CreatedAt, "registered"));
             var firstRelease = d.Revisions.Min(r => r.ReleasedAt);
             foreach (var r in d.Revisions)
             {
-                Before(r.ReleasedAt, r.ReleasedAt == firstRelease ? "first" : "replaced");
-                Before(r.VoidedAt, "out");
+                if (r.ReleasedAt is { } at) events.Add((at, at == firstRelease ? "first" : "replaced"));
+                if (r.VoidedAt is { } voided) events.Add((voided, "out"));
             }
-            Before(d.EndedAt, "out");
+            if (d.EndedAt is { } ended) events.Add((ended, "out"));
         }
+        events.RemoveAll(e => e.At >= startOfDayPeriod);
+        LocalDate Back(int n) => weekly ? dayPeriod.PlusWeeks(-n) : dayPeriod.PlusMonths(-n);
+        var back = 8;
+        if (events.Count > 0)
+        {
+            var lastBefore = PeriodOf(events.Max(e => e.At).InZone(_zone).Date);
+            while (back < (weekly ? 52 : 36) && Back(back) > lastBefore) back++;
+        }
+        var earlier = new List<Bar>();
+        for (var p = Back(back); p < dayPeriod; p = Next(p)) earlier.Add(new Bar(Said(p), [], Iso(p), Iso(Next(p).PlusDays(-1))));
+        var earlierIndex = earlier.Select((b, i) => (b.From!, i)).ToDictionary(x => x.Item1, x => x.i);
+        foreach (var (at, key) in events)
+            if (earlierIndex.TryGetValue(Iso(PeriodOf(at.InZone(_zone).Date)), out var i)) earlier[i].Add(key);
         while (earlier.Count > 0 && earlier[0].Values.Count == 0) earlier.RemoveAt(0);
+
+        // From that day on, the documents registered since count too (they have no line: they did not exist then).
+        var registeredSince = await db.Documents.AsNoTracking().Where(d => d.ProjectId == _project.Id && d.CreatedAt >= end)
+            .Select(d => d.CreatedAt).ToListAsync(cancellationToken);
+        foreach (var at in registeredSince)
+            if (periodIndex.TryGetValue(Said(PeriodOf(at.InZone(_zone).Date)), out var i)) periods[i].Add("registered");
 
         // Void on that day: voided by then and not taken back by then.
         bool VoidOn(Instant? voided, Instant? unvoided) => voided < end && (unvoided is null || unvoided >= end);
@@ -510,7 +530,7 @@ public sealed partial class ReportBuilder(IClock clock)
             ],
             // The periods before that day, then from it on (From: the day). Nothing moved at all: no chart.
             new Chart($"How the register moved around {label}, {(weekly ? "week" : "month")} by {(weekly ? "week" : "month")}", segments,
-                changed == 0 && earlier.Count == 0 ? [] : [.. earlier, .. periods], ChartKinds.Columns, From: Iso(day)),
+                changed == 0 && registeredSince.Count == 0 && earlier.Count == 0 ? [] : [.. earlier, .. periods], ChartKinds.Columns, From: Iso(day)),
             ["Document", "Title", "Discipline", $"Current on {day:yyyy-MM-dd}", "Status then", "Released", "Current now", "Since then", "Changed on"],
             // What changed first, in the order it changed; then the rest by number.
             [.. rows.OrderBy(x => x.Moved is null).ThenBy(x => x.Moved).Select(x => (x.Bar, x.Row))], $"No document was registered by {label}.");
@@ -547,11 +567,11 @@ public sealed partial class ReportBuilder(IClock clock)
     /// <summary>A cell showing a document number that links to that document.</summary>
     private static Cell Doc(Guid id, string number) => new(number, Kind: "document", Id: id);
 
-    /// <summary>A cell showing a segment's label, coloured when the segment's tone is good, warn or bad.</summary>
+    /// <summary>A cell showing a segment's label, in the chart's colour (good, warn, bad, info); muted stays plain.</summary>
     private static Cell Stage(Segment[] segments, string key)
     {
         var segment = segments.Single(s => s.Key == key);
-        return new Cell(segment.Label, segment.Tone is "good" or "warn" or "bad" ? segment.Tone : null);
+        return new Cell(segment.Label, segment.Tone is "good" or "warn" or "bad" or "info" ? segment.Tone : null);
     }
 
     /// <summary>Formats a moment as a yyyy-MM-dd date in the project's time zone; empty when there is none.</summary>

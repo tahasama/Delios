@@ -8,15 +8,16 @@ import { api, projectPath } from "@/lib/client";
 type Tone = "good" | "warn" | "bad";
 /** A headline number; `change` says how it moved since last week, coloured by `changeTone`. */
 export type Figure = { label: string; value: string | number; tone?: Tone; change?: string; changeTone?: "good" | "bad" };
-export type Segment = { key: string; label: string; tone: "good" | "info" | "warn" | "bad" | "muted" };
+/** One colour of the chart; `group` names the panel (one measure) it belongs to on a chart of panels. */
+export type Segment = { key: string; label: string; tone: "good" | "info" | "warn" | "bad" | "muted"; group?: string | null };
 /** One bar; on a timeline it spans `from` to `to` (yyyy-MM-dd). */
 export type Bar = { label: string; values: Record<string, number>; from?: string | null; to?: string | null };
 /**
  * How the chart is drawn, the way that fits its question: horizontal bars per name, upright columns per period (in time
  * order), or a timeline (each bar placed on the calendar). `unit` "days": a bar's length is days waited, not a count.
  */
-export type Chart = { title: string; segments: Segment[]; bars: Bar[]; kind: "bars" | "columns" | "timeline"; unit?: "days" | null; from?: string | null; to?: string | null };
-export type Cell = string | number | { text: string; href?: string; tone?: "good" | "warn" | "bad" };
+export type Chart = { title: string; segments: Segment[]; bars: Bar[]; kind: "bars" | "columns" | "timeline" | "panels"; unit?: "days" | null; from?: string | null; to?: string | null };
+export type Cell = string | number | { text: string; href?: string; tone?: "good" | "warn" | "bad" | "info" };
 export type Report = {
   id: ReportId;
   title: string;
@@ -55,7 +56,7 @@ export const WINDOWS: Partial<Record<ReportId, { param: string; label: string; c
   readiness: { param: "horizonDays", label: "Next", choices: [["30", "30 days"], ["7", "7 days"], ["14", "14 days"], ["60", "60 days"], ["90", "90 days"]].map(([value, label]) => ({ value, label })) },
   transmittals: { param: "months", label: "Last", choices: [["6", "6 months"], ["1", "1 month"], ["3", "3 months"], ["12", "12 months"]].map(([value, label]) => ({ value, label })) },
   reviews: { param: "turnaroundDays", label: "Turnaround over the last", choices: [["90", "90 days"], ["30", "30 days"], ["180", "180 days"], ["365", "a year"]].map(([value, label]) => ({ value, label })) },
-  progress: { param: "weeks", label: "Last", choices: [["12", "12 weeks"], ["8", "8"], ["26", "26"], ["52", "52"]].map(([value, label]) => ({ value, label })) },
+  progress: { param: "weeks", label: "Last", choices: [["12", "12 weeks"], ["8", "8 weeks"], ["26", "26 weeks"], ["52", "52 weeks"]].map(([value, label]) => ({ value, label })) },
 };
 
 /** What narrows a report: words, a bar chosen on the chart, a window, a day. */
@@ -69,7 +70,7 @@ export const CUTS: Partial<Record<ReportId, { value: string; label: string }[]>>
   deliveries: [{ value: "sender", label: "By who sends it" }, { value: "discipline", label: "By discipline" }],
   reviews: [{ value: "wait", label: "Longest waits" }, { value: "reviewer", label: "By reviewer" }],
   progress: [
-    { value: "released", label: "Released" }, { value: "delivered", label: "Delivered" }, { value: "overdue", label: "Overdue" },
+    { value: "all", label: "All" }, { value: "released", label: "Released" }, { value: "delivered", label: "Delivered" }, { value: "overdue", label: "Overdue" },
     { value: "reviews", label: "Reviews open" }, { value: "transmittals", label: "Sent & received" },
   ],
 };

@@ -1025,13 +1025,16 @@ summary::-webkit-details-marker {
   .file-tab[aria-current="page"] .file-count { color: var(--ink-soft); }
 }
 
-/* A report prints across the page (landscape): its lines carry many columns. */
+/* A report prints across the page (landscape): its lines carry many columns. On paper the chart keeps its colours
+   and every day reads as its date (`.print-only`), since "3 days ago" means nothing once filed. */
+.print-only { display: none; }
 @page report {
   size: A4 landscape;
   margin: 10mm;
 }
 @media print {
-  .report-print { page: report; }
+  .report-print { page: report; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-print .print-only { display: inline !important; }
   .report-print th,
   .report-print td {
     padding: 2px 6px !important;

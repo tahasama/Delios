@@ -86,7 +86,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-700">{report?.question ?? "Which revision was current on a given day?"}</p>
             <p className="mt-0.5 max-w-2xl text-xs leading-5 text-slate-500">
               {report?.audience ?? "Audits, claims and “what did we build from?”: the register as it stood at the end of that day."}
-              {report ? <> · counted {when(new Date(report.countedAt))}</> : null}
+              {report ? <> · counted <span className="no-print">{when(new Date(report.countedAt))}</span>
+                <span className="print-only">{new Date(report.countedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</span></> : null}
               {!ctx.user.isInternal ? <> · your organization&rsquo;s documents only</> : null}
             </p>
           </div>
@@ -140,7 +141,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                 <span id="chart-head" className="stencil text-slate-500">{report.chart.title}</span>
                 <span className="no-print text-[11px] text-slate-500">
                   {current === "asof" ? "before the day, a column opens the register as it stood then; from the day, it shows only its lines below"
-                    : `${report.chart.kind === "columns" ? "click a column" : "click a name"} to see only its lines below`}
+                    : `${report.chart.kind === "columns" || report.chart.kind === "panels" ? "click a week" : "click a name"} to see only its lines below`}
                 </span>
                 {/* What the chart shows, chosen right here: each choice applies at once. */}
                 <span className="no-print ml-auto flex flex-wrap items-center gap-3">
@@ -157,7 +158,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               </div>
               {current === "asof" && !report.chart.bars.some((b) => sinceTheDay(report.chart, b) && totalOf(report.chart.segments, b)) ? (
                 <p className="border-b border-line px-5 py-2.5 text-xs leading-5 text-slate-700 sm:px-6">
-                  Nothing has moved since that day: no document was replaced, released for the first time or put out of use.
+                  Nothing has moved since that day: no document was registered, replaced, released for the first time or put out of use.
                 </p>
               ) : null}
               <ChartView chart={report.chart} chosen={asked.bar} hrefOf={(label) => link({ bar: label === asked.bar ? undefined : label, page: undefined })}
@@ -165,7 +166,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             </section>
           ) : current === "asof" ? (
             <p className="rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
-              Nothing has moved, before or since that day: no document was released or put out of use.
+              Nothing was registered by that day, and nothing has moved since.
             </p>
           ) : null}
 
@@ -195,6 +196,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             ) : (
               <p className="px-5 py-4 text-xs text-slate-600 sm:px-6">{narrowed ? "Nothing here matches what you narrowed it to." : report.empty}</p>
             )}
+            {pages > 1 ? (
+              <p className="print-only border-t border-line px-5 py-2 text-xs text-slate-600">
+                Lines {(Math.min(page, pages) - 1) * PER_PAGE + 1}–{Math.min(rows.length, Math.min(page, pages) * PER_PAGE)} of {rows.length}; the full list is in the Excel.
+              </p>
+            ) : null}
             <div className="no-print flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-2.5 text-xs text-slate-600 sm:px-6">
               <span>
                 {pages > 1 ? (
@@ -216,13 +222,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
 const TEXT: Record<string, string> = { good: "text-emerald-700", warn: "text-amber-700", bad: "text-red-700" };
 const FILL: Record<Segment["tone"], string> = { good: "bg-emerald-500", info: "bg-sky-500", warn: "bg-amber-400", bad: "bg-red-500", muted: "bg-slate-300" };
-const TONE_OF = { good: "done", warn: "waiting", bad: "refused" } as const;
+// The chart's colours as the chips say them: blue is under way, as everywhere (lib/core/tones.ts).
+const TONE_OF = { good: "done", warn: "waiting", bad: "refused", info: "moving" } as const;
 
 function renderCell(cell: Cell) {
   if (typeof cell !== "object") {
     // A day reads from today; the day itself on hover.
     const said = typeof cell === "string" ? fromToday(cell) : null;
-    return said ? <span title={String(cell)} className="whitespace-nowrap">{said}</span> : cell;
+    return said ? <span title={String(cell)} className="whitespace-nowrap"><span className="no-print">{said}</span><span className="print-only">{String(cell)}</span></span> : cell;
   }
   if (cell.href) return <Link href={cell.href} className="font-mono font-semibold text-link hover:underline">{cell.text}</Link>;
   if (cell.tone) return <ToneChip tone={TONE_OF[cell.tone]}>{cell.text}</ToneChip>;
@@ -233,12 +240,13 @@ function renderCell(cell: Cell) {
  * A chart may start before its day (`from`, Register on a date): the periods ending before it are context, each opening
  * the register as it stood at its end (`readOn`); the rest narrow the lines.
  */
-type ChartProps = { chart: Chart; chosen?: string; hrefOf: (label: string) => string; readOn?: (day: string) => string };
+type ChartProps = { chart: Chart; chosen?: string; hrefOf: (label: string) => string; readOn?: (day: string) => string; strip?: "first" | "middle" | "last" };
 const sinceTheDay = (chart: Chart, b: Bar) => !chart.from || !b.to || b.to >= chart.from;
 
 /** Draws the report's chart the way that fits its question: bars per name, columns per period, or a timeline. */
 function ChartView(props: ChartProps) {
   if (props.chart.kind === "columns") return <ColumnChart {...props} />;
+  if (props.chart.kind === "panels") return <Panels {...props} />;
   if (props.chart.kind === "timeline") return <Timeline {...props} />;
   return <BarChart {...props} />;
 }
@@ -318,7 +326,7 @@ function BarChart({ chart, chosen, hrefOf }: ChartProps) {
  * A column narrows the lines below to its period. With many periods, only some are named under the axis; each column
  * still says its own on hover.
  */
-function ColumnChart({ chart, chosen, hrefOf, readOn }: ChartProps) {
+function ColumnChart({ chart, chosen, hrefOf, readOn, strip }: ChartProps) {
   const { segments, bars } = chart;
   const max = Math.max(1, ...bars.map((b) => totalOf(segments, b)));
   // Started before its day: the legend counts from the day on, and a line marks where the day falls.
@@ -331,7 +339,8 @@ function ColumnChart({ chart, chosen, hrefOf, readOn }: ChartProps) {
   // Many narrow columns: an empty one carries no count, and counts show from the wider screens.
   const crowded = bars.length > 13;
   return (
-    <figure className="px-5 py-4 sm:px-6">
+    <figure className={strip ? `px-5 sm:px-6 ${strip === "first" ? "pt-4" : "pt-3"} ${strip === "last" ? "pb-4" : "border-b border-dashed border-line pb-3"}` : "px-5 py-4 sm:px-6"}>
+      {strip ? <p className="mb-1.5 text-xs font-semibold text-slate-700">{chart.title}</p> : null}
       <Legend chart={before ? { ...chart, bars: bars.slice(firstSince) } : chart} />
       {before ? (
         <p className="-mt-1 mb-3 text-[11px] text-slate-500">
@@ -348,14 +357,14 @@ function ColumnChart({ chart, chosen, hrefOf, readOn }: ChartProps) {
           return (
             <Link key={b.label} href={href} scroll={false} aria-current={on ? "true" : undefined}
               title={earlier ? `${b.label}: ${counts}. Open the register as it stood on ${b.to}` : `${b.label}: ${counts}`}
-              className={`group mx-auto flex h-44 w-full max-w-16 min-w-0 flex-col items-stretch justify-end ${before && i === firstSince ? "border-l border-dashed border-line-strong pl-1" : ""} ${chosen && !on ? "opacity-50" : earlier ? "opacity-70" : ""}`}>
+              className={`group mx-auto flex ${strip ? "h-24" : "h-44"} w-full max-w-16 min-w-0 flex-col items-stretch justify-end ${before && i === firstSince ? "border-l border-dashed border-line-strong pl-1" : ""} ${chosen && !on ? "opacity-50" : earlier ? "opacity-70" : ""}`}>
               <span className={`mb-1 text-center text-[11px] font-semibold tabular-nums ${total ? "text-slate-700" : "text-slate-400"} ${crowded ? (total ? "hidden sm:block" : "invisible") : ""}`}>{total}</span>
               <span className="flex flex-col-reverse overflow-hidden rounded-t-sm bg-tint-soft group-hover:ring-1 group-hover:ring-line-strong"
                 style={{ height: `${Math.max(2, (total / max) * 100)}%` }} role="img" aria-label={`${b.label}: ${counts}`}>
                 {/* Stacked bottom up, in the legend's order. */}
                 <Stack segments={segments} bar={b} vertical />
               </span>
-              <span className={`mt-1.5 self-center text-center text-[10px] leading-3 ${on ? "font-semibold text-slate-900" : "text-slate-500"} ${named(i)} whitespace-nowrap`}>
+              <span className={`mt-1.5 self-center text-center text-[10px] leading-3 ${on ? "font-semibold text-slate-900" : "text-slate-500"} ${named(i)} ${strip && strip !== "last" ? "hidden" : ""} whitespace-nowrap`}>
                 {b.label}
               </span>
             </Link>
@@ -363,6 +372,22 @@ function ColumnChart({ chart, chosen, hrefOf, readOn }: ChartProps) {
         })}
       </div>
     </figure>
+  );
+}
+
+/**
+ * Every measure at once (Progress, "All"): one strip of columns per measure (`Segment.group`), each to its own scale and
+ * with its own legend, all on the same weeks; the weeks are named under the last. A week narrows the lines in any strip.
+ */
+function Panels(props: ChartProps) {
+  const groups = [...new Set(props.chart.segments.map((s) => s.group ?? ""))];
+  return (
+    <div>
+      {groups.map((g, i) => (
+        <ColumnChart key={g} {...props} strip={i === 0 ? "first" : i === groups.length - 1 ? "last" : "middle"}
+          chart={{ ...props.chart, kind: "columns", title: g, segments: props.chart.segments.filter((s) => (s.group ?? "") === g) }} />
+      ))}
+    </div>
   );
 }
 

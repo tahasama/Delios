@@ -54,10 +54,10 @@ public sealed partial class ReportBuilder
             var end = EndOf(last);
             bool VoidThen(Instant? voided, Instant? unvoided) => voided < end && (unvoided is null || unvoided >= end);
             // Each review open then, judged by its steps open then against their own due days (the latest of them).
-            string[] rank = ["none", "fresh", "week", "old"];
+            string[] rank = ["none", "intime", "risk", "late"];
             var open = reviews.Where(r => r.StartedAt < end && ((r.ClosedAt ?? r.DecidedAt) is not { } shut || shut >= end))
                 .Select(r => r.Steps.Where(s => s.OpenedAt < end && (s.CompletedAt is null || s.CompletedAt >= end))
-                    .Select(s => LateKey(s.DueDate, last, options)).OrderByDescending(k => Array.IndexOf(rank, k)).FirstOrDefault() ?? "none")
+                    .Select(s => LateKey(s.DueDate, last)).OrderByDescending(k => Array.IndexOf(rank, k)).FirstOrDefault() ?? "none")
                 .ToList();
             var inWeek = releases.Where(r => r.ReleasedAt >= from && r.ReleasedAt < end).ToList();
             var delivered = due.Where(x => x.Sent is { } s && s >= start && s <= last).ToList();
@@ -71,10 +71,10 @@ public sealed partial class ReportBuilder
                 Late: delivered.Count(x => x.Sent > x.Due),
                 // Overdue then: registered by then, its day passed, not delivered by then.
                 Overdue: due.Count(x => x.CreatedAt < end && x.Due < last && (x.Sent is null || x.Sent > last)),
-                Fresh: open.Count(k => k == "fresh"),
-                Waiting: open.Count(k => k == "week"),
-                Old: open.Count(k => k == "old"),
-                NoDue: open.Count(k => k == "none"),
+                ReviewsInTime: open.Count(k => k == "intime"),
+                ReviewsAtRisk: open.Count(k => k == "risk"),
+                ReviewsLate: open.Count(k => k == "late"),
+                ReviewsNoDue: open.Count(k => k == "none"),
                 Decided: reviews.Count(r => r.DecidedAt >= from && r.DecidedAt < end),
                 Sent: sentOut.Count(at => at >= from && at < end),
                 Received: cameIn.Count(at => at >= from && at < end));
@@ -83,24 +83,34 @@ public sealed partial class ReportBuilder
         static string Said(LocalDate day, string pattern) => day.ToString(pattern, System.Globalization.CultureInfo.InvariantCulture);
         var label = (Week w) => Said(w.Start, "d MMM");
 
-        var by = options.By is "delivered" or "overdue" or "reviews" or "transmittals" ? options.By : "released";
-        var (title, segments, values) = by switch
-        {
-            "delivered" => ("Delivered each week, on time or late",
-                new Segment[] { new("onTime", "On time", "good"), new("late", "Late", "warn") },
-                (Func<Week, Dictionary<string, int>>)(w => new() { ["onTime"] = w.OnTime, ["late"] = w.Late })),
-            "overdue" => ("Overdue at the end of each week (against today's plan)",
-                [new("overdue", "Overdue", "bad")], w => new() { ["overdue"] = w.Overdue }),
-            "reviews" => ("Reviews open at the end of each week, late or not against their steps' due days",
-                LateSegments(options),
-                w => new() { ["fresh"] = w.Fresh, ["week"] = w.Waiting, ["old"] = w.Old, ["none"] = w.NoDue }),
-            "transmittals" => ("Sent and received each week",
-                [new("out", "Sent", "info"), new("in", "Received", "good")], w => new() { ["out"] = w.Sent, ["in"] = w.Received }),
-            _ => ("Released each week",
+        // What the weeks can show: each measure with its colours. "All" shows every one, one strip each, on the same weeks.
+        (string Key, string Title, Segment[] Segments, Func<Week, Dictionary<string, int>> Values)[] measures =
+        [
+            ("released", "Released each week",
                 [new("first", "Released for the first time", "good"), new("again", "A new revision released", "info")],
                 w => new() { ["first"] = w.FirstReleases, ["again"] = w.NewRevisions }),
-        };
-        var bars = counted.Select(w => new Bar(label(w), values(w).Where(v => v.Value > 0).ToDictionary(v => v.Key, v => v.Value))).ToList();
+            ("delivered", "Delivered each week, on time or late",
+                [new("onTime", "On time", "good"), new("late", "Late", "warn")],
+                w => new() { ["onTime"] = w.OnTime, ["late"] = w.Late }),
+            ("overdue", "Overdue at the end of each week (against today's plan)",
+                [new("overdue", "Overdue", "bad")], w => new() { ["overdue"] = w.Overdue }),
+            ("reviews", "Reviews open at the end of each week, against their steps' due days",
+                LateSegments,
+                w => new() { ["intime"] = w.ReviewsInTime, ["risk"] = w.ReviewsAtRisk, ["late"] = w.ReviewsLate, ["none"] = w.ReviewsNoDue }),
+            ("transmittals", "Sent and received each week",
+                [new("out", "Sent", "info"), new("in", "Received", "good")], w => new() { ["out"] = w.Sent, ["in"] = w.Received }),
+        ];
+        var chosen = measures.Where(m => m.Key == options.By).ToArray();
+        var all = chosen.Length == 0;
+        if (all) chosen = measures;
+        // With every measure, each segment is named by its measure (Group) and its key carries it, so "Late" delivered
+        // and "Late" reviews stay apart.
+        string KeyOf(string measure, string key) => all ? $"{measure}.{key}" : key;
+        var title = all ? "Each week, everything at once" : chosen[0].Title;
+        var segments = chosen.SelectMany(m => m.Segments.Select(sg => sg with { Key = KeyOf(m.Key, sg.Key), Group = all ? m.Title : null })).ToArray();
+        var bars = counted.Select(w => new Bar(label(w), chosen
+            .SelectMany(m => m.Values(w).Where(v => v.Value > 0).Select(v => (Key: KeyOf(m.Key, v.Key), v.Value)))
+            .ToDictionary(v => v.Key, v => v.Value))).ToList();
 
         var thisWeek = counted[^1];
         var lastWeek = counted[^2];
@@ -128,7 +138,7 @@ public sealed partial class ReportBuilder
                 Moved("Overdue now", thisWeek.Overdue, lastWeek.Overdue, upIsGood: false, thisWeek.Overdue > 0 ? "bad" : "good"),
                 Moved("Reviews open", openNow, lastWeek.Open, upIsGood: false),
             ],
-            new Chart(title, segments, bars, ChartKinds.Columns),
+            new Chart(title, segments, bars, all ? ChartKinds.Panels : ChartKinds.Columns),
             ["Week starting", "Registered", "Released (documents)", "Released that week", "Delivered on time", "Delivered late", "Overdue at its end",
                 "Reviews open at its end", "Reviews decided", "Sent", "Received"],
             rows, "Nothing is registered yet.");
@@ -137,9 +147,9 @@ public sealed partial class ReportBuilder
     /// <summary>One week as the register stood at its end (<see cref="Last"/>: its Sunday, or today).</summary>
     private sealed record Week(
         LocalDate Start, LocalDate Last, int Registered, int Released, int FirstReleases, int NewRevisions, int OnTime, int Late, int Overdue,
-        int Fresh, int Waiting, int Old, int NoDue, int Decided, int Sent, int Received)
+        int ReviewsInTime, int ReviewsAtRisk, int ReviewsLate, int ReviewsNoDue, int Decided, int Sent, int Received)
     {
         /// <summary>Reviews open at the week's end, late or not.</summary>
-        public int Open => Fresh + Waiting + Old + NoDue;
+        public int Open => ReviewsInTime + ReviewsAtRisk + ReviewsLate + ReviewsNoDue;
     }
 }
