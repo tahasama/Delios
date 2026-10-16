@@ -208,13 +208,81 @@ export function activityWords(action: string): string {
   return plain.charAt(0).toUpperCase() + plain.slice(1);
 }
 
-/** Where the thing acted on is opened, when it has a page of its own. */
-export function activityLink(entityType: string | null, entityId: string | null): string | null {
-  if (!entityId) return null;
-  if (entityType === "Document") return `/documents/${entityId}`;
-  if (entityType === "Review") return `/reviews/${entityId}`;
-  if (entityType === "Transmittal") return `/transmittals/${entityId}`;
-  if (entityType === "User") return `/settings/users/${entityId}`;
-  if (entityType === "Package") return `/packages/${entityId}`;
-  return null;
+/**
+ * Where the thing acted on is opened, so every title in the log is a link: a document (or the document of a revision
+ * or a file, `documentId` from the backend), a review, a transmittal, a package, an action, a person, a tag, or the
+ * Settings page that keeps a list, a function, an organization, a route, a scheme.
+ */
+export function activityLink(entityType: string | null, entityId: string | null, label?: string | null, documentId?: string | null): string | null {
+  const set = (one: string | null | undefined) => (one ? `/settings/config?set=${encodeURIComponent(one)}` : "/settings/config");
+  switch (entityType) {
+    case "Document": return entityId ? `/documents/${entityId}` : null;
+    case "Revision":
+    case "StoredFile": return documentId ? `/documents/${documentId}` : null;
+    case "Review": return entityId ? `/reviews/${entityId}` : null;
+    case "Transmittal": return entityId ? `/transmittals/${entityId}` : null;
+    case "Package": return label ? `/packages/${encodeURIComponent(label.split(" ")[0])}` : null;
+    case "Activity": return label ? `/actions/${encodeURIComponent(label.split(" ")[0])}` : null;
+    case "User": return entityId ? `/settings/users/${entityId}` : null;
+    case "Asset": return entityId ? `/assets/${entityId}` : null;
+    case "Value": return label?.startsWith("VERDICT") || label?.includes("VERDICT") ? "/settings/verdicts" : set(label?.split("/")[0]);
+    case "Setting": return label?.startsWith("SET:") ? set(label.slice(4)) : "/settings/flow";
+    case "Function": return "/settings/functions";
+    case "Party":
+    case "OrganizationLink": return "/settings/parties";
+    case "Project": return "/settings/projects";
+    case "ReviewRoute": return "/settings/workflow-templates";
+    case "NumberingScheme":
+    case "SchemeRouting":
+    case "NumberRange": return "/settings/numbering";
+    case "RevisionScheme":
+    case "RevisionSchemeRouting": return "/settings/revisions";
+    case "IdentityProvider": return "/settings/security";
+    case "CheckRun":
+    case "Defect":
+    case "Exception": return "/conformance/checks";
+    case "ControlledVersion":
+    case "RequirementCall":
+    case "Notice": return "/actions";
+    default: return null;
+  }
+}
+
+/**
+ * A detail as a person reads it. Some acts keep what changed as data ("{…} → {…}"); that reads as the fields that
+ * changed, each "was → now", and a single record as its fields. Anything else stays as written.
+ */
+export function readableDetail(detail: string | null): string | null {
+  if (!detail) return null;
+  const parse = (text: string): Record<string, unknown> | null => {
+    try {
+      const value = JSON.parse(text.trim());
+      return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+    } catch {
+      return null;
+    }
+  };
+  const words = (key: string) => {
+    const plain = key.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ").toLowerCase();
+    return plain.charAt(0).toUpperCase() + plain.slice(1);
+  };
+  const show = (value: unknown) =>
+    value === null || value === undefined || value === "" ? "none"
+      : Array.isArray(value) ? value.join(", ") || "none"
+      : typeof value === "object" ? Object.entries(value as Record<string, unknown>).map(([k, v]) => `${k} ${String(v)}`).join(", ")
+      : String(value);
+  const arrow = detail.indexOf(" → ");
+  if (arrow > 0) {
+    const was = parse(detail.slice(0, arrow));
+    const now = parse(detail.slice(arrow + 3));
+    if (was || now) {
+      const keys = [...new Set([...Object.keys(was ?? {}), ...Object.keys(now ?? {})])];
+      const changed = keys.filter((k) => JSON.stringify(was?.[k]) !== JSON.stringify(now?.[k]));
+      if (!changed.length) return "Nothing changed.";
+      return changed.map((k) => `${words(k)}: ${show(was?.[k])} → ${show(now?.[k])}`).join("\n");
+    }
+  }
+  const one = parse(detail);
+  if (one) return Object.entries(one).map(([k, v]) => `${words(k)}: ${show(v)}`).join("\n");
+  return detail;
 }

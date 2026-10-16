@@ -798,6 +798,8 @@ summary::-webkit-details-marker {
   .edge-keep { --edge: var(--color-slate-400); }
   /* A slip of the audit trail takes its kind's side colour, from the key (lib/core/rails.ts, AUDIT_RAIL). */
   .logbook .slip[class*="rail-"] { --edge: var(--rail); }
+  /* Only the side takes the kind's colour; the title stays ink. */
+  .dispatch.logbook .slip-number { color: var(--ink); }
 
   .dark .dispatch {
     --paper: #0f1218;

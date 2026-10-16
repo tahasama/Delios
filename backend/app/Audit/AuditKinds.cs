@@ -78,4 +78,25 @@ public static class AuditKinds
         _ when Starts(action, "USER_", "PERSON_", "PROJECT_", "ORGANIZATION", "FUNCTION_", "PARTY_", "SETTING", "ROUTE_", "NUMBERING") => "PEOPLE",
         _ => "REGISTER",
     };
+
+    /// <summary>
+    /// The document a revision or a file of the log belongs to, so the screens open the document from either: entity id
+    /// to document id, for the rows given.
+    /// </summary>
+    public static async Task<Dictionary<Guid, Guid>> DocumentsOfAsync(Platform.DeliosDbContext db, IEnumerable<AuditEvent> rows,
+        CancellationToken cancellationToken)
+    {
+        var revisions = rows.Where(e => e.EntityType == "Revision" && e.EntityId != null).Select(e => e.EntityId!.Value).Distinct().ToList();
+        var files = rows.Where(e => e.EntityType == "StoredFile" && e.EntityId != null).Select(e => e.EntityId!.Value).Distinct().ToList();
+        var found = new Dictionary<Guid, Guid>();
+        if (revisions.Count > 0)
+            foreach (var r in await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+                         db.Revisions.Where(r => revisions.Contains(r.Id)).Select(r => new { r.Id, r.DocumentId }), cancellationToken))
+                found[r.Id] = r.DocumentId;
+        if (files.Count > 0)
+            foreach (var f in await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+                         db.StoredFiles.Where(f => files.Contains(f.Id) && f.DocumentId != null).Select(f => new { f.Id, f.DocumentId }), cancellationToken))
+                found[f.Id] = f.DocumentId!.Value;
+        return found;
+    }
 }

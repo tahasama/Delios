@@ -132,6 +132,7 @@ public static class DirectoryEndpoints
         var lastSignIn = !showsSignIns ? null : await mine.Where(e => e.Action.StartsWith("SIGN_IN") && e.Action != "SIGN_IN_FAILED")
             .OrderByDescending(e => e.Id).Select(e => (Instant?)e.At).FirstOrDefaultAsync(cancellationToken);
         var projects = await db.Projects.AsNoTracking().Select(x => new { x.Id, x.Code }).ToDictionaryAsync(x => x.Id, x => x.Code, cancellationToken);
+        var documents = await AuditKinds.DocumentsOfAsync(db, rows, cancellationToken);
         // Reading someone's record is itself recorded: who looked, and when.
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "ACTIVITY_READ", "User", user.Id, user.Name,
             projectId is null ? null : $"on {projects.GetValueOrDefault(projectId.Value)}", projectId, cancellationToken);
@@ -151,6 +152,7 @@ public static class DirectoryEndpoints
             {
                 e.Id, At = e.At.ToDateTimeOffset(), e.Action, Kind = AuditKinds.Of(e.Action), e.EntityType, e.EntityId, e.EntityLabel, e.Detail, e.ProjectId,
                 Project = e.ProjectId is { } pid ? projects.GetValueOrDefault(pid) : null,
+                DocumentId = e.EntityId is { } eid && documents.TryGetValue(eid, out var did) ? did : (Guid?)null,
             }),
         });
     }

@@ -34,6 +34,7 @@ public static class ActivityEndpoints
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter<ProjectAccessFilter>();
         project.MapGet("/activity", ActivityAsync);
+        project.MapGet("/log", LogAsync);
     }
 
     /// <summary>
@@ -66,5 +67,57 @@ public static class ActivityEndpoints
             .ToListAsync(cancellationToken);
         return Results.Ok(rows.Select(e => new ActivityRow(e.Id, e.At.ToDateTimeOffset(), e.ActorName, e.Action, e.EntityType,
             e.EntityLabel, e.Detail)));
+    }
+
+    /// <summary>
+    /// GET <c>/log</c>: Home's log, the project's whole trail on the logbook (the control function's and the
+    /// administrator's): every act of this project, newest first, a page at a time, narrowed by a kind
+    /// (<see cref="AuditKinds"/>), an act, words, and whole days in the project's time zone. Each act says its kind and,
+    /// for a revision or a file, its document; the acts come with their counts. Reading is left out where the
+    /// organization does not keep it.
+    /// </summary>
+    private static async Task<IResult> LogAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken,
+        string? kind = null, string? action = null, string? q = null, DateOnly? from = null, DateOnly? to = null, int page = 1, int per = 50)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.IsInternal || !(access.Holds(Verbs.Control) || access.Holds(Verbs.Configure)))
+            return Problems.Forbidden("CONTROL_ONLY", "The log is read by the control function and administrators.");
+        per = Math.Clamp(per, 10, 200);
+        page = Math.Max(1, page);
+        var hidden = await Settings.Tracking.KeepsReadingAsync(db, cancellationToken) ? [] : Settings.Tracking.Reading;
+        var query = db.AuditEvents.AsNoTracking().Where(e => e.ProjectId == access.Project.Id && !hidden.Contains(e.Action));
+        var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(access.Project.TimeZone) ?? DateTimeZone.Utc;
+        if (from is { } f) { var start = LocalDate.FromDateOnly(f).AtStartOfDayInZone(zone).ToInstant(); query = query.Where(e => e.At >= start); }
+        if (to is { } t) { var end = LocalDate.FromDateOnly(t).PlusDays(1).AtStartOfDayInZone(zone).ToInstant(); query = query.Where(e => e.At < end); }
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var pattern = $"%{q.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
+            query = query.Where(e => (e.EntityLabel != null && EF.Functions.ILike(e.EntityLabel, pattern))
+                || EF.Functions.ILike(e.ActorName, pattern) || (e.Detail != null && EF.Functions.ILike(e.Detail, pattern)));
+        }
+        var actions = await query.GroupBy(e => e.Action).Select(g => new { Action = g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(kind))
+        {
+            var codes = actions.Where(a => AuditKinds.Of(a.Action) == kind).Select(a => a.Action).ToArray();
+            query = query.Where(e => codes.Contains(e.Action));
+        }
+        if (!string.IsNullOrWhiteSpace(action)) query = query.Where(e => e.Action == action);
+        var total = await query.CountAsync(cancellationToken);
+        var rows = await query.OrderByDescending(e => e.Id).Skip((page - 1) * per).Take(per).ToListAsync(cancellationToken);
+        var documents = await AuditKinds.DocumentsOfAsync(db, rows, cancellationToken);
+        return Results.Ok(new
+        {
+            total,
+            page,
+            per,
+            pages = Math.Max(1, (total + per - 1) / per),
+            actions = actions.OrderByDescending(x => x.Count).Select(x => new { x.Action, x.Count, Kind = AuditKinds.Of(x.Action) }),
+            rows = rows.Select(e => new
+            {
+                e.Id, At = e.At.ToDateTimeOffset(), e.ActorId, e.ActorName, e.Action, Kind = AuditKinds.Of(e.Action), e.EntityType, e.EntityId,
+                e.EntityLabel, e.Detail, Project = (string?)access.Project.Code,
+                DocumentId = e.EntityId is { } eid && documents.TryGetValue(eid, out var did) ? did : (Guid?)null,
+            }),
+        });
     }
 }

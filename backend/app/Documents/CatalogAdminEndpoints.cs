@@ -382,6 +382,7 @@ public static class CatalogAdminEndpoints
         var total = await query.CountAsync(cancellationToken);
         var rows = await query.OrderByDescending(e => e.Id).Skip((page - 1) * per).Take(per).ToListAsync(cancellationToken);
         var projects = await db.Projects.AsNoTracking().Select(x => new { x.Id, x.Code }).ToDictionaryAsync(x => x.Id, x => x.Code, cancellationToken);
+        var documents = await AuditKinds.DocumentsOfAsync(db, rows, cancellationToken);
         return Results.Ok(new
         {
             total,
@@ -404,6 +405,7 @@ public static class CatalogAdminEndpoints
                 e.Detail,
                 e.ProjectId,
                 Project = e.ProjectId is { } pid ? projects.GetValueOrDefault(pid) : null,
+                DocumentId = e.EntityId is { } eid && documents.TryGetValue(eid, out var did) ? did : (Guid?)null,
             }),
         });
     }

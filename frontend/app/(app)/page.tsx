@@ -1,3 +1,5 @@
+import { LogbookDays, LogbookSide, readingLine, type LogAct } from "@/components/logbook";
+import { AUDIT_KINDS } from "@/lib/core/rails";
 import Link from "next/link";
 import { btn } from "@/components/ui";
 import { api, projectPath } from "@/lib/client";
@@ -7,9 +9,7 @@ import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
 import { organizationLinks } from "@/lib/organization/api";
 import { emailReplies } from "@/lib/transmittals/api";
-import { fmtDate, fmtDateTime } from "@/lib/core/utils";
-import { DateWindow } from "@/components/date-window";
-import { Search } from "lucide-react";
+import { fmtDate } from "@/lib/core/utils";
 import { CheckCheck, FileStack, Inbox, ListChecks, MessageSquare, PenLine, Plus, Send, Share2, Undo2, Upload } from "lucide-react";
 
 
@@ -25,9 +25,12 @@ export const dynamic = "force-dynamic";
  * clean the register is. The page used to be a column of cards that listed the
  * reader's chores and never told them the news.
  */
-import { type Row, type Aspect, ACTIVITY, NEWS, KINDS, ALIAS, startOfDay, LOG_EDGE, read, daysOf, lastWorkingDay, dayed, weekday, when, greeting, Fig, Card, Queue } from "./home-parts";
+import { type Row, type Aspect, ACTIVITY, NEWS, ALIAS, read, daysOf, lastWorkingDay, weekday, when, greeting, Fig, Card, Queue } from "./home-parts";
 
-export default async function HomePage({ searchParams }: { searchParams: Promise<{ view?: string; kind?: string; from?: string; to?: string; q?: string }> }) {
+/** Home's log: the project's whole trail, a page at a time, with every act's count (backend `GET /log`). */
+type ProjectLog = { total: number; page: number; pages: number; actions: { action: string; count: number; kind: string }[]; rows: LogAct[] };
+
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ view?: string; kind?: string; action?: string; from?: string; to?: string; q?: string; page?: string }> }) {
   const sp = await searchParams;
   // Everything this page shows comes from the backend; what it shows, and how, is unchanged.
   const ctx = await requireScope();
@@ -87,18 +90,17 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // A log is read with a question in mind: one kind of act, or a fortnight, or
   // a number somebody mentioned. A date names the whole day, so asking for the
   // 3rd to the 3rd returns the 3rd.
-  const kind = KINDS.find((one) => one === sp.kind);
-  const from = startOfDay(sp.from);
-  const to = startOfDay(sp.to, true);
-  const asked = !!(kind || from || to || sp.q);
+  // The log: the project's whole trail on the logbook (kinds, every act, words, days), as the Audit trail reads it.
   const log = view === "log"
-    ? acts(await api<ActivityRow[]>(projectPath(session, "/activity"), {
-        query: {
-          actions: backendNames(kind ? NEWS.filter((one) => ACTIVITY[one].kind === kind) : NEWS),
-          from: sp.from || undefined, to: sp.to || undefined, q: sp.q || undefined, take: 60,
-        },
-      }))
-    : [];
+    ? await api<ProjectLog>(projectPath(session, "/log"), {
+        query: { kind: sp.kind || undefined, action: sp.action || undefined, q: sp.q || undefined, from: sp.from || undefined, to: sp.to || undefined, page: sp.page || undefined, per: 50 },
+      }).catch(() => null)
+    : null;
+  const logHref = (q: { kind?: string; action?: string; page?: number }) => {
+    const next = new URLSearchParams(Object.entries({ view: "log", q: sp.q, from: sp.from, to: sp.to, kind: q.kind, action: q.action, page: q.page && q.page > 1 ? String(q.page) : undefined })
+      .filter((e): e is [string, string] => !!e[1]));
+    return `/?${next}`;
+  };
   // An audit label reads "P1001-60-CI-SPC-00001 rev B — route name", and a
   // supplier's number runs half as long again. The panel measures its own
   // entries: the widest number sets the column the revisions line up in, and
@@ -379,92 +381,15 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <div className="mt-3 grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,1fr)_296px] xl:items-start">
         <main className="@container min-w-0">
           {view === "log" ? (
-            <section className="dispatch logbook home-rise min-w-0" style={rise()}>
-              {/* The bar keeps its place while the log runs past it. The strip
-                  it sits on is the page's own canvas, so an act passing under it
-                  disappears behind the bar rather than showing through its
-                  corners, and there is air above and below. */}
-              <div className="sticky top-18 z-10 bg-canvas pt-2 pb-3">
-              <form className="register register-sheet register-sheet-open px-4 py-2.5">
-                <input type="hidden" name="view" value="log" />
-                <div className="flex flex-wrap items-end gap-x-4 gap-y-2.5 lg:flex-nowrap">
-                  <label className="relative min-w-48 flex-1">
-                    <span className="sr-only">Search the log</span>
-                    <Search className="absolute top-1/2 left-0 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      name="q"
-                      defaultValue={sp.q ?? ""}
-                      placeholder="A number, a person, a detail"
-                      className="plain w-full pl-6!"
-                    />
-                  </label>
-                  <label className="shrink-0">
-                    <span className="sr-only">Kind of act</span>
-                    <select name="kind" defaultValue={kind ?? ""} className="plain">
-                      <option value="">Every kind</option>
-                      {KINDS.map((one) => <option key={one} value={one}>{one}</option>)}
-                    </select>
-                  </label>
-                  <span className="shrink-0">
-                    <DateWindow fields={[{ code: "ts", label: "The day it happened" }]} on={sp.from ? "ts" : ""} from={sp.from ?? ""} to={sp.to ?? ""} />
-                  </span>
-                  <button className="ask" data-on={asked ? "true" : "false"}>Apply</button>
-                  {asked ? (
-                    <Link href="/?view=log" scroll={false} className="stencil pb-1.5 text-brand-ink hover:underline">Clear</Link>
-                  ) : null}
-                </div>
-              </form>
-              </div>
-
-              {asked ? (
-                <p className="slip-note mb-3">
-                  {log.length === 60 ? "The last 60 acts" : `${log.length} act${log.length === 1 ? "" : "s"}`}
-                  {kind ? ` of the kind ${kind.toLowerCase()}` : ""}
-                  {from || to ? ` between ${from ? fmtDate(from) : "the beginning"} and ${to ? fmtDate(to) : "now"}` : ""}
-                  {sp.q ? ` matching “${sp.q}”` : ""}.
-                </p>
+            <section className="dispatch logbook home-rise min-w-0 space-y-5" style={rise()}>
+              {readingLine({ from: sp.from, to: sp.to, kindLabel: AUDIT_KINDS.find((k) => k.key === sp.kind)?.label, q: sp.q }) ? (
+                <p className="slip-note">{readingLine({ from: sp.from, to: sp.to, kindLabel: AUDIT_KINDS.find((k) => k.key === sp.kind)?.label, q: sp.q })}</p>
               ) : null}
-
-              {dayed(log).map(({ day, when: on, acts }) => (
-                <div key={day} className="mb-5">
-                  <div className="day-rule mb-2.5">
-                    <span className="font-mono text-[12.5px]">{fmtDate(on)}</span>
-                    <span className="day-name">{weekday(on)}</span>
-                  </div>
-                  <ul className="space-y-2">
-                    {acts.map((e) => {
-                      const kind = ACTIVITY[e.action];
-                      const shape = read(e.entityLabel);
-                      if (!kind || !shape) return null;
-                      return (
-                        <li key={e.id} className={`slip ${LOG_EDGE[kind.kind] ?? "edge-keep"}`}>
-                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                            <span className="slip-number">{shape.number}</span>
-                            {shape.rev ? <span className="slip-note font-mono">rev {shape.rev}</span> : null}
-                            <span className="postmark">{kind.kind}</span>
-                            <span className="slip-note ml-auto whitespace-nowrap">{fmtDateTime(e.ts)}</span>
-                          </div>
-                          <p className="slip-subject mt-1.5">{kind.said}</p>
-                          {e.detail ? <p className="slip-note mt-1 line-clamp-2">{e.detail}</p> : null}
-                          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3">
-                            <span className="route">
-                              <span className="route-party">{e.actorName}</span>
-                              <span className="route-line" aria-hidden="true" />
-                              <span className="min-w-0 truncate">{e.entityType ?? "the project"}</span>
-                            </span>
-                            <span className="slip-note ml-auto">{when(e.ts)}</span>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-              {!log.length ? (
-                <p className="slip px-4 py-6 text-[13px] text-(--ink-soft)">
-                  {asked ? "Nothing in the log answers that." : "Nothing has happened yet."}
-                </p>
-              ) : null}
+              {log ? (
+                <LogbookDays acts={log.rows} chosen={{ kind: sp.kind, action: sp.action }} href={logHref} paging={{ page: log.page, pages: log.pages, total: log.total }} />
+              ) : (
+                <p className="slip px-4 py-6 text-[13px] text-(--ink-soft)">The log could not be read just now. Try again in a moment.</p>
+              )}
             </section>
           ) : opened ? (
             <Queue aspect={opened} rows={rows[opened.id]} style={rise()} />
@@ -482,6 +407,17 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </main>
 
         <aside className="grid min-w-0 gap-3 xl:sticky xl:top-22">
+          {/* The log's own side: its kinds and every act, then Find; nothing else beside it. */}
+          {view === "log" ? (
+            <div className="dispatch logbook home-rise min-w-0" style={rise()}>
+              <LogbookSide
+                counts={log?.actions ?? []}
+                chosen={{ kind: sp.kind, action: sp.action }}
+                href={logHref}
+                find={{ q: sp.q, from: sp.from, to: sp.to, hidden: { view: "log", kind: sp.kind, action: sp.action }, clear: `/?${new URLSearchParams(Object.entries({ view: "log", kind: sp.kind, action: sp.action }).filter((e): e is [string, string] => !!e[1]))}` }}
+              />
+            </div>
+          ) : null}
           {journal.length && view !== "log" ? (
             <section className="home-rise register register-sheet register-sheet-open px-4 py-3" style={rise()}>
               <h2 className="mb-2.5 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">{older.length ? "Lately" : `Since ${weekday(since)}`}</h2>
@@ -516,7 +452,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </section>
           ) : null}
 
-          {user.isInternal && atRisk.length ? (
+          {view !== "log" && user.isInternal && atRisk.length ? (
             <section className="home-rise register register-sheet register-sheet-open px-4 py-3" style={rise()}>
               <h2 className="mb-1 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">Schedule</h2>
               {atRisk.slice(0, 3).map((a) => {
