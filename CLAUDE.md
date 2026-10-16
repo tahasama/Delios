@@ -462,9 +462,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Document Control keeps it) are the project's. Who answers is optional and never blocks a save. A code is shown, never
   edited. An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
-- Layered settings (owner's decision, to build): the app gives defaults; the organization may change them for itself;
-  a project may change them for itself; each level is changed by whoever holds the clearance for it. Until built, a
-  page says plainly what is the organization's and what is the project's.
+- Layered settings (owner's decision, to build): the app gives defaults; the organization makes the originals; a
+  project may change only what is marked as open to change for projects. An administrator changes the organization's;
+  Document Control changes its project's; an administrator may give that right to anyone they nominate. Once a project
+  has its own version, later changes by the organization never touch it (no overriding projects afterwards: "pure
+  chaos"). Until built, a page says plainly what is the organization's and what is the project's.
 - Document families come back (owner): each document type belongs to a family (internal drawings like DWG, supplier
   documents like A109…); the family tells types apart and recommends a criticality. They were lost when the demo data
   was renewed.
