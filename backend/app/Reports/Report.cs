@@ -6,11 +6,8 @@ namespace Delios.Host.Reports;
 /// </summary>
 public sealed record Figure(string Label, string Value, string? Tone = null, string? Change = null, string? ChangeTone = null);
 
-/// <summary>
-/// One colour of the chart's stacked bars. Tone: good, info, warn, bad or muted. <see cref="Group"/>: on a chart of
-/// panels, the panel (one measure) the segment belongs to, by its title.
-/// </summary>
-public sealed record Segment(string Key, string Label, string Tone, string? Group = null);
+/// <summary>One colour of the chart's stacked bars. Tone: good, info, warn, bad or muted.</summary>
+public sealed record Segment(string Key, string Label, string Tone);
 
 /// <summary>One bar: how many items of each segment it holds. On a timeline, <see cref="From"/> and <see cref="To"/> are the days it spans (yyyy-MM-dd).</summary>
 public sealed record Bar(string Label, Dictionary<string, int> Values, string? From = null, string? To = null)
@@ -36,8 +33,6 @@ public static class ChartKinds
     public const string Columns = "columns";
     /// <summary>Each bar placed on the calendar from its first to its last day, stacked by state.</summary>
     public const string Timeline = "timeline";
-    /// <summary>Columns per period, one strip per measure (<see cref="Segment.Group"/>), the strips on the same periods.</summary>
-    public const string Panels = "panels";
 }
 
 /// <summary>
@@ -75,7 +70,7 @@ public sealed record Report(
 /// <param name="Party">Another organization reading: only its own documents are counted (Deliveries only).</param>
 /// <param name="By">
 /// How the chart is cut. Deliveries: per sender (each organization, and us as one) or per discipline. Reviews: the
-/// longest waits or per reviewer. Progress: what the weeks show (all, released, delivered, overdue, reviews, transmittals).
+/// longest waits or per reviewer. Progress: what the weeks show (released, delivered, overdue, reviews, transmittals).
 /// Null: the report's own first choice.
 /// </param>
 /// <param name="Weeks">Progress: how many weeks back, this one included.</param>
@@ -91,7 +86,7 @@ public sealed record ReportOptions(
         : TurnaroundDays is < 1 or > 731 ? "turnaroundDays is between 1 and 731."
         : OnTimeTarget is < 0 or > 100 ? "onTimeTarget is a percentage."
         : Weeks is < 2 or > 52 ? "weeks is between 2 and 52."
-        : By is not (null or "sender" or "discipline" or "wait" or "reviewer" or "all" or "released" or "delivered" or "overdue" or "reviews" or "transmittals")
+        : By is not (null or "sender" or "discipline" or "wait" or "reviewer" or "released" or "delivered" or "overdue" or "reviews" or "transmittals")
             ? "by is not one of the report's choices."
         : null;
 }

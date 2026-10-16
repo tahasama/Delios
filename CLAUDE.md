@@ -505,9 +505,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Report colours follow the app's key (`lib/core/rails.ts`): blue is under way, never late (in review, not late yet),
   amber is being prepared or at risk, red is late; a state's colour is the same in the chart and in the table's chip
   (`Stage` keeps blue; `TONE_OF` info → moving).
-- Progress by week starts on "All" (first of its choices): every measure at once, one strip of columns each
-  (`ChartKinds.Panels`, `Segment.Group`), on the same weeks; then Released, Delivered, Overdue, Reviews open, Sent &
-  received one at a time. Its windows read "8 weeks · 12 weeks · 26 weeks · 52 weeks".
+- Progress by week shows one measure at a time (Released first, then Delivered, Overdue, Reviews open, Sent &
+  received); no "All" (tried, the owner: a bad idea). Its windows read "8 weeks · 12 weeks · 26 weeks · 52 weeks".
 - Printed, a report keeps its chart's colours, every day reads as its date, the count says when it was made, and a
   list longer than a page says "Lines 1–50 of N; the full list is in the Excel" (`.print-only`).
 - Another organization reading Deliveries against plan sees its documents by discipline (never one bar of its own

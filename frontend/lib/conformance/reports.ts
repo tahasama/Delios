@@ -8,15 +8,14 @@ import { api, projectPath } from "@/lib/client";
 type Tone = "good" | "warn" | "bad";
 /** A headline number; `change` says how it moved since last week, coloured by `changeTone`. */
 export type Figure = { label: string; value: string | number; tone?: Tone; change?: string; changeTone?: "good" | "bad" };
-/** One colour of the chart; `group` names the panel (one measure) it belongs to on a chart of panels. */
-export type Segment = { key: string; label: string; tone: "good" | "info" | "warn" | "bad" | "muted"; group?: string | null };
+export type Segment = { key: string; label: string; tone: "good" | "info" | "warn" | "bad" | "muted" };
 /** One bar; on a timeline it spans `from` to `to` (yyyy-MM-dd). */
 export type Bar = { label: string; values: Record<string, number>; from?: string | null; to?: string | null };
 /**
  * How the chart is drawn, the way that fits its question: horizontal bars per name, upright columns per period (in time
  * order), or a timeline (each bar placed on the calendar). `unit` "days": a bar's length is days waited, not a count.
  */
-export type Chart = { title: string; segments: Segment[]; bars: Bar[]; kind: "bars" | "columns" | "timeline" | "panels"; unit?: "days" | null; from?: string | null; to?: string | null };
+export type Chart = { title: string; segments: Segment[]; bars: Bar[]; kind: "bars" | "columns" | "timeline"; unit?: "days" | null; from?: string | null; to?: string | null };
 export type Cell = string | number | { text: string; href?: string; tone?: "good" | "warn" | "bad" | "info" };
 export type Report = {
   id: ReportId;
@@ -70,7 +69,7 @@ export const CUTS: Partial<Record<ReportId, { value: string; label: string }[]>>
   deliveries: [{ value: "sender", label: "By who sends it" }, { value: "discipline", label: "By discipline" }],
   reviews: [{ value: "wait", label: "Longest waits" }, { value: "reviewer", label: "By reviewer" }],
   progress: [
-    { value: "all", label: "All" }, { value: "released", label: "Released" }, { value: "delivered", label: "Delivered" }, { value: "overdue", label: "Overdue" },
+    { value: "released", label: "Released" }, { value: "delivered", label: "Delivered" }, { value: "overdue", label: "Overdue" },
     { value: "reviews", label: "Reviews open" }, { value: "transmittals", label: "Sent & received" },
   ],
 };

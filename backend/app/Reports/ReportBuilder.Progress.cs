@@ -83,7 +83,7 @@ public sealed partial class ReportBuilder
         static string Said(LocalDate day, string pattern) => day.ToString(pattern, System.Globalization.CultureInfo.InvariantCulture);
         var label = (Week w) => Said(w.Start, "d MMM");
 
-        // What the weeks can show: each measure with its colours. "All" shows every one, one strip each, on the same weeks.
+        // What the weeks can show, one at a time: each measure with its colours (the first when none is chosen).
         (string Key, string Title, Segment[] Segments, Func<Week, Dictionary<string, int>> Values)[] measures =
         [
             ("released", "Released each week",
@@ -100,17 +100,10 @@ public sealed partial class ReportBuilder
             ("transmittals", "Sent and received each week",
                 [new("out", "Sent", "info"), new("in", "Received", "good")], w => new() { ["out"] = w.Sent, ["in"] = w.Received }),
         ];
-        var chosen = measures.Where(m => m.Key == options.By).ToArray();
-        var all = chosen.Length == 0;
-        if (all) chosen = measures;
-        // With every measure, each segment is named by its measure (Group) and its key carries it, so "Late" delivered
-        // and "Late" reviews stay apart.
-        string KeyOf(string measure, string key) => all ? $"{measure}.{key}" : key;
-        var title = all ? "Each week, everything at once" : chosen[0].Title;
-        var segments = chosen.SelectMany(m => m.Segments.Select(sg => sg with { Key = KeyOf(m.Key, sg.Key), Group = all ? m.Title : null })).ToArray();
-        var bars = counted.Select(w => new Bar(label(w), chosen
-            .SelectMany(m => m.Values(w).Where(v => v.Value > 0).Select(v => (Key: KeyOf(m.Key, v.Key), v.Value)))
-            .ToDictionary(v => v.Key, v => v.Value))).ToList();
+        var chosen = measures.FirstOrDefault(m => m.Key == options.By);
+        if (chosen.Key is null) chosen = measures[0];
+        var (title, segments) = (chosen.Title, chosen.Segments);
+        var bars = counted.Select(w => new Bar(label(w), chosen.Values(w).Where(v => v.Value > 0).ToDictionary(v => v.Key, v => v.Value))).ToList();
 
         var thisWeek = counted[^1];
         var lastWeek = counted[^2];
@@ -138,7 +131,7 @@ public sealed partial class ReportBuilder
                 Moved("Overdue now", thisWeek.Overdue, lastWeek.Overdue, upIsGood: false, thisWeek.Overdue > 0 ? "bad" : "good"),
                 Moved("Reviews open", openNow, lastWeek.Open, upIsGood: false),
             ],
-            new Chart(title, segments, bars, all ? ChartKinds.Panels : ChartKinds.Columns),
+            new Chart(title, segments, bars, ChartKinds.Columns),
             ["Week starting", "Registered", "Released (documents)", "Released that week", "Delivered on time", "Delivered late", "Overdue at its end",
                 "Reviews open at its end", "Reviews decided", "Sent", "Received"],
             rows, "Nothing is registered yet.");
