@@ -440,6 +440,28 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Roles on a project (CONTRACT_ROLES): GENERIC, EPC, EPCM, PMC, DESIGN, OWNER, CM, CONTRACTOR, SUBCONTRACTOR,
   SUPPLIER, INSPECTOR (docs/ORGANIZATIONS.md). New ones only with the owner's approval.
 
+### Settings
+- Every setting is the project's: the hub says "How <project> works… What you change here changes this project
+  only" (owner's answer). Nobody is left lost: the menu's Settings link shows exactly when a Settings page opens for
+  the person (`SETUP_PAGES` + `maySetup`, layout `canSettings`); a page they may not open says plainly who changes it
+  and leads back to Settings (`settings/no-access.tsx`), never a red "Administrators only" dead end.
+- The hub has a Tip, "Setting up a project? Do it in this order": organizations, people, lists, numbering,
+  revisions, verdict lists, review routes; each says done or to do, with what it found, and opens its page (a page
+  the person may not open is named, "an administrator does this"). It goes once everything is set up. Each card
+  carries a real figure, and what still needs doing reads "To do · …" in amber (an empty essential list, a
+  deliverable type with no numbering, no revision scheme, a verdict without a meaning, only you on the project).
+  Group icons take one neutral tint.
+- People & access never asks a password: our people and someone of another organization with no DELIOS get the
+  7-day link to choose their own (email off: the link is shown to whoever added them). Someone whose company has its
+  own DELIOS is never added there: link the organizations; their administrator puts them on the project.
+- A list's "Used on" counts the project's documents carrying each value (backend `GET /register/usage`), and opens
+  them in the register; a value in use keeps its code. Values are retired, never deleted: the bulk "Delete" (which
+  only retired) is removed.
+- The plan's starter values are added in one go ("Add them"); Controlled changes no longer exist.
+- Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
+- Settings pages use the reference boxes (`rounded-md`, `ring-line`, `bg-tint-soft`), the shared control size, and no
+  text under 11px.
+
 ### Import & export
 - A file is always checked first; the check writes nothing and uses the backend's own rules (`POST /documents/check`,
   the same as registering). Problems name the sheet and row the person sees. Writing names its count; rows with

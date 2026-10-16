@@ -29,12 +29,12 @@ export function DeleteSetButton({ setKey, title, count }: { setKey: string; titl
         disabled={pending}
         title="Delete this set"
         aria-label="Delete this set"
-        className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+        className="grid h-8 w-8 place-items-center rounded-md text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
       >
         <Trash2 className="h-4 w-4" />
       </button>
       {state?.error ? (
-        <p role="alert" className="absolute right-0 top-9 z-30 w-72 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 shadow-lg ring-1 ring-red-200">{state.error}</p>
+        <p role="alert" className="absolute right-0 top-9 z-30 w-72 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 shadow-lg ring-1 ring-red-200">{state.error}</p>
       ) : null}
     </form>
   );

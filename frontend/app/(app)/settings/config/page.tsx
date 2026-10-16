@@ -1,5 +1,6 @@
 import { isAdmin } from "@/lib/core/auth";
 import Link from "next/link";
+import { api, projectPath } from "@/lib/client";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, Chip, Field, inputCls, DataTable, Th, Td, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -12,6 +13,7 @@ import { SelectAll } from "./select-all";
 import { DeleteSetButton } from "./delete-set";
 import { SetNav, type SetNavGroup } from "./set-nav";
 import { Plus, Search, X, Pencil, Download } from "lucide-react";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Disciplines, types & sets" };
@@ -27,9 +29,14 @@ const GROUPS: { title: string; keys: string[] }[] = [
   { title: "File formats", keys: ["NATIVE_FORMATS", "RENDITION_FORMATS", "PRESERVATION_FORMATS"] },
 ];
 
-/** Where each set's codes are used, so the page can say how often: the backend does not count it yet, so nothing reads as used. */
-async function usage(_t: unknown, _key: string): Promise<{ counts: Map<string, number>; unit: string; filter?: string }> {
-  return { counts: new Map(), unit: "" };
+/**
+ * How many of the project's documents carry each value of a list, counted by the backend (`GET /register/usage`), and
+ * the register filter that opens them. A list documents do not carry counts nothing.
+ */
+async function usage(t: { projectId: string }, key: string): Promise<{ counts: Map<string, number>; unit: string; filter?: string }> {
+  const read = await api<{ filter: string | null; counts: Record<string, number> }>(projectPath(t, `/register/usage?set=${encodeURIComponent(key)}`))
+    .catch(() => ({ filter: null, counts: {} as Record<string, number> }));
+  return { counts: new Map(Object.entries(read.counts)), unit: "document", filter: read.filter ?? undefined };
 }
 
 /** A plain question nobody answered yet: none of what its answers set is stored (a value made before its list asked it). */
@@ -54,7 +61,7 @@ type Params = { set?: string; q?: string; show?: string; edit?: string; panel?: 
 export default async function AdminConfigPage({ searchParams }: { searchParams: Promise<Params> }) {
   const ctx = await requireScope();
   const { user: me } = ctx;
-  if (!isAdmin(me)) return <PageHeader title="Disciplines, types & sets" subtitle="Administrators only." />;
+  if (!isAdmin(me)) return <NoAccess title="Disciplines, types & sets" who="admin" />;
   const sp = await searchParams;
   const sets = await getSets();
   const currentKey = sp.set ?? sets[0]?.key ?? "";
@@ -124,20 +131,20 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                   <p className="mt-1 text-xs text-slate-600">A verdict list: its verdicts and what each means are kept in{" "}
                     <Link href="/settings/verdicts" className="font-semibold text-link hover:underline">Verdict lists</Link>.</p>
                 ) : null}
-                <p className="mt-1 text-[11px] text-slate-400">{countOf(set.key)} active{retiredCount ? ` · ${retiredCount} retired` : ""} · version {set.version}</p>
+                <p className="mt-1 text-[11px] text-slate-500">{countOf(set.key)} active{retiredCount ? ` · ${retiredCount} retired` : ""} · version {set.version}</p>
               </div>
               <div className="flex shrink-0 items-center gap-5">
                 <Link href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} className={btn("primary", "sm")}><Plus className="h-3.5 w-3.5" /> Add value</Link>
                 <div className="flex items-center gap-0.5 border-l border-line pl-4">
-                  <Link href={here({ panel: sp.panel === "details" ? undefined : "details", edit: undefined })} title="Rename or describe this set" aria-label="Rename or describe this set" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"><Pencil className="h-4 w-4" /></Link>
-                  <a href={`/api/export/config-set?set=${encodeURIComponent(set.key)}`} title="Export this set as CSV" aria-label="Export this set as CSV" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"><Download className="h-4 w-4" /></a>
+                  <Link href={here({ panel: sp.panel === "details" ? undefined : "details", edit: undefined })} title="Rename or describe this set" aria-label="Rename or describe this set" className="grid h-8 w-8 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"><Pencil className="h-4 w-4" /></Link>
+                  <a href={`/api/export/config-set?set=${encodeURIComponent(set.key)}`} title="Export this set as CSV" aria-label="Export this set as CSV" className="grid h-8 w-8 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"><Download className="h-4 w-4" /></a>
                   <DeleteSetButton setKey={set.key} title={set.title} count={countOf(set.key)} />
                 </div>
               </div>
             </div>
 
             {sp.panel === "add" ? (
-              <Card title={`Add a value to ${set.title}`} actions={<Link href={here({ panel: undefined })} aria-label="Close" className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></Link>}>
+              <Card title={`Add a value to ${set.title}`} actions={<Link href={here({ panel: undefined })} aria-label="Close" className="text-slate-500 hover:text-slate-700"><X className="h-4 w-4" /></Link>}>
                 <ActionForm action={addConfigValueAction} submitLabel="Publish value" size="sm" hidden={{ setKey: currentKey }} resetOnSuccess>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field label="Code" required hint="what appears in numbers and lists"><input name="code" required maxLength={24} className={inputCls} /></Field>
@@ -148,11 +155,11 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
               </Card>
             ) : null}
             {sp.panel === "new" ? (
-              <Card title="New set" description="A list your organization needs that the starter sets do not cover — areas, systems, anything." actions={<Link href={here({ panel: undefined })} aria-label="Close" className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></Link>}>
+              <Card title="New set" description="A list your organization needs that the starter sets do not cover — areas, systems, anything." actions={<Link href={here({ panel: undefined })} aria-label="Close" className="text-slate-500 hover:text-slate-700"><X className="h-4 w-4" /></Link>}>
                 <ActionForm action={createConfigSetAction} submitLabel="Create set" size="sm">
                   <div className="grid grid-cols-1 items-end gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
                     <Field label="Title" required><input name="title" required className={inputCls} placeholder="Areas" /></Field>
-                    <Field label="Key" required hint="UPPER_SNAKE"><input name="key" required className={inputCls} placeholder="AREAS" /></Field>
+                    <Field label="Short name" required hint="capitals, no spaces (use _); it never changes"><input name="key" required pattern="[A-Z][A-Z0-9_]*" title="Capital letters, digits and _ only, e.g. AREAS" className={inputCls} placeholder="AREAS" /></Field>
                     <Field label="Category">
                       <select name="group" className={inputCls} defaultValue="">
                         <option value="">Other</option>
@@ -165,7 +172,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
               </Card>
             ) : null}
             {sp.panel === "details" ? (
-              <Card title="Set details" actions={<Link href={here({ panel: undefined })} aria-label="Close" className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></Link>}>
+              <Card title="Set details" actions={<Link href={here({ panel: undefined })} aria-label="Close" className="text-slate-500 hover:text-slate-700"><X className="h-4 w-4" /></Link>}>
                 <ActionForm action={updateConfigSetAction} submitLabel="Save set details" size="sm" hidden={{ oldKey: set.key }}>
                   <div className="grid grid-cols-1 items-end gap-x-4 gap-y-3 sm:grid-cols-2">
                     <Field label="Title" required><input name="title" required defaultValue={set.title} className={inputCls} /></Field>
@@ -188,7 +195,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                 <input type="hidden" name="set" value={currentKey} />
                 <label className="search-field relative min-w-60 flex-1">
                   <span className="sr-only">Search this set</span>
-                  <Search className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Search className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                   <input
                     name="q"
                     defaultValue={q}
@@ -228,8 +235,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                 {show !== "ACTIVE" ? (
                   <button name="op" value="REACTIVATE" className="font-semibold text-slate-600 hover:text-emerald-700">Activate</button>
                 ) : null}
-                <button name="op" value="DELETE" className="font-semibold text-slate-600 hover:text-red-700">Delete</button>
-                <span className="ml-auto text-slate-400">A code the register already carries is retired, never deleted.</span>
+                <span className="ml-auto text-slate-500">Values are retired, never deleted: a retired value is no longer offered, and comes back with Activate.</span>
               </form>
               <DataTable
                 id={`set-values-${propFields ? currentKey : "plain"}`}
@@ -260,11 +266,11 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                           <ActionForm action={updateValuePropsAction} submitLabel="Save" size="sm" hidden={{ valueId: v.id, setKey: currentKey }}>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                               <Field label="Code" hint={n ? "in use — retire it and add a new code instead" : "not used yet, so it can still change"}>
-                                <input name="code" defaultValue={v.code} readOnly={n > 0} className={`${inputCls} ${n ? "bg-slate-50 text-slate-500" : ""}`} />
+                                <input name="code" defaultValue={v.code} readOnly={n > 0} className={`${inputCls} ${n ? "bg-tint-soft text-slate-500" : ""}`} />
                               </Field>
                               <Field label="Label"><input name="label" defaultValue={v.label} className={inputCls} /></Field>
                               {propFields ? null : (
-                                <Field label="Properties (JSON)" hint="free-form for custom sets" className="sm:col-span-2">
+                                <Field label="Extra details (advanced)" hint="leave empty unless you were told what goes here" className="sm:col-span-2">
                                   <textarea name="propsJson" rows={2} defaultValue={v.props ?? ""} className={inputCls} />
                                 </Field>
                               )}
@@ -282,7 +288,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
                                 <button className="text-slate-500 hover:text-red-600">Delete</button>
                               </form>
                             ) : null}
-                            <span className="ml-auto flex items-center gap-1 text-slate-400">
+                            <span className="ml-auto flex items-center gap-1 text-slate-500">
                               Order
                               <form action={moveConfigValueAction}><input type="hidden" name="valueId" value={v.id} /><input type="hidden" name="direction" value="up" /><button disabled={index === 0} className="rounded px-1.5 py-0.5 hover:bg-slate-100 disabled:opacity-25" title="Move up">↑</button></form>
                               <form action={moveConfigValueAction}><input type="hidden" name="valueId" value={v.id} /><input type="hidden" name="direction" value="down" /><button disabled={index === allValues.length - 1} className="rounded px-1.5 py-0.5 hover:bg-slate-100 disabled:opacity-25" title="Move down">↓</button></form>
@@ -296,13 +302,13 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
               </DataTable>
               </>
             ) : (
-              <p className="rounded-2xl border border-dashed border-line-strong px-5 py-10 text-center text-sm text-slate-500">
+              <p className="rounded-md border border-dashed border-line-strong px-5 py-10 text-center text-sm text-slate-500">
                 {q ? `Nothing in ${set.title} matches “${q}”.` : show === "RETIRED" ? "Nothing retired in this set." : "This set has no values yet — add one."}
               </p>
             )}
           </section>
         ) : (
-          <p className="text-sm text-slate-400">No sets published yet — run the seed or create one.</p>
+          <p className="text-sm text-slate-500">No sets published yet — run the seed or create one.</p>
         )}
       </SetNav>
     </div>
@@ -318,12 +324,12 @@ function PropInput({ field, value, lists, unset = false }: {
     const ticked = Array.isArray(value) ? value.map(String) : [];
     return (
       <fieldset className="sm:col-span-2">
-        <legend className="mb-1 text-xs font-semibold text-slate-700">{field.label}{field.hint ? <span className="ml-1 font-normal text-slate-400">{field.hint}</span> : null}</legend>
+        <legend className="mb-1 text-xs font-semibold text-slate-700">{field.label}{field.hint ? <span className="ml-1 font-normal text-slate-500">{field.hint}</span> : null}</legend>
         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
           {(lists[field.setKey] ?? []).map((o) => (
             <label key={o.code} className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" name={`prop_${field.key}`} value={o.code} defaultChecked={ticked.includes(o.code)} />
-              <span>{o.label} <span className="font-mono text-xs text-slate-400">{o.code}</span></span>
+              <span>{o.label} <span className="font-mono text-xs text-slate-500">{o.code}</span></span>
             </label>
           ))}
         </div>
@@ -346,7 +352,7 @@ function PropInput({ field, value, lists, unset = false }: {
         <legend className="mb-1 text-xs font-semibold text-slate-700">{field.label}{unset ? <span className="ml-1 text-red-500">*</span> : null}{unset ? <span className="ml-2 font-normal text-amber-700">not chosen yet: choose one</span> : null}</legend>
         <div className="space-y-1.5">
           {field.options.map((o, i) => (
-            <label key={o.value} className="flex items-start gap-2 rounded-lg border border-line px-3 py-2 text-sm text-slate-700 has-checked:border-brand-line has-checked:bg-tint-soft">
+            <label key={o.value} className="flex items-start gap-2 rounded-md border border-line px-3 py-2 text-sm text-slate-700 has-checked:border-brand-line has-checked:bg-tint-soft">
               <input type="radio" name={`prop_${field.key}`} value={o.value} required={unset} defaultChecked={unset ? false : value ? value === o.value : i === 0} className="mt-0.5" />
               <span><strong className="font-semibold">{o.label.split(" — ")[0]}</strong>{o.label.includes(" — ") ? <span className="text-slate-500"> — {o.label.split(" — ").slice(1).join(" — ")}</span> : null}</span>
             </label>
@@ -359,7 +365,7 @@ function PropInput({ field, value, lists, unset = false }: {
     return (
       <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700">
         <input type="checkbox" name={`prop_${field.key}`} defaultChecked={value === true} />
-        <span>{field.label}{field.hint ? <span className="ml-1 text-xs text-slate-400">{field.hint}</span> : null}</span>
+        <span>{field.label}{field.hint ? <span className="ml-1 text-xs text-slate-500">{field.hint}</span> : null}</span>
       </label>
     );
   }

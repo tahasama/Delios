@@ -24,16 +24,22 @@ export function SettingsCrumb({ pages }: { pages: { href: string; title: string 
       </Link>
       <span aria-hidden className="text-slate-300">/</span>
       {deeper ? (
-        <a href={page.href} className="font-semibold text-link hover:underline">{page.title}</a>
+        <Link href={page.href} className="font-semibold text-link hover:underline">{page.title}</Link>
       ) : (
         <span className="font-semibold text-slate-700">{page.title}</span>
       )}
       {deeper ? (
         <>
           <span aria-hidden className="text-slate-300">/</span>
-          <span className="font-semibold text-slate-700">{path.split("/").filter(Boolean).slice(-1)[0].replaceAll("_", " ").replaceAll("-", " ")}</span>
+          <span className="font-semibold text-slate-700">{said(path.split("/").filter(Boolean).slice(-1)[0])}</span>
         </>
       ) : null}
     </nav>
   );
+}
+
+/** The last part of the address as a person would say it: "DOCUMENT_TYPES" reads "Document types". */
+function said(segment: string): string {
+  const words = decodeURIComponent(segment).replaceAll("_", " ").replaceAll("-", " ").toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }

@@ -126,3 +126,15 @@ export function ActionForm({
     </form>
   );
 }
+
+/**
+ * A submit button that asks first, for a plain server form whose act cannot be taken back in one click (removing a
+ * route, retiring several values): the question says what happens, and Cancel leaves everything as it was.
+ */
+export function ConfirmButton({ confirm, children, ...rest }: { confirm: string; children: React.ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button type="submit" {...rest} onClick={(e) => { if (!window.confirm(confirm)) e.preventDefault(); }}>
+      {children}
+    </button>
+  );
+}

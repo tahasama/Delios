@@ -33,7 +33,9 @@ export async function ProjectSettings() {
 
   return (
     <div className="space-y-4">
-      <HowItWorks target="project" answers={answers} follows={controllers.length > 0} base={defaults?.values ?? null} />
+      <div id="how-it-works" className="scroll-mt-24">
+        <HowItWorks target="project" answers={answers} follows={controllers.length > 0} base={defaults?.values ?? null} />
+      </div>
 
       <section className="register register-sheet register-sheet-open">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
@@ -66,7 +68,7 @@ export async function ProjectSettings() {
 
       {/* The organization's words for the states. What each one does is not
           on offer — only what it is called. They are the organization's, on every project. */}
-      <section id="state-names" className="register register-sheet register-sheet-open">
+      <section id="state-names" className="register register-sheet register-sheet-open scroll-mt-24">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">What the states are called</span>
           <span className="text-[11px] text-slate-500">the organization&rsquo;s words, on every project; only the name changes, never what the state does</span>

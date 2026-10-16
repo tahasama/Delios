@@ -5,9 +5,10 @@ import { PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { DateWindow } from "@/components/date-window";
 import { adminAudit } from "@/lib/settings/api-admin";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "The log" };
+export const metadata = { title: "Audit trail" };
 
 /**
  * The log: what was done, to what, by whom, on the day it happened.
@@ -79,7 +80,7 @@ function said(action: string): string {
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ q?: string; family?: string; from?: string; to?: string }> }) {
   const { user } = await requireScope();
   if (!isAdmin(user)) {
-    return <PageHeader title="The log" subtitle="Administrators only. The evidence for a single act is shown on the thing it happened to — a document, an activity, a transmittal." />;
+    return <NoAccess title="Audit trail" who="admin" />;
   }
   const sp = await searchParams;
   const family = FAMILIES.find((f) => f.id === sp.family);
@@ -112,7 +113,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   return (
     <div className="dispatch logbook space-y-5">
       <header className="dispatch-head px-6 py-5">
-        <h1 className="dispatch-title">The log</h1>
+        <h1 className="dispatch-title">Audit trail</h1>
         <p className="dispatch-lede mt-1.5 max-w-2xl">
           Every controlled act, in the order it happened: who did it, what it was done to, and what changed.
           The evidence for one document is on the document; this is the project's whole memory.
@@ -139,7 +140,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                 }`}
               >
                 <span className="min-w-0 truncate">{f.label}</span>
-                <span className="ml-auto font-mono text-[11.5px] text-slate-400">{countOf(f)}</span>
+                <span className="ml-auto font-mono text-[11.5px] text-slate-500">{countOf(f)}</span>
               </Link>
             ))}
             <Link
@@ -150,7 +151,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
               }`}
             >
               <span>The whole log</span>
-              <span className="ml-auto font-mono text-[11.5px] text-slate-400">{total}</span>
+              <span className="ml-auto font-mono text-[11.5px] text-slate-500">{total}</span>
             </Link>
           </nav>
 

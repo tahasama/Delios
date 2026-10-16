@@ -52,7 +52,7 @@ export function ActSwitch({ act, title, controlText, selfText, controlDoes, offT
       <p className={cn("mt-1 text-xs leading-5", off ? "text-slate-500 italic" : "text-slate-600")}>{text(current)}</p>
 
       {asked ? (
-        <form action={formAction} className="act-confirm mt-2 space-y-2 rounded-lg px-3 py-2.5">
+        <form action={formAction} className="act-confirm mt-2 space-y-2 rounded-md px-3 py-2.5">
           <input type="hidden" name="key" value={act} />
           <input type="hidden" name="mode" value={asked} />
           <p className="text-xs leading-5 text-slate-700">
@@ -65,7 +65,7 @@ export function ActSwitch({ act, title, controlText, selfText, controlDoes, offT
           {state?.error ? <p role="alert" className="text-xs text-red-700">{state.error}</p> : null}
           <div className="flex items-center gap-2">
             <button type="submit" disabled={pending} data-on="true" className="ask">{pending ? "Switching…" : "Switch it"}</button>
-            <button type="button" onClick={() => setAsked(null)} className="rounded-md px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100">Keep as is</button>
+            <button type="button" onClick={() => setAsked(null)} className="ask">Keep as is</button>
           </div>
         </form>
       ) : state?.ok ? (

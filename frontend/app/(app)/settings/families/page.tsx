@@ -84,7 +84,7 @@ export default async function FamiliesPage() {
         </DataTable>
 
         {published.length === 0 ? (
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
             No family is published yet, so no matrix can be drawn and no route can know what to ask for.
           </p>
         ) : null}

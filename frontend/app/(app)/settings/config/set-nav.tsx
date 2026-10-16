@@ -36,15 +36,15 @@ export function SetNav({ groups, current, children }: { groups: SetNavGroup[]; c
                 onClick={() => { setTab(i); setQ(""); const first = g.sets[0]; if (first && !g.sets.some((s) => s.key === current)) router.replace(`/settings/config?set=${first.key}`); }}
                 className={`-mb-px whitespace-nowrap border-b-2 px-0.5 pb-2 pt-1 text-[12px] leading-4 transition ${on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"}`}
               >
-                {g.title} <span className="ml-1 font-normal tabular-nums text-slate-400">{g.sets.length}</span>
+                {g.title} <span className="ml-1 font-normal tabular-nums text-slate-500">{g.sets.length}</span>
               </button>
             );
           })}
         </div>
         <label className="relative mb-1.5 w-full sm:w-56">
           <span className="sr-only">Find a set</span>
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a set…" className="plain w-full py-1! pl-7! text-[12px]!" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a set…" className="plain w-full pl-7!" />
         </label>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)]" role="tabpanel">
@@ -58,15 +58,15 @@ export function SetNav({ groups, current, children }: { groups: SetNavGroup[]; c
                   replace
                   href={`/settings/config?set=${one.key}`}
                   aria-current={on ? "page" : undefined}
-                  className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[13px] ${on ? "bg-tint font-semibold text-brand-ink" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
+                  className={`flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-[13px] ${on ? "bg-tint font-semibold text-brand-ink" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
                 >
                   <span className="truncate">{one.title}</span>
-                  <span className={`shrink-0 text-[11px] tabular-nums ${on ? "text-brand-ink/70" : "text-slate-400"}`}>{one.count}</span>
+                  <span className={`shrink-0 text-[11px] tabular-nums ${on ? "text-brand-ink/70" : "text-slate-500"}`}>{one.count}</span>
                 </Link>
               </li>
             );
           })}
-          {!sets.length ? <li className="px-2.5 py-2 text-xs text-slate-400">No set matches “{q}”.</li> : null}
+          {!sets.length ? <li className="px-2.5 py-2 text-xs text-slate-500">No set matches “{q}”.</li> : null}
         </ul>
         </nav>
         <div className="min-w-0 p-4">{children}</div>

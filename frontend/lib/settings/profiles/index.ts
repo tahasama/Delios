@@ -38,10 +38,18 @@ export async function missingFromProfile(_t: unknown, profile: Profile): Promise
 }
 
 /**
- * For an organization that already exists, a profile is a controlled change
- * like any other (§4.7). Controlled changes are not kept by the backend yet, so
- * nothing is drafted: every set the profile would extend is reported skipped.
+ * Adds what a profile would still add: each missing value is published as it is in the profile (the backend audits
+ * every value it publishes). A profile never removes or relabels a value already there.
  */
 export async function draftProfile(t: Tenant, profile: Profile): Promise<{ drafted: string[]; skipped: string[] }> {
-  return { drafted: [], skipped: (await missingFromProfile(t, profile)).map((one) => one.key) };
+  const { api, forgetShortLived } = await import("@/lib/client");
+  const drafted: string[] = [];
+  for (const set of await missingFromProfile(t, profile)) {
+    for (const value of set.values) {
+      await api("/api/admin/values", { method: "PUT", body: { setKey: set.key, code: value.code, label: value.label, sort: value.sort, props: value.props } });
+    }
+    drafted.push(set.key);
+  }
+  await forgetShortLived();
+  return { drafted, skipped: [] };
 }

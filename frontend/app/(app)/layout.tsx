@@ -10,12 +10,16 @@ import Link from "next/link";
 import { ThemeToggle } from "@/app/(app)/theme-toggle";
 import { ROLE_LABEL } from "@/lib/core/standard";
 import type { Role } from "@/lib/core/standard";
+import { SETUP_PAGES, maySetup } from "@/app/(app)/settings/setup-pages";
+import { controlDoes } from "@/lib/settings/control-activities";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireScope();
   const { user, project, available, role } = ctx;
   // The organization's name is the account's.
-  const [unread, others] = await Promise.all([unreadNotifications(), elsewhere()]);
+  const [unread, others, managementAddsPeople] = await Promise.all([
+    unreadNotifications(), elsewhere(), controlDoes(ctx, "PROJECT_PEOPLE").then((dc) => !dc).catch(() => false),
+  ]);
   const scope = { organizationName: user.organization };
 
   // The navigation is built from what this person may actually do, so nobody
@@ -24,8 +28,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     canRead: ctx.can("READ"),
     canTransmit: ctx.can("TRANSMIT"),
     canControl: ctx.can("CONTROL"),
-    // Settings opens for administrators and for anyone granted a settings verb.
+    // Import & export opens for administrators and anyone granted a settings verb.
     canConfigure: ctx.can("CONFIGURE") || ctx.can("MATRIX") || ctx.can("ROUTES"),
+    // The Settings link shows exactly when a Settings page opens for this person: never a dead end, never a page
+    // they may open but cannot reach.
+    canSettings: SETUP_PAGES.some((page) => maySetup(user, page, managementAddsPeople)),
     canCreate: ctx.can("CREATE") && mayCreateDocument(user),
     // Another organization on this project: only what concerns them.
     external: !user.isInternal,

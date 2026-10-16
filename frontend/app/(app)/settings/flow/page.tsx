@@ -14,17 +14,18 @@ import { cn } from "@/lib/core/utils";
 
 import { adminFunctions, adminNumbering, partiesWithAnswers, routesForEditor, orEmpty } from "@/lib/settings/api-admin";
 import { getSet, getSets } from "@/lib/settings/config";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Control room" };
 
 /**
  * The whole flow on one page: each step a document goes through, who carries
- * it out, what the organization has switched on, and the sets it draws from.
+ * it out on this project, what the project has chosen, and the lists it draws from.
  *
- * Read only. Every answer shown here is changed on the page that owns it, and
- * each box links there — so this page can never disagree with the settings,
- * it only puts them in the order a document meets them.
+ * Who carries an act out is switched right here (ActSwitch); the project's
+ * answers and state names are changed lower on this page ("change" and
+ * "rename" jump there); lists, routes and numbering link to their own pages.
  */
 
 /** A step that is not a choice, and why. */
@@ -342,7 +343,7 @@ export default async function ControlRoomPage() {
   const ctx = await requireScope();
   const { user: me } = ctx;
   const page = SETUP_PAGES.find((one) => one.href === "/settings/flow")!;
-  if (!maySetup(me, page)) return <PageHeader title="Control room" subtitle="Administrators only." />;
+  if (!maySetup(me, page)) return <NoAccess title="Control room" who="admin" />;
 
   const [settings, chosen, holders, sets, values, templates, schemes, rules, names, parties] = await Promise.all([
     controlSettings(ctx),
@@ -427,7 +428,7 @@ export default async function ControlRoomPage() {
             {states.length ? (
               <span className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
                 {states.map((state) => <StateChip key={state} label={stateLabel(state)} color={stateColor(state)} />)}
-                <Link href="/settings/control#state-names" className="text-[11px] font-semibold text-link hover:underline">rename</Link>
+                <Link href="#state-names" className="text-[11px] font-semibold text-link hover:underline">rename</Link>
               </span>
             ) : null}
           </header>
@@ -454,8 +455,8 @@ export default async function ControlRoomPage() {
                     <p className="text-[11px] text-slate-500">{row.policy.title}</p>
                     <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[13px] font-medium text-slate-900">
                       {option?.label.replace(/ — recommended$/, "")}
-                      <span className="text-[11px] font-normal text-slate-400">{row.set ? "chosen" : "default"}</span>
-                      <Link href="/settings/control" className="text-[11px] font-semibold text-link hover:underline">change</Link>
+                      <span className="text-[11px] font-normal text-slate-500">{row.set ? "chosen" : "default"}</span>
+                      <Link href="#how-it-works" className="text-[11px] font-semibold text-link hover:underline">change</Link>
                     </p>
                   </div>
                 );
@@ -595,7 +596,7 @@ function FixedLine({ title, text }: Fixed) {
     <li>
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-[13px] font-medium text-slate-900">{title}</span>
-        <Chip className="bg-slate-50 text-slate-500 ring-slate-200"><Lock className="mr-1 h-3 w-3" />Fixed</Chip>
+        <Chip className="bg-tint-soft text-slate-500 ring-slate-200"><Lock className="mr-1 h-3 w-3" />Fixed</Chip>
       </p>
       <p className="mt-0.5 text-xs leading-5 text-slate-600">{text}</p>
     </li>
@@ -624,7 +625,7 @@ function SetLine({ setKey, set, values }: {
       {shown.length ? (
         <p className="mt-1 flex flex-wrap gap-1">
           {shown.map((one) => (
-            <code key={one.code} title={one.label} className={cn("code-chip", one.status !== "ACTIVE" && "opacity-50 line-through")}>{one.code}</code>
+            <code key={one.code} title={one.status === "ACTIVE" ? one.label : `${one.label} — retired`} className={cn("code-chip", one.status !== "ACTIVE" && "opacity-50 line-through")}>{one.code}{one.status === "ACTIVE" ? null : <span className="sr-only"> (retired)</span>}</code>
           ))}
           {more > 0 ? <Link href={`/settings/config?set=${setKey}`} className="self-center text-[11px] text-slate-500 hover:text-link">+{more} more</Link> : null}
         </p>

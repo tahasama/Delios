@@ -37,7 +37,7 @@ export function VerdictRows({ verdicts }: { verdicts: Verdict[] }) {
               </label>
             ) : (
               <button type="button" onClick={() => setRows((was) => was.filter((r) => r.key !== v.key))} disabled={rows.length === 1}
-                className="mb-1.5 rounded-sm p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:invisible" aria-label="Take this verdict out">
+                className="mb-1.5 rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:invisible" aria-label="Take this verdict out">
                 <X className="h-4 w-4" />
               </button>
             )}

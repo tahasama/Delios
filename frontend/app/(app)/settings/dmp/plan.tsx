@@ -28,7 +28,7 @@ function Section({ n, title, children }: { n: number; title: string; children: R
   return (
     <section className="mt-6 first:mt-0">
       <h2 className="text-[13px] font-semibold text-slate-900">
-        <span className="mr-2 font-mono text-slate-400">{n}</span>
+        <span className="mr-2 font-mono text-slate-500">{n}</span>
         {title}
       </h2>
       <div className="mt-1.5 space-y-1.5 text-[12px] leading-[1.5] text-slate-700">{children}</div>
@@ -40,7 +40,7 @@ function Section({ n, title, children }: { n: number; title: string; children: R
 function Line({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <p className="grid grid-cols-[11rem_minmax(0,1fr)] gap-3 border-b border-line py-1 last:border-0">
-      <span className="text-[11px] uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="text-[11px] uppercase tracking-wide text-slate-500">{label}</span>
       <span>{children}</span>
     </p>
   );
@@ -97,13 +97,13 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
   return (
     <article className="print-sheet register register-sheet px-8 py-8 print:border-0 print:p-0 print:shadow-none">
       <header className="border-b border-line pb-4 text-center">
-        <p className="stencil text-slate-400">Document management plan</p>
+        <p className="stencil text-slate-500">Document management plan</p>
         <h1 className="mt-2 text-xl font-semibold text-slate-900">{scope?.organizationName ?? "—"}</h1>
         <p className="mt-0.5 text-xs text-slate-500">
           {project.name} ({project.code}) · used since {scope ? fmtDate(scope.effectiveDate) : "—"} · printed {fmtDate(new Date())}
         </p>
         {dmpDoc ? (
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="mt-1 text-[11px] text-slate-500">
             Issued as {dmpDoc.docNumber}{dmpDoc.latestRevValue ? ` rev ${dmpDoc.latestRevValue}` : ""} — {dmpDoc.title}
           </p>
         ) : null}
@@ -131,7 +131,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
                 <li key={s.id}>
                   <span className="font-medium">{s.name}</span>
                   <span className="text-slate-500"> — {s.fields.map((f) => f.label).join(` ${s.delimiter} `)}</span>
-                  <span className="block text-[11px] text-slate-400">
+                  <span className="block text-[11px] text-slate-500">
                     {used.length ? `Used by ${used.join(", ")}` : "Not in use"}
                   </span>
                 </li>
@@ -141,7 +141,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
         ) : (
           <p>No numbering scheme is published.</p>
         )}
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] text-slate-500">
           Numbers are allocated by the application as a document is registered. None is typed, none is reused, and a number
           already issued keeps the scheme it was issued under.
         </p>
@@ -151,7 +151,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
         {classified.map(({ key, title, live }) => (
           <Line key={key} label={title}>
             {live.length} published
-            <span className="block text-[11px] text-slate-400">
+            <span className="block text-[11px] text-slate-500">
               {values(live.slice(0, 14))}
               {live.length > 14 ? " …" : ""}
             </span>
@@ -179,7 +179,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
                 return (
                   <li key={t.id}>
                     {t.name}
-                    <span className="text-slate-400">
+                    <span className="text-slate-500">
                       {" — "}{steps} step{steps === 1 ? "" : "s"}{days ? `, ${days} working days in all` : ", no time limits"}
                       {t.isDefault ? " · the default" : ""}
                     </span>
@@ -189,7 +189,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
             </ul>
           ) : "None published."}
         </Line>
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] text-slate-500">
           Approval authority is read from the distribution matrix for the discipline and document type. A release with no
           approval recorded is refused, except for types published as not reviewed.
         </p>
@@ -207,7 +207,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
         <Line label="Native formats">{native.length ? values(native) : "Not published."}</Line>
         <Line label="Rendition">{rendition.length ? values(rendition) : "Not published."}</Line>
         <Line label="For long keeping">{preservation.length ? values(preservation) : "Not published."}</Line>
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] text-slate-500">
           A released revision carries a fixed, viewable copy; release is refused without one. Every file is fingerprinted as
           it is stored, so a file altered afterwards is found by the checks.
         </p>
@@ -215,7 +215,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
 
       <Section n={7} title="How long information is kept">
         <Line label="Retention classes">{retention.length ? values(retention) : "Not published."}</Line>
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] text-slate-500">
           A class is set on every document, from its criticality where nothing else says. Disposal records who authorised it
           and on what basis, is refused while a legal hold stands, and the register entry is kept and marked disposed.
         </p>
@@ -224,7 +224,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
       <Section n={8} title="How this is checked">
         <Line label="Checks">
           {CATALOG.length} questions the application answers from its own records
-          <span className="block text-[11px] text-slate-400">
+          <span className="block text-[11px] text-slate-500">
             {PHASES.map((p) => `${CATALOG.filter((c) => c.phase === p).length} ${PHASE_LABEL[p].toLowerCase()}`).join(" · ")}
           </span>
         </Line>
@@ -238,7 +238,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
             {exceptions.map((e) => (
               <li key={e.id}>
                 <span className="font-medium">{e.item}</span>
-                <span className="block text-[11px] text-slate-400">
+                <span className="block text-[11px] text-slate-500">
                   {e.reason} — granted by {e.authority}, from {fmtDate(e.startDate)}
                   {e.reviewPoint ? `, looked at again ${fmtDate(e.reviewPoint)}` : ""}
                 </span>
@@ -254,7 +254,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
             {outstanding.map((r) => (
               <li key={r.title}>
                 <span className="font-medium">{r.title}</span>
-                <span className="block text-[11px] text-slate-400">{r.todo}</span>
+                <span className="block text-[11px] text-slate-500">{r.todo}</span>
               </li>
             ))}
           </ul>

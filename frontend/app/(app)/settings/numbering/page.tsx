@@ -7,6 +7,7 @@ import { removeNumberingSchemeAction, saveSchemeRoutingAction } from "@/lib/sett
 import { NumberingSchemeBuilder } from "./numbering-scheme-builder";
 import { getSets, getActiveSet } from "@/lib/settings/config";
 import { numberingForEditor } from "@/lib/settings/api-admin";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Numbering" };
@@ -65,7 +66,7 @@ function ruleSource(rule: string): string {
 export default async function NumberingPage() {
   const { user: me } = await requireScope();
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/numbering")!)) {
-    return <PageHeader title="Numbering" subtitle="Administrators and the control function." />;
+    return <NoAccess title="Numbering" who="control" />;
   }
   const [{ schemes, routing }, sets, deliverables] = await Promise.all([
     numberingForEditor(),
@@ -106,7 +107,7 @@ export default async function NumberingPage() {
             <tr key={r.code} id={`route-${r.code}`} className={cn("target:[&>td]:bg-amber-50", r.route!.status === "ACTIVE" ? "" : "opacity-60")}>
               <Td>
                 <span className="font-mono text-xs font-semibold text-slate-800">{r.code}</span>
-                <span className="mt-0.5 block max-w-64 text-[11px] leading-4 text-slate-400">{r.label}</span>
+                <span className="mt-0.5 block max-w-64 text-[11px] leading-4 text-slate-500">{r.label}</span>
               </Td>
               <Td colSpan={4}>
                 <ActionForm
@@ -136,12 +137,12 @@ export default async function NumberingPage() {
             <tr key={r.code} id={`route-${r.code}`} className="opacity-70 target:opacity-100 target:[&>td]:bg-amber-50">
               <Td>
                 <span className="font-mono text-xs font-semibold text-slate-800">{r.code}</span>
-                <span className="mt-0.5 block max-w-64 text-[11px] leading-4 text-slate-400">{r.label}</span>
+                <span className="mt-0.5 block max-w-64 text-[11px] leading-4 text-slate-500">{r.label}</span>
               </Td>
               <Td colSpan={4}>
                 <ActionForm
                   action={saveSchemeRoutingAction}
-                  submitLabel="Route it"
+                  submitLabel="Use this scheme"
                   size="sm"
                   variant="secondary"
                   hidden={{ deliverableType: r.code, status: "1", active: "on" }}
@@ -150,12 +151,12 @@ export default async function NumberingPage() {
                   <label className="min-w-44">
                     <span className="sr-only">Scheme for {r.code}</span>
                     <select name="schemeName" required defaultValue="" className={`${inputCls} w-44`}>
-                      <option value="" disabled>Not routed…</option>
+                      <option value="" disabled>Choose a scheme…</option>
                       {options.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
                     </select>
                   </label>
-                  <span className="min-w-48 text-[11px] text-slate-400">
-                    {r.fallback ? <>keeps the short form <span className="font-mono">{r.fallback}</span></> : "no number can be issued until it is routed"}
+                  <span className="min-w-48 text-[11px] text-slate-500">
+                    {r.fallback ? <>keeps the short form <span className="font-mono">{r.fallback}</span></> : "no number can be given until it has a scheme"}
                   </span>
                 </ActionForm>
               </Td>
@@ -165,7 +166,7 @@ export default async function NumberingPage() {
       </Card>
 
       <section>
-        <h2 className="stencil mb-2 text-slate-400">The schemes themselves</h2>
+        <h2 className="stencil mb-2 text-slate-500">The schemes themselves</h2>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {schemes.map((s) => {
             const used = routing.filter((r) => r.schemeName === s.name);
@@ -177,9 +178,9 @@ export default async function NumberingPage() {
                       <div key={f.id} className="flex items-end gap-1">
                         {i ? <span className="pb-6 font-mono text-lg text-slate-300">{s.delimiter}</span> : null}
                         <div className="text-center">
-                          <span className="block rounded-lg bg-slate-100 px-2.5 py-1.5 font-mono text-sm font-bold text-slate-800">{shown(f)}</span>
-                          <span className="mt-1 block max-w-28 text-[10px] leading-3 text-slate-500">{f.label}</span>
-                          <span className="block text-[10px] text-slate-300">
+                          <span className="block rounded-md bg-slate-100 px-2.5 py-1.5 font-mono text-sm font-bold text-slate-800">{shown(f)}</span>
+                          <span className="mt-1 block max-w-28 text-[11px] leading-3 text-slate-500">{f.label}</span>
+                          <span className="block text-[11px] text-slate-300">
                             {f.rule ? ruleSource(f.rule) : f.valueSetKey ? sets.find((x) => x.key === f.valueSetKey)?.title ?? f.valueSetKey : ""}
                           </span>
                         </div>
@@ -189,16 +190,16 @@ export default async function NumberingPage() {
                 </div>
                 <p className="mt-3 text-[11.5px] leading-[1.45] text-slate-500">
                   Looks like <span className="font-mono text-slate-700">{example(s.name)}</span> ·{" "}
-                  {used.length ? `used by ${used.map((u) => u.deliverableType).join(", ")}` : "routed to nothing yet"}
+                  {used.length ? `used by ${used.map((u) => u.deliverableType).join(", ")}` : "nothing uses it yet"}
                 </p>
-                <details className="mt-4 rounded-xl border border-line bg-tint-soft">
+                <details className="mt-4 rounded-md border border-line bg-tint-soft">
                   <summary className="cursor-pointer px-3 py-2 text-[11.5px] font-semibold text-slate-600">
                     {used.length ? "Edit — careful, it is in use" : "Edit this scheme"}
                   </summary>
                   <div className="border-t border-line p-3">
                     {used.length ? (
                       <p className="mb-3 text-[11px] leading-4 text-amber-700">
-                        Numbers already issued keep their shape; editing changes only what is issued next. To number new documents differently, make a scheme and route to it instead.
+                        Numbers already issued keep their shape; editing changes only what is issued next. To number new documents differently, make a new scheme and give it to those types instead.
                       </p>
                     ) : null}
                     <NumberingSchemeBuilder
@@ -211,7 +212,7 @@ export default async function NumberingPage() {
                     />
                     <form action={removeNumberingSchemeAction} className="mt-3 border-t border-line pt-3">
                       <input type="hidden" name="id" value={s.id} />
-                      <button className="text-[11.5px] font-semibold text-red-600">Remove if it is not routed</button>
+                      <button className="text-[11.5px] font-semibold text-red-600">Remove this scheme (only while nothing uses it)</button>
                     </form>
                   </div>
                 </details>
@@ -221,7 +222,7 @@ export default async function NumberingPage() {
         </div>
       </section>
 
-      <Card title="A new scheme" description="Build the shape, then route whatever should use it in the table above.">
+      <Card title="A new scheme" description="Build the shape, then choose it for whatever should use it in the table above.">
         <NumberingSchemeBuilder sets={sets.map((set) => ({ key: set.key, title: set.title }))} />
       </Card>
     </div>

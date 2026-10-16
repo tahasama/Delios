@@ -8,6 +8,7 @@ import { createVerdictListAction, updateVerdictListAction } from "@/lib/settings
 import { VerdictRows } from "./verdict-rows";
 import { Pencil, Plus } from "lucide-react";
 import Link from "next/link";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Verdict lists" };
@@ -28,7 +29,7 @@ const MEANING = Object.fromEntries(VERDICT_EFFECT.map((o) => [o.value, o.label.s
 export default async function VerdictListsPage() {
   const { user: me } = await requireScope();
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/verdicts")!)) {
-    return <PageHeader title="Verdict lists" subtitle="Administrators only." />;
+    return <NoAccess title="Verdict lists" who="admin" />;
   }
   const lists = await api<VerdictList[]>("/api/admin/verdict-lists");
 

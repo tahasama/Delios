@@ -1,7 +1,7 @@
 import { requireScope } from "@/lib/core/scope";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { PageHeader, Card, Chip, DataTable, Field, Th, Td, inputCls } from "@/components/ui";
-import { ActionForm } from "@/components/form";
+import { ActionForm, ConfirmButton } from "@/components/form";
 import { getActiveSet } from "@/lib/settings/config";
 import {
   createFunctionAction,
@@ -14,6 +14,7 @@ import { VERBS, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/core/permissions
 import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 import { Check, Minus } from "lucide-react";
 import { functionsForMatrix } from "@/lib/settings/api-admin";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Functions & permissions" };
@@ -33,7 +34,7 @@ function parseVerbs(json: string): Verb[] {
 export default async function FunctionsPage() {
   const { user: me } = await requireScope();
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/functions")!)) {
-    return <PageHeader title="Functions & permissions" subtitle="Administrators and the control function." />;
+    return <NoAccess title="Functions & permissions" who="control" />;
   }
   // Document Control maintains the matrix, but not the authority that could
   // give itself more: an administrator's own function stays with administrators.
@@ -121,8 +122,8 @@ export default async function FunctionsPage() {
             return (
               <tr key={fn.id} className={fn.active ? "" : "opacity-45"}>
                 <Td className="sticky left-0 z-1 bg-surface py-2 text-xs">
-                  <p className="font-semibold text-slate-800">{fn.name}</p>
-                  {narrowed.length ? <p className="text-[10px] text-slate-500">only for {narrowed.join("; ")}</p> : null}
+                  <p className="font-semibold text-slate-800">{fn.name}{fn.active ? null : <span className="ml-1.5 font-normal text-slate-500">· not in use</span>}</p>
+                  {narrowed.length ? <p className="text-[11px] text-slate-500">only for {narrowed.join("; ")}</p> : null}
                 </Td>
                 <Td className="whitespace-nowrap py-2 text-xs text-slate-500">{fn.department ? deptLabel.get(fn.department) ?? fn.department : <span className="text-slate-300">—</span>}</Td>
                     {VERBS.map((v) => {
@@ -134,14 +135,15 @@ export default async function FunctionsPage() {
                             <form action={toggleFunctionVerb}>
                               <input type="hidden" name="functionId" value={fn.id} />
                               <input type="hidden" name="verb" value={v} />
-                              <button
-                                type="submit"
+                              <ConfirmButton
+                                confirm={`${on ? "Take" : "Give"} ${VERB_LABEL[v]} ${on ? "from" : "to"} everyone who holds ${fn.name}${fn._count.memberships ? ` (${fn._count.memberships} ${fn._count.memberships === 1 ? "person" : "people"})` : ""}?`}
+                                aria-pressed={on}
                                 title={`${on ? "Remove" : "Grant"} ${VERB_LABEL[v]} for ${fn.name}${narrowed ? " — it is also granted for certain documents only, which is changed below" : ""}`}
                                 aria-label={`${on ? "Remove" : "Grant"} ${VERB_LABEL[v]} for ${fn.name}`}
-                                className={`mx-auto grid h-6 w-6 place-items-center rounded-md border transition ${on ? "border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : narrowed ? "border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100" : "border-transparent text-slate-200 hover:border-line-strong hover:text-slate-400"}`}
+                                className={`mx-auto grid h-6 w-6 place-items-center rounded-md border transition ${on ? "border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : narrowed ? "border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100" : "border-transparent text-slate-200 hover:border-line-strong hover:text-slate-500"}`}
                               >
-                                {on ? <Check className="h-3.5 w-3.5" /> : narrowed ? <span className="text-[10px] font-bold">◐</span> : <Minus className="h-3 w-3" />}
-                              </button>
+                                {on ? <Check className="h-3.5 w-3.5" /> : narrowed ? <span className="text-[11px] font-bold">◐</span> : <Minus className="h-3 w-3" />}
+                              </ConfirmButton>
                             </form>
                           ) : on ? <Check className="mx-auto h-4 w-4 text-emerald-600" /> : <Minus className="mx-auto h-3 w-3 text-slate-200" />}
                         </Td>
@@ -161,14 +163,14 @@ export default async function FunctionsPage() {
               <details>
                 <summary className="flex cursor-pointer list-none items-center gap-3 py-2.5 text-sm">
                   <span className="font-semibold text-slate-800">{fn.name}</span>
-                  <span className="text-xs text-slate-400">{fn._count.memberships} {fn._count.memberships === 1 ? "person" : "people"}</span>
+                  <span className="text-xs text-slate-500">{fn._count.memberships} {fn._count.memberships === 1 ? "person" : "people"}</span>
                   {fn.active ? null : <Chip className="bg-slate-100 text-slate-500 ring-slate-300">retired</Chip>}
                   {fn.rules.length === 0 ? <span className="text-xs text-amber-700">no rules — can do nothing</span> : null}
                 </summary>
                 <div className="space-y-4 pb-4 pl-3">
                   <ul className="space-y-1.5">
                     {fn.rules.map((rule) => (
-                      <li key={rule.id} className="flex items-start justify-between gap-3 rounded-lg border border-line bg-tint-soft px-3 py-2">
+                      <li key={rule.id} className="flex items-start justify-between gap-3 rounded-md border border-line bg-tint-soft px-3 py-2">
                         <span className="min-w-0">
                           <span className="block text-xs font-medium text-slate-700">{scopeText(rule) || "All documents"}</span>
                           <span className="mt-1 flex flex-wrap gap-1">
@@ -220,14 +222,14 @@ export default async function FunctionsPage() {
                   <ActionForm action={updateFunctionAction} submitLabel="Save" size="sm" hidden={{ functionId: fn.id, name: fn.name }} className="flex flex-wrap items-center gap-3 space-y-0">
                     <label className="flex items-center gap-2 text-xs text-slate-600">
                       Department
-                      <select name="department" defaultValue={fn.department ?? ""} className="rounded-md border border-line-strong px-1.5" title="The department this job sits in — optional">
+                      <select name="department" defaultValue={fn.department ?? ""} className={`${inputCls} w-auto`} title="The department this job sits in — optional">
                         <option value="">no department</option>
                         {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
                       </select>
                     </label>
                     <label className="flex items-center gap-2 text-xs text-slate-600">
                       Clearance
-                      <select name="clearance" defaultValue={fn.clearance ?? ""} className="rounded-md border border-line-strong px-1.5" title="The most confidential level this job reads without being named on the document">
+                      <select name="clearance" defaultValue={fn.clearance ?? ""} className={`${inputCls} w-auto`} title="The most confidential level this job reads without being named on the document">
                         <option value="">no limit</option>
                         {confidentialities.map((c) => <option key={c.code} value={c.code}>up to {c.label}</option>)}
                       </select>

@@ -11,6 +11,7 @@ import { adminFunctions, adminUsers, partiesWithAnswers } from "@/lib/settings/a
 import { projectOrganizations } from "@/lib/organization/api";
 import { inviteOrganizationAction, endLinkAction, setProjectOrganizationAction } from "@/lib/organization/forms";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Organizations" };
@@ -20,7 +21,7 @@ export default async function AdminPartiesPage() {
   const ctx = await requireScope();
   const { user: me } = ctx;
   const policy = await formPolicy(ctx, "PARTY");
-  if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/parties")!)) return <PageHeader title="Organizations" subtitle="Administrators and the control function." />;
+  if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/parties")!)) return <NoAccess title="Organizations" who="control" />;
   const [parties, onProject, roles] = await Promise.all([
     partiesWithAnswers(),
     projectOrganizations(ctx),
@@ -53,10 +54,10 @@ export default async function AdminPartiesPage() {
                   <Td>{p.name}</Td>
                   <Td><Chip className={p.isInternal ? "bg-sky-100 text-sky-800 ring-sky-300" : "bg-violet-100 text-violet-800 ring-violet-300"}>{p.isInternal ? "our organization" : "external"}</Chip></Td>
                   <Td className="text-xs">
-                    {p.isInternal ? <span className="text-slate-400">—</span> : (
+                    {p.isInternal ? <span className="text-slate-500">—</span> : (
                       <>
                         <span className="font-medium text-slate-700">{KINDS.find((k) => k.value === kindOf(p))?.label}</span>
-                        <span className="block max-w-56 text-[11px] leading-4 text-slate-400">{KINDS.find((k) => k.value === kindOf(p))?.hint}</span>
+                        <span className="block max-w-56 text-[11px] leading-4 text-slate-500">{KINDS.find((k) => k.value === kindOf(p))?.hint}</span>
                         {p.link ? (
                           <span className="mt-1 block text-[11px] font-semibold text-slate-600">
                             {p.link.state === "LINKED" ? `Linked to ${p.link.organization}` : `Invited to link: ${p.link.organization} has not answered yet`}
@@ -69,14 +70,14 @@ export default async function AdminPartiesPage() {
                     {p.contact ? (
                       <>
                         <a href={`/settings/users#${p.contact.id}`} className="font-semibold text-link hover:underline">{p.contact.name}</a>
-                        {p.backup ? <span className="block text-[11px] text-slate-500">backup: {p.backup.name}</span> : <span className="block text-[11px] text-slate-400">no backup</span>}
+                        {p.backup ? <span className="block text-[11px] text-slate-500">backup: {p.backup.name}</span> : <span className="block text-[11px] text-slate-500">no backup</span>}
                       </>
-                    ) : p.isInternal ? <span className="text-slate-400">—</span> : <span className="font-semibold text-amber-700">nobody named</span>}
+                    ) : p.isInternal ? <span className="text-slate-500">—</span> : <span className="font-semibold text-amber-700">nobody named</span>}
                   </Td>
                   <Td className="tabular-nums text-xs">
                     {p._count.users
                       ? <a href={`/settings/users?org=${p.id}`} className="font-semibold text-link hover:underline">{p._count.users}</a>
-                      : <span className="text-slate-400">0</span>}
+                      : <span className="text-slate-500">0</span>}
                     {p.active ? null : <span className="block text-[11px] font-semibold text-red-700">access revoked</span>}
                   </Td>
                   <Td>
@@ -146,9 +147,9 @@ export default async function AdminPartiesPage() {
               {onProject.map((one) => (
                 <tr key={one.partyId} className={one.active ? "align-top" : "align-top opacity-60"}>
                   <Td><span className="font-mono text-xs font-semibold">{one.code}</span> <span className="text-xs text-slate-600">{one.name}</span></Td>
-                  <Td className="text-xs">{KINDS.find((k) => k.value === (one.kind === "NOT_ON_DELIOS" ? "OFFLINE" : one.kind))?.label}{one.linkedOrganization ? <span className="block text-[11px] text-slate-400">{one.linkedOrganization}</span> : null}</Td>
-                  <Td className="text-xs">{one.role ? roles.find((r) => r.code === one.role)?.label ?? one.role : <span className="text-slate-400">not stated</span>}</Td>
-                  <Td className="text-xs">{one.startFunction ?? (one.kind === "COLLABORATOR" ? <span className="font-semibold text-amber-700">not said yet</span> : <span className="text-slate-400">—</span>)}</Td>
+                  <Td className="text-xs">{KINDS.find((k) => k.value === (one.kind === "NOT_ON_DELIOS" ? "OFFLINE" : one.kind))?.label}{one.linkedOrganization ? <span className="block text-[11px] text-slate-500">{one.linkedOrganization}</span> : null}</Td>
+                  <Td className="text-xs">{one.role ? roles.find((r) => r.code === one.role)?.label ?? one.role : <span className="text-slate-500">not stated</span>}</Td>
+                  <Td className="text-xs">{one.startFunction ?? (one.kind === "COLLABORATOR" ? <span className="font-semibold text-amber-700">not said yet</span> : <span className="text-slate-500">—</span>)}</Td>
                   <Td className="tabular-nums text-xs">{one.people}</Td>
                   <Td>
                     <details>
@@ -177,7 +178,7 @@ export default async function AdminPartiesPage() {
           </details>
         </Card>
 
-        <details className="rounded-2xl border border-line bg-surface px-5 py-3 shadow-sm"><summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Add an organization</summary><div className="mt-3 max-w-2xl">
+        <details className="rounded-md border border-line bg-surface px-5 py-3"><summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Add an organization</summary><div className="mt-3 max-w-2xl">
           <ActionForm action={savePartyAction} submitLabel="Register this organization" size="sm">
             <p className="text-xs text-slate-500">
               Another organization you exchange documents with. Yours is already here, registered once at setup.
@@ -192,7 +193,7 @@ export default async function AdminPartiesPage() {
               <Added fields={policy.own} />
             </div>
             <PartyKindFields kind="OFFLINE" contactId="" backupId="" liaisonFunction="" people={[]} functions={functions} />
-            <p className="text-[11px] leading-4 text-slate-400">
+            <p className="text-[11px] leading-4 text-slate-500">
               A collaborator or a guest needs accounts, created in <a href="/settings/users" className="font-semibold text-link hover:underline">People &amp; access</a> and attached to this organization; then you name the one who answers for it.
               An organization that is not on the EDMS needs nobody here: one of our functions carries it, and fills in its review, comments and answer with proof each time.
             </p>

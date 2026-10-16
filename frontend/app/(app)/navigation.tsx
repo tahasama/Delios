@@ -60,6 +60,8 @@ type NavPermissions = {
   canTransmit: boolean;
   canControl: boolean;
   canConfigure: boolean;
+  /** At least one Settings page opens for this person (`SETUP_PAGES`, `maySetup`): the Settings link shows exactly then. */
+  canSettings: boolean;
   canCreate: boolean;
   /** Someone from another organization: the menu holds only what concerns them. */
   external?: boolean;
@@ -224,7 +226,7 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
       </nav>
 
       <div className="mt-4 space-y-2">
-        {perms.canConfigure ? (
+        {perms.canSettings ? (
           <Link
             href="/settings"
             onClick={onNavigate}

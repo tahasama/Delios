@@ -7,6 +7,7 @@ import { adminNumbering, type RevisionSeries } from "@/lib/settings/api-admin";
 import { createRevisionSchemeAction, updateRevisionSchemeAction, routeRevisionSchemeAction } from "@/lib/settings/forms-revisions";
 import { Pencil, Plus } from "lucide-react";
 import { SeriesRows } from "./series-rows";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Revisions" };
@@ -35,7 +36,7 @@ function sample(s: RevisionSeries, count = 4): string {
 export default async function RevisionsPage() {
   const { user: me } = await requireScope();
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/revisions")!)) {
-    return <PageHeader title="Revisions" subtitle="Administrators and the control function." />;
+    return <NoAccess title="Revisions" who="control" />;
   }
   const [{ revisionSchemes: schemes, revisionRouting: routing }, deliverables, phaseValues] = await Promise.all([adminNumbering(), getActiveSet("DELIVERABLE_TYPES"), getActiveSet("PHASES")]);
   const phases = phaseValues.map((p) => ({ code: p.code, label: p.label }));
@@ -92,7 +93,7 @@ export default async function RevisionsPage() {
             head={<tr><Th>Phase</Th><Th>Name</Th><Th>Counts in</Th><Th>Looks like</Th><Th>Letters skipped</Th></tr>}>
             {s.series.map((one) => (
               <tr key={one.code}>
-                <Td className="text-[13px] text-slate-800">{phaseName(one.phase)}{one.phase ? null : <span className="ml-1.5 text-[11px] text-slate-400">the default</span>}</Td>
+                <Td className="text-[13px] text-slate-800">{phaseName(one.phase)}{one.phase ? null : <span className="ml-1.5 text-[11px] text-slate-500">the default</span>}</Td>
                 <Td className="text-xs text-slate-600">{one.label}</Td>
                 <Td className="text-xs text-slate-600">{one.kind === "NUMBERS" ? "numbers" : "letters"}</Td>
                 <Td className="font-mono text-xs text-slate-700">{sample(one)}</Td>

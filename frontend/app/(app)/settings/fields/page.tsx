@@ -10,6 +10,7 @@ import {
 } from "@/lib/settings/field-policy";
 import { getSets } from "@/lib/settings/config";
 import { orgSettings } from "@/lib/settings/api";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Forms & fields" };
@@ -22,7 +23,7 @@ const OWN_CONTROLS: Control[] = ["TEXT", "LONG_TEXT", "NUMBER", "DATE", "YES_NO"
 const RULE_TONE: Record<FieldRule, string> = {
   REQUIRED: "bg-tint text-brand-ink ring-brand-line",
   OPTIONAL: "bg-slate-100 text-slate-600 ring-slate-300",
-  OFF: "bg-slate-100 text-slate-400 ring-slate-200",
+  OFF: "bg-slate-100 text-slate-500 ring-slate-200",
 };
 
 /**
@@ -42,7 +43,7 @@ const RULE_TONE: Record<FieldRule, string> = {
  */
 export default async function FieldsPage({ searchParams }: { searchParams: Promise<{ form?: string }> }) {
   const ctx = await requireScope();
-  if (!isAdmin(ctx.user)) return <PageHeader title="Forms & fields" subtitle="Administrators only." />;
+  if (!isAdmin(ctx.user)) return <NoAccess title="Forms & fields" who="admin" />;
   const sp = await searchParams;
   const kind: FieldKind = KINDS.includes(sp.form as FieldKind) ? (sp.form as FieldKind) : "DOCUMENT";
 
@@ -88,7 +89,7 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
               className={`register register-sheet px-3 py-2.5 transition ${on ? "border-brand-line ring-1 ring-brand-line/40" : "hover:border-brand-line/50"}`}
             >
               <span className={`block text-[13px] font-semibold leading-5 ${on ? "text-slate-900" : "text-slate-700"}`}>{KIND_TAB[one]}</span>
-              <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">
+              <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">
                 {all.length + theirs} fields · {must} must
                 {theirs ? <span className="block text-brand-ink">{theirs} of yours</span> : null}
               </span>
@@ -116,9 +117,9 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                       </p>
                       <p className="mt-0.5 text-[11.5px] leading-[1.45] text-slate-500">
                         {field.text}
-                        {field.fixed ? <span className="text-slate-400"> {field.fixed}</span> : null}
+                        {field.fixed ? <span className="text-slate-500"> {field.fixed}</span> : null}
                       </p>
-                      <p className="mt-1 text-[11px] leading-4 text-slate-400">
+                      <p className="mt-1 text-[11px] leading-4 text-slate-500">
                         {CONTROL_LABEL[field.control]}
                         {set ? (
                           <>
@@ -131,7 +132,7 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                       </p>
                     </div>
                     <label className="min-w-0">
-                      <span className="stencil mb-1 block text-slate-400 sm:hidden">Called</span>
+                      <span className="stencil mb-1 block text-slate-500 sm:hidden">Called</span>
                       <input
                         name={`label:${field.key}`}
                         defaultValue={labelOf(field.key, field.label)}
@@ -141,7 +142,7 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                       />
                     </label>
                     {field.fixed ? (
-                      <span className="pt-1.5 text-[11.5px] text-slate-400">{RULE_LABEL[rule]}</span>
+                      <span className="pt-1.5 text-[11.5px] text-slate-500">{RULE_LABEL[rule]}</span>
                     ) : (
                       <label className="min-w-0">
                         <span className="sr-only">{field.label}</span>
@@ -162,7 +163,7 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                       <Chip className="bg-tint text-brand-ink ring-brand-line">yours</Chip>
                     </p>
                     <p className="mt-0.5 text-[11.5px] leading-[1.45] text-slate-500">{field.help ?? "No note under the box."}</p>
-                    <p className="mt-1 text-[11px] leading-4 text-slate-400">
+                    <p className="mt-1 text-[11px] leading-4 text-slate-500">
                       {CONTROL_LABEL[field.control as Control]}
                       {field.setKey ? ` — ${sets.find((s) => s.key === field.setKey)?.title ?? field.setKey}` : ""}
                       {" · added by "}{field.addedByName}
@@ -188,7 +189,7 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                       formAction={removeOwnFieldOnRow}
                       name="id"
                       value={field.id}
-                      className="mt-1.5 text-[11px] font-medium text-slate-400 underline-offset-2 hover:text-red-700 hover:underline"
+                      className="mt-1.5 text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-red-700 hover:underline"
                     >
                       Remove this field
                     </button>
@@ -233,21 +234,21 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                 <input type="checkbox" name="inRegister" /> a column in the register
               </label>
             </div>
-            <p className="text-[11px] leading-4 text-slate-400">
+            <p className="text-[11px] leading-4 text-slate-500">
               Nothing in the application computes with a field of yours — no number is built from it, no authority read from
               it, no check asks about it — which is exactly why you may shape it however you like.
             </p>
           </ActionForm>
 
           {mine.length ? (
-            <p className="mt-3 border-t border-line pt-3 text-[11px] leading-4 text-slate-400">
+            <p className="mt-3 border-t border-line pt-3 text-[11px] leading-4 text-slate-500">
               To take one away, use <span className="font-medium text-slate-500">Remove this field</span> on its row above. It
               stops being asked at once; answers already given stay on the records that carry them.
             </p>
           ) : null}
         </Card>
 
-        <p className="max-w-prose text-[11px] leading-4 text-slate-400">
+        <p className="max-w-prose text-[11px] leading-4 text-slate-500">
           Two things override what is set here, and both make a field stricter, never looser: a numbering scheme that draws
           on a field makes it required for whatever is routed to it, and the type-to-field matrix can insist on supplier,
           order or date received for a particular deliverable type.

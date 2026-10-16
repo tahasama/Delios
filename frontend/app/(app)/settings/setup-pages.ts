@@ -55,14 +55,14 @@ export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/settings/dmp",
     title: "The plan",
-    text: "This project's document management plan, written from what is configured — printable, with the scope statement, what is still to settle and any agreed departures.",
+    text: "This project's document management plan, written from these settings and ready to print; with what is still to set up.",
     group: "Organization",
   },
 
   {
     href: "/settings/config",
     title: "Disciplines, types & sets",
-    text: "The published value sets every classification is drawn from.",
+    text: "The lists every document is described with: disciplines, document types, statuses, reasons and more.",
     group: "Classification",
   },
   {
@@ -95,13 +95,13 @@ export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/settings/flow",
     title: "Control room",
-    text: "The whole flow on one page: each step a document goes through, who carries it out, what the project has settled, and the sets each step uses.",
+    text: "The whole way a document goes, step by step: who does each step on this project, and what the project has settled.",
     group: "How work flows",
   },
   {
     href: "/settings/workflow-templates",
     title: "Review routes",
-    text: "Reviewer sequences — parallel, serial, consolidated.",
+    text: "Who reviews, and in which order: side by side, one after another, or gathered by a lead.",
     group: "How work flows",
     verb: "ROUTES",
     control: true,
@@ -116,7 +116,7 @@ export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/settings/functions",
     title: "Functions & permissions",
-    text: "What each function may do. An administrator’s own function can only be changed by an administrator.",
+    text: "What each function may do. Only an administrator changes an administrator's own function.",
     group: "Access",
     control: true,
   },
@@ -129,7 +129,7 @@ export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/settings/users",
     title: "People & access",
-    text: "Who is on which project, and in what function. Invite outsiders or create visitors.",
+    text: "Who is on which project, in which function. Add our people, or someone from another organization.",
     group: "Access",
     control: true,
     manage: true,
@@ -138,7 +138,7 @@ export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/settings/audit",
     title: "Audit trail",
-    text: "Every state transition, metadata change and access event.",
+    text: "Every change, with who made it and when.",
     group: "Change & evidence",
   },
 ];

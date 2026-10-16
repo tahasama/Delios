@@ -46,7 +46,7 @@ export function SeriesRows({ series, phases }: { series: RevisionSeries[]; phase
             </Field>
             <button type="button" onClick={() => remove(s.key)} disabled={rows.length === 1 || !!s.code}
               title={s.code ? "A line stays once the scheme is saved: revisions may carry it" : "Take this line out"}
-              className="mb-1.5 rounded-sm p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:invisible" aria-label="Take this line out">
+              className="mb-1.5 rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:invisible" aria-label="Take this line out">
               <X className="h-4 w-4" />
             </button>
           </div>

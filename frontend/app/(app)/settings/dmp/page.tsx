@@ -17,6 +17,7 @@ import { fmtDate } from "@/lib/core/utils";
 import { adminFunctions, adminNumbering, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty, scopeConfig } from "@/lib/settings/api-admin";
 import { projectSettings } from "@/lib/settings/api";
 import { getSet, getSets } from "@/lib/settings/config";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "The plan" };
@@ -26,7 +27,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   const view = sp.view === "built" || sp.view === "scope" ? sp.view : "plan";
   const ctx = await requireScope();
   const { user } = ctx;
-  if (!isAdmin(user)) return <PageHeader title="The plan" subtitle="Administrators only." />;
+  if (!isAdmin(user)) return <NoAccess title="The plan" who="admin" />;
 
   const REQUIRED = ["DELIVERABLE_TYPES", "DOCUMENT_TYPES", "DISCIPLINES", "PHASES", "CRITICALITY", "CONFIDENTIALITY", "STATUSES", "REVIEW_OUTCOMES", "REASONS_FOR_ISSUE", "RETENTION_CLASSES"];
   const [scope, requiredSets, schemes, routings, externalParties, members, withDepartment, rules, templates, actions, lastRun, projects] = await Promise.all([
@@ -110,21 +111,21 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
       ) : null}
 
       <ol className={`grid grid-cols-1 gap-4 lg:grid-cols-2 no-print ${view === "built" ? "" : "hidden"}`}>
-        {steps.map((step, index) => <li key={step.title} className={`rounded-2xl border bg-surface p-5 shadow-sm ${step.done ? "border-emerald-200" : "border-amber-200"}`}>
+        {steps.map((step, index) => <li key={step.title} className={`rounded-md border bg-surface p-5 ${step.done ? "border-emerald-200" : "border-amber-200"}`}>
           <div className="flex items-start gap-4">
-            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${step.done ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}><step.icon className="h-5 w-5" /></span>
-            <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">{index + 1}</span><h2 className="text-sm font-semibold text-slate-900">{step.title}</h2>{step.done ? <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-600" /> : <CircleDashed className="ml-auto h-4 w-4 text-amber-600" />}</div><p className="mt-2 text-xs leading-5 text-slate-500">{step.text}</p><p className="mt-3 text-[11px] font-medium text-slate-400">Where it stands: {step.evidence}</p>{step.done ? null : <p className="mt-1 text-[11px] font-semibold text-amber-700">Still to do: {step.todo}</p>}<Link href={step.href} className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-link">{step.action}<ArrowRight className="h-3.5 w-3.5" /></Link></div>
+            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-md ${step.done ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}><step.icon className="h-5 w-5" /></span>
+            <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-500">{index + 1}</span><h2 className="text-sm font-semibold text-slate-900">{step.title}</h2>{step.done ? <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-600" /> : <CircleDashed className="ml-auto h-4 w-4 text-amber-600" />}</div><p className="mt-2 text-xs leading-5 text-slate-500">{step.text}</p><p className="mt-3 text-[11px] font-medium text-slate-500">Where it stands: {step.evidence}</p>{step.done ? null : <p className="mt-1 text-[11px] font-semibold text-amber-700">Still to do: {step.todo}</p>}<Link href={step.href} className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-link">{step.action}<ArrowRight className="h-3.5 w-3.5" /></Link></div>
           </div>
         </li>)}
       </ol>
 
       {view === "built" && profileGaps.length ? (
-        <Card className="no-print" title="Starter profiles" description="Values your project types bring that are not published yet. They are drafted as controlled changes; another administrator approves them.">
+        <Card className="no-print" title="Starter profiles" description="Values your project type brings that are not in your lists yet. Add them in one go; rename or retire any of them afterwards in Disciplines, types & sets.">
           <ul className="space-y-3">
             {profileGaps.map((g) => (
               <li key={g.profile.id} className="flex flex-wrap items-center justify-between gap-3">
                 <span className="text-sm"><span className="font-semibold text-slate-800">{g.profile.name}</span> <span className="text-xs text-slate-500">· {g.missing} value(s) · {g.profile.description}</span></span>
-                <ActionForm action={draftProfileAction} submitLabel="Prepare drafts" size="sm" hidden={{ profile: g.profile.id }} className="space-y-0" />
+                <ActionForm action={draftProfileAction} submitLabel="Add them" size="sm" hidden={{ profile: g.profile.id }} className="space-y-0" />
               </li>
             ))}
           </ul>
@@ -134,7 +135,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
       {view === "scope" ? <>
       <Card className="no-print" id="scope" title="Scope statement" description="What the system covers and the quality bar it is measured against.">
         {scope?.scopeStatement ? (
-          <div className="mb-4 rounded-xl border border-line bg-tint-soft p-3 text-[11.5px] leading-[1.45] text-slate-600">
+          <div className="mb-4 rounded-md border border-line bg-tint-soft p-3 text-[11.5px] leading-[1.45] text-slate-600">
             <p className="font-semibold text-slate-800">{scope.organizationName}</p>
             <p className="mt-1">{scope.scopeStatement}</p>
             <p className="mt-1 text-slate-500">{scope.assessmentLevel} assessment · trusted above {scope.integrityThreshold}% · measured every {scope.measurementIntervalDays} days</p>
@@ -168,7 +169,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
           </div>
         </details>
         {scope ? (
-          <p className="mt-3 text-xs text-slate-400">
+          <p className="mt-3 text-xs text-slate-500">
             Rules version {scope.standardVersion} · used since {fmtDate(scope.effectiveDate)} · control function: {scope.controlFunctionName}
           </p>
         ) : null}
@@ -180,13 +181,13 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
           <ul className="mb-4 divide-y divide-line">
             {exceptions.map((e) => (
               <li key={e.id} className="py-2 text-sm">
-                <span className="font-medium text-slate-700">{e.item}</span> <span className="text-slate-400">· clauses {e.clauses}</span>
+                <span className="font-medium text-slate-700">{e.item}</span> <span className="text-slate-500">· clauses {e.clauses}</span>
                 <p className="text-xs text-slate-500">{e.reason} — by {e.authority}, from {fmtDate(e.startDate)}{e.reviewPoint ? `, review ${fmtDate(e.reviewPoint)}` : ""}</p>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="mb-4 text-xs text-slate-400">No exceptions recorded.</p>
+          <p className="mb-4 text-xs text-slate-500">No exceptions recorded.</p>
         )}
         <details><summary className="cursor-pointer text-xs font-semibold text-link">+ Record an exception</summary><div className="mt-3"><ActionForm action={addExceptionAction} submitLabel="Record exception" size="sm">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

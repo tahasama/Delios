@@ -11,6 +11,7 @@ import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { adminProjects } from "@/lib/settings/api-admin";
 import { projectSettings } from "@/lib/settings/api";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
@@ -21,7 +22,7 @@ export default async function ProjectsPage() {
   const ctx = await requireScope();
   const policy = await formPolicy(ctx, "PROJECT");
   const { user: me, projectId } = ctx;
-  if (!isAdmin(me)) return <PageHeader title="Projects" subtitle="Administrators only." />;
+  if (!isAdmin(me)) return <NoAccess title="Projects" who="admin" />;
 
   const roleOptions = await contractRoleOptions();
   const projects = await Promise.all((await adminProjects())
@@ -71,7 +72,7 @@ export default async function ProjectsPage() {
               <Td className="text-xs text-slate-500">{p.role === "GENERIC" ? <span className="text-slate-300">not stated</span> : p.role}</Td>
               <Td className="tabular-nums">{p._count.members}</Td>
               <Td className="tabular-nums">{p._count.documents}</Td>
-              <Td className="whitespace-nowrap text-xs text-slate-400">
+              <Td className="whitespace-nowrap text-xs text-slate-500">
                 {fmtDate(p.startDate)}
                 {p.endDate ? <span className="block text-slate-300">to {fmtDate(p.endDate)}</span> : null}
               </Td>
@@ -94,7 +95,7 @@ export default async function ProjectsPage() {
                   ) : null}
                   <details className="w-full">
                     <summary className="cursor-pointer text-xs font-semibold text-link">Rename</summary>
-                    <div className="mt-2 rounded-xl border border-line bg-tint-soft p-3">
+                    <div className="mt-2 rounded-md border border-line bg-tint-soft p-3">
                       <p className="mb-2 text-[11px] leading-4 text-amber-800">
                         The code is part of every number already given out. Changing it does not renumber anything:
                         documents keep the code they were created with, and only new numbers use the new one. Reports and
@@ -128,7 +129,7 @@ export default async function ProjectsPage() {
         </DataTable>
       </Card>
 
-      <details className="rounded-2xl border border-line bg-surface px-5 py-3 shadow-sm"><summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Open a new project</summary><div className="mt-3 max-w-2xl">
+      <details className="rounded-md border border-line bg-surface px-5 py-3"><summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ Open a new project</summary><div className="mt-3 max-w-2xl">
         <ActionForm action={createProjectAction} submitLabel="Open project" resetOnSuccess>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_150px]">
             <Field label="Project name" required>
@@ -162,7 +163,7 @@ export default async function ProjectsPage() {
               {({ required }) => <input type="date" name="endDate" required={required} className={inputCls} />}
             </Asked>
           </div>
-          <details className="rounded-xl border border-line bg-tint-soft px-3 py-2 text-[11.5px] leading-[1.45] text-slate-600">
+          <details className="rounded-md border border-line bg-tint-soft px-3 py-2 text-[11.5px] leading-[1.45] text-slate-600">
             <summary className="cursor-pointer font-medium text-slate-700">Where approval sits under each role</summary>
             <dl className="mt-2 space-y-1.5">
               {roleOptions.filter((r) => r.code !== "GENERIC").map((r) => (
@@ -187,7 +188,7 @@ export default async function ProjectsPage() {
               You can prune the team afterwards in People &amp; access.
             </span>
           </label>
-          <p className="flex items-start gap-1.5 text-[11px] text-slate-400">
+          <p className="flex items-start gap-1.5 text-[11px] text-slate-500">
             <FolderOpen className="mt-0.5 h-3 w-3 shrink-0" />
             Value sets, numbering schemes and the permission matrix are shared — the new project uses them immediately.
           </p>

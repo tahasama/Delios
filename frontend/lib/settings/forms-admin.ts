@@ -39,9 +39,7 @@ export async function createUserAction(_prev: Result | undefined, formData: Form
   const name = text(formData, "name");
   const functionId = text(formData, "functionId");
   const partyId = text(formData, "partyId") || null;
-  const password = String(formData.get("password") ?? "");
   if (!email || !name) return { error: "Name and email are required." };
-  if (password.length < 8) return { error: "A password has at least 8 characters." };
   if (!functionId) return { error: "Choose the function this person will hold." };
   const projectIds = formData.getAll("projectIds").map(String).filter(Boolean);
   if (!projectIds.length) return { error: "Choose at least one project — access is granted per project." };
@@ -49,8 +47,10 @@ export async function createUserAction(_prev: Result | undefined, formData: Form
   const policy = await formPolicy(ctx, "PERSON");
   const asked = checkForm("PERSON", policy, { name, email, functionId, partyId, department: text(formData, "department") }, (n) => String(formData.get(n) ?? ""));
   if (asked.error) return { error: asked.error };
+  // Nobody but the person ever knows their password: they are invited to choose it.
+  let created: { id: string; invited?: boolean; link?: string | null };
   try {
-    const created = await api<{ id: string }>("/api/admin/users", { body: { name, email, password, partyId } });
+    created = await api<{ id: string; invited?: boolean; link?: string | null }>("/api/admin/users", { body: { name, email, partyId, invite: true } });
     for (const projectId of projectIds) {
       await api(`/api/admin/projects/${projectId}/members`, {
         method: "PUT", body: { userId: created.id, functionId, department: text(formData, "department") || null, active: true },
@@ -60,7 +60,14 @@ export async function createUserAction(_prev: Result | undefined, formData: Form
     return failed(e);
   }
   revalidatePath("/settings/users");
-  return {};
+  return { ok: invitedSaid(name, email, created) };
+}
+
+/** What happens next for someone just added: the email with their link, or the link to hand them when email is off. */
+function invitedSaid(name: string, email: string, created: { invited?: boolean; link?: string | null }): string {
+  return created.invited
+    ? `${name} is added. An email to ${email} asks them to choose their own password; the link works once, for 7 days.`
+    : `${name} is added. Email is off here, so give them this link to choose their own password (it works once, for 7 days): ${created.link ?? ""}`;
 }
 
 export async function addConfigValueAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
@@ -328,15 +335,14 @@ export async function removeNumberingSchemeAction(formData: FormData) {
 }
 
 /**
- * The same three things, to many rows at once. A value in use is retired,
- * never deleted, whichever button was pressed: the backend retires values and
- * never deletes them.
+ * Retire or activate many values at once. Values are retired, never deleted (the backend never deletes them), so
+ * there is no "Delete" here.
  */
 export async function bulkValuesAction(formData: FormData) {
   const ctx = await requireScope();
   if (!isAdmin(ctx.user)) return;
   const op = text(formData, "op");
-  if (!["RETIRE", "REACTIVATE", "DELETE"].includes(op)) return;
+  if (!["RETIRE", "REACTIVATE"].includes(op)) return;
   for (const valueId of formData.getAll("valueIds").map(String).filter(Boolean)) {
     const { setKey, code } = valueRef(valueId);
     await putValue({ setKey, code, status: op === "REACTIVATE" ? "ACTIVE" : "RETIRED" }).catch(() => undefined);

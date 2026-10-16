@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowRight, Check, Plus, Trash2, Users2, X } from "lucide-react";
 import { ActionForm } from "@/components/form";
-import { Field, Chip, inputCls } from "@/components/ui";
+import { Field, Chip, inputCls, btn } from "@/components/ui";
 import { saveTemplateAction } from "@/lib/reviews/forms";
 
 export type WorkflowBuilderStep = {
@@ -131,7 +131,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
       </div>
 
       {/* ── The route, drawn ─────────────────────────────────────────────── */}
-      <section className="rounded-2xl border border-line bg-slate-50/70 p-4">
+      <section className="rounded-md border border-line bg-tint-soft/70 p-4">
         <div className="mb-3">
           <p className="text-sm font-semibold text-slate-800">The route</p>
           <p className="mt-0.5 text-xs text-slate-500">
@@ -156,7 +156,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                     onClick={(e) => { e.stopPropagation(); remove(index); }}
                     title="Remove this step"
                     aria-label={`Remove step ${index + 1}`}
-                    className="absolute -right-1.5 -top-1.5 z-10 grid h-5 w-5 place-items-center rounded-full border border-line bg-surface text-slate-400 shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                    className="absolute -right-1.5 -top-1.5 z-10 grid h-5 w-5 place-items-center rounded-full border border-line bg-surface text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -164,21 +164,21 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                 <button
                   type="button"
                   onClick={() => setOpen(open === index ? null : index)}
-                  className={`w-56 shrink-0 rounded-xl border p-3 text-left transition ${open === index ? "border-brand-line bg-surface shadow-sm" : decides ? "border-emerald-300 bg-emerald-50/60 hover:bg-emerald-50" : "border-line bg-surface hover:border-line-strong"}`}
+                  className={`w-56 shrink-0 rounded-md border p-3 text-left transition ${open === index ? "border-brand-line bg-surface" : decides ? "border-emerald-300 bg-emerald-50/60 hover:bg-emerald-50" : "border-line bg-surface hover:border-line-strong"}`}
                 >
                   <span className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Step {index + 1}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Step {index + 1}</span>
                     <Chip className={decides ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{decides ? "decides" : "advises"}</Chip>
                   </span>
                   <span className="mt-1 block text-sm font-semibold text-slate-900">{step.title || (decides ? "Decision" : `Review ${index + 1}`)}</span>
                   <span className="mt-1.5 block text-[11px] leading-4 text-slate-600">
                     {step.partyId
-                      ? <span className="font-medium text-slate-700">{outsideParties.find((party) => party.id === step.partyId)?.name ?? "An outside party"}<span className="block text-[10px] text-slate-400">outside party</span></span>
+                      ? <span className="font-medium text-slate-700">{outsideParties.find((party) => party.id === step.partyId)?.name ?? "An outside party"}<span className="block text-[11px] text-slate-500">outside party</span></span>
                       : empty ? <span className="text-amber-700">Nobody yet — name a person or a function</span> : [...people, ...fns.map((f) => `${f} (function)`)].join(", ")}
                   </span>
-                  {step.days ? <span className="mt-1.5 block text-[10px] text-slate-400">{step.days} working day{step.days === 1 ? "" : "s"}</span> : null}
+                  {step.days ? <span className="mt-1.5 block text-[11px] text-slate-500">{step.days} working day{step.days === 1 ? "" : "s"}</span> : null}
                   {people.length + fns.length > 1 ? (
-                    <span className="mt-1.5 flex items-center gap-1 text-[10px] text-slate-400"><Users2 className="h-3 w-3" /> {HOW.find((h) => h.value === step.mode)?.label}</span>
+                    <span className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-500"><Users2 className="h-3 w-3" /> {HOW.find((h) => h.value === step.mode)?.label}</span>
                   ) : null}
                 </button>
                 </div>
@@ -200,7 +200,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
 
         {/* ── The open box ───────────────────────────────────────────────── */}
         {open !== null && steps[open] ? (
-          <div className="mt-3 rounded-xl border border-brand-line/40 bg-surface p-4">
+          <div className="mt-3 rounded-md border border-brand-line/40 bg-surface p-4">
             <div className="flex flex-wrap items-center gap-3">
               <input
                 value={steps[open].title ?? ""}
@@ -223,19 +223,19 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                 working days
               </label>
               <span className="text-xs text-slate-500">{open === steps.length - 1 ? "This box decides. Only people who may approve the document can be on it." : "This box advises the one that decides."}</span>
-              <button type="button" onClick={() => remove(open)} disabled={steps.length === 1} className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30">
-                <Trash2 className="h-3.5 w-3.5" /> Remove this box
+              <button type="button" onClick={() => remove(open)} disabled={steps.length === 1} className={`ml-auto ${btn("ghost", "sm")} text-slate-600 hover:text-red-600`}>
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Remove this box
               </button>
-              <button type="button" onClick={() => setOpen(null)} className="rounded-lg p-1 text-slate-400 hover:text-slate-700" aria-label="Close"><X className="h-4 w-4" /></button>
+              <button type="button" onClick={() => setOpen(null)} className="rounded-md p-1 text-slate-500 hover:text-slate-700" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
 
             {steps[open].partyId ? (
-              <div className="mt-4 rounded-xl border border-line bg-slate-50 p-3">
+              <div className="mt-4 rounded-md border border-line bg-tint-soft p-3">
                 <p className="text-xs font-semibold text-slate-800">{outsideParties.find((party) => party.id === steps[open].partyId)?.name ?? "An outside party"} answers this step</p>
                 <p className="mt-1 text-[11px] leading-4 text-slate-500">
                   {outsideParties.find((party) => party.id === steps[open].partyId)?.participation === "IN_APP"
                     ? "They answer here, in their own account."
-                    : "We send it to them and write down their answer. Who carries that, and whether it needs proof, is set on the party in Parties & people."}
+                    : "We send it to them and write down their answer. Who carries that, and whether it needs proof, is set on the organization, in Organizations."}
                 </p>
                 <button type="button" onClick={() => update(open, { partyId: undefined })} className="mt-2 text-[11px] font-semibold text-link hover:underline">
                   Choose our own people instead
@@ -245,25 +245,25 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
             <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_280px]">
               <div>
                 <p className="text-xs font-medium text-slate-700">People</p>
-                <p className="mb-1.5 text-[11px] text-slate-400">Two or more work in parallel. Every step names someone: people, a function, or an outside party.</p>
-                <div className="scroll-thin max-h-56 overflow-y-auto rounded-xl border border-line p-2">
+                <p className="mb-1.5 text-[11px] text-slate-500">Two or more work in parallel. Every step names someone: people, a function, or an outside party.</p>
+                <div className="scroll-thin max-h-56 overflow-y-auto rounded-md border border-line p-2">
                   {/* An outside party sits in the same list as our own people:
                       picking one is how a step becomes external. */}
                   {outsideParties.length ? (
                     <div className="mb-2">
-                      <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Outside parties</p>
+                      <p className="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">Outside parties</p>
                       <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                         {outsideParties.map((party) => (
                           <button
                             key={party.id}
                             type="button"
                             onClick={() => update(open, { partyId: party.id, participantIds: [], functionIds: [] })}
-                            className="flex items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-left text-xs text-slate-600 transition hover:bg-slate-50"
+                            className="flex items-center gap-2 rounded-md border border-transparent px-2.5 py-2 text-left text-xs text-slate-600 transition hover:bg-tint-soft"
                           >
                             <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md border border-line-strong" />
                             <span className="min-w-0">
                               <span className="block truncate font-semibold">{party.name}</span>
-                              <span className="block text-[10px] text-slate-400">{party.participation === "IN_APP" ? "answers here" : "we record their answer"}</span>
+                              <span className="block text-[11px] text-slate-500">{party.participation === "IN_APP" ? "answers here" : "we record their answer"}</span>
                             </span>
                           </button>
                         ))}
@@ -272,15 +272,15 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                   ) : null}
                   {parties.map(([party, list]) => (
                     <div key={party} className="mb-2 last:mb-0">
-                      <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">{party}</p>
+                      <p className="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">{party}</p>
                       <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                         {list.map((person) => {
                           const selected = steps[open].participantIds.includes(person.id);
                           return (
                             <button key={person.id} type="button" onClick={() => togglePerson(open, person.id)}
-                              className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition ${selected ? "border-brand-line bg-tint text-brand-ink" : "border-transparent text-slate-600 hover:bg-slate-50"}`}>
+                              className={`flex items-center gap-2 rounded-md border px-2.5 py-2 text-left text-xs transition ${selected ? "border-brand-line bg-tint text-brand-ink" : "border-transparent text-slate-600 hover:bg-tint-soft"}`}>
                               <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md ${selected ? "bg-brand text-white" : "border border-line-strong"}`}>{selected ? <Check className="h-3 w-3" /> : null}</span>
-                              <span className="min-w-0"><span className="block truncate font-semibold">{person.name}</span><span className="block text-[10px] text-slate-400">{person.role.toLowerCase()}</span></span>
+                              <span className="min-w-0"><span className="block truncate font-semibold">{person.name}</span><span className="block text-[11px] text-slate-500">{person.role.toLowerCase()}</span></span>
                             </button>
                           );
                         })}
@@ -293,13 +293,13 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
               <div className="space-y-4">
                 <div>
                   <p className="text-xs font-medium text-slate-700">Or whoever holds a function</p>
-                  <p className="mb-1.5 text-[11px] text-slate-400">The matrix decides who that is for each document.</p>
+                  <p className="mb-1.5 text-[11px] text-slate-500">The matrix decides who that is for each document.</p>
                   <div className="flex flex-wrap gap-1.5">
                     {functions.map((f) => {
                       const on = (steps[open].functionIds ?? []).includes(f.id);
                       return (
                         <button key={f.id} type="button" onClick={() => toggleFunction(open, f.id)}
-                          className={`rounded-[0.3rem] border px-2 py-1 text-xs ${on ? "border-brand-line bg-tint font-semibold text-brand-ink" : "border-line-strong bg-surface text-slate-600 hover:bg-slate-50"}`}>
+                          className={`rounded-[0.3rem] border px-2 py-1 text-xs ${on ? "border-brand-line bg-tint font-semibold text-brand-ink" : "border-line-strong bg-surface text-slate-600 hover:bg-tint-soft"}`}>
                           {on ? "✓ " : ""}{f.name}
                         </button>
                       );
@@ -321,7 +321,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
             {/* ── What this step does to the status ─────────────────────── */}
             <div className="mt-4 border-t border-line pt-4">
               <p className="text-xs font-medium text-slate-700">What it does to the status</p>
-              <p className="mb-2 text-[11px] leading-4 text-slate-400">
+              <p className="mb-2 text-[11px] leading-4 text-slate-500">
                 {open === steps.length - 1
                   ? "This box decides what the revision may be used for. Narrow the list if it may only decide on some of the statuses."
                   : "Nothing. A revision has a status only once Document Control publishes one; where it stands meanwhile is this route, and why it goes out is the reason for issue on the transmittal that carries it."}
@@ -330,7 +330,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                 {open === steps.length - 1 ? (
                   <div>
                     <p className="text-xs font-medium text-slate-700">May decide on</p>
-                    <p className="mb-1.5 text-[11px] text-slate-400">Nothing ticked: any status it is allowed to name.</p>
+                    <p className="mb-1.5 text-[11px] text-slate-500">Nothing ticked: any status it is allowed to name.</p>
                     <div className="flex flex-wrap gap-1.5">
                       {statuses.map((one) => {
                         const on = (steps[open!].grantsStatuses ?? []).includes(one.code);
@@ -344,7 +344,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
                               picked.has(one.code) ? picked.delete(one.code) : picked.add(one.code);
                               update(open!, { grantsStatuses: picked.size ? [...picked] : undefined });
                             }}
-                            className={`rounded-[0.3rem] border px-2 py-1 text-xs ${on ? "border-brand-line bg-tint font-semibold text-brand-ink" : "border-line-strong bg-surface text-slate-600 hover:bg-slate-50"}`}
+                            className={`rounded-[0.3rem] border px-2 py-1 text-xs ${on ? "border-brand-line bg-tint font-semibold text-brand-ink" : "border-line-strong bg-surface text-slate-600 hover:bg-tint-soft"}`}
                           >
                             {on ? "✓ " : ""}{one.code}
                           </button>
@@ -360,7 +360,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
       </section>
 
       {/* ── Which documents use it ───────────────────────────────────────── */}
-      <section className="rounded-2xl border border-line bg-slate-50/70 p-4">
+      <section className="rounded-md border border-line bg-tint-soft/70 p-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-slate-800">Which documents use this route?</p>
@@ -386,7 +386,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
 function AddHere({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} title="Add a step here" aria-label="Add a step here"
-      className="group grid w-6 shrink-0 place-items-center rounded-lg text-slate-300 transition hover:bg-slate-100 hover:text-link">
+      className="group grid w-6 shrink-0 place-items-center rounded-md text-slate-300 transition hover:bg-slate-100 hover:text-link">
       <Plus className="h-4 w-4" />
     </button>
   );

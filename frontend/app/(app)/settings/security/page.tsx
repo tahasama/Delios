@@ -4,6 +4,7 @@ import { ActionForm } from "@/components/form";
 import { api } from "@/lib/client";
 import { adminUsers } from "@/lib/settings/api-admin";
 import { setMfaRequiredAction, resetMfaAction } from "@/lib/account/forms-security";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Sign-in & security" };
@@ -15,7 +16,7 @@ export default async function SecurityPage() {
   await requireScope();
   const security = await api<Security>("/api/admin/security").catch(() => null);
   if (!security) {
-    return <PageHeader title="Sign-in & security" subtitle="Only an administrator of the organization changes how its people sign in." />;
+    return <NoAccess title="Sign-in & security" who="admin" />;
   }
   const people = (await adminUsers().catch(() => [])).filter((u) => u.active).sort((a, b) => a.name.localeCompare(b.name));
   const withMfa = people.filter((u) => u.mfa);

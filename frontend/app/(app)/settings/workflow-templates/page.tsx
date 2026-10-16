@@ -1,4 +1,5 @@
-import { PageHeader, Card, Chip, EmptyState } from "@/components/ui";
+import { PageHeader, Card, Chip, EmptyState, btn } from "@/components/ui";
+import { ConfirmButton } from "@/components/form";
 import { requireScope } from "@/lib/core/scope";
 import { deleteTemplateAction } from "@/lib/reviews/forms";
 import { getSets, getActiveSet } from "@/lib/settings/config";
@@ -71,7 +72,7 @@ export default async function WorkflowTemplatesPage() {
                   {admin ? (
                     <form action={deleteTemplateAction}>
                       <input type="hidden" name="id" value={t.id} />
-                      <button className="text-xs text-slate-400 hover:text-red-600">remove</button>
+                      <ConfirmButton className={`${btn("ghost", "sm")} text-slate-600 hover:text-red-600`} confirm={`Stop using the route "${t.name}"? It is no longer offered for new reviews; reviews already on it carry on.`}>Stop using it</ConfirmButton>
                     </form>
                   ) : null}
                 </div>
@@ -79,7 +80,7 @@ export default async function WorkflowTemplatesPage() {
                 {(() => {
                   const v = setViews.get(t.outcomeSetKey ?? "REVIEW_OUTCOMES");
                   return v ? (
-                    <div className="mb-3 rounded-lg border border-line bg-tint-soft px-3 py-2 text-[11.5px] leading-[1.45]">
+                    <div className="mb-3 rounded-md border border-line bg-tint-soft px-3 py-2 text-[11.5px] leading-[1.45]">
                       <span className="font-semibold text-slate-700">Verdicts: {v.title}</span>
                       <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
                         {v.values.map((x) => <span key={x.code} className="rounded bg-surface px-1.5 py-0.5 ring-1 ring-slate-200" title={`${x.label} — ${x.effectLabel}`}><span className="font-mono font-bold">{x.code}</span> <span className="text-slate-500">{x.effectLabel}</span></span>)}
@@ -93,23 +94,23 @@ export default async function WorkflowTemplatesPage() {
                     const who = [...(s.functionIds ?? []).map((fid) => `any ${functions.find((f) => f.id === fid)?.name ?? "?"}`), ...s.participantIds.map(nameOf)];
                     return (
                       <div key={i} className="flex items-stretch gap-1">
-                        <div className={`w-48 shrink-0 rounded-xl border p-2.5 ${decides ? "border-emerald-300 bg-emerald-50/60" : "border-line bg-tint-soft"}`}>
+                        <div className={`w-48 shrink-0 rounded-md border p-2.5 ${decides ? "border-emerald-300 bg-emerald-50/60" : "border-line bg-tint-soft"}`}>
                           <p className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Step {i + 1}</span>
+                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Step {i + 1}</span>
                             <Chip className={decides ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{decides ? "decides" : "advises"}</Chip>
                           </p>
                           <p className="mt-1 text-[13px] font-semibold text-slate-900">{s.title || (decides ? "Decision" : `Review ${i + 1}`)}</p>
                           <p className="mt-1 text-[11px] leading-4 text-slate-600">{who.length ? who.join(", ") : <span className="text-amber-700">by discipline when sent</span>}</p>
-                          {who.length > 1 ? <p className="mt-1 text-[10px] text-slate-400">{s.mode === "ANY_OF" ? "whoever gets there first" : s.mode === "SERIAL" ? "one after another" : s.mode === "ALL" ? "all, any order" : "all, last one sums up"}</p> : null}
+                          {who.length > 1 ? <p className="mt-1 text-[11px] text-slate-500">{s.mode === "ANY_OF" ? "whoever gets there first" : s.mode === "SERIAL" ? "one after another" : s.mode === "ALL" ? "all, any order" : "all, last one sums up"}</p> : null}
                         </div>
                         {i < steps.length - 1 ? <ArrowRight className="h-4 w-4 shrink-0 self-center text-slate-300" aria-hidden /> : null}
                       </div>
                     );
                   })}
                 </div>
-                <p className="mt-2 text-[11px] text-slate-400">Used for: {scopeWords(t.classes)}</p>
+                <p className="mt-2 text-[11px] text-slate-500">Used for: {scopeWords(t.classes)}</p>
                 {admin ? (
-                  <details className="mt-3 rounded-lg border border-line">
+                  <details className="mt-3 rounded-md border border-line">
                     <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-600">Edit</summary>
                     <div className="border-t border-line p-3">
                       <WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} id={t.id} name={t.name} description={t.description ?? ""} classes={t.classes} outcomeSetKey={t.outcomeSetKey ?? "REVIEW_OUTCOMES"} isDefault={t.isDefault} initialSteps={steps} users={users} outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} classOptions={classOptions} statuses={statusChoices} />
@@ -123,7 +124,7 @@ export default async function WorkflowTemplatesPage() {
       )}
 
       {admin ? (
-        <details className="rounded-2xl border border-line bg-surface px-5 py-3 shadow-sm">
+        <details className="rounded-md border border-line bg-surface px-5 py-3">
           <summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ New review route</summary>
           <div className="mt-3"><WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} users={users} outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} classOptions={classOptions} statuses={statusChoices} /></div>
         </details>

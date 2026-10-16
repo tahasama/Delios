@@ -7,10 +7,11 @@ import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/settings/field-policy";
 import { createUserAction, savePersonAction } from "@/lib/settings/forms-admin";
-import { inviteGuestAction, createVisitorAction } from "@/lib/settings/forms-guests";
+import { createVisitorAction } from "@/lib/settings/forms-guests";
 import { adminFunctions, adminParties, adminProjects, adminUsers } from "@/lib/settings/api-admin";
 import { getMe } from "@/lib/account/api";
 import { getActiveSet } from "@/lib/settings/config";
+import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "People & access" };
@@ -21,7 +22,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const policy = await formPolicy(ctx, "PERSON");
   const sp = await searchParams;
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/users")!, !(await controlDoes(ctx, "PROJECT_PEOPLE")))) {
-    return <PageHeader title="People & access" subtitle="Administrators and the control function." />;
+    return <NoAccess title="People & access" who="control" />;
   }
   // Scoped to this administrator's organization: they can see and add people
   // here and nowhere else.
@@ -80,7 +81,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
 
       <Card title="Add someone">
         <div className="divide-y divide-line">
-          <AddWay title="Someone in our organization" hint="They sign in straight away with the password you set.">
+          <AddWay title="Someone in our organization" hint="They get an email with a link to choose their own password.">
             <ActionForm action={createUserAction} submitLabel="Create account" size="sm">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Asked policy={policy} field="name">
@@ -105,32 +106,23 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                     </select>
                   )}
                 </Asked>
-                <Field label="Password" required><input name="password" required minLength={8} className={inputCls} placeholder="at least 8 characters" /></Field>
                 {projectPicker}
                 <Added fields={policy.own} />
               </div>
             </ActionForm>
           </AddWay>
 
-          <AddWay title="Someone whose company already uses this system" hint="Invite them. Their account stays with their company; you decide what they do here.">
-            <ActionForm action={inviteGuestAction} submitLabel="Invite" size="sm">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Their email" required><input type="email" name="email" required className={inputCls} placeholder="the address they sign in with" /></Field>
-                <Field label="Function here" required><select name="functionId" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{functionOptions}</select></Field>
-                <Field label="They represent" required hint="the organization they are on this project — a supplier, a client">
-                  <select name="partyId" required className={inputCls} defaultValue="">
-                    <option value="" disabled>Choose…</option>
-                    {externalParties.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </Field>
-                {projectPicker}
-              </div>
-            </ActionForm>
-          </AddWay>
+          {/* Someone whose company has its own DELIOS is never added here: once our organizations are linked, their
+              administrator puts them on the project, and they sign in at home (docs/ORGANIZATIONS.md). */}
+          <div className="py-2.5 text-xs text-slate-600">
+            <span className="font-semibold text-slate-800">Someone whose company has its own DELIOS?</span>{" "}
+            Link the two organizations on <Link href="/settings/parties" className="font-semibold text-link hover:underline">Organizations</Link>;
+            their administrator then puts them on the project, and they sign in with their own account.
+          </div>
 
-          <AddWay title="An outsider with no account" hint="Create a visitor. You own the account and can switch it off when they leave.">
+          <AddWay title="Someone from another organization, with no account" hint="They get an email with a link to choose their own password. You can switch the account off when they leave.">
             {externalParties.length === 0 ? (
-              <p className="text-xs text-amber-800">Add their company in Parties first.</p>
+              <p className="text-xs text-slate-700">Their organization is not set up yet. Add it on <Link href="/settings/parties" className="font-semibold text-link hover:underline">Organizations</Link> first, then come back here.</p>
             ) : (
               <ActionForm action={createVisitorAction} submitLabel="Create visitor" size="sm">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -143,7 +135,6 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                     </select>
                   </Field>
                   <Field label="Function" required><select name="functionId" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{functionOptions}</select></Field>
-                  <Field label="Password" required><input name="password" required minLength={8} className={inputCls} placeholder="at least 8 characters" /></Field>
                   {projectPicker}
                 </div>
               </ActionForm>
@@ -159,26 +150,26 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         {/* Narrowing this list is two questions: whose people, and on which
             project. Both are links, so the answer can be shared. */}
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-slate-400">Organization</span>
-          <a href="/settings/users" className={`rounded-lg px-2 py-1 font-semibold ${shownOrg ? "text-link hover:bg-slate-50" : "bg-slate-100 text-slate-800"}`}>All</a>
+          <span className="text-slate-500">Organization</span>
+          <a href="/settings/users" className={`rounded-md px-2 py-1 font-semibold ${shownOrg ? "text-link hover:bg-tint-soft" : "bg-slate-100 text-slate-800"}`}>All</a>
           {parties.map((party) => (
             <a
               key={party.id}
               href={`/settings/users?org=${party.id}${projectFilter ? `&project=${projectFilter}` : ""}`}
-              className={`rounded-lg px-2 py-1 font-semibold ${shownOrg?.id === party.id ? "bg-slate-100 text-slate-800" : "text-link hover:bg-slate-50"}`}
+              className={`rounded-md px-2 py-1 font-semibold ${shownOrg?.id === party.id ? "bg-slate-100 text-slate-800" : "text-link hover:bg-tint-soft"}`}
             >
               {party.name}
             </a>
           ))}
           {projects.length > 1 ? (
             <>
-              <span className="ml-3 text-slate-400">Project</span>
-              <a href={shownOrg ? `/settings/users?org=${shownOrg.id}` : "/settings/users"} className={`rounded-lg px-2 py-1 font-semibold ${projectFilter ? "text-link hover:bg-slate-50" : "bg-slate-100 text-slate-800"}`}>Any</a>
+              <span className="ml-3 text-slate-500">Project</span>
+              <a href={shownOrg ? `/settings/users?org=${shownOrg.id}` : "/settings/users"} className={`rounded-md px-2 py-1 font-semibold ${projectFilter ? "text-link hover:bg-tint-soft" : "bg-slate-100 text-slate-800"}`}>Any</a>
               {projects.map((item) => (
                 <a
                   key={item.id}
                   href={`/settings/users?project=${item.id}${shownOrg ? `&org=${shownOrg.id}` : ""}`}
-                  className={`rounded-lg px-2 py-1 font-semibold ${projectFilter === item.id ? "bg-slate-100 text-slate-800" : "text-link hover:bg-slate-50"}`}
+                  className={`rounded-md px-2 py-1 font-semibold ${projectFilter === item.id ? "bg-slate-100 text-slate-800" : "text-link hover:bg-tint-soft"}`}
                 >
                   {item.code}
                 </a>
@@ -193,8 +184,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             return (
               <tr key={u.id} id={`person-${u.id}`} className={u.active ? "scroll-mt-20 align-top target:bg-tint-soft" : "scroll-mt-20 align-top opacity-50 target:bg-tint-soft"}>
                 <Td>
-                  <span className="font-medium text-slate-800">{u.name}</span>{u.id === me.id ? <span className="ml-1 text-xs text-slate-400">(you)</span> : null}
-                  <span className="block text-[11px] text-slate-400">{u.email}{u.active ? "" : " · switched off"}</span>
+                  <span className="font-medium text-slate-800">{u.name}</span>{u.id === me.id ? <span className="ml-1 text-xs text-slate-500">(you)</span> : null}
+                  <span className="block text-[11px] text-slate-500">{u.email}{u.active ? "" : " · switched off"}</span>
                 </Td>
                 <Td className="text-xs">{u.party?.name ?? u.organization ?? "—"}</Td>
                 <Td className="text-xs">
@@ -248,7 +239,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           <DataTable head={<tr><Th>Person</Th><Th>Company</Th><Th>Project · job</Th><Th>Department</Th><Th></Th></tr>}>
             {guests.map((g) => (
               <tr key={g.id} className="align-top">
-                <Td>{g.user.name}<span className="block text-[11px] text-slate-400">{g.user.email}</span></Td>
+                <Td>{g.user.name}<span className="block text-[11px] text-slate-500">{g.user.email}</span></Td>
                 <Td className="text-xs">{g.user.org.name}</Td>
                 <Td className="text-xs">{g.project.code} · {g.function.name}</Td>
                 <Td className="text-xs">{g.department ? deptLabel(g.department) : "—"}</Td>
@@ -273,7 +264,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                         </ActionForm>
                       </div>
                     </details>
-                  ) : <span className="text-[11px] text-slate-400">switch to {g.project.code} to change</span>}
+                  ) : <span className="text-[11px] text-slate-500">switch to {g.project.code} to change</span>}
                 </Td>
               </tr>
             ))}

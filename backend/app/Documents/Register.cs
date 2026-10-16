@@ -85,9 +85,43 @@ public static class RegisterEndpoints
                 : Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register."));
         project.MapGet("", PageAsync);
         project.MapGet("/export", ExportAsync);
+        project.MapGet("/usage", UsageAsync);
         project.MapGet("/views", ViewsAsync);
         project.MapPut("/views", SaveViewAsync);
         project.MapDelete("/views/{viewId:guid}", DeleteViewAsync);
+    }
+
+    /// <summary>
+    /// <c>GET /register/usage?set=DISCIPLINES</c>: how many documents of the project (that this person may read) carry
+    /// each value of a list, for Settings' "Used on" column, and the register filter that opens them. A list documents
+    /// do not carry answers with no counts.
+    /// </summary>
+    private static async Task<IResult> UsageAsync(HttpContext http, ReadDatabase reads, DocumentService documents, CancellationToken cancellationToken,
+        string? set = null)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        var restricted = await documents.RestrictedAsync(cancellationToken);
+        return Results.Ok(await reads.ReadAsync(async db =>
+        {
+            var docs = Visible(db, access, restricted);
+            var (filter, codes) = set switch
+            {
+                ValueSets.Disciplines => ("discipline", docs.Select(d => d.Discipline)),
+                ValueSets.DocumentTypes => ("docType", docs.Select(d => d.DocType)),
+                ValueSets.DeliverableTypes => ("deliverable", docs.Select(d => d.DeliverableType)),
+                ValueSets.Criticality => ("criticality", docs.Select(d => d.Criticality!)),
+                ValueSets.Confidentiality => ("confidentiality", docs.Select(d => d.Confidentiality!)),
+                ValueSets.Phases => ("phase", docs.Select(d => d.Phase!)),
+                ValueSets.Subprojects => ((string?)null, docs.Select(d => d.Subproject!)),
+                ValueSets.RetentionClasses => (null, docs.Select(d => d.RetentionClass!)),
+                ValueSets.PurchaseOrders => ("po", docs.Select(d => d.ContractRef!)),
+                _ => (null, (IQueryable<string>?)null),
+            };
+            var counts = codes is null ? new Dictionary<string, int>()
+                : await codes.Where(c => c != null).GroupBy(c => c).Select(g => new { g.Key, N = g.Count() })
+                    .ToDictionaryAsync(x => x.Key, x => x.N, cancellationToken);
+            return new { Filter = codes is null ? null : filter, Counts = counts };
+        }, cancellationToken));
     }
 
     /// <summary><c>GET /register</c>: one page of matching rows, how many match, and the lists the screen needs.</summary>
