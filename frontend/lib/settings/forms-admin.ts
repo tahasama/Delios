@@ -33,36 +33,6 @@ async function putValue(body: { setKey: string; code: string; label?: string; st
   await forgetShortLived();
 }
 
-export async function createUserAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const ctx = await requireScope();
-  const email = text(formData, "email").toLowerCase();
-  const name = text(formData, "name");
-  const functionId = text(formData, "functionId");
-  const partyId = text(formData, "partyId") || null;
-  if (!email || !name) return { error: "Name and email are required." };
-  if (!functionId) return { error: "Choose the function this person will hold." };
-  const projectIds = formData.getAll("projectIds").map(String).filter(Boolean);
-  if (!projectIds.length) return { error: "Choose at least one project — access is granted per project." };
-  // What this organization asks when it gives somebody access.
-  const policy = await formPolicy(ctx, "PERSON");
-  const asked = checkForm("PERSON", policy, { name, email, functionId, partyId, department: text(formData, "department") }, (n) => String(formData.get(n) ?? ""));
-  if (asked.error) return { error: asked.error };
-  // Nobody but the person ever knows their password: they are invited to choose it.
-  let created: { id: string; invited?: boolean; link?: string | null };
-  try {
-    created = await api<{ id: string; invited?: boolean; link?: string | null }>("/api/admin/users", { body: { name, email, partyId, invite: true } });
-    for (const projectId of projectIds) {
-      await api(`/api/admin/projects/${projectId}/members`, {
-        method: "PUT", body: { userId: created.id, functionId, department: text(formData, "department") || null, active: true, confirmerId: text(formData, "confirmerId") || null },
-      });
-    }
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/users");
-  return { ok: `${invitedSaid(name, email, created)}${await waitingSaid(created.id, ctx.projectId, ctx.project.code)}` };
-}
-
 /** Said after adding someone: when the project asks management to confirm people, they wait off the project until then. */
 export async function waitingSaid(userId: string, projectId: string, projectCode: string): Promise<string> {
   const added = (await adminUsers().catch(() => [])).find((u) => u.id === userId);
@@ -88,12 +58,6 @@ export async function takeOffProjectAction(_prev: Result | undefined, formData: 
   return { ok: `${target.name} is off ${ctx.project.code}. Their account and their other projects stay.` };
 }
 
-/** What happens next for someone just added: the email with their link, or the link to hand them when email is off. */
-function invitedSaid(name: string, email: string, created: { invited?: boolean; link?: string | null }): string {
-  return created.invited
-    ? `${name} is added. An email to ${email} asks them to choose their own password; the link works once, for 7 days.`
-    : `${name} is added. Email is off here, so give them this link to choose their own password (it works once, for 7 days): ${created.link ?? ""}`;
-}
 
 export async function addConfigValueAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   await requireScope();

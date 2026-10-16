@@ -454,12 +454,22 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - People & access never asks a password: our people and someone of another organization with no DELIOS get the
   7-day link to choose their own (email off: the link is shown to whoever added them). Someone whose company has its
   own DELIOS is never added there: link the organizations; their administrator puts them on the project.
-- People & access adds our people and guests (people of a guest organization only; one not taking part yet is
-  marked) with their function, department and projects (ticks, this project first), and, where the project asks
-  management to confirm people, "Who confirms them" (Manage holders recommended, anyone on the project choosable);
-  the message says they join once confirmed. Each person's Edit: function and department here, and "Take off
-  <project>" (asked first; their account and other projects stay). "Can sign in" switches the account off on every
-  project. A linked account (works here from its own DELIOS) changes only its function and department here.
+- Joining a project (owner): a request management confirms, on by default (`CONFIRM:PROJECT_PEOPLE`, backend
+  `DefaultConfirm`; a project may untick it in the Control room). Anyone of ours asks ("Ask for someone to join", in
+  the account menu, `/people/ask`; or People & access): someone with an account, or someone new (an account is made,
+  its invitation waits); function, department, why (required), who confirms (managers recommended; none chosen:
+  every manager). Document Control may attach the email or letter it came on, kept as proof on the request
+  (`POST /people/requests`, `JoinRequests`). It travels as an information transmittal (Request); confirmed on People
+  to confirm, they are put on by themselves (a new account's invitation goes then), Document Control is told, and the
+  person is told by notification and email. Refused: they stay off, with why. Document Control reminds whoever
+  confirms with Notify (People & access, "Waiting for management"). Where nothing is asked (unticked, or an
+  administrator), they go straight on and are told. Nobody holding Manage: refused (NO_MANAGER), say who confirms.
+- People & access, in the reference style: masthead (on the project · waiting · refused, and how joining works here),
+  "Someone joins <project>" (the one form), "Waiting for management" (with Remind), and Everyone (organization and
+  project chips; each person's Change: function, department, name and email unless linked, "Can sign in" on every
+  project, "Take off <project>", asked first). A linked account (works here from its own DELIOS) changes only its
+  function and department here. The organization's own extra fields on a person (Forms & fields) are no longer asked
+  when adding (they were checked on the screen only).
 - A list's "Used on" counts the project's documents carrying each value (backend `GET /register/usage`), and opens
   them in the register; a value in use keeps its code. Values are retired, never deleted: the bulk "Delete" (which
   only retired) is removed.

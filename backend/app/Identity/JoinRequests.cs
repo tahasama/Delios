@@ -32,6 +32,48 @@ public static class JoinRequests
         var project = app.MapGroup("/api/projects/{projectId:guid}").WithTags("People")
             .AddEndpointFilter<TransactionFilter>().AddEndpointFilter<ProjectAccessFilter>();
         project.MapPost("/people/requests", AskAsync);
+        project.MapGet("/people/join-options", OptionsAsync);
+    }
+
+    /// <summary>
+    /// <c>GET /people/join-options</c>: what anyone of ours needs to ask for someone to join: the functions, our
+    /// organizations and the guest ones, the people with an account who are not on the project (nor waiting), and who
+    /// may confirm (managers first). Whether this person's ask is put on at once or asked of management.
+    /// </summary>
+    private static async Task<IResult> OptionsAsync(HttpContext http, DeliosDbContext db, Organizations.OrganizationService organizations,
+        CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.IsInternal) return Problems.Forbidden("OURS_ONLY", "Ask Document Control.");
+        var projectId = access.Project.Id;
+        var functions = await db.Functions.AsNoTracking().Where(f => f.Active).OrderBy(f => f.Name).Select(f => new { f.Id, f.Name }).ToListAsync(cancellationToken);
+        var links = await organizations.PartyLinksAsync(cancellationToken);
+        var parties = (await db.Parties.AsNoTracking().Where(p => p.Active).OrderBy(p => p.Name).ToListAsync(cancellationToken))
+            .Select(p => new { p.Id, p.Name, p.IsInternal, p.Participation, Linked = links.TryGetValue(p.Id, out var l) && l.State == Organizations.LinkStates.Linked })
+            .ToList();
+        var seated = await db.Memberships.AsNoTracking().Where(m => m.ProjectId == projectId && (m.Active || m.PendingSince != null))
+            .Select(m => m.UserId).ToListAsync(cancellationToken);
+        var people = await db.Users.AsNoTracking().Where(u => u.Active && !seated.Contains(u.Id)).OrderBy(u => u.Name)
+            .Select(u => new { u.Id, u.Name, Organization = u.Party == null ? null : u.Party.Name }).ToListAsync(cancellationToken);
+        var managers = await Actions.NoticeLog.HoldersAsync(db, projectId, Verbs.Manage, cancellationToken);
+        var onProject = await db.Memberships.AsNoTracking().Where(m => m.ProjectId == projectId && m.Active)
+            .Join(db.Users.AsNoTracking().Where(u => u.Active), m => m.UserId, u => u.Id, (m, u) => new { u.Id, u.Name, Function = m.Function!.Name })
+            .OrderBy(x => x.Name).ToListAsync(cancellationToken);
+        var admin = await Keepers.ConfiguresAsync(http);
+        var withControl = await Settings.ProjectAnswers.ControlDoesAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken);
+        var mayAdd = admin || (withControl ? access.Holds(Verbs.Control) : access.Holds(Verbs.Manage) || access.Holds(Verbs.Control));
+        var asks = !admin && (!mayAdd || await Settings.ProjectAnswers.NeedsConfirmationAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken));
+        return Results.Ok(new
+        {
+            Functions = functions,
+            Ours = parties.Where(p => p.IsInternal).Select(p => new { p.Id, p.Name }),
+            Guests = parties.Where(p => !p.IsInternal && !p.Linked && p.Participation != "BY_PROXY").Select(p => new { p.Id, p.Name }),
+            People = people,
+            Confirmers = onProject.Select(p => new { p.Id, p.Name, p.Function, Manager = managers.Contains(p.Id) })
+                .OrderByDescending(p => p.Manager).ThenBy(p => p.Name),
+            Asks = asks,
+            MayKeepProof = access.Holds(Verbs.Control),
+        });
     }
 
     private static async Task<IResult> AskAsync(JoinRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
