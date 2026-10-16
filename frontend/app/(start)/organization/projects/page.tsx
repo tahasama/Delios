@@ -22,7 +22,7 @@ export const metadata = { title: "Projects" };
 /** A field as on the new-document form: grey, no box, inside the sheet's `asking` body. */
 const field = "plain w-full";
 
-type Info = { kind?: string; startDate?: string; endDate?: string | null; scopeStatement?: string };
+type Info = { kind?: string; startDate?: string; endDate?: string | null; scopeStatement?: string; description?: string | null };
 
 /**
  * The organization's projects, in the reference style (People & access): the plate with how many are open and
@@ -109,6 +109,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 <Asked policy={policy} field="scopeStatement" hint="what it controls" className="sm:col-span-2">
                   {({ required }) => <input name="scopeStatement" required={required} className={field} placeholder="Leave blank for the standard wording" />}
                 </Asked>
+                <Field label="Description" hint="optional — what the project is about, in a few lines" className="sm:col-span-2">
+                  <textarea name="description" rows={3} maxLength={2000} className={field} />
+                </Field>
                 <Added fields={policy.own} />
               </div>
               <details className="text-[11.5px] leading-[1.45] text-slate-600">
@@ -169,6 +172,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                     ) : <span className="text-slate-800">{title}</span>}
                     {!here ? <span className="ml-1.5 text-[11px] text-slate-500">(you are not on it)</span> : null}
                     {p.codeChangedAt ? <span className="block text-[11px] text-slate-500">was {p.previousCode}</span> : null}
+                    {p.info.description ? <span className="mt-0.5 block max-w-md truncate text-[11px] text-slate-500" title={p.info.description}>{p.info.description}</span> : null}
                     {p.statusReason ? (
                       <span className="block text-[11px] whitespace-pre-line text-slate-500">
                         {active ? "Reopened" : "Archived"}{p.statusChangedAt ? ` ${fmtDate(p.statusChangedAt)}` : ""}{p.statusChangedByName ? ` by ${p.statusChangedByName}` : ""}: {p.statusReason}
@@ -202,7 +206,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                     <td colSpan={8} className="border-b border-line p-0">
                       <ActionForm id={`project-form-${p.id}`} action={saveProjectAction} hideSubmit hidden={{ projectId: p.id }}
                         className="asking space-y-5 px-5 py-5 sm:px-6">
-                        <ProjectFields p={{ ...p, scopeStatement: p.info.scopeStatement }} roles={roleOptions} />
+                        <ProjectFields p={{ ...p, scopeStatement: p.info.scopeStatement, description: p.info.description ?? undefined }} roles={roleOptions} />
                       </ActionForm>
                       <details className="border-t border-line px-5 py-3 sm:px-6">
                         <summary className="w-fit cursor-pointer list-none text-xs font-semibold text-slate-500 hover:text-slate-800 [&::-webkit-details-marker]:hidden">

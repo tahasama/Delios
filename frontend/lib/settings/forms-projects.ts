@@ -15,7 +15,7 @@ type ProjectState = { error?: string; ok?: string };
 
 const CODE = /^[A-Z0-9][A-Z0-9-]{0,15}$/;
 
-/** What a project says about itself that the backend has no column for: its type, dates and scope statement, in its settings. */
+/** What a project says about itself that the backend has no column for: its type, dates, scope statement and description, in its settings. */
 const PROJECT_INFO = "PROJECT_INFO";
 
 /** Where the organization's projects are kept: its own page, never a project's Settings. */
@@ -39,6 +39,7 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
   const startDate = String(formData.get("startDate") ?? "").trim();
   const endDate = String(formData.get("endDate") ?? "").trim();
   const scopeStatement = String(formData.get("scopeStatement") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim().slice(0, 2000);
   const copyFrom = String(formData.get("copyFrom") ?? "");
   if (!name) return { error: "A project needs a name." };
   if (!CODE.test(code)) return { error: "A code is letters, digits and hyphens — up to 16 characters, e.g. NP1." };
@@ -56,7 +57,7 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
     const project = await api<{ id: string }>("/api/admin/projects", { body: { code, name, contractRole: role, kind } });
     // §1.6 — a project is measured against the scope it states for itself.
     await setProjectSetting(project.id, PROJECT_INFO, JSON.stringify({
-      kind, startDate: startDate || new Date().toISOString().slice(0, 10), endDate: endDate || null,
+      kind, startDate: startDate || new Date().toISOString().slice(0, 10), endDate: endDate || null, description: description || null,
       scopeStatement: scopeStatement || `All controlled information produced or received for ${name}, in any medium.`,
     }));
     // The organization's defaults: who does what and how a project works, until the project changes them.
@@ -121,6 +122,7 @@ export async function saveProjectAction(_prev: ProjectState | undefined, formDat
   const startDate = String(formData.get("startDate") ?? "").trim();
   const endDate = String(formData.get("endDate") ?? "").trim();
   const scopeStatement = String(formData.get("scopeStatement") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim().slice(0, 2000);
   if (!name) return { error: "A project needs a name." };
   if (!CODE.test(code)) return { error: "A code is letters, digits and hyphens — up to 16 characters, e.g. NP1." };
   if (!PROJECT_KINDS.some((k) => k.code === kind)) return { error: "Choose a project type." };
@@ -132,6 +134,7 @@ export async function saveProjectAction(_prev: ProjectState | undefined, formDat
     try { info = JSON.parse((await projectSettings(projectId)).get(PROJECT_INFO) ?? "{}"); } catch { info = {}; }
     await setProjectSetting(projectId, PROJECT_INFO, JSON.stringify({
       ...info, kind, startDate: startDate || info.startDate || project.createdAt.slice(0, 10), endDate: endDate || null,
+      description: description || null,
       scopeStatement: scopeStatement || `All controlled information produced or received for ${name}, in any medium.`,
     }));
   } catch (e) {

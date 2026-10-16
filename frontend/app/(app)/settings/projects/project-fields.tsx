@@ -7,12 +7,13 @@ const field = "plain w-full";
 
 export type ProjectLine = {
   id: string; code: string; name: string; kind: string; contractRole: string; startDate: string; endDate: string | null;
-  scopeStatement?: string; previousCode?: string | null; codeChangedByName?: string | null; codeChangedAt?: string | null;
+  scopeStatement?: string; description?: string; previousCode?: string | null; codeChangedByName?: string | null; codeChangedAt?: string | null;
 };
 
 /**
  * A project's line opened for editing, the same on the organization's Projects and on Settings → This project: name,
- * code (changed once in its life, for a mistake; then fixed and shown, not sent), type, our role, dates, scope.
+ * code (changed once in its life, for a mistake; then fixed and shown, not sent), type, our role, dates, scope, and
+ * what the project is about in a few lines.
  */
 export function ProjectFields({ p, roles }: { p: ProjectLine; roles: { code: string; label: string }[] }) {
   const fixed = !!p.codeChangedAt;
@@ -43,6 +44,9 @@ export function ProjectFields({ p, roles }: { p: ProjectLine; roles: { code: str
       <Field label="End" hint="planned completion"><input type="date" name="endDate" defaultValue={p.endDate?.slice(0, 10) ?? ""} className={field} /></Field>
       <Field label="Scope" hint="what it controls; blank for the standard wording" className="sm:col-span-2">
         <input name="scopeStatement" defaultValue={p.scopeStatement ?? ""} className={field} />
+      </Field>
+      <Field label="Description" hint="optional — what the project is about, in a few lines" className="sm:col-span-2">
+        <textarea name="description" rows={3} maxLength={2000} defaultValue={p.description ?? ""} className={field} />
       </Field>
     </div>
   );

@@ -16,7 +16,7 @@ import { ProjectFields } from "./project-fields";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "This project" };
 
-type Info = { kind?: string; startDate?: string; endDate?: string | null; scopeStatement?: string };
+type Info = { kind?: string; startDate?: string; endDate?: string | null; scopeStatement?: string; description?: string | null };
 
 /**
  * Settings → This project: the project one is in, and only it (its name, type, our role, dates, scope; its code,
@@ -36,7 +36,7 @@ export default async function ThisProjectPage({ searchParams }: { searchParams: 
   if (!one) return <NoAccess title="This project" who="admin" />;
   const p = {
     ...one, kind: one.kind ?? info.kind ?? "GENERIC", startDate: info.startDate ?? one.createdAt.slice(0, 10), endDate: info.endDate ?? null,
-    scopeStatement: info.scopeStatement,
+    scopeStatement: info.scopeStatement, description: info.description ?? undefined,
   };
   const editing = sp.edit === "1";
   const kindLabel = PROJECT_KINDS.find((k) => k.code === p.kind)?.label ?? p.kind.toLowerCase();
@@ -49,6 +49,7 @@ export default async function ThisProjectPage({ searchParams }: { searchParams: 
     ["Type", kindLabel],
     ["Our role", roleLabel],
     ["Dates", <>{fmtDate(p.startDate)}{p.endDate ? ` to ${fmtDate(p.endDate)}` : ""}</>],
+    ["Description", p.description ? <span className="whitespace-pre-line">{p.description}</span> : <span className="text-slate-500">none yet</span>],
     ["Scope", p.scopeStatement || "the standard wording"],
     ["People · documents", `${p.members} · ${p.documents}`],
   ];

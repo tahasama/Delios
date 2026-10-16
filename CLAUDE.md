@@ -543,7 +543,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   administrators), People & access's way: plate (open · archived); "Open a new project" one sheet (`?new=1`: band, grey
   fields, "Where approval sits under each role", whose people it starts with, Cancel / Open project; it starts from the
   organization's defaults); the table, code and name opening a project one is on, a pencil opening its line
-  (`?edit=<id>`: name, code, type, our role, start, end, scope; Cancel / Save). Archive and Reopen sit in the opened line
+  (`?edit=<id>`: name, code, type, our role, start, end, scope, description; Cancel / Save). The description (optional,
+  a few lines, `PROJECT_INFO`) is asked when a project opens too, and shown under its name. Archive and Reopen sit in the opened line
   and always ask why (backend REASON_REQUIRED, kept on the project: `StatusReason`, by whom, when, shown on its line).
   Settings → **This project** (`/settings/projects`) is the project one is in only: what it is, and the same line to
   change; no "Open a new project" there.
