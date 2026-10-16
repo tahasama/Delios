@@ -114,6 +114,8 @@ public static class DirectoryEndpoints
             PartyCode = u.Party?.Code,
             PartyName = u.Party?.Name,
             Internal = u.Party is null || u.Party.IsInternal,
+            // Works here from its own organization's DELIOS: signs in at home; name and email are theirs.
+            Linked = u.HomeTenantId != null,
             Mfa = u.MfaEnabledAt != null,
             LockedUntil = u.LockedUntil?.ToDateTimeOffset(),
             CreatedAt = u.CreatedAt.ToDateTimeOffset(),

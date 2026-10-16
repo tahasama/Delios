@@ -454,6 +454,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - People & access never asks a password: our people and someone of another organization with no DELIOS get the
   7-day link to choose their own (email off: the link is shown to whoever added them). Someone whose company has its
   own DELIOS is never added there: link the organizations; their administrator puts them on the project.
+- People & access adds our people and guests (people of a guest organization only; one not taking part yet is
+  marked) with their function, department and projects (ticks, this project first), and, where the project asks
+  management to confirm people, "Who confirms them" (Manage holders recommended, anyone on the project choosable);
+  the message says they join once confirmed. Each person's Edit: function and department here, and "Take off
+  <project>" (asked first; their account and other projects stay). "Can sign in" switches the account off on every
+  project. A linked account (works here from its own DELIOS) changes only its function and department here.
 - A list's "Used on" counts the project's documents carrying each value (backend `GET /register/usage`), and opens
   them in the register; a value in use keeps its code. Values are retired, never deleted: the bulk "Delete" (which
   only retired) is removed.

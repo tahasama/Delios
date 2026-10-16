@@ -18,7 +18,10 @@ type AdminMembership = {
 
 type AdminUser = {
   id: string; name: string; email: string; active: boolean; isAdmin: boolean; partyId: string | null; partyCode: string | null;
-  partyName: string | null; internal: boolean; mfa: boolean; lockedUntil: string | null; createdAt: string; memberships: AdminMembership[];
+  partyName: string | null; internal: boolean;
+  /** Works here from its own organization's DELIOS: signs in at home; name and email are theirs. */
+  linked?: boolean;
+  mfa: boolean; lockedUntil: string | null; createdAt: string; memberships: AdminMembership[];
 };
 
 type AdminProject = {

@@ -53,14 +53,39 @@ export async function createUserAction(_prev: Result | undefined, formData: Form
     created = await api<{ id: string; invited?: boolean; link?: string | null }>("/api/admin/users", { body: { name, email, partyId, invite: true } });
     for (const projectId of projectIds) {
       await api(`/api/admin/projects/${projectId}/members`, {
-        method: "PUT", body: { userId: created.id, functionId, department: text(formData, "department") || null, active: true },
+        method: "PUT", body: { userId: created.id, functionId, department: text(formData, "department") || null, active: true, confirmerId: text(formData, "confirmerId") || null },
       });
     }
   } catch (e) {
     return failed(e);
   }
   revalidatePath("/settings/users");
-  return { ok: invitedSaid(name, email, created) };
+  return { ok: `${invitedSaid(name, email, created)}${await waitingSaid(created.id, ctx.projectId, ctx.project.code)}` };
+}
+
+/** Said after adding someone: when the project asks management to confirm people, they wait off the project until then. */
+export async function waitingSaid(userId: string, projectId: string, projectCode: string): Promise<string> {
+  const added = (await adminUsers().catch(() => [])).find((u) => u.id === userId);
+  const seat = added?.memberships.find((m) => m.projectId === projectId);
+  return seat?.pendingSince ? ` They join ${projectCode} once ${seat.confirmerName ?? "management"} confirms them (People to confirm).` : "";
+}
+
+/**
+ * Takes someone off this project only: their account and their places on other projects stay, and everything they
+ * did here keeps their name. Taking off is a change to the project, so it is said in its audit.
+ */
+export async function takeOffProjectAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const userId = text(formData, "userId");
+  const target = (await adminUsers()).find((one) => one.id === userId);
+  if (!target) return { error: "That person no longer exists." };
+  try {
+    await api(`/api/admin/projects/${ctx.projectId}/members`, { method: "PUT", body: { userId, functionId: null, active: false } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/settings/users");
+  return { ok: `${target.name} is off ${ctx.project.code}. Their account and their other projects stay.` };
 }
 
 /** What happens next for someone just added: the email with their link, or the link to hand them when email is off. */
@@ -395,26 +420,30 @@ export async function savePersonAction(_prev: Result | undefined, formData: Form
   const partyId = text(formData, "partyId") || null;
   const functionId = text(formData, "functionId");
   const department = text(formData, "department") || null;
-  const active = formData.get("active") === "on";
+  // A linked account's name, email and sign-in are its own organization's: only its place here changes.
+  const linked = !!target.linked;
+  const active = linked ? target.active : formData.get("active") === "on";
   const here = target.memberships.find((seat) => seat.projectId === ctx.projectId && seat.active);
   if (!here && !functionId) return { error: `Choose the function ${target.name} holds on ${ctx.project.code}.` };
-  if (!name) return { error: "A person needs a name." };
-  if (!/^\S+@\S+\.\S+$/.test(email)) return { error: "Give a valid email address." };
+  if (!linked && !name) return { error: "A person needs a name." };
+  if (!linked && !/^\S+@\S+\.\S+$/.test(email)) return { error: "Give a valid email address." };
   const changes: string[] = [];
   try {
     const person: Record<string, unknown> = {};
+    if (!linked) {
     if (name !== target.name) { person.name = name; changes.push(`name → ${name}`); }
     if (email !== target.email.toLowerCase()) { person.email = email; changes.push(`email → ${email}`); }
     if (partyId !== target.partyId) { if (partyId) person.partyId = partyId; else person.clearParty = true; changes.push("company changed"); }
-    if (active !== target.active) { person.active = active; changes.push(active ? "may sign in" : "switched off"); }
+    if (active !== target.active) { person.active = active; changes.push(active ? "may sign in" : "can no longer sign in"); }
+    }
     if (Object.keys(person).length) await api(`/api/admin/users/${userId}`, { method: "PUT", body: person });
     if ((functionId && functionId !== here?.functionId) || department !== (here?.department ?? null)) {
-      await api(`/api/admin/projects/${ctx.projectId}/members`, { method: "PUT", body: { userId, functionId: functionId || null, department, active: true } });
-      changes.push(here ? "job or department changed" : `added to ${ctx.project.code}`);
+      await api(`/api/admin/projects/${ctx.projectId}/members`, { method: "PUT", body: { userId, functionId: functionId || null, department, active: true, confirmerId: text(formData, "confirmerId") || null } });
+      changes.push(here ? "function or department changed" : `added to ${ctx.project.code}`);
     }
   } catch (e) {
     return failed(e);
   }
   revalidatePath("/settings/users");
-  return { ok: changes.length ? `${name || target.name}: ${changes.join("; ")}.` : "Nothing changed." };
+  return { ok: changes.length ? `${name || target.name}: ${changes.join("; ")}.${here ? "" : await waitingSaid(userId, ctx.projectId, ctx.project.code)}` : "Nothing changed." };
 }
