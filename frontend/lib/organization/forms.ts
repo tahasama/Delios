@@ -166,3 +166,23 @@ export async function resetDefaultsAction(_prev: Result | undefined, _formData: 
   revalidatePath("/organization/defaults");
   return { ok: "Back on the app's own defaults. Projects already open keep theirs." };
 }
+
+/**
+ * What is kept about people's activity, for the whole organization (`TRACK_READING`, `TRACK_SIGN_INS`): reading
+ * (a document opened, a file downloaded) kept or not; sign-ins shown on a person's activity or not. Acts on
+ * documents are always kept. An administrator only (the backend refuses anyone else).
+ */
+export async function setTrackingAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const reading = text(formData, "reading");
+  const signIns = text(formData, "signIns");
+  if (!["ON", "OFF"].includes(reading) || !["ON", "OFF"].includes(signIns)) return { error: "Answer both questions." };
+  try {
+    await api(`/api/settings/TRACK_READING`, { method: "PUT", body: { value: reading } });
+    await api(`/api/settings/TRACK_SIGN_INS`, { method: "PUT", body: { value: signIns } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization");
+  revalidatePath("/settings/flow");
+  return { ok: "Saved: it applies from now on, on every project." };
+}

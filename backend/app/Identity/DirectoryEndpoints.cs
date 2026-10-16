@@ -103,7 +103,11 @@ public static class DirectoryEndpoints
         if (user is null) return Problems.NotFound("USER_NOT_FOUND", "No such person.");
         per = Math.Clamp(per, 10, 200);
         page = Math.Max(1, page);
-        var mine = db.AuditEvents.AsNoTracking().Where(e => e.ActorId == userId);
+        // What the organization chose to keep and show (Settings.Tracking): reading only where kept, sign-ins only where shown.
+        var keepsReading = await Settings.Tracking.KeepsReadingAsync(db, cancellationToken);
+        var showsSignIns = await Settings.Tracking.ShowsSignInsAsync(db, cancellationToken);
+        var hidden = (keepsReading ? [] : Settings.Tracking.Reading).Concat(showsSignIns ? [] : Settings.Tracking.SignIns).ToArray();
+        var mine = db.AuditEvents.AsNoTracking().Where(e => e.ActorId == userId && !hidden.Contains(e.Action));
         var query = mine;
         if (projectId is { } p) query = query.Where(e => e.ProjectId == p);
         if (!string.IsNullOrWhiteSpace(action)) query = query.Where(e => e.Action == action);
@@ -112,7 +116,7 @@ public static class DirectoryEndpoints
         var kinds = await mine.GroupBy(e => e.Action).Select(g => new { Action = g.Key, Count = g.Count() })
             .OrderByDescending(g => g.Count).ToListAsync(cancellationToken);
         var first = await mine.OrderBy(e => e.Id).Select(e => (Instant?)e.At).FirstOrDefaultAsync(cancellationToken);
-        var lastSignIn = await mine.Where(e => e.Action.StartsWith("SIGN_IN") && e.Action != "SIGN_IN_FAILED")
+        var lastSignIn = !showsSignIns ? null : await mine.Where(e => e.Action.StartsWith("SIGN_IN") && e.Action != "SIGN_IN_FAILED")
             .OrderByDescending(e => e.Id).Select(e => (Instant?)e.At).FirstOrDefaultAsync(cancellationToken);
         var projects = await db.Projects.AsNoTracking().Select(x => new { x.Id, x.Code }).ToDictionaryAsync(x => x.Id, x => x.Code, cancellationToken);
         // Reading someone's record is itself recorded: who looked, and when.
@@ -126,6 +130,8 @@ public static class DirectoryEndpoints
             per,
             pages = Math.Max(1, (total + per - 1) / per),
             first = first?.ToDateTimeOffset(),
+            keepsReading,
+            showsSignIns,
             lastSignIn = lastSignIn?.ToDateTimeOffset(),
             kinds,
             rows = rows.Select(e => new

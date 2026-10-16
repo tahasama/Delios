@@ -511,6 +511,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   control function only, in Settings only, never on the directory; reading it is itself recorded (`ACTIVITY_READ`).
   Lawful as the register's integrity record, provided people are told it is kept (privacy notice), it is read only for
   that purpose, and the organization sets how long it is kept; some countries also ask staff representatives first.
+  What is kept is the organization's choice (organization page, "What is kept about people's activity",
+  `Settings.Tracking`; shown read-only in the Control room): acts on documents always; reading (opened a document,
+  downloaded a file, `TRACK_READING`) kept unless switched off; sign-ins always kept for security, shown on a person's
+  activity only when switched on (`TRACK_SIGN_INS` = ON).
 - A form never sits in a box inside a box: a sheet that opens a form becomes that form (`SomeoneJoins`), and a line
   of a table opened for editing goes on as the row itself (grey fields, then the strip with Cancel and the act), the
   new-document form's way.

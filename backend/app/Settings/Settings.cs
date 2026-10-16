@@ -115,6 +115,34 @@ public static class SettingEndpoints
 }
 
 /// <summary>
+/// What is kept about people's activity (owner): the organization's choice, never a project's, since a privacy policy is
+/// the organization's. Acts on documents (registered, reviewed, released, sent) are always kept: they are the
+/// register's own record. Reading (a document opened, a file downloaded) is kept unless switched off
+/// (<c>TRACK_READING</c> = OFF). Sign-ins are always kept for security, and shown on a person's activity only when
+/// switched on (<c>TRACK_SIGN_INS</c> = ON).
+/// </summary>
+public static class Tracking
+{
+    public const string ReadingKey = "TRACK_READING";
+    public const string SignInsKey = "TRACK_SIGN_INS";
+    /// <summary>The acts that are reading, kept or not by <see cref="ReadingKey"/>.</summary>
+    public static readonly string[] Reading = ["DOCUMENT_VIEWED", "DOWNLOAD"];
+    /// <summary>The sign-ins, always kept, shown or not by <see cref="SignInsKey"/>.</summary>
+    public static readonly string[] SignIns = ["SIGN_IN", "SIGN_IN_MFA", "SIGN_IN_SSO", "SIGN_IN_FAILED", "ACCOUNT_LOCKED", "LOGIN"];
+
+    private static Task<string?> OrgAsync(DeliosDbContext db, string key, CancellationToken cancellationToken) =>
+        db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && s.Key == key).Select(s => s.Value).FirstOrDefaultAsync(cancellationToken);
+
+    /// <summary>Whether a document opened or a file downloaded is kept (on unless switched off).</summary>
+    public static async Task<bool> KeepsReadingAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
+        await OrgAsync(db, ReadingKey, cancellationToken) != "OFF";
+
+    /// <summary>Whether sign-ins show on a person's activity (off unless switched on).</summary>
+    public static async Task<bool> ShowsSignInsAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
+        await OrgAsync(db, SignInsKey, cancellationToken) == "ON";
+}
+
+/// <summary>
 /// The project's answers the backend acts on, read the way the screens read them: who carries out an act
 /// (<c>__ALL__</c> = CONTROL | SELF | CUSTOM, then the act's own key), whether an act is left out
 /// (<c>SKIP:{act}</c> = OFF), and a policy's chosen option.

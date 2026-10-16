@@ -111,9 +111,10 @@ public static class DocumentEndpoints
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         // Who opened it, and when (owner): in the audit trail, once per person and document every half hour, so a page
-        // asking several times reads as one look.
+        // asking several times reads as one look; only where the organization keeps reading (Settings.Tracking).
         var since = clock.GetCurrentInstant() - Duration.FromMinutes(30);
-        if (!await db.AuditEvents.AnyAsync(e => e.ActorId == access.UserId && e.EntityId == documentId && e.Action == "DOCUMENT_VIEWED" && e.At > since, cancellationToken))
+        if (await Settings.Tracking.KeepsReadingAsync(db, cancellationToken)
+            && !await db.AuditEvents.AnyAsync(e => e.ActorId == access.UserId && e.EntityId == documentId && e.Action == "DOCUMENT_VIEWED" && e.At > since, cancellationToken))
             await audit.WriteAsync(http.User.Actor(), "DOCUMENT_VIEWED", "Document", documentId, document.Number,
                 projectId: access.Project.Id, cancellationToken: cancellationToken);
         // Decided and waiting for release (with what the decider granted), and when each revision first went out.
@@ -299,7 +300,9 @@ public static class DocumentEndpoints
         }
 
         var (url, expires) = storage.PresignDownload(file.ObjectKey, file.Name);
-        await audit.WriteAsync(http.User.Actor(), "DOWNLOAD", "StoredFile", file.Id, file.Name,
+        // Kept where the organization keeps reading (Settings.Tracking).
+        if (await Settings.Tracking.KeepsReadingAsync(db, cancellationToken))
+            await audit.WriteAsync(http.User.Actor(), "DOWNLOAD", "StoredFile", file.Id, file.Name,
             projectId: access.Project.Id, cancellationToken: cancellationToken);
         return Results.Ok(new DownloadTicket(url, expires.ToDateTimeOffset()));
     }

@@ -9,6 +9,8 @@ import { acceptLinkAction, refuseLinkAction, endLinkAction, joinPersonAction, br
 import { switchProjectAction } from "@/lib/settings/forms-project-switch";
 import { POLICIES, effectiveAnswer } from "@/lib/settings/control-activities";
 import { OrgHeader } from "./org-header";
+import { TrackingSheet } from "./tracking";
+import { orgSettings } from "@/lib/settings/api";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { fmtDate } from "@/lib/core/utils";
@@ -24,7 +26,7 @@ export const metadata = { title: "Organization" };
  */
 export default async function OrganizationPage() {
   const scope = await requireOrgAdmin();
-  const [links, joined, projects, users, parties, defaults, roles] = await Promise.all([
+  const [links, joined, projects, users, parties, defaults, roles, answers] = await Promise.all([
     organizationLinks(),
     joinedProjects(),
     adminProjects().catch(() => []),
@@ -32,6 +34,7 @@ export default async function OrganizationPage() {
     adminParties().catch(() => []),
     projectDefaults(),
     contractRoleOptions(),
+    orgSettings().catch(() => new Map<string, string>()),
   ]);
   const roleLabel = (code: string | null) => (code ? roles.find((r) => r.code === code)?.label ?? code : null);
   const received = links.filter((one) => one.side === "GUEST" && one.state === "INVITED");
@@ -261,6 +264,8 @@ export default async function OrganizationPage() {
             })}
           </ul>
         </Card>
+
+        <TrackingSheet reading={answers.get("TRACK_READING") !== "OFF"} signIns={answers.get("TRACK_SIGN_INS") === "ON"} />
 
         {scope.projectCount ? (
           <Card title="Sign-in and audit">

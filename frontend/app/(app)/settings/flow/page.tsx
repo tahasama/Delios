@@ -8,6 +8,8 @@ import { ActionForm } from "@/components/form";
 import { SearchPick } from "@/components/search-pick";
 import { api, projectPath } from "@/lib/client";
 import { setControlPeopleAction } from "@/lib/settings/forms-people";
+import { orgSettings } from "@/lib/settings/api";
+import { isAdmin } from "@/lib/core/auth";
 import { controlSettings, policies, PROJECT_MODE_LABEL, CONTROL_ACTIVITIES, SKIPPABLE } from "@/lib/settings/control-activities";
 import { holdersOf } from "@/lib/core/permissions";
 import { REV_STATE_COLOR, type RevState } from "@/lib/core/standard";
@@ -368,6 +370,7 @@ export default async function ControlRoomPage() {
     partiesWithAnswers().then((all) => all.filter((one) => one.active).map((one) => ({ kind: one.kind }))).catch(() => []),
   ]);
 
+  const orgAnswers = await orgSettings().catch(() => new Map<string, string>());
   const directory = await api<{
     people: { id: string; name: string; partyId: string | null; organization: string | null; function: string; control: boolean; actsAsControl: boolean }[];
     organizations: { id: string; kind: string }[];
@@ -615,6 +618,22 @@ export default async function ControlRoomPage() {
           </div>
         </section>
       ) : null}
+
+      {/* What is kept about people's activity: the organization's choice, shown here, changed on its page. */}
+      <section className="register register-sheet register-sheet-open" aria-labelledby="tracking-head">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span id="tracking-head" className="stencil mr-1 text-slate-500">What is kept about people&rsquo;s activity</span>
+          <span className="text-[11px] text-slate-500">the organization&rsquo;s choice, for every project</span>
+        </div>
+        <ul className="divide-y divide-line">
+          <li className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6"><span className="font-semibold text-slate-800">Acts on documents:</span> always kept (registered, reviewed, released, sent, returned).</li>
+          <li className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6"><span className="font-semibold text-slate-800">Who opened a document or downloaded a file:</span> {orgAnswers.get("TRACK_READING") === "OFF" ? "not kept." : "kept."}</li>
+          <li className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6"><span className="font-semibold text-slate-800">Sign-ins:</span> kept for security; {orgAnswers.get("TRACK_SIGN_INS") === "ON" ? "shown on a person's activity." : "not shown on a person's activity."}</li>
+        </ul>
+        <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
+          {isAdmin(me) ? <>Changed on the <Link href="/organization#tracking" className="font-semibold text-link hover:underline">organization&rsquo;s page</Link>.</> : "An administrator changes it, on the organization's page."}
+        </p>
+      </section>
 
       <ProjectSettings readOnly={!changesIt} />
     </div>

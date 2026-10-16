@@ -16,7 +16,7 @@ export const metadata = { title: "A person's activity" };
 type Activity = {
   user: { id: string; name: string; email: string; active: boolean; party: string | null; linked: boolean };
   total: number; page: number; per: number; pages: number;
-  first: string | null; lastSignIn: string | null;
+  first: string | null; lastSignIn: string | null; keepsReading: boolean; showsSignIns: boolean;
   kinds: { action: string; count: number }[];
   rows: { id: number; at: string; action: string; entityType: string | null; entityId: string | null; entityLabel: string | null; detail: string | null; projectId: string | null; project: string | null }[];
 };
@@ -72,12 +72,14 @@ export default async function PersonActivityPage({ params, searchParams }: {
             </p>
             <h1 className="plate-name mt-1 min-w-0">{user.name}</h1>
             <p className="plate-meta mt-2">
-              {activity.lastSignIn ? `last signed in ${fmtDate(activity.lastSignIn)}` : "never signed in"}
-              {activity.first ? ` · first act ${fmtDate(activity.first)}` : ""}
+              {activity.showsSignIns ? (activity.lastSignIn ? `last signed in ${fmtDate(activity.lastSignIn)} · ` : "never signed in · ") : ""}
+              {activity.first ? `first act ${fmtDate(activity.first)}` : "nothing recorded yet"}
               {` · ${activity.kinds.reduce((n, k) => n + k.count, 0).toLocaleString("en-GB")} acts recorded`}
             </p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-              Everything {user.name} did in the app, newest first, as the audit trail keeps it. Only an administrator or the control function reads this, and reading it is recorded too.
+              What {user.name} did in the app, newest first: their acts on documents
+              {activity.keepsReading ? ", what they opened and downloaded" : ""}{activity.showsSignIns ? ", and their sign-ins" : ""}, as the organization chose to keep them
+              {isAdmin(me) ? <> (<Link href="/organization#tracking" className="font-semibold text-link hover:underline">change it</Link>)</> : null}. Only an administrator or the control function reads this, and reading it is recorded too.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
