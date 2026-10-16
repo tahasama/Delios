@@ -79,7 +79,7 @@ public sealed class ReportTests(Infrastructure infrastructure) : IClassFixture<I
         Assert.Equal("1", Figure(reviews, "Decided (90 days)"));
         // The windows are the reader's to change, within reason.
         var narrow = await GetAsync(engineer, $"{p}/reports/reviews?warnDays=3&lateDays=5");
-        Assert.Contains(narrow.GetProperty("figures").EnumerateArray(), f => f.GetProperty("label").GetString() == "Over 5 days");
+        Assert.Contains(narrow.GetProperty("chart").GetProperty("segments").EnumerateArray(), s => s.GetProperty("label").GetString() == "Late over 3 days");
         using (var wrong = await engineer.GetAsync($"{p}/reports/reviews?warnDays=10&lateDays=5"))
             Assert.Equal(HttpStatusCode.UnprocessableEntity, wrong.StatusCode);
         using (var unknown = await engineer.GetAsync($"{p}/reports/everything"))

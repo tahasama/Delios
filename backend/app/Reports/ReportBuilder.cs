@@ -184,18 +184,12 @@ public sealed partial class ReportBuilder(IClock clock)
         var decided = await db.Reviews.AsNoTracking().Where(r => r.ProjectId == _project.Id && r.DecidedAt != null && r.DecidedAt >= since)
             .Select(r => new { r.StartedAt, r.DecidedAt }).ToListAsync(cancellationToken);
 
-        Segment[] segments =
-        [
-            // Waiting is never "good": the freshest wait reads as under way, not as done.
-            new("fresh", $"Under {options.WarnDays} days", "info"),
-            new("week", $"{options.WarnDays} to {options.LateDays} days", "warn"),
-            new("old", $"Over {options.LateDays} days", "bad"),
-        ];
-        string AgeKey(int age) => age < options.WarnDays ? "fresh" : age <= options.LateDays ? "week" : "old";
+        // Each wait is judged by its step's own due day, never by a fixed number of days.
+        var segments = LateSegments(options);
         // The longest waits, one bar each, as long as the days waited; or one bar per reviewer, counting their waits.
         var perReviewer = options.By == "reviewer";
         var bars = new Dictionary<string, Bar>();
-        var lines = new List<(int Age, string Bar, IReadOnlyList<Cell> Row)>();
+        var lines = new List<(int Age, string Key, string Bar, IReadOnlyList<Cell> Row)>();
         foreach (var x in open)
         {
             var opened = (x.Step.OpenedAt ?? clock.GetCurrentInstant()).InZone(_zone).Date;
@@ -207,28 +201,29 @@ public sealed partial class ReportBuilder(IClock clock)
             foreach (var who in waitingOn)
             {
                 var name = who;
-                if (perReviewer) (bars.TryGetValue(who, out var bar) ? bar : bars[who] = new Bar(who, [])).Add(AgeKey(age));
+                var key = LateKey(x.Step.DueDate, _today, options);
+                if (perReviewer) (bars.TryGetValue(who, out var bar) ? bar : bars[who] = new Bar(who, [])).Add(key);
                 else
                 {
                     name = $"{x.DocumentNumber} rev {x.Value} · {who}";
                     if (bars.ContainsKey(name)) name = $"{name} · {x.Step.Title}";
-                    bars[name] = new Bar(name, new() { [AgeKey(age)] = Math.Max(age, 0) });
+                    bars[name] = new Bar(name, new() { [key] = Math.Max(age, 0) });
                 }
-                lines.Add((age, name,
+                lines.Add((age, key, name,
                 [
                     Doc(x.DocumentId, x.DocumentNumber), x.Title, $"rev {x.Value}", new Cell(x.Number, Kind: "review", Id: x.ReviewId), x.Step.Title, who,
                     Date(x.Step.OpenedAt), x.Step.DueDate is { } due ? new Cell(due.ToString("yyyy-MM-dd", null), due < _today ? "bad" : null) : "—",
-                    new Cell($"{age} d", age > options.LateDays ? "bad" : age >= options.WarnDays ? "warn" : null),
+                    new Cell($"{age} d", key == "old" ? "bad" : key == "week" ? "warn" : null),
                 ]));
             }
         }
         var turnaround = decided.Count == 0 ? (double?)null : decided.Average(r => (r.DecidedAt!.Value - r.StartedAt).TotalDays);
-        var old = lines.Count(l => l.Age > options.LateDays);
+        var late = lines.Count(l => l.Key is "week" or "old");
         return Make(ReportIds.Reviews, "Reviews waiting", "What is with reviewers, and for how long?",
             "Chasing reviewers: for the weekly engineering meeting.",
             [
                 new("Waiting", lines.Count.ToString(), lines.Count > 0 ? "warn" : "good"),
-                new($"Over {options.LateDays} days", old.ToString(), old > 0 ? "bad" : "good"),
+                new("Late", late.ToString(), late > 0 ? "bad" : "good"),
                 new($"Decided ({options.TurnaroundDays} days)", decided.Count.ToString()),
                 // Under a day reads as such, not "0.0 d"; none decided reads as none.
                 new("Average turnaround", turnaround switch { null => "none decided", < 1 => "under a day", var t => $"{t:0.0} days" }),
@@ -239,6 +234,21 @@ public sealed partial class ReportBuilder(IClock clock)
             ["Document", "Title", "Revision", "Review", "Step", "Waiting on", "Since", "Due", "Waiting"],
             [.. lines.OrderByDescending(l => l.Age).Select(l => ((string?)l.Bar, l.Row))], "No review is waiting on anyone.");
     }
+
+    /// <summary>
+    /// How late a review step is, by its own due day: not late yet (due today or later), late, late over
+    /// <see cref="ReportOptions.WarnDays"/> days; a step with no due day says so. Waiting is never "good": not late
+    /// yet reads as under way. Reviews waiting and Progress by week judge it the same way.
+    /// </summary>
+    private static Segment[] LateSegments(ReportOptions options) =>
+    [
+        new("fresh", "Not late yet", "info"), new("week", "Late", "warn"),
+        new("old", $"Late over {options.WarnDays} days", "bad"), new("none", "No due day", "muted"),
+    ];
+
+    /// <inheritdoc cref="LateSegments"/>
+    private static string LateKey(LocalDate? due, LocalDate on, ReportOptions options) =>
+        due is not { } d ? "none" : d >= on ? "fresh" : Period.Between(d, on, PeriodUnits.Days).Days > options.WarnDays ? "old" : "week";
 
     // ── Transmittal log ───────────────────────────────────────────────────────
 

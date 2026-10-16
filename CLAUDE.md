@@ -496,8 +496,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   "only <bar> ×" on the lines' head; "Find in these lines" sits on the lines' head (Find lit only while new words
   wait, Clear). The download says it carries the lines shown. No form of dropdowns waiting for an Apply.
 - Deliveries against plan has "One bar per": who sends it (each organization, and us as one) or discipline
-  (`ReportOptions.By`); the lines carry both. Waiting is never shown as good: a review waiting under 7 days is blue
+  (`ReportOptions.By`); the lines carry both. Waiting is never shown as good: a review not late yet is blue
   (under way), not green.
+- A review's wait is judged by its step's own due day, never a fixed number of days (`LateSegments` / `LateKey`):
+  Not late yet (due today or later, blue), Late (amber), Late over 7 days (`WarnDays`, red), No due day (grey, the
+  step has no days). Reviews waiting colours and counts each wait so (figure "Late"); Progress by week judges each
+  review open at a week's end by its steps open then, the latest of them.
 - Bar names start at the same point, left-aligned, with room for the action's name.
 - Numbers are never printed on the bars: the legend gives each state's total, the end of each bar its count.
   Dates in the lines read from today ("3 days ago"), the day itself on hover.
