@@ -262,6 +262,11 @@ public sealed class Membership
     public string? RefusedReason { get; set; }
     /// <summary>The transmittal that asked management to confirm this person: the answer replies to it.</summary>
     public Guid? ConfirmTransmittalId { get; set; }
+    /// <summary>
+    /// A new account asked for on a request: its invitation (the link to choose a password) goes once management
+    /// confirms them, never before; refused, it never goes.
+    /// </summary>
+    public bool InviteOnJoin { get; set; }
 }
 
 /// <summary>A signed-in browser. The cookie holds a random token; only its hash is stored.</summary>

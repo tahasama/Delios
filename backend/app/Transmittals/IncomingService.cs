@@ -475,6 +475,19 @@ public sealed class IncomingService(
         return (files, null);
     }
 
+    /// <summary>
+    /// Keeps a file uploaded as proof (an email, a letter that came outside the system) on a transmittal of ours: a
+    /// request raised on what came in keeps what it came on. Null when kept; the refusal otherwise.
+    /// </summary>
+    public async Task<IResult?> KeepProofAsync(ProjectAccess access, Transmittal transmittal, Guid proofFileId, CancellationToken cancellationToken)
+    {
+        var (proof, problem) = await LooseFilesAsync(access, [proofFileId], proof: true, cancellationToken);
+        if (problem is not null) return problem;
+        Process(proof!.Single());
+        transmittal.ProofFileId = proofFileId;
+        return null;
+    }
+
     /// <summary>Sends a file for scanning, through the outbox.</summary>
     private void Process(StoredFile file)
     {

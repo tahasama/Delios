@@ -469,6 +469,9 @@ public static class DirectoryEndpoints
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "MEMBERSHIP_CHANGED", "User", user.Id, user.Name,
             string.Join("; ", changes), projectId, cancellationToken);
+        // Put on the project (not held for confirmation): they are told, by notification and email.
+        if (membership.Active && membership.PendingSince is null && changes.Any(c => c.StartsWith("added to") || c.StartsWith("back on")))
+            await JoinRequests.TellJoinedAsync(db, http.RequestServices.GetRequiredService<Notifications.Notifier>(), project, membership, cancellationToken);
         return Results.NoContent();
     }
 
@@ -476,8 +479,8 @@ public static class DirectoryEndpoints
     /// Holds a person off the project until management confirms them: inactive, with who added them and who is asked
     /// (anyone holding Manage on the project when nobody is named). Those asked are told.
     /// </summary>
-    private static async Task<string> HoldForConfirmationAsync(DeliosDbContext db, HttpContext http, Membership membership, Guid? confirmerId,
-        CancellationToken cancellationToken)
+    internal static async Task<string> HoldForConfirmationAsync(DeliosDbContext db, HttpContext http, Membership membership, Guid? confirmerId,
+        CancellationToken cancellationToken, string? why = null)
     {
         var clock = http.RequestServices.GetRequiredService<IClock>();
         var notifier = http.RequestServices.GetRequiredService<Notifications.Notifier>();
@@ -499,10 +502,15 @@ public static class DirectoryEndpoints
         var person = (await db.Users.AsNoTracking().SingleAsync(u => u.Id == membership.UserId, cancellationToken)).Name;
         // Asked on a transmittal: whoever confirms answers it, in the same thread.
         var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == membership.ProjectId, cancellationToken);
+        var function = await db.Functions.AsNoTracking().Where(f => f.Id == membership.FunctionId).Select(f => f.Name).SingleOrDefaultAsync(cancellationToken);
         var letter = await Actions.ActionLetters.SendAsync(db, transmittals, clock, project, new Actor(http.User.UserId(), by), Actions.ActionLetters.Request,
-            $"{person} to confirm on {project.Code}", $"{by} added {person} to {project.Code}; they join once confirmed. Confirm or refuse it on “People to confirm”.",
+            $"{person} to join {project.Code}",
+            $"{by} asks for {person} to join {project.Code} as {function}{(membership.Department is { } d ? $", department {d}" : "")}." +
+            (string.IsNullOrWhiteSpace(why) ? "" : $"\n\nWhy: {why.Trim()}") +
+            "\n\nThey join once confirmed. Confirm or refuse it on “People to confirm”.",
             told, [], null, cancellationToken);
         membership.ConfirmTransmittalId = letter?.Id;
+
         if (letter is null && told.Count > 0)
             await notifier.NotifyAsync(membership.TenantId, membership.ProjectId, told.Distinct(), Notifications.NotificationKinds.General,
                 $"{person} to confirm on the project", $"{by} added {person}; they join once confirmed.", "/people/confirm", cancellationToken);

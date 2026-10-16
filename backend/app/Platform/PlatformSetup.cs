@@ -329,6 +329,7 @@ public static class PlatformSetup
             app.MapEmailConfirmationEndpoints();
             app.MapAdminEndpoints();
             app.MapDirectoryEndpoints();
+            Identity.JoinRequests.MapJoinRequestEndpoints(app);
             Organizations.OrganizationEndpoints.MapOrganizationEndpoints(app);
             Seeding.SignUpEndpoints.MapSignUpEndpoints(app);
             Notifications.NotificationEndpoints.MapNotificationEndpoints(app);

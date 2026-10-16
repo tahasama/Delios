@@ -145,8 +145,14 @@ public static class ProjectAnswers
     /// (<c>CONFIRM:{act}</c> = ON). Without Document Control nothing is confirmed.
     /// </summary>
     public static async Task<bool> NeedsConfirmationAsync(DeliosDbContext db, Guid projectId, string act, CancellationToken cancellationToken) =>
-        (await AllAsync(db, projectId, cancellationToken)).GetValueOrDefault($"CONFIRM:{act}") == "ON"
+        ((await AllAsync(db, projectId, cancellationToken)).GetValueOrDefault($"CONFIRM:{act}") ?? DefaultConfirm(act)) == "ON"
         && await ControlDoesAsync(db, projectId, act, cancellationToken);
+
+    /// <summary>
+    /// Whether an act asks management to confirm when the project said nothing: joining a project does (owner's
+    /// decision: every addition is a request management confirms); adding to actions does not.
+    /// </summary>
+    public static string DefaultConfirm(string act) => act == "PROJECT_PEOPLE" ? "ON" : "OFF";
 
     /// <summary>Whether the organization left this act out on the project.</summary>
     public static async Task<bool> IsOffAsync(DeliosDbContext db, Guid projectId, string act, CancellationToken cancellationToken) =>

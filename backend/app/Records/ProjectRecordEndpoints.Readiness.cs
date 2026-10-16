@@ -236,11 +236,21 @@ public static partial class ProjectRecordEndpoints
         var person = await db.Users.AsNoTracking().SingleAsync(u => u.Id == membership.UserId, c);
         var now = clock.GetCurrentInstant();
         membership.PendingSince = null;
+        string? link = null;
         if (refusal is null)
         {
             membership.Active = true;
             membership.ConfirmedAt = now;
             membership.ConfirmedByName = access.UserName;
+            // A new account asked for on a request: its invitation goes now, never before.
+            if (membership.InviteOnJoin)
+            {
+                var account = await db.Users.SingleAsync(u => u.Id == membership.UserId, c);
+                link = await Identity.JoinRequests.InviteAsync(db, notifier,
+                    h.RequestServices.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(), account,
+                    membership.ProposedByName ?? access.UserName, c);
+                membership.InviteOnJoin = false;
+            }
         }
         else
         {
@@ -249,7 +259,9 @@ public static partial class ProjectRecordEndpoints
             membership.RefusedReason = refusal.Trim();
         }
         await db.SaveChangesAsync(c);
-        var said = refusal is null ? $"{person.Name} confirmed on the project by {access.UserName}." : $"{person.Name} refused by {access.UserName}: {refusal.Trim()}";
+        var said = refusal is null
+            ? $"{person.Name} confirmed on the project by {access.UserName}.{(link is not null ? $" Email is off here: give them this link to choose their password (7 days, once): {link}" : "")}"
+            : $"{person.Name} refused by {access.UserName}: {refusal.Trim()}";
         await audit.WriteAsync(Who(access), refusal is null ? "PERSON_CONFIRMED" : "PERSON_REFUSED", "User", person.Id, person.Name, said, access.Project.Id, c);
         // Whoever added them is answered on the transmittal that asked; the person themselves is told once they are on.
         var asked = membership.ConfirmTransmittalId is { } askId ? await db.Transmittals.AsNoTracking().SingleOrDefaultAsync(t => t.Id == askId, c) : null;
@@ -259,10 +271,14 @@ public static partial class ProjectRecordEndpoints
             asked?.Subject ?? $"{person.Name} to confirm on {access.Project.Code}", said, adder, [], asked?.Id, c);
         var told = new List<Guid>();
         if (letter is null) told.AddRange(adder);
-        if (refusal is null) told.Add(person.Id);
+        // Document Control keeps who is on the project: told of every answer.
+        told.AddRange(await notifier.ControlHoldersAsync(access.Project.Id, c));
+        told.RemoveAll(id => id == access.UserId || id == person.Id);
         if (told.Count > 0)
             await notifier.NotifyAsync(access.Project.TenantId, access.Project.Id, told.Distinct(), Notifications.NotificationKinds.General,
-                refusal is null ? $"{person.Name} is on the project" : $"{person.Name} was not confirmed", said, "/", c);
+                refusal is null ? $"{person.Name} is on the project" : $"{person.Name} was not confirmed", said, "/settings/users", c);
+        // The person themselves is told once they are on (a new account also gets its invitation).
+        if (refusal is null) await Identity.JoinRequests.TellJoinedAsync(db, notifier, access.Project, membership, c);
         await db.SaveChangesAsync(c);
         return Results.NoContent();
     }

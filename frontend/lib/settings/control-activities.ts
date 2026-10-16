@@ -440,6 +440,8 @@ export function effectiveAnswer(key: string, value: string | null | undefined): 
   const declared = POLICIES.find((one) => one.key === key);
   if (declared) return declared.options[0].value;
   if (key === ESCALATE_AFTER_KEY) return String(DEFAULT_ESCALATE_AFTER);
+  // Joining a project is a request management confirms unless the project unticks it (backend DefaultConfirm).
+  if (key === "CONFIRM:PROJECT_PEOPLE") return "ON";
   if (key.startsWith("CONFIRM:")) return "OFF";
   if (key.startsWith("SKIP:")) return "ON";
   return "FOLLOW";
