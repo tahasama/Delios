@@ -45,7 +45,7 @@ export async function prepareRevisionAction(_prev: Result | undefined, formData:
  * Edit a revision not yet released, in one go: its files and the document's
  * details. A new file replaces the one of its kind as a new submission of the
  * revision, the earlier one kept in its history; a revision without files yet
- * simply takes them. Its author or Document Control only, for the files.
+ * simply takes them. Its author or the control function only, for the files.
  */
 export async function editRevisionAction(_prev: Result | undefined, formData: FormData): Promise<Result & { ok?: string }> {
   const ctx = await requireScope();
@@ -164,7 +164,7 @@ export async function recordOutcomeAction(_prev: Result | undefined, formData: F
   return {};
 }
 
-/** Document Control sends the decided revision back to its author. */
+/** the control function sends the decided revision back to its author. */
 export async function returnToOriginatorAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
   const cycleId = text(formData, "cycleId");
@@ -187,7 +187,7 @@ export async function releaseRevisionAction(_prev: Result | undefined, formData:
   // with nobody to send to unless the organization keeps the two apart.
   const named = issueAsk(requestFromForm(formData));
   const issue = named && !named.delegated ? named : null;
-  // Of what was asked, who Document Control keeps; anyone left out is taken off, and the request says so.
+  // Of what was asked, who the control function keeps; anyone left out is taken off, and the request says so.
   const kept = formData.getAll("keptRequest").map(String).map((requestId) => {
     const keep = formData.getAll(`keep_${requestId}`).map(String);
     return {
@@ -208,7 +208,7 @@ export async function releaseRevisionAction(_prev: Result | undefined, formData:
         throw e;
       }
       documentId = review.documentId;
-      // Where nobody holds Document Control it is already released.
+      // Where nobody acts as the control function it is already released.
       if (review.state !== "RELEASED") await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue, kept } });
     } else {
       documentId = review.documentId;
@@ -221,7 +221,7 @@ export async function releaseRevisionAction(_prev: Result | undefined, formData:
   redirect(`/documents/${documentId}?released=1&superseded=`);
 }
 
-/** Document Control refuses to publish a decided revision and says why: back to its author, or the route back to a step. */
+/** the control function refuses to publish a decided revision and says why: back to its author, or the route back to a step. */
 export async function returnAtGateAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
   const revisionId = text(formData, "revisionId");
@@ -263,7 +263,7 @@ export async function voidRevisionAction(_prev: Result | undefined, formData: Fo
   return {};
 }
 
-/** Take a void back, with a reason: the revision counts again. Document Control's. */
+/** Take a void back, with a reason: the revision counts again. The control function's. */
 export async function unvoidRevisionAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
   const revisionId = text(formData, "revisionId");

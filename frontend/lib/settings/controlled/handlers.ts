@@ -168,12 +168,12 @@ const schedule: Handler = {
   kind: "SCHEDULE",
   title: "Project schedule",
   blurb:
-    "The activities the project must be ready for. Activity Code: your own code from whatever tool you plan in. Action Code: leave it empty for a new activity — the system assigns the next code (A00001, A00002…) and keeps it for that activity; after approval, download what is in force and put the codes back into your programme. Activity Description is optional. Date is the day the activity happens, as YYYY-MM-DD. Departments are not given here — the project manager tags them in the departments list. A new version moves the activity dates, and every needed-by date follows.",
+    "The activities the project must be ready for. Activity Code: your own code from whatever tool you plan in. Action Code: leave it empty for a new activity — the system assigns the next code (A00001, A00002…) and keeps it for that activity; after approval, download what is in force and put the codes back into your programme. Activity Description is optional. Date is the day the activity happens, as YYYY-MM-DD. Departments are not given here — whoever plans tags them in the departments list. A new version moves the activity dates, and every needed-by date follows.",
   clause: "§14.2 · §14.6",
   level: "PROJECT",
   columns: SCHEDULE_COLUMNS,
   sample: ["1010", "", "Foundation concrete pour — clarifier", "Clarifier TK-201, area 71", "2026-09-21", "Civil contractor"],
-  approverHint: "Document Control",
+  approverHint: "The control function",
 
   async parse(): Promise<ParseResult> {
     // The schedule is a controlled document: its export is read when a revision of it is released.

@@ -27,7 +27,7 @@ public static partial class ScheduleEndpoints
         var access = ProjectAccessFilter.Of(http);
         var activity = await db.Activities.SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
         if (activity is null) return NotFound();
-        // Added in answer to a request: the request is this action's and still open, and not one management confirms.
+        // Added in answer to a request: the request is this action's and still open, and not one whoever holds Manage confirms.
         Transmittal? ask = null;
         if (request.TransmittalId is { } askId)
         {
@@ -148,8 +148,8 @@ public static partial class ScheduleEndpoints
     }
 
     /// <summary>
-    /// The control function checks a request management confirms: the right documents for a discipline the action
-    /// concerns, or the disciplines it should concern, and who confirms it (management is proposed first; anyone on
+    /// The control function checks a request whoever holds Manage confirms: the right documents for a discipline the action
+    /// concerns, or the disciplines it should concern, and who confirms it (whoever holds Manage is proposed first; anyone on
     /// the project may be chosen). Nothing changes yet; whoever confirms is told.
     /// </summary>
     private static async Task<IResult> CheckActivityAskAsync(Guid transmittalId, ActivityCheckRequest request, HttpContext http,

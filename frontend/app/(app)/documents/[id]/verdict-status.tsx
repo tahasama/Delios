@@ -33,7 +33,7 @@ export type StatusOption = {
  * status the revision arrived with has to say so on purpose, because passing a
  * document on without having looked at what it is for is the mistake this
  * screen exists to prevent. The last step's answer is binding, and what it
- * leaves behind is a revision that is Not released until Document Control
+ * leaves behind is a revision that is Not released until the control function
  * publishes it.
  */
 export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterSteps = [], request, advice }: {
@@ -157,7 +157,7 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
 
           {deciding ? (
             <p className="rounded-md bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-900 ring-1 ring-amber-200">
-              This is the last step. Once you answer, the revision reads <strong>Not released</strong> until Document Control publishes it — nobody may work from it before that.
+              This is the last step. Once you answer, the revision reads <strong>Not released</strong> until the control function publishes it — nobody may work from it before that.
             </p>
           ) : null}
       </>

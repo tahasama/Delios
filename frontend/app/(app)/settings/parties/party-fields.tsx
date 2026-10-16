@@ -49,14 +49,14 @@ export function PartyKindFields({ kind, contactId, backupId, liaisonFunction, pe
       )}
 
       {offline ? (
-        <Field label="Their email for transmittals" hint="our transmittals go there by email, with their files; replies from it come back to the transmittal, for Document Control to record">
+        <Field label="Their email for transmittals" hint="our transmittals go there by email, with their files; replies from it come back to the transmittal, for the control function to record">
           <input type="email" name="contactEmail" defaultValue={contactEmail} maxLength={254} className={inputCls} placeholder="documents@their-company.com" />
         </Field>
       ) : null}
       {offline ? (
         <Field label="Who carries it" hint="our function that sends it to them, and fills in their review, comments and answer — with proof each time">
           <select name="liaisonFunction" defaultValue={liaisonFunction} className={inputCls}>
-            <option value="">Document Control</option>
+            <option value="">The control function</option>
             {functions.map((fn) => <option key={fn.id} value={fn.id}>{fn.name}</option>)}
           </select>
         </Field>

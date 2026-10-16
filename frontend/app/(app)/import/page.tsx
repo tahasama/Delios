@@ -44,7 +44,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
 
   // Everything on this page changes the project wholesale (a register, a team, the matrix, the lists) or copies it
-  // out whole: Document Control's, or whoever sets the project up.
+  // out whole: the control function's, or whoever sets the project up.
   const allowed = ctx.can("CONTROL") || ctx.can("CONFIGURE");
   const chosen = sp.kind ?? "deliverables";
 
@@ -61,7 +61,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
               </p>
             ) : (
               <p className="mt-2 max-w-2xl rounded-md bg-tint-soft px-2.5 py-1.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
-                Importing and exporting whole lists is for Document Control and administrators. Ask Document Control for a copy of a
+                Importing and exporting whole lists is for the control function and administrators. Ask the control function for a copy of a
                 register, or to bring a list in.
               </p>
             )}

@@ -14,12 +14,12 @@ import { documentPage, handBacks } from "@/lib/documents/api";
  * What a supplier sees on a document it owes us, in its own set of states: sent
  * to it, received, accepted, in review, released & issued; returned (by the
  * check, or by the review) brings it back to them. Attaching sends it, on one
- * transmittal. While Document Control has taken it back, nothing is sent.
+ * transmittal. While the control function has taken it back, nothing is sent.
  */
 export async function SupplierDelivery({ documentId }: { documentId: string }) {
   const ctx = await requireScope();
   const { user } = ctx;
-  // Read-only stays read-only: uploading is a right Document Control gives.
+  // Read-only stays read-only: uploading is a right the control function gives.
   const mayUpload = hasVerb(user, "CREATE") || hasVerb(user, "REVISE");
   const org = (await getMe())?.tenant.name ?? "us";
   const doc = await documentPage(ctx, documentId);
@@ -76,7 +76,7 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
     body: (
       <ActionForm action={attachSupplierFileAction} submitLabel="Send" size="sm" hidden={{ documentId }}>
         <input type="file" name="file" required className="w-full" />
-        <p className="text-[11px] text-slate-500">A PDF is what people read; send the editable original as well if it was asked for. One transmittal carries it to {org}&apos;s Document Control.</p>
+        <p className="text-[11px] text-slate-500">A PDF is what people read; send the editable original as well if it was asked for. One transmittal carries it to {org}&apos;s the control function.</p>
       </ActionForm>
     ),
   });
@@ -87,7 +87,7 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
     body: openAsk ? (
       <p className="whitespace-pre-line text-xs leading-5 text-slate-600">
         {openAsk.askedBy} asked, {fmtDate(new Date(openAsk.askedAt))}: {openAsk.reason}
-        <span className="block text-amber-800">{org}&apos;s Document Control answers; you are told.</span>
+        <span className="block text-amber-800">{org}&apos;s the control function answers; you are told.</span>
       </p>
     ) : mayUpload ? (
       <ActionForm action={askBackAction} submitLabel="Ask" size="sm" hidden={{ documentId }} className="space-y-3">
@@ -106,7 +106,7 @@ export async function SupplierDelivery({ documentId }: { documentId: string }) {
         <span className="stencil mr-1 text-slate-500">Your delivery</span>
         <span className="text-[11px] text-slate-500">asked of you by {org}</span>
       </div>
-      <NextStepBody items={items} status={<StagePath stages={["Sent", "Received", "Accepted", "In review", "Released & issued"]} at={at} note={<>{note}{!mayUpload && toSend ? <span className="mt-1 block text-[12px] text-amber-700">Your access is read-only. Ask {org}&apos;s Document Control for the right to upload.</span> : null}</>} />} />
+      <NextStepBody items={items} status={<StagePath stages={["Sent", "Received", "Accepted", "In review", "Released & issued"]} at={at} note={<>{note}{!mayUpload && toSend ? <span className="mt-1 block text-[12px] text-amber-700">Your access is read-only. Ask {org}&apos;s the control function for the right to upload.</span> : null}</>} />} />
     </section>
   );
 }

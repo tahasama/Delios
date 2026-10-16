@@ -42,7 +42,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
     getActiveSet("DOCUMENT_TYPES"),
     getActiveSet("DISCIPLINES"),
     getActiveSet("DELIVERABLE_TYPES"),
-    // Only Document Control and administrators may read the functions; anybody else sees no columns.
+    // Only the control function and administrators may read the functions; anybody else sees no columns.
     orEmpty(adminFunctions).then((rows) => rows.filter((f) => f.active)),
   ]);
 

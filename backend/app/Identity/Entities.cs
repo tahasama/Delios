@@ -247,7 +247,7 @@ public sealed class Membership
     public string? Department { get; set; }
     public bool Active { get; set; } = true;
     /// <summary>
-    /// Added while the project wants management to confirm who joins: not on the project (inactive) until confirmed.
+    /// Added while the project wants whoever holds Manage to confirm who joins: not on the project (inactive) until confirmed.
     /// Who added them, who is asked (empty: anyone holding Manage on the project), and how it was settled.
     /// </summary>
     public Instant? PendingSince { get; set; }
@@ -260,10 +260,10 @@ public sealed class Membership
     public Instant? RefusedAt { get; set; }
     public string? RefusedByName { get; set; }
     public string? RefusedReason { get; set; }
-    /// <summary>The transmittal that asked management to confirm this person: the answer replies to it.</summary>
+    /// <summary>The transmittal that asked whoever holds Manage to confirm this person: the answer replies to it.</summary>
     public Guid? ConfirmTransmittalId { get; set; }
     /// <summary>
-    /// A new account asked for on a request: its invitation (the link to choose a password) goes once management
+    /// A new account asked for on a request: its invitation (the link to choose a password) goes once whoever holds Manage
     /// confirms them, never before; refused, it never goes.
     /// </summary>
     public bool InviteOnJoin { get; set; }
@@ -312,7 +312,7 @@ public static class Verbs
     /// <summary>Upload the schedule's lists on Schedule &amp; actions: the schedule, the disciplines per action, the document requirements.</summary>
     public const string Plan = "PLAN";
     /// <summary>
-    /// Management (project, construction, engineering manager…): proposed first when a request needs management's
+    /// Manage: proposed first when a request needs a
     /// confirmation — a change to an action's documents or disciplines, a person added to the project — and adds
     /// people to the project where there is no control function.
     /// </summary>

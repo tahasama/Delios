@@ -10,7 +10,7 @@ import { api, projectPath, refusal } from "@/lib/client";
  * A view is a name and the address that produced it — the filters already live
  * in the query string, so nothing is copied and nothing goes stale. They are
  * per person: the question the piping lead asks every morning is not the
- * question Document Control asks, and a shared list would fill with both.
+ * question the control function asks, and a shared list would fill with both.
  */
 export async function saveRegisterView(formData: FormData) {
   const ctx = await requireScope();

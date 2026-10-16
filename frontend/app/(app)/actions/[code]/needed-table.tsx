@@ -480,7 +480,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link, toget
           <p className="px-5 py-6 text-xs text-slate-500 sm:px-6">
             {rows.length
               ? "No document here answers to that. Clear a filter above."
-              : empty ?? "No documents listed yet. Each discipline answers Document Control’s call; the answers become the approved requirements list."}
+              : empty ?? "No documents listed yet. Each discipline answers the control function’s call; the answers become the approved requirements list."}
           </p>
         )}
       </div>

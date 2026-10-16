@@ -73,10 +73,10 @@ export async function confirmPostponementAction(_prev: State | undefined, formDa
   } catch (e) {
     return { error: refusal(e).message };
   }
-  return { ok: "Confirmed. Everyone concerned and Document Control have been told." };
+  return { ok: "Confirmed. Everyone concerned and the control function have been told." };
 }
 
-/** Document Control takes a decision back, with why. It stays on the record, marked. */
+/** the control function takes a decision back, with why. It stays on the record, marked. */
 export async function reverseDecisionAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
   const actionId = String(formData.get("actionId") ?? "");

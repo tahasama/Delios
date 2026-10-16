@@ -324,7 +324,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
               <p className="mb-2 text-[11px] leading-4 text-slate-500">
                 {open === steps.length - 1
                   ? "This box decides what the revision may be used for. Narrow the list if it may only decide on some of the statuses."
-                  : "Nothing. A revision has a status only once Document Control publishes one; where it stands meanwhile is this route, and why it goes out is the reason for issue on the transmittal that carries it."}
+                  : "Nothing. A revision has a status only once the control function publishes one; where it stands meanwhile is this route, and why it goes out is the reason for issue on the transmittal that carries it."}
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 {open === steps.length - 1 ? (

@@ -96,8 +96,9 @@ public static class ProjectDirectory
 
     /// <summary>
     /// <c>PUT /people/control</c>: who acts as the control function on the project, whatever their function. An
-    /// administrator, or whoever already acts as it. Someone of ours on the project only; nobody left acting as it is
-    /// refused, unless a function still carries CONTROL. Those named or no longer named are told; it is logged.
+    /// administrator, or whoever already acts as it. Someone of ours on the project only. Nobody may be named: the
+    /// project then has no control function, and the people doing the work carry its acts out themselves. Those named
+    /// or no longer named are told; it is logged.
     /// </summary>
     private static async Task<IResult> ControlPeopleAsync(ControlPeopleRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
         Notifications.Notifier notifier, CancellationToken cancellationToken)
@@ -118,11 +119,6 @@ public static class ProjectDirectory
             if (!one.Internal)
                 return Problems.Invalid("OURS_ONLY", $"{one.Name} is of another organization: the control function is ours.");
         }
-        var byFunction = memberships.Any(m => m.Function!.Active && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))
-            && users.TryGetValue(m.UserId, out var u) && u.Active);
-        if (wanted.Count == 0 && !byFunction)
-            return Problems.Conflict("NO_CONTROL_LEFT", $"Somebody acts as the control function on {project.Code}: name at least one.");
-
         var named = new List<Guid>();
         var unnamed = new List<Guid>();
         foreach (var m in memberships)

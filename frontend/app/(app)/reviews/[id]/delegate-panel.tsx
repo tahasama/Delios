@@ -79,7 +79,7 @@ export function DelegatePanel({ rows, controller, off = false }: {
                   </ActionForm>
                 </div>
               ) : (
-                <p className="mt-1 text-[11px] opacity-80">Waiting for Document Control.</p>
+                <p className="mt-1 text-[11px] opacity-80">Waiting for the control function.</p>
               )}
               {row.mine && !controller ? (
                 <ActionForm action={endDelegationAction} submitLabel="Take it back" size="sm" variant="secondary" hidden={{ delegationId: row.id }} className="mt-2" />
@@ -118,7 +118,7 @@ export function DelegateForm({ cycleId, verb, candidates, throughControl, strict
   return candidates.length ? (
     <ActionForm
       action={delegateReviewAction}
-      submitLabel={throughControl ? "Ask Document Control" : "Hand it over"}
+      submitLabel={throughControl ? "Ask the control function" : "Hand it over"}
       size="sm"
       hidden={{ cycleId, verb }}
     >
@@ -141,7 +141,7 @@ export function DelegateForm({ cycleId, verb, candidates, throughControl, strict
         <input name="reason" className={inputCls} />
       </Field>
       <p className="text-[11px] leading-4 text-slate-500">
-        {throughControl ? "It starts once Document Control lets it; until then, the step is still yours." : "It takes effect at once."}
+        {throughControl ? "It starts once the control function lets it; until then, the step is still yours." : "It takes effect at once."}
         {" "}The record says you delegated it to them, and you answer for that choice.
       </p>
     </ActionForm>

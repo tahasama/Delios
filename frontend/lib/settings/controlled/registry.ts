@@ -59,7 +59,7 @@ export type Handler = {
   /** Which function may approve a change of this kind. */
   approverHint: string;
   /** The owner of this list uploads and approves it himself — no second person.
-   *  Document Control or an administrator may then decide their own upload. */
+   *  The control function or an administrator may then decide their own upload. */
   ownerApproves?: boolean;
   /** A verb that lets its holder upload and decide this kind besides Control and Configure — PLAN for the project manager's list. */
   ownerVerb?: "PLAN";

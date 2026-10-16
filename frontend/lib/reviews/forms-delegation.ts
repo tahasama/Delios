@@ -7,7 +7,7 @@ import { api, projectPath, refusal } from "@/lib/client";
 /**
  * Handing a review step to somebody else, and carrying that out.
  *
- * Where Document Control carries this act out, the reviewer asks and the request
+ * Where the control function carries this act out, the reviewer asks and the request
  * waits; where the people doing the work carry it out themselves, the same form
  * puts the delegation in force at once. The backend reads which of the two is in
  * use from the project — see `frontend/lib/settings/control-activities.ts` — and applies the
@@ -36,7 +36,7 @@ export async function delegateReviewAction(_prev: State | undefined, formData: F
     return { error: refusal(e).message };
   }
   revalidatePath(`/reviews/${cycleId}`);
-  return { message: row.status === "OPEN" ? "Asked. It starts once Document Control lets it." : `${row.toName} answers it in your place.` };
+  return { message: row.status === "OPEN" ? "Asked. It starts once the control function lets it." : `${row.toName} answers it in your place.` };
 }
 
 /** One act on a hand-over already made, by its id. */
@@ -56,19 +56,19 @@ function done(row: Delegation | State, message: (row: Delegation) => string): St
   return { message: message(row as Delegation) };
 }
 
-/** Document Control puts an asked-for delegation in force. */
+/** the control function puts an asked-for delegation in force. */
 export async function grantDelegationAction(_prev: State | undefined, formData: FormData): Promise<State> {
   return done(await act(formData, "grant"), (row) => `${row.toName} answers it in ${row.fromName}'s place.`);
 }
 
-/** Document Control declines it, with a reason — a refusal must be answerable. */
+/** the control function declines it, with a reason — a refusal must be answerable. */
 export async function refuseDelegationAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const why = text(formData, "refusedReason");
   if (!why) return { error: "Say why, so the person who asked knows what to do next." };
   return done(await act(formData, "refuse", { reason: why }), () => "Declined, and the person who asked has been told.");
 }
 
-/** The person who gave it takes it back; Document Control may also end it. */
+/** The person who gave it takes it back; the control function may also end it. */
 export async function endDelegationAction(_prev: State | undefined, formData: FormData): Promise<State> {
   return done(await act(formData, "end"), () => "Ended.");
 }

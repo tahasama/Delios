@@ -63,7 +63,7 @@ const VIEWS = [
 export default async function ReviewsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
   // One automatic warning per review that is about to miss its date. After that
-  // it is Document Control's call, and their chase is a transmittal.
+  // it is the control function's call, and their chase is a transmittal.
   const sp = await searchParams;
   const status = VIEWS.some((v) => v.id === sp.status) ? sp.status! : "ALL";
   const q = (sp.q ?? "").trim();

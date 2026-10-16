@@ -53,7 +53,7 @@ export const transmittalPage = cache(async (scope: Scope, id: string): Promise<T
 /**
  * Who of ours carries each organization a transmittal went to by hand, and
  * whether that is the reader. The backend lists the reader's own sending as
- * work; who else carries it is not published, so the names are Document Control's.
+ * work; who else carries it is not published, so the names are the control function's.
  */
 export async function carriersOf(scope: Scope, t: TransmittalView): Promise<Map<string, { names: string; mine: boolean }>> {
   const outside = t.recipients.filter((one) => one.partyId && !one.userId);
@@ -64,7 +64,7 @@ export async function carriersOf(scope: Scope, t: TransmittalView): Promise<Map<
       .catch(() => new Set<string | null>()),
     holders(scope.projectId, "CONTROL").catch(() => []),
   ]);
-  const names = control.filter((one) => one.internal).map((one) => one.name).join(", ") || "Document Control";
+  const names = control.filter((one) => one.internal).map((one) => one.name).join(", ") || "The control function";
   for (const one of outside) {
     const before = result.get(one.partyId!);
     result.set(one.partyId!, { names, mine: (before?.mine ?? false) || mine.has(one.id) });
@@ -84,7 +84,7 @@ export async function transmittalDrafts(scope: Scope) {
     projectPath(scope, "/transmittals/drafts")).catch(() => []);
 }
 
-/** A reply by email to one of our transmittals, waiting for Document Control (or answered). */
+/** A reply by email to one of our transmittals, waiting for the control function (or answered). */
 export type EmailReply = {
   id: string; transmittalId: string; transmittalNumber: string; organization: string; fromAddress: string; fromName: string | null;
   subject: string; text: string; receivedAt: string; files: { id: string; name: string; size: number }[];
@@ -92,6 +92,6 @@ export type EmailReply = {
   setAsideReason: string | null;
 };
 
-/** The replies by email on one transmittal, or (none named) those waiting on the project. Document Control's only. */
+/** The replies by email on one transmittal, or (none named) those waiting on the project. The control function's only. */
 export const emailReplies = cache(async (scope: Scope, transmittalId?: string): Promise<EmailReply[]> =>
   api<EmailReply[]>(projectPath(scope, "/email-replies"), { query: { transmittalId } }).catch(() => [] as EmailReply[]));

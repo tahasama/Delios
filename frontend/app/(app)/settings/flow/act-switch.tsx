@@ -10,7 +10,7 @@ type Side = "CONTROL" | "SELF" | "OFF";
  * One act, switched where it is shown. Choosing the other side does not save:
  * it says, in plain words, what will change, and waits to be confirmed.
  */
-export function ActSwitch({ act, title, controlText, selfText, controlDoes, offText, off = false }: {
+export function ActSwitch({ act, title, controlText, selfText, controlDoes, offText, off = false, readOnly = false }: {
   act: string;
   title: string;
   controlText: string;
@@ -19,6 +19,8 @@ export function ActSwitch({ act, title, controlText, selfText, controlDoes, offT
   /** What leaving the act out means — only for an act that may be left out. */
   offText?: string;
   off?: boolean;
+  /** Read only: the switch shows where the act stands, and nothing can be chosen. */
+  readOnly?: boolean;
 }) {
   const current: Side = off ? "OFF" : controlDoes ? "CONTROL" : "SELF";
   const [asked, setAsked] = useState<Side | null>(null);
@@ -31,7 +33,8 @@ export function ActSwitch({ act, title, controlText, selfText, controlDoes, offT
   const side = (one: Side, label: string) => (
     <button
       type="button"
-      onClick={() => setAsked(one === current ? null : one)}
+      disabled={readOnly && one !== current}
+      onClick={() => { if (!readOnly) setAsked(one === current ? null : one); }}
       aria-pressed={(asked ?? current) === one}
       className={cn("act-side", one === "CONTROL" && "act-side-control", one === "OFF" && "act-side-off", (asked ?? current) === one && "act-side-on", asked === one && "act-side-asked")}
     >
@@ -44,7 +47,7 @@ export function ActSwitch({ act, title, controlText, selfText, controlDoes, offT
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
         <span className="text-[13px] font-medium text-slate-900">{title}</span>
         <span className="act-switch" role="group" aria-label={`Who carries out: ${title}`}>
-          {side("CONTROL", "Document Control")}
+          {side("CONTROL", "The control function")}
           {side("SELF", "The people doing the work")}
           {offText ? side("OFF", "Skip it") : null}
         </span>

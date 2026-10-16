@@ -75,7 +75,7 @@ export async function buildSheet(
   // The published lists, the functions and their rules, and what the register
   // holds, from the backend.
   const [allFunctions, disciplines, inRegister, published, detail, types, levelValues, me] = await Promise.all([
-    // Only Document Control and administrators may read the functions; anybody else sees no columns.
+    // Only the control function and administrators may read the functions; anybody else sees no columns.
     orEmpty(adminFunctions),
     getActiveSet("DISCIPLINES"),
     registerByNumber(t).then((byNumber) => [...byNumber.values()].map((d) => ({ discipline: d.discipline, docType: d.docType }))),

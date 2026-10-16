@@ -27,14 +27,14 @@ function refresh(code: string, transmittalId?: string | null) {
 }
 
 /**
- * The disciplines concerned by an action, tagged by hand: Document Control (or
+ * The disciplines concerned by an action, tagged by hand: the control function (or
  * an administrator). Recorded in the activity log with what it was before. In
  * answer to a request for a missing discipline, the request is closed and
  * whoever asked is told.
  */
 export async function setDisciplinesAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
-  if (!ctx.can("CONTROL")) return { error: "Document Control tags the disciplines by hand." };
+  if (!ctx.can("CONTROL")) return { error: "The control function tags the disciplines by hand." };
   const actionId = String(formData.get("actionId") ?? "");
   const code = String(formData.get("code") ?? "");
   const transmittalId = String(formData.get("transmittalId") ?? "") || null;
@@ -49,7 +49,7 @@ export async function setDisciplinesAction(_prev: State | undefined, formData: F
 }
 
 /**
- * Document Control adds a register document to an action, for one of its
+ * The control function adds a register document to an action, for one of its
  * disciplines: the number only. Needed for the same purpose and at the same
  * status as the requirements list says when it says nothing, by the project's
  * lead before the day. In answer to a request, the request is closed and
@@ -57,7 +57,7 @@ export async function setDisciplinesAction(_prev: State | undefined, formData: F
  */
 export async function addDocumentToActionAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
-  if (!ctx.can("CONTROL")) return { error: "Document Control adds documents to an action." };
+  if (!ctx.can("CONTROL")) return { error: "The control function adds documents to an action." };
   const actionId = String(formData.get("actionId") ?? "");
   const documentIds = formData.getAll("documentIds").map(String).filter(Boolean);
   // A request answered names the discipline it was asked for; otherwise each document is needed for its own.
@@ -100,13 +100,13 @@ export async function addDocumentToActionAction(_prev: State | undefined, formDa
 /**
  * The register opened for one action: what is ticked is what the action needs.
  * Ticked and not there yet is added, for the discipline chosen; there and
- * unticked is taken off. Document Control. Each change is in the activity log.
+ * unticked is taken off. The control function. Each change is in the activity log.
  */
 export async function setActionDocumentsAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
-  // Without Document Control, the people of a discipline choose their own discipline's documents.
+  // Without a control function, the people of a discipline choose their own discipline's documents.
   const own = !ctx.can("CONTROL") && !(await controlDoes(ctx, "ACTION_LINKS")) ? ctx.user.department ?? null : null;
-  if (!ctx.can("CONTROL") && !own) return { error: "Document Control chooses an action's documents." };
+  if (!ctx.can("CONTROL") && !own) return { error: "The control function chooses an action's documents." };
   const actionId = String(formData.get("actionId") ?? "");
   const ticked = new Set(formData.getAll("documentIds").map(String).filter(Boolean));
 
@@ -117,7 +117,7 @@ export async function setActionDocumentsAction(_prev: State | undefined, formDat
   const linked = new Set(needs.map((one) => one.documentId));
   const adding = [...ticked].filter((id) => !linked.has(id));
   const leaving = needs.filter((one) => !ticked.has(one.documentId));
-  // Each document is needed for its own discipline (without Document Control, only one's own discipline's).
+  // Each document is needed for its own discipline (without a control function, only one's own discipline's).
   const disciplineOf = await disciplinesOf(ctx, adding);
   const outside = adding.filter((id) => !activity.departments.includes(disciplineOf.get(id) ?? "") || (own && disciplineOf.get(id) !== own));
   if (outside.length) return { error: `${outside.length} ticked document${outside.length === 1 ? " is" : "s are"} of a discipline ${activity.code} does not concern${own ? ", or not yours" : ""}: tag it on the action first, or untick ${outside.length === 1 ? "it" : "them"}.` };
@@ -138,10 +138,10 @@ export async function setActionDocumentsAction(_prev: State | undefined, formDat
   redirect(`/actions/${activity.code}`);
 }
 
-/** Document Control answers a request to add a document without adding one, saying why; whoever asked is told. */
+/** the control function answers a request to add a document without adding one, saying why; whoever asked is told. */
 export async function answerActionRequestAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
-  if (!ctx.can("CONTROL")) return { error: "Document Control answers these requests." };
+  if (!ctx.can("CONTROL")) return { error: "The control function answers these requests." };
   const transmittalId = String(formData.get("transmittalId") ?? "");
   const code = String(formData.get("code") ?? "");
   const note = String(formData.get("note") ?? "").trim();
@@ -156,13 +156,13 @@ export async function answerActionRequestAction(_prev: State | undefined, formDa
 }
 
 /**
- * Document Control checks a request that management confirms: what will change
+ * The control function checks a request that whoever holds Manage confirms: what will change
  * (the documents and the discipline needing them, or the disciplines), and who
  * confirms it. Nothing changes yet; whoever confirms is told.
  */
 export async function checkActionRequestAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
-  if (!ctx.can("CONTROL")) return { error: "Document Control checks these requests." };
+  if (!ctx.can("CONTROL")) return { error: "The control function checks these requests." };
   const transmittalId = String(formData.get("transmittalId") ?? "");
   const code = String(formData.get("code") ?? "");
   const confirmerId = String(formData.get("confirmerId") ?? "") || null;
@@ -186,7 +186,7 @@ export async function checkActionRequestAction(_prev: State | undefined, formDat
   return { ok: "Checked, and sent on to confirm." };
 }
 
-/** Whoever was asked confirms the request: what Document Control checked is applied by itself. */
+/** Whoever was asked confirms the request: what the control function checked is applied by itself. */
 export async function confirmActionRequestAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
   const transmittalId = String(formData.get("transmittalId") ?? "");
@@ -216,7 +216,7 @@ export async function refuseActionRequestAction(_prev: State | undefined, formDa
   return { ok: "Refused." };
 }
 
-/** Without Document Control: someone adds their own discipline to an action that should concern it. */
+/** Without a control function: someone adds their own discipline to an action that should concern it. */
 export async function addOwnDisciplineAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
   const actionId = String(formData.get("actionId") ?? "");

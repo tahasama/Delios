@@ -17,7 +17,7 @@ import { holders } from "@/lib/settings/api";
  *         was given — each answers for its own time, named apart so nobody
  *         carries a delay that began before them. Owed by the step.
  *   last  · it was released, then issued, by the day it is needed
- *       — owed by Document Control.
+ *       — owed by the control function.
  *
  * The backend works the chain out; this reads it.
  */

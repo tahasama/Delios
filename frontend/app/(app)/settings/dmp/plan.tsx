@@ -116,7 +116,7 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
         </Line>
         <Line label="Control function">
           {controlHolders.length
-            ? `${scope?.controlFunctionName ?? "Document Control"} — ${controlHolders.map((h) => h.name).join(", ")}`
+            ? `${scope?.controlFunctionName ?? "The control function"} — ${controlHolders.map((h) => h.name).join(", ")}`
             : "Nobody holds it: the people doing the work run the register themselves."}
         </Line>
         <Line label="Who carries each act">{PROJECT_MODE_LABEL[settings.projectMode]}</Line>

@@ -1,11 +1,12 @@
-import { controlDoes } from "@/lib/settings/control-activities";
+import { controlDoes, controlSettings, policies, PROJECT_MODE_LABEL, PEOPLE_MODE_LABEL } from "@/lib/settings/control-activities";
+import { holdersOf } from "@/lib/core/permissions";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { Chip, Tip } from "@/components/ui";
 import { NoAccess } from "./no-access";
 import { api } from "@/lib/client";
 import { getActiveSet } from "@/lib/settings/config";
-import { SETUP_PAGES, SETUP_GROUPS, maySetup, type SetupPage } from "./setup-pages";
+import { SETUP_PAGES, SETUP_GROUPS, maySetup, mayChangeControlRoom, CONTROL_ROOM, type SetupPage } from "./setup-pages";
 import { families } from "@/lib/settings/families";
 import {
   FolderKanban, Building2, Gauge, Tags, FileDigit, BadgeCheck, Users, Workflow, ScrollText, Layers, Route, ClipboardList, ArrowRight, KeyRound,
@@ -66,7 +67,15 @@ export default async function AdminPage() {
     getActiveSet("DELIVERABLE_TYPES").catch(() => []),
     Promise.all(ESSENTIAL.map(async (key) => ((await getActiveSet(key).catch(() => [])).length ? null : key))).then((all) => all.filter(Boolean).length),
   ]);
-  const familyList = await families(ctx);
+  const [familyList, how, chosen, controllers] = await Promise.all([
+    families(ctx),
+    controlSettings(ctx),
+    policies(ctx),
+    holdersOf(ctx, "CONTROL").catch(() => []),
+  ]);
+  const together = chosen.find((one) => one.policy.key === "POLICY_RELEASE")?.value !== "SEPARATE";
+  const adding = how.rows.find((row) => row.activity.key === "PROJECT_PEOPLE");
+  const changesIt = mayChangeControlRoom(user);
   const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
   const outside = parties.filter((p) => !p.isInternal).length;
   const schemes = numbering?.schemes.filter((s) => s.active).length ?? 0;
@@ -119,7 +128,7 @@ export default async function AdminPage() {
           <div className="min-w-0 max-w-2xl">
             <h1 className="plate-title text-slate-950">Settings</h1>
             <p className="plate-meta mt-1.5 font-normal">
-              How {ctx.project.code} works: its organizations, people, lists, numbering, reviews and who does what. What you change here
+              What {ctx.project.code} is built from: its organizations, people, lists, numbering and reviews. What you change here
               changes this project only.
             </p>
             {ready ? <p className="mt-2 text-xs font-semibold text-emerald-700">Everything a project needs is set up.</p> : null}
@@ -138,9 +147,57 @@ export default async function AdminPage() {
         </div>
       </header>
 
+      {/* The Control room stands above every page below: how the project works, and what makes it work that way. */}
+      <section className="register register-sheet register-sheet-open" aria-labelledby="control-room-head">
+        <div className="flex flex-col gap-3 px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 max-w-2xl gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-tint text-brand-ink">
+              <Route className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h2 id="control-room-head" className="text-base font-semibold text-slate-950">Control room</h2>
+              <p className="mt-0.5 text-xs leading-5 text-slate-600">
+                How {ctx.project.code} works, and what makes it work that way: every step a document goes through, who carries each act out, and
+                what the project has settled. Every page below is what it is built from.
+              </p>
+            </div>
+          </div>
+          <Link href={CONTROL_ROOM} className="ask shrink-0 self-start">
+            {changesIt ? "Open the Control room" : "See how it works"} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+        </div>
+        <dl className="grid grid-cols-1 divide-y divide-line border-t border-line sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-slate-500">Control function</dt>
+            <dd className="mt-1 text-[13px] font-medium text-slate-900">
+              {controllers.length ? controllers.map((one) => one.name).slice(0, 3).join(", ") + (controllers.length > 3 ? ` +${controllers.length - 3}` : "") : "None"}
+            </dd>
+            <dd className="text-[11px] text-slate-500">{controllers.length ? "stands between the work and the register" : "the people doing the work run the register"}</dd>
+          </div>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-slate-500">Who does what</dt>
+            <dd className="mt-1 text-[13px] font-medium text-slate-900">{PROJECT_MODE_LABEL[how.projectMode]}</dd>
+            <dd className="text-[11px] text-slate-500">{how.set ? "chosen for this project" : "read from the project"}</dd>
+          </div>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-slate-500">Releasing</dt>
+            <dd className="mt-1 text-[13px] font-medium text-slate-900">{together ? "Released and issued in one act" : "Released, then issued"}</dd>
+            <dd className="text-[11px] text-slate-500">{together ? "releasing sends it" : "releasing means go ahead"}</dd>
+          </div>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-slate-500">Adding people</dt>
+            <dd className="mt-1 text-[13px] font-medium text-slate-900">{PEOPLE_MODE_LABEL[adding?.controlDoes === false ? "SELF" : "CONTROL"]}</dd>
+            <dd className="text-[11px] text-slate-500">{adding?.confirm ? "confirmed by whoever holds Manage" : "no confirmation"}</dd>
+          </div>
+        </dl>
+        {changesIt ? null : (
+          <p className="border-t border-line px-5 py-2.5 text-[11px] text-slate-500 sm:px-6">You read it; an administrator or the control function changes it.</p>
+        )}
+      </section>
+
       <div className="space-y-5">
         {SETUP_GROUPS.map((group) => {
-          const pages = open.filter((p) => p.group === group);
+          const pages = open.filter((p) => p.group === group && p.href !== CONTROL_ROOM);
           if (!pages.length) return null;
           return (
             <section key={group}>

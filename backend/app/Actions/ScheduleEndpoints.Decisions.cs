@@ -135,7 +135,7 @@ public static partial class ScheduleEndpoints
                 x.IssuedAt.ToDateTimeOffset(), x.Id, x.Number, x.IssuedByName, x.ActivityAskKind ?? "DOCUMENT")));
         }
 
-        // A checked request waiting on this person's confirmation: whoever was asked, management first.
+        // A checked request waiting on this person's confirmation: whoever was asked, whoever holds Manage first.
         var confirming = await (from t in db.Transmittals.AsNoTracking()
                                 join a in db.Activities.AsNoTracking() on t.ActivityId equals a.Id
                                 where t.ProjectId == projectId && t.ActivityAnsweredAt == null && t.ActivityCheckedAt != null && t.ActivityConfirmerId == access.UserId

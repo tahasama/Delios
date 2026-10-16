@@ -56,7 +56,7 @@ function Act({ icon: Icon, label, href, primary, children }: { icon: typeof Send
 
 /**
  * One supplier's package. Two readers, two pages:
- *  - ours (Document Control and above): whether it is shared, what is sent to the supplier, where each document
+ *  - ours (the control function and above): whether it is shared, what is sent to the supplier, where each document
  *    stands and who holds it, and the acts on the package; nothing is uploaded here, the supplier sends its files;
  *  - the supplier's: only what was asked of it, in its own words, and a file field beside each document it holds.
  */

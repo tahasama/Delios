@@ -82,8 +82,8 @@ export async function WorkflowPanel({ doc, user, lead = [], extra: after = [] }:
             note={<>
               {decided?.outcome ? <><strong className="text-slate-800">{said?.label ?? decided.outcome}</strong>{decided.outcomeByName ? ` — ${decided.outcomeByName}` : ""}. </> : null}
               {letsItOut
-                ? controller ? "Ready to release." : "Document Control releases it next."
-                : controller ? "It asks for changes, so it is not released — send it back." : "It asks for changes, so Document Control will send it back."}
+                ? controller ? "Ready to release." : "The control function releases it next."
+                : controller ? "It asks for changes, so it is not released — send it back." : "It asks for changes, so the control function will send it back."}
             </>}
           />
         }
@@ -125,7 +125,7 @@ export async function WorkflowPanel({ doc, user, lead = [], extra: after = [] }:
           <StagePath
             stages={unreviewed ? UNREVIEWED : REVIEWED}
             at={unreviewed ? 1 : 2}
-            note={<>{unreviewed ? `${doc.docType} is not reviewed.` : "The route is finished."} Rev {revs[0].value} is at <strong className="text-slate-800">{revs[0].statusCode}</strong> and is not released until Document Control publishes it.</>}
+            note={<>{unreviewed ? `${doc.docType} is not reviewed.` : "The route is finished."} Rev {revs[0].value} is at <strong className="text-slate-800">{revs[0].statusCode}</strong> and is not released until the control function publishes it.</>}
           />
         ) : revs[0].state === "IN_REVIEW" ? (
           <StagePath stages={REVIEWED} at={1} note={<>Rev {revs[0].value} is with its reviewers.</>} />
@@ -141,7 +141,7 @@ export async function WorkflowPanel({ doc, user, lead = [], extra: after = [] }:
       title="Next step: first revision"
       className="border-brand-line/30 bg-tint-soft"
       items={may ? extra : []}
-      status={<StagePath stages={REVIEWED} at={0} note={may ? "The number is reserved. There is no content yet." : "The number is reserved. Document Control or the author prepares it."} />}
+      status={<StagePath stages={REVIEWED} at={0} note={may ? "The number is reserved. There is no content yet." : "The number is reserved. The control function or the author prepares it."} />}
     />
   );
 }
@@ -149,8 +149,8 @@ export async function WorkflowPanel({ doc, user, lead = [], extra: after = [] }:
 // ── Sending: pick a template, override participants, go ─────────────────────
 
 async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra, withdrawn }: { doc: DocLite; revId: string; value: string; hasFiles: boolean; user: SessionUser; lead: StepItem[]; extra: StepItem[]; withdrawn?: string | null }) {
-  // Who sends: the author for internal work; Document Control always, and
-  // only Document Control for what a supplier or other party produced.
+  // Who sends: the author for internal work; the control function always, and
+  // only the control function for what a supplier or other party produced.
   const isControl = isController(user);
   const external = !!doc.originator;
   const canSend = mayContributeToDocument(user, doc) && (isControl || (!external && user.id === doc.createdById));
@@ -167,7 +167,7 @@ async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra, withd
       <Card
         title={`Rev ${value} is being prepared`}
         items={[...lead, ...extra]}
-        status={<StagePath stages={unreviewed ? UNREVIEWED : REVIEWED} at={0} note={<>{file} {external ? "Document Control sends it on." : "The author sends it on."}</>} />}
+        status={<StagePath stages={unreviewed ? UNREVIEWED : REVIEWED} at={0} note={<>{file} {external ? "The control function sends it on." : "The author sends it on."}</>} />}
       />
     );
   }

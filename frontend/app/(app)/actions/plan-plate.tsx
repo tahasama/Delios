@@ -8,7 +8,7 @@
 export function PlanPlate({ inForce, plans, failed }: {
   /** The schedule in force and the day it was released; null when none is read yet. */
   inForce: { since: string | null } | null;
-  /** The reader uploads the schedule's lists (Document Control, or the Plan permission). */
+  /** The reader uploads the schedule's lists (the control function, or the Plan permission). */
   plans: boolean;
   /** The newest read of the schedule failed: which revision, and why. */
   failed: { revision: string; error: string | null } | null;
@@ -21,7 +21,7 @@ export function PlanPlate({ inForce, plans, failed }: {
           ? <>{inForce.since ? `Dates from the schedule released on ${inForce.since}.` : "Dates from the released schedule."}</>
           : plans
             ? <>No schedule yet: upload it below, and every action follows from it.</>
-            : <>No schedule yet. Document Control, or whoever plans the project, uploads it; every action follows from it.</>}
+            : <>No schedule yet. The control function, or whoever plans the project, uploads it; every action follows from it.</>}
       </p>
       {failed ? (
         <p className="mt-2 max-w-2xl rounded-md bg-red-50 px-2.5 py-1.5 text-xs leading-5 text-red-900 ring-1 ring-red-200">

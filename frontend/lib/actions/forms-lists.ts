@@ -24,7 +24,7 @@ const placeholders = (numbers: string[] | undefined) => numbers?.length
 
 export async function uploadPlanListAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
-  if (!mayUploadLists(ctx.user.verbs)) return { error: "Your function does not upload the schedule's lists. Document Control, or a function given Plan, does." };
+  if (!mayUploadLists(ctx.user.verbs)) return { error: "Your function does not upload the schedule's lists. The control function, or a function given Plan, does." };
   const kind = String(formData.get("kind") ?? "") as PlanListKind;
   const revisionId = String(formData.get("revisionId") ?? "");
   const confirmed = formData.get("confirmed") === "yes";
@@ -59,7 +59,7 @@ export async function uploadPlanListAction(_prev: Result | undefined, formData: 
  */
 export async function uploadLooseListAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
-  if (!mayUploadLists(ctx.user.verbs)) return { error: "Your function does not upload the schedule's lists. Document Control, or a function given Plan, does." };
+  if (!mayUploadLists(ctx.user.verbs)) return { error: "Your function does not upload the schedule's lists. The control function, or a function given Plan, does." };
   const kind = String(formData.get("kind") ?? "") as PlanListKind;
   const reason = String(formData.get("reason") ?? "").trim();
   const file = filesOf(formData, "file").find((one) => /\.(xlsx|csv)$/i.test(one.name)) ?? null;

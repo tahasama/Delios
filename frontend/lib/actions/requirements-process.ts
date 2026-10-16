@@ -5,13 +5,13 @@ import { planActions } from "@/lib/actions/api";
  * From schedule to safe activity, in the order it happens:
  *
  *   1. The schedule is in force; every activity has an A-code.
- *   2. The project manager fills the departments list, uploads and approves it.
- *   3. Document Control calls each department concerned for its documents.
+ *   2. Whoever plans fills the departments list, uploads and approves it.
+ *   3. The control function calls each department concerned for its documents.
  *   4. Departments fill their sheet (offline or a shared file) — documents,
  *      from whom, by when (5 working days before the activity by default).
- *   5. Late departments are reminded by Document Control.
+ *   5. Late departments are reminded by the control function.
  *   6. The filled list is uploaded and approved; the calls are answered.
- *   7. Document Control issues it to each sender, who baselines on it.
+ *   7. The control function issues it to each sender, who baselines on it.
  *      Reviewers then have the working days between needed-by and the activity.
  *   8. Each department confirms its documents are available before the activity.
  *   9. The activity goes ahead when every department has confirmed.

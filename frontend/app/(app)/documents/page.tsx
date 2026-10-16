@@ -244,10 +244,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   if (q) query.set("q", q); if (state) query.set("state", state); if (discipline) query.set("discipline", discipline); if (docType) query.set("docType", docType); if (revState) query.set("rev", revState); if (statusCode) query.set("status", statusCode); if (verdictCode) query.set("verdict", verdictCode); if (supplier) query.set("supplier", supplier); if (po) query.set("po", po); if (view === "all") query.set("view", "all"); if (criticality) query.set("criticality", criticality); if (confidentiality) query.set("confidentiality", confidentiality); if (deliverable) query.set("deliverable", deliverable); if (sp.phase) query.set("phase", sp.phase);
   if (dateOn) query.set("on", dateOn); if (sp.from) query.set("from", sp.from); if (sp.to) query.set("to", sp.to);
   if (sort) { query.set("sort", sort); query.set("dir", dir); }
-  // Opened for an action, by Document Control: what it needs now starts ticked.
-  // Without Document Control, the people of a discipline open it for their own discipline's documents only.
+  // Opened for an action, by the control function: what it needs now starts ticked.
+  // Without a control function, the people of a discipline open it for their own discipline's documents only.
   const own = !scope.can("CONTROL") && !(await controlDoes(scope, "ACTION_LINKS")) ? user.department ?? null : null;
-  // Opened for a supplier's package ("pkg:<number>"), by Document Control: its documents start ticked; tick to add.
+  // Opened for a supplier's package ("pkg:<number>"), by the control function: its documents start ticked; tick to add.
   // Opened for a form being filled ("tr:<form address>", "rv:<form address>"): what it holds starts ticked, and
   // "Continue" takes the ticks back to it. Only our own forms are gone back to.
   const formPick = sp.pick && /^(tr|rv):\/(transmittals\/new|reviews\/send)(\?|$)/.test(sp.pick) ? (() => {
@@ -267,7 +267,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         linked: found.documents.map((d) => d.id), disciplines: [] as { code: string; label: string }[], locked: [] as string[],
       } : null)
     : null;
-  // A delivery package is filled by those putting it together too; a supplier's, by Document Control.
+  // A delivery package is filled by those putting it together too; a supplier's, by the control function.
   const packagePick = sp.pick?.startsWith("pkg:")
     ? await packageByNumber(scope, sp.pick.slice(4)).then((pkg) => pkg && !pkg.closedAt && (scope.can("CONTROL") || (pkg.kind === "DELIVERY" && pkg.ownerIds.includes(user.id))) ? {
         kind: "package" as const, packageId: pkg.id, actionId: "", code: pkg.number, name: pkg.title ?? pkg.names.to,

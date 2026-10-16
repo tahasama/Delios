@@ -26,7 +26,7 @@ type Kind = {
 };
 
 // What each action needs is agreed through the Schedule (the requirements list) and
-// Document Control issues it: it is not imported here.
+// The control function issues it: it is not imported here.
 const KINDS: Kind[] = [
   {
     key: "deliverables",
@@ -45,7 +45,7 @@ const KINDS: Kind[] = [
     name: "Team list",
     hint: "people on this project",
     title: "Put a team on this project",
-    blurb: "One row per person. Each gets an account on this project in the function named, and an email asking them to choose their own password. Where management confirms who joins, they wait under People to confirm.",
+    blurb: "One row per person. Each gets an account on this project in the function named, and an email asking them to choose their own password. Where whoever holds Manage confirms who joins, they wait under People to confirm.",
     columns: "Name, Email, Company (an organization's code or name; empty for our own people), Function (as in Settings → Functions & permissions), Department.",
     now: { href: "/api/export/people", label: "The team as it stands (.csv)" },
     template: { href: "/api/export/template-people", label: "An empty template, with an example (.csv)" },

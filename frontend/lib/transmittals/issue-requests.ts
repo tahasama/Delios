@@ -14,7 +14,7 @@ import type { Distribution, IssueRequestView } from "@/lib/types";
  * team now" and "ask the client to approve it next week" are two requests, not
  * one form filled in twice.
  *
- * Document Control carries a request out. Releasing is its own act and needs
+ * The control function carries a request out. Releasing is its own act and needs
  * nobody's request; issuing needs one, always. Where a project runs without a
  * control function, whoever asked carries it out themselves. Until somebody
  * asks, a released revision is simply not issued, and the record says so.

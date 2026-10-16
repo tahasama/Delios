@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui";
  * Settings link at all).
  */
 export function NoAccess({ title, who }: { title: string; who: "admin" | "control" }) {
-  const by = who === "admin" ? "an administrator" : "an administrator or Document Control";
+  const by = who === "admin" ? "an administrator" : "an administrator or the control function";
   return (
     <PageHeader title={title} subtitle={`This page is changed by ${by}. Ask them if something here needs to change.`}>
       <p className="text-xs text-slate-600">

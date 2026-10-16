@@ -55,10 +55,10 @@ export function HowItWorks({
 
   const modes: (ProjectMode | "FOLLOW")[] = defaults ? ["FOLLOW", "CONTROL", "SELF", "CUSTOM"] : ["CONTROL", "SELF", "CUSTOM"];
   const modeText: Record<ProjectMode | "FOLLOW", string> = {
-    FOLLOW: "Each new project reads whether somebody holds the control function: Document Control when someone does, the people doing the work when nobody does.",
-    CONTROL: "Everything on the list below goes through Document Control. People ask; Document Control carries it out.",
+    FOLLOW: "Each new project reads whether somebody holds the control function: the control function when someone does, the people doing the work when nobody does.",
+    CONTROL: "Everything on the list below goes through the control function. People ask; the control function carries it out.",
     SELF: "Everything on the list below is done by whoever is doing the work — the author, the reviewer, whoever asked.",
-    CUSTOM: "Each act on its own. Put the ones you want with Document Control and leave the rest with the work.",
+    CUSTOM: "Each act on its own. Put the ones you want with the control function and leave the rest with the work.",
   };
   const checked = defaults && !set ? "FOLLOW" : projectMode;
 
@@ -109,7 +109,7 @@ export function HowItWorks({
                   </div>
                   <select
                     name={`mode:${activity.key}`}
-                    defaultValue={mode === "FOLLOW" ? (activity.key === PEOPLE_KEY || follows ? "CONTROL" : "SELF") : mode}
+                    defaultValue={mode === "FOLLOW" ? (follows ? "CONTROL" : "SELF") : mode}
                     className={`${inputCls} w-full sm:w-56`}
                     aria-label={`Who carries out ${activity.title}`}
                   >
@@ -211,7 +211,7 @@ export function HowItWorks({
               </div>
               <p className="text-xs leading-5 text-slate-600">
                 An action&rsquo;s day passed with a discipline&rsquo;s documents missing, and nobody of that discipline confirmed whether the work went
-                ahead. After this many working days, its people, management and Document Control are all notified, once. The app&rsquo;s default
+                ahead. After this many working days, its people, whoever holds Manage and the control function are all notified, once. The app&rsquo;s default
                 is {DEFAULT_ESCALATE_AFTER}.
               </p>
               <label className="flex items-center gap-2 text-xs text-slate-700">

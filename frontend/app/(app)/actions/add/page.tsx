@@ -16,7 +16,7 @@ export const metadata = { title: "Add to action" };
 /**
  * A selection from the register, added to one schedule action for one of its
  * disciplines: the numbers only, as the requirements list does when it says
- * nothing of status or date. Document Control.
+ * nothing of status or date. The control function.
  */
 export default async function AddToActionPage({ searchParams }: { searchParams: Promise<{ docs?: string }> }) {
   const ctx = await requireScope();

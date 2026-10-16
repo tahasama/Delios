@@ -1,7 +1,7 @@
 import { plain } from "@/lib/core/utils";
 import { CHECK_BY_ID } from "@/lib/conformance/checks/catalog";
 import { liveDefects, type DefectView } from "@/lib/conformance/api";
-export const OWNER_LABEL: Record<string, string> = { CF: "Document Control", OR: "Originator", RV: "Reviewer", OG: "Organization" };
+export const OWNER_LABEL: Record<string, string> = { CF: "The control function", OR: "Originator", RV: "Reviewer", OG: "Organization" };
 
 /** Where a list of values is kept in Settings, by its name; the numbering and the matrix have pages of their own. */
 function settingSpot(set: string, label: string): { label: string; href: string } {

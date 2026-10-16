@@ -52,12 +52,12 @@ export default async function DefaultsPage() {
           </div>
           <ul className="divide-y divide-line">
             <li className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6">
-              <span className="font-semibold text-slate-800">Who carries the acts out:</span> as each project is set up — Document Control when somebody
+              <span className="font-semibold text-slate-800">Who carries the acts out:</span> as each project is set up — The control function when somebody
               holds the control function, else the people doing the work
               {CONTROL_ACTIVITIES.some((one) => one.workByDefault) ? <> (except {CONTROL_ACTIVITIES.filter((one) => one.workByDefault).map((one) => one.title.toLowerCase()).join(", ")}, left with the work)</> : null}.
             </li>
             <li className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6">
-              <span className="font-semibold text-slate-800">Management confirmation:</span> not asked
+              <span className="font-semibold text-slate-800">Confirmation by whoever holds Manage:</span> not asked
               ({Object.keys(CONFIRMABLE).map((key) => CONTROL_ACTIVITIES.find((one) => one.key === key)?.title.toLowerCase() ?? key).join(", ")}).
             </li>
             {POLICIES.map((one) => (

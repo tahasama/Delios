@@ -101,7 +101,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   }
 
   // A supplier's documents with nothing released, asked of them as placeholders: the one exception to "only released
-  // revisions travel". Only Document Control asks; only one supplier's at a time, sent to that supplier.
+  // revisions travel". Only the control function asks; only one supplier's at a time, sent to that supplier.
   const askedIds = ctx.can("CONTROL") ? [...new Set((sp.placeholders ?? "").split(",").map((one) => one.trim()).filter(Boolean))] : [];
   const askedDocs = (await Promise.all(askedIds.map((one) => backendDocument(ctx, one))))
     .filter((d): d is NonNullable<typeof d> => !!d && !d.revisions.some((r) => r.state === "RELEASED" || r.state === "SUPERSEDED"));
@@ -151,7 +151,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         // Sending is what the form is mostly for, so it opens on sending —
         // replies included. Only a link that asks to record something
         // received opens the other way.
-        // Another organization's people send to us; Document Control may record what reached us outside the system.
+        // Another organization's people send to us; the control function may record what reached us outside the system.
         defaultDirection={!ctx.user.isInternal || (sp.direction === "INCOMING" && ctx.can("CONTROL")) ? "INCOMING" : "OUTGOING"}
         mayRecordReceived={ctx.user.isInternal && ctx.can("CONTROL")}
         askingBack={askingBack.length ? { to: supplier!.name, items: askingBack } : undefined}

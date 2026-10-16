@@ -61,8 +61,8 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
     return row ? VERDICT_EFFECT_BLURB[verdictEffect(row.props)] : OUTCOME_CONSEQUENCES[code]?.blurb;
   };
   const controller = isController(user) || isAdmin(user);
-  // Notifying the people the review still waits on, by hand: Document Control, or whoever started it.
-  // Whoever started the review, or Document Control (and above), may take the revision back out of it.
+  // Notifying the people the review still waits on, by hand: the control function, or whoever started it.
+  // Whoever started the review, or the control function (and above), may take the revision back out of it.
   const mayWithdraw = cycle.revision.state === "IN_REVIEW" && !cycle.withdrawn && (controller || (!!cycle.openedById && cycle.openedById === user.id));
   const notify = cycle.status === "OPEN" && !cycle.withdrawn && (controller || (!!cycle.openedById && cycle.openedById === user.id))
     ? await (async () => {
@@ -141,7 +141,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   const canRecordOutcome = (assigned || controller) && !cycle.outcome && !cycle.withdrawn && Boolean(cycle.issuedToReviewAt);
   // Writing comments: whoever sits on the open step, until they answer it.
   const mayComment = cycle.status === "OPEN" && assigned && !cycle.outcome && !cycle.withdrawn && Boolean(cycle.issuedToReviewAt);
-  // Whether an open comment stops the release: Document Control, or the revision's author, may change it.
+  // Whether an open comment stops the release: the control function, or the revision's author, may change it.
   // A step answered by an outside party that holds no accounts here: one of our
   // people sends the pack and writes down what comes back. The verdict stays
   // theirs; the record says who entered it.
@@ -160,7 +160,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   const routeCycleIds = run ? run.steps.map((step) => step.cycleId).filter((one): one is string => !!one) : [];
   const routeCycles = routeCycleIds.length ? await routeSteps(ctx, cycle.id) : [];
   const byId = new Map(routeCycles.map((one) => [one.id, one]));
-  // A decided review that is part of a route has one way back: Document Control
+  // A decided review that is part of a route has one way back: the control function
   // sends the revision back at the gate, with a reason, and everyone who sat on
   // the route is told. A review the control function ran on its own still ends
   // by handing the outcome to the author.
@@ -200,14 +200,14 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
           { group: "Withdrawn", label: rev.releasedAt ? "Released — in a later review" : "Released", at: rev.releasedAt, holder: rev.releasedAt ? rev.releasedByName ?? null : "only through a new review" },
         ] : [
         // Decided is when it became Not released; it stays reached once released.
-        { group: "Document Control", label: "Not released", here: rev.state === "NOT_RELEASED", at: cycle.binding && cycle.outcome ? cycle.returnedFromReviewAt : null,
-          holder: rev.state === "NOT_RELEASED" ? (rev.statusCode ? `at ${rev.statusCode}, waiting for Document Control` : "waiting for Document Control") : cycle.outcome && rev.statusCode ? `decided at ${rev.statusCode}` : null },
-        { group: "Document Control", label: "Released", at: rev.releasedAt, holder: rev.releasedByName ?? null },
+        { group: "The control function", label: "Not released", here: rev.state === "NOT_RELEASED", at: cycle.binding && cycle.outcome ? cycle.returnedFromReviewAt : null,
+          holder: rev.state === "NOT_RELEASED" ? (rev.statusCode ? `at ${rev.statusCode}, waiting for the control function` : "waiting for the control function") : cycle.outcome && rev.statusCode ? `decided at ${rev.statusCode}` : null },
+        { group: "The control function", label: "Released", at: rev.releasedAt, holder: rev.releasedByName ?? null },
         ]),
       ]
     : [
         { label: "Submitted", at: cycle.submittedAt, holder: cycle.openedByName },
-        { label: "Received by control", at: cycle.receivedAt, holder: "Document Control" },
+        { label: "Received by control", at: cycle.receivedAt, holder: "The control function" },
         { label: "With reviewers", at: cycle.issuedToReviewAt, holder: cycle.assignments.map((assignment) => assignment.userName).join(", ") || "Unassigned" },
         { label: "Review returned", at: cycle.returnedFromReviewAt, holder: cycle.outcomeByName ?? "the reviewers" },
         { label: "Returned to author", at: cycle.returnedToOriginatorAt, holder: doc.createdByName },
@@ -301,7 +301,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             {rendition ? <iframe src={`/api/files/${rendition.id}`} title={`${doc.docNumber} revision ${rev.value}`} className="block h-160 w-full bg-canvas"/> : <div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>}
           </section>
 
-          {/* Whoever started the review, or Document Control (and above), takes the revision back out of it to change
+          {/* Whoever started the review, or the control function (and above), takes the revision back out of it to change
               it, with why. The review stays in the register as withdrawn. Folded until asked for. */}
           {mayWithdraw ? (
             <details id="withdraw" open={opened === "withdraw"} className="register register-sheet register-sheet-open scroll-mt-24">
@@ -371,7 +371,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
 
           {/* Comments are written with the answer, under the verdict or advice
               that needs them; this lists them.
-              Document Control, or the revision's author, may change whether an
+              the control function, or the revision's author, may change whether an
               open one stops the release; what it was is kept. */}
           {/* Once the step has answered, its comments are shown with its answer: listed here only until then. */}
           {cycle.comments.length && !cycle.outcome ? (
@@ -511,11 +511,11 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
                   <Field label="Proof" required hint="what they sent back"><input type="file" name="evidence" required className="w-full" /></Field>
                 </div>
               ) : null}</ActionForm></Guarded>}
-            {cycle.outcome ? null : <p className="mt-2 text-xs leading-5 text-slate-500">{!cycle.issuedToReviewAt ? "Document Control sends it to the reviewers first." : ""}</p>}
+            {cycle.outcome ? null : <p className="mt-2 text-xs leading-5 text-slate-500">{!cycle.issuedToReviewAt ? "The control function sends it to the reviewers first." : ""}</p>}
           </AnswerCard>
           )}
 
-          {!cycle.issuedToReviewAt ? <Card title="Send to reviewers">{mayIssueToReviewers ? <ActionForm action={issueToReviewAction} submitLabel="Send to reviewers" hidden={{ cycleId: cycle.id }}/> : <p className="text-xs text-slate-500">{issueIsControl ? "Waiting for Document Control." : "Waiting for whoever sent it for review."}</p>}</Card> : null}
+          {!cycle.issuedToReviewAt ? <Card title="Send to reviewers">{mayIssueToReviewers ? <ActionForm action={issueToReviewAction} submitLabel="Send to reviewers" hidden={{ cycleId: cycle.id }}/> : <p className="text-xs text-slate-500">{issueIsControl ? "Waiting for the control function." : "Waiting for whoever sent it for review."}</p>}</Card> : null}
 
           {earlier.length ? (
             <Card title="What the earlier steps said" description="Their verdicts and their comments, in order.">

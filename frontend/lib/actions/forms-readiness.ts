@@ -10,7 +10,7 @@ const failed = (e: unknown): State => ({ error: refusal(e).message });
 
 /**
  * Step 8 — before the activity, a department confirms its documents are
- * available. Declaring a shortage needs a note, and alerts Document Control.
+ * available. Declaring a shortage needs a note, and alerts the control function.
  */
 export async function confirmReadinessAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
@@ -18,7 +18,7 @@ export async function confirmReadinessAction(_prev: State | undefined, formData:
   const answer = String(formData.get("available") ?? "");
   const note = String(formData.get("note") ?? "").trim() || null;
   // Available or not is a choice, never a box left as it was; and "not
-  // available" is what Document Control is alerted with, so it says why.
+  // available" is what the control function is alerted with, so it says why.
   if (answer !== "yes" && answer !== "no") return { error: "Choose Available or Not available." };
   if (answer === "no" && !note) return { error: "Say what is missing, and when it will be there." };
   try {
@@ -35,7 +35,7 @@ export async function confirmReadinessAction(_prev: State | undefined, formData:
   return { ok: "Recorded." };
 }
 
-/** Document Control takes a department's confirmation back (an honest mistake), with why. */
+/** the control function takes a department's confirmation back (an honest mistake), with why. */
 export async function revokeReadinessAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
   const reason = String(formData.get("reason") ?? "").trim();

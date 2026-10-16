@@ -249,7 +249,7 @@ export async function importBulkAction(_prev: ImportResult | undefined, formData
     }
   } else if (kind === "people") {
     // A whole team arrives at once, in a spreadsheet, like everything else here.
-    if (!ctx.can("CONFIGURE") && !ctx.can("CONTROL")) return { error: "Adding people is Document Control's, or an administrator's. Ask one of them." };
+    if (!ctx.can("CONFIGURE") && !ctx.can("CONTROL")) return { error: "Adding people is the control function's, or an administrator's. Ask one of them." };
     let functions: { id: string; name: string }[], parties: { id: string; code: string; name: string }[], existing: { email: string }[];
     try {
       [functions, parties, existing] = await Promise.all([
@@ -362,12 +362,12 @@ export async function importBulkAction(_prev: ImportResult | undefined, formData
         } catch (e) {
           throw new Error(refusal(e).message);
         }
-        // Joining may wait for management (People to confirm), as anyone added on People & access.
+        // Joining may wait for whoever holds Manage (People to confirm), as anyone added on People & access.
         const added = (await api<AdminUserLite[]>("/api/admin/users")).find((u) => u.id === created.id);
         const pending = added?.memberships.find((m) => m.projectId === projectId)?.pendingSince;
         if (!created.invited) handOver = true;
         report.message = [
-          `Added ${GET(o, "Name")} as ${fn.name}${pending ? ", waiting for management to confirm them (People to confirm)" : ""}.`,
+          `Added ${GET(o, "Name")} as ${fn.name}${pending ? ", waiting to be confirmed (People to confirm)" : ""}.`,
           created.invited ? `An email asks them to choose their password.`
             : `Email is off on this installation: give them the link below to choose their password (it works once, for 7 days).`,
         ].join(" ");

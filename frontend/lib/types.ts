@@ -19,7 +19,7 @@ export type WorkItem = {
   since: string;
   /** The person's step gives the verdict (otherwise it is advice). */
   deciding: boolean;
-  /** On Document Control's gate: what the review decided, and the status it grants. */
+  /** On The control function's gate: what the review decided, and the status it grants. */
   verdict: string | null;
   status: string | null;
 };
@@ -34,7 +34,7 @@ export type RevisionWork = {
   submission: number;
   note: string | null;
   since: string;
-  /** Sent to the supplier again after Document Control took it back, rather than returned by its check. */
+  /** Sent to the supplier again after the control function took it back, rather than returned by its check. */
   resent?: boolean;
 };
 
@@ -194,7 +194,7 @@ export type TransmittalLogRow = {
   recipients: { id: string; name: string; seen: boolean; kind: "TO" | "CC"; organization: string | null }[];
   responseRequired: boolean; responseDue: string | null; forReview: boolean;
   direction: "OUTGOING" | "INCOMING"; from: string | null; theirReference: string | null;
-  /** What came in: what Document Control's check said of its documents; null for anything else. */
+  /** What came in: what the control function's check said of its documents; null for anything else. */
   check?: "TO_CHECK" | "RETURNED" | "PARTLY_RETURNED" | "ACCEPTED" | null;
   /** Where the answer it asks stands (backend AnswerStates); null when none is asked. */
   answer?: "AWAITED" | "OVERDUE" | "ON_TIME" | "LATE" | null;
@@ -217,7 +217,7 @@ export type TransmittalView = {
   state: "ISSUED" | "DRAFT"; issuedById: string | null;
   inReplyTo: TransmittalRef | null; answers: TransmittalRef[]; follows: TransmittalRef | null; followedBy: TransmittalRef[];
   receiptNote: string | null; extras: Record<string, string> | null; followKind: string | null;
-  /** It asks for a document to be added to this schedule action; answered once Document Control has. */
+  /** It asks for a document to be added to this schedule action; answered once the control function has. */
   activity: {
     id: string; answeredAt: string | null; answeredBy: string | null; answer: string | null; kind: "DOCUMENT" | "DISCIPLINE";
     confirm?: boolean; checkedAt?: string | null; checkedBy?: string | null; confirmerId?: string | null; confirmerName?: string | null;
@@ -276,7 +276,7 @@ export type IssueRequestView = {
   id: string; revisionId: string; reason: string; userIds: string[]; partyIds: string[]; note: string | null; offDistributionReason: string | null;
   raisedBy: string; raisedAt: string; status: string; closedAt: string | null; closedBy: string | null; transmittals: string[];
   raisedById: string; transmittalIds: string[]; delegated?: boolean; approverPartyId?: string | null; approvalState?: string | null;
-  /** Who Document Control took off it when releasing. */
+  /** Who the control function took off it when releasing. */
   releaseNote?: string | null;
 };
 

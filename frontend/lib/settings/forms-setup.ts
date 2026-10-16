@@ -34,7 +34,7 @@ export async function openFirstProjectAction(_prev: SetupState | undefined, form
 
   let projectId: string;
   try {
-    // Whoever opens it is on it, as Document Control.
+    // Whoever opens it is on it, as the control function.
     projectId = (await api<{ id: string }>("/api/admin/projects", { body: { code, name, contractRole: role, kind } })).id;
     await setProjectSetting(projectId, "PROJECT_INFO", JSON.stringify({
       kind, startDate: new Date().toISOString().slice(0, 10), endDate: null,

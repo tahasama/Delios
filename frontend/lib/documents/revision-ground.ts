@@ -25,9 +25,9 @@ export async function revisionGround(t: Tenant, documentId: string): Promise<Rev
   const last = doc?.revisions[0];
   if (!last) return { kind: "FIRST" };
 
-  // Sent back by Document Control, at the gate or on arrival.
+  // Sent back by the control function, at the gate or on arrival.
   if (last.backend.state === "CORRECTING" || (last.state === "RETURNED" && last.backend.controlOutcome && !last.cycles.some((c) => c.outcome))) {
-    return { kind: "ASKED", why: `Sent back by Document Control: ${last.returnedReason ?? "see the record"}`, comments: 0 };
+    return { kind: "ASKED", why: `Sent back by the control function: ${last.returnedReason ?? "see the record"}`, comments: 0 };
   }
 
   // The binding verdict, read for what it does rather than for its code: an

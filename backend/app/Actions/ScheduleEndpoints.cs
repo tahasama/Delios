@@ -25,7 +25,7 @@ public sealed record NeedRequest(
 public sealed record ActivityAskAnswer(string? Note);
 
 /// <summary>
-/// What a request will change once management confirms it, as the control function checked it: the documents and the
+/// What a request will change once whoever holds Manage confirms it, as the control function checked it: the documents and the
 /// discipline needing them (with the purpose and statuses the need takes), or the disciplines the action concerns.
 /// </summary>
 public sealed record ActivityProposal(Guid[]? DocumentIds = null, string? Department = null, string[]? Departments = null,
@@ -36,7 +36,7 @@ public sealed record ActivityRequestView(Guid Id, string Number, string From, Da
     bool Confirm, DateTimeOffset? CheckedAt, string? CheckedBy, Guid? ConfirmerId, string? ConfirmerName, ActivityProposal? Proposal,
     IReadOnlyList<Guid> DocumentIds);
 
-/// <summary>The control function's check of a request that management confirms: what will change, and who confirms it.</summary>
+/// <summary>The control function's check of a request that whoever holds Manage confirms: what will change, and who confirms it.</summary>
 public sealed record ActivityCheckRequest(Guid? ConfirmerId, Guid[]? DocumentIds = null, string? Department = null,
     string[]? Departments = null, string? Purpose = null, string[]? Statuses = null);
 

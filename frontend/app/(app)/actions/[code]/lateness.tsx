@@ -23,17 +23,17 @@ const ANSWER: Record<WentAhead, { word: string; tone: string }> = {
  * documents), or postponed. Missing documents are explained by each discipline
  * short of them, under "Disciplines concerned"; what is written here is the
  * postponement: who decided and why, then whoever plans the project confirms it
- * with what changes, and Document Control can take it back. Nothing is erased:
+ * with what changes, and the control function can take it back. Nothing is erased:
  * a postponement taken back stays, marked.
  */
 export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, answer, missing, total, day, postponeCodes, people }: {
   notes: Note[];
   actionId: string;
-  /** Who writes a postponement down: Document Control, or whoever the project lets. */
+  /** Who writes a postponement down: the control function, or whoever the project lets. */
   mayNote: boolean;
   /** Whoever plans the project: they confirm a postponement. */
   mayPlan: boolean;
-  /** Document Control: takes a decision back. */
+  /** The control function: takes a decision back. */
   mayControl: boolean;
   answer: WentAhead;
   /** How many of the action's documents are not there, of how many. */
@@ -98,7 +98,7 @@ export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, ans
                     </Field>
                   </ActionForm>
                 ) : null}
-                {/* Document Control can take it back: a planner who would not confirm, a mistake. */}
+                {/* The control function can take it back: a planner who would not confirm, a mistake. */}
                 {note === active && mayControl ? (
                   <details className="pt-1">
                     <summary className="cursor-pointer text-xs font-semibold text-link">Take it back</summary>

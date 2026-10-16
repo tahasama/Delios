@@ -70,7 +70,7 @@ public static class DirectoryEndpoints
         var keepers = app.MapGroup("/api/admin").WithTags("Administration")
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter(Keepers.Filter);
-        // People, and who is on which project: also management, which adds people where there is no control function.
+        // People, and who is on which project: also whoever holds Manage, which adds people where there is no control function.
         var people = app.MapGroup("/api/admin").WithTags("Administration")
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter(Keepers.People);
@@ -78,7 +78,7 @@ public static class DirectoryEndpoints
         people.MapPost("/users", CreateUserAsync);
         people.MapPut("/users/{userId:guid}", UpdateUserAsync);
         people.MapPut("/projects/{projectId:guid}/members", MemberAsync);
-        // Reading the functions and organizations is also management's: People & access chooses from them.
+        // Reading the functions and organizations is open to whoever holds Manage too: People & access chooses from them.
         people.MapGet("/functions", FunctionsAsync);
         keepers.MapPost("/functions", CreateFunctionAsync);
         keepers.MapPut("/functions/{functionId:guid}", UpdateFunctionAsync);
@@ -734,7 +734,7 @@ public static class Keepers
     public static Func<EndpointFilterInvocationContext, EndpointFilterDelegate, ValueTask<object?>> Configurers(string refusal) => async (context, next) =>
         await ConfiguresAsync(context.HttpContext) ? await next(context) : Problems.Forbidden("ADMIN_ONLY", refusal);
 
-    /// <summary>People and memberships: an administrator, the control function, or management (Manage).</summary>
+    /// <summary>People and memberships: an administrator, the control function, or whoever holds Manage (Manage).</summary>
     public static async ValueTask<object?> People(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var http = context.HttpContext;

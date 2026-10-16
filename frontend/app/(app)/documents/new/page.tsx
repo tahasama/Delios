@@ -21,7 +21,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
   const kept = null as { id: string; name: string; transmittal: { number: string } | null } | null;
   const fromFile = kept ? { id: kept.id, name: kept.name, transmittal: kept.transmittal?.number ?? null } : undefined;
   if (!mayCreateDocument(user)) {
-    return <div><PageHeader title="Create a document" /><Banner tone="warn" title={user.isInternal ? "Read-only access" : "External party access"}>{user.isInternal ? "Your current access is read-only. Document Control can grant a contribution role when needed." : "External parties do not create register entries. Document Control creates and assigns a placeholder to your organization; you can then contribute files and revisions to that controlled entry."}</Banner></div>;
+    return <div><PageHeader title="Create a document" /><Banner tone="warn" title={user.isInternal ? "Read-only access" : "External party access"}>{user.isInternal ? "Your current access is read-only. The control function can grant a contribution role when needed." : "External parties do not create register entries. The control function creates and assigns a placeholder to your organization; you can then contribute files and revisions to that controlled entry."}</Banner></div>;
   }
   const [deliverableTypes, docTypes, disciplines, subprojects, suppliers, pos, criticalities, confidentialities, retentionClasses, phases] = await Promise.all([
     getActiveSet("DELIVERABLE_TYPES"),
@@ -51,7 +51,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
   // Which value sets each producer's numbering scheme needs, so the form can
   // mark exactly those fields as required instead of failing on submit.
   const [fields, labels, own] = await Promise.all([fieldRules(ctx, "DOCUMENT"), fieldLabels(ctx, "DOCUMENT"), ownFields(ctx, "DOCUMENT")]);
-  // Numbering and routes are read where Document Control keeps them; anybody
+  // Numbering and routes are read where the control function keeps them; anybody
   // else gets none, and the backend still checks every value on submit.
   const { routing, schemes } = await numberingForEditor().catch(() => ({ routing: [], schemes: [] }));
   const routings = routing.filter((r) => r.status === "ACTIVE");

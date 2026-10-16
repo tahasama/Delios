@@ -131,9 +131,6 @@ public static class ProjectAnswers
     public static async Task<bool> ControlDoesAsync(DeliosDbContext db, Guid projectId, string act, CancellationToken cancellationToken)
     {
         var answers = await AllAsync(db, projectId, cancellationToken);
-        // Who adds people (owner): only the control function (the default: a project is taken to have one), or everyone
-        // on the project. Its own switch, whatever the project answers for the other acts.
-        if (act == "PROJECT_PEOPLE") return answers.GetValueOrDefault(act) != "SELF";
         var all = answers.GetValueOrDefault("__ALL__");
         if (all == "CONTROL") return true;
         if (all == "SELF") return false;
@@ -144,7 +141,7 @@ public static class ProjectAnswers
     }
 
     /// <summary>
-    /// Whether a request for this act, carried out by the control function, needs management's confirmation first
+    /// Whether a request for this act, carried out by the control function, needs the confirmation of whoever holds Manage first
     /// (<c>CONFIRM:{act}</c> = ON). Without the control function nothing is confirmed.
     /// </summary>
     public static async Task<bool> NeedsConfirmationAsync(DeliosDbContext db, Guid projectId, string act, CancellationToken cancellationToken) =>
@@ -153,8 +150,8 @@ public static class ProjectAnswers
         && (act == "PROJECT_PEOPLE" || await ControlDoesAsync(db, projectId, act, cancellationToken));
 
     /// <summary>
-    /// Whether an act asks management to confirm when the project said nothing: joining a project does (owner's
-    /// decision: every addition is a request management confirms); adding to actions does not.
+    /// Whether an act asks whoever holds Manage to confirm when the project said nothing: joining a project does (owner's
+    /// decision: every addition is a request whoever holds Manage confirms); adding to actions does not.
     /// </summary>
     public static string DefaultConfirm(string act) => act == "PROJECT_PEOPLE" ? "ON" : "OFF";
 

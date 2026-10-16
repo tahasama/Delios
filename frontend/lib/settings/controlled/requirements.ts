@@ -91,7 +91,7 @@ const requirements: Handler = {
   level: "PROJECT",
   columns: COLUMNS,
   sample: ["EL", "A00001", "Pump house — MCC energisation", "MCC-2 and its feeders", "2026-10-20", "P1001-50-EL-DSW-09102", "EL", "DSW", "", "", "", "", "BL-301", "", "", "", ""],
-  approverHint: "Document Control",
+  approverHint: "The control function",
 
   async parse(t, rows): Promise<ParseResult> {
     const required = ["Action Code", "Department", "Document"];
@@ -153,7 +153,7 @@ const requirements: Handler = {
       const action = actionByCode.get(actionCode);
       if (!actionCode) errors.push("Action Code is missing");
       else if (!action) errors.push(`Action ${actionCode} is not in the schedule`);
-      else if (!departmentsOf(action).length) errors.push(`Action ${actionCode} has no departments yet — the project manager tags them first`);
+      else if (!departmentsOf(action).length) errors.push(`Action ${actionCode} has no departments yet — whoever plans tags them first`);
       else if (!departmentsOf(action).includes(department)) errors.push(`${department || "(no department)"} is not a department of ${actionCode} (${departmentsOf(action).join(", ")})`);
 
       const external = !OURS.includes(submitted);

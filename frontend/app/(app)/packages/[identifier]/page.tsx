@@ -67,7 +67,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   const statusMeaning = new Map(statuses.map((x) => [x.code, typeof x.props.may === "string" ? `${x.label}: ${x.props.may}` : x.label]));
   const spell = (codes: string) => statusList(codes).map((code) => `${code}${statusName.get(code) ? ` (${statusName.get(code)!.toLowerCase()})` : ""}`).join(" or ");
   const purpose = reasonsOf(pkg).map((code) => reasons.find((one) => one.code === code)?.label ?? code.toLowerCase()).join(", ");
-  // Those putting it together add and take out its documents; Document Control (and above) does everything else.
+  // Those putting it together add and take out its documents; the control function (and above) does everything else.
   const open = user.isInternal && !isReadOnly(user) && !pkg.closedAt;
   const mayCompose = open && (staff || pkg.ownerIds.includes(user.id));
   const canAct = open && staff;

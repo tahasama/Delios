@@ -102,7 +102,7 @@ async function main() {
   };
   /**
    * Through review to release, as the app has it: the engineer checks (no comment), the approver approves at IFC and
-   * says who receives it, Document Control releases — and the release sends it in the same act.
+   * says who receives it, the control function releases — and the release sends it in the same act.
    */
   const toReview = async (revisionId) => {
     const review = await engineer.post(`${p}/revisions/${revisionId}/reviews`, {});
@@ -133,7 +133,7 @@ async function main() {
     const person = people.find((one) => one.email === email);
     if (person) await admin.put(`/api/admin/projects/${project}/members`, { userId: person.id, department });
   }
-  // Who a released revision is sent to: the site (the viewer receives documents) and Document Control.
+  // Who a released revision is sent to: the site (the viewer receives documents) and the control function.
   const idOf = (email) => people.find((one) => one.email === email)?.id;
   const receivers = ["viewer@demo.local", "controller@demo.local"].map(idOf).filter(Boolean);
 
@@ -225,13 +225,13 @@ async function main() {
     department: "ME", available: true,
     note: "Screens set on temporary supports on the site manager's word; the arrangement drawing came after the day.",
   });
-  // A400's hydrotest is postponed: Document Control writes it down; whoever plans the project is asked to confirm it.
+  // A400's hydrotest is postponed: the control function writes it down; whoever plans the project is asked to confirm it.
   await controller.post(`${p}/activities/${byCode.A400}/decisions`, {
     // Who decided is a person on the project, of whichever organization, as the form picks them.
     decision: "STOPPED", responsibleName: people.find((one) => one.email === "approver@demo.local")?.name ?? "The approver",
     reason: "Pipe supports are not finished; the hydrotest cannot be held on the day.",
   });
-  // A310 is short of Electrical's single line diagram: Document Control tells Electrical by hand.
+  // A310 is short of Electrical's single line diagram: the control function tells Electrical by hand.
   const a310 = (await engineer.get(`${p}/activities`)).find((one) => one.id === byCode.A310);
   await controller.post(`${p}/notices`, {
     subject: `activity:${byCode.A310}:manual:EL`,
@@ -241,7 +241,7 @@ async function main() {
     people: [idOf("viewer@demo.local")].filter(Boolean),
   });
   // A300 is within its risk window with the duty pump datasheet missing: Mechanical's confirmation waits (approver's Home).
-  // Civil asks for the shoring drawing to be added to A110: the list missed it. Document Control answers on the action.
+  // Civil asks for the shoring drawing to be added to A110: the list missed it. The control function answers on the action.
   await engineer.post(`${p}/transmittals`, {
     userIds: [idOf("controller@demo.local")].filter(Boolean), reason: "REQUEST", activityId: byCode.A110, activityAsk: "DOCUMENT",
     subject: `Add a document to ${(await engineer.get(`${p}/activities`)).find((one) => one.id === byCode.A110).code} (Civil)`,

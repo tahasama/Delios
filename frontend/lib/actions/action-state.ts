@@ -32,7 +32,7 @@ export const DEFAULT_RISK_DAYS = 7;
 
 /**
  * Whether an action was postponed: a decision from the organization's list that
- * does not proceed, not taken back by Document Control. The schedule and the
+ * does not proceed, not taken back by the control function. The schedule and the
  * action's page both ask this.
  */
 export function isPostponed(action: { decisions: { decision: string; reversedAt?: Date | null }[] }, postponeCodes: string[]): boolean {

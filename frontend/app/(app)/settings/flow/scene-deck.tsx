@@ -186,7 +186,7 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
           <span style={{ width: `${((at + 1) / order.length) * 100}%` }} />
         </div>
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 pb-4 text-[11px] sm:px-7">
-          <span className="scene-legend"><span className="scene-dot scene-dot-control" /> Document Control</span>
+          <span className="scene-legend"><span className="scene-dot scene-dot-control" /> The control function</span>
           <span className="scene-legend"><span className="scene-dot scene-dot-work" /> the people doing the work</span>
           <span className="scene-legend"><span className="scene-dot scene-dot-fixed" /> fixed</span>
           <span className="scene-legend"><span className="scene-dot scene-dot-off" /> skipped</span>

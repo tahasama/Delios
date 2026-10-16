@@ -82,7 +82,7 @@ export async function joinPersonAction(_prev: Result | undefined, formData: Form
   return {};
 }
 
-/** Document Control says an organization takes part in this project (or no longer does), its role, and its people's starting function. */
+/** the control function says an organization takes part in this project (or no longer does), its role, and its people's starting function. */
 export async function setProjectOrganizationAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
   const partyId = text(formData, "partyId");

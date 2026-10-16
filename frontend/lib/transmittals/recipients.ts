@@ -27,7 +27,7 @@ export async function recipientCompanies(ctx: Tenant & { project: { name: string
   const all = [...companies.values()];
   if (withOffline) {
     for (const party of found.parties.filter((p) => p.participation === "BY_PROXY")) {
-      all.push({ key: `party:${party.id}`, name: party.name, people: [{ id: `party:${party.id}`, name: "Their contact", job: null }], offline: "Document Control" });
+      all.push({ key: `party:${party.id}`, name: party.name, people: [{ id: `party:${party.id}`, name: "Their contact", job: null }], offline: "The control function" });
     }
   }
   return all.sort((a, b) => (a.key === "US" ? -1 : b.key === "US" ? 1 : a.name.localeCompare(b.name)));

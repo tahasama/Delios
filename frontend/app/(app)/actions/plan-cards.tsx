@@ -15,7 +15,7 @@ import { UploadSwitch } from "./upload-switch";
  */
 export async function PlanCards({ from = null, to = null }: { from?: Date | null; to?: Date | null } = {}) {
   const ctx = await requireScope();
-  // Who uploads the lists: Document Control, or a function given Plan. The backend refuses anyone else.
+  // Who uploads the lists: the control function, or a function given Plan. The backend refuses anyone else.
   // Who uploads the lists: one rule, the backend's (Control or Plan held outright).
   const plans = mayUploadLists(ctx.user.verbs);
   const [progress, lists] = await Promise.all([planProgress(ctx, { from, to }), planLists(ctx).catch(() => [])]);

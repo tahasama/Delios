@@ -20,7 +20,7 @@ import type { PackageView, TransmittalView } from "@/lib/types";
 export async function createSupplierPackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const { user } = ctx;
-  if (!isController(user) && !isAdmin(user)) return { error: "Document Control sets up supplier packages." };
+  if (!isController(user) && !isAdmin(user)) return { error: "The control function sets up supplier packages." };
   const partyCode = String(formData.get("partyCode") ?? "");
   const po = String(formData.get("po") ?? "").trim() || null;
   // Optional: each document goes as it is asked, and is due on its own planned date.
@@ -48,7 +48,7 @@ export async function createSupplierPackageAction(_prev: { error?: string } | un
 
 /**
  * The supplier sends what they uploaded. Every file fills its placeholder, and
- * all of them travel on ONE incoming transmittal to Document Control — nothing
+ * all of them travel on ONE incoming transmittal to the control function — nothing
  * controlled arrives by email. The transmittal is the receipt.
  */
 export async function submitSupplierPackageAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
@@ -60,13 +60,13 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
   if (!pkg || !partyCode) return { error: "This is not a supplier package." };
   const isStaff = isController(user) || isAdmin(user);
   if (!isStaff && user.partyCode !== partyCode) return { error: "Only this supplier can send documents in this package." };
-  if (!isStaff && !supplierMayUpload(user)) return { error: "Your access here is read-only. Ask Document Control for the right to upload." };
+  if (!isStaff && !supplierMayUpload(user)) return { error: "Your access here is read-only. Ask the control function for the right to upload." };
 
   const chosen = pkg.members
     .map((m) => ({ m, upload: formData.get(`file_${m.documentId}`) }))
     .filter((one): one is { m: typeof one.m; upload: File } => one.upload instanceof File && one.upload.size > 0);
   if (!chosen.length) return { error: "Attach at least one file." };
-  // Document Control entering what the supplier sent by other means records it for them.
+  // The control function entering what the supplier sent by other means records it for them.
   const onBehalf = user.partyCode !== partyCode;
   let sent: TransmittalView;
   try {
@@ -85,7 +85,7 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
   revalidatePath("/");
   // Received outside the system: the review form opens next.
   if (onBehalf) redirect(`/reviews/send?revisions=${sent.items.map((one) => one.revisionId).filter(Boolean).join(",")}`);
-  return { ok: `Sent ${chosen.length} document${chosen.length === 1 ? "" : "s"} on ${sent.number}. Document Control has been notified.` };
+  return { ok: `Sent ${chosen.length} document${chosen.length === 1 ? "" : "s"} on ${sent.number}. The control function has been notified.` };
 }
 
 /**
@@ -100,7 +100,7 @@ export async function attachSupplierFileAction(_prev: { error?: string; ok?: str
   const file = formData.get("file");
   const doc = await backendDocument(ctx, documentId);
   if (!doc?.originator) return { error: "This is not a supplier's document." };
-  if (!mayDeliver(user, doc.originator)) return { error: user.partyCode === doc.originator ? "Your access here is read-only. Ask Document Control for the right to upload." : "Only the supplier, or Document Control for them, attaches its file." };
+  if (!mayDeliver(user, doc.originator)) return { error: user.partyCode === doc.originator ? "Your access here is read-only. Ask the control function for the right to upload." : "Only the supplier, or the control function for them, attaches its file." };
   if (!(file instanceof File) || file.size === 0) return { error: "Choose the file." };
   try {
     const reason = await supplyReason();
@@ -112,7 +112,7 @@ export async function attachSupplierFileAction(_prev: { error?: string; ok?: str
       idempotencyKey: randomUUID(),
     });
     revalidatePath(`/documents/${documentId}`);
-    return { ok: `Sent on ${sent.number}. Document Control has been notified.` };
+    return { ok: `Sent on ${sent.number}. The control function has been notified.` };
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -120,7 +120,7 @@ export async function attachSupplierFileAction(_prev: { error?: string; ok?: str
 
 /**
  * Send what was attached: one or several documents, one incoming transmittal
- * to Document Control. From a document page, or a selection in the register.
+ * to the control function. From a document page, or a selection in the register.
  */
 async function sendSupplierDocumentsAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
@@ -135,7 +135,7 @@ async function sendSupplierDocumentsAction(_prev: { error?: string; ok?: string 
   if (!ready.length) return { error: "Nothing chosen has a file waiting to be sent." };
   const parties = [...new Set(ready.map((one) => one.doc!.originator ?? ""))];
   if (parties.length !== 1 || !parties[0]) return { error: "Send one supplier's documents at a time." };
-  if (!mayDeliver(user, parties[0])) return { error: "Only the supplier, or Document Control for them, sends its documents." };
+  if (!mayDeliver(user, parties[0])) return { error: "Only the supplier, or the control function for them, sends its documents." };
   let number: string;
   try {
     const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
@@ -153,7 +153,7 @@ async function sendSupplierDocumentsAction(_prev: { error?: string; ok?: string 
 
 /**
  * The supplier itself — when its function lets it upload; read-only stays
- * read-only until Document Control gives it that right — or Document Control
+ * read-only until the control function gives it that right — or the control function
  * acting for one that is not on the system.
  */
 function mayDeliver(user: { partyCode: string | null; role: string; verbs?: string[] }, partyCode: string): boolean {
@@ -165,7 +165,7 @@ function supplierMayUpload(user: unknown): boolean {
   return hasVerb(user as never, "CREATE") || hasVerb(user as never, "REVISE");
 }
 
-/** The sending organization's id when Document Control records it for them; the supplier sends as itself. */
+/** The sending organization's id when the control function records it for them; the supplier sends as itself. */
 async function partyIdFor(ctx: Awaited<ReturnType<typeof requireScope>>, user: { partyCode: string | null }, partyCode: string): Promise<string | null> {
   if (user.partyCode === partyCode) return null;
   return (await addressees(ctx)).parties.find((one) => one.code === partyCode)?.id ?? null;
@@ -178,7 +178,7 @@ export async function sendSupplierFromRegisterAction(formData: FormData): Promis
 }
 
 /**
- * Document Control sends a supplier's document we hold to the supplier for an update: they hold it from then on.
+ * The control function sends a supplier's document we hold to the supplier for an update: they hold it from then on.
  * A revision not yet reviewed goes as it is and comes back under the same value.
  */
 export async function sendToSupplierAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {

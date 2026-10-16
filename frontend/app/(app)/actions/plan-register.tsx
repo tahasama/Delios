@@ -719,7 +719,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "happened", label: "Went ahead?",
-    note: "Once the day has passed: With documents — it had everything it needed, in time. Missing documents — it went ahead without all of them; each discipline that confirmed going ahead said why. Postponed — Document Control wrote down that it did not happen. Before the day: not yet.",
+    note: "Once the day has passed: With documents — it had everything it needed, in time. Missing documents — it went ahead without all of them; each discipline that confirmed going ahead said why. Postponed — the control function wrote down that it did not happen. Before the day: not yet.",
     cellClass: "whitespace-nowrap",
     // Before the day there is nothing to say: the column stays quiet.
     cell: (row) => row.happened === "AHEAD" ? <span className="text-xs text-slate-400">—</span> : (

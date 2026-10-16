@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * One scheduled activity and everything it needs. Departments are tagged by
- * the project manager; the documents come from the approved requirements list.
+ * whoever plans; the documents come from the approved requirements list.
  */
 export default async function ActionDetailPage({ params, searchParams }: { params: Promise<{ code: string }>; searchParams: Promise<{ dept?: string }> }) {
   const ctx = await requireScope();
@@ -54,8 +54,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const inside = ctx.user.isInternal;
   // Only administrators read the audit trail, so only they are sent to it.
   const me = { department: ctx.user.department ?? null };
-  // A document missing from the action is asked of Document Control by a concerned discipline (for itself), or by
-  // Document Control (naming the discipline in the message).
+  // A document missing from the action is asked of the control function by a concerned discipline (for itself), or by
+  // The control function (naming the discipline in the message).
   const ownConcerned = !!me.department && depts.includes(me.department);
   const mayRequestDocument = control || ownConcerned;
   const entries = dept ? action.needs.filter((e) => e.department === dept) : action.needs;
@@ -75,7 +75,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const readiness = action.state;
   // A department is a discipline: the people whose membership names one of them.
   const people = inside ? await holders(ctx.projectId, "READ").catch(() => []) : [];
-  // Manual notices: Document Control, or whoever plans the project. Each discipline's panel counts every notice
+  // Manual notices: the control function, or whoever plans the project. Each discipline's panel counts every notice
   // sent about this action to that discipline, the automatic ones included.
   const mayNotify = inside && mayUploadLists(ctx.user.verbs);
   const notices = inside ? await noticesAbout(ctx, `activity:${action.id}:`) : [];
@@ -89,9 +89,9 @@ export default async function ActionDetailPage({ params, searchParams }: { param
       docs: missing.filter((e) => e.document.originator === p.code),
       people: book.people.filter((one) => one.organization === p.name),
     }));
-  // Asking for a document the list missed: a transmittal to Document Control, the file attached there.
+  // Asking for a document the list missed: a transmittal to the control function, the file attached there.
   const controllers = inside ? await holders(ctx.projectId, "CONTROL").catch(() => []) : [];
-  // Asked by a concerned discipline for itself; by Document Control for whichever discipline it names in the message.
+  // Asked by a concerned discipline for itself; by the control function for whichever discipline it names in the message.
   const requestHref = (department: string | null) => `/transmittals/new?${new URLSearchParams({
     // A request: an information transmittal, which carries no document of its own.
     reason: "REQUEST",
@@ -105,12 +105,12 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     ].join("\n\n"),
   })}`;
 
-  // Who adds documents and disciplines to an action here: Document Control (asked by everyone else), or, without it,
+  // Who adds documents and disciplines to an action here: the control function (asked by everyone else), or, without it,
   // the people of each discipline for their own.
   const { controlDoes } = await import("@/lib/settings/control-activities");
   const selfLinks = !(await controlDoes(ctx, "ACTION_LINKS"));
 
-  // A discipline missing, or one that does not belong: anyone of ours asks Document Control, whose answer is the record.
+  // A discipline missing, or one that does not belong: anyone of ours asks the control function, whose answer is the record.
   const disciplineRequestHref = `/transmittals/new?${new URLSearchParams({
     // A request: an information transmittal, which carries no document of its own.
     reason: "REQUEST",
@@ -121,7 +121,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     message: `Please add the discipline … to (or take it off) ${action.code}, ${action.name}, on ${fmtDate(action.start)}.\n\nWhy: …`,
   })}`;
 
-  // The requests about this action not yet answered: Document Control sees them all; whoever is asked to
+  // The requests about this action not yet answered: the control function sees them all; whoever is asked to
   // confirm one sees that one, at the top of the page.
   const requests = inside ? await activityRequests(ctx, action.id) : [];
   const asks: Ask[] = control ? requests : [];
@@ -131,7 +131,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const confirmers = book.people
     .map((one) => ({ id: one.id, name: one.name, detail: [managers.has(one.id) ? "Manage · recommended" : null, one.organization, one.function].filter(Boolean).join(" · ") }))
     .sort((a, b) => Number(managers.has(b.id)) - Number(managers.has(a.id)) || a.name.localeCompare(b.name));
-  // The register, read once: document numbers for what a checked request will add, and Document Control's pick list.
+  // The register, read once: document numbers for what a checked request will add, and the control function's pick list.
   const register = mine.length || control ? [...(await registerByNumber(ctx)).values()] : [];
   const numberOf = new Map(register.map((d) => [d.id, d.number] as const));
   const pickDocuments = control ? register.map((d) => ({ id: d.id, name: d.number, detail: d.title })) : [];
@@ -262,7 +262,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
         }
       />
 
-      {/* A request checked by Document Control, waiting on this person's confirmation. */}
+      {/* A request checked by the control function, waiting on this person's confirmation. */}
       {mine.length ? (
         <section id="your-confirmation" className="register register-sheet register-sheet-open scroll-mt-24">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
@@ -287,7 +287,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                   <details className="min-w-0 flex-1 text-xs">
                     <summary className="cursor-pointer font-semibold text-link">Refuse</summary>
                     <ActionForm action={refuseActionRequestAction} submitLabel="Refuse" variant="secondary" size="sm" hidden={{ transmittalId: one.id, code: action.code }} className="mt-2 space-y-3">
-                      <Field label="Why" required hint={`${one.from} and Document Control are told`}>
+                      <Field label="Why" required hint={`${one.from} and the control function are told`}>
                         <textarea name="note" required rows={2} className={inputCls} />
                       </Field>
                     </ActionForm>
@@ -446,7 +446,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                           />
                         </div>
                       ) : null}
-                      {/* Without Document Control, the discipline chooses its own documents; otherwise it asks. */}
+                      {/* Without a control function, the discipline chooses its own documents; otherwise it asks. */}
                       {selfLinks && me.department === d ? (
                         <Link href={`/documents?pick=${encodeURIComponent(action.code)}`} className="ask">Add or take off documents</Link>
                       ) : null}
@@ -467,17 +467,17 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             </ul>
           ) : (
             <div className="px-5 py-3.5 sm:px-6">
-              <Banner tone="warn" title="Needs disciplines">No discipline is tagged on this action yet, so its documents cannot be asked for. Document Control tags them, by hand or with the disciplines-per-action list.</Banner>
+              <Banner tone="warn" title="Needs disciplines">No discipline is tagged on this action yet, so its documents cannot be asked for. The control function tags them, by hand or with the disciplines-per-action list.</Banner>
             </div>
           )}
-          {/* A discipline the action should concern: asked of Document Control, or, without it, added by its own people. */}
+          {/* A discipline the action should concern: asked of the control function, or, without it, added by its own people. */}
           {selfLinks && me.department && !depts.includes(me.department) ? (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
               Is your discipline, {deptLabel(me.department)}, missing from this action?
               <ActionForm action={addOwnDisciplineAction} submitLabel="Add it" size="sm" variant="secondary" hidden={{ actionId: action.id, code: action.code }} className="space-y-0" />
             </div>
           ) : !selfLinks && ctx.user.isInternal ? (
-            // A discipline missing, or one that does not belong: asked of Document Control, whose answer is the record.
+            // A discipline missing, or one that does not belong: asked of the control function, whose answer is the record.
             // The two asks side by side, each its question then its link, the links in one column.
             <div className="grid grid-cols-[auto_auto] items-baseline justify-start gap-x-3 gap-y-1.5 border-t border-line bg-tint-soft px-5 py-3 text-xs sm:px-6">
               <span className="text-slate-600">Is a discipline missing, or one that should not be here?</span>

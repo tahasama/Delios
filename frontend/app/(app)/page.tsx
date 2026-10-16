@@ -36,9 +36,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const controller = ctx.can("CONTROL") || ctx.can("CONFIGURE");
   // Another organization invites ours to work on its projects: its administrators answer.
   const invitations = isAdmin(ctx.user) ? (await organizationLinks()).filter((one) => one.side === "GUEST" && one.state === "INVITED") : [];
-  // Replies by email from organizations not on DELIOS, waiting for Document Control to record them.
+  // Replies by email from organizations not on DELIOS, waiting for the control function to record them.
   const repliesByEmail = ctx.can("CONTROL") ? await emailReplies(ctx) : [];
-  // The whole log is Document Control's and the administrator's: they answer
+  // The whole log is the control function's and the administrator's: they answer
   // for what the record says. Anybody else asking for it gets their own page.
   const view = sp.view === "log" && !controller ? undefined : sp.view;
   const at = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
@@ -113,7 +113,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const advice = answering.filter((w) => !w.deciding);
 
   // Schedule activities whose documents will not be ready in time, for the
-  // people engaged in them. Document Control and the planners are engaged in
+  // people engaged in them. The control function and the planners are engaged in
   // all of them, because chasing the schedule is their work.
   const wholeSchedule = controller || session.can("PLAN");
   const atRisk = activities
@@ -168,7 +168,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         href: `/documents/${r.documentId}`, code: r.documentNumber, rev: r.revision, title: r.title,
         tag: r.status ?? "released", tone: "violet", at: at(r.releasedAt), cta: "Ask to send",
       })),
-      // Asked for, released: Document Control sends it.
+      // Asked for, released: the control function sends it.
       ...issuesOf(["CARRY_OUT_REQUEST"]).map<Row>((w) => ({
         href: w.documentId ? `/documents/${w.documentId}#step-send-out` : "/transmittals", code: w.label.split(" ")[0], rev: w.label.split(" rev ")[1], title: `asked by ${w.who ?? "someone"}`,
         tag: w.reason.toLowerCase(), tone: "violet", at: at(w.since), cta: "Send",
@@ -237,7 +237,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         : w.kind === "CONFIRM_PERSON"
         ? { href: "/people/confirm", code: `${w.count}`, title: `${w.count === 1 ? "person waits" : "people wait"} for you to confirm them on the project`, tag: "to confirm", tone: "amber", at: at(w.since), cta: "Confirm" }
         : w.kind === "CONFIRM_ACTION_REQUEST"
-        ? { href: `/actions/${w.code}#your-confirmation`, code: w.code ?? "", title: `${w.name}: ${w.ask === "DISCIPLINE" ? "a discipline" : "a document"} to add, checked by ${w.from ?? "Document Control"} (${w.number})`, tag: "to confirm", tone: "amber", at: at(w.since), cta: "Confirm" }
+        ? { href: `/actions/${w.code}#your-confirmation`, code: w.code ?? "", title: `${w.name}: ${w.ask === "DISCIPLINE" ? "a discipline" : "a document"} to add, checked by ${w.from ?? "the control function"} (${w.number})`, tag: "to confirm", tone: "amber", at: at(w.since), cta: "Confirm" }
         : w.kind === "ADD_TO_ACTION"
         ? { href: `/actions/${w.code}#asked`, code: w.code ?? "", title: `${w.name}: ${w.from ?? "someone"} asks for ${w.ask === "DISCIPLINE" ? "a missing discipline" : "a document"} to be added (${w.number})`, tag: "asked", tone: "sky", at: at(w.since), cta: "Answer" }
         : w.kind === "UNTAGGED"
@@ -310,7 +310,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <p className="home-soft mt-1.5 text-[13.5px]">
               {ctx.project.name}
               <span className="mx-1.5 opacity-45">·</span>
-              {user.functionName ?? (controller ? "Document Control" : user.isInternal ? "Project team" : user.partyName ?? "Partner")}
+              {user.functionName ?? (controller ? "The control function" : user.isInternal ? "Project team" : user.partyName ?? "Partner")}
             </p>
           </div>
           {user.isInternal ? (

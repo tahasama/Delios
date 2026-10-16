@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Lock } from "lucide-react";
-import { SETUP_PAGES, maySetup } from "../setup-pages";
+import { SETUP_PAGES, maySetup, mayChangeControlRoom } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Chip, StateChip } from "@/components/ui";
 import { ProjectSettings } from "./project-settings";
@@ -121,7 +121,7 @@ const STAGES: Stage[] = [
     branches: [
       { title: "Starting a revision nobody asked for", text: "The last one was accepted as it stands; whoever starts the next writes why.", act: "AUTHORIZE_REVISION" },
     ],
-    fixed: [{ title: "A revision the verdict asked for", text: "Refused, accepted with comments, or sent back by Document Control: the next revision may be started at once, and carries the verdict as its reason." }],
+    fixed: [{ title: "A revision the verdict asked for", text: "Refused, accepted with comments, or sent back by the control function: the next revision may be started at once, and carries the verdict as its reason." }],
     extras: [],
   },
   {
@@ -135,7 +135,7 @@ const STAGES: Stage[] = [
     policies: ["POLICY_PDF_STAMP", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL"],
     sets: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES"],
     fixed: [
-      { title: "Outside reviewers on the route", text: "An organization with accounts here answers for itself, alongside ours. One that is not on the system is carried by its liaison — or Document Control — who sends the pack out and records what comes back." },
+      { title: "Outside reviewers on the route", text: "An organization with accounts here answers for itself, alongside ours. One that is not on the system is carried by its liaison — or the control function — who sends the pack out and records what comes back." },
       { title: "Or on a transmittal for review", text: "Sent for review or approval, with an answer due by the reason's period; their answer arrives as a reply, and the verdict is recorded against the revision." },
     ],
     branches: [{ title: "Handing a review to somebody else", text: "A reviewer who cannot answer in time passes the step on.", act: "DELEGATE" }],
@@ -180,7 +180,7 @@ const STAGES: Stage[] = [
     policies: ["POLICY_PDF_STAMP", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL"],
     sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES"],
     fixed: [
-      { title: "Who it goes back to", text: "The sender, as the document's originator — on a reply to the transmittal it came on. Document Control chooses who else is copied in." },
+      { title: "Who it goes back to", text: "The sender, as the document's originator — on a reply to the transmittal it came on. The control function chooses who else is copied in." },
       { title: "To a sender not on the system", text: "One of our people sends it on and marks it sent, with the proof." },
     ],
     branches: [],
@@ -189,8 +189,8 @@ const STAGES: Stage[] = [
   {
     key: "gate",
     tagline: "Checked before it is published",
-    title: "Document Control's check",
-    text: "Decided, and waiting: Document Control publishes it at the status the review settled on — or sends it back when it is wrong for the record.",
+    title: "The control function's check",
+    text: "Decided, and waiting: the control function publishes it at the status the review settled on — or sends it back when it is wrong for the record.",
     rail: "rail-check",
     states: ["NOT_RELEASED"],
     acts: [],
@@ -204,14 +204,14 @@ const STAGES: Stage[] = [
     key: "gate-return",
     tagline: "Sent back — this revision ends",
     title: "Sent back",
-    text: "Document Control refuses to publish it — the wrong file, a missing enclosure, a status that cannot be true yet — and sends it back with a reason. This revision ends; the next one is authorized.",
+    text: "The control function refuses to publish it — the wrong file, a missing enclosure, a status that cannot be true yet — and sends it back with a reason. This revision ends; the next one is authorized.",
     rail: "rail-returned",
     states: ["RETURNED"],
     acts: [],
     policies: [],
     sets: ["RETURN_REASONS"],
     fixed: [
-      { title: "To the author, or to a step", text: "Back to the author, or — when the route itself was at fault, for one of the published reasons — to an earlier step of the same route. Document Control edits who is copied in." },
+      { title: "To the author, or to a step", text: "Back to the author, or — when the route itself was at fault, for one of the published reasons — to an earlier step of the same route. The control function edits who is copied in." },
     ],
     branches: [],
     extras: [],
@@ -288,7 +288,7 @@ const STAGES: Stage[] = [
  *
  * After a decision the line forks: one lane carries on, the other ends — the
  * revision goes back, and the next one starts the flow again. Who sends it back
- * follows the project: Document Control where it has one, the people doing the
+ * follows the project: the control function where it has one, the people doing the
  * work where it has not. Without a control function there is no check before
  * release either; the verdict releases it.
  */
@@ -348,6 +348,8 @@ export default async function ControlRoomPage() {
   const { user: me } = ctx;
   const page = SETUP_PAGES.find((one) => one.href === "/settings/flow")!;
   if (!maySetup(me, page)) return <NoAccess title="Control room" who="admin" />;
+  // Everyone of ours reads how the project works; an administrator or the control function changes it.
+  const changesIt = mayChangeControlRoom(me);
 
   const [settings, chosen, holders, sets, values, templates, schemes, rules, names, parties] = await Promise.all([
     controlSettings(ctx),
@@ -418,7 +420,7 @@ export default async function ControlRoomPage() {
   // Release reads differently with and without somebody standing between the
   // route and the register; the gate is the control function itself.
   const releaseFixed: Fixed = gate
-    ? { title: "Document Control's gate", text: `A finished route waits as Not released until Document Control publishes it — ${holders.length} ${holders.length === 1 ? "person holds" : "people hold"} the control function.` }
+    ? { title: "The control function's gate", text: `A finished route waits as Not released until the control function publishes it — ${holders.length} ${holders.length === 1 ? "person holds" : "people hold"} the control function.` }
     : { title: "No gate", text: "Nobody holds the control function, so a finished route is released at once." };
 
   const usedBy = new Map<string, string[]>();
@@ -426,7 +428,7 @@ export default async function ControlRoomPage() {
   const unplaced = sets.filter((one) => !usedBy.has(one.key));
 
   const panels = Object.fromEntries(stages.map((stage) => {
-    // The check before release is Document Control's gate where there is one,
+    // The check before release is The control function's gate where there is one,
     // and the release itself says so where there is none.
     const fixed = stage.key === (gate ? "gate" : "release") ? [releaseFixed, ...stage.fixed] : stage.fixed;
     // Not released and Returned to review only exist where there is a gate.
@@ -451,7 +453,7 @@ export default async function ControlRoomPage() {
               <p className="stencil text-slate-500">Who does it</p>
               {stage.acts.length || fixed.length ? (
                 <ul className="space-y-2.5">
-                  {stage.acts.map((key) => <ActLine key={key} act={key} row={actRow.get(key)} />)}
+                  {stage.acts.map((key) => <ActLine key={key} act={key} row={actRow.get(key)} readOnly={!changesIt} />)}
                   {fixed.map((one) => <FixedLine key={one.title} {...one} />)}
                 </ul>
               ) : (
@@ -479,7 +481,7 @@ export default async function ControlRoomPage() {
                   <p className="stencil mb-1.5 text-slate-500">Off this step</p>
                   <ul className="space-y-2.5">
                     {stage.branches.map((branch) => branch.act
-                      ? <ActLine key={branch.title} act={branch.act} row={actRow.get(branch.act)} />
+                      ? <ActLine key={branch.title} act={branch.act} row={actRow.get(branch.act)} readOnly={!changesIt} />
                       : <FixedLine key={branch.title} title={branch.title} text={`${branch.text} ${branch.fixed ?? ""}`.trim()} />)}
                   </ul>
                 </div>
@@ -531,7 +533,7 @@ export default async function ControlRoomPage() {
     };
   };
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
-  const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "Document Control" : "the reviewer";
+  const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "the reviewer";
   const flows: Flow[] = flowsFor({ gate, returner }).map((flow) => ({
     ...flow,
     columns: flow.columns.map((column) => column.map((lane) => ({ scene: { ...sceneOf(byKey.get(lane.scene)!), ...(lane.tagline ? { tagline: lane.tagline } : {}) }, optional: lane.optional, end: lane.end }))),
@@ -541,7 +543,7 @@ export default async function ControlRoomPage() {
     <div className="space-y-4">
       <PageHeader
         title="Control room"
-        subtitle="How a document moves through this project, and what the project has settled: who carries each act out, what releasing means here, what the states are called. The deck shows the flow; the panels under it decide it."
+        subtitle={`How ${ctx.project.code} works, and what makes it work that way: every step a document goes through, who carries each act out, what releasing means here, what the states are called. The deck shows the flow; the panels under it decide it, and each list or rule opens where it is kept.${changesIt ? "" : " You read it; an administrator or the control function changes it."}`}
       />
 
       {/* Where the project stands, before the steps. */}
@@ -550,7 +552,7 @@ export default async function ControlRoomPage() {
           <div className="px-5 py-3 sm:px-6">
             <p className="stencil text-slate-500">Control function</p>
             <p className="mt-1 text-[13px] font-medium text-slate-900">{gate ? `${holders.length} ${holders.length === 1 ? "person" : "people"}` : "Nobody"}</p>
-            <p className="text-[11px] text-slate-500">{gate ? "The control function stands between the work and the register." : "The people doing the work run the register."}</p>
+            <p className="text-[11px] text-slate-500">{gate ? "The control function stands between the work and the register." : "No control function: the people doing the work run the register."}</p>
             <a href="#control-people" className="text-[11px] font-semibold text-link hover:underline">Who acts as it</a>
           </div>
           <div className="px-5 py-3 sm:px-6">
@@ -602,6 +604,7 @@ export default async function ControlRoomPage() {
                   <SearchPick name="userIds" label={`Named on ${ctx.project.code}`} hint="people of ours on the project; each is told"
                     items={ourPeople.filter((p) => !byFunction.some((b) => b.id === p.id)).map((p) => ({ id: p.id, name: p.name, detail: p.function }))}
                     initial={ourPeople.filter((p) => p.actsAsControl).map((p) => p.id)} placeholder="Find someone" />
+                  <p className="mt-1.5 text-[11px] leading-4 text-slate-500">Nobody named, and no function carrying it: the project has no control function, and the people doing the work carry its acts out themselves.</p>
                 </div>
               </ActionForm>
             ) : (
@@ -613,13 +616,13 @@ export default async function ControlRoomPage() {
         </section>
       ) : null}
 
-      <ProjectSettings />
+      <ProjectSettings readOnly={!changesIt} />
     </div>
   );
 }
 
 /** One act the organization decides the carrier of, switchable in place. */
-function ActLine({ act, row }: { act: string; row?: { controlDoes: boolean; off: boolean } }) {
+function ActLine({ act, row, readOnly }: { act: string; row?: { controlDoes: boolean; off: boolean }; readOnly?: boolean }) {
   const activity = CONTROL_ACTIVITIES.find((one) => one.key === act);
   if (!activity || !row) return null;
   return (
@@ -631,6 +634,7 @@ function ActLine({ act, row }: { act: string; row?: { controlDoes: boolean; off:
       controlDoes={row.controlDoes}
       offText={SKIPPABLE[act]?.off}
       off={row.off}
+      readOnly={readOnly}
     />
   );
 }

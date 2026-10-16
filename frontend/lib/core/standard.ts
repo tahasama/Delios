@@ -6,7 +6,7 @@ export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABEL: Record<Role, string> = {
   ADMIN: "Administrator",
-  CONTROLLER: "Document Controller",
+  CONTROLLER: "The control functionler",
   APPROVER: "Approver",
   REVIEWER: "Reviewer",
   AUTHOR: "Author / Originator",
@@ -67,19 +67,19 @@ export const DOC_STATE_LABEL: Record<DocState, string> = {
 export const DOC_MEANING: Record<DocState, { means: string; how: string }> = {
   PLANNED: { means: "The number is reserved; nothing has been released under it yet.", how: "Set when the document is created or listed." },
   ACTIVE: { means: "In use \u2014 at least one revision has been released.", how: "Automatic, at the first release." },
-  WITHDRAWN: { means: "Taken out of use after it was released. Its revisions stay on record.", how: "Document Control, with a reason." },
-  CANCELLED: { means: "Dropped before anything was released.", how: "Document Control, with a reason. Not possible once released." },
-  ARCHIVED: { means: "Closed at the end of its life, kept for retention.", how: "Document Control, with a reason." },
+  WITHDRAWN: { means: "Taken out of use after it was released. Its revisions stay on record.", how: "The control function, with a reason." },
+  CANCELLED: { means: "Dropped before anything was released.", how: "The control function, with a reason. Not possible once released." },
+  ARCHIVED: { means: "Closed at the end of its life, kept for retention.", how: "The control function, with a reason." },
 };
 
 export const REV_MEANING: Record<RevState, { means: string; how: string }> = {
   IN_PREPARATION: { means: "Being written. Only the author's side works from it.", how: "The author starts a new revision." },
   IN_REVIEW: { means: "Submitted; reviewers and approvers are looking at it.", how: "The author sends it for review." },
   RETURNED: { means: "Reviewed and sent back. It is kept as what was submitted and what was said about it, and it is never released. The next revision replaces it.", how: "The control function sends it back to its author; the verdict that asked for changes authorizes the next revision." },
-  NOT_RELEASED: { means: "The route is finished and the status is decided, but Document Control has not published it. Nobody may work from it.", how: "Automatic, when the deciding step of the route answers." },
-  RELEASED: { means: "The current revision \u2014 the one people work from.", how: "Document Control releases it, once it is approved and no blocking comment is open." },
+  NOT_RELEASED: { means: "The route is finished and the status is decided, but the control function has not published it. Nobody may work from it.", how: "Automatic, when the deciding step of the route answers." },
+  RELEASED: { means: "The current revision \u2014 the one people work from.", how: "The control function releases it, once it is approved and no blocking comment is open." },
   SUPERSEDED: { means: "Replaced by a later released revision. Kept, not used.", how: "Automatic, when the next revision is released." },
-  VOID: { means: "Found to be wrong after release and cancelled.", how: "Document Control, with a reason and a check of what was built from it." },
+  VOID: { means: "Found to be wrong after release and cancelled.", how: "The control function, with a reason and a check of what was built from it." },
 };
 
 export const DOC_STATE_COLOR: Record<DocState, string> = {
@@ -110,8 +110,8 @@ export const REASON_LABEL: Record<ReasonForIssue, string> = {
 // Which reasons require a response
 // §12.6 — the five exposure conditions
 export const EXPOSURES = [
-  { key: "UNPROPAGATED_SUPERSESSION", label: "Replaced, but recipients not told", detail: "A newer revision exists; people who got the old one were never informed.", who: "Document Control" },
-  { key: "BLOCKED_WORK", label: "Released, but the verdict says stop", detail: "A released revision carries a binding verdict that does not permit the work to proceed.", who: "Document Control and executing party" },
+  { key: "UNPROPAGATED_SUPERSESSION", label: "Replaced, but recipients not told", detail: "A newer revision exists; people who got the old one were never informed.", who: "The control function" },
+  { key: "BLOCKED_WORK", label: "Released, but the verdict says stop", detail: "A released revision carries a binding verdict that does not permit the work to proceed.", who: "The control function and executing party" },
   { key: "ORPHANED_WITHDRAWAL", label: "Withdrawn but still needed", detail: "A schedule action or package still requires a withdrawn document.", who: "Package or action owner" },
   { key: "UNRESOLVED_VOID", label: "Declared void — nobody has said what was done from it", detail: "A revision was declared void: it should never have been used at all, unlike a superseded one that was right in its day. Whatever was built, ordered or decided from it has to be found and reassessed, and no such record exists.", who: "The party that performed the work" },
 ] as const;

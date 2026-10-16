@@ -106,7 +106,7 @@ public sealed partial class TransmittalService
             Extras = raise.Extras,
             ActivityId = raise.ActivityId,
             ActivityAskKind = raise.ActivityAsk,
-            // Whether management confirms it is the project's answer when it is raised, and stays so.
+            // Whether whoever holds Manage confirms it is the project's answer when it is raised, and stays so.
             ActivityConfirm = raise.ActivityId is not null
                 && await Delios.Host.Settings.ProjectAnswers.NeedsConfirmationAsync(db, project.Id, "ACTION_LINKS", cancellationToken),
             IssuedById = raise.Actor.Id,

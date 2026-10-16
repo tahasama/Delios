@@ -20,8 +20,8 @@ import { REV_STATE_LABEL, type RevState } from "@/lib/core/standard";
 export const STATE_NAMES = [
   { code: "IN_PREPARATION", default: REV_STATE_LABEL.IN_PREPARATION, means: "Being written; nobody may act on it." },
   { code: "IN_REVIEW", default: REV_STATE_LABEL.IN_REVIEW, means: "On its route, with its reviewers." },
-  { code: "NOT_RELEASED", default: REV_STATE_LABEL.NOT_RELEASED, means: "The route is finished; waiting for Document Control to publish it." },
-  { code: "RETURNED", default: REV_STATE_LABEL.RETURNED, means: "Document Control sent it back to a step of its route." },
+  { code: "NOT_RELEASED", default: REV_STATE_LABEL.NOT_RELEASED, means: "The route is finished; waiting for the control function to publish it." },
+  { code: "RETURNED", default: REV_STATE_LABEL.RETURNED, means: "The control function sent it back to a step of its route." },
   { code: "RELEASED_ISSUED", default: "Released & issued", means: "In force and sent to the people named — where releasing sends it (the default)." },
   { code: "RELEASED", default: "Released", means: "In force; people work from it — where releasing means go ahead." },
   { code: "ON_HOLD", default: "On hold", means: "Released, then held: not for use until it is lifted." },
@@ -65,7 +65,7 @@ export function stateName(
 
 /**
  * A document asked of a supplier reads in the supplier's own set of states, not ours: sent (to the supplier),
- * received (from them), accepted (Document Control's check), returned (by that check, with why), in review, released
+ * received (from them), accepted (the control function's check), returned (by that check, with why), in review, released
  * & issued, returned (rejected by the review). Who holds it (who may change it) is said beside it. The backend
  * works the stage out the same way (`Register.SupplierStage`).
  */

@@ -38,10 +38,10 @@ export default async function CodesPage() {
 
       {/* The four, side by side */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Layer n="1" href="#document" title="Document state" about="the document number as a whole" examples="Planned · Active · Withdrawn" who="The system, and Document Control to end it" list="Fixed by the Standard" />
-        <Layer n="2" href="#revision" title="Revision state" about="one revision — A, B, C…" examples="In preparation · In review · Released" who="Moves as the work moves: author, then Document Control" list="Fixed by the Standard" />
+        <Layer n="1" href="#document" title="Document state" about="the document number as a whole" examples="Planned · Active · Withdrawn" who="The system, and the control function to end it" list="Fixed by the Standard" />
+        <Layer n="2" href="#revision" title="Revision state" about="one revision — A, B, C…" examples="In preparation · In review · Released" who="Moves as the work moves: author, then the control function" list="Fixed by the Standard" />
         <Layer n="3" href="#outcome" title="Review verdict" about="the decision on a revision in review" examples="C1 · C2 · C3 · C4" who="The route's last step — someone who may approve" list="Your organization's list" />
-        <Layer n="4" href="#status" title="Released for" about="what a released revision may be used for" examples="IFC · AFC · IFI · AB" who="Document Control, when releasing" list="Your organization's list" />
+        <Layer n="4" href="#status" title="Released for" about="what a released revision may be used for" examples="IFC · AFC · IFI · AB" who="The control function, when releasing" list="Your organization's list" />
       </div>
 
       {/* How they connect */}
@@ -49,10 +49,10 @@ export default async function CodesPage() {
         <ol className="grid grid-cols-1 gap-2 lg:grid-cols-6">
           <FlowStep n="1" title="Create" who="Author" body="Number reserved." chips={[["1", "Planned"]]} />
           <FlowStep n="2" title="Write rev A" who="Author" body="Content being prepared." chips={[["2", "In preparation"]]} />
-          <FlowStep n="3" title="Send down a route" who="Author or Document Control" body="The route names who advises and who decides." chips={[["2", "In review"]]} />
+          <FlowStep n="3" title="Send down a route" who="Author or the control function" body="The route names who advises and who decides." chips={[["2", "In review"]]} />
           <FlowStep n="4" title="Advise" who="Reviewers" body="Comments and a suggested verdict." chips={[]} />
           <FlowStep n="5" title="Decide" who="Last step · an approver" body="The binding verdict, and what it may be used for." chips={[["3", "C1 / C2 / C3 / C4"], ["4", "IFC"]]} />
-          <FlowStep n="6" title="Release" who="Document Control" body="Checks, then releases at the status decided — “to be” drops." chips={[["2", "Released"], ["4", "IFC"], ["1", "Active"]]} last />
+          <FlowStep n="6" title="Release" who="The control function" body="Checks, then releases at the status decided — “to be” drops." chips={[["2", "Released"], ["4", "IFC"], ["1", "Active"]]} last />
         </ol>
         <div className="mt-4 grid grid-cols-1 gap-3 text-xs leading-5 text-slate-600 md:grid-cols-3">
           <p className="rounded-xl bg-tint-soft p-3"><strong className="text-slate-800">Releasing is not sending.</strong> Release is internal: it makes that revision the current one and fixes what it may be used for. Issuing is a transmittal: telling a named party, for a stated reason. A revision can be released and issued to nobody, or issued many times after one release.</p>

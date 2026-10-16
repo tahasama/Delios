@@ -39,7 +39,7 @@ export const dynamic = "force-dynamic";
  * — with the whole history beside it.
  *
  * Nothing that was recorded is hidden to make the page tidy: the acceptance
- * check keeps its condition-by-condition answer, and what Document Control
+ * check keeps its condition-by-condition answer, and what the control function
  * wrote when they accepted it is shown where they wrote it.
  */
 export default async function TransmittalDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ issueError?: string }> }) {
@@ -175,7 +175,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                   </ActionForm>
                 </span>
               ) : null
-            ) : <span className="ml-auto text-[11px] text-slate-400">Document Control issues it.</span>}
+            ) : <span className="ml-auto text-[11px] text-slate-400">The control function issues it.</span>}
           </div>
           {controller && (!issueCheck!.ok || issueCheck!.warnings.length) ? (
             <div className="border-t border-line px-5 py-3 sm:px-6"><PreflightPanel result={issueCheck!} /></div>
@@ -189,7 +189,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             ? <>Answered by {ask.answeredBy}, {fmtDate(ask.answeredAt)}: {ask.answer} </>
             : ask.checkedAt
               ? <>{askedOf.name}. Checked by {ask.checkedBy}, {fmtDate(ask.checkedAt)}; with {ask.confirmerName} to confirm. </>
-              : <>{askedOf.name}. Not answered yet{ask.confirm ? "; Document Control checks it, then management confirms it" : ""}. </>}
+              : <>{askedOf.name}. Not answered yet{ask.confirm ? "; the control function checks it, then whoever holds Manage confirms it" : ""}. </>}
           {(() => {
             const yours = !ask.answeredAt && !!ask.checkedAt && ask.confirmerId === ctx.user.id;
             const toCheck = !ask.answeredAt && !ask.checkedAt && ctx.can("CONTROL");
@@ -431,7 +431,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             </section>
           ) : null}
 
-          {/* Replies by email from an organization not on DELIOS: Document Control records or sets each aside. */}
+          {/* Replies by email from an organization not on DELIOS: the control function records or sets each aside. */}
           {controller ? <EmailReplies replies={await emailReplies(ctx, t.id)} transmittalId={t.id} /> : null}
 
           {/* What came back. Each answer is correspondence in its own right, so
@@ -487,7 +487,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             </section>
           ) : null}
 
-          {/* On arrival: Document Control accepts what came in, or rejects it
+          {/* On arrival: the control function accepts what came in, or rejects it
               with a reason the sender reads. How they judge it is their
               procedure; the record keeps the decision, who made it, when, and
               what they wrote. A check recorded condition by condition before
@@ -500,7 +500,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                   {status === "ACCEPTED" || status === "REJECTED"
                     ? <>{status === "ACCEPTED" ? "accepted" : "rejected"} by {page.checkedBy}, {fmtDate(page.checkedAt)}</>
                     : t.direction === "INCOMING"
-                      ? "Document Control accepts it, or rejects it with a reason the sender reads"
+                      ? "The control function accepts it, or rejects it with a reason the sender reads"
                       : "their document control checks what we send"}
                 </span>
               </div>
@@ -530,7 +530,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                     <p className="mt-2 text-[11px] text-slate-400">Accepting starts any response period. Rejecting returns it to the sender with your reason.</p>
                   </div>
                 ) : (
-                  <p className="px-5 py-2.5 text-xs text-slate-500 sm:px-6">Document Control checks what arrives.</p>
+                  <p className="px-5 py-2.5 text-xs text-slate-500 sm:px-6">The control function checks what arrives.</p>
                 )
               ) : null}
             </section>
@@ -557,7 +557,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             title="Progress"
             actions={controller ? (
               <span className="flex items-center gap-3 text-[11px] font-semibold">
-                {/* The project's log is Document Control's; the audit trail is
+                {/* The project's log is the control function's; the audit trail is
                     the administrator's. Nobody is shown a door they cannot open. */}
                 <Link href={`/?view=log&q=${encodeURIComponent(t.number)}`} className="text-link hover:underline" title="What has happened to this transmittal, in the project's own log">Log &rarr;</Link>
                 {isAdmin(user) ? <Link href={`/settings/audit?q=${encodeURIComponent(t.number)}`} className="text-link hover:underline" title="Every recorded act on this transmittal, in the audit trail">Audit &rarr;</Link> : null}

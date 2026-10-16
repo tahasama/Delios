@@ -36,7 +36,7 @@ export default async function FunctionsPage() {
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/functions")!)) {
     return <NoAccess title="Functions & permissions" who="control" />;
   }
-  // Document Control maintains the matrix, but not the authority that could
+  // The control function maintains the matrix, but not the authority that could
   // give itself more: an administrator's own function stays with administrators.
 
   const [functions, disciplines, docTypes, deliverableTypes, criticalities, confidentialities] = await Promise.all([

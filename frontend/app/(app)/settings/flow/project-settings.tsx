@@ -21,7 +21,7 @@ import { fmtDate } from "@/lib/core/utils";
  * says whether it is the default's or changed here, and the project can go
  * back to the defaults in one step.
  */
-export async function ProjectSettings() {
+export async function ProjectSettings({ readOnly = false }: { readOnly?: boolean }) {
   const ctx = await requireScope();
   const [answers, controllers, names, defaults] = await Promise.all([
     projectSettings(ctx.projectId).catch(() => new Map<string, string>()),
@@ -32,7 +32,8 @@ export async function ProjectSettings() {
   const admin = isAdmin(ctx.user);
 
   return (
-    <div className="space-y-4">
+    // Read only for whoever may not change it: every answer shows, nothing can be chosen or saved.
+    <fieldset disabled={readOnly} className="min-w-0 space-y-4">
       <div id="how-it-works" className="scroll-mt-24">
         <HowItWorks target="project" answers={answers} follows={controllers.length > 0} base={defaults?.values ?? null} />
       </div>
@@ -108,6 +109,6 @@ export async function ProjectSettings() {
           {NOT_SWITCHABLE.map((one) => <li key={one} className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6">{one}</li>)}
         </ul>
       </section>
-    </div>
+    </fieldset>
   );
 }

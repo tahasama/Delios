@@ -6,9 +6,9 @@ import { getActiveSet } from "@/lib/settings/config";
 
 /**
  * Which departments each scheduled activity concerns. Once the schedule is in,
- * the project manager downloads this list pre-filled with every activity, fills
+ * whoever plans downloads this list pre-filled with every activity, fills
  * the Departments column, uploads it and approves it himself. Only then can
- * Document Control ask those departments for the documents they need.
+ * The control function ask those departments for the documents they need.
  *
  * The file is authoritative for the activities it lists; activities left out
  * keep what they have.
@@ -28,12 +28,12 @@ const departments: Handler = {
   kind: "ACTION_DEPARTMENTS",
   title: "Departments per action",
   blurb:
-    "Which departments each action concerns — the project manager's list. Download it pre-filled with every action, fill the Departments column, upload it and approve it. Departments: discipline codes, and where an action concerns several, separate them with a comma — EL, ME. Everything else on the row comes from the schedule and is there to read; it is not changed from here.",
+    "Which departments each action concerns — the list of whoever plans. Download it pre-filled with every action, fill the Departments column, upload it and approve it. Departments: discipline codes, and where an action concerns several, separate them with a comma — EL, ME. Everything else on the row comes from the schedule and is there to read; it is not changed from here.",
   clause: "§14.1",
   level: "PROJECT",
   columns: COLUMNS,
   sample: ["A00001", "1010", "Pump house — MCC energisation", "MCC-2 and its feeders", "2026-10-20", "EL, ME"],
-  approverHint: "the project manager who uploads it",
+  approverHint: "whoever plans, who uploads it",
   ownerApproves: true,
   ownerVerb: "PLAN",
 

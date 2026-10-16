@@ -13,7 +13,7 @@ import { adminNumbering, adminUsers, backendField, RECORD_KIND } from "@/lib/set
 
 /**
  * The organization's directory and lists. The backend keeps them, checks who
- * may change what (an administrator, or Document Control for the day-to-day
+ * may change what (an administrator, or the control function for the day-to-day
  * lists) and audits every change; these send what the form says.
  */
 
@@ -33,11 +33,11 @@ async function putValue(body: { setKey: string; code: string; label?: string; st
   await forgetShortLived();
 }
 
-/** Said after adding someone: when the project asks management to confirm people, they wait off the project until then. */
+/** Said after adding someone: when the project asks for people to be confirmed, they wait off the project until then. */
 export async function waitingSaid(userId: string, projectId: string, projectCode: string): Promise<string> {
   const added = (await adminUsers().catch(() => [])).find((u) => u.id === userId);
   const seat = added?.memberships.find((m) => m.projectId === projectId);
-  return seat?.pendingSince ? ` They join ${projectCode} once ${seat.confirmerName ?? "management"} confirms them (People to confirm).` : "";
+  return seat?.pendingSince ? ` They join ${projectCode} once ${seat.confirmerName ?? "whoever holds Manage"} confirms them (People to confirm).` : "";
 }
 
 /**
@@ -158,7 +158,7 @@ function assetFields(formData: FormData) {
   };
 }
 
-/** Document Control adds a tag to the asset breakdown. */
+/** the control function adds a tag to the asset breakdown. */
 export async function addAssetAction(_prev: (Result & { ok?: string }) | undefined, formData: FormData): Promise<Result & { ok?: string }> {
   const ctx = await requireScope();
   const fields = assetFields(formData);

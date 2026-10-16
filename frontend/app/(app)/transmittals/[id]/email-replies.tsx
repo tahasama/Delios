@@ -6,7 +6,7 @@ import type { EmailReply } from "@/lib/transmittals/api";
 import { recordEmailReplyAction, setAsideEmailReplyAction } from "@/lib/transmittals/forms-email-replies";
 
 /**
- * Replies by email to this transmittal, from an organization not on DELIOS: Document Control's to record as received
+ * Replies by email to this transmittal, from an organization not on DELIOS: the control function's to record as received
  * (a transmittal following this one, its files checked as anything that arrives) or to set aside, with why. Nothing
  * of a reply is filed by itself, and its files are not opened before the check.
  */

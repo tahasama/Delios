@@ -25,7 +25,7 @@ import { reviewOfRequest } from "@/lib/reviews/api";
  * function, moving somebody off the project or approving a new matrix ends a
  * delegation that no longer makes sense without anybody having to revoke it.
  *
- * Document Control and administrators are left out of the list. They hold every
+ * The control function and administrators are left out of the list. They hold every
  * verb so that an emergency has a way through, and normally they do not review
  * at all — offering them as the ordinary answer to "who takes this step" would
  * turn the exception into the habit. Where the route needs somebody the matrix

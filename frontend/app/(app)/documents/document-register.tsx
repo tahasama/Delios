@@ -122,9 +122,9 @@ function withDocs(back: string, ids: string[]) {
 }
 
 export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort, views, supplier, picking, mayAddToAction }: {
-  /** Opened from an action, by Document Control: tick to add, untick to take off. */
+  /** Opened from an action, by the control function: tick to add, untick to take off. */
   picking?: Picking | null;
-  /** Document Control: the selection can be added to an action. */
+  /** the control function: the selection can be added to an action. */
   mayAddToAction?: boolean;
   /** The reader is an outside organization: what they owe can be sent from here. */
   supplier?: { to: string; readOnly?: boolean } | null;
@@ -220,7 +220,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   const selectedRevisionIds = selectedRows.map((row) => row.reviewRevisionId).filter((id): id is string => Boolean(id));
   const transmittableRows = selectedRows.filter((row) => row.hasReleased);
   // The one exception to "only released revisions travel": a supplier's placeholder not asked yet, asked of that
-  // supplier. Document Control's; the new transmittal keeps one supplier's own. Its package can send them too.
+  // supplier. The control function's; the new transmittal keeps one supplier's own. Its package can send them too.
   const placeholderRows = mayAddToAction ? selectedRows.filter((row) => !row.hasReleased && !!row.originator && !row.requested) : [];
   // Opened for an action, the ticks span pages: the box at the top ticks or unticks this page only.
   const pageSelected = rows.length > 0 && (picking ? rows.every((row) => selected.includes(row.id)) : selected.length === rows.length);

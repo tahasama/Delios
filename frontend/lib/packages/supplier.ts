@@ -12,9 +12,9 @@ import { supplierStage, supplierStamp, type SupplierStage } from "@/lib/core/sta
  */
 export type SupplierState =
   | "NOT_SENT"        // nothing submitted yet
-  | "AWAITING_CHECK"  // sent; Document Control has not checked it
+  | "AWAITING_CHECK"  // sent; the control function has not checked it
   | "REJECTED"        // failed the check; back with the supplier
-  | "TO_ROUTE"        // accepted; Document Control sends it for review
+  | "TO_ROUTE"        // accepted; the control function sends it for review
   | "IN_REVIEW"
   | "RETURNED"        // review asked for changes; back with the supplier
   | "APPROVED";       // review passed (awaiting or after release)
@@ -40,7 +40,7 @@ export type SupplierRow = {
 
 /**
  * Where a revision stands, from the backend's state: sent in and waiting for
- * Document Control (RECEIVED), sent back for a correction (CORRECTING),
+ * The control function (RECEIVED), sent back for a correction (CORRECTING),
  * accepted and waiting to be routed (IN_PREPARATION), and so on.
  */
 function stateOf(revisionState: string | null): SupplierState {
@@ -79,7 +79,7 @@ export async function supplierRows(t: { projectId: string }, pkg: PackageView, d
     const rev = doc?.revisions[0];
     if (!doc || !rev) return light;
     const cycle = rev.cycles[rev.cycles.length - 1] ?? null;
-    // Sent back to the supplier after Document Control took it back: with them, not returned.
+    // Sent back to the supplier after the control function took it back: with them, not returned.
     const resent = rev.backend.state === "CORRECTING" && supplierStage(true, { state: rev.backend.state, resentAt: rev.backend.resent?.at, returnedAt: rev.backend.returnedAt }) === "SENT";
     const state = resent ? "NOT_SENT" : stateOf(rev.backend.state);
     const incoming = (context?.transmittals ?? [])
@@ -202,7 +202,7 @@ export function packageCounts(pkg: PackageView, rows: SupplierRow[]) {
     withThem: sent.filter((r) => WITH_SUPPLIER.includes(r.state)).length,
     /** We hold it: to check, to send for review, or in review. */
     withUs: sent.filter((r) => !WITH_SUPPLIER.includes(r.state) && r.state !== "APPROVED").length,
-    /** Of those with us, waiting for Document Control's check. */
+    /** Of those with us, waiting for the control function's check. */
     toCheck: sent.filter((r) => r.state === "AWAITING_CHECK").length,
     released: sent.filter((r) => r.state === "APPROVED").length,
     late: rows.filter((r) => r.state === "NOT_SENT" && r.late).length,

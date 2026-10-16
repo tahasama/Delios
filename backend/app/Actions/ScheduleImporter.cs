@@ -241,7 +241,7 @@ public sealed class ScheduleImporter(
             activity.Start = row.Start;
             activity.Finish = row.Finish;
             activity.Responsible = row.Responsible;
-            // A schedule without a departments column leaves the project manager's tags as they are.
+            // A schedule without a departments column leaves the planner's tags as they are.
             if (row.Departments is not null) activity.Departments = row.Departments;
             activity.State = ActivityStates.Active;
             activity.SourceRevisionId = sourceRevisionId;

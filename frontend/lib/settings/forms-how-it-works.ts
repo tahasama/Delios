@@ -19,7 +19,6 @@ import {
   SKIP_KEY,
   CONFIRMABLE,
   CONFIRM_KEY,
-  PEOPLE_KEY,
   actIsOff,
   effectiveAnswer,
   MODE_LABEL,
@@ -33,7 +32,7 @@ import {
 } from "@/lib/settings/control-activities";
 
 /**
- * Who carries out each act: Document Control, or the people doing the work.
+ * Who carries out each act: the control function, or the people doing the work.
  *
  * The project answers it once — one side, the other side, or "it depends on the
  * act", and then each act carries its own answer. One screen writes both, and
@@ -107,15 +106,12 @@ export async function setControlActivitiesAction(_prev: State | undefined, formD
   const wanted: [string, string | null][] = [[PROJECT_KEY, asked === "FOLLOW" ? null : asked]];
   if (asked === "CUSTOM") {
     for (const activity of CONTROL_ACTIVITIES) {
-      if (activity.key === PEOPLE_KEY) continue;
       const value = String(formData.get(`mode:${activity.key}`) ?? "") as ControlMode;
       if (ACT_MODES.includes(value)) wanted.push([activity.key, value]);
     }
   }
-  // Who adds people is its own switch, saved whatever the answer above.
-  const people = String(formData.get(`mode:${PEOPLE_KEY}`) ?? "") as ControlMode;
-  if (ACT_MODES.includes(people)) wanted.push([PEOPLE_KEY, people]);
-  // Management's confirmation is its own answer, kept whichever way the acts are carried out.
+
+  // The confirmation by whoever holds Manage is its own answer, kept whichever way the acts are carried out.
   for (const key of Object.keys(CONFIRMABLE)) wanted.push([CONFIRM_KEY(key), formData.get(`confirm:${key}`) === "on" ? "ON" : "OFF"]);
   let changed: number;
   try {
@@ -125,7 +121,7 @@ export async function setControlActivitiesAction(_prev: State | undefined, formD
   }
   revalidateHowItWorks();
   if (!changed) return { ok: "Nothing changed." };
-  if (asked === "FOLLOW") return { ok: "Saved — each new project follows whether it has Document Control." };
+  if (asked === "FOLLOW") return { ok: "Saved — each new project follows whether it has a control function." };
   return {
     ok: asked === "CUSTOM"
       ? `Saved — act by act. ${CONTROL_ACTIVITIES.length} acts, each with its own answer.`

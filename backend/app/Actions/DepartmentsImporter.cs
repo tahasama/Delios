@@ -18,7 +18,7 @@ public sealed record DepartmentsImportRequested(Guid TenantId, Guid RevisionId)
 }
 
 /// <summary>
-/// The project manager's list of which disciplines each activity concerns, as a controlled document. A document
+/// The planner's list of which disciplines each activity concerns, as a controlled document. A document
 /// whose type is marked as such a list is reviewed like any other; once a revision is released, the spreadsheet
 /// attached to it is read: each row names an activity and its disciplines. Activities the list does not name keep
 /// what they had. The list is read whole or not at all: one wrong row and nothing changes, and the control function is

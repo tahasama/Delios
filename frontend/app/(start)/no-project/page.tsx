@@ -19,7 +19,7 @@ export default async function NoProjectPage() {
   if (isAdmin(user)) redirect("/setup");
 
   // Naming the administrators is the whole point of this page, but the backend
-  // names them only to administrators and Document Control, so none are listed.
+  // names them only to administrators and the control function, so none are listed.
   const admins: { name: string; email: string; role: string }[] = [];
 
   return (

@@ -9,8 +9,8 @@ type Named = { id: string; name: string };
 type AskedRequest = { id: string; reason: string; askedBy: string; people: Named[]; parties: Named[] };
 
 /**
- * Who receives the revision when it is released. Document Control does not choose this: it was said by whoever
- * decided the review, or asked for it to be sent. Releasing, Document Control sees them and may take anyone off
+ * Who receives the revision when it is released. The control function does not choose this: it was said by whoever
+ * decided the review, or asked for it to be sent. Releasing, the control function sees them and may take anyone off
  * (the request says so) or add others. Asked by nobody yet, the people added here are who it goes to.
  */
 export function ReleaseRecipients({ asked, leftTo, choices, reasons, required }: {

@@ -78,7 +78,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   try {
     if (direction === "INCOMING") {
       // What arrived from another organization. Their own people send it
-      // themselves; Document Control records it for one working outside the system.
+      // themselves; the control function records it for one working outside the system.
       let fromPartyId: string | undefined;
       if (user.isInternal) {
         const found = (await addressees(ctx)).parties
@@ -142,7 +142,7 @@ export async function issueTransmittalAction(_prev: { error?: string } | undefin
 }
 
 /**
- * What arrived is accepted or returned by Document Control on arrival: each
+ * What arrived is accepted or returned by the control function on arrival: each
  * submission it carried is checked, and a return says why, for the sender to
  * read. Something unplanned is registered on its own, from its file.
  */

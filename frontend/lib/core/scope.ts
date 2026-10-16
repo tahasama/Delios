@@ -54,7 +54,7 @@ export type Scope = {
   why: (verb: Verb, target?: DocumentClass | null) => string;
 };
 
-/** The role a function's verbs amount to (administrator, Document Control, approver…), for the screens that ask by role. */
+/** The role a function's verbs amount to (administrator, the control function, approver…), for the screens that ask by role. */
 function roleOf(verbs: string[]): Role {
   if (verbs.includes("CONFIGURE")) return "ADMIN" as Role;
   if (verbs.includes("CONTROL")) return "CONTROLLER" as Role;

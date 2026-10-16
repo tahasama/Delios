@@ -216,7 +216,7 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
 /**
  * Who is copied in when something is sent back: the people it goes back to are
  * settled by the record and shown, not chosen; everyone else starts as those
- * who sat on the route, and Document Control adds or removes as it sees fit.
+ * who sat on the route, and the control function adds or removes as it sees fit.
  */
 export function CopyPicker({ companies, backTo, preselected = [] }: { companies: Company[]; backTo: string; preselected?: string[] }) {
   const everyone = useMemo<Person[]>(

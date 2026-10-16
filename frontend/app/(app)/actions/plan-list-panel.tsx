@@ -123,7 +123,7 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
               <button className="ask" data-on="true">Upload and read</button>
             </ActionForm>
           ) : (
-            <p className="mt-4 text-xs text-slate-500">Document Control uploads the spreadsheet of the released revision.</p>
+            <p className="mt-4 text-xs text-slate-500">The control function uploads the spreadsheet of the released revision.</p>
           )}
         </>
       ) : (

@@ -80,7 +80,7 @@ export const VERB_BLURB: Record<Verb, string> = {
   CONTROL: "Act as the control function: release, supersede, withdraw.",
   CONFIGURE: "Publish value sets, schemes, people and this matrix.",
   PLAN: "Upload the schedule's lists on the Schedule: the schedule, the disciplines per action, the document requirements.",
-  MANAGE: "Management (project, construction, engineering manager…): proposed first to confirm requests that need it, and adds people to the project where there is no Document Control.",
+  MANAGE: "Manage: proposed first to confirm requests that need it, and who joins the project.",
   ROUTES: "Create and edit review routes (workflow templates).",
   MATRIX: "Read this distribution matrix without being able to change it.",
 };

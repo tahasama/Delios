@@ -101,7 +101,7 @@ export default async function DocumentDetailPage({
   const canEdit = mayContributeToDocument(user, doc) && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
   // Asked of a supplier (a placeholder went out to them): its files and what it is issued for are theirs from then
   // on. Nobody of ours starts a revision or changes its files; the backend refuses it too (ASKED_OF_SUPPLIER).
-  // Document Control may take it back (unlock it) to change anything, until it sends it to them again.
+  // The control function may take it back (unlock it) to change anything, until it sends it to them again.
   const supplierName = doc.originator && context.transmittals.some((t) => t.direction === "OUTGOING" && t.itemKind === "PLACEHOLDER")
     ? (await addressees(ctx).catch(() => ({ parties: [] as { code: string; name: string }[] }))).parties.find((p) => p.code === doc.originator)?.name ?? null
     : null;
@@ -111,7 +111,7 @@ export default async function DocumentDetailPage({
   const asks = supplierName ? await handBacks(ctx, doc.id) : [];
   const openAsk = asks.find((one) => !one.answeredAt) ?? null;
   const controller = isController(user) || isAdmin(user);
-  // Document Control adds it to a schedule action from here too: the actions with a discipline tagged that do not need it yet.
+  // The control function adds it to a schedule action from here too: the actions with a discipline tagged that do not need it yet.
   const mayAddToAction = ctx.can("CONTROL") && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
   const actionChoices = mayAddToAction
     // Only actions that concern the document's own discipline: it is needed for that discipline, never another.
@@ -148,7 +148,7 @@ export default async function DocumentDetailPage({
     : [[], []] as [{ id: string; userId: string; user: { name: string }; addedByName: string; reason: string | null; createdAt: Date }[], { user: { id: string; name: string }; function: { name: string } | null }[]];
   const inPrep = doc.revisions.find((r) => r.state === "IN_PREPARATION");
   const inReview = doc.revisions.find((r) => r.state === "IN_REVIEW");
-  // Decided, waiting for Document Control. Still the revision in hand, and the
+  // Decided, waiting for the control function. Still the revision in hand, and the
   // one the release card is about.
   const notReleased = doc.revisions.find((r) => r.state === "NOT_RELEASED");
   const current = doc.revisions.find((r) => r.state === "RELEASED");
@@ -187,7 +187,7 @@ export default async function DocumentDetailPage({
   // Released and issued are one act unless the organization keeps them apart: when no request names who receives
   // it, the release asks, with the same fields as asking for it to be sent.
   const releaseTogether = (await controlPolicy(ctx, "POLICY_RELEASE")) !== "SEPARATE";
-  // Releasing, Document Control does not say who receives it: whoever decided the review or asked for it to be
+  // Releasing, the control function does not say who receives it: whoever decided the review or asked for it to be
   // sent did. It sees them, may take anyone off, and may add others (needed when nobody named anyone).
   const releaseChoices = controller && working?.state === "NOT_RELEASED" ? await requestChoices(ctx, doc) : null;
   const releaseReasons = releaseChoices ? await getActiveSet("REASONS_FOR_ISSUE") : [];
@@ -231,7 +231,7 @@ export default async function DocumentDetailPage({
   const routeSteps = (run?.steps ?? []).map((step, index) => ({ number: index + 1, title: step.title ?? `Step ${index + 1}` }));
   // Sending back, and the hold: who it goes back to is the record's answer —
   // the supplier, or whoever started the route — and who is copied in starts as
-  // the people who sat on the route. Only Document Control sees either.
+  // the people who sat on the route. Only the control function sees either.
   const { returnRecipients, pendingIssue } = await import("@/lib/transmittals/issue-requests");
   const held = current?.heldAt ? current : null;
   const sendBackOf = controller ? (working ?? held) : null;
@@ -386,7 +386,7 @@ export default async function DocumentDetailPage({
                           <ActionForm action={carryOutRequestAction} submitLabel="Send it" size="sm" hidden={{ requestId: one.id }} />
                         ) : (
                           <p className="text-[11px] text-slate-400">
-                            {carrying.state === "RELEASED" ? "Waiting for Document Control to send it." : "It goes out when the revision is released."}
+                            {carrying.state === "RELEASED" ? "Waiting for the control function to send it." : "It goes out when the revision is released."}
                           </p>
                         )}
                         {one.raisedById === user.id || controller ? (
@@ -500,7 +500,7 @@ export default async function DocumentDetailPage({
         </>) },
       ] : []),
 
-      // A supplier's document with the supplier: only they change it. Document Control may ask for it back, saying why.
+      // A supplier's document with the supplier: only they change it. The control function may ask for it back, saying why.
       ...(askedOf ? [
         { key: "asked", label: `With ${askedOf}`, open: !!openAsk, body: (<>
           <p className="text-xs leading-5 text-slate-600">
@@ -523,13 +523,13 @@ export default async function DocumentDetailPage({
           ) : null}
         </>) },
       ] : []),
-      // With us: the supplier may ask for it back, and Document Control answers; or we send it to them for an update.
+      // With us: the supplier may ask for it back, and the control function answers; or we send it to them for an update.
       ...(user.isInternal && supplierName && withSupplier === false ? [
         openAsk && openAsk.fromSupplier
           ? { key: "asked-back", primary: controller, open: true, label: `${supplierName} asks for it back`, body: (<>
               <p className="whitespace-pre-line rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
                 <span className="font-semibold text-slate-800">{openAsk.askedBy}</span>, {fmtDate(new Date(openAsk.askedAt))}: {openAsk.reason}
-                <span className="mt-1 block text-slate-600">Does Document Control hand it back to {supplierName} to update it?{working && ["IN_PREPARATION", "RECEIVED"].includes(working.state) ? ` Rev ${working.value} goes as it is and comes back under the same value.` : ""}</span>
+                <span className="mt-1 block text-slate-600">Does the control function hand it back to {supplierName} to update it?{working && ["IN_PREPARATION", "RECEIVED"].includes(working.state) ? ` Rev ${working.value} goes as it is and comes back under the same value.` : ""}</span>
               </p>
               {controller ? (
                 <ActionForm action={answerAskAction} submitLabel="Answer" size="sm" hidden={{ askId: openAsk.id, documentId: doc.id }} className="mt-3 space-y-3">

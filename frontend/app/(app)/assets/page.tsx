@@ -75,7 +75,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
           </DataTable>
         ) : (
           <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">
-            {q || sp.area || sp.system ? "Nothing matches that." : keeper ? "No tags yet. Add the first one below." : "No tags yet. Document Control keeps the asset list."}
+            {q || sp.area || sp.system ? "Nothing matches that." : keeper ? "No tags yet. Add the first one below." : "No tags yet. The control function keeps the asset list."}
           </p>
         )}
       </section>

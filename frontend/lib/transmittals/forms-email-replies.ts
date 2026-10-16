@@ -7,7 +7,7 @@ import { api, projectPath, refusal } from "@/lib/client";
 
 type Result = { error?: string; ok?: string };
 
-/** Document Control records a reply by email as received: a transmittal following ours, its files to check. */
+/** the control function records a reply by email as received: a transmittal following ours, its files to check. */
 export async function recordEmailReplyAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
   const replyId = String(formData.get("replyId") ?? "");
@@ -22,7 +22,7 @@ export async function recordEmailReplyAction(_prev: Result | undefined, formData
   redirect(`/transmittals/${recorded}`);
 }
 
-/** Document Control sets a reply by email aside, with why. It is kept on the transmittal. */
+/** the control function sets a reply by email aside, with why. It is kept on the transmittal. */
 export async function setAsideEmailReplyAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
   const replyId = String(formData.get("replyId") ?? "");

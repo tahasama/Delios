@@ -17,7 +17,7 @@ import { upload, filesOf } from "@/lib/documents/api-uploads";
 export async function createDocumentAction(_prev: { error?: string; fields?: string[] } | undefined, formData: FormData): Promise<{ error?: string; fields?: string[] }> {
   const ctx = await requireScope();
   const { user } = ctx;
-  if (!mayCreateDocument(user)) return { error: user.isInternal ? "Read-only users cannot create documents." : "External parties cannot create register entries. Document Control must issue a placeholder to your organization first." };
+  if (!mayCreateDocument(user)) return { error: user.isInternal ? "Read-only users cannot create documents." : "External parties cannot create register entries. The control function must issue a placeholder to your organization first." };
 
   const title = String(formData.get("title") ?? "").trim();
   const deliverableType = String(formData.get("deliverableType") ?? "");

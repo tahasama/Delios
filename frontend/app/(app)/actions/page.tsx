@@ -52,7 +52,7 @@ const STATES = ACTION_STATES;
  * What became of the work, as against whether its documents arrived.
  *
  * The day passes and the work is taken to have happened — that is what a
- * schedule is — unless Document Control wrote down that it was postponed. So
+ * schedule is — unless the control function wrote down that it was postponed. So
  * this asks the question the state cannot: which activities went ahead short of
  * what they needed, and of those, which were owned and which were never
  * written down at all.
@@ -120,7 +120,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const postponeCodes = (await getActiveSet("ACTIVITY_DECISIONS")).filter((one) => one.props.proceeds !== true).map((one) => one.code);
   const postponed = (a: PlanAction) => isPostponed(a, postponeCodes);
   // Went ahead? Once its day has passed: with its documents, with documents
-  // missing, or not at all because Document Control postponed it.
+  // missing, or not at all because the control function postponed it.
   const HAPPENED_WHERE: Record<string, (action: PlanAction) => boolean> = {
     WITH: (a) => a.needs.length > 0 && a.passed && !shortOnTheDay(a) && !postponed(a),
     WITHOUT: (a) => shortOnTheDay(a) && !postponed(a),

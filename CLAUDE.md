@@ -456,7 +456,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   own DELIOS is never added there: link the organizations; their administrator puts them on the project.
 - Joining a project (owner): two switches of the project (Control room, "Adding people to the project"): who adds,
   **only the control function** (the default: a project is taken to have one) or **everyone on the project**
-  (`PROJECT_PEOPLE` = CONTROL / SELF, its own switch whatever the other acts answer); and **confirmation by whoever
+  (`PROJECT_PEOPLE` = CONTROL / SELF, read like every act: a project with no control function does it itself); and **confirmation by whoever
   holds Manage**, necessary (the default, `CONFIRM:PROJECT_PEOPLE`, backend `DefaultConfirm`) or not, in both modes.
   "Ask for someone to join" is always for someone new (first name, last name, email, function, department, an
   optional message; closed until opened): an information transmittal (Request) to whoever answers it (who is named;
@@ -475,7 +475,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   control function", `PUT /people/control`, `Membership.ActsAsControl`): anyone of ours on the project, whatever their
   function, holds CONTROL on the whole project, as if their function carried it (`ProjectAccess.WithControl`, every
   CONTROL holder lookup, `/api/me`). Those whose function carries CONTROL count too. An administrator or whoever acts
-  as it names them; each is told; never nobody left (NO_CONTROL_LEFT).
+  as it names them; each is told. Nobody may be named: the project then has no control function, and the people
+  doing the work carry its acts out themselves (as when the Control room says so).
 - People & access, in the reference style: masthead (on the project · waiting · refused, and how joining works here),
   "Someone joins <project>" ("Add someone", "Ask for someone to join"), "Waiting to be confirmed" (with Remind), and
   Everyone (organization and project chips; each person's Change: function, department, name and email unless
@@ -498,6 +499,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Document families come back (owner): each document type belongs to a family (internal drawings like DWG, supplier
   documents like A109…); the family tells types apart and recommends a criticality. They were lost when the demo data
   was renewed.
+- **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
+  of the hub (`CONTROL_ROOM`): how the project works, and what makes it work that way (the control function, who does
+  what, releasing, adding people), opening on "Open the Control room". Everyone of ours reads it (`read: true`, "See
+  how it works"); an administrator or the control function changes it (`mayChangeControlRoom`; read only otherwise:
+  switches shown, nothing chosen). Every page below is what it is built from.
+- Screens and the backend say "the control function" and "whoever holds Manage" (or "whoever plans"), never a job
+  title; a function's own name is shown only as read from the data.
 - The plan's starter values are added in one go ("Add them"); Controlled changes no longer exist.
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
 - Settings pages use the reference boxes (`rounded-md`, `ring-line`, `bg-tint-soft`), the shared control size, and no

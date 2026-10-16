@@ -22,7 +22,7 @@ export function proposalText(proposal: ActivityProposal | null, kind: Ask["kind"
 
 /**
  * Who this action concerns and which documents it needs, set by hand, and the
- * requests about them. Document Control only. Documents are chosen in the
+ * requests about them. The control function only. Documents are chosen in the
  * register, opened for this action: ticked is needed, unticked is not.
  */
 export function LinksCard({ actionId, code, departments, disciplines, documents, asks, count, confirmers }: {
@@ -37,20 +37,20 @@ export function LinksCard({ actionId, code, departments, disciplines, documents,
   asks: Ask[];
   /** How many documents it needs now. */
   count: number;
-  /** Who may be asked to confirm: everyone on the project, management first. */
+  /** Who may be asked to confirm: everyone on the project, holders of Manage first. */
   confirmers: PickItem[];
 }) {
   const tagged = disciplines.filter((d) => departments.includes(d.code));
   const disciplineItems = disciplines.map((d) => ({ id: d.code, name: d.label, detail: d.code }));
   const numberOf = (id: string) => documents.find((one) => one.id === id)?.name ?? "a document";
   const labelOf = (c: string) => disciplines.find((d) => d.code === c)?.label ?? c;
-  const confirmerField = <SearchPick single browse items={confirmers} name="confirmerId" label="Who confirms it" hint="management first; anyone on the project may be chosen" placeholder="Type a name" required />;
+  const confirmerField = <SearchPick single browse items={confirmers} name="confirmerId" label="Who confirms it" hint="holders of Manage first; anyone on the project may be chosen" placeholder="Type a name" required />;
 
   return (
     <section id="links" className="register register-sheet register-sheet-open">
       <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
         <span className="stencil mr-1 text-slate-500">Disciplines and documents</span>
-        <span className="text-[11px] text-slate-500">Document Control</span>
+        <span className="text-[11px] text-slate-500">The control function</span>
       </div>
 
       {asks.length ? (
@@ -63,7 +63,7 @@ export function LinksCard({ actionId, code, departments, disciplines, documents,
                   <span className="ml-1.5 font-normal text-slate-500">
                     · <Link href={`/transmittals/${ask.id}`} className="text-link hover:underline">{ask.number}</Link>, {fmtDate(ask.at)}
                   </span>
-                  {ask.confirm ? <span className="ml-1.5 font-normal text-slate-500">· management confirms it</span> : null}
+                  {ask.confirm ? <span className="ml-1.5 font-normal text-slate-500">· whoever holds Manage confirms it</span> : null}
                 </p>
                 <p className="whitespace-pre-line text-slate-600">{ask.message ?? ask.subject}</p>
               </div>

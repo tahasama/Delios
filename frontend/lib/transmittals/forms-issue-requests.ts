@@ -10,7 +10,7 @@ import { cancelRequest, carryOutRequest, noRecipients, raiseRequest, requestFrom
  * Asking for a revision to be sent somewhere, and carrying that out.
  *
  * Anybody with standing on the document may ask — whoever wrote it, uploaded
- * it, started its review or decided it. Document Control carries the request
+ * it, started its review or decided it. The control function carries the request
  * out when it publishes, or later; where a project runs without a control
  * function, whoever asked carries it out themselves.
  */
@@ -40,7 +40,7 @@ export async function requestIssueAction(_prev: { error?: string } | undefined, 
 export async function carryOutRequestAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const requestId = String(formData.get("requestId") ?? "");
-  // Document Control sends what was asked for; where a project has no control
+  // The control function sends what was asked for; where a project has no control
   // function, whoever has standing sends it. The backend decides.
   try {
     const { request } = await carryOutRequest(ctx, requestId);

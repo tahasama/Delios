@@ -72,7 +72,7 @@ export function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, 
             ))}
           </dl>
 
-          {/* Each submission Document Control judged, with what it said when it sent one back. */}
+          {/* Each submission the control function judged, with what it said when it sent one back. */}
           {rev.backend.submissions.some((one) => one.note) ? (
             <ul className="space-y-1 text-xs leading-5">
               {rev.backend.submissions.filter((one) => one.note).map((one) => (

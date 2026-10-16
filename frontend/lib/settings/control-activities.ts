@@ -9,7 +9,7 @@ async function hasControlFunction(t: Tenant): Promise<boolean> {
 }
 
 /**
- * The acts that are either carried out by Document Control or by the people
+ * The acts that are either carried out by the control function or by the people
  * doing the work themselves.
  *
  * Whether a project has a control function is a fact about the project, not a
@@ -24,7 +24,7 @@ type ControlActivity = {
   title: string;
   /** What the act is, in the words of somebody doing it. */
   text: string;
-  /** What happens when Document Control carries it out. */
+  /** What happens when the control function carries it out. */
   control: string;
   /** What happens when the people doing the work carry it out. */
   self: string;
@@ -40,35 +40,35 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
     key: "REVIEW_ISSUE",
     title: "Sending a review to its reviewers",
     text: "A revision is ready to be looked at, and the reviewers have to be told it is with them.",
-    control: "Whoever sent it for review waits; Document Control issues it to the reviewers.",
+    control: "Whoever sent it for review waits; the control function issues it to the reviewers.",
     self: "Whoever sent it for review issues it to the reviewers themselves.",
   },
   {
     key: "RETURN_OUTCOME",
     title: "Returning the answer to the author",
     text: "The reviewers have answered, and the answer has to reach the person who wrote the document.",
-    control: "Document Control returns it, so an answer never passes straight from reviewer to author.",
+    control: "The control function returns it, so an answer never passes straight from reviewer to author.",
     self: "The reviewer returns it to the author directly.",
   },
   {
     key: "ISSUE",
     title: "Sending a document out",
     text: "A released revision leaving the project — to a contractor, a supplier, the client.",
-    control: "Whoever wants it sent asks, and Document Control raises and sends the transmittal.",
+    control: "Whoever wants it sent asks, and the control function raises and sends the transmittal.",
     self: "Whoever wants it sent raises the transmittal and sends it themselves.",
   },
   {
     key: "DELEGATE",
     title: "Handing a review to somebody else",
     text: "A reviewer or a decider who cannot answer in time passes their step to another person the matrix names for it.",
-    control: "The reviewer asks, and Document Control lets the hand-over start.",
+    control: "The reviewer asks, and the control function lets the hand-over start.",
     self: "The reviewer hands it over themselves, and the record says who did it.",
   },
   {
     key: "AUTHORIZE_REVISION",
     title: "Starting a revision nobody asked for",
     text: "The last revision was accepted as it stands, and somebody wants a new one anyway. One a verdict asked for — refused, or accepted with comments — needs nobody's leave.",
-    control: "Document Control opens it, and writes why; the reason stays next to the revision it follows.",
+    control: "The control function opens it, and writes why; the reason stays next to the revision it follows.",
     self: "Whoever works on the document opens it, and writes why; the reason stays next to the revision it follows.",
     workByDefault: true,
   },
@@ -76,21 +76,21 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
     key: "WITHDRAW",
     title: "Taking a document out of use",
     text: "The document should no longer be worked from at all.",
-    control: "Document Control withdraws it.",
+    control: "The control function withdraws it.",
     self: "Whoever registered the document withdraws it.",
   },
   {
     key: "ACTION_NOTE",
     title: "Writing down that an action went ahead without its documents",
     text: "The day passes and something it needed is still missing. Somebody carries the decision to go ahead anyway, or to stop; somebody owns the delay behind it. The note says both, and stays.",
-    control: "Document Control writes it, from what the manager and the late party tell them.",
-    self: "The manager the action answers to writes it themselves.",
+    control: "The control function writes it, from what whoever runs the action and the late party tell them.",
+    self: "Whoever the action answers to writes it themselves.",
   },
   {
     key: "ACTION_LINKS",
     title: "Adding a document or a discipline to an action",
     text: "Somebody finds an action is missing a document it needs, or a discipline it concerns.",
-    control: "Whoever needs it asks, and Document Control adds it. Asking is taking responsibility for it: the request keeps their name.",
+    control: "Whoever needs it asks, and the control function adds it. Asking is taking responsibility for it: the request keeps their name.",
     self: "The people of the discipline add it themselves, for their own discipline only; whoever plans the project is told.",
   },
   {
@@ -104,7 +104,7 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
     key: "VOID",
     title: "Voiding a revision, and recording what came of it",
     text: "A revision released in error, or never reviewed — and the work already done from it.",
-    control: "Document Control voids it and records the reassessment.",
+    control: "The control function voids it and records the reassessment.",
     self: "Whoever wrote the revision voids it and records the reassessment.",
   },
 ];
@@ -129,19 +129,19 @@ export const SKIPPABLE: Record<string, { off: string }> = {
 export const SKIP_KEY = (key: string) => `SKIP:${key}`;
 
 /**
- * Acts whose requests may need management's confirmation when Document Control
- * carries them out: Document Control checks, management confirms or refuses, and
- * what was asked is then applied by itself. Without Document Control nothing is
+ * Acts whose requests may need confirming by whoever holds Manage when the control function
+ * carries them out: the control function checks, whoever holds Manage confirms or refuses, and
+ * what was asked is then applied by itself. Without a control function nothing is
  * confirmed.
  */
 export const CONFIRMABLE: Record<string, string> = {
-  ACTION_LINKS: "Document Control checks the request, then management confirms or refuses it; once confirmed it is applied by itself.",
+  ACTION_LINKS: "The control function checks the request, then whoever holds Manage confirms or refuses it; once confirmed it is applied by itself.",
   PROJECT_PEOPLE: "Whoever holds Manage confirms or refuses each addition; until confirmed they are not on the project.",
 };
 
 export const CONFIRM_KEY = (key: string) => `CONFIRM:${key}`;
 
-/** Who adds people to the project: a switch of its own (only the control function, or everyone on the project). */
+/** Who adds people to the project, in the project's words: only the control function, or everyone on the project. */
 export const PEOPLE_KEY = "PROJECT_PEOPLE";
 /** The two answers of that switch, in the project's words. */
 export const PEOPLE_MODE_LABEL: Record<ControlMode, string> = {
@@ -172,7 +172,7 @@ export type ControlMode = "FOLLOW" | "CONTROL" | "SELF";
 
 export const MODE_LABEL: Record<ControlMode, string> = {
   FOLLOW: "As the project is set up",
-  CONTROL: "Document Control",
+  CONTROL: "The control function",
   SELF: "The people doing the work",
 };
 
@@ -191,13 +191,13 @@ export type ProjectMode = "CONTROL" | "SELF" | "CUSTOM";
 export const PROJECT_KEY = "__ALL__";
 
 export const PROJECT_MODE_LABEL: Record<ProjectMode, string> = {
-  CONTROL: "Document Control does all of it",
+  CONTROL: "The control function does all of it",
   SELF: "The people doing the work do all of it",
   CUSTOM: "It depends on the act — set them one by one",
 };
 
 /**
- * Who carries out this act on this project: `true` means Document Control.
+ * Who carries out this act on this project: `true` means the control function.
  *
  * FOLLOW reads the project — does anybody hold the control function — so
  * nothing is configured twice.
@@ -210,9 +210,6 @@ const answers = cache(async (t: Tenant): Promise<Map<string, string>> => project
 
 export async function controlDoes(t: Tenant, key: string): Promise<boolean> {
   const rows = [...(await answers(t))].map(([k, mode]) => ({ key: k, mode }));
-  // Who adds people: its own switch, only the control function unless the project lets everyone add (a project is
-  // taken to have one), whatever the project answers for the other acts. As the backend reads it.
-  if (key === PEOPLE_KEY) return rows.find((one) => one.key === key)?.mode !== "SELF";
   const all = rows.find((one) => one.key === PROJECT_KEY)?.mode;
   if (all === "CONTROL") return true;
   if (all === "SELF") return false;
@@ -228,9 +225,9 @@ export async function controlDoes(t: Tenant, key: string): Promise<boolean> {
 /**
  * May this person carry this act out?
  *
- * Where Document Control carries it out, they do — and an administrator, who
+ * Where the control function carries it out, they do — and an administrator, who
  * stands in for them. Where the people doing the work carry it out, whoever has
- * standing does, and Document Control may as well: they never lose an act, they
+ * standing does, and the control function may as well: they never lose an act, they
  * only stop being the only ones who hold it.
  */
 export async function carrierRefusal(
@@ -243,7 +240,7 @@ export async function carrierRefusal(
   if (!doesIt && standing) return null;
   const activity = CONTROL_ACTIVITIES.find((one) => one.key === key);
   const title = activity ? activity.title.toLowerCase() : "this";
-  if (doesIt) return `On this project, ${title} is Document Control's act. Ask them — the reason goes on the record.`;
+  if (doesIt) return `On this project, ${title} is the control function's act. Ask them — the reason goes on the record.`;
   return activity ? activity.self : "Somebody else carries this out.";
 }
 
@@ -414,14 +411,13 @@ export function controlFrom(byKey: Map<string, string>, follows: boolean): Contr
     set,
     rows: CONTROL_ACTIVITIES.map((activity) => {
       const own = (byKey.get(activity.key) ?? "FOLLOW") as ControlMode;
-      const mine = own === "CONTROL" ? true : own === "SELF" ? false : activity.workByDefault ? false
-        : activity.key === PEOPLE_KEY ? true : follows;
+      const mine = own === "CONTROL" ? true : own === "SELF" ? false : activity.workByDefault ? false : follows;
       return {
         activity,
         mode: own,
         // Until the project answers for everything, each act reads its own
         // default — which for most is the project's control function.
-        controlDoes: !set || activity.key === PEOPLE_KEY ? mine : projectMode === "CONTROL" ? true : projectMode === "SELF" ? false : mine,
+        controlDoes: !set ? mine : projectMode === "CONTROL" ? true : projectMode === "SELF" ? false : mine,
         off: !!SKIPPABLE[activity.key] && byKey.get(SKIP_KEY(activity.key)) === "OFF",
         confirm: !!CONFIRMABLE[activity.key] && effectiveAnswer(CONFIRM_KEY(activity.key), byKey.get(CONFIRM_KEY(activity.key))) === "ON",
       };
@@ -453,7 +449,7 @@ export function effectiveAnswer(key: string, value: string | null | undefined): 
   const declared = POLICIES.find((one) => one.key === key);
   if (declared) return declared.options[0].value;
   if (key === ESCALATE_AFTER_KEY) return String(DEFAULT_ESCALATE_AFTER);
-  // Joining a project is a request management confirms unless the project unticks it (backend DefaultConfirm).
+  // Joining a project is a request whoever holds Manage confirms unless the project unticks it (backend DefaultConfirm).
   if (key === "CONFIRM:PROJECT_PEOPLE") return "ON";
   if (key.startsWith("CONFIRM:")) return "OFF";
   if (key.startsWith("SKIP:")) return "ON";

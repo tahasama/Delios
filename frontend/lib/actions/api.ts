@@ -109,7 +109,7 @@ export type PlanDecision = {
   delayOwedBy: string | null; delayReason: string | null; recordedBy: string; recordedAt: Date;
   /** A postponement confirmed by whoever plans, with what changes. */
   confirmedBy: string | null; confirmedAt: Date | null; confirmNote: string | null;
-  /** Taken back by Document Control, with why: it no longer counts. */
+  /** Taken back by the control function, with why: it no longer counts. */
   reversedBy: string | null; reversedAt: Date | null; reversedReason: string | null;
 };
 
@@ -126,7 +126,7 @@ export type PlanAction = {
   moved: { wasStart: Date | null; wasFinish: Date | null; in: string } | null;
   /** By department, then by the day each is needed. */
   needs: PlanNeed[];
-  /** Each discipline's answer on going ahead; one taken back by Document Control is kept, marked. */
+  /** Each discipline's answer on going ahead; one taken back by the control function is kept, marked. */
   confirmations: {
     department: string; available: boolean; note: string | null; confirmedByName: string; confirmedAt: Date | null;
     /** Written by the system when the day passed with every document released. */
@@ -223,13 +223,13 @@ type ActionWork = {
 export const actionWork = cache(async (scope: Scope): Promise<ActionWork[]> =>
   api<ActionWork[]>(projectPath(scope, "/activities-work")).catch(() => []));
 
-/** What a request will change once management confirms it, as Document Control checked it. */
+/** What a request will change once it is confirmed, as the control function checked it. */
 export type ActivityProposal = { documentIds: string[] | null; department: string | null; departments: string[] | null; purpose: string | null; statuses: string[] | null };
 
 /** A request about an action not yet answered (GET /activities/{id}/requests). */
 export type ActivityRequest = {
   id: string; number: string; from: string; at: string; kind: "DOCUMENT" | "DISCIPLINE"; subject: string; message: string | null;
-  /** Management confirms it: Document Control checks it first, then whoever is asked confirms or refuses. */
+  /** Confirmed by whoever holds Manage: the control function checks it first, then whoever is asked confirms or refuses. */
   confirm: boolean; checkedAt: string | null; checkedBy: string | null; confirmerId: string | null; confirmerName: string | null;
   proposal: ActivityProposal | null; documentIds: string[];
 };

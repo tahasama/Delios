@@ -29,7 +29,7 @@ type Prefill = {
   answering?: { id: string; number: string; subject: string | null };
   /** The sent transmittal this one completes (a supplement) or corrects (it replaces one they rejected). */
   following?: { id: string; number: string; kind: "SUPPLEMENT" | "REPLACES"; rejection: string | null };
-  /** The schedule action it asks a document to be added to: Document Control answers it there. */
+  /** The schedule action it asks a document to be added to: the control function answers it there. */
   activity?: { id: string; code: string; ask: "DOCUMENT" | "DISCIPLINE" };
 };
 
@@ -82,7 +82,7 @@ export function NewTransmittalForm({
   companies: Company[];
   ourOrganization: string;
   defaultDirection: "OUTGOING" | "INCOMING";
-  /** Document Control records what reached us outside the system: a tick, never the default. */
+  /** the control function records what reached us outside the system: a tick, never the default. */
   mayRecordReceived?: boolean;
   /** Another organization's person: what they send comes to us, today; nobody asks them who sent it or when. */
   outsider?: boolean;
@@ -131,7 +131,7 @@ export function NewTransmittalForm({
   const says = (key: string, fallback: string) => labels[key] ?? fallback;
 
   const outgoing = direction === "OUTGOING";
-  // Document Control recording what reached us outside the system: who sent it, and when, are asked.
+  // The control function recording what reached us outside the system: who sent it, and when, are asked.
   const recording = !outgoing && !outsider;
   const needsReview = reasons.find((r) => r.code === reasonCode)?.props.reviewCycle === true;
   const picked = useMemo(() => {
@@ -254,7 +254,7 @@ export function NewTransmittalForm({
           </>
         ) : null}
 
-        {/* A request to add a document to an action: the action travels with it, so Document Control answers it there. */}
+        {/* A request to add a document to an action: the action travels with it, so the control function answers it there. */}
         {prefill?.activity ? (
           <>
             <input type="hidden" name="activityId" value={prefill.activity.id} />
@@ -265,7 +265,7 @@ export function NewTransmittalForm({
               {" "}{prefill.activity.ask === "DISCIPLINE"
                 ? "Say which discipline, and why the action concerns it."
                 : "Enclose it in step 2 if it is released, or name it in the message."}
-              {" "}Document Control answers on the action&rsquo;s page, and you are told.
+              {" "}the control function answers on the action&rsquo;s page, and you are told.
             </p>
           </>
         ) : null}
@@ -300,7 +300,7 @@ export function NewTransmittalForm({
               <label className="flex w-fit items-center gap-2 text-xs font-medium text-slate-700">
                 <input type="checkbox" checked={!outgoing} onChange={(e) => setDirection(e.target.checked ? "INCOMING" : "OUTGOING")} />
                 Received from outside the system
-                <span className="font-normal text-slate-500">— by email, post or their own portal; recorded here, Document Control accepts it</span>
+                <span className="font-normal text-slate-500">— by email, post or their own portal; recorded here, the control function accepts it</span>
               </label>
             ) : null}
 

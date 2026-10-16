@@ -16,25 +16,30 @@ export type SetupPage = {
   /** The verb that opens this page. Configure (administrators) unless stated. */
   verb?: "MATRIX" | "ROUTES";
   /**
-   * Also open to the control function. Document Control runs the register day
+   * Also open to the control function. The control function runs the register day
    * to day, so the lists it works from are its own: who the parties are, who
    * has access, how numbers are built, which routes exist. What decides the
    * organization itself — projects, scope, the classification sets — and the
    * audit trail stay with administrators.
    */
   control?: true;
-  /** Also open to management (Manage), which adds people where the project has no Document Control. */
+  /** Also open to whoever holds Manage, where everyone on the project adds people. */
   manage?: true;
+  /**
+   * Read by everyone of ours on the project (the Control room: how the project works, and what makes it work that
+   * way); changed only by an administrator or the control function.
+   */
+  read?: true;
 };
 
 /** Does this person reach this setup page? */
-export function maySetup(user: { verbs?: string[]; role?: string } | null, page: SetupPage, managementAddsPeople = false): boolean {
+export function maySetup(user: { verbs?: string[]; role?: string; isInternal?: boolean } | null, page: SetupPage, managementAddsPeople = false): boolean {
   if (!user) return false;
   const held = heldVerbs(user);
   const holds = (verb: string) => held.includes(verb);
   if (holds(page.verb ?? "CONFIGURE")) return true;
-  // Management adds people where the project has no Document Control for it (Who does what, PROJECT_PEOPLE), so
-  // there it reaches People & access.
+  if (page.read === true && user.isInternal !== false) return true;
+  // Where everyone on the project adds people (PROJECT_PEOPLE), whoever holds Manage reaches People & access.
   return (page.control === true && holds("CONTROL")) || (page.manage === true && managementAddsPeople && holds("MANAGE"));
 }
 
@@ -95,8 +100,9 @@ export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/settings/flow",
     title: "Control room",
-    text: "The whole way a document goes, step by step: who does each step on this project, and what the project has settled.",
+    text: "How the project works, and what makes it work that way: the whole way a document goes, who carries each act out, and what the project has settled.",
     group: "How work flows",
+    read: true,
   },
   {
     href: "/settings/workflow-templates",
@@ -150,3 +156,13 @@ export const SETUP_GROUPS: SetupPage["group"][] = [
   "Access",
   "Change & evidence",
 ];
+
+/** Who changes what the Control room settles: an administrator, or the control function of the project. */
+export function mayChangeControlRoom(user: { verbs?: string[]; role?: string } | null): boolean {
+  if (!user) return false;
+  const held = heldVerbs(user);
+  return held.includes("CONFIGURE") || held.includes("CONTROL");
+}
+
+/** The Control room stands above every other Settings page: it is not one card among them. */
+export const CONTROL_ROOM = "/settings/flow";

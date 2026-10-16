@@ -13,7 +13,7 @@ const text = (formData: FormData, name: string) => String(formData.get(name) ?? 
 /**
  * Registers or changes an organization we exchange documents with. The organization itself is the whole
  * organization's record (its code never changes: documents and transmittals were issued under it); who answers for
- * it is said per project, so Document Control of the project keeps it (`PARTY:<id>`, a project setting). An
+ * it is said per project, so the control function of the project keeps it (`PARTY:<id>`, a project setting). An
  * organization is never removed: its access is switched off instead, and every record keeps meaning what it meant.
  */
 export async function savePartyAction(_prev: Result | undefined, formData: FormData): Promise<Result> {

@@ -170,7 +170,7 @@ export async function setPackageRuleAction(_prev: { error?: string } | undefined
 
 /**
  * Change a package while it is open: name and description; for a delivery package also its date, the statuses it
- * needs, who it goes to, who puts it together and who accepts it. Document Control (and above); the backend checks.
+ * needs, who it goes to, who puts it together and who accepts it. The control function (and above); the backend checks.
  */
 export async function updatePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const title = String(formData.get("title") ?? "").trim();
@@ -199,7 +199,7 @@ export async function updatePackageAction(_prev: { error?: string } | undefined,
   return {};
 }
 
-/** Document Control shares a supplier's package with that supplier: once, and for good. */
+/** the control function shares a supplier's package with that supplier: once, and for good. */
 export async function sharePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const { error } = await onPackage(String(formData.get("packageId") ?? ""), "/share", {});
   return error ? { error } : {};
@@ -239,6 +239,6 @@ export async function acceptShortfallAction(_prev: { error?: string } | undefine
 }
 
 /**
- * Step 2 of the schedule process: the project manager says which departments
+ * Step 2 of the schedule process: whoever plans says which departments
  * an activity concerns. Until this is done nobody can list its documents.
  */
