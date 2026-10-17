@@ -1,25 +1,61 @@
 "use client";
 
-/**
- * Ticks every row in the bulk form at once. The boxes belong to that form by id
- * rather than by nesting, so this reaches them through the form rather than
- * through the table.
- */
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
+
+/** The boxes tied to the selection form by id (a form cannot sit inside a table cell around them). */
+const boxesOf = (formId: string) =>
+  [...document.querySelectorAll<HTMLInputElement>(`input[type=checkbox][form="${formId}"][name="valueIds"]`)];
+
+/** Ticks every value shown at once, from the table's head. */
 export function SelectAll({ formId, count }: { formId: string; count: number }) {
   return (
-    <label className="flex cursor-pointer items-center gap-1.5 font-medium text-slate-600">
-      <input
-        type="checkbox"
-        aria-label={`Select all ${count} rows shown`}
-        onChange={(event) => {
-          const form = document.getElementById(formId) as HTMLFormElement | null;
-          if (!form) return;
-          for (const box of form.elements) {
-            if (box instanceof HTMLInputElement && box.name === "valueIds") box.checked = event.target.checked;
-          }
-        }}
-      />
-      All {count} shown
-    </label>
+    <input
+      type="checkbox"
+      data-select-all={formId}
+      aria-label={`Tick all ${count} values shown`}
+      onChange={(event) => {
+        for (const box of boxesOf(formId)) box.checked = event.target.checked;
+        document.dispatchEvent(new Event("values-ticked"));
+      }}
+    />
+  );
+}
+
+/**
+ * What can be done with the ticked values, as the register's dock: the count, Retire (those in use) and Bring back
+ * (those retired), Clear. It shows only while something is ticked.
+ */
+export function ValuesDock({ formId }: { formId: string }) {
+  const [ticked, setTicked] = useState<{ active: number; retired: number }>({ active: 0, retired: 0 });
+  useEffect(() => {
+    const read = () => {
+      const on = boxesOf(formId).filter((box) => box.checked);
+      setTicked({ active: on.filter((box) => box.dataset.status === "ACTIVE").length, retired: on.filter((box) => box.dataset.status !== "ACTIVE").length });
+    };
+    const changed = (event: Event) => { if ((event.target as HTMLInputElement | null)?.name === "valueIds" || event.type === "values-ticked") read(); };
+    document.addEventListener("change", changed);
+    document.addEventListener("values-ticked", changed);
+    read();
+    return () => { document.removeEventListener("change", changed); document.removeEventListener("values-ticked", changed); };
+  }, [formId]);
+  const count = ticked.active + ticked.retired;
+  if (!count) return null;
+  const clear = () => {
+    for (const box of [...boxesOf(formId), ...document.querySelectorAll<HTMLInputElement>(`input[data-select-all="${formId}"]`)]) box.checked = false;
+    setTicked({ active: 0, retired: 0 });
+  };
+  return (
+    <div className="dock palette-light sticky bottom-4 z-30 mx-auto flex w-fit max-w-full flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+      <span className="px-2 font-mono text-sm tabular-nums">{count}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked</span></span>
+      {ticked.active ? (
+        <button type="submit" form={formId} name="op" value="RETIRE" className="rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15">Retire ({ticked.active})</button>
+      ) : null}
+      {ticked.retired ? (
+        <button type="submit" form={formId} name="op" value="REACTIVATE" className="rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15">Bring back ({ticked.retired})</button>
+      ) : null}
+      <span className="px-2 text-xs text-white/70">retired: no longer offered, kept on everything that carries it</span>
+      <button type="button" onClick={clear} className="ml-auto rounded-sm p-2 text-white/60 hover:bg-white/10 hover:text-white" aria-label="Clear the ticks"><X className="h-4 w-4" /></button>
+    </div>
   );
 }

@@ -29,7 +29,7 @@ export function DeleteSetButton({ setKey, title, count }: { setKey: string; titl
         disabled={pending}
         title="Delete this list"
         aria-label="Delete this list"
-        className="grid h-8 w-8 place-items-center rounded-md text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+        className="inline-flex rounded-sm p-1.5 text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
       >
         <Trash2 className="h-4 w-4" />
       </button>
