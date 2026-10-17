@@ -28,6 +28,6 @@ public static class ValueEndpoints
         var names = (sets ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(100).ToList();
         var values = await db.ValueEntries.AsNoTracking().Where(v => names.Contains(v.SetKey)).OrderBy(v => v.Sort).ToListAsync(cancellationToken);
         return Results.Ok(names.ToDictionary(n => n, n => values.Where(v => v.SetKey == n)
-            .Select(v => new ListValue(v.Code, v.Label, v.Status, v.Props?.RootElement.Clone())).ToList()));
+            .Select(v => new ListValue(v.Code, v.Label, v.Status, v.Props?.RootElement.Clone(), v.SetId)).ToList()));
     }
 }

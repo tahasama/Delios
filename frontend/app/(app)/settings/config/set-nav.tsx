@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
@@ -17,30 +17,14 @@ export function SetNav({ groups, current, children }: { groups: SetNavGroup[]; c
   const [q, setQ] = useState("");
   const router = useRouter();
   const needle = q.trim().toLowerCase();
-  // The sheet stands from where it starts to the foot of the window (the page keeps its own bottom margin), so the
-  // page never scrolls: only the table's rows do, and the list of lists when it is long. On a narrow screen it flows.
-  const box = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState<number | null>(null);
-  useEffect(() => {
-    const fit = () => {
-      const el = box.current;
-      if (!el) return;
-      if (window.innerWidth < 1024) { setHeight(null); return; }
-      const top = el.getBoundingClientRect().top + window.scrollY;
-      const below = parseFloat(getComputedStyle(el.closest("main") ?? document.body).paddingBottom) || 0;
-      setHeight(Math.max(360, Math.floor(window.innerHeight - top - below)));
-    };
-    fit();
-    window.addEventListener("resize", fit);
-    document.fonts?.ready.then(fit).catch(() => {});
-    return () => window.removeEventListener("resize", fit);
-  }, []);
   const sets = needle
     ? groups.flatMap((g) => g.sets).filter((s) => s.title.toLowerCase().includes(needle) || s.key.toLowerCase().includes(needle))
     : groups[tab]?.sets ?? [];
 
   return (
-    <div ref={box} style={height ? { height } : undefined} className="register register-sheet register-sheet-open flex flex-col">
+    // As tall as the window under the top bar (h-18) less the page's margins above and below it (py-6): the title above
+    // scrolls away, then this sheet fills the window and only its table and its list of lists scroll. A narrow screen flows.
+    <div className="register register-sheet register-sheet-open flex flex-col lg:h-[calc(100dvh-7.5rem)]">
       <div className="asking flex shrink-0 flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-line px-5 pt-2 sm:px-6">
         <div role="tablist" className="-mb-px flex flex-wrap gap-x-5">
           {groups.map((g, i) => {

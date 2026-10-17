@@ -586,7 +586,8 @@ public static class ProjectLists
         if (!ListRules.TakesSets(set)) return Problems.Invalid("ONE_SET_ONLY", "This list holds one set: it is the same for every deliverable type.");
         if (Blank(request.Name) is not { } name) return Problems.Invalid("NAME_REQUIRED", "A set has a name.");
         await EnsureOwnAsync(db, access.Project.Id, cancellationToken);
-        await DefaultSetAsync(db, access, set, cancellationToken);
+        // A list filled before it had sets first gets its default set, for the values it already holds.
+        if (!await db.ListSets.AnyAsync(s => s.ListKey == set, cancellationToken)) await DefaultSetAsync(db, access, set, cancellationToken);
         if (await db.ListSets.AnyAsync(s => s.ListKey == set && s.Name == name, cancellationToken))
             return Problems.Conflict("SET_EXISTS", $"This list already has a set called {name}.");
         var added = new ValueSet
@@ -636,9 +637,9 @@ public static class ProjectLists
             changes.Add($"name {one.Name} → {name}");
             one.Name = name;
         }
+        // The default set is theirs like any other (owner): renamed, switched off, deleted; switched off, the deliverable
+        // types no other set names find nothing in this list.
         var active = request.Active ?? one.Active;
-        if (!active && one.IsDefault)
-            return Problems.Invalid("DEFAULT_SET_STAYS", "The default set serves every deliverable type no other set names: it stays on. Rename it, or give the types to other sets.");
         var (types, problem) = await TypesForAsync(db, one, request.DeliverableTypes, active, cancellationToken);
         if (problem is not null) return problem;
         if (!types!.SequenceEqual(one.DeliverableTypes))
@@ -673,7 +674,6 @@ public static class ProjectLists
         if (await RefusedAsync(db, access, set, cancellationToken) is { } refused) return refused;
         var one = await OwnSetAsync(db, access, set, setId, cancellationToken);
         if (one is null) return Problems.NotFound("SET_NOT_FOUND", "That set is not in this list.");
-        if (one.IsDefault) return Problems.Invalid("DEFAULT_SET_STAYS", "The default set serves every deliverable type no other set names: it stays.");
         var values = await ValuesOfAsync(db, one, cancellationToken);
         var used = await UsageAsync(db, access.Project, set, cancellationToken);
         if (values.FirstOrDefault(v => used.ContainsKey(v.Code)) is { } inUse)

@@ -63,7 +63,8 @@ public sealed record RegisterRow(
 public sealed record RegisterActivity(string Code, string Name);
 
 /// <summary>A value of one of the organization's lists, with what it means for the system.</summary>
-public sealed record ListValue(string Code, string Label, string Status, JsonElement? Props);
+/// <param name="SetId">The set of its list it is in; none: the list's default set.</param>
+public sealed record ListValue(string Code, string Label, string Status, JsonElement? Props, Guid? SetId = null);
 
 /// <summary>
 /// The register as people work it: filters, sorting by any column, page numbers,

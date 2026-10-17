@@ -497,13 +497,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   runs on is never deleted. Verdict lists (Settings → Verdict lists) and Project codes (filled by itself) read only
   there. The "Used" column says where each value is used, or "never used".
 - **List → sets → values** (owner, Types & sets; `ListRules`, `ValueSet`, `ValueEntry.SetId`): a list holds sets, each
-  naming the deliverable types it serves; the **default** set (renamed at will, never switched off nor deleted:
-  DEFAULT_SET_STAYS) serves every type no other active set names, so a document always finds exactly one set (a list
+  naming the deliverable types it serves; the **default** set serves every type no other active set names (it is
+  theirs like any other, owner: renamed, switched off, deleted when never used; switched off, the types no other set
+  names find nothing in that list), so a document always finds exactly one set (a list
   with one set uses it). Two active sets of a list never serve the same type (SETS_OVERLAP). A code is unique across all
   sets of its list. Deliverable types, Project codes, Project types and Contract roles hold one set (ONE_SET_ONLY).
   A value, a set and a list of one's own are switched off and on (a value then reads OFF: not offered, kept on what
   carries it); the app's lists are not switched here, their field is left out in Forms & fields (APP_LIST_STAYS). Never
   used: a value or a set is deleted (SET_IN_USE otherwise); a list only if it is one's own (the app's stay).
+- Types & sets: the menu card is as tall as the window under the top bar (`set-nav.tsx`): the title scrolls
+  away, then only its table and its list of lists scroll.
 - Groups (`ListRules.Groups`): Numbering & identity, Classification & keeping, Review & issue, File formats, Schedule
   (no "Other": activity decisions in Schedule, control outcomes in Review & issue, generic title words in Numbering &
   identity). A list of one's own is a document field and goes only in the first two (LIST_NOT_HERE); in Numbering &
