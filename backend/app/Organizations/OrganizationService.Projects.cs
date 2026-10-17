@@ -1,5 +1,6 @@
 using Delios.Host.Audit;
 using Delios.Host.Identity;
+using Delios.Host.Notifications;
 using Delios.Host.Platform;
 using Delios.Host.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -72,6 +73,8 @@ public sealed partial class OrganizationService
         if (request.StartFunctionId is { } fid && !await db.Functions.AnyAsync(f => f.Id == fid && f.Active, cancellationToken))
             return Problems.Invalid("FUNCTION_UNKNOWN", "Choose one of our functions.");
         var row = await db.ProjectParties.SingleOrDefaultAsync(p => p.ProjectId == projectId && p.PartyId == partyId, cancellationToken);
+        // Put on the project now (new, or back after leaving it): the organization is told.
+        var joins = request.Active && (row is null || !row.Active);
         if (row is null)
         {
             row = new ProjectParty { TenantId = tenant.Required, ProjectId = projectId, PartyId = partyId, AddedAt = clock.GetCurrentInstant(), AddedByName = actor.Name };
@@ -105,7 +108,44 @@ public sealed partial class OrganizationService
             request.Active ? $"{party.Name} takes part{(role is null ? "" : $" as {role}")}." : $"{party.Name} no longer takes part.",
             projectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        if (joins) await TellJoinedAsync(project, party, cancellationToken);
         return null;
+    }
+
+    /// <summary>
+    /// An organization put on one of our projects is told, by notification and email as always: one with its own DELIOS
+    /// through its administrators there; one whose people have accounts with us through them; one not on DELIOS by the
+    /// email it gave for transmittals.
+    /// </summary>
+    private async Task TellJoinedAsync(Identity.Project project, Party party, CancellationToken cancellationToken)
+    {
+        var us = await HostNameAsync(tenant.Required, cancellationToken);
+        var title = $"{party.Name} works on {project.Code} — {project.Name}";
+        var body = $"{us} has put {party.Name} on its project {project.Code} — {project.Name}.";
+        var identity = party.OrganizationId is { } oid ? await Registry.IdentityAsync(db, oid, cancellationToken) : null;
+        if (identity?.TenantId is { } theirs && theirs != tenant.Required)
+        {
+            await TenantScope.RunAsync(scopes, theirs, async (services, there) =>
+            {
+                var admins = await there.Users.AsNoTracking().Where(u => u.Active && u.IsAdmin && u.HomeTenantId == null).Select(u => u.Id).ToListAsync(cancellationToken);
+                await services.GetRequiredService<Notifier>().NotifyAsync(theirs, null, admins, "ORGANIZATION", title,
+                    $"{body} Your administrators put your people on it from your organization's page.", "/organization", cancellationToken);
+                await there.SaveChangesAsync(cancellationToken);
+            }, cancellationToken);
+            return;
+        }
+        // Ours to tell, in our own data: its people with accounts from us, and its email for transmittals.
+        var people = await db.Users.AsNoTracking().Where(u => u.Active && u.PartyId == party.Id).Select(u => u.Id).ToListAsync(cancellationToken);
+        var me = tenant.Required;
+        await TenantScope.RunAsync(scopes, me, async (services, here) =>
+        {
+            var notifier = services.GetRequiredService<Notifier>();
+            await notifier.NotifyAsync(me, project.Id, people, "ORGANIZATION", title, body, "/", cancellationToken);
+            if (party.ContactEmail is { } email)
+                notifier.Queue(me, project.Id, EmailKinds.Notification, email, party.Name, title,
+                    $"{body} Our transmittals for it reach you at this address; reply to them to answer.", "Party", party.Id);
+            await here.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
     }
 
     /// <summary>

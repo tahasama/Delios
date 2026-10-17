@@ -773,7 +773,7 @@ public static class DirectoryEndpoints
     /// </summary>
     private static async Task<IResult> CreatePartyAsync(
         PartyRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, Organizations.OrganizationService organizations,
-        CancellationToken cancellationToken)
+        Notifications.Notifier notifier, CancellationToken cancellationToken)
     {
         var tenantId = http.User.TenantId();
         var actor = await ActorAsync(http, db, cancellationToken);
@@ -846,6 +846,15 @@ public static class DirectoryEndpoints
         db.Parties.Add(party);
         await Organizations.Registry.HoldAsync(db, identity, party, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        // One not on DELIOS is told at its email for transmittals that it is now one we work with.
+        if (party.ContactEmail is { } contact)
+        {
+            var us = await db.Tenants.AsNoTracking().Where(t => t.Id == tenantId).Select(t => t.Name).SingleAsync(cancellationToken);
+            notifier.Queue(tenantId, null, Notifications.EmailKinds.Notification, contact, party.Name, $"{us} works with {party.Name} on DELIOS",
+                $"{us} has recorded {party.Name} ({party.Code}) as an organization it works with. Its transmittals for you reach you at this address, "
+                + "with their files; reply to them to answer. Nobody needs to sign in.", "Party", party.Id);
+            await db.SaveChangesAsync(cancellationToken);
+        }
         var said = request.NotTheSame is { Length: > 0 } ? $"; said not to be {request.NotTheSame.Length} look-alike(s)" : "";
         await audit.WriteAsync(actor, "PARTY_CREATED", "Party", party.Id, party.Name, $"{code}{(changes.Count > 0 ? $"; {string.Join("; ", changes)}" : "")}{said}",
             cancellationToken: cancellationToken);

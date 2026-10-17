@@ -495,6 +495,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   button and two ways, plus "Works on": optionally the project(s) the organization added or created is put on. An
   organization with its **own DELIOS** is never changed by us: its line there is read only (name, code, identifier,
   domain), we see it and link with it; only "In use" is ours.
+- An organization is always told (notification and email, as always): put on a project (`TellJoinedAsync`: one with its
+  own DELIOS through its administrators there; one whose people have accounts with us through them; one not on DELIOS at
+  its email for transmittals), and when it is first recorded (one not on DELIOS at that email; one on DELIOS by its
+  invitation to link; a guest's people by the link to choose their password).
 - **Organization's list** (owner's "idea1"), People & access's way: plate (with their own DELIOS · with accounts from us ·
   worked for by one of ours · working on <project>); "Organizations we work with" one sheet (`OrganizationJoins`):
   **Add an organization** (one DELIOS already knows, any list's, found by name or code, `GET /api/admin/organizations/on-delios`,
