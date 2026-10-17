@@ -495,14 +495,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   a project asks its **role with us** (required) and contract number with it; nothing is added on a click alone. Its
   **name opens a drawer** (from the right) with what it is (identifier, how it works with us, domain, its people here) and its
   **role with us** (client, supplier…), then: role here, contract number (once), who of
-  theirs answers for it here and backup (`PARTY:<id>`), the function their people get, works on it. The list of every
+  theirs answers for it here and backup (`PARTY:<id>`), their function (from Who may do what). The list of every
   organization and its details is the **organization's** (`/organization/organizations`, administrators): the same
   button and two ways, plus "Works on": optionally the project(s) the organization added or created is put on. An
   organization with its **own DELIOS** is never changed by us: its line there is read only (name, code, identifier,
   domain), we see it and link with it; only "In use" is ours.
 - People of another organization keep **their own function**, always shown with their company ("ACME / Lead Engineer",
-  `User.HomeFunction`), never confused with ours. What they may do on our project comes from their organization's
-  **role with us** (owner's choice "a"): the function of ours whose matrix rows are written for that role. A **guest
+  `User.HomeFunction`), never confused with ours, for display only. What they may do on our project is **their function**,
+  one we define in Who may do what (e.g. "SMYU-guest": read, upload into its placeholders, transmit, RFI) and assign in
+  the organization's drawer ("Their function"; a guest's one account gets it in People & access). Never "start as". A **guest
   organization has one account** (backend ONE_GUEST_ACCOUNT): the person who stands for it and acts as its document
   control; when it gets its own DELIOS, it claims. One not on DELIOS has nobody signing in.
 - **Claiming an entry** we or others recorded (owner): never on the claimer's word. The guest who stood for it confirms by

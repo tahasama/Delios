@@ -51,7 +51,7 @@ public sealed partial class OrganizationService
                 .SingleOrDefaultAsync(p => p.ProjectId == projectId && p.PartyId == link.HostPartyId && p.Active, cancellationToken);
             if (part?.Project is null) return (Problems.NotFound("PROJECT_NOT_FOUND", $"We do not take part in that project of {host}'s."), Guid.Empty, "");
             if (request.Active && part.StartFunctionId is null)
-                return (Problems.Conflict("NO_START_FUNCTION", $"{host} has not said yet what our people may do on {part.Project.Code}: it gives us our role there first."), Guid.Empty, "");
+                return (Problems.Conflict("NO_START_FUNCTION", $"{host} has not given our people their function on {part.Project.Code} yet."), Guid.Empty, "");
             User? stand = account is null ? null : await hostDb.Users.SingleOrDefaultAsync(u => u.Id == account.HostUserId, cancellationToken);
             if (stand is null)
             {

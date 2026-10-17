@@ -195,11 +195,7 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
                                         label="Backup" hint="optional — who stands in when they are away" placeholder="No backup" />
                                     </>
                                   ) : null}
-                                  <Field label="What their people may do" hint="set by their role with us; each keeps the function their company gave them">
-                              <p className="flex h-(--control-h) items-center text-[13px] text-slate-600">
-                                {one.role ? `As ${(roles.find((r) => r.code === one.role)?.label ?? one.role).toLowerCase()}${one.startFunction ? ` (${one.startFunction})` : ""}` : "Give their role first"}
-                              </p>
-                            </Field>
+                                  <Field label="Their function" hint="what their people may do here: a function from Who may do what">{startSelect(one.startFunctionId)}</Field>
                                   <input type="hidden" name="active" value="on" />
                                 </div>
                               </ActionForm>
