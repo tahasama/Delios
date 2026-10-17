@@ -3,7 +3,7 @@ import { api, projectPath } from "@/lib/client";
 import { requireScope } from "@/lib/core/scope";
 import { Field, DataTable, Th, Td, ToneChip, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { addValueAction, retireValueAction, createListAction, updateValueAction, deleteValueAction, moveValueAction, updateListAction, bulkValuesAction } from "@/lib/settings/forms-lists";
+import { addValueAction, retireValueAction, createListAction, updateValueAction, deleteValueAction, moveValueAction, updateListAction, bulkValuesAction, createSetAction, updateSetAction, switchSetAction, deleteSetAction } from "@/lib/settings/forms-lists";
 import { getSet, getSets } from "@/lib/settings/config";
 import { parseProps, type PropField } from "@/lib/settings/config-props";
 import { propFieldsFor, isVerdictSet } from "@/lib/settings/set-props";
@@ -12,7 +12,7 @@ import { DeleteSetButton } from "./delete-set";
 import { SetNav, type SetNavGroup } from "./set-nav";
 import { Fragment } from "react";
 import { cn } from "@/lib/core/utils";
-import { Plus, Search, Pencil, Download, X } from "lucide-react";
+import { Plus, Search, Pencil, Download, X, Trash2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Types & sets" };
@@ -61,12 +61,15 @@ function doesText(fields: PropField[] | undefined, props: Record<string, unknown
   }).filter(Boolean).join(" · ");
 }
 
-type Params = { set?: string; q?: string; show?: string; edit?: string; panel?: string };
+type Params = { set?: string; vs?: string; q?: string; show?: string; edit?: string; panel?: string };
+
+/** A set of a list as the backend reads it (`ListRules`): the deliverable types it serves, switched on or off, its values. */
+type SetAnswer = { id: string | null; name: string; isDefault: boolean; active: boolean; deliverableTypes: string[]; inUse: number; others: number };
 
 type ListsAnswer = {
   own: boolean; mayChange: boolean; sets: { key: string; active: number; retired: number }[];
   /** Each list as the backend reads it (`ListRules`): whether the app runs on it, among the rest. */
-  lists: { key: string; app: boolean }[];
+  lists: { key: string; app: boolean; takesSets: boolean; sets: SetAnswer[] }[];
 };
 
 /**
@@ -90,13 +93,24 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
   // Each group in the order its lists are listed above (Numbering & identity first), the rest by name.
   const rank = (one: (typeof sets)[number]) => { const at = GROUPS.find((g) => g.title === headingOf(one))?.keys.indexOf(one.key) ?? -1; return at < 0 ? 999 : at; };
   const groups: SetNavGroup[] = [...new Set(headings)]
-    .map((title) => ({ title, sets: sets.filter((one) => headingOf(one) === title).sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title)).map((one) => ({ key: one.key, title: one.title, count: countOf(one.key) })) }))
+    .map((title) => ({ title, sets: sets.filter((one) => headingOf(one) === title).sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title)).map((one) => {
+      const read = (lists.lists ?? []).find((l) => l.key === one.key);
+      return {
+        key: one.key, title: one.title, count: countOf(one.key), takesSets: read?.takesSets ?? false,
+        parts: (read?.sets ?? []).map((p) => ({ id: p.id, name: p.name, active: p.active, isDefault: p.isDefault, count: p.inUse })),
+      };
+    }) }))
     .filter((g) => g.sets.length);
   // The page opens on the first list of the first group: Numbering & identity.
   const currentKey = sp.set && sets.some((one) => one.key === sp.set) ? sp.set : groups[0]?.sets[0]?.key ?? "";
   const q = (sp.q ?? "").trim();
   const show = sp.show === "RETIRED" || sp.show === "ALL" ? sp.show : "ACTIVE";
   const set = sets.find((one) => one.key === currentKey) ?? null;
+  // The set shown: the one chosen, else the default one (a list with one set: that one).
+  const listRead = (lists.lists ?? []).find((l) => l.key === currentKey) ?? null;
+  const setsOfList = listRead?.sets ?? [];
+  const chosen = setsOfList.find((p) => p.id && p.id === sp.vs) ?? setsOfList.find((p) => p.isDefault) ?? setsOfList[0] ?? null;
+  const inChosen = (v: { setId: string | null }) => !chosen || setsOfList.length <= 1 || v.setId === chosen.id || (chosen.isDefault && !v.setId);
   // Verdict lists are kept in Verdict lists, project codes by the app: shown here, changed there.
   const readOnlyWhy = !set ? null
     : isVerdictSet(set.key, set.kind) ? "verdicts"
@@ -113,15 +127,19 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
   const pick: Record<string, { code: string; label: string }[]> = Object.fromEntries(await Promise.all(
     [...new Set((propFields ?? []).flatMap((f) => (f.type === "set" || f.type === "sets" ? [f.setKey] : [])))].map(async (key) =>
       [key, (await getSet(key)).filter((v) => v.status === "ACTIVE").map((v) => ({ code: v.code, label: v.label }))] as const)));
-  const values = allValues.filter((v) =>
-    (show === "ALL" || v.status === show) &&
+  const deliverables = await getSet("DELIVERABLE_TYPES");
+  const typeName = (code: string) => deliverables.find((d) => d.code === code)?.label ?? code;
+  const values = allValues.filter((v) => inChosen(v) &&
+    // A value of a set switched off is still the set's: shown with it, marked so.
+    (show === "ALL" || v.status === show || (show === "ACTIVE" && v.status === "OFF")) &&
     (!q || v.code.toLowerCase().includes(q.toLowerCase()) || v.label.toLowerCase().includes(q.toLowerCase())),
   );
   const retiredCount = allValues.filter((v) => v.status === "RETIRED").length;
   const listUsed = Object.keys(places).length > 0;
   const runsOn = !!set && (lists.lists ?? []).some((one) => one.key === set.key && one.app);
+  const setUsed = !!chosen && allValues.some((v) => inChosen(v) && (places[v.code] ?? []).length > 0);
   const here = (extra: Record<string, string | undefined>) => {
-    const p = new URLSearchParams({ set: currentKey, ...(q ? { q } : {}), ...(show !== "ACTIVE" ? { show } : {}) });
+    const p = new URLSearchParams({ set: currentKey, ...(chosen?.id && sp.vs ? { vs: chosen.id } : {}), ...(q ? { q } : {}), ...(show !== "ACTIVE" ? { show } : {}) });
     for (const [k, v] of Object.entries(extra)) v === undefined ? p.delete(k) : p.set(k, v);
     return `/settings/config?${p}`;
   };
@@ -173,7 +191,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
         </section>
       ) : null}
 
-      <SetNav groups={groups} current={currentKey}>
+      <SetNav groups={groups} current={currentKey} currentSet={chosen?.id ?? null} mayAddSets={may}>
         {set ? (
           <section className="flex min-h-0 min-w-0 flex-1 flex-col">
             {/* The list: its name, what it is for, where it stands; what may be done to it, on the right. */}
@@ -200,11 +218,78 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
               </div>
             </div>
 
+            {/* The set shown: whom it serves, switched on or off; what may be done to it. */}
+            {chosen && listRead?.takesSets ? (
+              <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+                <span className="stencil text-slate-500">Set</span>
+                <span className="text-sm font-semibold text-slate-800">{chosen.name}</span>
+                {chosen.active ? <ToneChip tone="done">on</ToneChip> : <ToneChip tone="idle">off</ToneChip>}
+                <span className="min-w-0 text-[11px] text-slate-600">
+                  {chosen.isDefault
+                    ? (setsOfList.length > 1 ? "serves every deliverable type no other set names" : "serves every deliverable type")
+                    : chosen.deliverableTypes.length ? `serves ${chosen.deliverableTypes.map(typeName).join(", ")}` : "serves no deliverable type yet: say which"}
+                </span>
+                {may ? (
+                  <span className="ml-auto flex items-center gap-1">
+                    {chosen.id ? (
+                      <>
+                        <ActionForm action={switchSetAction} hidden={{ key: currentKey, setId: chosen.id, active: chosen.active ? "0" : "1" }} hideSubmit className="space-y-0">
+                          <button type="submit" className="ask">{chosen.active ? "Switch off" : "Switch on"}</button>
+                        </ActionForm>
+                        <Link href={here({ panel: sp.panel === "editset" ? undefined : "editset", edit: undefined, vs: chosen.id })} title="Change this set" aria-label="Change this set" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil className="h-4 w-4" /></Link>
+                        {!setUsed ? (
+                          <ActionForm action={deleteSetAction} hidden={{ key: currentKey, setId: chosen.id }} hideSubmit className="space-y-0"
+                            confirmText={`Delete the set ${chosen.name} and its values? None of them was ever used on ${ctx.project.code}; the log keeps it.`}>
+                            <button type="submit" title="Delete this set" aria-label="Delete this set" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                          </ActionForm>
+                        ) : null}
+                      </>
+                    ) : <span className="text-[11px] text-slate-500">Add a value or a set and it becomes a set of its own.</span>}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
+            {(sp.panel === "newset" || (sp.panel === "editset" && chosen?.id)) && may && listRead?.takesSets ? (
+              <div className="shrink-0 border-b border-line">
+                <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+                  <span className="stencil mr-1 text-slate-500">{sp.panel === "newset" ? "A new set" : `The set ${chosen!.name}`}</span>
+                  <span className="text-[11px] text-slate-500">its values are offered for the deliverable types it serves; two sets switched on never serve the same one</span>
+                </div>
+                <ActionForm id="set-form" action={sp.panel === "newset" ? createSetAction : updateSetAction} hideSubmit
+                  hidden={{ key: currentKey, ...(sp.panel === "editset" ? { setId: chosen!.id!, typesAsked: chosen!.isDefault ? "0" : "1" } : {}) }}
+                  className="asking space-y-4 px-5 py-5 sm:px-6">
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                    <Field label="Name" required><input name="name" required defaultValue={sp.panel === "editset" ? chosen!.name : ""} placeholder="Supplier documents" className={field} /></Field>
+                  </div>
+                  {sp.panel === "editset" && chosen!.isDefault ? (
+                    <p className="text-xs leading-5 text-slate-600">The default set serves every deliverable type no other set names.</p>
+                  ) : (
+                    <fieldset>
+                      <legend className="stencil mb-1.5 text-slate-500">Deliverable types it serves</legend>
+                      <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+                        {deliverables.filter((d) => d.status === "ACTIVE").map((d) => (
+                          <label key={d.code} className="flex items-center gap-2 text-sm text-slate-700">
+                            <input type="checkbox" name="deliverableTypes" value={d.code} defaultChecked={sp.panel === "editset" && chosen!.deliverableTypes.includes(d.code)} />
+                            <span>{d.label} <span className="font-mono text-xs text-slate-500">{d.code}</span></span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  )}
+                </ActionForm>
+                <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
+                  <Link href={here({ panel: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                  <button type="submit" form="set-form" data-on="true" className="ask">{sp.panel === "newset" ? "Make the set" : "Save"}</button>
+                </div>
+              </div>
+            ) : null}
+
             {/* A form opened from the list takes its place under the head: grey fields, then the strip. */}
             {sp.panel === "add" && may ? (
               <div className="shrink-0 border-b border-line">
-                <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6"><span className="stencil mr-1 text-slate-500">A new value</span><span className="text-[11px] text-slate-500">in {set.title.toLowerCase()}</span></div>
-                <ActionForm id="add-value" action={addValueAction} hideSubmit hidden={{ setKey: currentKey }} resetOnSuccess className="asking px-5 py-5 sm:px-6">
+                <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6"><span className="stencil mr-1 text-slate-500">A new value</span><span className="text-[11px] text-slate-500">in {set.title.toLowerCase()}{chosen && setsOfList.length > 1 ? `, set ${chosen.name}` : ""}</span></div>
+                <ActionForm id="add-value" action={addValueAction} hideSubmit hidden={{ setKey: currentKey, setId: chosen?.id ?? "" }} resetOnSuccess className="asking px-5 py-5 sm:px-6">
                   <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                     <Field label="Code" required hint="what appears in numbers and lists"><input name="code" required maxLength={24} className={field} /></Field>
                     <Field label="Name" required><input name="label" required className={field} /></Field>
@@ -346,7 +431,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
               </>
             ) : (
               <p className="px-5 py-10 text-center text-sm text-slate-500 sm:px-6">
-                {q ? `Nothing in ${set.title} matches “${q}”.` : show === "RETIRED" ? "Nothing retired in this list." : may ? "This list has no value yet: add the first one." : "This list has no value yet."}
+                {q ? `Nothing in ${set.title} matches “${q}”.` : show === "RETIRED" ? `Nothing retired in this ${setsOfList.length > 1 ? "set" : "list"}.` : `This ${setsOfList.length > 1 ? "set" : "list"} has no value yet${may ? ": add the first one." : "."}`}
               </p>
             )}
           </section>

@@ -1,14 +1,15 @@
 import { cache } from "react";
 import { api, apiShortLived } from "@/lib/client";
 
-type ValueRow = { code: string; label: string; status: string; props: Record<string, unknown> };
+/** A value of a list; `setId` is the set of its list it is in (none: the list's default set). */
+type ValueRow = { code: string; label: string; status: string; props: Record<string, unknown>; setId: string | null };
 
 // Value sets are published at organization level (Annex C — the configuration
 // gateway) and are the same for every project the organization runs. They are
 // read from the backend, which applies the organization.
 // The lists a page asks for in the same moment are fetched in one request, and
 // the answer is kept for a few seconds: a page reads a dozen lists, many twice.
-type RawRow = { code: string; label: string; status: string; props: Record<string, unknown> | null };
+type RawRow = { code: string; label: string; status: string; props: Record<string, unknown> | null; setId?: string | null };
 let pending: { keys: Set<string>; answer: Promise<Record<string, RawRow[]>> } | null = null;
 
 function batched(setKey: string): Promise<Record<string, RawRow[]>> {
@@ -28,7 +29,7 @@ function batched(setKey: string): Promise<Record<string, RawRow[]>> {
 
 const readSet = cache(async (setKey: string): Promise<ValueRow[]> => {
   const sets = await batched(setKey);
-  return (sets[setKey] ?? []).map((row) => ({ code: row.code, label: row.label, status: row.status, props: row.props ?? {} }));
+  return (sets[setKey] ?? []).map((row) => ({ code: row.code, label: row.label, status: row.status, props: row.props ?? {}, setId: row.setId ?? null }));
 });
 
 /** All values of a published set, active first. */

@@ -28,6 +28,18 @@ export function MissingSummary({ missing }: { missing: MissingField[] }) {
   );
 }
 
+/** Puts what was written back into a form's fields, after React emptied it. */
+function restore(form: HTMLFormElement, data: FormData) {
+  for (const field of Array.from(form.elements)) {
+    if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement) || !field.name) continue;
+    if (field instanceof HTMLInputElement && (field.type === "hidden" || field.type === "file" || field.type === "submit")) continue;
+    const values = data.getAll(field.name).map(String);
+    if (field instanceof HTMLInputElement && (field.type === "checkbox" || field.type === "radio")) field.checked = values.includes(field.value);
+    else if (field instanceof HTMLSelectElement && field.multiple) for (const option of Array.from(field.options)) option.selected = values.includes(option.value);
+    else if (values.length) field.value = values[0];
+  }
+}
+
 export function ActionForm({
   action,
   children,
@@ -62,9 +74,16 @@ export function ActionForm({
   const [state, formAction, pending] = useActionState(action, undefined);
   const [missing, setMissing] = useState<MissingField[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
+  /** What was written when it was sent: React empties a form once its action answers, a refusal included. */
+  const written = useRef<FormData | null>(null);
   // What the server named as missing is outlined, as what the screen found is.
   useEffect(() => {
     if (formRef.current && state?.fields?.length) markMissing(formRef.current, fieldsNamed(formRef.current, state.fields));
+    // A refusal gives back everything written, to put right and send again (files, which cannot be set, aside).
+    // React empties the form as the answer lands; given back just after, so it stays given back.
+    const form = formRef.current;
+    const data = written.current;
+    if (form && data && (state?.error || state?.fields?.length)) requestAnimationFrame(() => restore(form, data));
   }, [state]);
 
   return (
@@ -84,7 +103,8 @@ export function ActionForm({
           return;
         }
         setMissing([]);
-        if (confirmText && !window.confirm(confirmText)) e.preventDefault();
+        if (confirmText && !window.confirm(confirmText)) { e.preventDefault(); return; }
+        written.current = new FormData(e.currentTarget);
       }}
       key={resetOnSuccess && state?.ok ? String(state.ok) : "form"}
     >

@@ -24,7 +24,7 @@ function valueRef(valueId: string): { setKey: string; code: string } {
   return { setKey: valueId.slice(0, at), code: valueId.slice(at + 2) };
 }
 
-async function putValue(projectId: string, setKey: string, body: { code: string; newCode?: string; label?: string; status?: string; sort?: number; props?: unknown }) {
+async function putValue(projectId: string, setKey: string, body: { code: string; newCode?: string; label?: string; status?: string; sort?: number; props?: unknown; setId?: string }) {
   await api(projectPath({ projectId }, `/lists/${encodeURIComponent(setKey)}/values`), { method: "PUT", body });
   // The lists are read through a few-second cache: the person who changed one sees it at once.
   await forgetShortLived();
@@ -41,7 +41,7 @@ export async function addValueAction(_prev: Result | undefined, formData: FormDa
   if ((await getSet(setKey)).some((one) => one.code === code)) return { error: `${code} is already in this list.` };
   const props = buildProps(setKey, formData);
   try {
-    await putValue(ctx.projectId, setKey, { code, label, props: props ? JSON.parse(props) : undefined });
+    await putValue(ctx.projectId, setKey, { code, label, props: props ? JSON.parse(props) : undefined, setId: text(formData, "setId") || undefined });
   } catch (e) {
     return failed(e);
   }
@@ -170,4 +170,76 @@ export async function deleteListAction(_prev: Result | undefined, formData: Form
   }
   revalidatePath("/settings/config");
   redirect("/settings/config");
+}
+
+// ── Sets ──────────────────────────────────────────────────────────────────
+
+const setsPath = (key: string) => `/lists/${encodeURIComponent(key)}/sets`;
+const typesOf = (formData: FormData) => formData.getAll("deliverableTypes").map(String).filter(Boolean);
+
+/** A set of a list: its name and the deliverable types it serves. It opens once made. */
+export async function createSetAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const key = text(formData, "key");
+  const name = text(formData, "name");
+  if (!key || !name) return { error: "A set has a name." };
+  let id = "";
+  try {
+    id = (await api<{ id: string }>(projectPath(ctx, setsPath(key)), { body: { name, deliverableTypes: typesOf(formData) } })).id;
+    await forgetShortLived();
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/settings/config");
+  redirect(`/settings/config?set=${encodeURIComponent(key)}&vs=${id}`);
+}
+
+/** Its name and the deliverable types it serves. */
+export async function updateSetAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const key = text(formData, "key");
+  const setId = text(formData, "setId");
+  const name = text(formData, "name");
+  if (!key || !setId || !name) return { error: "A set has a name." };
+  try {
+    await api(projectPath(ctx, `${setsPath(key)}/${setId}`), {
+      method: "PUT",
+      body: { name, ...(formData.get("typesAsked") === "1" ? { deliverableTypes: typesOf(formData) } : {}) },
+    });
+    await forgetShortLived();
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/settings/config");
+  redirect(`/settings/config?set=${encodeURIComponent(key)}&vs=${setId}`);
+}
+
+/** Switched off (its values are no longer offered) or on again. */
+export async function switchSetAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const key = text(formData, "key");
+  const setId = text(formData, "setId");
+  try {
+    await api(projectPath(ctx, `${setsPath(key)}/${setId}`), { method: "PUT", body: { name: null, active: formData.get("active") === "1" } });
+    await forgetShortLived();
+  } catch (e) {
+    return failed(e);
+  }
+  done();
+  return {};
+}
+
+/** A set none of whose values was ever used is deleted with them; the log keeps it. */
+export async function deleteSetAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const key = text(formData, "key");
+  const setId = text(formData, "setId");
+  try {
+    await api(projectPath(ctx, `${setsPath(key)}/${setId}`), { method: "DELETE" });
+    await forgetShortLived();
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/settings/config");
+  redirect(`/settings/config?set=${encodeURIComponent(key)}`);
 }

@@ -505,6 +505,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   A value, a set and a list of one's own are switched off and on (a value then reads OFF: not offered, kept on what
   carries it); the app's lists are not switched here, their field is left out in Forms & fields (APP_LIST_STAYS). Never
   used: a value or a set is deleted (SET_IN_USE otherwise); a list only if it is one's own (the app's stay).
+- Types & sets shows the sets: each list in the menu has a + (− once open) showing its sets under it, each with its
+  count ("· off" when switched off), and "New set" (name, the deliverable types it serves). The set shown has its bar:
+  name, on/off, whom it serves, Switch off/on, its pencil (name, types), delete while never used. Values are the set's;
+  a value is added to the set shown (`?vs=<set>`).
+- A refused form keeps everything written (`ActionForm` gives it back after React empties it), to put right and send again.
 - Types & sets: the menu card is as tall as the window under the top bar (`set-nav.tsx`): the title scrolls
   away, then only its table and its list of lists scroll.
 - Groups (`ListRules.Groups`): Numbering & identity, Classification & keeping, Review & issue, File formats, Schedule
