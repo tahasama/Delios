@@ -190,3 +190,67 @@ export async function setTrackingAction(_prev: Result | undefined, formData: For
   revalidatePath("/settings/flow");
   return { ok: "Saved: it applies from now on, on every project." };
 }
+
+/** Our identifier, with its country (changed once at most), or why we have none. */
+export async function saveOwnIdentityAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const none = formData.get("none") === "on";
+  try {
+    await api("/api/organization/identity", {
+      method: "PUT",
+      body: none
+        ? { noIdentifierReason: text(formData, "noIdentifierReason") || null }
+        : { country: text(formData, "country") || null, identifierKind: text(formData, "identifierKind") || null, identifierNumber: text(formData, "identifierNumber") || null },
+    });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization");
+  return { ok: "Saved." };
+}
+
+/** A link to an address of ours at our domain: opening it proves the domain is ours. */
+export async function sendDomainLinkAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const email = text(formData, "email");
+  try {
+    await api("/api/organization/domain", { body: { email } });
+  } catch (e) {
+    return failed(e);
+  }
+  return { ok: `A link went to ${email}: opening it there proves the domain is ours (two days).` };
+}
+
+/** The link opened: the domain is ours. Anyone holding the link may open it; the link is the proof. */
+export async function confirmDomainAction(_prev: { error?: string; done?: string } | undefined, formData: FormData): Promise<{ error?: string; done?: string }> {
+  const response = await apiFetch("/api/auth/confirm-domain", { method: "POST", body: { token: text(formData, "token") } }).catch(() => null);
+  if (!response) return { error: "The server cannot be reached. Try again in a moment." };
+  if (response.status === 429) return { error: "Too many attempts. Wait a minute and try again." };
+  if (!response.ok) return { error: (await problemOf(response)).message };
+  const said = (await response.json()) as { domain: string; organization: string };
+  return { done: `${said.domain} is ${said.organization}'s, proven.` };
+}
+
+/** That entry, made by another organization, is us: it becomes our organization. */
+export async function claimAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  try {
+    await api(`/api/organization/claims/${text(formData, "identityId")}`, { method: "POST" });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization");
+  return { ok: "Claimed: it is us now, under our code and name, in every list that held it." };
+}
+
+/** We agree that two organizations are one, or refuse with why. */
+export async function answerMergeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const id = text(formData, "mergeId");
+  const agree = text(formData, "answer") === "agree";
+  const note = text(formData, "note");
+  if (!agree && !note) return { error: "Say why they are not one organization." };
+  try {
+    await api(`/api/organization/merges/${id}/${agree ? "agree" : "refuse"}`, { method: "POST", body: agree ? {} : { note } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization");
+  return { ok: agree ? "Agreed. Once every side has, the app's owner merges them." : "Refused: they stay two." };
+}

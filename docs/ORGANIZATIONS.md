@@ -89,8 +89,15 @@ codes and names, organization codes and names, contract numbers) stays reserved 
 Each organization taking part in a project carries the number of its contract with the project's organization
 (`ProjectParty.ContractNumber`), unique on DELIOS, changed once.
 
-Not yet joined up: an organization known in others' lists before it came onto DELIOS itself, and a collaborator linked
-under a different code, are not merged into one row by themselves.
+Each carries an identifier with its country (company registration, else tax number, else professional register, else a
+public body's), or why it has none, and its email domain. **Add** takes one already on DELIOS as it is and invites it to
+link; **Create** makes one that is not, naming look-alikes first (same identifier, same domain, a name that reads the
+same). An organization on DELIOS proves its domain by a link to an address there, then claims the entries others made
+for it at that domain. Duplicates are merged: asked with why, agreed by each side, carried out by the app's owner
+(`merge-organizations`); the merged one's values stay reserved and point to the one kept, and a list that held both keeps
+both lines. Asking for someone of an organization on DELIOS brings that organization onto the project.
+
+Not yet joined up by itself: a collaborator linked under a code other than its own (merge them).
 
 ## Our role in a project
 

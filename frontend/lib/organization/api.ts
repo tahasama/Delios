@@ -51,3 +51,22 @@ export const elsewhere = cache(async (): Promise<Elsewhere[]> => api<Elsewhere[]
 /** The guest accounts another organization made for our people before we linked, not yet brought over. */
 export const guestAccounts = cache(async (linkId: string): Promise<{ id: string; name: string; email: string; active: boolean }[]> =>
   api<{ id: string; name: string; email: string; active: boolean }[]>(`/api/organization/joined/${linkId}/guests`).catch(() => []));
+
+/** Our own organization as DELIOS knows it: its identifier (or why none) and the email domain it proved. */
+export type OwnIdentity = {
+  id: string; code: string; name: string; country: string | null; kind: string | null; number: string | null; noIdentifierReason: string | null;
+  identifierWas: { was: string; by: string; at: string } | null; domain: string | null; domainConfirmedAt: string | null;
+};
+export const ownIdentity = cache(async (): Promise<OwnIdentity | null> => api<OwnIdentity>("/api/organization/identity").catch(() => null));
+
+/** Entries other organizations made for us before we came onto DELIOS, at the domain we proved: each can be claimed. */
+export type Claims = { domain: string | null; entries: { id: string; code: string; name: string; identifier: string | null; lists: number }[] };
+export const claims = cache(async (): Promise<Claims> => api<Claims>("/api/organization/claims").catch(() => ({ domain: null, entries: [] })));
+
+/** Merges asked by us or waiting on us. */
+export type MergeView = {
+  id: string; state: "ASKED" | "AGREED" | "REFUSED" | "DONE"; why: string; requestedByName: string; requestedAt: string; ours: boolean;
+  keep: { code: string; name: string }; merge: { code: string; name: string }; waitsOnUs: boolean;
+  refusedByName: string | null; refusedWhy: string | null; doneAt: string | null;
+};
+export const merges = cache(async (): Promise<MergeView[]> => api<MergeView[]>("/api/organization/merges").catch(() => []));

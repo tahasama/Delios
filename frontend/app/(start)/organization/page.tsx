@@ -3,7 +3,8 @@ import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { ActionForm } from "@/components/form";
 import { Card, DataTable, Th, Td, Chip, Field, inputCls } from "@/components/ui";
 import { adminParties, adminProjects, adminUsers } from "@/lib/settings/api-admin";
-import { organizationLinks, joinedProjects, guestAccounts } from "@/lib/organization/api";
+import { organizationLinks, joinedProjects, guestAccounts, ownIdentity, claims, merges } from "@/lib/organization/api";
+import { WhoWeAre } from "./identity";
 import { projectDefaults } from "@/lib/organization/defaults";
 import { acceptLinkAction, refuseLinkAction, endLinkAction, joinPersonAction, bringOverAction, switchOrganizationAction } from "@/lib/organization/forms";
 import { switchProjectAction } from "@/lib/settings/forms-project-switch";
@@ -26,7 +27,7 @@ export const metadata = { title: "Organization" };
  */
 export default async function OrganizationPage() {
   const scope = await requireOrgAdmin();
-  const [links, joined, projects, users, parties, defaults, roles, answers] = await Promise.all([
+  const [links, joined, projects, users, parties, defaults, roles, answers, own, claimable, mergeList] = await Promise.all([
     organizationLinks(),
     joinedProjects(),
     adminProjects().catch(() => []),
@@ -35,6 +36,7 @@ export default async function OrganizationPage() {
     projectDefaults(),
     contractRoleOptions(),
     orgSettings().catch(() => new Map<string, string>()),
+    ownIdentity(), claims(), merges(),
   ]);
   const roleLabel = (code: string | null) => (code ? roles.find((r) => r.code === code)?.label ?? code : null);
   const received = links.filter((one) => one.side === "GUEST" && one.state === "INVITED");
@@ -79,6 +81,8 @@ export default async function OrganizationPage() {
             </ul>
           </Card>
         ) : null}
+
+        <WhoWeAre own={own} claimable={claimable} mergeList={mergeList} />
 
         <Card title="Projects" actions={<Link href="/organization/projects" className="text-xs font-semibold text-link hover:underline">Open a new project, change or archive one</Link>}>
           <p className="mb-3 text-xs text-slate-500">Ours, opened by us, and those of other organizations we take part in.</p>

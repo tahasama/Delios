@@ -1174,6 +1174,11 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
   each project's.
 - A contract is between two organizations: the one signing it is known on the project by the project's code, the other
   by its contract number.
+- Beside its name, an organization carries an identifier with its country: its company registration, else its tax
+  number, else its number on a professional register, else a public body's own; or why it has none. A name can be
+  spelled ten ways; an identifier cannot. Before one is created, those that look like it are named, and the person
+  says whether it is one of them. An organization joining DELIOS proves its email domain and claims what others made for
+  it; duplicates are merged with every side's agreement, never deleted.
 
 ## Still open — decided in conversation, not yet built
 

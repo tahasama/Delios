@@ -2,12 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/core/scope";
-import { api, refusal } from "@/lib/client";
+import { api, refusal, refusalForForm } from "@/lib/client";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";
 import { setProjectSetting } from "@/lib/settings/api";
 import { adminParties, PARTY_KEY } from "@/lib/settings/api-admin";
 
-type Result = { error?: string; ok?: string };
+/** One organization already on DELIOS that looks like the one being created, and why (the backend's LOOKS_LIKE). */
+export type Lookalike = { id: string; code: string; name: string; country: string | null; onDelios: boolean; why: string };
+type Result = { error?: string; ok?: string; lookalikes?: Lookalike[]; fields?: string[] };
 const text = (formData: FormData, name: string) => String(formData.get(name) ?? "").trim();
 
 /**
@@ -31,6 +33,14 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
   // Not on DELIOS: where our transmittals go by email (empty: one of ours sends them).
   const contactEmail = kind === "OFFLINE" ? text(formData, "contactEmail") : undefined;
   if (contactId && backupId && contactId === backupId) return { error: "The backup has to be someone other than the person who answers." };
+  // Who it is beside its name: its identifier with its country, or why it has none; and its email domain.
+  const identity = {
+    country: text(formData, "country") || null, identifierKind: text(formData, "identifierKind") || null,
+    identifierNumber: text(formData, "identifierNumber") || null, noIdentifierReason: text(formData, "noIdentifierReason") || null,
+    domain: formData.has("domain") ? text(formData, "domain") : undefined,
+  };
+  // Add: one DELIOS knows already, as it is.
+  const identityId = text(formData, "identityId");
   let saidName = name;
   try {
     let partyId = id;
@@ -49,26 +59,66 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
           ? { code: recode, name: rename, active }
           : {
             code: recode, name: rename, active, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail,
-            participation: participation !== party.participation ? participation : undefined,
+            participation: participation !== party.participation ? participation : undefined, ...identity,
           },
       });
+    } else if (identityId) {
+      const added = await api<{ id: string; invited: boolean }>("/api/admin/parties", {
+        body: { identityId, participation, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail },
+      });
+      partyId = added.id;
+      saidName = text(formData, "identityName") || "The organization";
+      if (added.invited) saidName += " (invited to work with us: their administrator accepts, then puts their people on)";
     } else {
       // What this organization asks when it adds another one.
       const policy = await formPolicy(ctx, "PARTY");
       const asked = checkForm("PARTY", policy, { code, name, kind, contactId, backupId, liaisonFunction: custodianFunction || null }, (n) => String(formData.get(n) ?? ""));
       if (asked.error) return { error: asked.error };
       const created = await api<{ id: string }>("/api/admin/parties", {
-        body: { code, name, isInternal: false, participation, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail },
+        body: {
+          code, name, isInternal: false, participation, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail, ...identity,
+          notTheSame: text(formData, "notTheSame").split(",").filter(Boolean),
+        },
       });
       partyId = created.id;
     }
     // Who answers for it here: optional, never a reason a save fails.
     await setProjectSetting(ctx.projectId, PARTY_KEY + partyId, contactId || backupId ? JSON.stringify({ contactId, backupId }) : null);
   } catch (e) {
-    return { error: refusal(e).message };
+    // Look-alikes are named first: the form asks whether it is one of them.
+    const { code: refused, params, message } = refusal(e);
+    if (refused === "LOOKS_LIKE") return { error: message, lookalikes: (params as { lookalikes?: Lookalike[] })?.lookalikes ?? [] };
+    return refusalForForm(e);
   }
   revalidatePath("/settings/parties");
   revalidatePath("/settings/users");
   saidName ||= code;
   return { ok: id ? `${saidName} is saved.` : `${saidName} is registered. Say whether it takes part in ${ctx.project.code} below.` };
+}
+
+/** Organizations on DELIOS whose code or name holds the words: to add one as it is. */
+export async function findOnDeliosAction(words: string): Promise<{ id: string; code: string; name: string; country: string | null; listed: boolean }[]> {
+  await requireScope();
+  if (words.trim().length < 2) return [];
+  return api<{ id: string; code: string; name: string; country: string | null; listed: boolean }[]>(
+    `/api/admin/organizations/on-delios?q=${encodeURIComponent(words.trim())}`).catch(() => []);
+}
+
+/** Two organizations are one: asked with why; each side agrees, then the app's owner merges them. */
+export async function askMergeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  await requireScope();
+  const keepId = text(formData, "keepId");
+  const mergeId = text(formData, "mergeId");
+  const why = text(formData, "why");
+  if (!keepId || !mergeId) return { error: "Choose the organization it is the same as.", fields: ["keepId"] };
+  if (!why) return { error: "Say why they are one organization.", fields: ["why"] };
+  let state: string;
+  try {
+    state = (await api<{ state: string }>("/api/admin/organizations/merges", { body: { keepId, mergeId, why } })).state;
+  } catch (e) {
+    return refusalForForm(e);
+  }
+  revalidatePath("/settings/parties");
+  revalidatePath("/organization");
+  return { ok: state === "AGREED" ? "Asked: every side agrees; the app's owner merges them." : "Asked: the other side is told, and answers on their organization's page." };
 }

@@ -486,6 +486,28 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A list's "Used on" counts the project's documents carrying each value (backend `GET /register/usage`), and opens
   them in the register; a value in use keeps its code. Values are retired, never deleted: the bulk "Delete" (which
   only retired) is removed.
+- **Organizations page** (owner's "idea1"), People & access's way: plate (collaborators · guests · not on DELIOS · taking
+  part here); "An organization works with us" one sheet (`OrganizationJoins`): **Add one on DELIOS** (found by name or
+  code, `GET /api/admin/organizations/on-delios`, taken as it is, invited to link at once: their administrator accepts,
+  then puts their people on) or **Create one** (not on DELIOS: code, name, **country + identifier**, the best it has:
+  company registration, else tax number, else professional register such as an order of architects, else a public
+  body's; or why it has none; its email domain; how it works with us). Before creating, look-alikes are named (backend
+  LOOKS_LIKE: same identifier, same domain, or a name reading the same once legal forms and punctuation are left out):
+  "Is this the same as…?" → "Yes, add that one" or "No, it's a different company" (kept in the record). Every
+  organization: a pencil opens its line (name, code, identifier, how it works with us: once each; domain; who answers
+  here; linking; "Is it the same as another organization?" asks a merge). "On <project>: who takes part": a sheet to add
+  one, each line opened by its pencil (role, contract number once, the function its people start with, takes part).
+- Asking for someone whose email belongs to an organization on DELIOS brings **their whole organization** onto the
+  project (`BringOrganizationAsync`): added as DELIOS knows it, invited to link through that address, taking part with
+  the function asked as its people's start; their administrator accepts, then puts them on. The control function does it.
+- The identifier (country + kind + number) is unique across DELIOS (`reserved_values` ORG_IDENT, IDENTIFIER_TAKEN) and
+  changed once. **Our own organization** on its page ("Who we are on DELIOS"): its identifier; its email domain, proven
+  by a link sent to an address of ours there (`/confirm-domain`, never a public mail provider, one organization per
+  domain); proven, it **claims** the entries others made for it at that domain (they become it, under its code and name).
+  **Merges** of duplicates: asked with why (by an organization holding either), agreed by every side that answers for
+  them (an organization on DELIOS for itself, else whoever first listed it), refused with why; then the app's owner
+  carries them out (`merge-organizations [<id>]`, backend command). Nothing is deleted: the merged one's code and name stay
+  reserved and point to the one kept.
 - Organizations: the list is the organization's, shared by every project; who takes part in a project (role, the
   function a collaborator's people start with) and who answers for each there (`PARTY:<id>`, a project setting, so
   Document Control keeps it) are the project's. Who answers is optional and never blocks a save. Its code, name and

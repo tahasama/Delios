@@ -44,7 +44,9 @@ backend/
 │   ├── Search/           full-text search
 │   ├── Identity/         people, sign-in, functions, organizations, who may do what
 │   ├── Organizations/    organizations working together: links, linked accounts, switching; Registry (what is
-│   │                     unique across DELIOS: codes, names, contract numbers; changed once)
+│   │                     unique across DELIOS: codes, names, identifiers, contract numbers; changed once;
+│   │                     look-alikes, claims, merges), RegistryEndpoints (on DELIOS, our identity and domain,
+│   │                     claims, merges; command merge-organizations)
 │   ├── Settings/         the organization's and the project's settings and lists
 │   ├── Notifications/    notifications, email, pop-ups
 │   ├── Audit/            the audit trail

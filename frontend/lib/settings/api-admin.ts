@@ -58,6 +58,10 @@ type AdminParty = {
   changed?: {
     code: { was: string; by: string; at: string } | null; name: { was: string; by: string; at: string } | null;
     participation: { was: string; by: string; at: string } | null; theirs: boolean;
+    /** The organization as DELIOS knows it (one row for every list holding it), its identifier and email domain. */
+    id: string; identifier: { country: string; kind: string; number: string } | null;
+    identifierWas: { was: string; by: string; at: string } | null; noIdentifierReason: string | null;
+    domain: string | null; domainConfirmed: boolean; onDelios: boolean;
   } | null;
 };
 
