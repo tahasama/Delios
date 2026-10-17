@@ -58,6 +58,9 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   const forwarded = incoming.get("x-forwarded-for") ?? incoming.get("x-real-ip");
   const sendHeaders: Record<string, string> = { Accept: "application/json" };
   if (session) sendHeaders.Cookie = `${BACKEND_COOKIE}=${session}`;
+  // The project the person is in: the backend reads the lists as that project sees them (its own, else the organization's).
+  const project = jar.get("edms_project")?.value;
+  if (project) sendHeaders["X-Delios-Project"] = project;
   if (forwarded) sendHeaders["X-Forwarded-For"] = forwarded;
   if (options.device) {
     sendHeaders["X-Delios-Device"] = options.device;
@@ -110,8 +113,10 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
 const shortLived = new Map<string, { until: number; value: Promise<unknown> }>();
 
 export async function apiShortLived<T>(path: string, ttlMs: number, options: Pick<ApiOptions, "query"> = {}): Promise<T> {
-  const session = (await cookies()).get(SESSION_COOKIE)?.value ?? "";
-  const key = `${session}\n${url(path, options.query)}`;
+  const jar = await cookies();
+  const session = jar.get(SESSION_COOKIE)?.value ?? "";
+  // Per session and per project: a project reads its own lists.
+  const key = `${session}\n${jar.get("edms_project")?.value ?? ""}\n${url(path, options.query)}`;
   const now = Date.now();
   const hit = shortLived.get(key);
   if (hit && hit.until > now) return hit.value as Promise<T>;

@@ -1,14 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/core/scope";
-import { isAdmin } from "@/lib/core/auth";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";
-import { buildProps } from "@/lib/settings/config-props";
-import { getSet, getSets, SET_KEY } from "@/lib/settings/config";
 import { api, forgetShortLived, projectPath, refusal } from "@/lib/client";
-import { setOrgSetting } from "@/lib/settings/api";
 import { adminNumbering, adminUsers, backendField, RECORD_KIND } from "@/lib/settings/api-admin";
 
 /**
@@ -20,18 +15,6 @@ import { adminNumbering, adminUsers, backendField, RECORD_KIND } from "@/lib/set
 type Result = { error?: string; ok?: string };
 const failed = (e: unknown): Result => ({ error: refusal(e).message });
 const text = (formData: FormData, name: string) => String(formData.get(name) ?? "").trim();
-
-/** A value as the settings screens name it: its list and its code. */
-function valueRef(valueId: string): { setKey: string; code: string } {
-  const at = valueId.indexOf("::");
-  return { setKey: valueId.slice(0, at), code: valueId.slice(at + 2) };
-}
-
-async function putValue(body: { setKey: string; code: string; label?: string; status?: string; sort?: number; props?: unknown }) {
-  await api("/api/admin/values", { method: "PUT", body });
-  // The lists are read through a few-second cache: the person who changed one sees it at once.
-  await forgetShortLived();
-}
 
 /** Said after adding someone: when the project asks for people to be confirmed, they wait off the project until then. */
 export async function waitingSaid(userId: string, projectId: string, projectCode: string): Promise<string> {
@@ -58,74 +41,6 @@ export async function takeOffProjectAction(_prev: Result | undefined, formData: 
   return { ok: `${target.name} is off ${ctx.project.code}. Their account and their other projects stay.` };
 }
 
-
-export async function addConfigValueAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  await requireScope();
-  const setKey = text(formData, "setKey");
-  const code = text(formData, "code");
-  const label = text(formData, "label");
-  if (!setKey || !code || !label) return { error: "Set, code and label are required." };
-  const existing = (await getSet(setKey)).find((one) => one.code === code);
-  if (existing) {
-    if (existing.status === "RETIRED") return { error: "That code exists but is retired — reactivate it instead (values in use are never deleted,)." };
-    return { error: "Code already exists in this set." };
-  }
-  const props = buildProps(setKey, formData);
-  try {
-    await putValue({ setKey, code, label, props: props ? JSON.parse(props) : undefined });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/config");
-  return {};
-}
-
-/** Create a brand-new published set (the organization defines its own lists). */
-export async function createConfigSetAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const ctx = await requireScope();
-  if (!isAdmin(ctx.user)) return { error: "Administrators only." };
-  const key = text(formData, "key").toUpperCase().replace(/[^A-Z0-9_]/g, "_");
-  const title = text(formData, "title");
-  if (!key || !title) return { error: "Key and title are required." };
-  if (key.length > 40) return { error: "Keep the key under 40 characters." };
-  if ((await getSets()).some((one) => one.key === key)) return { error: "A set with that key already exists." };
-  try {
-    await setOrgSetting(SET_KEY + key, JSON.stringify({ title, description: text(formData, "description") || null, group: text(formData, "group") || null, version: 1 }));
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/config");
-  return {};
-}
-
-/** Edit a value's label and properties. Its code is durable: a value in use is retired and replaced, never recoded. */
-export async function updateValuePropsAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  await requireScope();
-  const { setKey, code: current } = valueRef(text(formData, "valueId"));
-  const code = text(formData, "code");
-  const label = text(formData, "label");
-  const value = (await getSet(setKey)).find((one) => one.code === current);
-  if (!value) return { error: "That value no longer exists." };
-  if (code && code !== current) return { error: "A value's code does not change. Retire it and publish a replacement so historical metadata stays interpretable." };
-  const props = buildProps(setKey, formData, JSON.stringify(value.props));
-  try {
-    await putValue({ setKey, code: current, label: label || value.label, props: props ? JSON.parse(props) : null });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/config");
-  return {};
-}
-
-export async function retireConfigValueAction(formData: FormData) {
-  await requireScope();
-  const { setKey, code } = valueRef(text(formData, "valueId"));
-  const value = (await getSet(setKey)).find((one) => one.code === code);
-  if (!value) return;
-  // Retired codes stay on existing documents but cannot be used on new ones (§4.7).
-  await putValue({ setKey, code, status: value.status === "ACTIVE" ? "RETIRED" : "ACTIVE" }).catch(() => undefined);
-  revalidatePath("/settings/config");
-}
 
 /** The organization's own fields on an asset, as the form names them. */
 function assetFields(formData: FormData) {
@@ -184,50 +99,6 @@ export async function removeAssetAction(_prev: (Result & { ok?: string }) | unde
   return { ok: "Removed from the list." };
 }
 
-/** Rename and describe a set. Its key is the values' list: it stays, as codes do. */
-export async function updateConfigSetAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const ctx = await requireScope();
-  if (!isAdmin(ctx.user)) return { error: "Administrators only." };
-  const oldKey = text(formData, "oldKey");
-  const key = text(formData, "key").toUpperCase().replace(/[^A-Z0-9_]/g, "_");
-  const title = text(formData, "title");
-  if (!oldKey || !key || !title) return { error: "Key and title are required." };
-  if (key !== oldKey) return { error: "A set's key does not change: the values in it, and the records using them, are filed under it." };
-  const current = (await getSets()).find((one) => one.key === oldKey);
-  try {
-    await setOrgSetting(SET_KEY + key, JSON.stringify({
-      title, description: text(formData, "description") || null,
-      group: formData.has("group") ? text(formData, "group") || null : current?.group ?? null, version: (current?.version ?? 1) + 1,
-      // A verdict list stays one (Settings, Verdict lists, makes it so).
-      kind: current?.kind ?? null,
-    }));
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/config");
-  revalidatePath("/settings/numbering");
-  revalidatePath("/settings/workflow-templates");
-  return { ok: `Published ${title} as ${key}.` };
-}
-
-/** Move a published value without changing its durable code. */
-export async function moveConfigValueAction(formData: FormData) {
-  await requireScope();
-  const { setKey, code } = valueRef(text(formData, "valueId"));
-  const direction = text(formData, "direction") || "up";
-  const values = await getSet(setKey);
-  const index = values.findIndex((item) => item.code === code);
-  const target = direction === "down" ? index + 1 : index - 1;
-  if (index < 0 || target < 0 || target >= values.length) return;
-  [values[index], values[target]] = [values[target], values[index]];
-  try {
-    for (const [sort, item] of values.entries()) await putValue({ setKey, code: item.code, sort: sort * 10 });
-  } catch {
-    // The configuration screen remains usable; ActionForm surfaces edits that need validation.
-  }
-  revalidatePath("/settings/config");
-}
-
 /** Create or revise an organization numbering scheme and its ordered fields. */
 export async function saveNumberingSchemeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   await requireScope();
@@ -283,51 +154,6 @@ export async function removeNumberingSchemeAction(formData: FormData) {
   if (numbering.routing.some((r) => r.schemeId === id && r.active)) return;
   await api(`/api/admin/numbering/schemes/${id}`, { method: "PUT", body: { active: false } }).catch(() => undefined);
   revalidatePath("/settings/numbering");
-}
-
-/**
- * Retire or activate many values at once. Values are retired, never deleted (the backend never deletes them), so
- * there is no "Delete" here.
- */
-export async function bulkValuesAction(formData: FormData) {
-  const ctx = await requireScope();
-  if (!isAdmin(ctx.user)) return;
-  const op = text(formData, "op");
-  if (!["RETIRE", "REACTIVATE"].includes(op)) return;
-  for (const valueId of formData.getAll("valueIds").map(String).filter(Boolean)) {
-    const { setKey, code } = valueRef(valueId);
-    await putValue({ setKey, code, status: op === "REACTIVATE" ? "ACTIVE" : "RETIRED" }).catch(() => undefined);
-  }
-  revalidatePath("/settings/config");
-}
-
-/** Values are retired rather than deleted, so the register never loses what a code meant. */
-export async function deleteValueAction(formData: FormData) {
-  const ctx = await requireScope();
-  if (!isAdmin(ctx.user)) return;
-  const { setKey, code } = valueRef(text(formData, "valueId"));
-  await putValue({ setKey, code, status: "RETIRED" }).catch(() => undefined);
-  revalidatePath("/settings/config");
-}
-
-/** A set is never deleted with its values: its values are retired, and its name is forgotten once it has none in use. */
-export async function deleteSetAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const ctx = await requireScope();
-  if (!isAdmin(ctx.user)) return { error: "Administrators only." };
-  const key = text(formData, "key");
-  if (["STATUSES", "REVIEW_OUTCOMES", "REASONS_FOR_ISSUE", "COMMENT_CLASSES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES"].includes(key)) {
-    return { error: `${key} is one of the sets the system runs on — its values can be edited, but the set itself stays.` };
-  }
-  try {
-    for (const value of await getSet(key)) {
-      if (value.status === "ACTIVE") await putValue({ setKey: key, code: value.code, status: "RETIRED" });
-    }
-    if ((await getSet(key)).length === 0) await setOrgSetting(SET_KEY + key, null);
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/config");
-  redirect("/settings/config");
 }
 
 /**

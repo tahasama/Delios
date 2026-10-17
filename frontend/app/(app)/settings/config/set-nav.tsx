@@ -42,9 +42,9 @@ export function SetNav({ groups, current, children }: { groups: SetNavGroup[]; c
           })}
         </div>
         <label className="relative mb-1.5 w-full sm:w-56">
-          <span className="sr-only">Find a set</span>
+          <span className="sr-only">Find a list</span>
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a set…" className="plain w-full pl-7!" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a list…" className="plain w-full pl-7!" />
         </label>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)]" role="tabpanel">
@@ -66,7 +66,7 @@ export function SetNav({ groups, current, children }: { groups: SetNavGroup[]; c
               </li>
             );
           })}
-          {!sets.length ? <li className="px-2.5 py-2 text-xs text-slate-500">No set matches “{q}”.</li> : null}
+          {!sets.length ? <li className="px-2.5 py-2 text-xs text-slate-500">No list matches “{q}”.</li> : null}
         </ul>
         </nav>
         <div className="min-w-0 p-4">{children}</div>

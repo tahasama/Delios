@@ -60,11 +60,19 @@ type SetInfo = { key: string; title: string; description: string | null; group: 
  * are the organization's settings; its values are the backend's.
  */
 export const getSets = cache(async (): Promise<SetInfo[]> => {
-  const { orgSettings } = await import("@/lib/settings/api");
-  const [counted, named] = await Promise.all([
-    api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets").catch(() => []),
+  const { orgSettings, projectSettings } = await import("@/lib/settings/api");
+  const { getScope } = await import("@/lib/core/scope");
+  const scope = await getScope();
+  // The project's lists (its own, else the organization's) and their names: the project's over the organization's.
+  const [counted, org, own] = await Promise.all([
+    scope
+      ? api<{ sets: { key: string; active: number; retired: number }[] }>(`/api/projects/${scope.projectId}/lists`).then((r) => r.sets).catch(() => [])
+      : api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets").catch(() => []),
     orgSettings().catch(() => new Map<string, string>()),
+    scope ? projectSettings(scope.projectId).catch(() => new Map<string, string>()) : Promise.resolve(new Map<string, string>()),
   ]);
+  const named = new Map(org);
+  for (const [key, value] of own) if (key.startsWith(SET_KEY)) named.set(key, value);
   // Lists the app reads by name are offered even before they hold a value, so they can be filled.
   const keys = new Set([...READ_BY_THE_APP, ...counted.map((one) => one.key), ...[...named.keys()].filter((k) => k.startsWith(SET_KEY)).map((k) => k.slice(SET_KEY.length))]);
   return [...keys].sort().map((key) => {

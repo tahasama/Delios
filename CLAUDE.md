@@ -483,9 +483,19 @@ a screen only words it. A new rule goes in the backend, never in a page.
   linked, "Can sign in" on every project, "Take off <project>", asked first). A linked account (works here from its
   own DELIOS) changes only its function and department here. The organization's own extra fields on a person (Forms
   & fields) are no longer asked when adding (they were checked on the screen only).
-- A list's "Used on" counts the project's documents carrying each value (backend `GET /register/usage`), and opens
-  them in the register; a value in use keeps its code. Values are retired, never deleted: the bulk "Delete" (which
-  only retired) is removed.
+- **Lists are the project's** (owner, Types & sets): the organization's lists are the default every project starts
+  from; a project's first change gives it its own copy (`ProjectLists.EnsureOwnAsync`, `Project.OwnLists`,
+  `ValueEntry.ProjectId`), a customization that never becomes the default for new projects. Which lists a request
+  reads is set once per request (`DeliosDbContext.UseListsOf`, query filter on `ValueEntry`): the project of the
+  page (header `X-Delios-Project` from the `edms_project` cookie), else the person's first project.
+  `/api/projects/{id}/lists` (`ProjectLists.cs`, `lib/settings/forms-lists.ts`). Only whoever acts as the control
+  function on that project changes them; on a project with none, only whoever opened it (`Project.OpenedById`);
+  nobody else (backend CONTROL_ONLY). Everyone of ours reads them. Every change is in the log.
+- A value or a list **never used** on the project (no document, revision, review, transmittal, package, action,
+  route, rule, numbering or other value carries it: backend `UsageAsync`) may be changed entirely or deleted. Once
+  used: renamed or retired only (backend VALUE_IN_USE); anything else is a new value or a new list. A list the app
+  runs on is never deleted. Verdict lists (Settings → Verdict lists) and Project codes (filled by itself) read only
+  there. The "Used" column says where each value is used, or "never used".
 - **Organizations, two levels** (owner): Settings → Organizations is the **project's**: one field to find an organization,
   always there (our list first, then any DELIOS knows; choosing it adds it to the project), and beside it one button
   "Create an organization" that opens the form (guests, or not on DELIOS). No two-button steps, no project code repeated on

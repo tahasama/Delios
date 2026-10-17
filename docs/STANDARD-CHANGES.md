@@ -1189,6 +1189,16 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
   says whether it is one of them. An organization joining DELIOS proves its email domain and claims what others made for
   it; duplicates are merged with every side's agreement, never deleted.
 
+## 61 · Lists are the project's; what was never used may still change
+
+- The Standard publishes one set of lists for the organization. In DELIOS the organization's lists are the default
+  every project starts from; a project may change its own, and that change stays the project's (it never becomes the
+  default for projects opened later).
+- Refines §23: a value or a list none of the project's records ever carried may be changed entirely or deleted; once
+  used, it is renamed or retired only, and anything else is a new value or a new list. The log keeps every change.
+- Only whoever acts as the control function on the project changes its lists; a project with none leaves it to
+  whoever opened it, and nobody else.
+
 ## Still open — decided in conversation, not yet built
 
 - **Every transmittal and every notification also goes by email**, showing what

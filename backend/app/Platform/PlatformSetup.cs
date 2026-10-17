@@ -308,12 +308,17 @@ public static class PlatformSetup
         // also on the calls that are not about one project (the values for a dropdown).
         app.Use(async (http, next) =>
         {
-            if (http.User.Identity?.IsAuthenticated == true
-                && Guid.TryParse(http.Request.Headers["X-Delios-Project"].ToString(), out var projectId))
+            if (http.User.Identity?.IsAuthenticated == true)
             {
                 var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
-                var project = await db.Projects.AsNoTracking().Where(p => p.Id == projectId)
-                    .Select(p => new { p.Id, p.OwnLists }).SingleOrDefaultAsync(http.RequestAborted);
+                var project = Guid.TryParse(http.Request.Headers["X-Delios-Project"].ToString(), out var projectId)
+                    ? await db.Projects.AsNoTracking().Where(p => p.Id == projectId)
+                        .Select(p => new { p.Id, p.OwnLists }).SingleOrDefaultAsync(http.RequestAborted)
+                    // None said: the project the screens open first, as /api/me lists them.
+                    : await db.Memberships.AsNoTracking()
+                        .Where(m => m.UserId == http.User.UserId() && m.Active && m.Project!.Status == "ACTIVE" && m.Function!.Active)
+                        .OrderBy(m => m.Project!.Code).Select(m => new { m.Project!.Id, m.Project.OwnLists })
+                        .FirstOrDefaultAsync(http.RequestAborted);
                 if (project is not null) db.UseListsOf(project.Id, project.OwnLists);
             }
             await next(http);

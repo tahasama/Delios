@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Trash2 } from "lucide-react";
-import { deleteSetAction } from "@/lib/settings/forms-admin";
+import { deleteListAction } from "@/lib/settings/forms-lists";
 
 /**
  * Deleting a set, as an icon beside the other things you do to one.
@@ -12,12 +12,12 @@ import { deleteSetAction } from "@/lib/settings/forms-admin";
  * like a button that does nothing.
  */
 export function DeleteSetButton({ setKey, title, count }: { setKey: string; title: string; count: number }) {
-  const [state, formAction, pending] = useActionState(deleteSetAction, undefined);
+  const [state, formAction, pending] = useActionState(deleteListAction, undefined);
   return (
     <form
       action={formAction}
       onSubmit={(event) => {
-        if (!confirm(`Delete “${title}” and its ${count} value(s)?\n\nA set a numbering scheme or review route still points at is refused, and says which one.`)) {
+        if (!confirm(`Delete “${title}” and its ${count} value(s)? None of them was ever used on this project; the log keeps it.`)) {
           event.preventDefault();
         }
       }}
@@ -27,8 +27,8 @@ export function DeleteSetButton({ setKey, title, count }: { setKey: string; titl
       <button
         type="submit"
         disabled={pending}
-        title="Delete this set"
-        aria-label="Delete this set"
+        title="Delete this list"
+        aria-label="Delete this list"
         className="grid h-8 w-8 place-items-center rounded-md text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
       >
         <Trash2 className="h-4 w-4" />
