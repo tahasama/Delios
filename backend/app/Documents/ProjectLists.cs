@@ -219,17 +219,34 @@ public static class ProjectLists
             _ => null,
         }), "who may do what");
 
-        // Another list of the project pointing to it (a document type's deliverable types, a level's retention…).
-        var others = await db.ValueEntries.AsNoTracking().Where(v => v.SetKey != set && v.Props != null).ToListAsync(cancellationToken);
-        var codes = await db.ValueEntries.AsNoTracking().Where(v => v.SetKey == set).Select(v => v.Code).ToListAsync(cancellationToken);
-        foreach (var code in codes)
+        // Another list pointing to it through a property that names a value of this list (only those: a code also written
+        // elsewhere by chance is not a use), said with the names of the values pointing: "recommended by document types:
+        // Calculation, Drawing".
+        foreach (var (from, prop, to, how) in Pointers.Where(p => p.To == set))
         {
-            var quoted = JsonSerializer.Serialize(code);
-            foreach (var other in others.Where(o => o.Props!.RootElement.GetRawText().Contains(quoted, StringComparison.Ordinal)))
-                Mark([code], $"the list {other.SetKey.Replace('_', ' ').ToLowerInvariant()} ({other.Code})");
+            var pointing = await db.ValueEntries.AsNoTracking().Where(v => v.SetKey == from && v.Props != null).ToListAsync(cancellationToken);
+            foreach (var group in pointing
+                .SelectMany(v => Named(v.Props!.RootElement, prop).Select(code => (Code: code, v.Label)))
+                .GroupBy(x => x.Code))
+                Mark([group.Key], $"{how}: {string.Join(", ", group.Select(x => x.Label).Distinct())}");
         }
         return used;
     }
+
+    /// <summary>The properties by which a value of one list names values of another, and how that use is said.</summary>
+    private static readonly (string From, string Prop, string To, string How)[] Pointers =
+    [
+        (ValueSets.DocumentTypes, "deliverables", ValueSets.DeliverableTypes, "document types belonging to it"),
+        (ValueSets.DocumentTypes, "criticality", ValueSets.Criticality, "recommended by document types"),
+        (ValueSets.Criticality, "retention", ValueSets.RetentionClasses, "brought by criticality levels"),
+    ];
+
+    /// <summary>The codes a property holds: one, or a list of them.</summary>
+    private static IEnumerable<string> Named(JsonElement props, string prop) =>
+        !props.TryGetProperty(prop, out var value) ? []
+        : value.ValueKind == JsonValueKind.String ? [value.GetString()!]
+        : value.ValueKind == JsonValueKind.Array ? value.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.String).Select(e => e.GetString()!)
+        : [];
 
     // ── Endpoints ────────────────────────────────────────────────────────────
 
@@ -515,7 +532,9 @@ public static class ProjectLists
             }
             changes.Add(active ? "switched on" : "switched off");
         }
-        await SaveMetaAsync(db, clock, access, set, title, request.Description, group, active, cancellationToken);
+        // Switching alone (nothing else asked) keeps the description as it was.
+        var description = request.Active is not null && request.Description is null ? meta.Description : request.Description;
+        await SaveMetaAsync(db, clock, access, set, title, description, group, active, cancellationToken);
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "LIST_CHANGED", "List", null, set, string.Join("; ", changes),
             access.Project.Id, cancellationToken);
         return Results.Ok(new { key = set });
@@ -554,8 +573,6 @@ public static class ProjectLists
         CancellationToken cancellationToken)
     {
         var types = (asked ?? set.DeliverableTypes).Select(t => t.Trim()).Where(t => t.Length > 0).Distinct().ToArray();
-        if (set.IsDefault && types.Length > 0)
-            return (null, Problems.Invalid("DEFAULT_SERVES_THE_REST", "The default set serves every deliverable type no other set names: it names none itself."));
         var known = await db.ValueEntries.AsNoTracking().Where(v => v.SetKey == ValueSets.DeliverableTypes).Select(v => v.Code).ToListAsync(cancellationToken);
         if (types.FirstOrDefault(t => !known.Contains(t)) is { } unknown)
             return (null, Problems.Invalid("DELIVERABLE_TYPE_UNKNOWN", $"{unknown} is not a deliverable type of this project."));

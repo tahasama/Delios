@@ -110,16 +110,41 @@ export async function moveValueAction(formData: FormData) {
   done();
 }
 
-/** Retire, or bring back, the values ticked. */
+/**
+ * What the dock does with the values ticked: retire them, bring them back, delete those never used, or move those never
+ * used to another set of the list. Each value is sent as one change; the backend refuses any it may not take.
+ */
 export async function bulkValuesAction(formData: FormData) {
   const ctx = await requireScope();
   const op = text(formData, "op");
-  if (!["RETIRE", "REACTIVATE"].includes(op)) return;
+  if (!["RETIRE", "REACTIVATE", "DELETE", "MOVE"].includes(op)) return;
+  const toSet = text(formData, "toSet");
   for (const valueId of formData.getAll("valueIds").map(String).filter(Boolean)) {
     const { setKey, code } = valueRef(valueId);
-    await putValue(ctx.projectId, setKey, { code, status: op === "REACTIVATE" ? "ACTIVE" : "RETIRED" }).catch(() => undefined);
+    if (op === "DELETE") {
+      await api(projectPath(ctx, `/lists/${encodeURIComponent(setKey)}/values/${encodeURIComponent(code)}`), { method: "DELETE" }).catch(() => undefined);
+    } else if (op === "MOVE") {
+      if (toSet) await putValue(ctx.projectId, setKey, { code, setId: toSet }).catch(() => undefined);
+    } else {
+      await putValue(ctx.projectId, setKey, { code, status: op === "REACTIVATE" ? "ACTIVE" : "RETIRED" }).catch(() => undefined);
+    }
+  }
+  await forgetShortLived();
+  done();
+}
+
+/** A list of one's own switched off (its values are no longer offered) or on again. */
+export async function switchListAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
+  const key = text(formData, "key");
+  try {
+    await api(projectPath(ctx, `/lists/${encodeURIComponent(key)}`), { method: "PUT", body: { title: text(formData, "title"), active: formData.get("active") === "1" } });
+    await forgetShortLived();
+  } catch (e) {
+    return failed(e);
   }
   done();
+  return {};
 }
 
 export async function createListAction(_prev: Result | undefined, formData: FormData): Promise<Result> {

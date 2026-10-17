@@ -3,7 +3,8 @@ import { api, projectPath } from "@/lib/client";
 import { requireScope } from "@/lib/core/scope";
 import { Field, DataTable, Th, Td, ToneChip, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { addValueAction, retireValueAction, createListAction, updateValueAction, deleteValueAction, moveValueAction, updateListAction, bulkValuesAction, createSetAction, updateSetAction, switchSetAction, deleteSetAction } from "@/lib/settings/forms-lists";
+import { addValueAction, retireValueAction, createListAction, updateValueAction, deleteValueAction, moveValueAction, updateListAction, bulkValuesAction, createSetAction, updateSetAction, switchSetAction, deleteSetAction, switchListAction } from "@/lib/settings/forms-lists";
+import { Switch } from "@/components/switch";
 import { getSet, getSets } from "@/lib/settings/config";
 import { parseProps, type PropField } from "@/lib/settings/config-props";
 import { propFieldsFor, isVerdictSet } from "@/lib/settings/set-props";
@@ -12,10 +13,13 @@ import { DeleteSetButton } from "./delete-set";
 import { SetNav, type SetNavGroup } from "./set-nav";
 import { Fragment } from "react";
 import { cn } from "@/lib/core/utils";
-import { Plus, Search, Pencil, Download, X, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Download, X, Trash2, Archive, ArchiveRestore, ArrowUp, ArrowDown } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Types & sets" };
+
+/** An act shown as its icon alone, where the icon says it (its name on hover and for screen readers). */
+const ICON = "inline-flex rounded-sm p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:ring-3 focus-visible:ring-link/25 outline-none";
 
 /** A field as on the new-document form: grey, no box, inside a sheet's `asking` body. */
 const field = "plain w-full";
@@ -69,7 +73,7 @@ type SetAnswer = { id: string | null; name: string; isDefault: boolean; active: 
 type ListsAnswer = {
   own: boolean; mayChange: boolean; sets: { key: string; active: number; retired: number }[];
   /** Each list as the backend reads it (`ListRules`): whether the app runs on it, among the rest. */
-  lists: { key: string; app: boolean; takesSets: boolean; sets: SetAnswer[] }[];
+  lists: { key: string; app: boolean; takesSets: boolean; active: boolean; sets: SetAnswer[] }[];
 };
 
 /**
@@ -101,8 +105,8 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
       };
     }) }))
     .filter((g) => g.sets.length);
-  // The page opens on the first list of the first group: Numbering & identity.
-  const currentKey = sp.set && sets.some((one) => one.key === sp.set) ? sp.set : groups[0]?.sets[0]?.key ?? "";
+  // Nothing is chosen on arrival: the page opens on Numbering & identity's lists, and a list is shown once chosen.
+  const currentKey = sp.set && sets.some((one) => one.key === sp.set) ? sp.set : "";
   const q = (sp.q ?? "").trim();
   const show = sp.show === "RETIRED" || sp.show === "ALL" ? sp.show : "ACTIVE";
   const set = sets.find((one) => one.key === currentKey) ?? null;
@@ -134,7 +138,8 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
     (show === "ALL" || v.status === show || (show === "ACTIVE" && v.status === "OFF")) &&
     (!q || v.code.toLowerCase().includes(q.toLowerCase()) || v.label.toLowerCase().includes(q.toLowerCase())),
   );
-  const retiredCount = allValues.filter((v) => v.status === "RETIRED").length;
+  const retiredCount = allValues.filter((v) => inChosen(v) && v.status === "RETIRED").length;
+  const inUseCount = allValues.filter((v) => inChosen(v) && v.status !== "RETIRED").length;
   const listUsed = Object.keys(places).length > 0;
   const runsOn = !!set && (lists.lists ?? []).some((one) => one.key === set.key && one.app);
   const setUsed = !!chosen && allValues.some((v) => inChosen(v) && (places[v.code] ?? []).length > 0);
@@ -211,9 +216,14 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                 ) : null}
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                {may ? <Link scroll={false} href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} data-on={sp.panel === "add"} className="ask mr-2"><Plus className="h-3.5 w-3.5" /> Add a value</Link> : null}
-                {may ? <Link scroll={false} href={here({ panel: sp.panel === "details" ? undefined : "details", edit: undefined })} title="Change this list" aria-label="Change this list" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil className="h-4 w-4" /></Link> : null}
-                <a href={`/api/export/config-set?set=${encodeURIComponent(set.key)}`} title="Download this list" aria-label="Download this list" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Download className="h-4 w-4" /></a>
+                {may && listRead && !listRead.app ? (
+                  <ActionForm action={switchListAction} hidden={{ key: set.key, title: set.title, active: listRead.active ? "0" : "1" }} hideSubmit className="mr-3 space-y-0">
+                    <Switch on={listRead.active} label={listRead.active ? `Switch ${set.title} off: its values are no longer offered` : `Switch ${set.title} on again`} />
+                  </ActionForm>
+                ) : null}
+                {may ? <Link scroll={false} href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} aria-current={sp.panel === "add" ? "true" : undefined} title="Add a value" aria-label="Add a value" className={`${ICON} aria-[current]:bg-tint aria-[current]:text-brand-ink`}><Plus className="h-4 w-4" /></Link> : null}
+                {may ? <Link scroll={false} href={here({ panel: sp.panel === "details" ? undefined : "details", edit: undefined })} title="Change this list" aria-label="Change this list" className={ICON}><Pencil className="h-4 w-4" /></Link> : null}
+                <a href={`/api/export/config-set?set=${encodeURIComponent(set.key)}`} title="Download this list" aria-label="Download this list" className={ICON}><Download className="h-4 w-4" /></a>
                 {may && !runsOn && !listUsed ? <DeleteSetButton setKey={set.key} title={set.title} count={allValues.length} /> : null}
               </div>
             </div>
@@ -223,20 +233,20 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
               <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
                 <span className="stencil text-slate-500">Set</span>
                 <span className="text-sm font-semibold text-slate-800">{chosen.name}</span>
-                {chosen.active ? <ToneChip tone="done">on</ToneChip> : <ToneChip tone="idle">off</ToneChip>}
+                {!may || !chosen.id ? (chosen.active ? <ToneChip tone="done">on</ToneChip> : <ToneChip tone="idle">off</ToneChip>) : null}
                 <span className="min-w-0 text-[11px] text-slate-600">
-                  {chosen.isDefault
-                    ? (setsOfList.length > 1 ? "serves every deliverable type no other set names" : "serves every deliverable type")
-                    : chosen.deliverableTypes.length ? `serves ${chosen.deliverableTypes.map(typeName).join(", ")}` : "serves no deliverable type yet: say which"}
+                  {chosen.deliverableTypes.length ? `serves ${chosen.deliverableTypes.map(typeName).join(", ")}`
+                    : chosen.isDefault ? (setsOfList.length > 1 ? "serves every deliverable type no other set names" : "serves every deliverable type")
+                    : "serves no deliverable type yet: say which"}
                 </span>
                 {may ? (
                   <span className="ml-auto flex items-center gap-1">
                     {chosen.id ? (
                       <>
-                        <ActionForm action={switchSetAction} hidden={{ key: currentKey, setId: chosen.id, active: chosen.active ? "0" : "1" }} hideSubmit className="space-y-0">
-                          <button type="submit" className="ask">{chosen.active ? "Switch off" : "Switch on"}</button>
+                        <ActionForm action={switchSetAction} hidden={{ key: currentKey, setId: chosen.id, active: chosen.active ? "0" : "1" }} hideSubmit className="mr-2 space-y-0">
+                          <Switch on={chosen.active} label={chosen.active ? `Switch the set ${chosen.name} off: its values are no longer offered` : `Switch the set ${chosen.name} on`} />
                         </ActionForm>
-                        <Link scroll={false} href={here({ panel: sp.panel === "editset" ? undefined : "editset", edit: undefined, vs: chosen.id })} title="Change this set" aria-label="Change this set" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil className="h-4 w-4" /></Link>
+                        <Link scroll={false} href={here({ panel: sp.panel === "editset" ? undefined : "editset", edit: undefined, vs: chosen.id })} title="Change this set" aria-label="Change this set" className={ICON}><Pencil className="h-4 w-4" /></Link>
                         {!setUsed ? (
                           <ActionForm action={deleteSetAction} hidden={{ key: currentKey, setId: chosen.id }} hideSubmit className="space-y-0"
                             confirmText={`Delete the set ${chosen.name} and its values? None of them was ever used on ${ctx.project.code}; the log keeps it.`}>
@@ -257,16 +267,17 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                   <span className="text-[11px] text-slate-500">its values are offered for the deliverable types it serves; two sets switched on never serve the same one</span>
                 </div>
                 <ActionForm id="set-form" action={sp.panel === "newset" ? createSetAction : updateSetAction} hideSubmit
-                  hidden={{ key: currentKey, ...(sp.panel === "editset" ? { setId: chosen!.id!, typesAsked: chosen!.isDefault ? "0" : "1" } : {}) }}
+                  hidden={{ key: currentKey, ...(sp.panel === "editset" ? { setId: chosen!.id!, typesAsked: "1" } : {}) }}
                   className="asking space-y-4 px-5 py-5 sm:px-6">
                   <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                     <Field label="Name" required><input name="name" required defaultValue={sp.panel === "editset" ? chosen!.name : ""} placeholder="Supplier documents" className={field} /></Field>
                   </div>
-                  {sp.panel === "editset" && chosen!.isDefault ? (
-                    <p className="text-xs leading-5 text-slate-600">The default set serves every deliverable type no other set names.</p>
-                  ) : (
+                  {(
                     <fieldset>
-                      <legend className="stencil mb-1.5 text-slate-500">Deliverable types it serves</legend>
+                      <legend className="stencil mb-1.5 text-slate-500">
+                        Deliverable types it serves
+                        {sp.panel === "editset" && chosen!.isDefault ? <span className="ml-2 font-sans text-[11px] font-normal normal-case tracking-normal text-slate-500">none ticked: every deliverable type no other set names</span> : null}
+                      </legend>
                       <div className="flex flex-wrap gap-x-5 gap-y-1.5">
                         {deliverables.filter((d) => d.status === "ACTIVE").map((d) => (
                           <label key={d.code} className="flex items-center gap-2 text-sm text-slate-700">
@@ -335,11 +346,14 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                 <Search className="absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <input name="q" defaultValue={q} placeholder={`Search ${set.title.toLowerCase()} by code or name…`} className="plain w-full pl-6!" />
               </label>
-              <span className="flex items-center gap-2">
-                {([["ACTIVE", "In use"], ["RETIRED", `Retired${retiredCount ? ` ${retiredCount}` : ""}`], ["ALL", "All"]] as const).map(([value, label]) => (
-                  <Link scroll={false} key={value} href={here({ show: value === "ACTIVE" ? undefined : value, edit: undefined })} data-on={show === value} aria-current={show === value ? "true" : undefined} className="ask">{label}</Link>
+              {/* Which values: one control of three, the app's segmented choice. */}
+              <nav aria-label="Which values" className="seg w-fit">
+                {([["ACTIVE", "In use", inUseCount], ["RETIRED", "Retired", retiredCount], ["ALL", "All", inUseCount + retiredCount]] as const).map(([value, label, n]) => (
+                  <Link scroll={false} key={value} href={here({ show: value === "ACTIVE" ? undefined : value, edit: undefined })} aria-current={show === value ? "page" : undefined} className="segment">
+                    {label}<span className="segment-n">{n}</span>
+                  </Link>
                 ))}
-              </span>
+              </nav>
               {q ? <Link scroll={false} href={here({ q: undefined, edit: undefined })} className="text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-slate-800 hover:underline">Clear</Link> : null}
             </form>
 
@@ -366,7 +380,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                   return (
                     <Fragment key={v.id}>
                       <tr id={`value-${index}-line`} className={cn("scroll-mt-20 align-top", v.status === "RETIRED" && !open && "opacity-60", open && "[&>td]:border-b-0")}>
-                        {may ? <Td className="w-8"><input type="checkbox" form="bulk-values" name="valueIds" value={v.id} data-status={v.status} aria-label={`Tick ${v.code}`} /></Td> : null}
+                        {may ? <Td className="w-8"><input type="checkbox" form="bulk-values" name="valueIds" value={v.id} data-status={v.status} data-used={isUsed ? "1" : "0"} aria-label={`Tick ${v.code}`} /></Td> : null}
                         <Td className="whitespace-nowrap font-mono text-xs font-bold text-slate-900">{v.code}</Td>
                         <Td className="min-w-50 text-sm">{v.label}</Td>
                         {propFields ? <Td className={propFields.some((f) => unanswered(f, props)) ? "text-xs text-amber-700" : "text-xs text-slate-600"}>{doesText(propFields, props) || <span className="text-slate-300">—</span>}</Td> : null}
@@ -403,20 +417,22 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                             </ActionForm>
                             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line bg-tint-soft px-5 py-3 text-xs sm:px-6">
                               <Link scroll={false} href={here({ edit: undefined })} className="font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
-                              <form action={retireValueAction}>
-                                <input type="hidden" name="valueId" value={v.id} />
-                                <button className="font-semibold text-slate-500 hover:text-slate-800">{v.status !== "RETIRED" ? "Retire" : "Bring back"}</button>
-                              </form>
-                              {!isUsed ? (
-                                <ActionForm action={deleteValueAction} hidden={{ valueId: v.id }} hideSubmit className="space-y-0"
-                                  confirmText={`Delete ${v.code}? It was never used on ${ctx.project.code}; the log keeps it.`}>
-                                  <button type="submit" className="font-semibold text-slate-500 hover:text-red-700">Delete</button>
-                                </ActionForm>
-                              ) : null}
-                              <span className="flex items-center gap-1 text-slate-500">
-                                Order
-                                <form action={moveValueAction}><input type="hidden" name="valueId" value={v.id} /><input type="hidden" name="direction" value="up" /><button disabled={index === 0} className="rounded-sm px-1.5 py-0.5 hover:bg-slate-100 disabled:opacity-25" title="Move up" aria-label="Move up">↑</button></form>
-                                <form action={moveValueAction}><input type="hidden" name="valueId" value={v.id} /><input type="hidden" name="direction" value="down" /><button disabled={index === allValues.length - 1} className="rounded-sm px-1.5 py-0.5 hover:bg-slate-100 disabled:opacity-25" title="Move down" aria-label="Move down">↓</button></form>
+                              <span className="flex items-center gap-0.5">
+                                <form action={retireValueAction}>
+                                  <input type="hidden" name="valueId" value={v.id} />
+                                  {v.status !== "RETIRED"
+                                    ? <button title="Retire: no longer offered, kept on what carries it" aria-label={`Retire ${v.code}`} className={ICON}><Archive className="h-4 w-4" /></button>
+                                    : <button title="Bring it back" aria-label={`Bring ${v.code} back`} className={ICON}><ArchiveRestore className="h-4 w-4" /></button>}
+                                </form>
+                                {!isUsed ? (
+                                  <ActionForm action={deleteValueAction} hidden={{ valueId: v.id }} hideSubmit className="space-y-0"
+                                    confirmText={`Delete ${v.code}? It was never used on ${ctx.project.code}; the log keeps it.`}>
+                                    <button type="submit" title="Delete: never used" aria-label={`Delete ${v.code}`} className={`${ICON} hover:bg-red-50! hover:text-red-600!`}><Trash2 className="h-4 w-4" /></button>
+                                  </ActionForm>
+                                ) : null}
+                                <span aria-hidden className="mx-1.5 h-4 w-px bg-line" />
+                                <form action={moveValueAction}><input type="hidden" name="valueId" value={v.id} /><input type="hidden" name="direction" value="up" /><button disabled={index === 0} title="Up the list" aria-label={`Move ${v.code} up`} className={`${ICON} disabled:opacity-25`}><ArrowUp className="h-4 w-4" /></button></form>
+                                <form action={moveValueAction}><input type="hidden" name="valueId" value={v.id} /><input type="hidden" name="direction" value="down" /><button disabled={index === allValues.length - 1} title="Down the list" aria-label={`Move ${v.code} down`} className={`${ICON} disabled:opacity-25`}><ArrowDown className="h-4 w-4" /></button></form>
                               </span>
                               <button type="submit" form={`value-${index}`} data-on="true" className="ask ml-auto">Save</button>
                             </div>
@@ -427,7 +443,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                   );
                 })}
               </DataTable>
-              {may ? <div className="shrink-0"><ValuesDock formId="bulk-values" /></div> : null}
+              {may ? <div className="shrink-0"><ValuesDock formId="bulk-values" otherSets={setsOfList.filter((p) => p.id && p.id !== chosen?.id).map((p) => ({ id: p.id!, name: p.name }))} /></div> : null}
               </>
             ) : (
               <p className="px-5 py-10 text-center text-sm text-slate-500 sm:px-6">
@@ -436,7 +452,14 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
             )}
           </section>
         ) : (
-          <p className="px-5 py-10 text-sm text-slate-500 sm:px-6">No list yet{lists.mayChange ? ": create the first one." : "."}</p>
+          // Nothing chosen yet: what the page holds, and where to start.
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+            <p className="text-sm font-semibold text-slate-800">Choose a list on the left</p>
+            <p className="max-w-md text-xs leading-5 text-slate-500">
+              Each list holds one or more sets, and each set serves the deliverable types it names: open a list with its + to see its sets.
+              {lists.mayChange ? " A list of your own goes in Numbering & identity or Classification & keeping, with New list above." : ""}
+            </p>
+          </div>
         )}
       </SetNav>
     </div>

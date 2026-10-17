@@ -117,18 +117,18 @@ public static class ListRules
     }
 
     /// <summary>
-    /// The set of a list that serves a deliverable type: the active set naming it, else the default set. None when the list
-    /// has no set (nothing is offered then).
+    /// The set of a list that serves a deliverable type: the active set naming it; else the default set, when it names no
+    /// type (owner: the default may be given types of its own, and then serves those only). None: nothing is offered.
     /// </summary>
     public static ValueSet? Serving(IEnumerable<ValueSet> setsOfList, string? deliverableType)
     {
         var sets = setsOfList.ToList();
-        return (deliverableType is null ? null : sets.FirstOrDefault(s => s.Active && !s.IsDefault && s.DeliverableTypes.Contains(deliverableType)))
-            ?? sets.FirstOrDefault(s => s.IsDefault && s.Active);
+        return (deliverableType is null ? null : sets.FirstOrDefault(s => s.Active && s.DeliverableTypes.Contains(deliverableType)))
+            ?? sets.FirstOrDefault(s => s.IsDefault && s.Active && s.DeliverableTypes.Length == 0);
     }
 
     /// <summary>The deliverable types another active set of the same list already serves, among those given.</summary>
     public static IReadOnlyList<(string Type, string Set)> Overlaps(IEnumerable<ValueSet> setsOfList, ValueSet set, IEnumerable<string> types) =>
-        setsOfList.Where(s => s.Id != set.Id && s.Active && !s.IsDefault)
+        setsOfList.Where(s => s.Id != set.Id && s.Active)
             .SelectMany(s => s.DeliverableTypes.Intersect(types).Select(t => (t, s.Name))).ToList();
 }

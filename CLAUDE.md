@@ -497,18 +497,24 @@ a screen only words it. A new rule goes in the backend, never in a page.
   runs on is never deleted. Verdict lists (Settings → Verdict lists) and Project codes (filled by itself) read only
   there. The "Used" column says where each value is used, or "never used".
 - **List → sets → values** (owner, Types & sets; `ListRules`, `ValueSet`, `ValueEntry.SetId`): a list holds sets, each
-  naming the deliverable types it serves; the **default** set serves every type no other active set names (it is
-  theirs like any other, owner: renamed, switched off, deleted when never used; switched off, the types no other set
-  names find nothing in that list), so a document always finds exactly one set (a list
+  naming the deliverable types it serves; the **default** set serves every type no other active set names, unless it is
+  given types of its own, then those only (it is theirs like any other, owner: renamed, given types, switched off, deleted
+  when never used; switched off, the types no other set names find nothing in that list), so a document always finds exactly one set (a list
   with one set uses it). Two active sets of a list never serve the same type (SETS_OVERLAP). A code is unique across all
   sets of its list. Deliverable types, Project codes, Project types and Contract roles hold one set (ONE_SET_ONLY).
   A value, a set and a list of one's own are switched off and on (a value then reads OFF: not offered, kept on what
   carries it); the app's lists are not switched here, their field is left out in Forms & fields (APP_LIST_STAYS). Never
   used: a value or a set is deleted (SET_IN_USE otherwise); a list only if it is one's own (the app's stay).
-- Types & sets shows the sets: each list in the menu has a + (− once open) showing its sets under it, each with its
-  count ("· off" when switched off), and "New set" (name, the deliverable types it serves). The set shown has its bar:
-  name, on/off, whom it serves, Switch off/on, its pencil (name, types), delete while never used. Values are the set's;
-  a value is added to the set shown (`?vs=<set>`).
+- Types & sets shows the sets: nothing is chosen on arrival (Numbering & identity's lists, and "Choose a list on the
+  left"); choosing a list opens its sets. In the menu a list counts its sets, a set its values in use ("· off" when
+  switched off); "New set" (name, the deliverable types it serves). The set shown has its bar: name, whom it serves,
+  its switch, its pencil (name, types), delete while never used. Values are the set's; a value is added to the set
+  shown (`?vs=<set>`). Which values: the segmented choice (`.seg` / `.segment`, In use · Retired · All, with counts).
+  "Used" names what uses a value ("recommended by document types: Calculation"), only real references (`Pointers`).
+  The bottom bar for ticked values: Retire, Bring back, and for those never used, Move to another set and Delete.
+- **On/off is a switch** (owner, everywhere): `components/switch.tsx` (`role="switch"`), never a "Switch off" button or
+  an on/off chip beside a button. Acts whose icon says them are icons (add, change, download, delete, retire, order),
+  their name on hover; Save, Cancel and a page's first act keep their words.
 - **Forms follow the sets**: a document is offered, for each list, only the values of the set serving its deliverable
   type (new document, once the type is chosen; Details and Edit rev by the document's own type), read from the backend
   (`GET /api/values/serving`, `lib/settings/serving.ts` `forType`); the backend refuses any other (VALUE_NOT_FOR_TYPE,

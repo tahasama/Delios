@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Minus, Plus, Search } from "lucide-react";
 
 /** One set of a list, as the menu shows it under its list. */
@@ -29,7 +28,6 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
   // The list chosen opens on its sets by itself, whichever way it was chosen.
   useEffect(() => { setOpen((was) => (was.has(current) ? was : new Set(was).add(current))); }, [current]);
   const toggle = (key: string) => setOpen((was) => { const next = new Set(was); if (next.has(key)) next.delete(key); else next.add(key); return next; });
-  const router = useRouter();
   const needle = q.trim().toLowerCase();
   const sets = needle
     ? groups.flatMap((g) => g.sets).filter((s) => s.title.toLowerCase().includes(needle) || s.key.toLowerCase().includes(needle))
@@ -39,8 +37,8 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
     // As tall as the window under the top bar (h-18) less the page's margins above and below it (py-6): the title above
     // scrolls away, then this sheet fills the window and only its table and its list of lists scroll. A narrow screen flows.
     <div className="register register-sheet register-sheet-open flex flex-col lg:h-[calc(100dvh-7.5rem)]">
-      <div className="asking flex shrink-0 flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-line px-5 pt-2 sm:px-6">
-        <div role="tablist" className="-mb-px flex flex-wrap gap-x-5">
+      <div className="asking flex shrink-0 flex-wrap items-stretch justify-between gap-x-4 border-b border-line px-5 sm:px-6">
+        <div role="tablist" className="-mb-px flex flex-wrap items-stretch gap-x-5">
           {groups.map((g, i) => {
             const on = !needle && i === tab;
             return (
@@ -49,15 +47,15 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                 type="button"
                 role="tab"
                 aria-selected={on}
-                onClick={() => { setTab(i); setQ(""); const first = g.sets[0]; if (first && !g.sets.some((s) => s.key === current)) router.replace(`/settings/config?set=${first.key}`, { scroll: false }); }}
-                className={`-mb-px whitespace-nowrap border-b-2 px-0.5 pb-2 pt-1 text-[12px] leading-4 transition ${on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"}`}
+                onClick={() => { setTab(i); setQ(""); }}
+                className={`inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-0.5 text-[12px] leading-4 transition ${on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"}`}
               >
                 {g.title} <span className="ml-1 font-normal tabular-nums text-slate-500">{g.sets.length}</span>
               </button>
             );
           })}
         </div>
-        <label className="search-field relative mb-1.5 w-full sm:w-56">
+        <label className="search-field relative w-full self-center py-1.5 sm:w-56">
           <span className="sr-only">Find a list</span>
           <Search className="pointer-events-none absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a list…" className="plain w-full pl-6!" />
@@ -80,7 +78,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                       className={`flex min-w-0 flex-1 items-center justify-between gap-2 py-2 pl-2.5 pr-1 text-[13px] ${on ? "font-semibold text-brand-ink" : "text-slate-600 hover:text-slate-900"}`}
                     >
                       <span className="truncate">{one.title}</span>
-                      <span className={`shrink-0 text-[11px] tabular-nums ${on ? "text-brand-ink/70" : "text-slate-500"}`}>{one.count}</span>
+                      <span title={`${one.parts.length} ${one.parts.length === 1 ? "set" : "sets"}`} className={`shrink-0 text-[11px] tabular-nums ${on ? "text-brand-ink/70" : "text-slate-500"}`}>{one.parts.length}</span>
                     </Link>
                     <button
                       type="button"
@@ -107,7 +105,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                               className={`flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-[12px] ${here ? "bg-tint font-semibold text-brand-ink" : "text-slate-600 hover:bg-tint-soft hover:text-slate-900"} ${part.active ? "" : "opacity-60"}`}
                             >
                               <span className="truncate">{part.name}{part.active ? "" : " · off"}</span>
-                              <span className="shrink-0 text-[11px] tabular-nums text-slate-500">{part.count}</span>
+                              <span title={`${part.count} ${part.count === 1 ? "value" : "values"} in use`} className="shrink-0 text-[11px] tabular-nums text-slate-500">{part.count}</span>
                             </Link>
                           </li>
                         );
