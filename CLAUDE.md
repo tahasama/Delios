@@ -486,7 +486,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A list's "Used on" counts the project's documents carrying each value (backend `GET /register/usage`), and opens
   them in the register; a value in use keeps its code. Values are retired, never deleted: the bulk "Delete" (which
   only retired) is removed.
-- **Organizations page** (owner's "idea1"), People & access's way: plate (with their own DELIOS · with accounts from us ·
+- **Organizations, two levels** (owner): Settings → Organizations is the **project's**: only the organizations working on
+  it ("Organizations on <project>", "Add one to <project>" from our list, then "Not in our list yet?" to add or create
+  one, which then works on the project), each line opened by its pencil: role here, contract number (once), who of
+  theirs answers for it here and backup (`PARTY:<id>`), the function their people get, works on it. The list of every
+  organization and its details is the **organization's** (`/organization/organizations`, administrators). An
+  organization with its **own DELIOS** is never changed by us: its line there is read only (name, code, identifier,
+  domain), we see it and link with it; only "In use" is ours.
+- **Organization's list** (owner's "idea1"), People & access's way: plate (with their own DELIOS · with accounts from us ·
   worked for by one of ours · working on <project>); "Organizations we work with" one sheet (`OrganizationJoins`):
   **Add an organization** (one DELIOS already knows, any list's, found by name or code, `GET /api/admin/organizations/on-delios`,
   taken as it is; one with its own DELIOS is invited to link at once, their administrator accepts then puts their

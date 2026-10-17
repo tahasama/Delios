@@ -53,7 +53,7 @@ export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/settings/parties",
     title: "Organizations",
-    text: "Your own organization and the others you exchange information with.",
+    text: "Which organizations work on this project: their role, their contract with us, who of theirs answers for them.",
     group: "Organization",
     control: true,
   },

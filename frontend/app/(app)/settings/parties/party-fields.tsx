@@ -15,8 +15,10 @@ const field = "plain w-full";
  * only address whose replies are taken in) and the person of ours who works for it (nobody chosen: the control
  * function). The questions change as the choice is made.
  */
-export function PartyKindFields({ kind, contactId, backupId, carriedBy, people, ours, control, access, contactEmail = "", fixed }: {
+export function PartyKindFields({ kind, contactId, backupId, carriedBy, people, ours, control, access, contactEmail = "", fixed, askContact = true }: {
   kind: string;
+  /** Who of theirs answers for it is the project's: asked on a project's line, not on the organization's list. */
+  askContact?: boolean;
   /** How they work with us was changed once already: shown, fixed (the words say when and by whom). */
   fixed?: string;
   contactEmail?: string;
@@ -66,7 +68,7 @@ export function PartyKindFields({ kind, contactId, backupId, carriedBy, people, 
           <SearchPick single name="carriedBy" label="Who of ours works for it" hint={`sends to them and records their answers; nobody chosen: ${nobody}`}
             items={ours} initial={carriedBy ? [carriedBy] : []} placeholder={nobody} />
         </>
-      ) : people.length ? (
+      ) : !askContact ? null : people.length ? (
         <>
           <SearchPick single name="contactId" items={people.map((person) => ({ id: person.id, name: person.name, detail: person.email ?? null }))}
             initial={contactId ? [contactId] : []} label="Who answers for it here" hint="optional — one of their people, so we know whom to ask" placeholder="Nobody yet" />

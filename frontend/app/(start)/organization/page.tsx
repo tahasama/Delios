@@ -193,7 +193,7 @@ export default async function OrganizationPage() {
               <tr key={p.id} className={p.active ? "" : "opacity-60"}>
                 <Td>
                   {scope.projectCount ? (
-                    <Link href={`/settings/parties#party-${p.id}`} className="hover:underline">
+                    <Link href={`/organization/organizations?edit=${p.id}#party-${p.id}`} className="hover:underline">
                       <span className="font-mono text-xs font-semibold text-link">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span>
                     </Link>
                   ) : <><span className="font-mono text-xs font-semibold">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span></>}
@@ -251,7 +251,7 @@ export default async function OrganizationPage() {
               </ul>
             </details>
           ) : null}
-          {scope.projectCount ? <p className="mt-2 text-[11px] text-slate-400">Add organizations, invite them to link, and say which take part in each project in <Link href="/settings/parties" className="font-semibold text-link hover:underline">Organizations</Link>.</p> : null}
+          <p className="mt-2 text-[11px] text-slate-400">Add, create and change them, and invite them to link, in <Link href="/organization/organizations" className="font-semibold text-link hover:underline">Organizations we work with</Link>; each project says which of them work on it.</p>
         </Card>
 
         <Card title="Defaults for new projects" actions={<Link href="/organization/defaults" className="text-xs font-semibold text-link hover:underline">See and change them</Link>}>

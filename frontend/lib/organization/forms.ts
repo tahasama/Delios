@@ -87,6 +87,9 @@ export async function setProjectOrganizationAction(_prev: Result | undefined, fo
   const ctx = await requireScope();
   const partyId = text(formData, "partyId");
   if (!partyId) return { error: "Choose the organization." };
+  const contactId = text(formData, "contactId") || null;
+  const backupId = text(formData, "backupId") || null;
+  if (contactId && backupId && contactId === backupId) return { error: "The backup has to be someone other than the person who answers." };
   try {
     await api(projectPath(ctx, `/organizations/${partyId}`), {
       method: "PUT",
@@ -99,8 +102,14 @@ export async function setProjectOrganizationAction(_prev: Result | undefined, fo
   } catch (e) {
     return failed(e);
   }
+  // Who of theirs answers for it on this project: optional, never a reason a save fails.
+  if (formData.get("answers") === "1") {
+    const { setProjectSetting } = await import("@/lib/settings/api");
+    const { PARTY_KEY } = await import("@/lib/settings/api-admin");
+    await setProjectSetting(ctx.projectId, PARTY_KEY + partyId, contactId || backupId ? JSON.stringify({ contactId, backupId }) : null).catch(() => undefined);
+  }
   revalidatePath("/settings/parties");
-  return {};
+  return { ok: "Saved." };
 }
 
 /**

@@ -26,7 +26,8 @@ type Found = { id: string; code: string; name: string; country: string | null; l
  * look like it are named: "Is this the same as…?" — Yes adds that one; No creates it.
  */
 export function OrganizationJoins({ projectCode, ours, control, own }: {
-  projectCode: string;
+  /** On a project's page: what is added or created also works on this project. */
+  projectCode?: string;
   /** Our people, to choose who works for an organization nobody of which signs in. */
   ours: PickItem[];
   /** Who acts as the control function, by name. */
@@ -76,7 +77,8 @@ export function OrganizationJoins({ projectCode, ours, control, own }: {
   if (!chosen) {
     return (
       <section id="join" className="register register-sheet register-sheet-open scroll-mt-24" aria-label="Organizations we work with">
-        {band("Organizations we work with", "add one DELIOS already knows, or create one it does not know yet")}
+        {band(projectCode ? `Not in our list yet?` : "Organizations we work with",
+          projectCode ? `add one DELIOS already knows, or create it; it then works on ${projectCode}` : "add one DELIOS already knows, or create one it does not know yet")}
         <div className="space-y-3 px-5 py-4 sm:px-6">
           {state?.ok ? <p className="w-fit rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-800 ring-1 ring-emerald-200">{state.ok}</p> : null}
           <div className="flex flex-wrap items-start gap-2">
@@ -84,8 +86,7 @@ export function OrganizationJoins({ projectCode, ours, control, own }: {
             <button type="button" onClick={() => setChosen("create")} className="ask"><Plus aria-hidden className="h-3.5 w-3.5" /> Create an organization</button>
           </div>
           <p className="text-[11px] leading-4 text-slate-500">
-            Look for it first: an organization has one code and one name everywhere. Someone asked onto {projectCode} whose company
-            has its own DELIOS brings their company with them.
+            Look for it first: an organization has one code and one name everywhere on DELIOS.
           </p>
         </div>
       </section>
@@ -113,6 +114,7 @@ export function OrganizationJoins({ projectCode, ours, control, own }: {
         <input ref={identityRef} type="hidden" name="identityId" defaultValue={picked?.id ?? ""} key={picked?.id ?? "none"} />
         <input ref={identityName} type="hidden" name="identityName" defaultValue={picked?.name ?? ""} />
         <input ref={notTheSame} type="hidden" name="notTheSame" defaultValue="" />
+        {projectCode ? <input type="hidden" name="takePart" value="1" /> : null}
         {chosen === "add" ? (
           <>
             <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">

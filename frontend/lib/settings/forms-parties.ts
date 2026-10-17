@@ -2,10 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/core/scope";
-import { api, refusal, refusalForForm } from "@/lib/client";
+import { api, projectPath, refusal, refusalForForm } from "@/lib/client";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";
-import { setProjectSetting } from "@/lib/settings/api";
-import { adminParties, PARTY_KEY } from "@/lib/settings/api-admin";
+import { adminParties } from "@/lib/settings/api-admin";
 
 /** One organization already on DELIOS that looks like the one being created, and why (the backend's LOOKS_LIKE). */
 export type Lookalike = { id: string; code: string; name: string; country: string | null; onDelios: boolean; why: string };
@@ -84,8 +83,10 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
       });
       partyId = created.id;
     }
-    // Who answers for it here: optional, never a reason a save fails.
-    await setProjectSetting(ctx.projectId, PARTY_KEY + partyId, contactId || backupId ? JSON.stringify({ contactId, backupId }) : null);
+    // Added from a project's page: it works on that project too.
+    if (!id && formData.get("takePart") === "1") {
+      await api(projectPath(ctx, `/organizations/${partyId}`), { method: "PUT", body: { role: null, startFunctionId: null, active: true } });
+    }
   } catch (e) {
     // Look-alikes are named first: the form asks whether it is one of them.
     const { code: refused, params, message } = refusal(e);
@@ -93,9 +94,14 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
     return refusalForForm(e);
   }
   revalidatePath("/settings/parties");
+  revalidatePath("/organization/organizations");
   revalidatePath("/settings/users");
   saidName ||= code;
-  return { ok: id ? `${saidName} is saved.` : `${saidName} is registered. Say whether it takes part in ${ctx.project.code} below.` };
+  return {
+    ok: id ? `${saidName} is saved.`
+      : formData.get("takePart") === "1" ? `${saidName} is in our list and works on ${ctx.project.code}: open its line to give its role and contract.`
+      : `${saidName} is in our list.`,
+  };
 }
 
 /** Organizations DELIOS knows whose code or name holds the words: to add one as it is. */
