@@ -46,7 +46,19 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
   const control = controllers.map((one) => one.name);
   const functions = functionList.filter((one) => one.active).sort((a, b) => a.name.localeCompare(b.name));
   const kindLabel = (kind: string) => PARTY_KINDS.find((k) => k.value === (kind === "NOT_ON_DELIOS" ? "OFFLINE" : kind))?.label ?? kind;
-  const working = onProject.filter((one) => one.active);
+  // In our list is on the project (owner): every organization of ours but us, with what the project says of it, if anything.
+  const rows = parties.filter((p) => !p.isInternal && p.active).map((p) => {
+    const here = onProject.find((o) => o.partyId === p.id);
+    return {
+      partyId: p.id, code: p.code, name: p.name, kind: here?.kind ?? (p.kind === "OFFLINE" ? "NOT_ON_DELIOS" : p.kind),
+      linkedOrganization: here?.linkedOrganization ?? (p.link?.state === "LINKED" ? p.link.organization : null),
+      role: here?.role ?? null, startFunctionId: here?.startFunctionId ?? null, startFunction: here?.startFunction ?? null,
+      people: here?.people ?? users.filter((u) => u.active && u.partyId === p.id).length,
+      contractNumber: here?.contractNumber ?? null, previousContractNumber: here?.previousContractNumber ?? null,
+      contractChangedByName: here?.contractChangedByName ?? null, contractChangedAt: here?.contractChangedAt ?? null,
+    };
+  });
+  const working = rows;
   const href = (q: Search, anchor?: string) => {
     const next = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1]));
     return `/settings/parties${next.size ? `?${next}` : ""}${anchor ? `#${anchor}` : ""}`;
@@ -88,22 +100,22 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
       </section>
 
       {/* One way to bring an organization onto the project: look for it (our list, then DELIOS), else create it. */}
-      <OrganizationJoins project onProject={onProject.filter((o) => o.active).map((o) => o.partyId)} ours={ours} control={control} own={policy.own} />
+      <OrganizationJoins project ours={ours} control={control} own={policy.own} />
 
       {/* The organizations working on this project. */}
       <section className="register register-sheet register-sheet-open" aria-labelledby="list-head">
         {band("list-head", `Organizations on ${ctx.project.code}`, `${working.length}`)}
-        {onProject.length ? (
+        {rows.length ? (
           <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
             head={<tr><Th>Organization</Th><Th>Role with us</Th><Th>How they work with us</Th><Th>Contract</Th><Th>Who answers for it</Th><Th></Th></tr>}>
-            {onProject.map((one) => {
+            {rows.map((one) => {
               const open = sp.part === one.partyId;
               const party = parties.find((p) => p.id === one.partyId);
               const c = party?.changed;
               const theirPeople = users.filter((u) => u.active && u.partyId === one.partyId).map((u) => ({ id: u.id, name: u.name, detail: u.email }));
               return (
                 <Fragment key={one.partyId}>
-                  <tr id={`part-${one.partyId}`} className={cn("scroll-mt-20 align-top target:bg-tint-soft", !one.active && "opacity-60", open && "[&>td]:border-b-0")}>
+                  <tr id={`part-${one.partyId}`} className={cn("scroll-mt-20 align-top target:bg-tint-soft", open && "[&>td]:border-b-0")}>
                     <Td>
                       <Link href={open ? href({}, `part-${one.partyId}`) : href({ part: one.partyId }, `part-${one.partyId}`)} scroll={false}
                         className="text-slate-800 hover:text-link hover:underline" title={open ? "Close" : `What ${one.name} is, and its role with us`}>
@@ -114,7 +126,6 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
                           {countryName(c.identifier.country)} · {IDENTIFIER_KINDS.find((k) => k.value === c.identifier!.kind)?.label.toLowerCase()} {c.identifier.number}
                         </span>
                       ) : null}
-                      {one.active ? null : <span className="block text-[11px] text-slate-500">no longer on the project</span>}
                     </Td>
                     <Td className="text-xs">{one.role ? roles.find((r) => r.code === one.role)?.label ?? one.role : <span className="text-slate-500">not stated</span>}</Td>
                     <Td className="text-xs">{kindLabel(one.kind)}</Td>
@@ -166,12 +177,7 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
                               </>
                             ) : null}
                             <Field label="Their people start as" hint="the function their people get here">{startSelect(one.startFunctionId)}</Field>
-                            <Field label="On the project">
-                              <select name="active" defaultValue={one.active ? "on" : "off"} className={field}>
-                                <option value="on">Yes</option>
-                                <option value="off">No longer</option>
-                              </select>
-                            </Field>
+                            <input type="hidden" name="active" value="on" />
                           </div>
                         </ActionForm>
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">

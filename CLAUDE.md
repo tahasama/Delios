@@ -489,7 +489,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Organizations, two levels** (owner): Settings → Organizations is the **project's**: one field to find an organization,
   always there (our list first, then any DELIOS knows; choosing it adds it to the project), and beside it one button
   "Create an organization" that opens the form (guests, or not on DELIOS). No two-button steps, no project code repeated on
-  every line. Below, "Organizations on <project>": every organization on it (on DELIOS, guests, created by us); its
+  every line. **In our list is on the project** (owner, "1+1=2"): the search shows one in our list as "in our list" (never
+  added twice) and any other with "+ Add". Below, "Organizations on <project>": every organization in our list but us
+  (backend `ProjectPartiesAsync`, what the project says of each kept in `ProjectParty`, written when its line is saved); its
   **name opens** what it is (identifier, how it works with us, domain, its people here) and its **role with us** (client,
   supplier…), then: role here, contract number (once), who of
   theirs answers for it here and backup (`PARTY:<id>`), the function their people get, works on it. The list of every

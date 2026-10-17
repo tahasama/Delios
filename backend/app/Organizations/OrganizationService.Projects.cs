@@ -33,12 +33,14 @@ public sealed partial class OrganizationService
 {
     // ── Organizations taking part in our projects ─────────────────────────────
 
-    /// <summary>The organizations taking part in one of our projects, each with its kind, role and people on it.</summary>
+    /// <summary>The organizations on one of our projects (every one in our list but us), each with its kind, role and people on it.</summary>
     public async Task<IReadOnlyList<ProjectPartyView>> ProjectPartiesAsync(Guid projectId, CancellationToken cancellationToken)
     {
-        var rows = await db.ProjectParties.AsNoTracking().Where(p => p.ProjectId == projectId).ToListAsync(cancellationToken);
-        var partyIds = rows.Select(r => r.PartyId).ToList();
-        var parties = await db.Parties.AsNoTracking().Where(p => partyIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
+        // In our list is on the project (owner): every organization of ours but us, with what the project says of it.
+        var said = await db.ProjectParties.AsNoTracking().Where(p => p.ProjectId == projectId).ToListAsync(cancellationToken);
+        var parties = await db.Parties.AsNoTracking().Where(p => !p.IsInternal && p.Active).ToDictionaryAsync(p => p.Id, cancellationToken);
+        var rows = parties.Values.Select(p => said.FirstOrDefault(r => r.PartyId == p.Id)
+            ?? new ProjectParty { ProjectId = projectId, PartyId = p.Id, AddedByName = "", Active = true }).ToList();
         var functionIds = rows.Where(r => r.StartFunctionId != null).Select(r => r.StartFunctionId!.Value).ToList();
         var functions = await db.Functions.AsNoTracking().Where(f => functionIds.Contains(f.Id)).ToDictionaryAsync(f => f.Id, f => f.Name, cancellationToken);
         var people = await (from m in db.Memberships

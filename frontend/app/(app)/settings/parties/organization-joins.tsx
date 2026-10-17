@@ -25,11 +25,9 @@ type Found = { id: string; code: string; name: string; country: string | null; l
  * country (or why none), email domain, how it works with us; look-alikes are named before it is created. On a project's
  * page what is added is put on the project; on the organization's list, the projects may be chosen.
  */
-export function OrganizationJoins({ project, onProject = [], projects = [], ours, control, own }: {
+export function OrganizationJoins({ project, projects = [], ours, control, own }: {
   /** On a project's page: what is added is put on it. */
   project?: boolean;
-  /** Our lines already on the project. */
-  onProject?: string[];
   /** On the organization's list: the projects it may also be put on (optional). */
   projects?: { id: string; code: string; name: string }[];
   ours: PickItem[];
@@ -114,16 +112,19 @@ export function OrganizationJoins({ project, onProject = [], projects = [], ours
             {found.length ? (
               <ul className="divide-y divide-line rounded-md ring-1 ring-line">
                 {found.map((one) => {
-                  const here = !!one.partyId && onProject.includes(one.partyId);
+                  // In our list is on the project already: never added twice.
                   return (
                     <li key={one.id}>
-                      <button type="button" disabled={here || (!project && one.listed && !projects.length)} onClick={() => choose(one)}
+                      <button type="button" disabled={one.listed} onClick={() => choose(one)}
                         className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-tint-soft disabled:cursor-not-allowed disabled:opacity-50">
                         <Building2 aria-hidden className="h-3.5 w-3.5 text-slate-400" />
                         <code className="code-chip">{one.code}</code>
                         <span>{one.name}</span>
                         <span className="ml-auto text-[11px] text-slate-500">
-                          {here ? "already here" : one.listed ? "in our list" : [countryName(one.country), one.onDelios ? "has its own DELIOS" : null].filter(Boolean).join(" · ")}
+                          {one.listed ? "in our list" : (
+                            <>{[countryName(one.country), one.onDelios ? "has its own DELIOS" : null].filter(Boolean).join(" · ")}
+                              <span className="ml-3 inline-flex items-center gap-1 font-semibold text-link"><Plus aria-hidden className="h-3 w-3" /> Add</span></>
+                          )}
                         </span>
                       </button>
                     </li>
