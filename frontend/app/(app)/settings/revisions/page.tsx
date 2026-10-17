@@ -1,4 +1,5 @@
 import { SETUP_PAGES, maySetup } from "../setup-pages";
+import { SwitchControl } from "@/components/switch";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, DataTable, Th, Td, Field, inputCls, ToneChip } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -110,7 +111,7 @@ export default async function RevisionsPage() {
               <ActionForm action={updateRevisionSchemeAction} submitLabel="Save" size="sm" hidden={{ id: s.id }}>
                 <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
                   <Field label="Name" required><input name="name" required defaultValue={s.name} className={inputCls} /></Field>
-                  <label className="flex items-center gap-2 self-end text-[13px] text-slate-700"><input type="checkbox" name="forwardOnly" defaultChecked={s.forwardOnly} /> Only moves forward</label>
+                  <label className="flex cursor-pointer items-center gap-2.5 self-end pb-1.5 text-[13px] text-slate-700"><SwitchControl name="forwardOnly" defaultChecked={s.forwardOnly} /> Only moves forward</label>
                   {s.isDefault ? null : <label className="flex items-center gap-2 self-end text-[13px] text-slate-700"><input type="checkbox" name="isDefault" /> Make it the default</label>}
                 </div>
                 <SeriesRows series={s.series} phases={phases} />
@@ -129,7 +130,7 @@ export default async function RevisionsPage() {
           <ActionForm action={createRevisionSchemeAction} submitLabel="Add the scheme" size="sm">
             <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
               <Field label="Name" required><input name="name" required className={inputCls} /></Field>
-              <label className="flex items-center gap-2 self-end text-[13px] text-slate-700"><input type="checkbox" name="forwardOnly" defaultChecked /> Only moves forward</label>
+              <label className="flex cursor-pointer items-center gap-2.5 self-end pb-1.5 text-[13px] text-slate-700"><SwitchControl name="forwardOnly" defaultChecked /> Only moves forward</label>
             </div>
             <SeriesRows series={[]} phases={phases} />
           </ActionForm>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SwitchControl } from "@/components/switch";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
 import { PageHeader, Card, Chip, inputCls } from "@/components/ui";
@@ -168,8 +169,8 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                       {field.setKey ? ` — ${sets.find((s) => s.key === field.setKey)?.title ?? field.setKey}` : ""}
                       {" · added by "}{field.addedByName}
                     </p>
-                    <label className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-slate-500">
-                      <input type="checkbox" name={`own-register:${field.id}`} defaultChecked={field.inRegister} /> show it in the register
+                    <label className="mt-1 inline-flex cursor-pointer items-center gap-2 text-[11px] text-slate-500">
+                      <SwitchControl name={`own-register:${field.id}`} defaultChecked={field.inRegister} /> shown in the register
                     </label>
                   </div>
                   <label className="min-w-0">
@@ -230,8 +231,8 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                 <span className="stencil mb-1 block text-slate-500">Note under the box</span>
                 <input name="help" maxLength={140} placeholder="what to put in it, in your words" className={inputCls} />
               </label>
-              <label className="inline-flex items-center gap-1.5 self-end pb-1.5 text-[11.5px] text-slate-600">
-                <input type="checkbox" name="inRegister" /> a column in the register
+              <label className="inline-flex cursor-pointer items-center gap-2 self-end pb-1.5 text-[11.5px] text-slate-600">
+                <SwitchControl name="inRegister" /> a column in the register
               </label>
             </div>
             <p className="text-[11px] leading-4 text-slate-500">

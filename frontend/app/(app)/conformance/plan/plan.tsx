@@ -282,12 +282,19 @@ export async function DocumentManagementPlan() {
           )}
         </Part>
         <Part title="Each act, and who carries it out here">
-          <Grid head={["Act", "On this project"]}
+          {/* Who first, in a word, so the column reads at a glance; how it is done after it, in a lighter voice. */}
+          <Grid head={["Act", "Who", "How"]}
             rows={reading.rows.map((row) => [
-              row.activity.title,
+              <span key="a" className="font-semibold text-slate-800">{row.activity.title}</span>,
               row.off
-                ? <span className="text-slate-500">Not done on this project.</span>
-                : <span>{row.controlDoes ? row.activity.control : row.activity.self}{row.confirm ? <span className="text-slate-500"> Whoever holds Manage confirms first.</span> : null}</span>,
+                ? <span key="w" className="whitespace-nowrap text-slate-500">Nobody: left out</span>
+                : <span key="w" className="flex flex-col gap-0.5 whitespace-nowrap">
+                    <span className="font-semibold text-slate-800">{row.controlDoes ? "The control function" : "Whoever does the work"}</span>
+                    {row.confirm ? <span className="text-[11px] text-slate-500">after whoever holds Manage confirms</span> : null}
+                  </span>,
+              row.off
+                ? <span key="h" className="text-slate-500">Not done on this project.</span>
+                : <span key="h" className="text-slate-600">{row.controlDoes ? row.activity.control : row.activity.self}</span>,
             ])} />
         </Part>
         <Part title="What each function may do" aside={`${strictMatrix ? "only the matrix decides who may be named" : "the matrix proposes; anyone on the project may be named, and the record says who chose"} · answered ${answer("POLICY_MATRIX_DETAIL") === "FAMILY" ? "per discipline and document family" : "per discipline"}`}>

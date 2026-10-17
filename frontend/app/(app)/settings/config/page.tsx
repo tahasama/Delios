@@ -4,7 +4,7 @@ import { requireScope } from "@/lib/core/scope";
 import { Field, DataTable, Th, Td, ToneChip, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { addValueAction, retireValueAction, createListAction, updateValueAction, deleteValueAction, moveValueAction, updateListAction, bulkValuesAction, createSetAction, updateSetAction, switchSetAction, deleteSetAction, switchListAction } from "@/lib/settings/forms-lists";
-import { Switch } from "@/components/switch";
+import { Switch, SwitchControl } from "@/components/switch";
 import { getSet, getSets } from "@/lib/settings/config";
 import { parseProps, type PropField } from "@/lib/settings/config-props";
 import { propFieldsFor, isVerdictSet } from "@/lib/settings/set-props";
@@ -28,7 +28,7 @@ const field = "plain w-full";
 /** The groups a list of your own may go in: it is a document field. */
 const TAKES_LISTS = ["Numbering & identity", "Classification & keeping"];
 const GROUPS: { title: string; keys: string[] }[] = [
-  { title: "Numbering & identity", keys: ["PROJECT_CODES", "SUBPROJECTS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "SUPPLIER_CODES", "PURCHASE_ORDERS", "DELIVERABLE_TYPE_FIELDS", "PROJECT_KINDS", "CONTRACT_ROLES", "GENERIC_TITLE_WORDS"] },
+  { title: "Numbering & identity", keys: ["SUBPROJECTS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "SUPPLIER_CODES", "PURCHASE_ORDERS", "DELIVERABLE_TYPE_FIELDS", "PROJECT_KINDS", "CONTRACT_ROLES", "GENERIC_TITLE_WORDS"] },
   // The comment lists sit together, with the outcomes they feed: one classifies
   // a comment somebody wrote, the other is what an advisory step's comments
   // amount to. Both are the organization's to edit.
@@ -97,7 +97,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
   // Each group in the order its lists are listed above (Numbering & identity first), the rest by name.
   const rank = (one: (typeof sets)[number]) => { const at = GROUPS.find((g) => g.title === headingOf(one))?.keys.indexOf(one.key) ?? -1; return at < 0 ? 999 : at; };
   const groups: SetNavGroup[] = [...new Set(headings)]
-    .map((title) => ({ title, sets: sets.filter((one) => headingOf(one) === title).sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title)).map((one) => {
+    .map((title) => ({ title, sets: sets.filter((one) => one.key !== "PROJECT_CODES" && headingOf(one) === title).sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title)).map((one) => {
       const read = (lists.lists ?? []).find((l) => l.key === one.key);
       return {
         key: one.key, title: one.title, count: countOf(one.key), takesSets: read?.takesSets ?? false,
@@ -159,7 +159,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
           <div className="min-w-0">
             <h1 className="plate-title text-slate-950">Types & sets</h1>
             <p className="plate-meta mt-2">
-              {ctx.project.code} · {sets.length} lists · {lists.own ? `${ctx.project.code}'s own` : "the organization's, until a first change here"}
+              {ctx.project.code} · {lists.own ? `${ctx.project.code}'s own` : "the organization's, until a first change here"}
             </p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
               Every code and choice a document is described with, one list each. A value never used on {ctx.project.code} may change
@@ -204,8 +204,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-semibold text-slate-900">{set.title}</h2>
                 <p className="plate-meta mt-1">
-                  {countOf(set.key)} in use{retiredCount ? ` · ${retiredCount} retired` : ""} · {listUsed ? "used on this project" : "never used on this project"}
-                  {runsOn ? " · the app runs on it" : ""}
+                  {listUsed ? "Used on this project" : "Never used on this project"}{runsOn ? " · the app runs on it" : ""}
                 </p>
                 {set.description ? <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{set.description}</p> : null}
                 {readOnlyWhy === "verdicts" ? (
@@ -350,7 +349,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
               <nav aria-label="Which values" className="seg w-fit">
                 {([["ACTIVE", "In use", inUseCount], ["RETIRED", "Retired", retiredCount], ["ALL", "All", inUseCount + retiredCount]] as const).map(([value, label, n]) => (
                   <Link scroll={false} key={value} href={here({ show: value === "ACTIVE" ? undefined : value, edit: undefined })} aria-current={show === value ? "page" : undefined} className="segment">
-                    {label}<span className="segment-n">{n}</span>
+                    {label}{value === "RETIRED" && n ? <span className="segment-n">{n}</span> : null}
                   </Link>
                 ))}
               </nav>
@@ -515,7 +514,7 @@ function PropInput({ field, value, lists, unset = false }: {
   if (field.type === "bool") {
     return (
       <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700">
-        <input type="checkbox" name={`prop_${field.key}`} defaultChecked={value === true} />
+        <SwitchControl name={`prop_${field.key}`} defaultChecked={value === true} />
         <span>{field.label}{field.hint ? <span className="ml-1 text-xs text-slate-500">{field.hint}</span> : null}</span>
       </label>
     );

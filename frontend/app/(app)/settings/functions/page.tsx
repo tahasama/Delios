@@ -1,4 +1,5 @@
 import { requireScope } from "@/lib/core/scope";
+import { SwitchControl } from "@/components/switch";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { PageHeader, Card, Chip, DataTable, Field, Th, Td, inputCls } from "@/components/ui";
 import { ActionForm, ConfirmButton } from "@/components/form";
@@ -234,7 +235,7 @@ export default async function FunctionsPage() {
                         {confidentialities.map((c) => <option key={c.code} value={c.code}>up to {c.label}</option>)}
                       </select>
                     </label>
-                    <label className="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" name="active" defaultChecked={fn.active} /> in use</label>
+                    <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600"><SwitchControl name="active" defaultChecked={fn.active} /> in use</label>
                   </ActionForm>
                 </div>
               </details>

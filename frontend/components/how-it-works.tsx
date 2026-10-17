@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SwitchControl } from "@/components/switch";
 import { ActionForm } from "@/components/form";
 import { ToneChip, inputCls } from "@/components/ui";
 import {
@@ -121,7 +122,7 @@ export function HowItWorks({
                 {/* A request may also need the say of whoever holds Manage. */}
                 {CONFIRMABLE[activity.key] ? (
                   <label className="flex cursor-pointer items-start gap-2 rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 ring-1 ring-line">
-                    <input type="checkbox" name={`confirm:${activity.key}`} defaultChecked={confirm} className="mt-1" />
+                    <SwitchControl name={`confirm:${activity.key}`} defaultChecked={confirm} className="mt-0.5" />
                     <span className="min-w-0 flex-1">
                       <span className="font-semibold text-slate-800">
                         {activity.key === PEOPLE_KEY ? "Confirmation by whoever holds Manage is necessary" : "Requests need confirming by whoever holds Manage"}
@@ -184,7 +185,7 @@ export function HowItWorks({
               <div className="grid gap-2 md:grid-cols-2">
                 {STAMP_KINDS.map((kind) => (
                   <label key={kind.key} className="flex cursor-pointer items-start gap-2.5 rounded-md px-3 py-2 ring-1 ring-line hover:bg-tint-soft has-checked:bg-tint-soft">
-                    <input type="checkbox" name={kind.key} defaultChecked={effectiveAnswer(kind.key, answers.get(kind.key)) === "ON"} className="mt-0.5" />
+                    <SwitchControl name={kind.key} defaultChecked={effectiveAnswer(kind.key, answers.get(kind.key)) === "ON"} className="mt-0.5" />
                     <span className="min-w-0 flex-1">
                       <span className="block text-[13px] font-semibold text-slate-800">{kind.label}</span>
                       <span className="block text-xs text-slate-600">{kind.text}</span>
@@ -193,7 +194,7 @@ export function HowItWorks({
                   </label>
                 ))}
                 <label className="flex cursor-pointer items-start gap-2.5 rounded-md px-3 py-2 ring-1 ring-line hover:bg-tint-soft has-checked:bg-tint-soft md:col-span-2">
-                  <input type="checkbox" name={STAMP_COMMENTS_KEY} defaultChecked={effectiveAnswer(STAMP_COMMENTS_KEY, answers.get(STAMP_COMMENTS_KEY)) === "ON"} className="mt-0.5" />
+                  <SwitchControl name={STAMP_COMMENTS_KEY} defaultChecked={effectiveAnswer(STAMP_COMMENTS_KEY, answers.get(STAMP_COMMENTS_KEY)) === "ON"} className="mt-0.5" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] font-semibold text-slate-800">The comments too</span>
                     <span className="block text-xs text-slate-600">

@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { SwitchControl } from "@/components/switch";
 import Link from "next/link";
 import { Pencil, X } from "lucide-react";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
@@ -145,9 +146,9 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                             <dt className="text-xs font-semibold text-slate-500">Email domain</dt><dd>{c.domain ?? "—"}{c.domainConfirmed ? " (proven)" : ""}</dd>
                           </dl>
                           <p className="text-xs leading-5 text-slate-600">{p.name} has its own DELIOS: only {p.name} changes these. We see them, and link with it.</p>
-                          <label className="flex w-fit cursor-pointer items-start gap-1.5 text-xs font-medium text-slate-700">
-                            <input type="checkbox" name="active" defaultChecked={p.active} className="mt-0.5" />
-                            <span>In use <span className="font-normal text-slate-500">— untick to stop working with them: their people here no longer sign in; everything done stays</span></span>
+                          <label className="flex w-fit cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700">
+                            <SwitchControl name="active" defaultChecked={p.active} />
+                            <span>In use <span className="font-normal text-slate-500">— switch off to stop working with them: their people here no longer sign in; everything done stays</span></span>
                           </label>
                         </ActionForm>
                       ) : (

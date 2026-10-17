@@ -50,7 +50,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                 onClick={() => { setTab(i); setQ(""); }}
                 className={`inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-0.5 text-[12px] leading-4 transition ${on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"}`}
               >
-                {g.title} <span className="ml-1 font-normal tabular-nums text-slate-500">{g.sets.length}</span>
+                {g.title}
               </button>
             );
           })}

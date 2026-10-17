@@ -263,8 +263,9 @@ public static class ProjectLists
             .ToListAsync(cancellationToken);
         var sets = await db.ListSets.AsNoTracking().OrderBy(s => s.Sort).ThenBy(s => s.Name).ToListAsync(cancellationToken);
         var meta = await ListRules.MetaAsync(db, access.Project.Id, cancellationToken);
+        // Project codes are not a list anyone keeps (owner): filled by the app, one per project, shown on This project.
         var keys = counts.Select(c => c.SetKey).Concat(sets.Select(s => s.ListKey)).Concat(meta.Keys)
-            .Append(ValueSets.Phases).Append(ValueSets.ProjectKinds).Distinct().ToList();
+            .Append(ValueSets.Phases).Append(ValueSets.ProjectKinds).Distinct().Where(k => k != ValueSets.ProjectCodes).ToList();
         var lists = keys.Select(key =>
         {
             var info = meta.GetValueOrDefault(key) ?? ListRules.ListMeta.Read(null);

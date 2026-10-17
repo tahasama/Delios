@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SwitchControl } from "@/components/switch";
 import Link from "next/link";
 import { Field } from "@/components/ui";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
@@ -84,10 +85,10 @@ export function PartyKindFields({ kind, contactId, backupId, carriedBy, people, 
       )}
 
       {access ? (
-        <label className="flex w-fit cursor-pointer items-start gap-1.5 text-xs font-medium text-slate-700 sm:col-span-2">
-          <input type="checkbox" name="active" defaultChecked={access.active} className="mt-0.5" />
+        <label className="flex w-fit cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700 sm:col-span-2">
+          <SwitchControl name="active" defaultChecked={access.active} />
           <span>
-            In use <span className="font-normal text-slate-500">— untick to switch it off: no longer offered for new documents, transmittals or routes
+            In use <span className="font-normal text-slate-500">— switched off: no longer offered for new documents, transmittals or routes
             {access.signingIn ? `, and its ${access.signingIn} ${access.signingIn === 1 ? "person" : "people"} can no longer sign in` : ""}. Everything already done under it stays.</span>
           </span>
         </label>

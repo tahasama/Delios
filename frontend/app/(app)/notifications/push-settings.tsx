@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { SwitchControl } from "@/components/switch";
 import { BellRing } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { btn } from "@/components/ui";
@@ -125,8 +126,8 @@ export function PushSettings({ publicKey, devices, off }: {
         <ActionForm action={setPushGroupsAction} submitLabel="Save" size="sm" className="space-y-2">
           <p className="text-xs font-semibold text-slate-700">What pops up</p>
           {GROUPS.map((group) => (
-            <label key={group.key} className="flex items-start gap-2 text-xs text-slate-700">
-              <input type="checkbox" name="on" value={group.key} defaultChecked={!off.includes(group.key)} className="mt-0.5" />
+            <label key={group.key} className="flex cursor-pointer items-center gap-2.5 text-xs text-slate-700">
+              <SwitchControl name="on" value={group.key} defaultChecked={!off.includes(group.key)} />
               <span><span className="font-semibold">{group.label}</span> <span className="text-slate-500">· {group.text}</span></span>
             </label>
           ))}

@@ -1,4 +1,5 @@
 import { controlDoes, CONFIRM_KEY, effectiveAnswer } from "@/lib/settings/control-activities";
+import { SwitchControl } from "@/components/switch";
 import Link from "next/link";
 import { Fragment } from "react";
 import { cn } from "@/lib/core/utils";
@@ -293,9 +294,9 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                           </Field>
                         </div>
                         {u.linked ? null : (
-                          <label className="flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-700">
-                            <input type="checkbox" name="active" defaultChecked={u.active} />
-                            Can sign in <span className="font-normal text-slate-500">— untick to switch their account off on every project</span>
+                          <label className="flex w-fit cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700">
+                            <SwitchControl name="active" defaultChecked={u.active} />
+                            Can sign in <span className="font-normal text-slate-500">— switched off, their account stops on every project</span>
                           </label>
                         )}
                       </ActionForm>

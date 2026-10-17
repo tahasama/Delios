@@ -505,6 +505,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   A value, a set and a list of one's own are switched off and on (a value then reads OFF: not offered, kept on what
   carries it); the app's lists are not switched here, their field is left out in Forms & fields (APP_LIST_STAYS). Never
   used: a value or a set is deleted (SET_IN_USE otherwise); a list only if it is one's own (the app's stay).
+- Counts only where they help (owner: too many overwhelm): Types & sets counts sets per list and values per set in its
+  menu, and the retired values; no counts on its tabs, its plate or "In use / All". Project codes are not on Types &
+  sets: filled by the app, one per project, shown on This project.
 - Types & sets shows the sets: nothing is chosen on arrival (Numbering & identity's lists, and "Choose a list on the
   left"); choosing a list opens its sets. In the menu a list counts its sets, a set its values in use ("· off" when
   switched off); "New set" (name, the deliverable types it serves). The set shown has its bar: name, whom it serves,
@@ -512,8 +515,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   shown (`?vs=<set>`). Which values: the segmented choice (`.seg` / `.segment`, In use · Retired · All, with counts).
   "Used" names what uses a value ("recommended by document types: Calculation"), only real references (`Pointers`).
   The bottom bar for ticked values: Retire, Bring back, and for those never used, Move to another set and Delete.
-- **On/off is a switch** (owner, everywhere): `components/switch.tsx` (`role="switch"`), never a "Switch off" button or
-  an on/off chip beside a button. Acts whose icon says them are icons (add, change, download, delete, retire, order),
+- **On/off is a switch** (owner, everywhere): `components/switch.tsx` (`role="switch"`): `Switch` acts at once,
+  `SwitchControl` / `SwitchField` are a form's field (can sign in, in use, pop-ups, stamps, confirmation needed, only
+  moves forward, shown in the register…). Never a "Switch off" button or an on/off chip beside a button; a choice among
+  several, or a confirmation, stays a tick. Acts whose icon says them are icons (add, change, download, delete, retire, order),
   their name on hover; Save, Cancel and a page's first act keep their words.
 - **Forms follow the sets**: a document is offered, for each list, only the values of the set serving its deliverable
   type (new document, once the type is chosen; Details and Edit rev by the document's own type), read from the backend

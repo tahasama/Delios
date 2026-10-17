@@ -1,4 +1,5 @@
 import { SETUP_PAGES, maySetup } from "../setup-pages";
+import { SwitchControl } from "@/components/switch";
 import { requireScope } from "@/lib/core/scope";
 import { PageHeader, Card, DataTable, Th, Td, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -126,8 +127,8 @@ export default async function NumberingPage() {
                     </select>
                   </label>
                   <span className="min-w-48 font-mono text-[12px] text-slate-500">{example(r.route!.schemeName)}</span>
-                  <label className="flex items-center gap-1.5 text-[11px] text-slate-600">
-                    <input type="checkbox" name="active" defaultChecked={r.route!.status === "ACTIVE"} /> In use
+                  <label className="flex cursor-pointer items-center gap-2 text-[11px] text-slate-600">
+                    <SwitchControl name="active" defaultChecked={r.route!.status === "ACTIVE"} /> In use
                   </label>
                 </ActionForm>
               </Td>
