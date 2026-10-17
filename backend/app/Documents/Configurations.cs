@@ -16,7 +16,11 @@ internal sealed class ValueEntryConfiguration : IEntityTypeConfiguration<ValueEn
     public void Configure(EntityTypeBuilder<ValueEntry> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
-        b.HasIndex(x => new { x.TenantId, x.SetKey, x.Code }).IsUnique();
+        // One code per list: in the organization's lists, and in each project's own.
+        b.HasIndex(x => new { x.TenantId, x.SetKey, x.Code }).IsUnique().HasFilter("project_id IS NULL")
+            .HasDatabaseName("ix_value_entries_org_set_code");
+        b.HasIndex(x => new { x.TenantId, x.ProjectId, x.SetKey, x.Code }).IsUnique().HasFilter("project_id IS NOT NULL")
+            .HasDatabaseName("ix_value_entries_project_set_code");
         b.Property(x => x.SetKey).HasMaxLength(64);
         b.Property(x => x.Code).HasMaxLength(64);
         b.Property(x => x.Label).HasMaxLength(200);

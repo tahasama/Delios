@@ -1907,6 +1907,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("label");
 
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
                     b.Property<JsonDocument>("Props")
                         .HasColumnType("jsonb")
                         .HasColumnName("props");
@@ -1936,7 +1940,13 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasIndex("TenantId", "SetKey", "Code")
                         .IsUnique()
-                        .HasDatabaseName("ix_value_entries_tenant_id_set_key_code");
+                        .HasDatabaseName("ix_value_entries_org_set_code")
+                        .HasFilter("project_id IS NULL");
+
+                    b.HasIndex("TenantId", "ProjectId", "SetKey", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_value_entries_project_set_code")
+                        .HasFilter("project_id IS NOT NULL");
 
                     b.ToTable("value_entries", (string)null);
                 });
@@ -2483,6 +2493,14 @@ namespace Delios.Host.Platform.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("code_changed_by_name");
+
+                    b.Property<Guid?>("OpenedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("opened_by_id");
+
+                    b.Property<bool>("OwnLists")
+                        .HasColumnType("boolean")
+                        .HasColumnName("own_lists");
 
                     b.Property<string>("PreviousCode")
                         .HasMaxLength(32)

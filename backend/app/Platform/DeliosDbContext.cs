@@ -91,9 +91,26 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     /// Called once by Entity Framework Core when it first builds the model. Applies every <c>IEntityTypeConfiguration</c> class in this assembly
     /// (the *Configuration classes in each feature folder), then marks every Guid <c>Id</c> as set by the application, not the database.
     /// </summary>
+    /// <summary>The project whose lists this request reads; none: the organization's.</summary>
+    public Guid? ListsProject { get; private set; }
+    /// <summary>That project keeps its own lists; otherwise it reads the organization's, the default.</summary>
+    public bool ListsOwn { get; private set; }
+
+    /// <summary>
+    /// Reads the lists as this project sees them from now on in the request: its own copy once it has one, else the
+    /// organization's. Set by <c>ProjectAccessFilter</c> and by the <c>X-Delios-Project</c> header.
+    /// </summary>
+    public void UseListsOf(Guid projectId, bool own)
+    {
+        ListsProject = projectId;
+        ListsOwn = own;
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DeliosDbContext).Assembly);
+        // A list is read as the project in hand sees it: its own copy, else the organization's.
+        modelBuilder.Entity<ValueEntry>().HasQueryFilter(v => ListsOwn ? v.ProjectId == ListsProject : v.ProjectId == null);
 
         // Every Guid id is made in code (Guid.CreateVersion7), never by the database.
         // Saying so lets a new row reached through a navigation be inserted rather

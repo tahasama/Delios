@@ -86,6 +86,8 @@ public static class CatalogAdminEndpoints
         var status = Blank(request.Status)?.ToUpperInvariant();
         if (status is not (null or ValueStatus.Active or ValueStatus.Retired))
             return Problems.Invalid("STATUS_INVALID", "A value is ACTIVE or RETIRED.");
+        // Said from inside a project: the project's own lists (its copy made first); else the organization's.
+        var scope = await ProjectLists.WriteScopeAsync(db, cancellationToken);
         var value = await db.ValueEntries.SingleOrDefaultAsync(v => v.SetKey == set && v.Code == code, cancellationToken);
         var changes = new List<string>();
         if (value is null)
@@ -93,7 +95,7 @@ public static class CatalogAdminEndpoints
             var label = Blank(request.Label);
             if (label is null) return Problems.Invalid("LABEL_REQUIRED", "A value has a label people read.");
             var sort = request.Sort ?? (await db.ValueEntries.Where(v => v.SetKey == set).MaxAsync(v => (int?)v.Sort, cancellationToken) ?? 0) + 10;
-            value = new ValueEntry { TenantId = http.User.TenantId(), SetKey = set, Code = code, Label = label, Sort = sort, Status = status ?? ValueStatus.Active };
+            value = new ValueEntry { TenantId = http.User.TenantId(), ProjectId = scope, SetKey = set, Code = code, Label = label, Sort = sort, Status = status ?? ValueStatus.Active };
             db.ValueEntries.Add(value);
             changes.Add($"published: {label}");
         }

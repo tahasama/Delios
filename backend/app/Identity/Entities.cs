@@ -208,6 +208,13 @@ public sealed class Project
     public string? PreviousCode { get; set; }
     public Instant? CodeChangedAt { get; set; }
     public string? CodeChangedByName { get; set; }
+    /// <summary>Who opened the project. Where nobody acts as its control function, they alone change its lists.</summary>
+    public Guid? OpenedById { get; set; }
+    /// <summary>
+    /// The project keeps its own lists (it changed one): it reads its own copy, never the organization's again.
+    /// Until then it reads the organization's lists, the default.
+    /// </summary>
+    public bool OwnLists { get; set; }
 }
 
 /// <summary>A job as the organization names it: Lead Electrical Engineer, the control function.</summary>

@@ -92,6 +92,8 @@ public sealed class ProjectAccessLoader(DeliosDbContext db)
             .Select(u => u.Party == null ? null : new { u.Party.Code, u.Party.IsInternal })
             .SingleAsync(cancellationToken);
         var project = membership.Project!;
+        // Its lists from here on: its own copy once it has one, else the organization's.
+        db.UseListsOf(project.Id, project.OwnLists);
         var above = membership.Function!.Clearance is null ? []
             : Clearance.Above(await Clearance.RanksAsync(db, cancellationToken), membership.Function.Clearance);
         return new ProjectAccess

@@ -304,6 +304,20 @@ public static class PlatformSetup
         app.UseHttpMetrics();
         app.UseAuthentication();
         app.UseAuthorization();
+        // The screens say which project they are in (X-Delios-Project): the lists are read as that project sees them,
+        // also on the calls that are not about one project (the values for a dropdown).
+        app.Use(async (http, next) =>
+        {
+            if (http.User.Identity?.IsAuthenticated == true
+                && Guid.TryParse(http.Request.Headers["X-Delios-Project"].ToString(), out var projectId))
+            {
+                var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
+                var project = await db.Projects.AsNoTracking().Where(p => p.Id == projectId)
+                    .Select(p => new { p.Id, p.OwnLists }).SingleOrDefaultAsync(http.RequestAborted);
+                if (project is not null) db.UseListsOf(project.Id, project.OwnLists);
+            }
+            await next(http);
+        });
         app.UseRateLimiter();
 
         app.MapHealthChecks("/health/live", new HealthCheckOptions
@@ -354,6 +368,7 @@ public static class PlatformSetup
             Extraction.ExtractionEndpoints.MapExtractionEndpoints(app);
             Checks.CheckEndpoints.MapCheckEndpoints(app);
             Checks.PlanEndpoints.MapPlanEndpoints(app);
+            Documents.ProjectLists.MapProjectListEndpoints(app);
             Actions.ScheduleEndpoints.MapScheduleEndpoints(app);
             Actions.ListUploadEndpoints.MapListUploadEndpoints(app);
             Documents.SheetGuard.MapSheetGuardEndpoints(app);

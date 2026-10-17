@@ -36,6 +36,8 @@ public sealed class ReadDatabase(
                 .UseSnakeCaseNamingConvention()
                 .AddInterceptors(tenant)
                 .Options);
+            // The lists as the project in hand sees them, as on the primary.
+            if (primary.ListsProject is { } listsProject) replica.UseListsOf(listsProject, primary.ListsOwn);
             await using var transaction = await replica.Database.BeginTransactionAsync(cancellationToken);
             var result = await query(replica);
             await transaction.CommitAsync(cancellationToken);

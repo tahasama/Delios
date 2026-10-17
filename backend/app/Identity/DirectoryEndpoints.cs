@@ -398,6 +398,7 @@ public static class DirectoryEndpoints
             ContractRole = Blank(request.ContractRole)?.ToUpperInvariant() ?? "GENERIC",
             Kind = Blank(request.Kind)?.ToUpperInvariant() ?? "GENERIC",
             TimeZone = zone,
+            OpenedById = http.User.UserId(),
         };
         // A project's code and name are its own across DELIOS, for good: never given to another.
         if (!await Organizations.Registry.ReserveAsync(db, Organizations.ReservedKinds.ProjectCode, code, project.Id, project.TenantId, cancellationToken))

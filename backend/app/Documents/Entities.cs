@@ -11,6 +11,12 @@ public sealed class ValueEntry
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
+    /// <summary>
+    /// The project whose own list it belongs to; none: the organization's list, the default every project starts from.
+    /// A project reads the organization's lists until it changes one; then it gets its own copy of them all
+    /// (<see cref="Identity.Project.OwnLists"/>), which later changes to the organization's never touch.
+    /// </summary>
+    public Guid? ProjectId { get; set; }
     public required string SetKey { get; set; }
     public required string Code { get; set; }
     public required string Label { get; set; }

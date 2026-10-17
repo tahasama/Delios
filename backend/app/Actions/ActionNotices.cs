@@ -148,6 +148,7 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({"action-notices:" + projectId}))", cancellationToken);
         var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == projectId, cancellationToken);
+        db.UseListsOf(project.Id, project.OwnLists);
         var today = WorkingCalendar.Today(clock, project.TimeZone);
 
         var ids = await db.Activities.Where(a => a.ProjectId == projectId && a.State == ActivityStates.Active && a.Start != null

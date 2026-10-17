@@ -168,13 +168,15 @@ public static class VerdictListEndpoints
             key = $"{stem}_{n}";
         var me = await db.Users.AsNoTracking().SingleAsync(u => u.Id == http.User.UserId(), c);
         var tenantId = http.User.TenantId();
+        // Made on a project: into the project's own lists (its copy made first); else the organization's.
+        var scope = await Documents.ProjectLists.WriteScopeAsync(db, c);
         await NameAsync(db, clock, tenantId, key, title, Blank(request.Description), me.Name, c);
         var sort = 10;
         foreach (var v in verdicts)
         {
             db.ValueEntries.Add(new ValueEntry
             {
-                TenantId = tenantId, SetKey = key, Code = v.Code!.Trim(), Label = Blank(v.Label) ?? v.Code!.Trim(), Sort = sort,
+                TenantId = tenantId, ProjectId = scope, SetKey = key, Code = v.Code!.Trim(), Label = Blank(v.Label) ?? v.Code!.Trim(), Sort = sort,
                 Status = v.Retired ? ValueStatus.Retired : ValueStatus.Active, Props = Props(v.Meaning!.Trim()),
             });
             sort += 10;
@@ -192,6 +194,7 @@ public static class VerdictListEndpoints
     private static async Task<IResult> UpdateAsync(string key, VerdictListRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock,
         CancellationToken c)
     {
+        var scope = await Documents.ProjectLists.WriteScopeAsync(db, c);
         var values = await db.ValueEntries.Where(v => v.SetKey == key).ToListAsync(c);
         var named = await NamedAsync(db, c);
         if (values.Count == 0 && !named.ContainsKey(key)) return Problems.NotFound("LIST_NOT_FOUND", "No such list.");
@@ -214,7 +217,7 @@ public static class VerdictListEndpoints
             var row = values.FirstOrDefault(x => string.Equals(x.Code, code, StringComparison.OrdinalIgnoreCase));
             if (row is null)
             {
-                db.ValueEntries.Add(new ValueEntry { TenantId = http.User.TenantId(), SetKey = key, Code = code, Label = label, Sort = sort += 10, Status = status, Props = Props(meaning) });
+                db.ValueEntries.Add(new ValueEntry { TenantId = http.User.TenantId(), ProjectId = scope, SetKey = key, Code = code, Label = label, Sort = sort += 10, Status = status, Props = Props(meaning) });
                 changes.Add($"{code} added ({meaning})");
                 continue;
             }
