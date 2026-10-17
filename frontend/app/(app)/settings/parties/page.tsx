@@ -100,24 +100,23 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
       </section>
 
       {/* One way to bring an organization onto the project: look for it (our list, then DELIOS), else create it. */}
-      <OrganizationJoins project ours={ours} control={control} own={policy.own} />
+      <OrganizationJoins project roles={roles} ours={ours} control={control} own={policy.own} />
 
       {/* The organizations working on this project. */}
       <section className="register register-sheet register-sheet-open" aria-labelledby="list-head">
         {band("list-head", `Organizations on ${ctx.project.code}`, `${working.length}`)}
         {rows.length ? (
           <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
-            head={<tr><Th>Organization</Th><Th>Role with us</Th><Th>How they work with us</Th><Th>Contract</Th><Th>Who answers for it</Th><Th></Th></tr>}>
+            head={<tr><Th>Organization</Th><Th>Role with us</Th><Th>How they work with us</Th><Th>Contract</Th><Th>Who answers for it</Th></tr>}>
             {rows.map((one) => {
               const open = sp.part === one.partyId;
               const party = parties.find((p) => p.id === one.partyId);
               const c = party?.changed;
-              const theirPeople = users.filter((u) => u.active && u.partyId === one.partyId).map((u) => ({ id: u.id, name: u.name, detail: u.email }));
               return (
                 <Fragment key={one.partyId}>
-                  <tr id={`part-${one.partyId}`} className={cn("scroll-mt-20 align-top target:bg-tint-soft", open && "[&>td]:border-b-0")}>
+                  <tr id={`part-${one.partyId}`} className={cn("scroll-mt-20 align-top target:bg-tint-soft", open && "bg-tint-soft")}>
                     <Td>
-                      <Link href={open ? href({}, `part-${one.partyId}`) : href({ part: one.partyId }, `part-${one.partyId}`)} scroll={false}
+                      <Link href={open ? href({}) : href({ part: one.partyId })} scroll={false}
                         className="text-slate-800 hover:text-link hover:underline" title={open ? "Close" : `What ${one.name} is, and its role with us`}>
                         <code className="code-chip mr-1.5">{one.code}</code><span className="font-medium">{one.name}</span>
                       </Link>
@@ -136,63 +135,78 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
                     <Td className="text-xs">
                       {party?.contact ? <>{party.contact.name}<span className="block text-[11px] text-slate-500">{party.backup ? `backup: ${party.backup.name}` : "no backup"}</span></> : <span className="text-slate-500">—</span>}
                     </Td>
-                    <Td className="w-px whitespace-nowrap text-right">
-                      {open ? <Link href={href({}, `part-${one.partyId}`)} scroll={false} className={icon} title="Close"><X aria-label={`Close ${one.name}`} className="h-4 w-4" /></Link> : null}
-                    </Td>
                   </tr>
-                  {open ? (
-                    <tr>
-                      <td colSpan={6} className="border-b border-line p-0">
-                        {/* What it is: read from its record; changed only where it is kept. */}
-                        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 border-b border-line px-5 py-4 text-[13px] sm:grid-cols-[180px_minmax(0,1fr)] sm:px-6">
-                          <dt className="text-xs font-semibold text-slate-500">Organization</dt>
-                          <dd>{one.name} · <span className="font-mono">{one.code}</span>{one.linkedOrganization ? ` · works from its own DELIOS (${one.linkedOrganization})` : ""}</dd>
-                          <dt className="text-xs font-semibold text-slate-500">Identifier</dt>
-                          <dd>{c?.identifier ? `${countryName(c.identifier.country)} · ${IDENTIFIER_KINDS.find((k) => k.value === c.identifier!.kind)?.label.toLowerCase()} ${c.identifier.number}` : c?.noIdentifierReason ? `none: ${c.noIdentifierReason}` : "—"}</dd>
-                          <dt className="text-xs font-semibold text-slate-500">How they work with us</dt>
-                          <dd>{kindLabel(one.kind)}{party?.contactEmail ? ` · transmittals to ${party.contactEmail}` : ""}</dd>
-                          <dt className="text-xs font-semibold text-slate-500">Email domain</dt>
-                          <dd>{c?.domain ?? "—"}{c?.domainConfirmed ? " (proven)" : ""}</dd>
-                          <dt className="text-xs font-semibold text-slate-500">Their people here</dt>
-                          <dd>{one.people ? `${one.people} on the project` : "none yet"}</dd>
-                        </dl>
-                        <ActionForm id={`part-form-${one.partyId}`} action={setProjectOrganizationAction} hideSubmit hidden={{ partyId: one.partyId, answers: "1" }}
-                          className="asking space-y-5 px-5 py-5 sm:px-6">
-                          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                            <Field label="Role with us" hint="client, supplier, contractor…">{roleSelect(one.role)}</Field>
-                            <Field label="Contract number"
-                              hint={one.contractChangedAt
-                                ? `fixed: changed once, from ${one.previousContractNumber}, by ${one.contractChangedByName}, ${fmtDate(one.contractChangedAt)}`
-                                : "its contract with us; unique on DELIOS, changed once only"}>
-                              {one.contractChangedAt
-                                ? <input defaultValue={one.contractNumber ?? ""} disabled className={cn(field, "font-mono text-slate-500")} aria-label="Contract number (fixed)" />
-                                : <input name="contractNumber" defaultValue={one.contractNumber ?? ""} maxLength={64} className={cn(field, "font-mono")} />}
-                            </Field>
-                            {theirPeople.length ? (
-                              <>
-                                <SearchPick single name="contactId" items={theirPeople} initial={party?.contactId ? [party.contactId] : []}
-                                  label="Who answers for it here" hint="optional — one of their people, so we know whom to ask" placeholder="Nobody yet" />
-                                <SearchPick single name="backupId" items={theirPeople} initial={party?.backupId ? [party.backupId] : []}
-                                  label="Backup" hint="optional — who stands in when they are away" placeholder="No backup" />
-                              </>
-                            ) : null}
-                            <Field label="Their people start as" hint="the function their people get here">{startSelect(one.startFunctionId)}</Field>
-                            <input type="hidden" name="active" value="on" />
-                          </div>
-                        </ActionForm>
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
-                          <Link href={href({}, `part-${one.partyId}`)} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
-                          <button type="submit" form={`part-form-${one.partyId}`} data-on="true" className="ask">Save</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : null}
                 </Fragment>
               );
             })}
           </DataTable>
         ) : <p className="px-5 py-4 text-xs text-slate-500 sm:px-6">No other organization works on {ctx.project.code} yet.</p>}
       </section>
+
+      {/* A name opens its drawer: what it is, then what it is to us on this project. */}
+      {(() => {
+        const one = rows.find((r) => r.partyId === sp.part);
+        if (!one) return null;
+        const party = parties.find((p) => p.id === one.partyId);
+        const c = party?.changed;
+        const theirPeople = users.filter((u) => u.active && u.partyId === one.partyId).map((u) => ({ id: u.id, name: u.name, detail: u.email }));
+        return (
+          <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={one.name}>
+            <Link href={href({})} scroll={false} aria-label="Close" className="absolute inset-0 bg-slate-900/40" />
+            <aside className="register absolute inset-y-0 right-0 flex w-[min(40rem,100vw)] flex-col overflow-y-auto bg-surface shadow-2xl">
+              <div className="flex items-start justify-between gap-3 border-b border-line px-5 pt-6 pb-4 sm:px-6">
+                <div className="min-w-0">
+                  <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{one.code}</p>
+                  <h2 className="plate-title mt-1 text-slate-950">{one.name}</h2>
+                  <p className="plate-meta mt-2">{one.role ? roles.find((r) => r.code === one.role)?.label ?? one.role : "Role not stated yet"}</p>
+                </div>
+                <Link href={href({})} scroll={false} className={icon} title="Close"><X aria-label="Close" className="h-4 w-4" /></Link>
+              </div>
+                              {/* What it is: read from its record; changed only where it is kept. */}
+                              <dl className="grid grid-cols-1 gap-x-6 gap-y-2 border-b border-line px-5 py-4 text-[13px] sm:grid-cols-[180px_minmax(0,1fr)] sm:px-6">
+                                <dt className="text-xs font-semibold text-slate-500">Organization</dt>
+                                <dd>{one.name} · <span className="font-mono">{one.code}</span>{one.linkedOrganization ? ` · works from its own DELIOS (${one.linkedOrganization})` : ""}</dd>
+                                <dt className="text-xs font-semibold text-slate-500">Identifier</dt>
+                                <dd>{c?.identifier ? `${countryName(c.identifier.country)} · ${IDENTIFIER_KINDS.find((k) => k.value === c.identifier!.kind)?.label.toLowerCase()} ${c.identifier.number}` : c?.noIdentifierReason ? `none: ${c.noIdentifierReason}` : "—"}</dd>
+                                <dt className="text-xs font-semibold text-slate-500">How they work with us</dt>
+                                <dd>{kindLabel(one.kind)}{party?.contactEmail ? ` · transmittals to ${party.contactEmail}` : ""}</dd>
+                                <dt className="text-xs font-semibold text-slate-500">Email domain</dt>
+                                <dd>{c?.domain ?? "—"}{c?.domainConfirmed ? " (proven)" : ""}</dd>
+                                <dt className="text-xs font-semibold text-slate-500">Their people here</dt>
+                                <dd>{one.people ? `${one.people} on the project` : "none yet"}</dd>
+                              </dl>
+                              <ActionForm id={`part-form-${one.partyId}`} action={setProjectOrganizationAction} hideSubmit hidden={{ partyId: one.partyId, answers: "1" }}
+                                className="asking space-y-5 px-5 py-5 sm:px-6">
+                                <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                                  <Field label="Role with us" hint="client, supplier, contractor…">{roleSelect(one.role)}</Field>
+                                  <Field label="Contract number"
+                                    hint={one.contractChangedAt
+                                      ? `fixed: changed once, from ${one.previousContractNumber}, by ${one.contractChangedByName}, ${fmtDate(one.contractChangedAt)}`
+                                      : "its contract with us; unique on DELIOS, changed once only"}>
+                                    {one.contractChangedAt
+                                      ? <input defaultValue={one.contractNumber ?? ""} disabled className={cn(field, "font-mono text-slate-500")} aria-label="Contract number (fixed)" />
+                                      : <input name="contractNumber" defaultValue={one.contractNumber ?? ""} maxLength={64} className={cn(field, "font-mono")} />}
+                                  </Field>
+                                  {theirPeople.length ? (
+                                    <>
+                                      <SearchPick single name="contactId" items={theirPeople} initial={party?.contactId ? [party.contactId] : []}
+                                        label="Who answers for it here" hint="optional — one of their people, so we know whom to ask" placeholder="Nobody yet" />
+                                      <SearchPick single name="backupId" items={theirPeople} initial={party?.backupId ? [party.backupId] : []}
+                                        label="Backup" hint="optional — who stands in when they are away" placeholder="No backup" />
+                                    </>
+                                  ) : null}
+                                  <Field label="Their people start as" hint="the function their people get here">{startSelect(one.startFunctionId)}</Field>
+                                  <input type="hidden" name="active" value="on" />
+                                </div>
+                              </ActionForm>
+                              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
+                                <Link href={href({})} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                                <button type="submit" form={`part-form-${one.partyId}`} data-on="true" className="ask">Save</button>
+                              </div>
+            </aside>
+          </div>
+        );
+      })()}
     </div>
   );
 }

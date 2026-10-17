@@ -46,7 +46,11 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
   const projectIds = formData.get("takePart") === "1" ? [ctx.projectId] : formData.getAll("projectIds").map(String).filter(Boolean);
   const putOn = async (partyId: string) => {
     for (const pid of projectIds) {
-      await api(`/api/projects/${pid}/organizations/${partyId}`, { method: "PUT", body: { role: null, startFunctionId: null, active: true } });
+      // Its role with us and contract, asked with the add on a project's page.
+      await api(`/api/projects/${pid}/organizations/${partyId}`, {
+        method: "PUT",
+        body: { role: text(formData, "role") || null, contractNumber: text(formData, "contractNumber") || null, startFunctionId: null, active: true },
+      });
     }
   };
   // Already in our list: it only starts working on the projects chosen.

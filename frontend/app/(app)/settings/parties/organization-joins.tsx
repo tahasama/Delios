@@ -25,7 +25,9 @@ type Found = { id: string; code: string; name: string; country: string | null; l
  * country (or why none), email domain, how it works with us; look-alikes are named before it is created. On a project's
  * page what is added is put on the project; on the organization's list, the projects may be chosen.
  */
-export function OrganizationJoins({ project, projects = [], ours, control, own }: {
+export function OrganizationJoins({ project, projects = [], roles = [], ours, control, own }: {
+  /** On a project's page: the roles an organization plays with us (client, supplier…), asked when it is added. */
+  roles?: { code: string; label: string }[];
   /** On a project's page: what is added is put on it. */
   project?: boolean;
   /** On the organization's list: the projects it may also be put on (optional). */
@@ -69,10 +71,24 @@ export function OrganizationJoins({ project, projects = [], ours, control, own }
     setWords("");
     setFound(null);
     // In our list already, or with its own DELIOS: nothing more to ask, it is added at once.
-    if (project && (one.listed || one.onDelios)) setTimeout(() => form.current?.requestSubmit(), 0);
+    // Its role with us (and contract) is asked before it is added: nothing is added on a click alone.
   };
   const lookalikes = state?.lookalikes ?? [];
   const asksKind = !creating && picked && !picked.listed && !picked.onDelios;
+  /** On a project's page: what it is to us here, asked with the add. */
+  const toUs = project ? (
+    <>
+      <Field label="Role with us" required hint="what they are to us on this project">
+        <select name="role" required defaultValue="" className={field}>
+          <option value="" disabled>Choose…</option>
+          {roles.filter((r) => r.code !== "GENERIC").map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+        </select>
+      </Field>
+      <Field label="Contract number" hint="optional — its contract with us; unique on DELIOS">
+        <input name="contractNumber" maxLength={64} autoComplete="off" className={`${field} font-mono`} />
+      </Field>
+    </>
+  ) : null;
 
   return (
     <section id="join" className="register register-sheet register-sheet-open scroll-mt-24" aria-label="Add an organization">
@@ -139,12 +155,16 @@ export function OrganizationJoins({ project, projects = [], ours, control, own }
           </div>
         ) : null}
 
-        {/* One found that is not on DELIOS and not ours yet: how it works with us, then add. */}
-        {asksKind ? (
+        {/* One found: its role with us here, and how it works with us when it is not on DELIOS; then add. */}
+        {!creating && picked ? (
           <div className="space-y-4 border-t border-line px-5 py-5 sm:px-6">
-            <p className="text-[13px] text-slate-800"><code className="code-chip mr-1.5">{picked!.code}</code>{picked!.name}</p>
+            <p className="text-[13px] text-slate-800">
+              <code className="code-chip mr-1.5">{picked.code}</code>{picked.name}
+              {picked.onDelios ? <span className="ml-2 text-[11px] text-slate-500">has its own DELIOS: it is invited to work with us</span> : null}
+            </p>
             <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-              <PartyKindFields kind="GUEST" contactId="" backupId="" carriedBy="" people={[]} ours={ours} control={control} askContact={false} />
+              {toUs}
+              {asksKind ? <PartyKindFields kind="GUEST" contactId="" backupId="" carriedBy="" people={[]} ours={ours} control={control} askContact={false} /> : null}
             </div>
           </div>
         ) : null}
@@ -160,6 +180,7 @@ export function OrganizationJoins({ project, projects = [], ours, control, own }
               <Field label="Email domain" hint="optional — e.g. acme.com; it helps find it again">
                 <input name="domain" autoComplete="off" placeholder="acme.com" className={field} />
               </Field>
+              {toUs}
               <PartyKindFields kind="GUEST" contactId="" backupId="" carriedBy="" people={[]} ours={ours} control={control} askContact={false} />
               <Added fields={own} />
             </div>
@@ -210,7 +231,7 @@ export function OrganizationJoins({ project, projects = [], ours, control, own }
           </div>
         ) : null}
 
-        {creating || asksKind || (!project && picked) ? (
+        {creating || picked ? (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
             <button type="button" onClick={() => { setCreating(false); setPicked(null); setMissing([]); }}
               className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</button>
