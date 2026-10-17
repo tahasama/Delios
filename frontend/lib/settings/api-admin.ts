@@ -347,12 +347,12 @@ export async function controlledSets(scope?: { projectId: string }): Promise<Con
 
 export type ScopeConfig = {
   organizationName: string; scopeStatement: string; standardVersion: string; effectiveDate: Date;
-  integrityThreshold: number; measurementIntervalDays: number; controlFunctionName: string | null; dmpDocumentId: string | null;
+  integrityThreshold: number; controlFunctionName: string | null; dmpDocumentId: string | null;
   /** Who last changed how it is measured, and when; null while the defaults stand. */
   measuredBy: { name: string; at: string } | null;
 };
 
-/** How a project is measured: the share of clear documents it aims at, and how often it is checked. */
+/** How a project is measured: the share of clear documents it aims at. The checks run by themselves every day. */
 export const MEASURE_KEY = "MEASURE";
 
 export async function scopeConfig(projectId?: string): Promise<ScopeConfig> {
@@ -362,7 +362,7 @@ export async function scopeConfig(projectId?: string): Promise<ScopeConfig> {
   const [org, project, me] = await Promise.all([orgSettings(), projectId ? projectSettings(projectId) : Promise.resolve(new Map<string, string>()), getMe()]);
   let said: Partial<Omit<ScopeConfig, "effectiveDate"> & { effectiveDate: string }> = {};
   let own: { scopeStatement?: string; name?: string } = {};
-  let measure: { integrityThreshold?: number; measurementIntervalDays?: number; by?: string; at?: string } = {};
+  let measure: { integrityThreshold?: number; by?: string; at?: string } = {};
   try { said = JSON.parse(org.get("SCOPE") ?? "{}"); } catch { said = {}; }
   try { own = JSON.parse(project.get("PROJECT_INFO") ?? "{}"); } catch { own = {}; }
   try { measure = JSON.parse(project.get(MEASURE_KEY) ?? "{}"); } catch { measure = {}; }
@@ -373,7 +373,6 @@ export async function scopeConfig(projectId?: string): Promise<ScopeConfig> {
     standardVersion: said.standardVersion ?? STANDARD_VERSION,
     effectiveDate: new Date(said.effectiveDate ?? Date.now()),
     integrityThreshold: measure.integrityThreshold ?? said.integrityThreshold ?? 95,
-    measurementIntervalDays: measure.measurementIntervalDays ?? said.measurementIntervalDays ?? 30,
     controlFunctionName: said.controlFunctionName ?? null,
     dmpDocumentId: said.dmpDocumentId ?? null,
     measuredBy: measure.by && measure.at ? { name: measure.by, at: measure.at } : null,

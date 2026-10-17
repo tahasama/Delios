@@ -88,7 +88,7 @@ Everything an organization publishes lives under **`/settings`**, in five groups
 | Group | Screens |
 |---|---|
 | **Organization** | Projects · Organizations · **The plan** |
-| **Classification** | Disciplines, types & sets · Document families · **Forms & fields** · Numbering |
+| **Classification** | Types & sets · Document families · **Forms & fields** · Numbering |
 | **How work flows** | Control room (the flow, who carries each act, the project's policies, state names) · Review routes |
 | **Access** | Functions & permissions · People & access |
 | **Change & evidence** | Uploaded lists to decide · The log |

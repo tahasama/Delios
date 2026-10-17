@@ -16,7 +16,7 @@ import { Plus, Search, X, Pencil, Download } from "lucide-react";
 import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Disciplines, types & sets" };
+export const metadata = { title: "Types & sets" };
 
 /** Sets grouped by what they are for. Anything not listed falls under "Other". */
 const GROUPS: { title: string; keys: string[] }[] = [
@@ -61,7 +61,7 @@ type Params = { set?: string; q?: string; show?: string; edit?: string; panel?: 
 export default async function AdminConfigPage({ searchParams }: { searchParams: Promise<Params> }) {
   const ctx = await requireScope();
   const { user: me } = ctx;
-  if (!isAdmin(me)) return <NoAccess title="Disciplines, types & sets" who="admin" />;
+  if (!isAdmin(me)) return <NoAccess title="Types & sets" who="admin" />;
   const sp = await searchParams;
   const sets = await getSets();
   const currentKey = sp.set ?? sets[0]?.key ?? "";
@@ -110,7 +110,7 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Disciplines, types & sets"
+        title="Types & sets"
         subtitle="Every code and choice this organization works from, one list each. A code already in use is retired, never deleted, so older documents stay findable."
         actions={
           <div className="flex flex-col items-end gap-2.5">

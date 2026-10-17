@@ -112,18 +112,16 @@ export async function restoreCheckAction(_prev: Result | undefined, formData: Fo
 }
 
 /**
- * How this project is measured: the share of clear documents it aims at, how often it is checked.
+ * How this project is measured: the share of clear documents it aims at (the checks run by themselves every day).
  * The project's answer (MEASURE); the backend lets an administrator or the control function change it.
  */
 export async function setMeasureAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
   const threshold = Number(formData.get("integrityThreshold"));
-  const interval = Number(formData.get("measurementIntervalDays"));
   if (!Number.isInteger(threshold) || threshold < 50 || threshold > 100) return { error: "The target is a whole number from 50 to 100." };
-  if (!Number.isInteger(interval) || interval < 1 || interval > 365) return { error: "Checked every 1 to 365 days." };
   try {
     await setProjectSetting(ctx.projectId, MEASURE_KEY, JSON.stringify({
-      integrityThreshold: threshold, measurementIntervalDays: interval, by: ctx.user.name, at: new Date().toISOString(),
+      integrityThreshold: threshold, by: ctx.user.name, at: new Date().toISOString(),
     }));
   } catch (e) {
     return failed(e);

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
-import { fmtDate, fmtDateTime } from "@/lib/core/utils";
+import { fmtDateTime } from "@/lib/core/utils";
 import { untoldRecipients } from "@/lib/documents/supersession";
 import { haltedRevisions } from "@/lib/reviews/halted";
 import { checksOf, documentCount, flawedDocuments, liveDefects, optOutsOf, scopeOf } from "@/lib/conformance/api";
@@ -37,9 +37,6 @@ export async function AssuranceFigure() {
   }
 
   const threshold = scope.integrityThreshold;
-  // The project asks for the checks at least every so many days: past that, the figure is old and says so.
-  const dueBy = new Date(new Date(last.ranAt).getTime() + scope.measurementIntervalDays * 86_400_000);
-  const due = dueBy.getTime() < Date.now();
   const clear = totalDocs - flawedDocs;
   const rate = totalDocs ? (clear / totalDocs) * 100 : 100;
   const below = rate < threshold || criticals > 0;
@@ -71,9 +68,6 @@ export async function AssuranceFigure() {
           {last.executed} of {last.totalChecks} checks asked
           {switchedOff ? ` · ${switchedOff} switched off` : ""} · {fmtDateTime(last.ranAt)}
           {last.ranByName ? ` · ${last.ranByName}` : ""}
-          {due
-            ? <strong className="font-semibold text-amber-700"> · checks due since {fmtDate(dueBy)}: run them again</strong>
-            : ` · next by ${fmtDate(dueBy)}`}
         </span>
       </p>
       <div className="flex flex-col items-start gap-1 text-xs sm:items-end">

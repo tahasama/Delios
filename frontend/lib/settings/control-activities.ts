@@ -163,7 +163,7 @@ export async function actIsOff(t: Tenant, key: string): Promise<boolean> {
 export const NOT_SWITCHABLE = [
   "Accepting something that arrived is the recipient's act already, checked against the acceptance conditions.",
   "Refusing to publish a decided revision only exists where somebody stands between the decision and the register — that is the control function itself.",
-  "Accepting a check finding has its own authority, set with the scope statement on The plan.",
+  "Accepting a check finding as it is has its own reason and a date to look again, on Assurance.",
   "Disposal of a record is never delegated.",
 ];
 

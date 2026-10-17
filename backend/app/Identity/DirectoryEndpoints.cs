@@ -376,7 +376,7 @@ public static class DirectoryEndpoints
         if (Blank(kind)?.ToUpperInvariant() is not { } code) return null;
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         if (catalog.Active(ValueSets.ProjectKinds).Count == 0 || catalog.IsActive(ValueSets.ProjectKinds, code)) return null;
-        return Problems.Invalid("KIND_UNKNOWN", $"{code} is not one of the project types (Settings, Disciplines, types & sets, Project types).", new { field = "kind" });
+        return Problems.Invalid("KIND_UNKNOWN", $"{code} is not one of the project types (Settings, Types & sets, Project types).", new { field = "kind" });
     }
 
     /// <summary><c>POST /api/admin/projects</c>: a new project. Whoever creates it is put on it, with the first function that controls.</summary>

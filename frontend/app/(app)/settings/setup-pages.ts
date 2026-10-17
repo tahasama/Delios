@@ -60,7 +60,7 @@ export const SETUP_PAGES: SetupPage[] = [
 
   {
     href: "/settings/config",
-    title: "Disciplines, types & sets",
+    title: "Types & sets",
     text: "The lists every document is described with: disciplines, document types, statuses, reasons and more.",
     group: "Classification",
   },

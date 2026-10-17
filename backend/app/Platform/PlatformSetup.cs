@@ -353,6 +353,7 @@ public static class PlatformSetup
             Search.SearchEndpoints.MapSearchEndpoints(app);
             Extraction.ExtractionEndpoints.MapExtractionEndpoints(app);
             Checks.CheckEndpoints.MapCheckEndpoints(app);
+            Checks.PlanEndpoints.MapPlanEndpoints(app);
             Actions.ScheduleEndpoints.MapScheduleEndpoints(app);
             Actions.ListUploadEndpoints.MapListUploadEndpoints(app);
             Documents.SheetGuard.MapSheetGuardEndpoints(app);

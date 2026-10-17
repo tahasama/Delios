@@ -45,7 +45,7 @@ const CONTROL: CapabilityItem[] = [
 
 const SETUP: CapabilityItem[] = [
   { href: "/settings", title: "Set the project up", text: "Work through what a project needs — organizations, people, lists, numbering, routes — in the order it is decided.", icon: Settings },
-  { href: "/settings/config", title: "Disciplines, types and sets", text: "Define the codes and behavior that belong to your organization—not to the software vendor.", icon: Tags },
+  { href: "/settings/config", title: "Types and sets", text: "Define the codes and behavior that belong to your organization—not to the software vendor.", icon: Tags },
   { href: "/settings/workflow-templates", title: "Review routes", text: "Build review and approval routes, participant modes and applicable document classes.", icon: Workflow },
   { href: "/settings/numbering", title: "Numbering", text: "Define schemes, fields, routing and issued number ranges.", icon: FileText },
   { href: "/settings/parties", title: "Organizations and suppliers", text: "Separate your organization from external parties and group people correctly.", icon: Network },

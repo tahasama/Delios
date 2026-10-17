@@ -95,7 +95,7 @@ export default async function NumberingPage() {
     <div className="space-y-4">
       <PageHeader
         title="Numbering"
-        subtitle="One table: everything the register numbers, and the scheme it is numbered by. A scheme is a list of parts; the codes that fill them live in Disciplines, types & sets."
+        subtitle="One table: everything the register numbers, and the scheme it is numbered by. A scheme is a list of parts; the codes that fill them live in Types & sets."
       />
 
       <Card

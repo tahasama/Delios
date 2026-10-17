@@ -594,16 +594,22 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Screens and the backend say "the control function" and "whoever holds Manage" (or "whoever plans"), never a job
   title; a function's own name is shown only as read from the data.
 - No ready-made codes offered by a button (owner): the "starter profiles" ("Add them") are removed. Lists are filled by
-  the organization itself, typed on Disciplines, types & sets or imported.
+  the organization itself, typed on Types & sets or imported.
 - A project's **Type** is chosen from the organization's list **Project types** (`PROJECT_KINDS`, Disciplines, types &
   sets, Numbering & identity), kept like any list; it describes the project only. The backend refuses a type not in it
   (KIND_UNKNOWN); a retired type stays readable on the project that carries it (`lib/settings/project-kinds.ts`).
   Controlled changes no longer exist.
-- **The plan is a document, not a setting** (owner): Assurance → The plan (`/conformance/plan`), written from how the
-  project is set up, printed; nothing on it is typed and nothing on it repeats a Settings page. Scope is said once (This
-  project); how it is measured once (Assurance, "How it is measured": target and how often, `MEASURE`; past it the
-  figure says the checks are due). The organization's name is its own, never typed again. No exceptions register (it
-  changed nothing): a check switched off, with why, is the departure that applies. `/settings/dmp` only redirects.
+- **The plan is a document, not a setting** (owner): Assurance → The plan (`/conformance/plan`), the project's document
+  management plan, read by everyone of ours and printed. It says how each thing is done, why, by whom, where and when,
+  in 16 chapters (who takes part, who does what, a document's life, registering, numbering, revisions, review, release,
+  transmittals, other organizations, the schedule, who sees what, keeping and ending, what is recorded, how it is
+  checked): each with why, the steps (who, what, when, its state's side colour), the facts it runs on, and "the app
+  makes sure of it" (`prevented.ts` by area); "Set in" links on screen only. Every sentence is read from how the
+  project is set up (`GET /plan`, `PlanEndpoints`, for what only the keepers read elsewhere); what is not set up is said
+  where it belongs. Nothing on it is typed and nothing repeats a Settings page. Scope is said once (This project); the
+  target once (Assurance, "How it is measured", `MEASURE`; the checks run by themselves every day, so no interval). The
+  organization's name is its own. No exceptions register (it changed nothing): a check switched off, with why, is the
+  departure that applies. `/settings/dmp` only redirects.
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
 - **Two levels of settings** (owner): the organization's (`/organization`, its portal) and the project's (Settings).
   Every project, opening one, archiving and reopening are the organization's: **Projects** (`/organization/projects`,

@@ -2,7 +2,7 @@ import "server-only";
 import { getSet } from "@/lib/settings/config";
 
 /**
- * Project types: the organization's own list (PROJECT_KINDS, Disciplines, types & sets), what a project's "Type" is
+ * Project types: the organization's own list (PROJECT_KINDS, Types & sets), what a project's "Type" is
  * chosen from. It describes the project and changes nothing else. `offered` are those still in use; `all` names every
  * type, retired included, so a project keeps reading its own. The backend refuses a type not in the list (KIND_UNKNOWN).
  */

@@ -1,38 +1,46 @@
 import { requireScope } from "@/lib/core/scope";
-import { isAdmin, isController } from "@/lib/core/auth";
 import { PageHeader } from "@/components/ui";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 import { PrintButton } from "@/app/(app)/conformance/statement/print-button";
-import { DocumentManagementPlan } from "./plan";
+import { DocumentManagementPlan, CHAPTERS } from "./plan";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "The plan" };
 
 /**
- * The project's document management plan: a document, not a setting. It is written from what the project is set
- * up to do, so nothing on it is typed. It is read from the settings an administrator and the control function keep.
+ * The project's document management plan: a document, not a setting. Everyone of ours reads it (Assurance is ours
+ * only); the backend gathers what only the keepers read elsewhere (`GET /plan`). The contents stay beside it on screen.
  */
 export default async function PlanPage() {
-  const { user } = await requireScope();
-  const reads = isAdmin(user) || isController(user);
-
+  await requireScope();
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="space-y-4">
       <div className="no-print">
         <PageHeader
           title="The plan"
-          subtitle="This project's document management plan, written from how the project is set up. Change a numbering, a route or a list and the plan changes with it."
-          actions={reads ? <PrintButton /> : undefined}
+          subtitle="How documents are controlled on this project: how each thing is done, why, by whom, where and when. Written from how the project is set up, so it is always true."
+          actions={<PrintButton />}
         />
         <AssuranceTabs current="/conformance/plan" />
       </div>
-      {reads ? (
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
         <DocumentManagementPlan />
-      ) : (
-        <p className="register register-sheet px-5 py-4 text-[13px] text-slate-600 sm:px-6">
-          The plan is written from the project&rsquo;s settings, which an administrator and the control function read. Ask one of them for a printed copy.
-        </p>
-      )}
+        <aside className="no-print hidden xl:block">
+          <nav aria-label="Contents" className="register register-sheet register-sheet-open sticky top-20">
+            <p className="border-b border-line bg-tint-soft px-4 py-2.5"><span className="stencil text-slate-500">Contents</span></p>
+            <ol className="space-y-0.5 px-2 py-2">
+              {CHAPTERS.map((c, i) => (
+                <li key={c.id}>
+                  <a href={`#${c.id}`} className="flex gap-2 rounded-sm px-2 py-1 text-[12px] leading-5 text-slate-600 hover:bg-tint-soft hover:text-slate-900">
+                    <span className="w-4 shrink-0 text-right font-mono text-[11px] text-slate-400">{i + 1}</span>
+                    <span>{c.title}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        </aside>
+      </div>
     </div>
   );
 }

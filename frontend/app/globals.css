@@ -587,6 +587,27 @@ summary::-webkit-details-marker {
     display: none !important;
   }
 
+  /* The document management plan runs to many pages: a chapter may break, but never inside a step, a row or a
+     part's heading, and each chapter starts with its band. */
+  .plan-doc .plan-chapter {
+    break-inside: auto;
+    box-shadow: none !important;
+    margin-top: 10px;
+  }
+  .plan-doc .plan-chapter > header,
+  .plan-doc h3 {
+    break-after: avoid;
+  }
+  .plan-doc .plan-flow li,
+  .plan-doc tr,
+  .plan-doc .plan-part > div:first-child {
+    break-inside: avoid;
+  }
+  .plan-doc .plan-cover {
+    break-after: page;
+    box-shadow: none !important;
+  }
+
   /* A statement of conformance is one page or it is not a statement: whoever
      receives it files one sheet. The sheet keeps its proportions — it is set
      tighter, not shrunk — and nothing it holds may break across a page. */
