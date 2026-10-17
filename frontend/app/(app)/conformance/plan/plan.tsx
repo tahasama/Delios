@@ -4,7 +4,8 @@ import { fmtDate } from "@/lib/core/utils";
 import { getMe } from "@/lib/account/api";
 import { getActiveSet, getSets } from "@/lib/settings/config";
 import { projectSettings, orgSettings } from "@/lib/settings/api";
-import { controlSettings, effectiveAnswer, STAMP_KINDS, STAMP_COMMENTS_KEY, PROJECT_MODE_LABEL } from "@/lib/settings/control-activities";
+import { controlSettings, effectiveAnswer, STAMP_KINDS, STAMP_COMMENTS_KEY, PROJECT_MODE_LABEL, SKIPPABLE } from "@/lib/settings/control-activities";
+import { KINDS, KIND_LABEL, fieldsOf, fieldRules, fieldLabels, storedOwnFields, type FieldRule } from "@/lib/settings/field-policy";
 import { ESCALATE_AFTER_KEY } from "@/lib/actions/escalation";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
 import { scheduleSource } from "@/lib/actions/api";
@@ -47,6 +48,7 @@ export const CHAPTERS = [
   { id: "roles", title: "Who does what" },
   { id: "life", title: "A document's life, end to end" },
   { id: "register", title: "Registering a document" },
+  { id: "asked", title: "What is asked, and what must be filled" },
   { id: "numbering", title: "How documents are numbered" },
   { id: "revisions", title: "Revisions" },
   { id: "review", title: "Review and approval" },
@@ -180,6 +182,17 @@ export async function DocumentManagementPlan() {
   const infoReasons = reasons.filter((r) => r.props.family === "Information");
   const verbsOf = (f: ProjectPlan["functions"][number]) => [...new Set(f.rows.flatMap((r) => r.verbs))] as Verb[];
   const checksBy = (["SETUP", "RUNNING", "HANDOVER"] as Phase[]).map((p) => ({ phase: p, count: CATALOG.filter((c) => c.phase === p).length }));
+  // What each form asks, where the organization decided otherwise than the app: a field made required, left out, or
+  // added of its own. A form nobody changed asks what the app asks, and is not repeated here.
+  const RULE_WORDS: Record<FieldRule, string> = { REQUIRED: "must be filled", OPTIONAL: "asked, may be left", OFF: "not asked" };
+  const asked = (await Promise.all(KINDS.map(async (kind) => {
+    const [rules, labels, own] = await Promise.all([fieldRules(ctx, kind), fieldLabels(ctx, kind), storedOwnFields(kind)]);
+    const changed = fieldsOf(kind).filter((f) => !f.fixed && rules[f.key] !== f.fallback)
+      .map((f) => ({ label: labels[f.key] ?? f.label, rule: rules[f.key], own: false }));
+    const added = own.filter((f) => f.rule !== "OFF").map((f) => ({ label: f.label, rule: f.rule, own: true }));
+    return { kind, lines: [...changed, ...added] };
+  }))).filter((one) => one.lines.length);
+  const leftOut = reading.rows.filter((row) => row.off);
 
   return (
     <article className="plan-doc space-y-4">
@@ -277,7 +290,7 @@ export async function DocumentManagementPlan() {
                 : <span>{row.controlDoes ? row.activity.control : row.activity.self}{row.confirm ? <span className="text-slate-500"> Whoever holds Manage confirms first.</span> : null}</span>,
             ])} />
         </Part>
-        <Part title="What each function may do" aside={strictMatrix ? "only the matrix decides who may be named" : "the matrix proposes; anyone on the project may be named, and the record says who chose"}>
+        <Part title="What each function may do" aside={`${strictMatrix ? "only the matrix decides who may be named" : "the matrix proposes; anyone on the project may be named, and the record says who chose"} · answered ${answer("POLICY_MATRIX_DETAIL") === "FAMILY" ? "per discipline and document family" : "per discipline"}`}>
           <Grid head={["Function", "May", "Held here by"]}
             rows={plan.functions.map((f) => [
               f.name,
@@ -286,10 +299,15 @@ export async function DocumentManagementPlan() {
             ])}
             empty="No function is set up yet: nobody may act." />
         </Part>
+        {leftOut.length ? (
+          <Part title="Left out on this project">
+            <Always items={leftOut.map((row) => <><strong className="font-semibold">{row.activity.title}:</strong> {SKIPPABLE[row.activity.key]?.off}</>)} />
+          </Part>
+        ) : null}
         <Part title="Joining the project">
           <Flow steps={[
-            { what: "Someone new is asked for", who: "Anyone of ours, from the project directory", detail: "First and last name, email, function, department, and an optional message.", rail: "rail-draft" },
-            { what: "They are added", who: peopleRow?.controlDoes ? "The control function (People & access)" : "Anyone on the project", rail: "rail-review" },
+            { what: "Someone new is asked for", who: "Anyone of ours", detail: "With their name, email, function and department.", rail: "rail-draft" },
+            { what: "They are added", who: peopleRow?.controlDoes ? "The control function" : "Anyone on the project", rail: "rail-review" },
             ...(peopleRow?.confirm ? [{ what: "Their joining is confirmed, or refused with why", who: "Whoever holds Manage", detail: "Until confirmed they are not on the project.", rail: "rail-prep" }] : []),
             { what: "They are on the project, and told", who: "By itself", detail: "By notification and email; a new account gets its link to choose a password.", rail: "rail-released" },
           ]} />
@@ -301,7 +319,7 @@ export async function DocumentManagementPlan() {
         change={[{ href: "/settings/flow", label: "Control room" }]}>
         <Flow steps={[
           { what: "Registered", who: "Its author (or the control function)", detail: "It gets its number at once. It may hold nothing yet: a placeholder for what is due.", rail: "rail-none" },
-          { what: names.IN_PREPARATION, who: "Its author or the control function", detail: "Everything is editable in one step, Edit rev: PDF, native file, title and every field.", rail: "rail-prep" },
+          { what: names.IN_PREPARATION, who: "Its author or the control function", detail: "Until it is released, anything about it may change: its files, its title, every field.", rail: "rail-prep" },
           { what: names.IN_REVIEW, who: "The people on each step of its route", when: "Each step has its own days", detail: "Advisers advise, the decider decides. Whoever started the review, or the control function, may withdraw it with a reason.", rail: "rail-review" },
           { what: "Decided", who: "The decider", detail: "Accepted, accepted with comments, rejected, or taken for information. Rejected goes back to its author for a new revision.", rail: "rail-accepted" },
           { what: releaseSends ? names.RELEASED_ISSUED : names.RELEASED, who: hasControl ? "The control function" : "The deciding step", detail: releaseSends ? "Released and sent in one act, to the people the decider named." : "Released: people work from it; sending it is a separate act.", rail: "rail-released" },
@@ -322,9 +340,9 @@ export async function DocumentManagementPlan() {
         why="A document exists for the project once it is registered: described the same way by everyone, so it can be found, numbered, routed and kept."
         change={[{ href: "/settings/config", label: "Types & sets" }, { href: "/settings/fields", label: "Forms & fields" }]}>
         <Flow steps={[
-          { what: "Choose its deliverable type", who: "Whoever registers it", detail: "Who produces it, and so how it is numbered.", rail: "rail-none" },
-          { what: "Describe it", detail: "Document type (only those of that deliverable type), discipline, phase, criticality (the type recommends one), who may see it.", rail: "rail-none" },
-          { what: "Add its files, if any", detail: "A PDF and a native file, both optional at this point.", rail: "rail-none" },
+          { what: "Its deliverable type says who produces it", who: "Whoever registers it", detail: "And so how it is numbered, and which document types it may be.", rail: "rail-none" },
+          { what: "It is described the same way by everyone", detail: "Document type, discipline, phase, criticality (its type recommends one), who may see it: each chosen from the project's lists.", rail: "rail-none" },
+          { what: "Its files may come later", detail: "A PDF and a native file; neither is needed to register it.", rail: "rail-none" },
           { what: "It is numbered and in the register", who: "By itself", detail: "The project code comes from the project; nobody types a number.", rail: "rail-prep" },
         ]} />
         <Part title="Deliverable types: who produces it" aside={`${deliverables.length} in use`}>
@@ -364,6 +382,17 @@ export async function DocumentManagementPlan() {
         <Ensured rules={ensured("Registering a document")} />
       </Chapter>
 
+      <Chapter n={n("asked")} id="asked" title="What is asked, and what must be filled"
+        why="What this organization decided each form asks, beyond what the app asks by itself: so everyone gives the same information, every time."
+        change={[{ href: "/settings/fields", label: "Forms & fields" }]}>
+        {asked.length ? asked.map((one) => (
+          <Part key={one.kind} title={KIND_LABEL[one.kind]}>
+            <Grid head={["Field", "Here"]}
+              rows={one.lines.map((line) => [<span key="f">{line.label}{line.own ? <span className="text-slate-500"> (added by us)</span> : null}</span>, RULE_WORDS[line.rule]])} />
+          </Part>
+        )) : <Say>Every form asks what the app asks by itself; nothing was made required, left out or added.</Say>}
+      </Chapter>
+
       <Chapter n={n("numbering")} id="numbering" title="How documents are numbered"
         why="Every document, review, transmittal and package is numbered by the app, from its parts in a fixed order, so a number says what it is and is never given twice."
         change={[{ href: "/settings/numbering", label: "Numbering" }]}>
@@ -399,7 +428,7 @@ export async function DocumentManagementPlan() {
         )) : <Missing>No revision scheme yet.</Missing>}
         <Flow steps={[
           { what: "A new revision is started", who: "Its author", detail: "It asks one thing: what changed, and why. A verdict that asked for changes needs nobody's leave; one accepted as it stands needs a reason.", rail: "rail-prep" },
-          { what: "It is prepared", detail: "Until released, Edit rev changes anything: PDF, native file, title, every field.", rail: "rail-prep" },
+          { what: "It is prepared", detail: "Until released, anything about it may change: its files, its title, every field.", rail: "rail-prep" },
           { what: "It is sent for review, or released", detail: "Never in two reviews at once.", rail: "rail-review" },
         ]} />
         <Ensured rules={ensured("Revisions")} />
@@ -458,7 +487,7 @@ export async function DocumentManagementPlan() {
         why="A revision is in force only once released, and the people who need it receive it with a record of who got what and when."
         change={[{ href: "/settings/flow", label: "Control room" }, { href: "/settings/config?set=STATUSES", label: "Statuses" }]}>
         <Flow steps={[
-          { what: "The decider says who receives it", who: "The decider, or whoever asked for it to be sent", detail: "People or organizations; the release form shows them, each removable.", rail: "rail-accepted" },
+          { what: "The decider says who receives it", who: "The decider, or whoever asked for it to be sent", detail: "People or organizations. Whoever releases it may take someone off; the record keeps who, by whom and when.", rail: "rail-accepted" },
           { what: releaseSends ? "Released and sent, in one act" : "Released: people work from it", who: hasControl ? "The control function" : "The deciding step", detail: releaseSends ? "A release needs someone to send to; it goes to them at once, by transmittal." : "Sending it is a separate act; nothing requires it.", rail: "rail-released" },
           { what: "The previous revision is superseded", who: "By itself", detail: "Everyone who received it is told to stop using it.", rail: "rail-superseded" },
         ]} />
@@ -479,6 +508,13 @@ export async function DocumentManagementPlan() {
             </Say>
           ) : <Say>It stays as it was sent; where it stands is read in the app.</Say>}
         </Part>
+        <Part title="Handing documents over together: delivery packages">
+          <Flow steps={[
+            { what: "A package is put together", who: "Whoever is composing it", detail: "Its documents, and the status each is needed at (which also says why they get it).", rail: "rail-draft" },
+            { what: "What is still missing is asked for", who: "The control function", detail: "On a transmittal to whoever accepts the package.", rail: "rail-review" },
+            { what: "Its receiver confirms, and it is delivered", who: "Whoever accepts it", detail: "On their responsibility: a document not ready yet goes as it stands, and the delivery says so.", rail: "rail-delivered" },
+          ]} />
+        </Part>
         <Ensured rules={ensured("Releasing a revision")} />
       </Chapter>
 
@@ -486,15 +522,26 @@ export async function DocumentManagementPlan() {
         why="Everything that goes out or comes in travels on a transmittal: what, to whom, why, and by when an answer is due."
         change={[{ href: "/settings/config?set=REASONS_FOR_ISSUE", label: "Reasons for issue" }]}>
         <Part title="Two kinds">
-          <Grid head={["Kind", "Carries", "Its reasons"]} rows={[
-            ["Data transmittal", "At least one document (or, received, the files that came)", list(dataReasons.map((r) => r.label))],
-            ["Information transmittal", "Words: a request, a question, an answer, a confirmation", list(infoReasons.map((r) => r.label))],
+          <Always items={[
+            <><strong className="font-semibold">Data transmittal:</strong> carries at least one document (or, received, the files that came with it).</>,
+            <><strong className="font-semibold">Information transmittal:</strong> words alone: a request, a question, an answer, a confirmation.</>,
           ]} />
+        </Part>
+        <Part title="Why it is sent: the reasons">
+          <Grid head={["Reason", "Kind", "An answer"]}
+            rows={[...dataReasons, ...infoReasons].map((r) => [
+              <span key="r"><Code>{r.code}</Code> {r.label}</span>,
+              r.props.family === "Information" ? "Information" : "Data",
+              r.props.response === true
+                ? `expected${typeof r.props.responseDays === "number" ? `, within ${r.props.responseDays} working days` : ""}`
+                : "only if the sender asks for one",
+            ])}
+            empty="No reason for issue yet." />
         </Part>
         <Flow steps={[
           { what: "Written and sent", who: "Its sender, today", detail: "The documents chosen from the register; the people or organizations it goes to.", rail: "rail-sent" },
-          { what: "An answer is asked by a day, when needed", who: "The sender ticks it", detail: "It then reads awaited, overdue, answered on time or answered late.", rail: "rail-review" },
-          { what: "Followed up", who: "Either side", detail: "One Follow up answers or completes it: a new transmittal that names the one it follows.", rail: "rail-received" },
+          { what: "An answer is asked by a day, when needed", who: "The sender", detail: "It then reads awaited, overdue, answered on time or answered late.", rail: "rail-review" },
+          { what: "Answered or completed", who: "Either side", detail: "By a new transmittal that names the one it follows.", rail: "rail-received" },
         ]} />
         <Say className="text-[12px] text-slate-500">What arrives outside the system is recorded by the control function as received, with who sent it and when, and is checked like anything that arrives.</Say>
         <Ensured rules={ensured("Transmittals")} />
@@ -581,7 +628,7 @@ export async function DocumentManagementPlan() {
           "Every act on a document, review, transmittal, package and setting: always.",
           trackReading ? "Opening a document and downloading a file: kept." : "Opening a document and downloading a file: not kept on this organization.",
           trackSignIns ? "Sign-ins: kept and shown on a person's activity." : "Sign-ins: kept for security, not shown on a person's activity.",
-          "Each document's History holds every reason in full, never cut off.",
+          "Every reason given is kept with its document, in full.",
         ]} />
       </Chapter>
 

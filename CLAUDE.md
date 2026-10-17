@@ -610,6 +610,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   target once (Assurance, "How it is measured", `MEASURE`; the checks run by themselves every day, so no interval). The
   organization's name is its own. No exceptions register (it changed nothing): a check switched off, with why, is the
   departure that applies. `/settings/dmp` only redirects.
+  **A plan, never a manual** (owner): it is the app's plan for this project, made of its switches, settings, the inputs
+  its forms ask and its flows; nothing the app does not do (no hardcopies, no matrix typed by hand). Each line states a
+  choice of this project or a rule that always holds, with who and when; a line naming a button, tab or click is
+  manual and belongs in Help. It includes what each form asks where the organization decided otherwise (Forms &
+  fields: made required, left out, added), the acts left out, each reason's expected answer, delivery packages, and
+  how fine the matrix is cut. A setting the app does not apply is never stated (the families' outside stamp is not).
   **Plan v1** (owner: "I like it; if the next one doesn't work we fall back to it") is commit `ef95589`
   (`frontend/app/(app)/conformance/plan/`, `backend/app/Checks/PlanEndpoints.cs`): restore those files from it.
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
