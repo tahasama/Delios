@@ -10,14 +10,41 @@ public sealed class Catalog
     /// <summary>The values by set key, then by code.</summary>
     private readonly Dictionary<string, Dictionary<string, ValueEntry>> _sets;
 
+    /// <summary>The sets of each list (a list holds one or more; each serves the deliverable types it names).</summary>
+    private readonly Dictionary<string, List<ValueSet>> _listSets;
+
     /// <summary>Groups the loaded values by set and by code for quick look-ups.</summary>
-    private Catalog(IEnumerable<ValueEntry> values) =>
+    private Catalog(IEnumerable<ValueEntry> values, IEnumerable<ValueSet> sets)
+    {
         _sets = values.GroupBy(v => v.SetKey)
             .ToDictionary(g => g.Key, g => g.ToDictionary(v => v.Code, StringComparer.Ordinal));
+        _listSets = sets.GroupBy(s => s.ListKey).ToDictionary(g => g.Key, g => g.ToList());
+    }
 
     /// <summary>Reads every value of the current tenant from the database. Called by <see cref="DocumentService"/> when it needs the lists.</summary>
     public static async Task<Catalog> LoadAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
-        new(await db.ValueEntries.AsNoTracking().ToListAsync(cancellationToken));
+        new(await db.ValueEntries.AsNoTracking().ToListAsync(cancellationToken), await db.ListSets.AsNoTracking().ToListAsync(cancellationToken));
+
+    /// <summary>
+    /// True when the value is active and in the set of its list that serves this deliverable type (`ListRules.Serving`):
+    /// a list with one set offers it for every type. Without a type, any active value.
+    /// </summary>
+    public bool IsOfferedFor(string setKey, string code, string? deliverableType) =>
+        IsActive(setKey, code) && (deliverableType is null || ServedBy(setKey, _sets[setKey][code], deliverableType));
+
+    /// <summary>Whether a value is in the set serving a deliverable type; a value with no set is the default set's.</summary>
+    private bool ServedBy(string setKey, ValueEntry value, string deliverableType)
+    {
+        if (!_listSets.TryGetValue(setKey, out var sets) || sets.Count <= 1) return true;
+        var serving = ListRules.Serving(sets, deliverableType);
+        return serving is not null && (value.SetId ?? sets.FirstOrDefault(s => s.IsDefault)?.Id) == serving.Id;
+    }
+
+    /// <summary>The active values offered for a deliverable type (all active ones without a type), in order.</summary>
+    private IEnumerable<ValueEntry> Offered(string setKey, string? deliverableType) =>
+        _sets.TryGetValue(setKey, out var set)
+            ? set.Values.Where(v => v.Status == ValueStatus.Active && (deliverableType is null || ServedBy(setKey, v, deliverableType))).OrderBy(v => v.Sort)
+            : [];
 
     /// <summary>True when the code is in the set and still active (not retired).</summary>
     public bool IsActive(string setKey, string code) =>
@@ -81,17 +108,16 @@ public sealed class Catalog
                     && p.ValueKind == JsonValueKind.String && p.GetString() == value).Select(v => v.Code).ToList()
             : [];
 
-    /// <summary>The active value of a set flagged <c>"default": true</c>.</summary>
-    public string? DefaultOf(string setKey) =>
-        _sets.TryGetValue(setKey, out var set)
-            ? set.Values.Where(v => v.Status == ValueStatus.Active)
-                .FirstOrDefault(v => v.Props?.RootElement.TryGetProperty("default", out var d) == true
-                    && d.ValueKind == JsonValueKind.True)?.Code
-            : null;
+    /// <summary>The active value flagged <c>"default": true</c>, among those offered for the deliverable type when one is given.</summary>
+    public string? DefaultOf(string setKey, string? deliverableType = null) =>
+        Offered(setKey, deliverableType).FirstOrDefault(v => v.Props?.RootElement.TryGetProperty("default", out var d) == true
+            && d.ValueKind == JsonValueKind.True)?.Code;
 
-    /// <summary>The first active value in the published order: for confidentiality, the lowest level (ranks follow that order).</summary>
-    public string? LowestOf(string setKey) =>
-        _sets.TryGetValue(setKey, out var set) ? set.Values.Where(v => v.Status == ValueStatus.Active).OrderBy(v => v.Sort).FirstOrDefault()?.Code : null;
+    /// <summary>
+    /// The first active value in the published order, among those offered for the deliverable type when one is given: for
+    /// confidentiality, the lowest level (ranks follow that order).
+    /// </summary>
+    public string? LowestOf(string setKey, string? deliverableType = null) => Offered(setKey, deliverableType).FirstOrDefault()?.Code;
 
     /// <summary>The organization's words that, alone, make a title generic.</summary>
     public IReadOnlySet<string> GenericTitleWords() =>
@@ -110,15 +136,15 @@ public sealed class Catalog
     /// The retention class a document gets when none is chosen: the one its
     /// criticality maps to, else the default class.
     /// </summary>
-    public string? RetentionFor(string? criticality)
+    public string? RetentionFor(string? criticality, string? deliverableType = null)
     {
         if (criticality is not null
             && Prop(ValueSets.Criticality, criticality, "retention") is { ValueKind: JsonValueKind.String } mapped
-            && IsActive(ValueSets.RetentionClasses, mapped.GetString()!))
+            && IsOfferedFor(ValueSets.RetentionClasses, mapped.GetString()!, deliverableType))
         {
             return mapped.GetString();
         }
-        return DefaultOf(ValueSets.RetentionClasses);
+        return DefaultOf(ValueSets.RetentionClasses, deliverableType);
     }
 
     /// <summary>Fields a deliverable type requires, from its <c>"required"</c> list.</summary>

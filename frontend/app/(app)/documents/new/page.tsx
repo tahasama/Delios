@@ -1,6 +1,7 @@
 import { packagesOf } from "@/lib/packages/api";
 import { fieldRules, fieldLabels, ownFields } from "@/lib/settings/field-policy";
 import { getActiveSet } from "@/lib/settings/config";
+import { servingOf } from "@/lib/settings/serving-api";
 import { requireScope } from "@/lib/core/scope";
 import { mayCreateDocument } from "@/lib/core/auth";
 import { numberingForEditor } from "@/lib/settings/api-admin";
@@ -60,12 +61,15 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     const scheme = schemes.find((sc) => sc.name === r.schemeName);
     numberingSets[r.deliverableType] = (scheme?.fields ?? []).map((f) => f.valueSetKey).filter((k): k is string => !!k);
   }
+  const serving = await servingOf(["DOCUMENT_TYPES", "DISCIPLINES", "SUBPROJECTS", "PHASES", "PURCHASE_ORDERS", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES"]);
   const defaultConf = confidentialities.find((c) => c.props.default === true)?.code ?? null;
   // A value's own one-line meaning travels with it, so the form can say what
   // "Restricted" or "Asset life" means where it is chosen.
-  const toOpt = (rows: { code: string; label: string; props?: Record<string, unknown> }[]) => rows.map((r) => ({
+  const toOpt = (rows: { code: string; label: string; props?: Record<string, unknown>; setId?: string | null }[]) => rows.map((r) => ({
     code: r.code,
     label: r.label,
+    // The set of its list it is in: the form offers the set serving the chosen deliverable type.
+    setId: r.setId ?? null,
     meaning: [r.props?.meaning, r.props?.basis, r.props?.may, r.props?.approval ? `approved by ${String(r.props.approval).toLowerCase()}` : null]
       .filter((x): x is string => typeof x === "string" && x.length > 0)[0] ?? null,
     // Who produces this kind of document, where the value says so.
@@ -82,7 +86,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     // The retention period a criticality level brings, when none is chosen.
     retention: typeof r.props?.retention === "string" ? r.props.retention : null,
   }));
-  const byName = (rows: { code: string; label: string; props?: Record<string, unknown> }[]) => toOpt(rows).sort((x, y) => x.label.localeCompare(y.label));
+  const byName = (rows: { code: string; label: string; props?: Record<string, unknown>; setId?: string | null }[]) => toOpt(rows).sort((x, y) => x.label.localeCompare(y.label));
 
   return (
     <div>
@@ -117,6 +121,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
         confidentialities={toOpt(confidentialities)}
         retentionClasses={toOpt(retentionClasses)}
         defaultConfidentiality={defaultConf}
+        serving={serving}
       />
     </div>
   );

@@ -55,8 +55,8 @@ public sealed class DocumentService(
         // A document of another organization's is shared with it: unless a level is chosen, it starts at the lowest.
         var confidentiality = Blank(request.Confidentiality)
             ?? (Blank(request.Originator) is { } from && await db.Parties.AnyAsync(p => p.Code == from && !p.IsInternal, cancellationToken)
-                ? catalog.LowestOf(ValueSets.Confidentiality) : null)
-            ?? catalog.DefaultOf(ValueSets.Confidentiality);
+                ? catalog.LowestOf(ValueSets.Confidentiality, request.DeliverableType) : null)
+            ?? catalog.DefaultOf(ValueSets.Confidentiality, request.DeliverableType);
         var facts = new DocumentFacts(request.DeliverableType, request.DocType, request.Discipline,
             Blank(request.Criticality), confidentiality);
         if (!access.IsInternal || !access.Allows(Verbs.Create, facts))
@@ -87,6 +87,8 @@ public sealed class DocumentService(
                     $"{value} is not a published {field}. Choose one from the list, or ask an administrator to publish it.",
                     new { field, value }));
             }
+            if (value is not null && set != ValueSets.DeliverableTypes && !catalog.IsOfferedFor(set, value, request.DeliverableType))
+                return Fail(NotForType(field, value, request.DeliverableType));
         }
 
         var originator = Blank(request.Originator);
@@ -172,7 +174,7 @@ public sealed class DocumentService(
             ContractRef = Blank(request.ContractRef),
             Criticality = Blank(request.Criticality),
             Confidentiality = confidentiality,
-            RetentionClass = Blank(request.RetentionClass) ?? catalog.RetentionFor(Blank(request.Criticality)),
+            RetentionClass = Blank(request.RetentionClass) ?? catalog.RetentionFor(Blank(request.Criticality), request.DeliverableType),
             Kind = kind,
             ReceivedDate = request.ReceivedDate is { } received ? LocalDate.FromDateOnly(received) : null,
             PlannedDate = request.PlannedDate is { } planned ? LocalDate.FromDateOnly(planned) : null,
@@ -248,19 +250,23 @@ public sealed class DocumentService(
                     if (value is null) return Fail(Problems.Invalid("FIELD_REQUIRED", $"{field} is required.", new { field }));
                     if (!catalog.IsActive(sets[field], value))
                         return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{value} is not a published {field}.", new { field, value }));
+                    if (!catalog.IsOfferedFor(sets[field], value, document.DeliverableType))
+                        return Fail(NotForType(field, value, document.DeliverableType));
                     if (field == "docType") { before = document.DocType; document.DocType = value; }
                     else { before = document.Discipline; document.Discipline = value; }
                     break;
                 case "subproject" or "phase" or "contractRef" or "criticality" or "confidentiality" or "retentionClass":
                     if (value is not null && !catalog.IsActive(sets[field], value))
                         return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{value} is not a published {field}.", new { field, value }));
+                    if (value is not null && !catalog.IsOfferedFor(sets[field], value, document.DeliverableType))
+                        return Fail(NotForType(field, value, document.DeliverableType));
                     (before, value) = field switch
                     {
                         "subproject" => (document.Subproject, document.Subproject = value),
                         "phase" => (document.Phase, document.Phase = value),
                         "contractRef" => (document.ContractRef, document.ContractRef = value),
                         "criticality" => (document.Criticality, document.Criticality = value),
-                        "confidentiality" => (document.Confidentiality, document.Confidentiality = value ?? catalog.DefaultOf(ValueSets.Confidentiality)),
+                        "confidentiality" => (document.Confidentiality, document.Confidentiality = value ?? catalog.DefaultOf(ValueSets.Confidentiality, document.DeliverableType)),
                         _ => (document.RetentionClass, document.RetentionClass = value),
                     };
                     break;
@@ -861,6 +867,12 @@ public sealed class DocumentService(
 
     /// <summary>The trimmed text, or null when it is null, empty or only spaces.</summary>
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>A value of its list, but of a set that does not serve this deliverable type (Types &amp; sets).</summary>
+    private static IResult NotForType(string field, string value, string? deliverableType) =>
+        Problems.Invalid("VALUE_NOT_FOR_TYPE",
+            $"{value} is not offered for {deliverableType} documents: its set of {field} serves other deliverable types. Choose one from the list.",
+            new { field, value });
     /// <summary>Shorthand for returning a problem response with no document.</summary>
     private static (Document?, IResult?) Fail(IResult problem) => (null, problem);
 }

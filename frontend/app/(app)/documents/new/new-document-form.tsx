@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { forType, type Serving } from "@/lib/settings/serving";
 import Link from "next/link";
 import { ActionForm } from "@/components/form";
 import { SearchPick } from "@/components/search-pick";
@@ -11,7 +12,7 @@ import { isEmptyTitle } from "@/lib/core/standard";
 import type { OwnField } from "@/lib/settings/field-policy";
 import { OwnFields } from "./own-fields";
 
-type Opt = { code: string; label: string; meaning?: string | null; appliesTo?: string | null; deliverables?: string[] | null; criticality?: string | null; decides?: string | null; record?: boolean; required?: string[] | null; retention?: string | null };
+type Opt = { code: string; label: string; setId?: string | null; meaning?: string | null; appliesTo?: string | null; deliverables?: string[] | null; criticality?: string | null; decides?: string | null; record?: boolean; required?: string[] | null; retention?: string | null };
 
 
 const STEPS = ["What it is", "How it is described"];
@@ -38,8 +39,12 @@ function Ask({ label, hint, required, children, className }: { label: string; hi
  * it is comes with the file.
  */
 export function NewDocumentForm({
-  received, start, fromFile, numberingSets, deliverableTypes, docTypes, disciplines, currentProject, subprojects, phases, suppliers, pos, poOwners, usualCriticality, criticalities, confidentialities, retentionClasses, defaultConfidentiality, fields, ownFields, labels,
+  received, start, fromFile, numberingSets, deliverableTypes, docTypes: docTypesAll, disciplines: disciplinesAll, currentProject,
+  subprojects: subprojectsAll, phases: phasesAll, suppliers, pos: posAll, poOwners, usualCriticality, criticalities: criticalitiesAll,
+  confidentialities: confidentialitiesAll, retentionClasses: retentionClassesAll, defaultConfidentiality, fields, ownFields, labels, serving,
 }: {
+  /** Which set of each list serves each deliverable type (Types & sets): the form offers that set's values only. */
+  serving: Serving;
   received: boolean;
   /** Where another page sent the reader to register a document of a known type: our own, with its title. */
   start?: { docType: string; title: string };
@@ -63,6 +68,15 @@ export function NewDocumentForm({
 }) {
   const [step, setStep] = useState(1);
   const [producer, setProducer] = useState(received ? "VND" : start ? "ENG" : "");
+  // Each list offers the set serving the chosen deliverable type (Types & sets); the backend refuses any other.
+  const docTypes = forType(serving, "DOCUMENT_TYPES", producer, docTypesAll);
+  const disciplines = forType(serving, "DISCIPLINES", producer, disciplinesAll);
+  const subprojects = forType(serving, "SUBPROJECTS", producer, subprojectsAll);
+  const phases = forType(serving, "PHASES", producer, phasesAll);
+  const pos = forType(serving, "PURCHASE_ORDERS", producer, posAll);
+  const criticalities = forType(serving, "CRITICALITY", producer, criticalitiesAll);
+  const confidentialities = forType(serving, "CONFIDENTIALITY", producer, confidentialitiesAll);
+  const retentionClasses = forType(serving, "RETENTION_CLASSES", producer, retentionClassesAll);
   const [receivedFile, setHasFile] = useState(!!fromFile);
   const [pdf, setPdf] = useState(false);
   const [native, setNative] = useState(false);

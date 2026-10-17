@@ -34,7 +34,7 @@ backend/
 │   ├── Documents/        documents, revisions, files, the register; the lists, numbering and revision
 │   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (verdict lists)
 │   │                     ProjectLists: the project's lists (own copy on first change, where each value is used, who changes them)
-│   │                     ListRules: groups, the app's lists, which set of a list serves a deliverable type
+│   │                     ListRules: groups, the app's lists, which set of a list serves a deliverable type; Catalog.IsOfferedFor checks it
 │   │                     SheetGuard: every spreadsheet checked before it is read (type, size unpacked, macros, viruses)
 │   ├── Reviews/          routes, steps, advice, verdicts, release
 │   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs)

@@ -509,6 +509,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   count ("· off" when switched off), and "New set" (name, the deliverable types it serves). The set shown has its bar:
   name, on/off, whom it serves, Switch off/on, its pencil (name, types), delete while never used. Values are the set's;
   a value is added to the set shown (`?vs=<set>`).
+- **Forms follow the sets**: a document is offered, for each list, only the values of the set serving its deliverable
+  type (new document, once the type is chosen; Details and Edit rev by the document's own type), read from the backend
+  (`GET /api/values/serving`, `lib/settings/serving.ts` `forType`); the backend refuses any other (VALUE_NOT_FOR_TYPE,
+  `Catalog.IsOfferedFor`), and its defaults (confidentiality, retention) come from that set too. Values already carried
+  are still read by their names.
 - A refused form keeps everything written (`ActionForm` gives it back after React empties it), to put right and send again.
 - Types & sets: the menu card is as tall as the window under the top bar (`set-nav.tsx`): the title scrolls
   away, then only its table and its list of lists scroll.

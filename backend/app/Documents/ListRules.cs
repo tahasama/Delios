@@ -124,7 +124,7 @@ public static class ListRules
     {
         var sets = setsOfList.ToList();
         return (deliverableType is null ? null : sets.FirstOrDefault(s => s.Active && !s.IsDefault && s.DeliverableTypes.Contains(deliverableType)))
-            ?? sets.FirstOrDefault(s => s.IsDefault);
+            ?? sets.FirstOrDefault(s => s.IsDefault && s.Active);
     }
 
     /// <summary>The deliverable types another active set of the same list already serves, among those given.</summary>

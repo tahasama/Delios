@@ -14,6 +14,7 @@ public static class ValueEndpoints
     public static void MapValueEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/values", ValuesAsync).WithTags("Values").AddEndpointFilter<TransactionFilter>();
+        app.MapGet("/api/values/serving", ServingAsync).WithTags("Values").AddEndpointFilter<TransactionFilter>();
         app.MapGet("/api/parties", PartiesAsync).WithTags("Values").AddEndpointFilter<TransactionFilter>();
     }
 
@@ -21,6 +22,28 @@ public static class ValueEndpoints
     private static async Task<IResult> PartiesAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
         Results.Ok(await db.Parties.AsNoTracking().Where(p => p.Active && !p.IsInternal).OrderBy(p => p.Name)
             .Select(p => new { p.Code, p.Name, p.Participation }).ToListAsync(cancellationToken));
+
+    /// <summary>
+    /// <c>GET /api/values/serving?sets=CRITICALITY,…</c>: for each list named, the set serving each deliverable type
+    /// (`ListRules.Serving`; null: none, nothing is offered), its default set, and whether it holds more than one set. A
+    /// form offers a document the values whose set (none: the default) is the one serving its deliverable type.
+    /// </summary>
+    private static async Task<IResult> ServingAsync(DeliosDbContext db, CancellationToken cancellationToken, string? sets = null)
+    {
+        var names = (sets ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(100).ToList();
+        var all = await db.ListSets.AsNoTracking().Where(s => names.Contains(s.ListKey)).ToListAsync(cancellationToken);
+        var types = await db.ValueEntries.AsNoTracking().Where(v => v.SetKey == ValueSets.DeliverableTypes).Select(v => v.Code).ToListAsync(cancellationToken);
+        return Results.Ok(names.ToDictionary(n => n, n =>
+        {
+            var own = all.Where(s => s.ListKey == n).ToList();
+            return new
+            {
+                defaultId = own.FirstOrDefault(s => s.IsDefault)?.Id,
+                many = own.Count > 1,
+                byType = types.ToDictionary(t => t, t => ListRules.Serving(own, t)?.Id),
+            };
+        }));
+    }
 
     /// <summary>The values of each list named (up to 100), in their published order, retired ones marked.</summary>
     private static async Task<IResult> ValuesAsync(DeliosDbContext db, CancellationToken cancellationToken, string? sets = null)

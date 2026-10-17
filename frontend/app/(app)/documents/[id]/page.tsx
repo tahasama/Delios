@@ -19,6 +19,8 @@ import { stateNames, stateName, supplierStage, supplierStageName, supplierStamp 
 import { revisionGround } from "@/lib/documents/revision-ground";
 import { ownFields, readExtras, formPolicy } from "@/lib/settings/field-policy";
 import { fmtDate, timeAgo, plain } from "@/lib/core/utils";
+import { forType } from "@/lib/settings/serving";
+import { servingOf } from "@/lib/settings/serving-api";
 import { getActiveSet, getSet, getValue } from "@/lib/settings/config";
 import { updateDocumentAction, reinstateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/documents/forms";
 import {
@@ -288,17 +290,21 @@ export default async function DocumentDetailPage({
   // revision is released it can be changed — its files and the document's
   // details — in one place. In review it is taken out of the review first:
   // closed as withdrawn, everyone on it told, its comments kept.
+  // What is offered to choose: the set of each list serving this document's deliverable type (Types & sets); every
+  // value is still read by its name wherever the document already carries it.
+  const serving = await servingOf(["DOCUMENT_TYPES", "DISCIPLINES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES", "PHASES"]);
+  const offer = <T extends { setId?: string | null }>(list: string, rows: T[]) => forType(serving, list, doc.deliverableType, rows);
   // The document's details, as one set of fields: the revision's edit step and
   // the Details tab both use these, so the two can never ask different things.
   const detailFields = (<>
     <Field label="Title" required><input name="title" defaultValue={doc.title} className={inputCls} /></Field>
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <Field label="Type"><select name="docType" defaultValue={doc.docType} className={inputCls}>{types.filter((t) => t.status === "ACTIVE").map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}</select></Field>
-      <Field label="Discipline"><select name="discipline" defaultValue={doc.discipline} className={inputCls}>{disciplines.filter((d) => d.status === "ACTIVE").map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}</select></Field>
-      <Field label="Criticality"><select name="criticality" defaultValue={doc.criticality ?? ""} className={inputCls}><option value="">—</option>{criticalities.map((c) => <option key={c.code} value={c.code}>{c.label}{c.code === types.find((t) => t.code === doc.docType)?.props.criticality ? " (recommended)" : ""}</option>)}</select></Field>
-      <Field label="Confidentiality"><select name="confidentiality" defaultValue={doc.confidentiality ?? ""} className={inputCls}>{confidentialities.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
-      <Field label="Retention"><select name="retentionClass" defaultValue={doc.retentionClass ?? ""} className={inputCls}><option value="">—</option>{retentions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select></Field>
-      <Field label="Phase" hint="names its next revision"><select name="phase" defaultValue={doc.phase ?? ""} className={inputCls}><option value="">—</option>{phases.map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}</select></Field>
+      <Field label="Type"><select name="docType" defaultValue={doc.docType} className={inputCls}>{offer("DOCUMENT_TYPES", types).filter((t) => t.status === "ACTIVE").map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}</select></Field>
+      <Field label="Discipline"><select name="discipline" defaultValue={doc.discipline} className={inputCls}>{offer("DISCIPLINES", disciplines).filter((d) => d.status === "ACTIVE").map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}</select></Field>
+      <Field label="Criticality"><select name="criticality" defaultValue={doc.criticality ?? ""} className={inputCls}><option value="">—</option>{offer("CRITICALITY", criticalities).map((c) => <option key={c.code} value={c.code}>{c.label}{c.code === types.find((t) => t.code === doc.docType)?.props.criticality ? " (recommended)" : ""}</option>)}</select></Field>
+      <Field label="Confidentiality"><select name="confidentiality" defaultValue={doc.confidentiality ?? ""} className={inputCls}>{offer("CONFIDENTIALITY", confidentialities).filter((c) => c.status === "ACTIVE" || c.code === doc.confidentiality).map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
+      <Field label="Retention"><select name="retentionClass" defaultValue={doc.retentionClass ?? ""} className={inputCls}><option value="">—</option>{offer("RETENTION_CLASSES", retentions).map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select></Field>
+      <Field label="Phase" hint="names its next revision"><select name="phase" defaultValue={doc.phase ?? ""} className={inputCls}><option value="">—</option>{offer("PHASES", phases).map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}</select></Field>
       <Field label="Previous number"><input name="previousId" defaultValue={doc.previousId ?? ""} className={inputCls} /></Field>
     </div>
     <input type="hidden" name="appVersion" value={doc.appVersion ?? ""} />
@@ -589,7 +595,7 @@ export default async function DocumentDetailPage({
                 <Field label="Phase" hint="names this revision (Settings, Revisions)">
                   <select name="phase" className={inputCls} defaultValue={doc.phase ?? ""}>
                     {doc.phase ? null : <option value="">—</option>}
-                    {phases.map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}
+                    {offer("PHASES", phases).map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}
                   </select>
                 </Field>
               ) : null}
