@@ -594,7 +594,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Screens and the backend say "the control function" and "whoever holds Manage" (or "whoever plans"), never a job
   title; a function's own name is shown only as read from the data.
 - No ready-made codes offered by a button (owner): the "starter profiles" ("Add them") are removed. Lists are filled by
-  the organization itself, typed on Disciplines, types & sets or imported. The project type only describes the project.
+  the organization itself, typed on Disciplines, types & sets or imported.
+- A project's **Type** is chosen from the organization's list **Project types** (`PROJECT_KINDS`, Disciplines, types &
+  sets, Numbering & identity), kept like any list; it describes the project only. The backend refuses a type not in it
+  (KIND_UNKNOWN); a retired type stays readable on the project that carries it (`lib/settings/project-kinds.ts`).
   Controlled changes no longer exist.
 - **The plan is a document, not a setting** (owner): Assurance → The plan (`/conformance/plan`), written from how the
   project is set up, printed; nothing on it is typed and nothing on it repeats a Settings page. Scope is said once (This

@@ -6,7 +6,7 @@ import { ActionForm } from "@/components/form";
 import { ToneChip } from "@/components/ui";
 import { saveProjectAction } from "@/lib/settings/forms-projects";
 import { fmtDate } from "@/lib/core/utils";
-import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
+import { projectKinds } from "@/lib/settings/project-kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { adminProjects } from "@/lib/settings/api-admin";
 import { projectSettings } from "@/lib/settings/api";
@@ -39,7 +39,8 @@ export default async function ThisProjectPage({ searchParams }: { searchParams: 
     scopeStatement: info.scopeStatement, description: info.description ?? undefined,
   };
   const editing = sp.edit === "1";
-  const kindLabel = PROJECT_KINDS.find((k) => k.code === p.kind)?.label ?? p.kind.toLowerCase();
+  const kinds = await projectKinds();
+  const kindLabel = kinds.label(p.kind);
   const roleLabel = p.contractRole === "GENERIC" ? "not stated" : roles.find((r) => r.code === p.contractRole)?.label ?? p.contractRole;
   const lines: [string, React.ReactNode][] = [
     ["Name", p.name],
@@ -85,7 +86,7 @@ export default async function ThisProjectPage({ searchParams }: { searchParams: 
         {editing ? (
           <>
             <ActionForm id="this-project" action={saveProjectAction} hideSubmit hidden={{ projectId: p.id }} className="asking space-y-5 px-5 py-5 sm:px-6">
-              <ProjectFields p={p} roles={roles} />
+              <ProjectFields p={p} roles={roles} kinds={kinds.offered} />
             </ActionForm>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
               <Link href="/settings/projects" scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>

@@ -44,6 +44,8 @@ public static class ValueSets
     public const string RetentionClasses = "RETENTION_CLASSES";
     /// <summary>Every project's code. Kept by <see cref="ProjectCodes"/>: a project's own code is always in it.</summary>
     public const string ProjectCodes = "PROJECT_CODES";
+    /// <summary>The organization's project types (general, industrial…): what a project's "Type" is chosen from. It describes the project only.</summary>
+    public const string ProjectKinds = "PROJECT_KINDS";
     /// <summary>Words that, alone, make a title say nothing: "Drawing", "Report".</summary>
     public const string GenericTitleWords = "GENERIC_TITLE_WORDS";
 }

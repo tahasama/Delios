@@ -204,6 +204,10 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         Set(ValueSets.DeliverableTypes,
             ("ENG", "Engineering Document", null),
             ("SUP", "Supplier document", new { required = new[] { "originator", "contractRef" } }));
+        // The project types it describes its projects with; the organization adds its own.
+        Set(ValueSets.ProjectKinds, demo
+            ? [("GENERIC", "General", null), ("INDUSTRIAL", "Industrial / process plant", null), ("ENERGY", "Energy / power", null), ("CONSTRUCTION", "Construction / buildings", null)]
+            : [("GENERIC", "General", null)]);
         if (demo)
         {
             Set(ValueSets.Subprojects, ("00", "Project-wide", null), ("10", "General", null), ("20", "Inlet works", null));

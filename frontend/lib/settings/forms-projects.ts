@@ -5,7 +5,6 @@ import { applyDefaults } from "@/lib/organization/defaults";
 import { revalidatePath } from "next/cache";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
-import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { api, refusal } from "@/lib/client";
 import { projectSettings, setProjectSetting } from "@/lib/settings/api";
@@ -43,7 +42,6 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
   const copyFrom = String(formData.get("copyFrom") ?? "");
   if (!name) return { error: "A project needs a name." };
   if (!CODE.test(code)) return { error: "A code is letters, digits and hyphens — up to 16 characters, e.g. NP1." };
-  if (!PROJECT_KINDS.some((k) => k.code === kind)) return { error: "Choose a project type." };
   const chosenRole = (await contractRoleOptions()).find((r) => r.code === role);
   if (!chosenRole) return { error: "Choose what this organization does on the project." };
   if (startDate && endDate && endDate < startDate) return { error: "The end date cannot fall before the start date." };
@@ -125,7 +123,6 @@ export async function saveProjectAction(_prev: ProjectState | undefined, formDat
   const description = String(formData.get("description") ?? "").trim().slice(0, 2000);
   if (!name) return { error: "A project needs a name." };
   if (!CODE.test(code)) return { error: "A code is letters, digits and hyphens — up to 16 characters, e.g. NP1." };
-  if (!PROJECT_KINDS.some((k) => k.code === kind)) return { error: "Choose a project type." };
   if (!(await contractRoleOptions()).some((r) => r.code === role)) return { error: "Choose what this organization does on the project." };
   if (startDate && endDate && endDate < startDate) return { error: "The end date cannot fall before the start date." };
   try {

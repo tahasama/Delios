@@ -9,7 +9,7 @@ import { formPolicy } from "@/lib/settings/field-policy";
 import { createProjectAction, saveProjectAction, setProjectStatusAction } from "@/lib/settings/forms-projects";
 import { switchProjectAction } from "@/lib/settings/forms-project-switch";
 import { cn, fmtDate } from "@/lib/core/utils";
-import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
+import { projectKinds } from "@/lib/settings/project-kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { adminProjects, adminUsers } from "@/lib/settings/api-admin";
 import { projectSettings } from "@/lib/settings/api";
@@ -50,14 +50,15 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     }));
   const open = projects.filter((p) => p.status !== "ARCHIVED").length;
   const archived = projects.length - open;
-  const kindLabel = (code: string) => PROJECT_KINDS.find((k) => k.code === code)?.label ?? code.toLowerCase();
+  const kinds = await projectKinds();
+  const kindLabel = kinds.label;
   const roleLabel = (code: string) => roleOptions.find((r) => r.code === code)?.label ?? code;
   const editing = sp.edit ?? null;
   const opening = sp.new === "1";
 
   const kindSelect = (value: string, required: boolean) => (
     <select name="kind" required={required} defaultValue={value} className={field}>
-      {PROJECT_KINDS.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
+      {kinds.offered.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
     </select>
   );
   const roleSelect = (value: string, required: boolean) => (
@@ -102,7 +103,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
               <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                 <Field label="Project name" required><input name="name" required autoComplete="off" className={field} placeholder="North plant upgrade" /></Field>
                 <Field label="Code" required hint="unique here; it starts every number"><input name="code" required autoComplete="off" className={`${field} uppercase`} placeholder="NP1" /></Field>
-                <Asked policy={policy} field="kind" hint="affects defaults only, never the rules">{({ required }) => kindSelect("GENERIC", required)}</Asked>
+                <Asked policy={policy} field="kind" hint="describes the project; from Project types">{({ required }) => kindSelect("GENERIC", required)}</Asked>
                 <Asked policy={policy} field="role" hint="decides where approval sits, and the matrix it starts from">{({ required }) => roleSelect("GENERIC", required)}</Asked>
                 <Asked policy={policy} field="startDate">{({ required }) => <input type="date" name="startDate" required={required} className={field} />}</Asked>
                 <Asked policy={policy} field="endDate" hint="planned completion">{({ required }) => <input type="date" name="endDate" required={required} className={field} />}</Asked>
@@ -206,7 +207,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                     <td colSpan={8} className="border-b border-line p-0">
                       <ActionForm id={`project-form-${p.id}`} action={saveProjectAction} hideSubmit hidden={{ projectId: p.id }}
                         className="asking space-y-5 px-5 py-5 sm:px-6">
-                        <ProjectFields p={{ ...p, scopeStatement: p.info.scopeStatement, description: p.info.description ?? undefined }} roles={roleOptions} />
+                        <ProjectFields p={{ ...p, scopeStatement: p.info.scopeStatement, description: p.info.description ?? undefined }} roles={roleOptions} kinds={kinds.offered} />
                       </ActionForm>
                       <details className="border-t border-line px-5 py-3 sm:px-6">
                         <summary className="w-fit cursor-pointer list-none text-xs font-semibold text-slate-500 hover:text-slate-800 [&::-webkit-details-marker]:hidden">

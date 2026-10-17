@@ -6,7 +6,7 @@ import { logoutAction } from "@/lib/account/forms-sign-in";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls, btn } from "@/components/ui";
 import { FolderPlus, UserPlus, Check, LogOut } from "lucide-react";
-import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
+import { projectKinds } from "@/lib/settings/project-kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { adminFunctions, adminUsers } from "@/lib/settings/api-admin";
 import { getSets } from "@/lib/settings/config";
@@ -14,8 +14,6 @@ import { ElsewhereCard } from "../elsewhere-card";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Set up your organization" };
-
-const KINDS = PROJECT_KINDS;
 
 /**
  * The gap between registering an organization and having a project to work in.
@@ -43,6 +41,7 @@ export default async function SetupPage() {
   ]);
   const labelFor = (role: string) => functions.find((f) => f.role === role)?.name ?? role;
   const roleOptions = await contractRoleOptions();
+  const kinds = (await projectKinds()).offered;
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -151,7 +150,7 @@ export default async function SetupPage() {
                 </div>
                 <Field label="Type" hint="Affects defaults only, never the rules">
                   <select name="kind" className={inputCls} defaultValue="GENERIC">
-                    {KINDS.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
+                    {kinds.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
                   </select>
                 </Field>
                 <Field label="What you do on it" hint="Decides where approval sits, and the matrix it starts from">

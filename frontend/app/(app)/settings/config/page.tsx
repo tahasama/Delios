@@ -20,7 +20,7 @@ export const metadata = { title: "Disciplines, types & sets" };
 
 /** Sets grouped by what they are for. Anything not listed falls under "Other". */
 const GROUPS: { title: string; keys: string[] }[] = [
-  { title: "Numbering & identity", keys: ["PROJECT_CODES", "SUBPROJECTS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "SUPPLIER_CODES", "PURCHASE_ORDERS", "DELIVERABLE_TYPE_FIELDS"] },
+  { title: "Numbering & identity", keys: ["PROJECT_CODES", "SUBPROJECTS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "SUPPLIER_CODES", "PURCHASE_ORDERS", "DELIVERABLE_TYPE_FIELDS", "PROJECT_KINDS"] },
   // The comment lists sit together, with the outcomes they feed: one classifies
   // a comment somebody wrote, the other is what an advisory step's comments
   // amount to. Both are the organization's to edit.

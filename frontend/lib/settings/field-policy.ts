@@ -157,7 +157,7 @@ const FIELDS: FieldDef[] = [
   // ── Opening a project ──
   { control: "TEXT", kind: "PROJECT", key: "code", label: "Code", text: "The short code every number on the project begins with.", fallback: "REQUIRED", fixed: "Numbers are built from it, so it cannot be left out or changed later." },
   { control: "TEXT", kind: "PROJECT", key: "name", label: "Name", text: "What people call it.", fallback: "REQUIRED", fixed: "A project nobody can name cannot be chosen from the switcher." },
-  { control: "CHOICE", setKey: "PROJECT_KINDS", computedBy: "The contract kind decides the starting distribution matrix and who approves what.", kind: "PROJECT", key: "kind", label: "Type", text: "EPC, EPCM, PMC and the rest.", fallback: "REQUIRED" },
+  { control: "CHOICE", setKey: "PROJECT_KINDS", kind: "PROJECT", key: "kind", label: "Type", text: "What kind of project it is, from Project types. It describes the project only.", fallback: "REQUIRED" },
   { control: "CHOICE", setKey: "CONTRACT_ROLES", computedBy: "Our role decides which column of the matrix is ours.", kind: "PROJECT", key: "role", label: "Our role on it", text: "What this organization is on this project.", fallback: "REQUIRED" },
   { control: "DATE", kind: "PROJECT", key: "startDate", label: "Start date", text: "When work begins.", fallback: "OPTIONAL" },
   { control: "DATE", kind: "PROJECT", key: "endDate", label: "End date", text: "When it is due to close.", fallback: "OPTIONAL" },

@@ -1,6 +1,5 @@
 "use server";
 
-import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
 import { isContractRole } from "@/lib/settings/contract-roles";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -29,7 +28,6 @@ export async function openFirstProjectAction(_prev: SetupState | undefined, form
   const role = String(formData.get("role") ?? "GENERIC");
   if (!name) return { error: "Give the project a name people will recognise." };
   if (!CODE.test(code)) return { error: "The code is short and uppercase — letters, digits and hyphens, e.g. P1." };
-  if (!PROJECT_KINDS.some((k) => k.code === kind)) return { error: "Choose a project type." };
   if (!(await isContractRole(role))) return { error: "Choose what this organization does on the project." };
 
   let projectId: string;

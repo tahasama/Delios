@@ -45,7 +45,11 @@ export const getValue = cache(async (setKey: string, code: string | null | undef
 /** Where a set's title, description and group are kept: the organization's settings, one key per set. */
 export const SET_KEY = "SET:";
 /** Lists the app reads by their key, shown in Settings even while empty. */
-const READ_BY_THE_APP = ["PHASES"];
+const READ_BY_THE_APP = ["PHASES", "PROJECT_KINDS"];
+/** Their names until the organization renames them. */
+const APP_TITLES: Record<string, { title: string; description: string }> = {
+  PROJECT_KINDS: { title: "Project types", description: "What a project's Type is chosen from (This project, Open a new project). It describes the project only." },
+};
 type SetInfo = { key: string; title: string; description: string | null; group: string | null; version: number;
   /** What the list is, when it says: VERDICTS (a review decides with it). */
   kind: string | null };
@@ -67,6 +71,6 @@ export const getSets = cache(async (): Promise<SetInfo[]> => {
     let info: { title?: string; description?: string | null; group?: string | null; version?: number; kind?: string | null } = {};
     try { info = JSON.parse(named.get(SET_KEY + key) ?? "{}"); } catch { info = {}; }
     const humane = key.replaceAll("_", " ").toLowerCase();
-    return { key, title: info.title ?? humane.charAt(0).toUpperCase() + humane.slice(1), description: info.description ?? null, group: info.group ?? null, version: info.version ?? 1, kind: info.kind ?? null };
+    return { key, title: info.title ?? APP_TITLES[key]?.title ?? humane.charAt(0).toUpperCase() + humane.slice(1), description: info.description ?? APP_TITLES[key]?.description ?? null, group: info.group ?? null, version: info.version ?? 1, kind: info.kind ?? null };
   });
 });

@@ -1,6 +1,5 @@
 import { Field } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
-import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
 
 /** A field as on the new-document form: grey, no box, inside the sheet's `asking` body. */
 const field = "plain w-full";
@@ -15,7 +14,7 @@ export type ProjectLine = {
  * code (changed once in its life, for a mistake; then fixed and shown, not sent), type, our role, dates, scope, and
  * what the project is about in a few lines.
  */
-export function ProjectFields({ p, roles }: { p: ProjectLine; roles: { code: string; label: string }[] }) {
+export function ProjectFields({ p, roles, kinds }: { p: ProjectLine; roles: { code: string; label: string }[]; kinds: { code: string; label: string }[] }) {
   const fixed = !!p.codeChangedAt;
   return (
     <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -30,9 +29,10 @@ export function ProjectFields({ p, roles }: { p: ProjectLine; roles: { code: str
           ? <input defaultValue={p.code} disabled className={`${field} uppercase`} aria-label="Code (fixed)" />
           : <input name="code" required defaultValue={p.code} autoComplete="off" className={`${field} uppercase`} />}
       </Field>
-      <Field label="Type" hint="affects defaults only, never the rules">
+      <Field label="Type" hint="describes the project; from Project types">
         <select name="kind" defaultValue={p.kind} className={field}>
-          {PROJECT_KINDS.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
+          {/* A type since retired stays readable on the project that carries it. */}
+          {[...kinds, ...(kinds.some((k) => k.code === p.kind) ? [] : [{ code: p.kind, label: p.kind }])].map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
         </select>
       </Field>
       <Field label="Our role" hint="decides where approval sits">

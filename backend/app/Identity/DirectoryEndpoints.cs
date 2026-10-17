@@ -367,6 +367,18 @@ public static class DirectoryEndpoints
         }));
     }
 
+    /// <summary>
+    /// A project's type is one of the organization's Project types (<see cref="ValueSets.ProjectKinds"/>), still in use. None
+    /// given: the default, GENERIC. A list nobody filled refuses nothing.
+    /// </summary>
+    private static async Task<IResult?> KindRefusedAsync(DeliosDbContext db, string? kind, CancellationToken cancellationToken)
+    {
+        if (Blank(kind)?.ToUpperInvariant() is not { } code) return null;
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        if (catalog.Active(ValueSets.ProjectKinds).Count == 0 || catalog.IsActive(ValueSets.ProjectKinds, code)) return null;
+        return Problems.Invalid("KIND_UNKNOWN", $"{code} is not one of the project types (Settings, Disciplines, types & sets, Project types).", new { field = "kind" });
+    }
+
     /// <summary><c>POST /api/admin/projects</c>: a new project. Whoever creates it is put on it, with the first function that controls.</summary>
     private static async Task<IResult> CreateProjectAsync(
         CreateProjectRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
@@ -377,6 +389,7 @@ public static class DirectoryEndpoints
         if (code.Length > 32) return Problems.Invalid("CODE_TOO_LONG", "A project code has at most 32 characters.");
         var zone = Blank(request.TimeZone) ?? "UTC";
         if (DateTimeZoneProviders.Tzdb.GetZoneOrNull(zone) is null) return Problems.Invalid("TIME_ZONE_UNKNOWN", $"{zone} is not a time zone.");
+        if (await KindRefusedAsync(db, request.Kind, cancellationToken) is { } refusedKind) return refusedKind;
         var project = new Project
         {
             TenantId = http.User.TenantId(),
@@ -438,7 +451,12 @@ public static class DirectoryEndpoints
             project.Name = name;
         }
         if (Blank(request.ContractRole)?.ToUpperInvariant() is { } role && role != project.ContractRole) { changes.Add($"contract role → {role}"); project.ContractRole = role; }
-        if (Blank(request.Kind)?.ToUpperInvariant() is { } kind && kind != project.Kind) { changes.Add($"kind → {kind}"); project.Kind = kind; }
+        if (Blank(request.Kind)?.ToUpperInvariant() is { } kind && kind != project.Kind)
+        {
+            if (await KindRefusedAsync(db, kind, cancellationToken) is { } refusedKind) return refusedKind;
+            changes.Add($"kind → {kind}");
+            project.Kind = kind;
+        }
         if (Blank(request.Status)?.ToUpperInvariant() is { } status && status != project.Status)
         {
             if (status is not ("ACTIVE" or "CLOSED" or "ON_HOLD" or "ARCHIVED"))
