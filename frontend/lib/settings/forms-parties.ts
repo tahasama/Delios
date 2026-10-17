@@ -29,9 +29,11 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
   // How this organization works with us: a collaborator is linked, never chosen here.
   const kind = ["COLLABORATOR", "GUEST", "OFFLINE"].includes(text(formData, "kind")) ? text(formData, "kind") : "GUEST";
   const participation = kind === "OFFLINE" ? "BY_PROXY" : "IN_APP";
-  const custodianFunction = text(formData, "liaisonFunction");
+  // Who of ours works for one nobody of which signs in: a person; nobody chosen, the control function ("").
+  const carriedBy = kind === "OFFLINE" ? text(formData, "carriedBy") : undefined;
   // Not on DELIOS: where our transmittals go by email (empty: one of ours sends them).
   const contactEmail = kind === "OFFLINE" ? text(formData, "contactEmail") : undefined;
+  if (kind === "OFFLINE" && !contactEmail) return { error: "Give their email for transmittals: our transmittals go there.", fields: ["contactEmail"] };
   if (contactId && backupId && contactId === backupId) return { error: "The backup has to be someone other than the person who answers." };
   // Who it is beside its name: its identifier with its country, or why it has none; and its email domain.
   const identity = {
@@ -58,13 +60,13 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
         body: party.isInternal
           ? { code: recode, name: rename, active }
           : {
-            code: recode, name: rename, active, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail,
+            code: recode, name: rename, active, carriedBy, evidenceRequired: kind === "OFFLINE", contactEmail,
             participation: participation !== party.participation ? participation : undefined, ...identity,
           },
       });
     } else if (identityId) {
       const added = await api<{ id: string; invited: boolean }>("/api/admin/parties", {
-        body: { identityId, participation, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail },
+        body: { identityId, participation, carriedBy, evidenceRequired: kind === "OFFLINE", contactEmail },
       });
       partyId = added.id;
       saidName = text(formData, "identityName") || "The organization";
@@ -72,11 +74,11 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
     } else {
       // What this organization asks when it adds another one.
       const policy = await formPolicy(ctx, "PARTY");
-      const asked = checkForm("PARTY", policy, { code, name, kind, contactId, backupId, liaisonFunction: custodianFunction || null }, (n) => String(formData.get(n) ?? ""));
+      const asked = checkForm("PARTY", policy, { code, name, kind, contactId, backupId, liaisonFunction: carriedBy || null }, (n) => String(formData.get(n) ?? ""));
       if (asked.error) return { error: asked.error };
       const created = await api<{ id: string }>("/api/admin/parties", {
         body: {
-          code, name, isInternal: false, participation, custodianFunction, evidenceRequired: kind === "OFFLINE", contactEmail, ...identity,
+          code, name, isInternal: false, participation, carriedBy, evidenceRequired: kind === "OFFLINE", contactEmail, ...identity,
           notTheSame: text(formData, "notTheSame").split(",").filter(Boolean),
         },
       });
@@ -96,11 +98,11 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
   return { ok: id ? `${saidName} is saved.` : `${saidName} is registered. Say whether it takes part in ${ctx.project.code} below.` };
 }
 
-/** Organizations on DELIOS whose code or name holds the words: to add one as it is. */
-export async function findOnDeliosAction(words: string): Promise<{ id: string; code: string; name: string; country: string | null; listed: boolean }[]> {
+/** Organizations DELIOS knows whose code or name holds the words: to add one as it is. */
+export async function findOnDeliosAction(words: string): Promise<{ id: string; code: string; name: string; country: string | null; listed: boolean; onDelios: boolean }[]> {
   await requireScope();
   if (words.trim().length < 2) return [];
-  return api<{ id: string; code: string; name: string; country: string | null; listed: boolean }[]>(
+  return api<{ id: string; code: string; name: string; country: string | null; listed: boolean; onDelios: boolean }[]>(
     `/api/admin/organizations/on-delios?q=${encodeURIComponent(words.trim())}`).catch(() => []);
 }
 

@@ -64,8 +64,8 @@ public static class RegistryEndpoints
         db.OrganizationIdentities.SingleOrDefaultAsync(o => o.TenantId == tenantId && o.MergedIntoId == null, cancellationToken);
 
     /// <summary>
-    /// <c>GET /api/admin/organizations/on-delios?q=</c>: organizations on DELIOS whose code or name holds the words (two
-    /// letters at least, twelve at most): to add one as it is. Only organizations on DELIOS are found here.
+    /// <c>GET /api/admin/organizations/on-delios?q=</c>: organizations DELIOS knows whose code or name holds the words (two
+    /// letters at least, twelve at most), those with their own DELIOS and those others listed: to add one as it is.
     /// </summary>
     private static async Task<IResult> OnDeliosAsync(string? q, HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
     {
@@ -75,10 +75,10 @@ public static class RegistryEndpoints
         var key = Registry.Key(words);
         var listed = await db.Parties.AsNoTracking().Where(p => p.OrganizationId != null).Select(p => p.OrganizationId!.Value).ToListAsync(cancellationToken);
         var found = await db.OrganizationIdentities.AsNoTracking()
-            .Where(o => o.TenantId != null && o.TenantId != me && o.MergedIntoId == null
+            .Where(o => o.TenantId != me && o.MergedIntoId == null
                 && (o.Code.Contains(key) || EF.Functions.ILike(o.Name, $"%{words}%")))
             .OrderBy(o => o.Name).Take(12).ToListAsync(cancellationToken);
-        return Results.Ok(found.Select(o => new { o.Id, o.Code, o.Name, o.Country, Listed = listed.Contains(o.Id) }));
+        return Results.Ok(found.Select(o => new { o.Id, o.Code, o.Name, o.Country, Listed = listed.Contains(o.Id), OnDelios = o.TenantId != null }));
     }
 
     /// <summary><c>GET /api/organization/identity</c>: ours, as DELIOS knows it.</summary>

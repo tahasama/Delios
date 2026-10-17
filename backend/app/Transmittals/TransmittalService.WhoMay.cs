@@ -69,20 +69,22 @@ public sealed partial class TransmittalService
         (await CarriedPartiesAsync(access, cancellationToken)).Contains(partyId);
 
     /// <summary>
-    /// The outside parties this person carries the exchange with: those whose custodian function is theirs, plus those
-    /// with no custodian when they hold Control. Empty for people outside our organization.
+    /// The outside parties this person carries the exchange with: those naming them, those whose custodian function is
+    /// theirs, plus those naming nobody when they hold Control. Empty for people outside our organization.
     /// </summary>
     private async Task<List<Guid>> CarriedPartiesAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
         if (!access.IsInternal) return [];
         var code = access.Function.Code;
         var control = access.Holds(Verbs.Control);
+        var me = access.UserId;
         return await db.Parties.AsNoTracking()
-            .Where(p => !p.IsInternal && (p.CustodianFunction == code || (p.CustodianFunction == null && control)))
+            .Where(p => !p.IsInternal && (p.CarriedByUserId == me
+                || (p.CarriedByUserId == null && (p.CustodianFunction == code || (p.CustodianFunction == null && control)))))
             .Select(p => p.Id).ToListAsync(cancellationToken);
     }
 
-    /// <summary>The people who carry the exchange with a party: its custodian function, else the control function.</summary>
+    /// <summary>The people who carry the exchange with a party: the person it names, its custodian function, else the control function.</summary>
     public async Task<List<User>> CustodiansAsync(Guid projectId, Party party, CancellationToken cancellationToken)
     {
         var ours = from m in db.Memberships
@@ -90,6 +92,11 @@ public sealed partial class TransmittalService
                    where m.ProjectId == projectId && m.Active && m.Function!.Active && u.Active
                        && (u.PartyId == null || u.Party!.IsInternal)
                    select new { m, u };
+        if (party.CarriedByUserId is { } carrier)
+        {
+            var named = await ours.Where(x => x.u.Id == carrier).Select(x => x.u).ToListAsync(cancellationToken);
+            if (named.Count > 0) return named;
+        }
         ours = party.CustodianFunction is { } code
             ? ours.Where(x => x.m.Function!.Code == code)
             : ours.Where(x => (x.m.ActsAsControl || x.m.Function!.Rules.Any(r => r.Verbs.Contains(Verbs.Control))));

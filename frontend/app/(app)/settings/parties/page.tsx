@@ -14,7 +14,9 @@ import { adminFunctions, adminUsers, partiesWithAnswers } from "@/lib/settings/a
 import { projectOrganizations } from "@/lib/organization/api";
 import { inviteOrganizationAction, endLinkAction, setProjectOrganizationAction } from "@/lib/organization/forms";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
-import { COUNTRIES, IDENTIFIER_KINDS, countryName } from "@/lib/organization/countries";
+import { IDENTIFIER_KINDS, countryName } from "@/lib/organization/countries";
+import { IdentifierFields } from "./identifier-fields";
+import { holdersOf } from "@/lib/core/permissions";
 import { cn, fmtDate } from "@/lib/core/utils";
 import { NoAccess } from "../no-access";
 
@@ -40,12 +42,14 @@ export default async function AdminPartiesPage({ searchParams }: { searchParams:
   const { user: me } = ctx;
   if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/parties")!)) return <NoAccess title="Organizations" who="control" />;
   const sp = await searchParams;
-  const [parties, onProject, roles, functionList, users, policy] = await Promise.all([
+  const [parties, onProject, roles, functionList, users, policy, controllers] = await Promise.all([
     partiesWithAnswers(ctx.projectId), projectOrganizations(ctx), contractRoleOptions(), adminFunctions(), adminUsers(), formPolicy(ctx, "PARTY"),
+    holdersOf(ctx, "CONTROL").catch(() => []),
   ]);
+  // Who of ours may work for an organization nobody of which signs in, and who does when nobody is chosen.
+  const ours = users.filter((one) => one.active && one.internal).map((one) => ({ id: one.id, name: one.name, detail: one.email }));
+  const control = controllers.map((one) => one.name);
   const allFunctions = functionList.filter((one) => one.active).sort((a, b) => a.name.localeCompare(b.name));
-  // A function is named on an organization by its code: the one that carries its exchange.
-  const functions = functionList.map((one) => ({ id: one.code, name: one.name })).sort((a, b) => a.name.localeCompare(b.name));
   const people = users.filter((one) => one.active).map((one) => ({ id: one.id, name: one.name, email: one.email, partyId: one.partyId }));
   const signingIn = (partyId: string) => people.filter((person) => person.partyId === partyId).length;
   const kindLabel = (kind: string) => PARTY_KINDS.find((k) => k.value === (kind === "NOT_ON_DELIOS" ? "OFFLINE" : kind))?.label ?? kind;
@@ -94,8 +98,7 @@ export default async function AdminPartiesPage({ searchParams }: { searchParams:
         <div className="px-5 pt-6 pb-4 sm:px-6">
           <h1 className="plate-title text-slate-950">Organizations</h1>
           <p className="plate-meta mt-2">
-            {count("COLLABORATOR")} collaborator{count("COLLABORATOR") === 1 ? "" : "s"} · {count("GUEST")} guest{count("GUEST") === 1 ? "" : "s"} ·{" "}
-            {count("OFFLINE")} not on DELIOS · {takingPart} taking part in {ctx.project.code}
+            {count("COLLABORATOR")} with their own DELIOS · {count("GUEST")} with accounts from us · {count("OFFLINE")} worked for by one of ours · {takingPart} working on {ctx.project.code}
           </p>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
             Ours, and the others we exchange documents with. The list is the organization&rsquo;s, shared by every project; who
@@ -105,7 +108,7 @@ export default async function AdminPartiesPage({ searchParams }: { searchParams:
         </div>
       </section>
 
-      <OrganizationJoins projectCode={ctx.project.code} functions={functions} own={policy.own} />
+      <OrganizationJoins projectCode={ctx.project.code} ours={ours} control={control} own={policy.own} />
 
       {/* Every organization: the pencil opens its line as the form. */}
       <section className="register register-sheet register-sheet-open" aria-labelledby="orgs-head">
@@ -123,7 +126,7 @@ export default async function AdminPartiesPage({ searchParams }: { searchParams:
                     <code className="code-chip mr-1.5">{p.code}</code><span className="font-medium text-slate-800">{p.name}</span>
                     {p.isInternal ? <span className="ml-1.5"><ToneChip tone="moving">ours</ToneChip></span> : null}
                     <span className="block text-[11px] text-slate-500">
-                      {identifierShown(c) ?? (c?.noIdentifierReason ? `no identifier: ${c.noIdentifierReason}` : <span className="text-amber-800">no identifier yet</span>)}
+                      {identifierShown(c) ?? (c?.noIdentifierReason ? `no identifier: ${c.noIdentifierReason}` : null)}
                       {c?.domain ? ` · ${c.domain}${c.domainConfirmed ? " (proven)" : ""}` : ""}
                     </span>
                   </Td>
@@ -172,27 +175,8 @@ export default async function AdminPartiesPage({ searchParams }: { searchParams:
                               <p className="flex h-(--control-h) items-center text-[13px] text-slate-600">{identifierShown(c) ?? "none given"}</p>
                             </Field>
                           ) : (
-                            <>
-                              <Field label="Country" hint="where its identifier was given">
-                                <select name="country" defaultValue={c?.identifier?.country ?? ""} className={field}>
-                                  <option value="">Choose…</option>
-                                  {COUNTRIES.map((one) => <option key={one.code} value={one.code}>{one.name}</option>)}
-                                </select>
-                              </Field>
-                              <Field label="Identifier" hint={c?.identifier ? "changed once only, for a mistake" : "the best it has: company registration first"}>
-                                <span className="flex gap-2">
-                                  <select name="identifierKind" defaultValue={c?.identifier?.kind ?? "COMPANY"} className="plain w-auto" aria-label="Kind of identifier">
-                                    {IDENTIFIER_KINDS.map((k) => <option key={k.value} value={k.value} title={k.hint}>{k.label}</option>)}
-                                  </select>
-                                  <input name="identifierNumber" defaultValue={c?.identifier?.number ?? ""} aria-label="Number" className={cn(field, "font-mono")} />
-                                </span>
-                              </Field>
-                              {!c?.identifier ? (
-                                <Field label="Or why it has none" hint="only when it has none of these" className="sm:col-span-2">
-                                  <input name="noIdentifierReason" defaultValue={c?.noIdentifierReason ?? ""} className={field} />
-                                </Field>
-                              ) : null}
-                            </>
+                            <IdentifierFields country={c?.identifier?.country} kind={c?.identifier?.kind} number={c?.identifier?.number}
+                              noReason={c?.noIdentifierReason} allowNone={!c?.identifier} />
                           )}
                           {c?.domainConfirmed || c?.theirs ? null : (
                             <Field label="Email domain" hint="e.g. acme.com; it helps find it again">
@@ -200,8 +184,8 @@ export default async function AdminPartiesPage({ searchParams }: { searchParams:
                             </Field>
                           )}
                           {p.isInternal ? <input type="hidden" name="active" value="on" /> : (
-                            <PartyKindFields kind={p.kind} contactId={p.contactId ?? ""} backupId={p.backupId ?? ""} liaisonFunction={p.liaisonFunction ?? ""}
-                              contactEmail={p.contactEmail ?? ""} people={people.filter((u) => u.partyId === p.id)} functions={functions}
+                            <PartyKindFields kind={p.kind} contactId={p.contactId ?? ""} backupId={p.backupId ?? ""} carriedBy={p.carriedByUserId ?? ""}
+                              contactEmail={p.contactEmail ?? ""} people={people.filter((u) => u.partyId === p.id)} ours={ours} control={control}
                               access={{ active: p.active, signingIn: signingIn(p.id) }}
                               fixed={c?.participation ? `changed once, by ${c.participation.by}, ${fmtDate(c.participation.at)}: fixed now` : undefined} />
                           )}
@@ -267,8 +251,9 @@ export default async function AdminPartiesPage({ searchParams }: { searchParams:
 
       {/* Who takes part in this project: role, contract, the function their people start with. */}
       <section id="take" className="register register-sheet register-sheet-open scroll-mt-24" aria-labelledby="take-head">
-        {band("take-head", `On ${ctx.project.code}: who takes part`, `${takingPart} · the contract is between ${ctx.project.code} and each of them`,
-          sp.take ? null : <Link href={href({ take: "1" }, "take")} scroll={false} className="ask ml-auto">An organization takes part</Link>)}
+        {band("take-head", `Working on ${ctx.project.code}`,
+          `which of these organizations work on ${ctx.project.code}: their role here, the number of their contract with us, and the function their people get`,
+          sp.take ? null : <Link href={href({ take: "1" }, "take")} scroll={false} className="ask ml-auto">Add one to {ctx.project.code}</Link>)}
         {sp.take ? (
           <>
             <ActionForm id="take-form" action={setProjectOrganizationAction} hideSubmit resetOnSuccess className="asking space-y-5 px-5 py-5 sm:px-6">
@@ -350,7 +335,7 @@ export default async function AdminPartiesPage({ searchParams }: { searchParams:
               );
             })}
           </DataTable>
-        ) : <p className="px-5 py-4 text-xs text-slate-500 sm:px-6">No other organization takes part in {ctx.project.code} yet.</p>}
+        ) : <p className="px-5 py-4 text-xs text-slate-500 sm:px-6">No other organization works on {ctx.project.code} yet: add the ones that do, with their contract number.</p>}
       </section>
     </div>
   );

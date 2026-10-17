@@ -169,7 +169,7 @@ const FIELDS: FieldDef[] = [
   { control: "CHOICE", kind: "PARTY", key: "kind", label: "How they work with us", text: "Collaborator (their own DELIOS, linked), guest (accounts we make) or not on DELIOS (one of ours records for them).", fallback: "OPTIONAL", fixed: "Always asked: it decides how they take part." },
   { control: "PEOPLE", kind: "PARTY", key: "contactId", label: "Who answers for it here", text: "One of their people we ask first on this project.", fallback: "OPTIONAL" },
   { control: "PEOPLE", kind: "PARTY", key: "backupId", label: "Backup", text: "Who answers when the first is away.", fallback: "OPTIONAL" },
-  { control: "CHOICE", kind: "PARTY", key: "liaisonFunction", label: "Who carries it", text: "The function on our side that deals with them.", fallback: "OPTIONAL" },
+  { control: "CHOICE", kind: "PARTY", key: "liaisonFunction", label: "Who of ours works for it", text: "The person of ours who sends to them and records their answers.", fallback: "OPTIONAL" },
 
   // ── Adding a person ──
   { control: "TEXT", kind: "PERSON", key: "name", label: "Full name", text: "As it should appear against their decisions.", fallback: "REQUIRED", fixed: "Every approval and verdict carries the name of whoever gave it." },
@@ -358,7 +358,7 @@ export function checkForm(
   const missing = [...short, ...answered.missing];
   if (missing.length) {
     return {
-      error: `This organization asks for ${missing.join(", ")}. Fill ${missing.length === 1 ? "it" : "them"} in, or change what the form asks in Settings → Forms & fields.`,
+      error: `Fill in ${missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]}`}.`,
       extras: answered.extras,
     };
   }

@@ -486,17 +486,25 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A list's "Used on" counts the project's documents carrying each value (backend `GET /register/usage`), and opens
   them in the register; a value in use keeps its code. Values are retired, never deleted: the bulk "Delete" (which
   only retired) is removed.
-- **Organizations page** (owner's "idea1"), People & access's way: plate (collaborators · guests · not on DELIOS · taking
-  part here); "An organization works with us" one sheet (`OrganizationJoins`): **Add one on DELIOS** (found by name or
-  code, `GET /api/admin/organizations/on-delios`, taken as it is, invited to link at once: their administrator accepts,
-  then puts their people on) or **Create one** (not on DELIOS: code, name, **country + identifier**, the best it has:
+- **Organizations page** (owner's "idea1"), People & access's way: plate (with their own DELIOS · with accounts from us ·
+  worked for by one of ours · working on <project>); "Organizations we work with" one sheet (`OrganizationJoins`):
+  **Add an organization** (one DELIOS already knows, any list's, found by name or code, `GET /api/admin/organizations/on-delios`,
+  taken as it is; one with its own DELIOS is invited to link at once, their administrator accepts then puts their
+  people on; any other asks how it works with us) or **Create an organization** (code, name, **country + identifier**, the best it has:
   company registration, else tax number, else professional register such as an order of architects, else a public
   body's; or why it has none; its email domain; how it works with us). Before creating, look-alikes are named (backend
   LOOKS_LIKE: same identifier, same domain, or a name reading the same once legal forms and punctuation are left out):
   "Is this the same as…?" → "Yes, add that one" or "No, it's a different company" (kept in the record). Every
   organization: a pencil opens its line (name, code, identifier, how it works with us: once each; domain; who answers
-  here; linking; "Is it the same as another organization?" asks a merge). "On <project>: who takes part": a sheet to add
-  one, each line opened by its pencil (role, contract number once, the function its people start with, takes part).
+  here; linking; "Is it the same as another organization?" asks a merge). "Working on <project>": which of them work on
+  the project (role here, the number of their contract with us, the function their people get), "Add one to <project>",
+  each line opened by its pencil. The identifier's number is named by its kind (Registration number, Tax number, Number
+  on the register, Government identifier). Names of buttons are plain acts, never "on DELIOS".
+- How they work with us, in plain words (`PARTY_KINDS`): "Works from its own DELIOS" (collaborator, never chosen by
+  hand), "We give its people accounts" (guest), "One of ours works for it" (not on DELIOS). For the last, "Their email
+  for transmittals" is required, and "Who of ours works for it" is a **person** (`Party.CarriedByUserId`; nobody chosen:
+  the control function, its people named), never a function.
+- Demo data is dummy data: never flag it, chase it or build errands around it (no "no identifier yet" warnings).
 - Asking for someone whose email belongs to an organization on DELIOS brings **their whole organization** onto the
   project (`BringOrganizationAsync`): added as DELIOS knows it, invited to link through that address, taking part with
   the function asked as its people's start; their administrator accepts, then puts them on. The control function does it.

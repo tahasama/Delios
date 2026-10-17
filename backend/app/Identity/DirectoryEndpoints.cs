@@ -54,7 +54,7 @@ public sealed record PartyRequest(
     string? Code = null, string? Name = null, bool? IsInternal = null, bool? Active = null, string? Participation = null,
     string? CustodianFunction = null, string? ExternalSystem = null, bool? EvidenceRequired = null, string? ContactEmail = null,
     Guid? IdentityId = null, string? Country = null, string? IdentifierKind = null, string? IdentifierNumber = null,
-    string? NoIdentifierReason = null, string? Domain = null, Guid[]? NotTheSame = null);
+    string? NoIdentifierReason = null, string? Domain = null, Guid[]? NotTheSame = null, string? CarriedBy = null);
 
 /// <summary>
 /// The organization's directory, kept by its administrators: people, projects and who is on them with which
@@ -740,6 +740,7 @@ public static class DirectoryEndpoints
             p.Active,
             p.Participation,
             p.CustodianFunction,
+            p.CarriedByUserId,
             p.ExternalSystem,
             p.EvidenceRequired,
             p.ContactEmail,
@@ -929,7 +930,18 @@ public static class DirectoryEndpoints
             changes.Add($"participation → {participation}");
             party.Participation = participation;
         }
-        if (request.CustodianFunction is not null && Blank(request.CustodianFunction) != party.CustodianFunction)
+        // Who of ours carries it: a person ("" puts it back to the control function).
+        if (request.CarriedBy is not null)
+        {
+            Guid? person = Guid.TryParse(request.CarriedBy, out var pid) ? pid : null;
+            if (person != party.CarriedByUserId)
+            {
+                party.CarriedByUserId = person;
+                party.CustodianFunction = null;
+                changes.Add(person is null ? "carried by the control function" : "carried by someone of ours");
+            }
+        }
+        else if (request.CustodianFunction is not null && Blank(request.CustodianFunction) != party.CustodianFunction)
         {
             party.CustodianFunction = Blank(request.CustodianFunction);
             changes.Add($"carried by {party.CustodianFunction ?? "the control function"}");

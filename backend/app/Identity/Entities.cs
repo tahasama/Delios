@@ -91,6 +91,11 @@ public sealed class Party
     /// the only address whose replies are taken in. Empty: one of ours sends them, as the dispatch records.
     /// </summary>
     public string? ContactEmail { get; set; }
+    /// <summary>
+    /// The person of ours who carries the exchange with an organization not on DELIOS (sends to it, records its answers).
+    /// Empty: the control function does.
+    /// </summary>
+    public Guid? CarriedByUserId { get; set; }
     /// <summary>The organization it is, as all of DELIOS knows it (one code and one name everywhere): <c>Organizations.Registry</c>.</summary>
     public Guid? OrganizationId { get; set; }
     /// <summary>How it worked with us before its one change of it, by whom and when; once changed it is fixed.</summary>

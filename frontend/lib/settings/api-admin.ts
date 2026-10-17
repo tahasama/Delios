@@ -44,6 +44,8 @@ export type AdminFunction = { id: string; code: string; name: string; active: bo
 
 type AdminParty = {
   id: string; code: string; name: string; isInternal: boolean; active: boolean; participation: string; custodianFunction: string | null;
+  /** The person of ours who works for it (one nobody of which signs in); null: the control function. */
+  carriedByUserId?: string | null;
   externalSystem: string | null; evidenceRequired: boolean; people: number;
   /** Not on DELIOS: where our transmittals go by email, and whose replies are taken in. */
   contactEmail?: string | null;

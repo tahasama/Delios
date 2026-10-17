@@ -2298,6 +2298,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<Guid?>("CarriedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("carried_by_user_id");
+
                     b.Property<Guid?>("OrganizationId")
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");

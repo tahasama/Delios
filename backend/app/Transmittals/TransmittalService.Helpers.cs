@@ -62,8 +62,9 @@ public sealed partial class TransmittalService
             // What an organization sent us, its own people see.
             || (party != null && t.FromPartyId != null && db.Parties.Any(p => p.Id == t.FromPartyId && p.Code == party))
             || (access.IsInternal && t.Recipients.Any(r => r.PartyId != null
-                && db.Parties.Any(p => p.Id == r.PartyId && p.CustodianFunction == code)))
-            || (access.IsInternal && t.FromPartyId != null && db.Parties.Any(p => p.Id == t.FromPartyId && p.CustodianFunction == code)));
+                && db.Parties.Any(p => p.Id == r.PartyId && (p.CarriedByUserId == me || (p.CarriedByUserId == null && p.CustodianFunction == code)))))
+            || (access.IsInternal && t.FromPartyId != null
+                && db.Parties.Any(p => p.Id == t.FromPartyId && (p.CarriedByUserId == me || (p.CarriedByUserId == null && p.CustodianFunction == code)))));
     }
 
     /// <summary>
