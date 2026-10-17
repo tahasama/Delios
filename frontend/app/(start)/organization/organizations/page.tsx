@@ -11,7 +11,7 @@ import { OrganizationJoins } from "@/app/(app)/settings/parties/organization-joi
 import { IdentifierFields } from "@/app/(app)/settings/parties/identifier-fields";
 import { OrgHeader } from "../org-header";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
-import { adminUsers, partiesWithAnswers } from "@/lib/settings/api-admin";
+import { adminProjects, adminUsers, partiesWithAnswers } from "@/lib/settings/api-admin";
 import { inviteOrganizationAction, endLinkAction } from "@/lib/organization/forms";
 import { IDENTIFIER_KINDS, countryName } from "@/lib/organization/countries";
 import { cn, fmtDate } from "@/lib/core/utils";
@@ -36,9 +36,10 @@ type Search = { edit?: string };
 export default async function OrganizationsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const scope = await requireOrgAdmin();
   const sp = await searchParams;
-  const [parties, users, policy] = await Promise.all([
-    partiesWithAnswers(), adminUsers().catch(() => []), formPolicy({ orgId: scope.orgId, projectId: "" }, "PARTY"),
+  const [parties, users, policy, projectList] = await Promise.all([
+    partiesWithAnswers(), adminUsers().catch(() => []), formPolicy({ orgId: scope.orgId, projectId: "" }, "PARTY"), adminProjects().catch(() => []),
   ]);
+  const projects = projectList.filter((p) => p.status !== "ARCHIVED").map((p) => ({ id: p.id, code: p.code, name: p.name }));
   // Who of ours may work for an organization nobody of which signs in; nobody chosen: the control function.
   const ours = users.filter((one) => one.active && one.internal).map((one) => ({ id: one.id, name: one.name, detail: one.email }));
   const control: string[] = [];
@@ -89,7 +90,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
         </div>
       </section>
 
-      <OrganizationJoins ours={ours} control={control} own={policy.own} />
+      <OrganizationJoins ours={ours} control={control} own={policy.own} projects={projects} />
 
       {/* Every organization: the pencil opens its line as the form. */}
       <section className="register register-sheet register-sheet-open" aria-labelledby="orgs-head">

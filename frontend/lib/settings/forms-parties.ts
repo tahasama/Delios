@@ -42,6 +42,25 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
   };
   // Add: one DELIOS knows already, as it is.
   const identityId = text(formData, "identityId");
+  // The projects it works on: this one (added from a project's page), or those chosen on the organization's list.
+  const projectIds = formData.get("takePart") === "1" ? [ctx.projectId] : formData.getAll("projectIds").map(String).filter(Boolean);
+  const putOn = async (partyId: string) => {
+    for (const pid of projectIds) {
+      await api(`/api/projects/${pid}/organizations/${partyId}`, { method: "PUT", body: { role: null, startFunctionId: null, active: true } });
+    }
+  };
+  // Already in our list: it only starts working on the projects chosen.
+  const listedParty = text(formData, "partyId");
+  if (listedParty) {
+    try {
+      await putOn(listedParty);
+    } catch (e) {
+      return refusalForForm(e);
+    }
+    revalidatePath("/settings/parties");
+    revalidatePath("/organization/organizations");
+    return { ok: projectIds.length ? `${text(formData, "identityName") || "It"} now works on the project: open its line to give its role and contract.` : "It is in our list already." };
+  }
   let saidName = name;
   try {
     let partyId = id;
@@ -83,10 +102,8 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
       });
       partyId = created.id;
     }
-    // Added from a project's page: it works on that project too.
-    if (!id && formData.get("takePart") === "1") {
-      await api(projectPath(ctx, `/organizations/${partyId}`), { method: "PUT", body: { role: null, startFunctionId: null, active: true } });
-    }
+    // Added or created with projects: it works on them.
+    if (!id) await putOn(partyId);
   } catch (e) {
     // Look-alikes are named first: the form asks whether it is one of them.
     const { code: refused, params, message } = refusal(e);
@@ -99,16 +116,16 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
   saidName ||= code;
   return {
     ok: id ? `${saidName} is saved.`
-      : formData.get("takePart") === "1" ? `${saidName} is in our list and works on ${ctx.project.code}: open its line to give its role and contract.`
+      : projectIds.length ? `${saidName} is added and works on ${formData.get("takePart") === "1" ? ctx.project.code : `${projectIds.length} project(s)`}: open its line to give its role and contract.`
       : `${saidName} is in our list.`,
   };
 }
 
 /** Organizations DELIOS knows whose code or name holds the words: to add one as it is. */
-export async function findOnDeliosAction(words: string): Promise<{ id: string; code: string; name: string; country: string | null; listed: boolean; onDelios: boolean }[]> {
+export async function findOnDeliosAction(words: string): Promise<{ id: string; code: string; name: string; country: string | null; listed: boolean; partyId: string | null; onDelios: boolean }[]> {
   await requireScope();
   if (words.trim().length < 2) return [];
-  return api<{ id: string; code: string; name: string; country: string | null; listed: boolean; onDelios: boolean }[]>(
+  return api<{ id: string; code: string; name: string; country: string | null; listed: boolean; partyId: string | null; onDelios: boolean }[]>(
     `/api/admin/organizations/on-delios?q=${encodeURIComponent(words.trim())}`).catch(() => []);
 }
 

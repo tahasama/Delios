@@ -73,12 +73,18 @@ public static class RegistryEndpoints
         if (string.IsNullOrEmpty(words) || words.Length < 2) return Results.Ok(Array.Empty<object>());
         var me = http.User.TenantId();
         var key = Registry.Key(words);
-        var listed = await db.Parties.AsNoTracking().Where(p => p.OrganizationId != null).Select(p => p.OrganizationId!.Value).ToListAsync(cancellationToken);
+        var listed = await db.Parties.AsNoTracking().Where(p => p.OrganizationId != null)
+            .Select(p => new { Organization = p.OrganizationId!.Value, p.Id }).ToListAsync(cancellationToken);
         var found = await db.OrganizationIdentities.AsNoTracking()
             .Where(o => o.TenantId != me && o.MergedIntoId == null
                 && (o.Code.Contains(key) || EF.Functions.ILike(o.Name, $"%{words}%")))
             .OrderBy(o => o.Name).Take(12).ToListAsync(cancellationToken);
-        return Results.Ok(found.Select(o => new { o.Id, o.Code, o.Name, o.Country, Listed = listed.Contains(o.Id), OnDelios = o.TenantId != null }));
+        // One already in our list carries our line for it, to put it on a project.
+        return Results.Ok(found.Select(o => new
+        {
+            o.Id, o.Code, o.Name, o.Country, Listed = listed.Any(l => l.Organization == o.Id),
+            PartyId = listed.FirstOrDefault(l => l.Organization == o.Id)?.Id, OnDelios = o.TenantId != null,
+        }));
     }
 
     /// <summary><c>GET /api/organization/identity</c>: ours, as DELIOS knows it.</summary>

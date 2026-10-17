@@ -26,13 +26,12 @@ export const metadata = { title: "Organizations" };
 const field = "plain w-full";
 const icon = "inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800";
 
-type Search = { part?: string; take?: string };
+type Search = { part?: string };
 
 /**
  * Settings → Organizations, at the project's level: the organizations working on this project, and nothing else. Each
  * line, opened by its pencil, says its role here, the number of its contract with us, who of theirs answers for it
- * here, and the function its people get. "Add one to <project>" takes one from our list; one not in it yet is added or
- * created below. The list of every organization, and its details, are the organization's (its own page).
+ * here, and the function its people get. One search brings one on: from our list, else from DELIOS, else it is created. The list of every organization, and its details, are the organization's (its own page).
  */
 export default async function ProjectOrganizationsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -48,7 +47,6 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
   const functions = functionList.filter((one) => one.active).sort((a, b) => a.name.localeCompare(b.name));
   const kindLabel = (kind: string) => PARTY_KINDS.find((k) => k.value === (kind === "NOT_ON_DELIOS" ? "OFFLINE" : kind))?.label ?? kind;
   const working = onProject.filter((one) => one.active);
-  const notYet = parties.filter((p) => !p.isInternal && p.active && !onProject.some((o) => o.partyId === p.id));
   const href = (q: Search, anchor?: string) => {
     const next = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1]));
     return `/settings/parties${next.size ? `?${next}` : ""}${anchor ? `#${anchor}` : ""}`;
@@ -79,7 +77,7 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
       <section className="register register-sheet register-sheet-open">
         <div className="flex flex-col gap-3 px-5 pt-6 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
-            <h1 className="plate-title text-slate-950">Organizations on {ctx.project.code}</h1>
+            <h1 className="plate-title text-slate-950">Organizations</h1>
             <p className="plate-meta mt-2">{working.length} working on {ctx.project.code}</p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
               Who works on {ctx.project.code} besides us: the role each plays here, the number of its contract with us, who of
@@ -87,46 +85,15 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
               {isAdmin(me) ? <> Every organization we work with, and its details, are on the <Link href="/organization/organizations" className="font-semibold text-link hover:underline">organization&rsquo;s list</Link>.</> : null}
             </p>
           </div>
-          {sp.take ? null : (
-            <div className="flex shrink-0 items-center gap-2">
-              <Link href={href({ take: "1" }, "take")} scroll={false} className="ask">Add one to {ctx.project.code}</Link>
-            </div>
-          )}
         </div>
       </section>
 
-      {/* Add one from our list: the sheet becomes the form. */}
-      {sp.take ? (
-        <section id="take" className="register register-sheet register-sheet-open scroll-mt-24" aria-labelledby="take-head">
-          {band("take-head", `Add one to ${ctx.project.code}`, "from our list; one not in it yet is added or created below")}
-          <ActionForm id="take-form" action={setProjectOrganizationAction} hideSubmit resetOnSuccess className="asking space-y-5 px-5 py-5 sm:px-6">
-            <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-              <Field label="Organization" required>
-                <select name="partyId" required defaultValue="" className={field}>
-                  <option value="" disabled>{notYet.length ? "Choose…" : "Every one in our list is on it already"}</option>
-                  {notYet.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-                </select>
-              </Field>
-              <Field label="Role here" hint="optional">{roleSelect(null)}</Field>
-              <Field label="Contract number" hint={`its contract with us for ${ctx.project.code}; unique on DELIOS, changed once`}>
-                <input name="contractNumber" maxLength={64} className={cn(field, "font-mono")} />
-              </Field>
-              <Field label="Their people start as" hint="the function their people get here">{startSelect(null)}</Field>
-            </div>
-          </ActionForm>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
-            <Link href={href({})} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
-            <button type="submit" form="take-form" data-on="true" className="ask">Add to {ctx.project.code}</button>
-          </div>
-        </section>
-      ) : null}
-
-      {/* Not in our list yet: add one DELIOS knows, or create it; either way it works on this project. */}
-      <OrganizationJoins projectCode={ctx.project.code} ours={ours} control={control} own={policy.own} />
+      {/* One way to bring an organization onto the project: look for it (our list, then DELIOS), else create it. */}
+      <OrganizationJoins projectCode={ctx.project.code} onProject={onProject.filter((o) => o.active).map((o) => o.partyId)} ours={ours} control={control} own={policy.own} />
 
       {/* The organizations working on this project. */}
       <section className="register register-sheet register-sheet-open" aria-labelledby="list-head">
-        {band("list-head", `Working on ${ctx.project.code}`, `${working.length} · the pencil opens a line`)}
+        {band("list-head", `Organizations on ${ctx.project.code}`, `${working.length} · the pencil opens one to give its role, contract and who answers for it`)}
         {onProject.length ? (
           <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
             head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Role here</Th><Th>Contract</Th><Th>Who answers for it</Th><Th>Their people start as</Th><Th></Th></tr>}>
