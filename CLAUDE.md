@@ -486,10 +486,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A list's "Used on" counts the project's documents carrying each value (backend `GET /register/usage`), and opens
   them in the register; a value in use keeps its code. Values are retired, never deleted: the bulk "Delete" (which
   only retired) is removed.
-- **Organizations, two levels** (owner): Settings → Organizations is the **project's**: one button "Add an organization",
-  then two ways: **an existing organization account** (search: our list first, then any DELIOS knows; one already on the
-  project is marked so) or **create one** (guests, or not on DELIOS). Either way it is added to the project. Below,
-  "Organizations on <project>": only those on it, each line opened by its pencil: role here, contract number (once), who of
+- **Organizations, two levels** (owner): Settings → Organizations is the **project's**: one field to find an organization,
+  always there (our list first, then any DELIOS knows; choosing it adds it to the project), and beside it one button
+  "Create an organization" that opens the form (guests, or not on DELIOS). No two-button steps, no project code repeated on
+  every line. Below, "Organizations on <project>": every organization on it (on DELIOS, guests, created by us); its
+  **name opens** what it is (identifier, how it works with us, domain, its people here) and its **role with us** (client,
+  supplier…), then: role here, contract number (once), who of
   theirs answers for it here and backup (`PARTY:<id>`), the function their people get, works on it. The list of every
   organization and its details is the **organization's** (`/organization/organizations`, administrators): the same
   button and two ways, plus "Works on": optionally the project(s) the organization added or created is put on. An

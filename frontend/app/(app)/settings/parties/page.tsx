@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { Pencil, X } from "lucide-react";
+import { X } from "lucide-react";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
@@ -78,25 +78,24 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
         <div className="flex flex-col gap-3 px-5 pt-6 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             <h1 className="plate-title text-slate-950">Organizations</h1>
-            <p className="plate-meta mt-2">{working.length} working on {ctx.project.code}</p>
+            <p className="plate-meta mt-2">{working.length} on the project</p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-              Who works on {ctx.project.code} besides us: the role each plays here, the number of its contract with us, who of
-              theirs answers for it, and the function its people get.
-              {isAdmin(me) ? <> Every organization we work with, and its details, are on the <Link href="/organization/organizations" className="font-semibold text-link hover:underline">organization&rsquo;s list</Link>.</> : null}
+              Find one to add it, or create one nobody has yet. A name opens what it is and its role with us.
+              {isAdmin(me) ? <> Every organization we work with is on the <Link href="/organization/organizations" className="font-semibold text-link hover:underline">organization&rsquo;s list</Link>.</> : null}
             </p>
           </div>
         </div>
       </section>
 
       {/* One way to bring an organization onto the project: look for it (our list, then DELIOS), else create it. */}
-      <OrganizationJoins projectCode={ctx.project.code} onProject={onProject.filter((o) => o.active).map((o) => o.partyId)} ours={ours} control={control} own={policy.own} />
+      <OrganizationJoins project onProject={onProject.filter((o) => o.active).map((o) => o.partyId)} ours={ours} control={control} own={policy.own} />
 
       {/* The organizations working on this project. */}
       <section className="register register-sheet register-sheet-open" aria-labelledby="list-head">
-        {band("list-head", `Organizations on ${ctx.project.code}`, `${working.length} · the pencil opens one to give its role, contract and who answers for it`)}
+        {band("list-head", `Organizations on ${ctx.project.code}`, `${working.length}`)}
         {onProject.length ? (
           <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
-            head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Role here</Th><Th>Contract</Th><Th>Who answers for it</Th><Th>Their people start as</Th><Th></Th></tr>}>
+            head={<tr><Th>Organization</Th><Th>Role with us</Th><Th>How they work with us</Th><Th>Contract</Th><Th>Who answers for it</Th><Th></Th></tr>}>
             {onProject.map((one) => {
               const open = sp.part === one.partyId;
               const party = parties.find((p) => p.id === one.partyId);
@@ -106,16 +105,19 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
                 <Fragment key={one.partyId}>
                   <tr id={`part-${one.partyId}`} className={cn("scroll-mt-20 align-top target:bg-tint-soft", !one.active && "opacity-60", open && "[&>td]:border-b-0")}>
                     <Td>
-                      <code className="code-chip mr-1.5">{one.code}</code><span className="text-slate-800">{one.name}</span>
+                      <Link href={open ? href({}, `part-${one.partyId}`) : href({ part: one.partyId }, `part-${one.partyId}`)} scroll={false}
+                        className="text-slate-800 hover:text-link hover:underline" title={open ? "Close" : `What ${one.name} is, and its role with us`}>
+                        <code className="code-chip mr-1.5">{one.code}</code><span className="font-medium">{one.name}</span>
+                      </Link>
                       {c?.identifier ? (
                         <span className="block text-[11px] text-slate-500">
                           {countryName(c.identifier.country)} · {IDENTIFIER_KINDS.find((k) => k.value === c.identifier!.kind)?.label.toLowerCase()} {c.identifier.number}
                         </span>
                       ) : null}
-                      {one.active ? null : <span className="block text-[11px] text-slate-500">no longer works on it</span>}
+                      {one.active ? null : <span className="block text-[11px] text-slate-500">no longer on the project</span>}
                     </Td>
-                    <Td className="text-xs">{kindLabel(one.kind)}{one.linkedOrganization ? <span className="block text-[11px] text-slate-500">{one.linkedOrganization}</span> : null}</Td>
                     <Td className="text-xs">{one.role ? roles.find((r) => r.code === one.role)?.label ?? one.role : <span className="text-slate-500">not stated</span>}</Td>
+                    <Td className="text-xs">{kindLabel(one.kind)}</Td>
                     <Td className="text-xs">
                       {one.contractNumber ? <span className="font-mono">{one.contractNumber}</span> : <span className="text-slate-500">not given</span>}
                       {one.previousContractNumber ? <span className="block text-[11px] text-slate-500">was {one.previousContractNumber}</span> : null}
@@ -123,24 +125,34 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
                     <Td className="text-xs">
                       {party?.contact ? <>{party.contact.name}<span className="block text-[11px] text-slate-500">{party.backup ? `backup: ${party.backup.name}` : "no backup"}</span></> : <span className="text-slate-500">—</span>}
                     </Td>
-                    <Td className="text-xs">{one.startFunction ?? (one.kind === "COLLABORATOR" ? <span className="font-semibold text-amber-700">not said yet</span> : <span className="text-slate-500">—</span>)}</Td>
                     <Td className="w-px whitespace-nowrap text-right">
-                      {open
-                        ? <Link href={href({}, `part-${one.partyId}`)} scroll={false} className={icon} title="Close"><X aria-label={`Close ${one.name}`} className="h-4 w-4" /></Link>
-                        : <Link href={href({ part: one.partyId }, `part-${one.partyId}`)} scroll={false} className={icon} title={`Change ${one.name} on ${ctx.project.code}`}><Pencil aria-label={`Change ${one.name}`} className="h-4 w-4" /></Link>}
+                      {open ? <Link href={href({}, `part-${one.partyId}`)} scroll={false} className={icon} title="Close"><X aria-label={`Close ${one.name}`} className="h-4 w-4" /></Link> : null}
                     </Td>
                   </tr>
                   {open ? (
                     <tr>
-                      <td colSpan={7} className="border-b border-line p-0">
+                      <td colSpan={6} className="border-b border-line p-0">
+                        {/* What it is: read from its record; changed only where it is kept. */}
+                        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 border-b border-line px-5 py-4 text-[13px] sm:grid-cols-[180px_minmax(0,1fr)] sm:px-6">
+                          <dt className="text-xs font-semibold text-slate-500">Organization</dt>
+                          <dd>{one.name} · <span className="font-mono">{one.code}</span>{one.linkedOrganization ? ` · works from its own DELIOS (${one.linkedOrganization})` : ""}</dd>
+                          <dt className="text-xs font-semibold text-slate-500">Identifier</dt>
+                          <dd>{c?.identifier ? `${countryName(c.identifier.country)} · ${IDENTIFIER_KINDS.find((k) => k.value === c.identifier!.kind)?.label.toLowerCase()} ${c.identifier.number}` : c?.noIdentifierReason ? `none: ${c.noIdentifierReason}` : "—"}</dd>
+                          <dt className="text-xs font-semibold text-slate-500">How they work with us</dt>
+                          <dd>{kindLabel(one.kind)}{party?.contactEmail ? ` · transmittals to ${party.contactEmail}` : ""}</dd>
+                          <dt className="text-xs font-semibold text-slate-500">Email domain</dt>
+                          <dd>{c?.domain ?? "—"}{c?.domainConfirmed ? " (proven)" : ""}</dd>
+                          <dt className="text-xs font-semibold text-slate-500">Their people here</dt>
+                          <dd>{one.people ? `${one.people} on the project` : "none yet"}</dd>
+                        </dl>
                         <ActionForm id={`part-form-${one.partyId}`} action={setProjectOrganizationAction} hideSubmit hidden={{ partyId: one.partyId, answers: "1" }}
                           className="asking space-y-5 px-5 py-5 sm:px-6">
                           <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                            <Field label="Role here" hint="optional">{roleSelect(one.role)}</Field>
+                            <Field label="Role with us" hint="client, supplier, contractor…">{roleSelect(one.role)}</Field>
                             <Field label="Contract number"
                               hint={one.contractChangedAt
                                 ? `fixed: changed once, from ${one.previousContractNumber}, by ${one.contractChangedByName}, ${fmtDate(one.contractChangedAt)}`
-                                : `its contract with us for ${ctx.project.code}; unique on DELIOS, changed once only`}>
+                                : "its contract with us; unique on DELIOS, changed once only"}>
                               {one.contractChangedAt
                                 ? <input defaultValue={one.contractNumber ?? ""} disabled className={cn(field, "font-mono text-slate-500")} aria-label="Contract number (fixed)" />
                                 : <input name="contractNumber" defaultValue={one.contractNumber ?? ""} maxLength={64} className={cn(field, "font-mono")} />}
@@ -154,7 +166,7 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
                               </>
                             ) : null}
                             <Field label="Their people start as" hint="the function their people get here">{startSelect(one.startFunctionId)}</Field>
-                            <Field label="Works on it">
+                            <Field label="On the project">
                               <select name="active" defaultValue={one.active ? "on" : "off"} className={field}>
                                 <option value="on">Yes</option>
                                 <option value="off">No longer</option>
