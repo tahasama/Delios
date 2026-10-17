@@ -593,7 +593,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   new-document form's way.
 - Screens and the backend say "the control function" and "whoever holds Manage" (or "whoever plans"), never a job
   title; a function's own name is shown only as read from the data.
-- The plan's starter values are added in one go ("Add them"); Controlled changes no longer exist.
+- A project type's starter values are added in one go ("Add them"), on Disciplines, types & sets; Controlled changes no
+  longer exist.
+- **The plan is a document, not a setting** (owner): Assurance → The plan (`/conformance/plan`), written from how the
+  project is set up, printed; nothing on it is typed and nothing on it repeats a Settings page. Scope is said once (This
+  project); how it is measured once (Assurance, "How it is measured": target and how often, `MEASURE`; past it the
+  figure says the checks are due). The organization's name is its own, never typed again. No exceptions register (it
+  changed nothing): a check switched off, with why, is the departure that applies. `/settings/dmp` only redirects.
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
 - **Two levels of settings** (owner): the organization's (`/organization`, its portal) and the project's (Settings).
   Every project, opening one, archiving and reopening are the organization's: **Projects** (`/organization/projects`,

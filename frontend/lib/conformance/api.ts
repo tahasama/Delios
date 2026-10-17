@@ -103,10 +103,10 @@ export async function optOutsOf(projectId: string): Promise<OptOut[]> {
 
 /**
  * The scope statement and integrity target the conformance screens measure
- * against: the organization's SCOPE setting, with the project's own scope
- * statement winning (see `scopeConfig` in ./admin). Null when none is stated.
+ * against: the project's own answers (This project's scope, Assurance's "How it is
+ * measured"), see `scopeConfig`.
  */
-export async function scopeOf(projectId: string): Promise<ScopeConfig | null> {
+export async function scopeOf(projectId: string): Promise<ScopeConfig> {
   return scopeConfig(projectId);
 }
 

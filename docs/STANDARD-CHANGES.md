@@ -579,8 +579,17 @@ drift. What the application does not hold (cover page, client clauses, local
 conventions) stays in a document the organization registers and names as its
 plan.
 
-**Depends on it:** `frontend/app/(app)/settings/dmp/plan.tsx`,
-`ScopeConfig.dmpDocumentId`.
+The plan is a document, not a setting: it changes nothing, so it is read under
+Assurance, beside the statement of conformance, never among the settings. A
+project states its scope once (This project), and how it is measured once
+(Assurance: the share of clear documents it aims at, and how often it is
+checked; past that, the figure says the checks are due). There is no separate
+register of exceptions to the rules: an exception that changes nothing is not a
+control. The departure that applies is a check switched off, with why, by whom
+and when.
+
+**Depends on it:** `frontend/app/(app)/conformance/plan/plan.tsx`,
+`ScopeConfig` (`MEASURE`, `dmpDocumentId`).
 
 ## 28 · Advice is chosen from a published list, with its comments
 

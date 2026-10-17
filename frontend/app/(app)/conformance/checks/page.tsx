@@ -5,7 +5,8 @@ import { PageHeader, Card, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { FAMILY_TITLES, PHASE_LABEL, PHASE_BLURB, CATALOG, CHECK_BY_ID, type Phase, type CheckDef } from "@/lib/conformance/checks/catalog";
 import { latestResults } from "@/lib/conformance/checks/engine";
-import { optOutsOf } from "@/lib/conformance/api";
+import { optOutsOf, scopeOf } from "@/lib/conformance/api";
+import { HowMeasured } from "@/app/(app)/conformance/measure";
 import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
 import { retireCheckAction, restoreCheckAction } from "@/lib/conformance/forms";
 import { OWNER_LABEL } from "@/lib/core/problems";
@@ -67,7 +68,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
     return <OneKind ctx={ctx} checkId={sp.check} controller={controller} back="/conformance/checks?result=FAIL" />;
   }
 
-  const [results, optOuts] = await Promise.all([latestResults(ctx), optOutsOf(ctx.projectId)]);
+  const [results, optOuts, scope] = await Promise.all([latestResults(ctx), optOutsOf(ctx.projectId), scopeOf(ctx.projectId)]);
   const off = new Map(optOuts.map((o) => [o.checkId, o]));
 
   const severity = SEVERITIES.includes(sp.severity ?? "") ? sp.severity! : null;
@@ -129,6 +130,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
         <AssuranceFigure />
       </PageHeader>
       <AssuranceTabs current="/conformance/checks" />
+      <HowMeasured scope={scope} mayChange={controller} />
 
       <CheckFilters
         base={filterBase}

@@ -57,12 +57,6 @@ export const SETUP_PAGES: SetupPage[] = [
     group: "Organization",
     control: true,
   },
-  {
-    href: "/settings/dmp",
-    title: "The plan",
-    text: "This project's document management plan, written from these settings and ready to print; with what is still to set up.",
-    group: "Organization",
-  },
 
   {
     href: "/settings/config",

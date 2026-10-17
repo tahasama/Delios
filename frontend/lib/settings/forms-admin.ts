@@ -127,25 +127,6 @@ export async function retireConfigValueAction(formData: FormData) {
   revalidatePath("/settings/config");
 }
 
-/** The scope statement and the conformance figures it is measured by: the organization's answer, kept in its settings. */
-export async function setScopeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  await requireScope();
-  const organizationName = text(formData, "organizationName");
-  const scopeStatement = text(formData, "scopeStatement");
-  if (!organizationName || !scopeStatement) return { error: "Organization and scope statement are required." };
-  try {
-    await setOrgSetting("SCOPE", JSON.stringify({
-      organizationName, scopeStatement, assessmentLevel: text(formData, "assessmentLevel") || "Full",
-      integrityThreshold: Number(formData.get("integrityThreshold") ?? 95), measurementIntervalDays: Number(formData.get("measurementIntervalDays") ?? 30),
-      effectiveDate: new Date().toISOString(),
-    }));
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings");
-  return {};
-}
-
 /** The organization's own fields on an asset, as the form names them. */
 function assetFields(formData: FormData) {
   const extras: Record<string, string> = {};
@@ -201,25 +182,6 @@ export async function removeAssetAction(_prev: (Result & { ok?: string }) | unde
   }
   revalidatePath("/assets");
   return { ok: "Removed from the list." };
-}
-
-/** A published exception to the standard: what, which clauses, why, on whose authority, and dates. */
-export async function addExceptionAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const ctx = await requireScope();
-  const body = {
-    item: text(formData, "item"), clauses: text(formData, "clauses"), reason: text(formData, "reason"), authority: text(formData, "authority"),
-    startDate: text(formData, "startDate") || null, reviewPoint: text(formData, "reviewPoint") || null,
-  };
-  if (!body.item || !body.clauses || !body.reason || !body.authority || !body.startDate) {
-    return { error: "An exception records what is exempt, clauses, reason, granting authority and dates." };
-  }
-  try {
-    await api(projectPath(ctx, "/exceptions"), { body });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/dmp");
-  return {};
 }
 
 /** Rename and describe a set. Its key is the values' list: it stays, as codes do. */

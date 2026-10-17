@@ -3,7 +3,6 @@ import { cache } from "react";
 import { api, projectPath } from "@/lib/client";
 
 type Scope = { projectId: string };
-const day = (value: string | null | undefined) => (value ? new Date(`${value.slice(0, 10)}T00:00:00`) : null);
 
 type AssetRow = {
   id: string; code: string; name: string; area: string | null; system: string | null; unit: string | null; description: string | null;
@@ -26,13 +25,6 @@ export async function projectAsset(scope: Scope, id: string) {
 export async function documentAssets(scope: Scope, documentId: string) {
   return api<{ id: string; assetId: string; code: string; name: string; createdBy: string; createdAt: string }[]>(
     projectPath(scope, `/documents/${documentId}/assets`)).catch(() => []);
-}
-
-/** The project's published exceptions to the standard, newest first. */
-export async function projectExceptions(scope: Scope) {
-  const rows = await api<{ id: string; item: string; clauses: string; reason: string; authority: string; startDate: string; reviewPoint: string | null }[]>(
-    projectPath(scope, "/exceptions")).catch(() => []);
-  return rows.map((one) => ({ ...one, startDate: day(one.startDate)!, reviewPoint: day(one.reviewPoint) }));
 }
 
 type CallRow = {

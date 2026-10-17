@@ -44,16 +44,7 @@ public sealed class ProjectRecordTests(Infrastructure infrastructure) : IClassFi
         Assert.Equal(HttpStatusCode.NoContent, retired);
         Assert.Empty((await controller.GetFromJsonAsync<JsonElement>($"{p}/assets")).EnumerateArray());
 
-        // Exceptions and number ranges.
-        var (exception, exceptionBody) = await Flow.PostAsync(controller, $"{p}/exceptions", new
-        {
-            item = "Vendor drawings",
-            clauses = "7.3",
-            reason = "Vendor portal numbering",
-            authority = "Project director",
-            startDate = "2026-10-01",
-        });
-        Assert.True(exception == HttpStatusCode.OK, exceptionBody.ToString());
+        // Number ranges.
         var (range, _) = await Flow.PostAsync(controller, $"{p}/number-ranges", new { prefix = "P1001-ACME-ME-DWG", from = 1, to = 99, issuedTo = "Acme Pumps" });
         Assert.Equal(HttpStatusCode.OK, range);
         var (overlap, overlapBody) = await Flow.PostAsync(controller, $"{p}/number-ranges", new { prefix = "P1001-ACME-ME-DWG", from = 50, to = 150, issuedTo = "Other" });

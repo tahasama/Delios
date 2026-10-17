@@ -18,7 +18,6 @@ public sealed record AssetRequest(string? Code, string? Name, string? Area = nul
 public sealed record LinkAssetRequest(string? AssetCode);
 /// <summary>From an asset's page, through the register opened for it: the documents to link, and those to unlink.</summary>
 public sealed record AssetDocumentsRequest(Guid[]? Add, Guid[]? Remove);
-public sealed record ExceptionRequest(string? Item, string? Clauses, string? Reason, string? Authority, DateOnly? StartDate, DateOnly? ReviewPoint = null);
 public sealed record NumberRangeRequest(string? Prefix, int From, int To, string? IssuedTo);
 public sealed record CallsRequest(string[]? Departments, DateOnly? DueOn);
 public sealed record AnswerCallRequest(string? Note);
@@ -57,11 +56,8 @@ public static partial class ProjectRecordEndpoints
         p.MapDelete("/document-assets/{linkId:guid}", UnlinkAssetAsync);
         p.MapPost("/assets/{assetId:guid}/documents", SetAssetDocumentsAsync);
 
-        // Exceptions and number ranges
-        p.MapGet("/exceptions", async (HttpContext h, DeliosDbContext db, CancellationToken c) =>
-            Results.Ok(await db.Set<ExceptionEntry>().AsNoTracking().Where(x => x.ProjectId == ProjectAccessFilter.Of(h).Project.Id)
-                .OrderByDescending(x => x.StartDate).ToListAsync(c)));
-        p.MapPost("/exceptions", AddExceptionAsync);
+        // Number ranges. Exceptions to the rules are no longer recorded: they changed nothing; a check switched off,
+        // with why, is the departure that applies. The rows kept stay in their table.
         p.MapGet("/number-ranges", async (HttpContext h, DeliosDbContext db, CancellationToken c) =>
             Results.Ok(await db.Set<NumberRange>().AsNoTracking().Where(x => x.ProjectId == ProjectAccessFilter.Of(h).Project.Id)
                 .OrderBy(x => x.Prefix).ThenBy(x => x.From).ToListAsync(c)));

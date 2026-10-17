@@ -20,7 +20,6 @@ export async function draftProfileAction(_prev: State | undefined, formData: For
     return { error: refusal(e).message };
   }
   if (!drafted.length) return { error: "Nothing to add: every value is already there." };
-  revalidatePath("/settings/dmp");
   revalidatePath("/settings/config");
   return { ok: `Added the ${profile.name} values to: ${drafted.join(", ").toLowerCase().replaceAll("_", " ")}. Rename or retire any of them in Disciplines, types & sets.` };
 }

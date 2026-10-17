@@ -13,35 +13,7 @@ namespace Delios.Host.Records;
 
 public static partial class ProjectRecordEndpoints
 {
-    // ── Exceptions and number ranges ──────────────────────────────────────────
-
-    private static async Task<IResult> AddExceptionAsync(ExceptionRequest r, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken c)
-    {
-        var access = ProjectAccessFilter.Of(h);
-        if (!await KeepsAsync(h, access)) return KeepersOnly("the published exceptions");
-        if (Blank(r.Item) is not { } item || Blank(r.Clauses) is not { } clauses || Blank(r.Reason) is not { } reason
-            || Blank(r.Authority) is not { } authority || r.StartDate is not { } start)
-            return Problems.Invalid("FIELDS_REQUIRED", "An exception says what, which clauses, why, on whose authority, and from when.");
-        if (r.ReviewPoint is { } review && review < start) return Problems.Invalid("REVIEW_BEFORE_START", "It is reviewed after it starts, not before.");
-        var row = new ExceptionEntry
-        {
-            TenantId = access.Project.TenantId,
-            ProjectId = access.Project.Id,
-            Item = item,
-            Clauses = clauses,
-            Reason = reason,
-            Authority = authority,
-            StartDate = LocalDate.FromDateOnly(start),
-            ReviewPoint = r.ReviewPoint is { } rp ? LocalDate.FromDateOnly(rp) : null,
-            RecordedByName = access.UserName,
-            CreatedAt = clock.GetCurrentInstant(),
-        };
-        db.Add(row);
-        await db.SaveChangesAsync(c);
-        await audit.WriteAsync(Who(access), "EXCEPTION_RECORDED", "Exception", row.Id, item, $"Clauses {clauses}, on the authority of {authority}: {reason}",
-            access.Project.Id, c);
-        return Results.Ok(row);
-    }
+    // ── Number ranges ──────────────────────────────────────────
 
     private static async Task<IResult> IssueRangeAsync(NumberRangeRequest r, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken c)
     {

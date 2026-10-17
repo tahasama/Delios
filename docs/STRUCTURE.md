@@ -5,7 +5,7 @@ in a folder called `transmittals` (or `Transmittals`) in every part of the app. 
 that area's folder in each part, and nowhere else.
 
 The areas: documents, reviews, transmittals, packages, actions (the schedule and its actions), records (assets,
-exceptions), conformance (checks and reports), notifications, account (your sign-in), organization (working with
+number ranges), conformance (checks, the plan, reports), notifications, account (your sign-in), organization (working with
 other organizations, the organization's admin page), settings.
 
 ## The whole repository
@@ -38,7 +38,7 @@ backend/
 │   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs)
 │   ├── Packages/         delivery packages and supplier packages
 │   ├── Actions/          the schedule, its actions, what each needs, notices
-│   ├── Records/          assets, exceptions, readiness answers
+│   ├── Records/          assets, number ranges, readiness answers
 │   ├── Checks/           conformance checks
 │   ├── Reports/          reports
 │   ├── Search/           full-text search

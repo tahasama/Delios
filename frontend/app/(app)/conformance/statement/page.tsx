@@ -1,5 +1,4 @@
 import { requireScope } from "@/lib/core/scope";
-import { projectExceptions } from "@/lib/records/api";
 import { PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { PrintButton } from "./print-button";
@@ -40,10 +39,9 @@ export default async function ConformancePage() {
         items: answer.lastRun.results.map((i) => ({ id: i.checkId, checkId: i.checkId, result: i.result, failingCount: i.failing, note: i.note })),
       }
     : null;
-  const exceptions = await projectExceptions(ctx);
   const flawedDocs = flawedDocuments(defects);
 
-  const threshold = scope?.integrityThreshold ?? 95;
+  const threshold = scope.integrityThreshold;
   const clear = totalDocs - flawedDocs;
   const rate = totalDocs ? (clear / totalDocs) * 100 : 100;
   const openCritical = defects.filter((d) => d.severity === "CRITICAL").length;
@@ -179,22 +177,6 @@ export default async function ConformancePage() {
                   <span className="font-medium">{CHECK_BY_ID.get(o.checkId)?.condition ?? o.checkId}</span>
                   <span className="block text-[11px] leading-4 text-slate-500">
                     {o.reason} — decided by {o.setByName}, {fmtDate(o.setAt)}.
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Section>
-        ) : null}
-
-        {exceptions.length ? (
-          <Section title="Exemptions that apply">
-            <ul className="space-y-1.5">
-              {exceptions.map((e) => (
-                <li key={e.id} className="text-[13px] leading-5">
-                  <span className="font-medium">{e.item}</span>
-                  <span className="block text-[11px] leading-4 text-slate-500">
-                    {e.reason} — granted by {e.authority}, from {fmtDate(e.startDate)}
-                    {e.reviewPoint ? `, looked at again ${fmtDate(e.reviewPoint)}` : ""}.
                   </span>
                 </li>
               ))}

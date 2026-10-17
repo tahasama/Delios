@@ -340,34 +340,42 @@ export async function controlledSets(scope?: { projectId: string }): Promise<Con
 }
 
 // ── The scope statement ───────────────────────────────────────────────────────
-// The organization's statement of what it controls and how it is measured is
-// its own answer, kept in its settings (SCOPE); a project may state its own
-// scope (PROJECT_INFO), which then wins.
+// What a project controls is said on This project (PROJECT_INFO); how it is
+// measured is the project's answer on Assurance (MEASURE). The organization's
+// older SCOPE answer is read only where neither says. The organization's name is
+// its own, never typed again.
 
 export type ScopeConfig = {
-  organizationName: string; scopeStatement: string; assessmentLevel: string; standardVersion: string; effectiveDate: Date;
+  organizationName: string; scopeStatement: string; standardVersion: string; effectiveDate: Date;
   integrityThreshold: number; measurementIntervalDays: number; controlFunctionName: string | null; dmpDocumentId: string | null;
+  /** Who last changed how it is measured, and when; null while the defaults stand. */
+  measuredBy: { name: string; at: string } | null;
 };
 
-export async function scopeConfig(projectId?: string): Promise<ScopeConfig | null> {
+/** How a project is measured: the share of clear documents it aims at, and how often it is checked. */
+export const MEASURE_KEY = "MEASURE";
+
+export async function scopeConfig(projectId?: string): Promise<ScopeConfig> {
   const { orgSettings, projectSettings } = await import("@/lib/settings/api");
   const { STANDARD_VERSION } = await import("@/lib/core/standard");
   const { getMe } = await import("@/lib/account/api");
   const [org, project, me] = await Promise.all([orgSettings(), projectId ? projectSettings(projectId) : Promise.resolve(new Map<string, string>()), getMe()]);
   let said: Partial<Omit<ScopeConfig, "effectiveDate"> & { effectiveDate: string }> = {};
-  let own: { scopeStatement?: string } = {};
+  let own: { scopeStatement?: string; name?: string } = {};
+  let measure: { integrityThreshold?: number; measurementIntervalDays?: number; by?: string; at?: string } = {};
   try { said = JSON.parse(org.get("SCOPE") ?? "{}"); } catch { said = {}; }
   try { own = JSON.parse(project.get("PROJECT_INFO") ?? "{}"); } catch { own = {}; }
-  if (!org.get("SCOPE") && !own.scopeStatement) return null;
+  try { measure = JSON.parse(project.get(MEASURE_KEY) ?? "{}"); } catch { measure = {}; }
+  const projectName = me?.projects.find((p) => p.id === projectId)?.name;
   return {
-    organizationName: said.organizationName ?? me?.tenant.name ?? "",
-    scopeStatement: own.scopeStatement ?? said.scopeStatement ?? "",
-    assessmentLevel: said.assessmentLevel ?? "Full",
+    organizationName: me?.tenant.name ?? said.organizationName ?? "",
+    scopeStatement: own.scopeStatement || said.scopeStatement || `All controlled information produced or received for ${projectName ?? "the project"}, in any medium.`,
     standardVersion: said.standardVersion ?? STANDARD_VERSION,
     effectiveDate: new Date(said.effectiveDate ?? Date.now()),
-    integrityThreshold: said.integrityThreshold ?? 95,
-    measurementIntervalDays: said.measurementIntervalDays ?? 30,
+    integrityThreshold: measure.integrityThreshold ?? said.integrityThreshold ?? 95,
+    measurementIntervalDays: measure.measurementIntervalDays ?? said.measurementIntervalDays ?? 30,
     controlFunctionName: said.controlFunctionName ?? null,
     dmpDocumentId: said.dmpDocumentId ?? null,
+    measuredBy: measure.by && measure.at ? { name: measure.by, at: measure.at } : null,
   };
 }

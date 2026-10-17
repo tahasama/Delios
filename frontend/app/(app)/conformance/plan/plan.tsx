@@ -15,10 +15,8 @@ import { PREVENTED } from "@/lib/conformance/checks/prevented";
  * the configuration that does it. The two cannot drift: change a scheme, a
  * route or a list, and the plan changes with it.
  *
- * Nothing here is editable. What an organization wants to say beyond what the
- * application knows — its cover page, its client's clauses, its own
- * conventions — belongs in the plan it uploads and registers, which this page
- * points at.
+ * Nothing here is editable, so it is not a setting: it is read under Assurance,
+ * beside the statement of conformance.
  */
 
 const PHASES: Phase[] = ["SETUP", "RUNNING", "HANDOVER"];
@@ -49,12 +47,12 @@ function Line({ label, children }: { label: string; children: React.ReactNode })
 import { adminFunctions, numberingForEditor, routesForEditor, orEmpty, scopeConfig } from "@/lib/settings/api-admin";
 import { backendDocument } from "@/lib/documents/api";
 
-export async function DocumentManagementPlan({ readiness }: { readiness: { title: string; done: boolean; todo: string }[] }) {
+export async function DocumentManagementPlan() {
   const ctx = await requireScope();
   const { project } = ctx;
 
   const [
-    scope, sets, schemes, routings, templates, distribution, exceptions, chosen, settings, names,
+    scope, sets, schemes, routings, templates, distribution, chosen, settings, names,
     controlHolders, statuses, outcomes, retention, criticality, native, rendition, preservation, dmpDoc,
   ] = await Promise.all([
     scopeConfig(ctx.projectId),
@@ -64,8 +62,6 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
     routesForEditor().then((all) => [...all].sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.name.localeCompare(b.name))),
     // Who receives what is the matrix's Receive rows.
     orEmpty(adminFunctions).then((all) => all.flatMap((f) => f.rules.filter((r) => r.verbs.includes("RECEIVE")))),
-    // Published exceptions to the standard are not kept by the backend yet.
-    Promise.resolve([] as { id: string; item: string; clauses: string; reason: string; authority: string; startDate: Date; reviewPoint: Date | null }[]),
     policies(ctx),
     controlSettings(ctx),
     stateNames(ctx),
@@ -78,12 +74,11 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
     getActiveSet("RENDITION_FORMATS"),
     getActiveSet("PRESERVATION_FORMATS"),
     scopeConfig(ctx.projectId).then(async (s) => {
-      const found = s?.dmpDocumentId ? await backendDocument(ctx, s.dmpDocumentId) : null;
+      const found = s.dmpDocumentId ? await backendDocument(ctx, s.dmpDocumentId) : null;
       return found ? { docNumber: found.number, title: found.title, latestRevValue: found.revisions.at(-1)?.value ?? null } : null;
     }),
   ]);
 
-  const outstanding = readiness.filter((r) => !r.done);
   // The lists a document is classified by, with the values each one holds.
   const classified = await Promise.all(
     ["DOCUMENT_TYPES", "DISCIPLINES", "DELIVERABLE_TYPES", "PHASES", "SUBPROJECTS"].map(async (key) => ({
@@ -98,9 +93,9 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
     <article className="print-sheet register register-sheet px-8 py-8 print:border-0 print:p-0 print:shadow-none">
       <header className="border-b border-line pb-4 text-center">
         <p className="stencil text-slate-500">Document management plan</p>
-        <h1 className="mt-2 text-xl font-semibold text-slate-900">{scope?.organizationName ?? "—"}</h1>
+        <h1 className="mt-2 text-xl font-semibold text-slate-900">{scope.organizationName}</h1>
         <p className="mt-0.5 text-xs text-slate-500">
-          {project.name} ({project.code}) · used since {scope ? fmtDate(scope.effectiveDate) : "—"} · printed {fmtDate(new Date())}
+          {project.name} ({project.code}) · printed {fmtDate(new Date())}
         </p>
         {dmpDoc ? (
           <p className="mt-1 text-[11px] text-slate-500">
@@ -110,13 +105,13 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
       </header>
 
       <Section n={1} title="What this plan covers">
-        <Line label="Scope">{scope?.scopeStatement ?? "Not stated."}</Line>
+        <Line label="Scope">{scope.scopeStatement}</Line>
         <Line label="Measured against">
-          {scope ? `${scope.integrityThreshold}% of documents carrying nothing critical or major, checked at least every ${scope.measurementIntervalDays} days` : "—"}
+          {`${scope.integrityThreshold}% of documents carrying nothing critical or major, checked at least every ${scope.measurementIntervalDays} days`}
         </Line>
         <Line label="Control function">
           {controlHolders.length
-            ? `${scope?.controlFunctionName ?? "The control function"} — ${controlHolders.map((h) => h.name).join(", ")}`
+            ? `${scope.controlFunctionName ?? "The control function"} — ${controlHolders.map((h) => h.name).join(", ")}`
             : "Nobody holds it: the people doing the work run the register themselves."}
         </Line>
         <Line label="Who carries each act">{PROJECT_MODE_LABEL[settings.projectMode]}</Line>
@@ -229,46 +224,13 @@ export async function DocumentManagementPlan({ readiness }: { readiness: { title
           </span>
         </Line>
         <Line label="Refused outright">{PREVENTED.length} conditions the application does not allow to arise</Line>
-        <Line label="Measured">{scope ? `At least every ${scope.measurementIntervalDays} days, against ${scope.integrityThreshold}%` : "—"}</Line>
-      </Section>
-
-      {exceptions.length ? (
-        <Section n={9} title="Agreed departures">
-          <ul className="space-y-1">
-            {exceptions.map((e) => (
-              <li key={e.id}>
-                <span className="font-medium">{e.item}</span>
-                <span className="block text-[11px] text-slate-500">
-                  {e.reason} — granted by {e.authority}, from {fmtDate(e.startDate)}
-                  {e.reviewPoint ? `, looked at again ${fmtDate(e.reviewPoint)}` : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
-
-      <Section n={exceptions.length ? 10 : 9} title="What is still to settle">
-        {outstanding.length ? (
-          <ul className="space-y-1">
-            {outstanding.map((r) => (
-              <li key={r.title}>
-                <span className="font-medium">{r.title}</span>
-                <span className="block text-[11px] text-slate-500">{r.todo}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>Nothing. Every list, matrix and rule this project runs on is published.</p>
-        )}
+        <Line label="Measured">{`At least every ${scope.measurementIntervalDays} days, against ${scope.integrityThreshold}%`}</Line>
       </Section>
 
       <p className="mt-7 border-t border-line pt-4 text-[11px] leading-5 text-slate-500">
         Every statement above is read from this project&rsquo;s own configuration at the moment of printing, not written by
         hand: change a scheme, a route or a list and this plan changes with it.
-        {dmpDoc
-          ? " The organization's own plan, with its cover and anything this application does not hold, is registered as the document named above."
-          : " An organization's own plan — its cover page, its client's clauses, its own conventions — is registered as a document and named on the settings screen."}
+        {dmpDoc ? " The organization's own plan, with its cover and anything this application does not hold, is registered as the document named above." : null}
       </p>
     </article>
   );

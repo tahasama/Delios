@@ -9,7 +9,7 @@ import { getActiveSet } from "@/lib/settings/config";
 import { SETUP_PAGES, SETUP_GROUPS, maySetup, mayChangeControlRoom, CONTROL_ROOM, type SetupPage } from "./setup-pages";
 import { families } from "@/lib/settings/families";
 import {
-  FolderKanban, Building2, Gauge, Tags, FileDigit, BadgeCheck, Users, Workflow, ScrollText, Layers, Route, ClipboardList, ArrowRight, KeyRound,
+  FolderKanban, Building2, Tags, FileDigit, BadgeCheck, Users, Workflow, ScrollText, Layers, Route, ClipboardList, ArrowRight, KeyRound,
   GitBranch, Gavel,
   type LucideIcon,
 } from "lucide-react";
@@ -24,7 +24,6 @@ export const metadata = { title: "Settings" };
 const ICON: Record<string, LucideIcon> = {
   "/settings/projects": FolderKanban,
   "/settings/parties": Building2,
-  "/settings/dmp": Gauge,
   "/settings/config": Tags,
   "/settings/families": Layers,
   "/settings/fields": ClipboardList,
@@ -87,7 +86,6 @@ export default async function AdminPage() {
   const figure: Record<string, { text: string; attention?: boolean }> = {
     "/settings/projects": { text: ctx.project.code },
     "/settings/parties": { text: `yours + ${plural(outside, "other")}` },
-    "/settings/dmp": { text: "written from these settings" },
     "/settings/config": emptyLists ? { text: `${plural(emptyLists, "essential list")} still empty`, attention: true } : { text: plural(sets, "list") },
     "/settings/families": { text: plural(familyList.length, "family", "families") },
     "/settings/flow": { text: `who does what on ${ctx.project.code}` },
