@@ -1198,6 +1198,10 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
   used, it is renamed or retired only, and anything else is a new value or a new list. The log keeps every change.
 - Only whoever acts as the control function on the project changes its lists; a project with none leaves it to
   whoever opened it, and nobody else.
+- A list holds sets. Each set names the deliverable types it serves; the default set serves every other type, so a
+  document always finds exactly one set of each list, and two sets switched on never serve the same type. This is how
+  supplier documents get their own document types, criticality levels or review outcomes without a second list.
+- A value, a set and a list of one's own are switched off rather than deleted once used: what carries them keeps them.
 
 ## Still open — decided in conversation, not yet built
 

@@ -28,6 +28,22 @@ internal sealed class ValueEntryConfiguration : IEntityTypeConfiguration<ValueEn
     }
 }
 
+/// <summary>Tells EF Core how to store <see cref="ValueSet"/>: one name per list, in the organization's lists and each project's.</summary>
+internal sealed class ValueSetConfiguration : IEntityTypeConfiguration<ValueSet>
+{
+    public void Configure(EntityTypeBuilder<ValueSet> b)
+    {
+        b.ToTable("value_sets");
+        b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.TenantId, x.ListKey, x.Name }).IsUnique().HasFilter("project_id IS NULL")
+            .HasDatabaseName("ix_value_sets_org_list_name");
+        b.HasIndex(x => new { x.TenantId, x.ProjectId, x.ListKey, x.Name }).IsUnique().HasFilter("project_id IS NOT NULL")
+            .HasDatabaseName("ix_value_sets_project_list_name");
+        b.Property(x => x.ListKey).HasMaxLength(64);
+        b.Property(x => x.Name).HasMaxLength(120);
+    }
+}
+
 /// <summary>Tells EF Core how to store <see cref="NumberingScheme"/>: unique name per tenant, fields kept as JSON in the row.</summary>
 internal sealed class NumberingSchemeConfiguration : IEntityTypeConfiguration<NumberingScheme>
 {

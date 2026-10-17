@@ -20,15 +20,18 @@ export const metadata = { title: "Types & sets" };
 /** A field as on the new-document form: grey, no box, inside a sheet's `asking` body. */
 const field = "plain w-full";
 
-/** Sets grouped by what they are for. Anything not listed falls under "Other". */
+/** Lists grouped by what they are for (as the backend, `ListRules`). A verdict list is in Review & issue; one of your own where it was put. */
+/** The groups a list of your own may go in: it is a document field. */
+const TAKES_LISTS = ["Numbering & identity", "Classification & keeping"];
 const GROUPS: { title: string; keys: string[] }[] = [
-  { title: "Numbering & identity", keys: ["PROJECT_CODES", "SUBPROJECTS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "SUPPLIER_CODES", "PURCHASE_ORDERS", "DELIVERABLE_TYPE_FIELDS", "PROJECT_KINDS"] },
+  { title: "Numbering & identity", keys: ["PROJECT_CODES", "SUBPROJECTS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "SUPPLIER_CODES", "PURCHASE_ORDERS", "DELIVERABLE_TYPE_FIELDS", "PROJECT_KINDS", "CONTRACT_ROLES", "GENERIC_TITLE_WORDS"] },
   // The comment lists sit together, with the outcomes they feed: one classifies
   // a comment somebody wrote, the other is what an advisory step's comments
   // amount to. Both are the organization's to edit.
-  { title: "Review & issue", keys: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES", "STATUSES", "REASONS_FOR_ISSUE", "RETURN_REASONS", "ISSUE_CODES"] },
+  { title: "Review & issue", keys: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES", "STATUSES", "REASONS_FOR_ISSUE", "RETURN_REASONS", "ISSUE_CODES", "CONTROL_OUTCOMES"] },
   { title: "Classification & keeping", keys: ["CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES", "PHASES"] },
   { title: "File formats", keys: ["NATIVE_FORMATS", "RENDITION_FORMATS", "PRESERVATION_FORMATS"] },
+  { title: "Schedule", keys: ["ACTIVITY_DECISIONS"] },
 ];
 
 /**
@@ -77,8 +80,9 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
   ]);
   const countOf = (key: string) => lists.sets.find((c) => c.key === key)?.active ?? 0;
   const headingOf = (one: (typeof sets)[number]) =>
-    one.group?.trim() || GROUPS.find((g) => g.keys.includes(one.key))?.title || "Other";
-  const headings = [...GROUPS.map((g) => g.title), ...sets.map(headingOf).filter((h) => !GROUPS.some((g) => g.title === h) && h !== "Other"), "Other"];
+    GROUPS.find((g) => g.keys.includes(one.key))?.title
+    ?? (one.kind === "VERDICTS" ? "Review & issue" : TAKES_LISTS.includes(one.group?.trim() ?? "") ? one.group!.trim() : "Classification & keeping");
+  const headings = GROUPS.map((g) => g.title);
   // Each group in the order its lists are listed above (Numbering & identity first), the rest by name.
   const rank = (one: (typeof sets)[number]) => { const at = GROUPS.find((g) => g.title === headingOf(one))?.keys.indexOf(one.key) ?? -1; return at < 0 ? 999 : at; };
   const groups: SetNavGroup[] = [...new Set(headings)]
@@ -118,7 +122,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
     return `/settings/config?${p}`;
   };
   const editing = sp.edit ? allValues.find((v) => v.id === sp.edit) ?? null : null;
-  const categories = [...new Set([...GROUPS.map((g) => g.title), ...sets.map((one) => one.group).filter((one): one is string => !!one)])];
+  const categories = TAKES_LISTS;
 
   return (
     <div className="space-y-4">
@@ -153,7 +157,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
               <Field label="Name" required><input name="title" required className={field} placeholder="Areas" /></Field>
               <Field label="Short name" required hint="capitals, no spaces (use _); fixed once a value is used"><input name="key" required pattern="[A-Z][A-Z0-9_]*" title="Capital letters, digits and _ only, e.g. AREAS" className={field} placeholder="AREAS" /></Field>
               <Field label="Group">
-                <select name="group" className={field} defaultValue=""><option value="">Other</option>{categories.map((title) => <option key={title} value={title}>{title}</option>)}</select>
+                <select name="group" className={field} defaultValue={categories[0]}>{categories.map((title) => <option key={title} value={title}>{title}</option>)}</select>
               </Field>
               <Field label="What it is for"><input name="description" className={field} /></Field>
             </div>
@@ -221,7 +225,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                         : <input name="newKey" defaultValue={set.key} pattern="[A-Z][A-Z0-9_]*" className={field} />}
                     </Field>
                     <Field label="Group">
-                      <select name="group" defaultValue={set.group ?? ""} className={field}><option value="">Other</option>{categories.map((title) => <option key={title} value={title}>{title}</option>)}</select>
+                      <select name="group" defaultValue={headingOf(set)} className={field}>{categories.map((title) => <option key={title} value={title}>{title}</option>)}</select>
                     </Field>
                     <Field label="What it is for"><input name="description" defaultValue={set.description ?? ""} className={field} /></Field>
                   </div>
@@ -284,7 +288,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                               : <span className="text-slate-600">{where.join(" · ")}</span>
                           ) : <span className="text-slate-400">never used</span>}
                         </Td>
-                        <Td className="whitespace-nowrap">{v.status === "ACTIVE" ? <ToneChip tone="done">in use</ToneChip> : <ToneChip tone="idle">retired</ToneChip>}</Td>
+                        <Td className="whitespace-nowrap">{v.status === "ACTIVE" ? <ToneChip tone="done">in use</ToneChip> : v.status === "OFF" ? <ToneChip tone="idle">its set is off</ToneChip> : <ToneChip tone="idle">retired</ToneChip>}</Td>
                         {may ? (
                           <Td className="w-px whitespace-nowrap text-right">
                             <Link href={`${here({ edit: open ? undefined : v.id, panel: undefined })}#value-${index}-line`} scroll={false} className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title={open ? "Close" : `Change ${v.code}`}>
@@ -312,7 +316,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                               <Link href={here({ edit: undefined })} className="font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
                               <form action={retireValueAction}>
                                 <input type="hidden" name="valueId" value={v.id} />
-                                <button className="font-semibold text-slate-500 hover:text-slate-800">{v.status === "ACTIVE" ? "Retire" : "Bring back"}</button>
+                                <button className="font-semibold text-slate-500 hover:text-slate-800">{v.status !== "RETIRED" ? "Retire" : "Bring back"}</button>
                               </form>
                               {!isUsed ? (
                                 <ActionForm action={deleteValueAction} hidden={{ valueId: v.id }} hideSubmit className="space-y-0"

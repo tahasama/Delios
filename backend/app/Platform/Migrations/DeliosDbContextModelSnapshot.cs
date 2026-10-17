@@ -1915,6 +1915,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("props");
 
+                    b.Property<Guid?>("SetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("set_id");
+
                     b.Property<string>("SetKey")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -1949,6 +1953,65 @@ namespace Delios.Host.Platform.Migrations
                         .HasFilter("project_id IS NOT NULL");
 
                     b.ToTable("value_entries", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Documents.ValueSet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.PrimitiveCollection<string[]>("DeliverableTypes")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("deliverable_types");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<string>("ListKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("list_key");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_value_sets");
+
+                    b.HasIndex("TenantId", "ListKey", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_value_sets_org_list_name")
+                        .HasFilter("project_id IS NULL");
+
+                    b.HasIndex("TenantId", "ProjectId", "ListKey", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_value_sets_project_list_name")
+                        .HasFilter("project_id IS NOT NULL");
+
+                    b.ToTable("value_sets", (string)null);
                 });
 
             modelBuilder.Entity("Delios.Host.Extraction.FileText", b =>
@@ -6524,6 +6587,16 @@ namespace Delios.Host.Platform.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_value_entries_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Delios.Host.Documents.ValueSet", b =>
+                {
+                    b.HasOne("Delios.Host.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_value_sets_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Delios.Host.Extraction.FileText", b =>

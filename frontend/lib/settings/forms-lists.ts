@@ -76,7 +76,7 @@ export async function retireValueAction(formData: FormData) {
   const { setKey, code } = valueRef(text(formData, "valueId"));
   const value = (await getSet(setKey)).find((one) => one.code === code);
   if (!value) return;
-  await putValue(ctx.projectId, setKey, { code, status: value.status === "ACTIVE" ? "RETIRED" : "ACTIVE" }).catch(() => undefined);
+  await putValue(ctx.projectId, setKey, { code, status: value.status === "RETIRED" ? "ACTIVE" : "RETIRED" }).catch(() => undefined);
   done();
 }
 

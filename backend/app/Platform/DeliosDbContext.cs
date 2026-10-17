@@ -40,6 +40,7 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     public DbSet<ValueEntry> ValueEntries => Set<ValueEntry>();
+    public DbSet<ValueSet> ListSets => Set<ValueSet>();
     public DbSet<NumberingScheme> NumberingSchemes => Set<NumberingScheme>();
     public DbSet<SchemeRouting> SchemeRoutings => Set<SchemeRouting>();
     public DbSet<NumberCounter> NumberCounters => Set<NumberCounter>();
@@ -111,6 +112,7 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DeliosDbContext).Assembly);
         // A list is read as the project in hand sees it: its own copy, else the organization's.
         modelBuilder.Entity<ValueEntry>().HasQueryFilter(v => ListsOwn ? v.ProjectId == ListsProject : v.ProjectId == null);
+        modelBuilder.Entity<ValueSet>().HasQueryFilter(v => ListsOwn ? v.ProjectId == ListsProject : v.ProjectId == null);
 
         // Every Guid id is made in code (Guid.CreateVersion7), never by the database.
         // Saying so lets a new row reached through a navigation be inserted rather

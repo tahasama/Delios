@@ -17,10 +17,16 @@ public sealed class ValueEntry
     /// (<see cref="Identity.Project.OwnLists"/>), which later changes to the organization's never touch.
     /// </summary>
     public Guid? ProjectId { get; set; }
+    /// <summary>The list it belongs to (disciplines, criticality…). Its code is unique across every set of that list.</summary>
     public required string SetKey { get; set; }
+    /// <summary>The set of its list it is in (<see cref="ValueSet"/>); none: the list's default set.</summary>
+    public Guid? SetId { get; set; }
     public required string Code { get; set; }
     public required string Label { get; set; }
-    /// <summary><c>ACTIVE</c> or <c>RETIRED</c>; see <see cref="ValueStatus"/>. Retired values stay on old documents but cannot be chosen.</summary>
+    /// <summary>
+    /// <c>ACTIVE</c>, <c>RETIRED</c> or <c>OFF</c>; see <see cref="ValueStatus"/>. Only an active value is offered; retired and
+    /// off values stay on what carries them.
+    /// </summary>
     public string Status { get; set; } = ValueStatus.Active;
     /// <summary>Display order within its set; lower comes first.</summary>
     public int Sort { get; set; }
@@ -33,6 +39,31 @@ public static class ValueStatus
 {
     public const string Active = "ACTIVE";
     public const string Retired = "RETIRED";
+    /// <summary>Active itself, but its set or its list is switched off: not offered until that is switched on again.</summary>
+    public const string Off = "OFF";
+}
+
+/// <summary>
+/// One set of a list's values (owner, Types &amp; sets): a list holds one or more sets, each serving the deliverable types it
+/// names. The default set serves every deliverable type no other active set names, so a document always finds exactly one
+/// set of each list; a list with one set uses it for every type. Two active sets of a list never serve the same type.
+/// </summary>
+public sealed class ValueSet
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid TenantId { get; set; }
+    /// <summary>As <see cref="ValueEntry.ProjectId"/>: the project's own copy, or none for the organization's.</summary>
+    public Guid? ProjectId { get; set; }
+    /// <summary>The list it belongs to, as <see cref="ValueEntry.SetKey"/>.</summary>
+    public required string ListKey { get; set; }
+    /// <summary>What people call it ("Default", "Clients criticality"); renamed at will.</summary>
+    public required string Name { get; set; }
+    /// <summary>The deliverable types it serves; the default set names none (it serves the rest).</summary>
+    public string[] DeliverableTypes { get; set; } = [];
+    public bool IsDefault { get; set; }
+    /// <summary>Switched off: its values are not offered (they read <see cref="ValueStatus.Off"/>); it stays on what carries them.</summary>
+    public bool Active { get; set; } = true;
+    public int Sort { get; set; }
 }
 
 /// <summary>The keys of the value lists the organization controls, as stored in <see cref="ValueEntry.SetKey"/>.</summary>

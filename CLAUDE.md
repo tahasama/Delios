@@ -496,6 +496,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   used: renamed or retired only (backend VALUE_IN_USE); anything else is a new value or a new list. A list the app
   runs on is never deleted. Verdict lists (Settings → Verdict lists) and Project codes (filled by itself) read only
   there. The "Used" column says where each value is used, or "never used".
+- **List → sets → values** (owner, Types & sets; `ListRules`, `ValueSet`, `ValueEntry.SetId`): a list holds sets, each
+  naming the deliverable types it serves; the **default** set (renamed at will, never switched off nor deleted:
+  DEFAULT_SET_STAYS) serves every type no other active set names, so a document always finds exactly one set (a list
+  with one set uses it). Two active sets of a list never serve the same type (SETS_OVERLAP). A code is unique across all
+  sets of its list. Deliverable types, Project codes, Project types and Contract roles hold one set (ONE_SET_ONLY).
+  A value, a set and a list of one's own are switched off and on (a value then reads OFF: not offered, kept on what
+  carries it); the app's lists are not switched here, their field is left out in Forms & fields (APP_LIST_STAYS). Never
+  used: a value or a set is deleted (SET_IN_USE otherwise); a list only if it is one's own (the app's stay).
+- Groups (`ListRules.Groups`): Numbering & identity, Classification & keeping, Review & issue, File formats, Schedule
+  (no "Other": activity decisions in Schedule, control outcomes in Review & issue, generic title words in Numbering &
+  identity). A list of one's own is a document field and goes only in the first two (LIST_NOT_HERE); in Numbering &
+  identity it may also go into the numbering. Project codes are used by every document of their project.
 - **Organizations, two levels** (owner): Settings → Organizations is the **project's**: one field to find an organization,
   always there (our list first, then any DELIOS knows; choosing it adds it to the project), and beside it one button
   "Create an organization" that opens the form (guests, or not on DELIOS). No two-button steps, no project code repeated on
