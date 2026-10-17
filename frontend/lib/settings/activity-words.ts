@@ -179,6 +179,8 @@ const WORDS: Record<string, string> = {
   DOMAIN_LINK_SENT: "Sent the link to prove our domain",
   DOMAIN_CONFIRMED: "Proved our email domain",
   ORGANIZATION_CLAIMED: "Claimed an entry others made for us",
+  CLAIM_VOUCHED: "Vouched for an organization's claim",
+  CLAIM_REFUSED: "Refused an organization's claim",
   MERGE_ASKED: "Asked for two organizations to be merged",
   MERGE_AGREED: "Agreed to a merge",
   MERGE_REFUSED: "Refused a merge",

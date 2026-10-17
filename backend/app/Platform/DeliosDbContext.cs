@@ -70,6 +70,7 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Organizations.OrganizationIdentity> OrganizationIdentities => Set<Organizations.OrganizationIdentity>();
     public DbSet<Organizations.OrganizationHolder> OrganizationHolders => Set<Organizations.OrganizationHolder>();
     public DbSet<Organizations.OrganizationMerge> OrganizationMerges => Set<Organizations.OrganizationMerge>();
+    public DbSet<Organizations.OrganizationClaim> OrganizationClaims => Set<Organizations.OrganizationClaim>();
 
     public DbSet<Packages.Package> Packages => Set<Packages.Package>();
     public DbSet<Search.SearchWatermark> SearchWatermarks => Set<Search.SearchWatermark>();

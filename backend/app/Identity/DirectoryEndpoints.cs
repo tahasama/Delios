@@ -205,7 +205,8 @@ public static class DirectoryEndpoints
                 ProjectName = m.Project.Name,
                 m.FunctionId,
                 FunctionCode = m.Function!.Code,
-                FunctionName = m.Function.Name,
+                // A linked account reads in its own organization's words: "ACME / Lead Engineer".
+                FunctionName = u.HomeFunction != null ? $"{u.Party?.Code} / {u.HomeFunction}" : m.Function.Name,
                 m.Department,
                 m.Active,
                 PendingSince = m.PendingSince?.ToDateTimeOffset(),

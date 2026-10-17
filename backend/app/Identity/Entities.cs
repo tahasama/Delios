@@ -136,6 +136,11 @@ public sealed class User
     /// them on our projects (see <c>Organizations.AccountLink</c>). It has no password of its own and no sign-in name.
     /// </summary>
     public Guid? HomeTenantId { get; set; }
+    /// <summary>
+    /// A linked account's function in its own organization, as its organization names it: shown as "ACME / Lead
+    /// Engineer", never confused with ours. What it may do here comes from its organization's role with us.
+    /// </summary>
+    public string? HomeFunction { get; set; }
     public Party? Party { get; set; }
     /// <summary>False stops the person signing in and ends their sessions, without deleting anything.</summary>
     public bool Active { get; set; } = true;

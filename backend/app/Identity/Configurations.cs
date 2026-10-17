@@ -44,6 +44,11 @@ internal sealed class IdentityProviderConfiguration : IEntityTypeConfiguration<I
 /// <summary>
 /// Database mapping for parties (companies taking part in projects): the code is unique within a tenant. Picked up by <c>DeliosDbContext</c>.
 /// </summary>
+internal sealed class UserHomeFunctionConfiguration : IEntityTypeConfiguration<User>
+{
+    public void Configure(EntityTypeBuilder<User> b) => b.Property(x => x.HomeFunction).HasMaxLength(200);
+}
+
 internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
 {
     /// <summary>Called by Entity Framework Core when it builds the model, to set up the <c>Party</c> table.</summary>

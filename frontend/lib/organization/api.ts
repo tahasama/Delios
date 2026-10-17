@@ -60,8 +60,15 @@ export type OwnIdentity = {
 export const ownIdentity = cache(async (): Promise<OwnIdentity | null> => api<OwnIdentity>("/api/organization/identity").catch(() => null));
 
 /** Entries other organizations made for us before we came onto DELIOS, at the domain we proved: each can be claimed. */
-export type Claims = { domain: string | null; entries: { id: string; code: string; name: string; identifier: string | null; lists: number }[] };
-export const claims = cache(async (): Promise<Claims> => api<Claims>("/api/organization/claims").catch(() => ({ domain: null, entries: [] })));
+export type Claims = {
+  /** Entries others made that look like us, each with where our claim on it stands. */
+  candidates: { id: string; code: string; name: string; why: string;
+    claim: { id: string; state: "WAITING" | "CONFIRMED" | "REFUSED"; method: "GUEST_EMAIL" | "VOUCH"; sentTo: string | null; refusedWhy: string | null } | null }[];
+  /** Claims on entries we made, waiting for us to vouch. */
+  incoming: { id: string; claimedByName: string; createdAt: string;
+    entry: { code: string; name: string } | null; claimer: { code: string; name: string; identifier: string | null; domain: string | null } | null }[];
+};
+export const claims = cache(async (): Promise<Claims> => api<Claims>("/api/organization/claims").catch(() => ({ candidates: [], incoming: [] })));
 
 /** Merges asked by us or waiting on us. */
 export type MergeView = {

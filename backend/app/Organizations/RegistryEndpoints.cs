@@ -43,11 +43,14 @@ public static class RegistryEndpoints
         admins.MapPost("/domain", SendDomainLinkAsync);
         admins.MapGet("/claims", ClaimsAsync);
         admins.MapPost("/claims/{identityId:guid}", ClaimAsync);
+        admins.MapPost("/claims/incoming/{claimId:guid}/vouch", VouchAsync);
+        admins.MapPost("/claims/incoming/{claimId:guid}/refuse", RefuseClaimAsync);
         admins.MapGet("/merges", MergesAsync);
         admins.MapPost("/merges/{mergeId:guid}/agree", AgreeAsync);
         admins.MapPost("/merges/{mergeId:guid}/refuse", RefuseAsync);
 
         app.MapPost("/api/auth/confirm-domain", ConfirmDomainAsync).WithTags("Auth").AllowAnonymous().RequireRateLimiting("sign-in");
+        app.MapPost("/api/auth/confirm-claim", ConfirmClaimAsync).WithTags("Auth").AllowAnonymous().RequireRateLimiting("sign-in");
     }
 
     private static ITimeLimitedDataProtector Links(IDataProtectionProvider protection) =>
@@ -171,39 +174,151 @@ public static class RegistryEndpoints
         return Results.Ok(new { domain = parts[1], organization = o.Name });
     }
 
+    private static ITimeLimitedDataProtector ClaimLinks(IDataProtectionProvider protection) =>
+        protection.CreateProtector("delios.organization.claim").ToTimeLimitedDataProtector();
+
     /// <summary>
-    /// <c>GET /api/organization/claims</c>: entries other organizations made for us before we came onto DELIOS (as a
-    /// guest or not on DELIOS), at the domain we proved: each can be claimed, and becomes us.
+    /// <c>GET /api/organization/claims</c>: the entries others made that look like us (same identifier, domain, or a
+    /// name that reads the same) and are not on DELIOS themselves, each with where our claim on it stands; and the claims
+    /// on entries we made, waiting for us to vouch.
     /// </summary>
     private static async Task<IResult> ClaimsAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
     {
-        var o = await OwnAsync(db, http.User.TenantId(), cancellationToken);
-        if (o?.Domain is null || o.DomainConfirmedAt is null) return Results.Ok(new { domain = (string?)null, entries = Array.Empty<object>() });
-        var entries = await db.OrganizationIdentities.AsNoTracking()
-            .Where(x => x.TenantId == null && x.MergedIntoId == null && x.Domain == o.Domain).ToListAsync(cancellationToken);
-        var ids = entries.Select(e => e.Id).ToList();
-        var lists = await db.OrganizationHolders.AsNoTracking().Where(h => ids.Contains(h.OrganizationId))
-            .GroupBy(h => h.OrganizationId).Select(g => new { g.Key, Count = g.Select(h => h.TenantId).Distinct().Count() }).ToListAsync(cancellationToken);
+        var me = http.User.TenantId();
+        var o = await OwnAsync(db, me, cancellationToken);
+        if (o is null) return Results.Ok(new { candidates = Array.Empty<object>(), incoming = Array.Empty<object>() });
+        var identifier = o.IdentifierNumber is null ? null : Registry.IdentifierValue(o.Country ?? "", o.IdentifierKind ?? "", o.IdentifierNumber);
+        var alike = (await Registry.LookalikesAsync(db, o.Name, identifier, o.DomainConfirmedAt is null ? null : o.Domain, cancellationToken))
+            .Where(l => !l.OnDelios && l.Id != o.Id).ToList();
+        var ids = alike.Select(l => l.Id).ToList();
+        var mine = await db.OrganizationClaims.AsNoTracking().Where(c => c.ClaimerTenantId == me && ids.Contains(c.EntryId))
+            .OrderByDescending(c => c.CreatedAt).ToListAsync(cancellationToken);
+        var incoming = await db.OrganizationClaims.AsNoTracking()
+            .Where(c => c.MakerTenantId == me && c.Method == ClaimMethods.Vouch && c.State == ClaimStates.Waiting).ToListAsync(cancellationToken);
+        var names = await db.OrganizationIdentities.AsNoTracking()
+            .Where(x => incoming.Select(c => c.EntryId).Contains(x.Id) || incoming.Select(c => c.ClaimerIdentityId).Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => new { x.Code, x.Name, Identifier = x.IdentifierShown, x.Domain }, cancellationToken);
         return Results.Ok(new
         {
-            o.Domain,
-            entries = entries.Select(e => new { e.Id, e.Code, e.Name, Identifier = e.IdentifierShown, Lists = lists.FirstOrDefault(l => l.Key == e.Id)?.Count ?? 0 }),
+            candidates = alike.Select(l =>
+            {
+                var claim = mine.FirstOrDefault(c => c.EntryId == l.Id);
+                return new { l.Id, l.Code, l.Name, l.Why, Claim = claim is null ? null : new { claim.Id, claim.State, claim.Method, claim.SentTo, claim.RefusedWhy } };
+            }),
+            incoming = incoming.Select(c => new
+            {
+                c.Id, c.ClaimedByName, CreatedAt = c.CreatedAt.ToDateTimeOffset(),
+                Entry = names.GetValueOrDefault(c.EntryId), Claimer = names.GetValueOrDefault(c.ClaimerIdentityId),
+            }),
         });
     }
 
-    /// <summary><c>POST /api/organization/claims/{id}</c>: that entry is us: it is folded into our organization, our code and name kept.</summary>
+    /// <summary>
+    /// <c>POST /api/organization/claims/{id}</c>: that entry is us. Nothing passes yet: the guest account that stood for
+    /// it is sent a link to confirm; with no guest, the organization that made it is asked to vouch.
+    /// </summary>
     private static async Task<IResult> ClaimAsync(Guid identityId, HttpContext http, DeliosDbContext db, IServiceScopeFactory scopes, AuditLog audit,
+        Notifier notifier, IDataProtectionProvider protection, CancellationToken cancellationToken)
+    {
+        var me = http.User.TenantId();
+        var o = await OwnAsync(db, me, cancellationToken);
+        var entry = await db.OrganizationIdentities.SingleOrDefaultAsync(x => x.Id == identityId && x.MergedIntoId == null, cancellationToken);
+        if (o is null || entry is null || entry.TenantId is not null) return Problems.NotFound("NOT_FOUND", "No such entry to claim.");
+        if (await db.OrganizationClaims.AnyAsync(c => c.EntryId == entry.Id && c.ClaimerTenantId == me && c.State == ClaimStates.Waiting, cancellationToken))
+            return Problems.Conflict("ALREADY_ASKED", "Our claim on it is already waiting.");
+        var actor = await ActorAsync(http, db, cancellationToken);
+        var maker = entry.CreatedByTenantId;
+        // The guest that stood for it, in the data of the organization that made it.
+        var guest = maker is { } m ? await TenantScope.RunAsync(scopes, m, async (_, there) =>
+        {
+            var partyIds = await there.Parties.AsNoTracking().Where(p => p.OrganizationId == entry.Id).Select(p => p.Id).ToListAsync(cancellationToken);
+            return await there.Users.AsNoTracking().Where(u => u.PartyId != null && partyIds.Contains(u.PartyId.Value) && u.Active && u.HomeTenantId == null)
+                .OrderBy(u => u.Name).Select(u => new { u.Email, u.Name }).FirstOrDefaultAsync(cancellationToken);
+        }, cancellationToken) : null;
+        var claim = new OrganizationClaim
+        {
+            EntryId = entry.Id, ClaimerTenantId = me, ClaimerIdentityId = o.Id, ClaimedByName = actor.Name, MakerTenantId = maker,
+            Method = guest is null ? ClaimMethods.Vouch : ClaimMethods.GuestEmail, SentTo = guest?.Email,
+            CreatedAt = SystemClock.Instance.GetCurrentInstant(),
+        };
+        db.OrganizationClaims.Add(claim);
+        if (guest is not null)
+        {
+            var token = ClaimLinks(protection).Protect(claim.Id.ToString("N"), TimeSpan.FromDays(7));
+            notifier.Queue(me, null, EmailKinds.Account, guest.Email, guest.Name, $"Is {o.Name} the organization you stood for as {entry.Name}?",
+                $"{o.Name} says it is {entry.Name} ({entry.Code}), the organization you stood for on DELIOS. If it is, open this link within seven days:\n\n"
+                + $"{notifier.Url($"/confirm-claim?token={Uri.EscapeDataString(token)}")}\n\nIf it is not, ignore this email: nothing passes without it.",
+                "Organization", entry.Id);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        if (guest is null && maker is { } makerTenant)
+            await TellAdminsAsync(scopes, makerTenant, $"{o.Name} says it is {entry.Name}",
+                $"{o.Name} ({o.Code}) on DELIOS says it is {entry.Name} ({entry.Code}), which you recorded. Vouch for it, or refuse with why, on your organization's page.",
+                cancellationToken);
+        await audit.WriteAsync(actor, "ORGANIZATION_CLAIMED", "Organization", entry.Id, entry.Name,
+            guest is null ? $"Claimed {entry.Name}: the organization that recorded it is asked to vouch." : $"Claimed {entry.Name}: a link went to its guest, {guest.Email}.",
+            cancellationToken: cancellationToken);
+        return Results.Ok(new { claim.Id, claim.Method, claim.SentTo });
+    }
+
+    /// <summary>A claim confirmed: the entry becomes the claimer, under its own code and name, in every list holding it.</summary>
+    private static async Task CompleteClaimAsync(DeliosDbContext db, IServiceScopeFactory scopes, OrganizationClaim claim, string by, CancellationToken cancellationToken)
+    {
+        var keep = await db.OrganizationIdentities.SingleAsync(x => x.Id == claim.ClaimerIdentityId, cancellationToken);
+        var entry = await db.OrganizationIdentities.SingleAsync(x => x.Id == claim.EntryId, cancellationToken);
+        claim.State = ClaimStates.Confirmed;
+        claim.AnsweredAt = SystemClock.Instance.GetCurrentInstant();
+        claim.AnsweredByName = by;
+        if (entry.MergedIntoId is null) await Registry.MergeAsync(db, scopes, keep, entry, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary><c>POST /api/auth/confirm-claim</c>: the guest who stood for the entry opened the link: it is them.</summary>
+    private static async Task<IResult> ConfirmClaimAsync(DomainTokenRequest request, DeliosDbContext db, IServiceScopeFactory scopes,
+        IDataProtectionProvider protection, CancellationToken cancellationToken)
+    {
+        var invalid = Problems.Problem(StatusCodes.Status400BadRequest, "CLAIM_LINK_INVALID", "This link has expired, or was answered already.", null);
+        Guid claimId;
+        try { claimId = Guid.ParseExact(ClaimLinks(protection).Unprotect(request.Token ?? ""), "N"); }
+        catch (Exception e) when (e is CryptographicException or FormatException) { return invalid; }
+        var claim = await db.OrganizationClaims.SingleOrDefaultAsync(c => c.Id == claimId && c.State == ClaimStates.Waiting, cancellationToken);
+        if (claim is null) return invalid;
+        await CompleteClaimAsync(db, scopes, claim, claim.SentTo ?? "its guest", cancellationToken);
+        var name = await db.OrganizationIdentities.Where(x => x.Id == claim.ClaimerIdentityId).Select(x => x.Name).SingleAsync(cancellationToken);
+        return Results.Ok(new { organization = name });
+    }
+
+    /// <summary><c>POST /api/organization/claims/incoming/{id}/vouch</c>: we made the entry, and vouch that the claimer is it.</summary>
+    private static async Task<IResult> VouchAsync(Guid claimId, HttpContext http, DeliosDbContext db, IServiceScopeFactory scopes, AuditLog audit,
         CancellationToken cancellationToken)
     {
-        var o = await OwnAsync(db, http.User.TenantId(), cancellationToken);
-        var entry = await db.OrganizationIdentities.SingleOrDefaultAsync(x => x.Id == identityId && x.MergedIntoId == null, cancellationToken);
-        if (o is null || entry is null) return Problems.NotFound("NOT_FOUND", "No such entry.");
-        if (entry.TenantId is not null || o.DomainConfirmedAt is null || entry.Domain != o.Domain)
-            return Problems.Forbidden("NOT_YOURS", $"{entry.Name} is not at the domain we proved: ask for a merge instead.");
-        await Registry.MergeAsync(db, scopes, o, entry, cancellationToken);
+        var me = http.User.TenantId();
+        var claim = await db.OrganizationClaims.SingleOrDefaultAsync(c => c.Id == claimId && c.MakerTenantId == me && c.State == ClaimStates.Waiting, cancellationToken);
+        if (claim is null) return Problems.NotFound("NOT_FOUND", "No such claim waiting on us.");
+        var actor = await ActorAsync(http, db, cancellationToken);
+        await CompleteClaimAsync(db, scopes, claim, actor.Name, cancellationToken);
+        await audit.WriteAsync(actor, "CLAIM_VOUCHED", "Organization", claim.EntryId, claim.ClaimedByName, "Vouched: the claimer is the organization we recorded.",
+            cancellationToken: cancellationToken);
+        return Results.NoContent();
+    }
+
+    /// <summary><c>POST /api/organization/claims/incoming/{id}/refuse</c>: it is not them, with why; nothing passes.</summary>
+    private static async Task<IResult> RefuseClaimAsync(Guid claimId, NoteRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        IServiceScopeFactory scopes, CancellationToken cancellationToken)
+    {
+        var me = http.User.TenantId();
+        var why = request.Note?.Trim();
+        if (string.IsNullOrEmpty(why)) return Problems.Invalid("WHY_REQUIRED", "Say why it is not them.", new { field = "note" });
+        var claim = await db.OrganizationClaims.SingleOrDefaultAsync(c => c.Id == claimId && c.MakerTenantId == me && c.State == ClaimStates.Waiting, cancellationToken);
+        if (claim is null) return Problems.NotFound("NOT_FOUND", "No such claim waiting on us.");
+        var actor = await ActorAsync(http, db, cancellationToken);
+        claim.State = ClaimStates.Refused;
+        claim.RefusedWhy = why;
+        claim.AnsweredAt = SystemClock.Instance.GetCurrentInstant();
+        claim.AnsweredByName = actor.Name;
         await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "ORGANIZATION_CLAIMED", "Organization", o.Id, o.Name,
-            $"Claimed {entry.Name} ({entry.Code}), made by another organization at {entry.Domain}: it is us now.", cancellationToken: cancellationToken);
+        await audit.WriteAsync(actor, "CLAIM_REFUSED", "Organization", claim.EntryId, claim.ClaimedByName, $"Refused: {why}", cancellationToken: cancellationToken);
+        await TellAdminsAsync(scopes, claim.ClaimerTenantId, "Your claim was refused", $"{actor.Name} refused your claim: {why}", cancellationToken);
         return Results.NoContent();
     }
 

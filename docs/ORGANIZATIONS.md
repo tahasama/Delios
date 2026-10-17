@@ -97,6 +97,12 @@ for it at that domain. Duplicates are merged: asked with why, agreed by each sid
 (`merge-organizations`); the merged one's values stay reserved and point to the one kept, and a list that held both keeps
 both lines. Asking for someone of an organization on DELIOS brings that organization onto the project.
 
+A claim (an organization on DELIOS saying an entry others recorded is it) passes nothing until it is confirmed: by the
+guest who stood for that entry, through a link sent to their email; or, with no guest, by the organization that recorded
+it, which vouches or refuses with why. People of another organization keep their own function, shown with their company
+("ACME / Lead Engineer"); what they may do here follows their organization's role with us. A guest organization has one
+account.
+
 Not yet joined up by itself: a collaborator linked under a code other than its own (merge them).
 
 ## Our role in a project

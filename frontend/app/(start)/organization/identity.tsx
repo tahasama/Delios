@@ -3,12 +3,13 @@ import { Card, Field, inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
 import { COUNTRIES, IDENTIFIER_KINDS, countryName } from "@/lib/organization/countries";
 import type { Claims, MergeView, OwnIdentity } from "@/lib/organization/api";
-import { saveOwnIdentityAction, sendDomainLinkAction, claimAction, answerMergeAction } from "@/lib/organization/forms";
+import { saveOwnIdentityAction, sendDomainLinkAction, claimAction, answerMergeAction, answerClaimAction } from "@/lib/organization/forms";
 
 /**
  * Who we are on DELIOS: our code and name (one of each everywhere), our identifier with its country (changed once at
- * most) or why we have none, and the email domain we proved by a link to an address there. Proven, we claim the
- * entries others made for us before we came onto DELIOS. And the merges asked of us, agreed or refused with why.
+ * most) or why we have none, and the email domain we proved by a link to an address there. We claim the entries others
+ * made for us before we came onto DELIOS (confirmed by the guest that stood for it, or vouched for by whoever recorded
+ * it), and vouch for claims on entries we recorded. And the merges asked of us, agreed or refused with why.
  */
 export function WhoWeAre({ own, claimable, mergeList }: { own: OwnIdentity | null; claimable: Claims; mergeList: MergeView[] }) {
   if (!own) return null;
@@ -75,16 +76,50 @@ export function WhoWeAre({ own, claimable, mergeList }: { own: OwnIdentity | nul
           </div>
         </div>
 
-        {claimable.entries.length ? (
+        {claimable.candidates.length ? (
           <div className="space-y-2 border-t border-line pt-3">
-            <p className="text-xs font-semibold text-slate-700">Made for us by others, at {claimable.domain}</p>
+            <p className="text-xs font-semibold text-slate-700">Recorded by others, and looking like us</p>
+            <p className="text-[11px] text-slate-500">
+              Claim one that is us. The guest who stood for it confirms by a link sent to their email; with no guest, the organization that recorded it
+              vouches. Until then nothing passes.
+            </p>
             <ul className="divide-y divide-line">
-              {claimable.entries.map((e) => (
+              {claimable.candidates.map((e) => (
                 <li key={e.id} className="flex flex-wrap items-center gap-2 py-2 text-xs">
                   <span className="font-mono font-semibold">{e.code}</span> {e.name}
-                  <span className="text-slate-500">{[e.identifier, `in ${e.lists} organization${e.lists === 1 ? "" : "s"}' list${e.lists === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}</span>
-                  <ActionForm action={claimAction} submitLabel="It is us: claim it" size="sm" variant="secondary" hidden={{ identityId: e.id }}
-                    className="ml-auto space-y-0" confirmText={`${e.name} becomes us, under our code and name, in every list that holds it. Go ahead?`} />
+                  <span className="text-slate-500">{e.why}</span>
+                  {e.claim?.state === "WAITING" ? (
+                    <span className="ml-auto text-slate-600">{e.claim.method === "GUEST_EMAIL" ? `waiting for ${e.claim.sentTo} to confirm` : "waiting for the organization that recorded it to vouch"}</span>
+                  ) : e.claim?.state === "CONFIRMED" ? (
+                    <span className="ml-auto text-emerald-700">confirmed: it is us</span>
+                  ) : (
+                    <>
+                      {e.claim?.state === "REFUSED" ? <span className="text-red-700">refused: {e.claim.refusedWhy}</span> : null}
+                      <ActionForm action={claimAction} submitLabel="It is us: claim it" size="sm" variant="secondary" hidden={{ identityId: e.id }} className="ml-auto space-y-0" />
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {claimable.incoming.length ? (
+          <div className="space-y-2 border-t border-line pt-3">
+            <p className="text-xs font-semibold text-slate-700">Claims on organizations we recorded · {claimable.incoming.length} waiting for us to vouch</p>
+            <ul className="divide-y divide-line">
+              {claimable.incoming.map((c) => (
+                <li key={c.id} className="space-y-2 py-2 text-xs">
+                  <p className="text-slate-700">
+                    <span className="font-semibold">{c.claimer?.name}</span> ({c.claimer?.code}) on DELIOS says it is <span className="font-semibold">{c.entry?.name}</span> ({c.entry?.code}), which we recorded.
+                    <span className="block text-[11px] text-slate-500">{[c.claimer?.identifier, c.claimer?.domain, `asked by ${c.claimedByName}, ${fmtDate(c.createdAt)}`].filter(Boolean).join(" · ")}</span>
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <ActionForm action={answerClaimAction} submitLabel="Vouch: it is them" size="sm" hidden={{ claimId: c.id, answer: "vouch" }} />
+                    <ActionForm action={answerClaimAction} submitLabel="Refuse" size="sm" variant="secondary" hidden={{ claimId: c.id, answer: "refuse" }}>
+                      <Field label="Why it is not them" required><input name="note" required className={inputCls} /></Field>
+                    </ActionForm>
+                  </div>
                 </li>
               ))}
             </ul>

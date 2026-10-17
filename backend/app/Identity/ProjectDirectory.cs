@@ -38,11 +38,15 @@ public static class ProjectDirectory
         var people = await (from m in db.Memberships.AsNoTracking()
                             join u in db.Users.AsNoTracking() on m.UserId equals u.Id
                             join f in db.Functions.AsNoTracking() on m.FunctionId equals f.Id
+                            join p in db.Parties.AsNoTracking() on u.PartyId equals p.Id into ps
+                            from p in ps.DefaultIfEmpty()
                             where m.ProjectId == projectId && m.Active && u.Active
                             orderby u.Name
                             select new
                             {
-                                u.Id, u.Name, u.Email, u.PartyId, Function = f.Name, m.Department, m.ActsAsControl,
+                                u.Id, u.Name, u.Email, u.PartyId,
+                                // A linked account reads in its own organization's words: "ACME / Lead Engineer".
+                                Function = u.HomeFunction != null ? p.Code + " / " + u.HomeFunction : f.Name, m.Department, m.ActsAsControl,
                                 ControlByFunction = f.Rules.Any(r => r.Verbs.Contains(Verbs.Control)),
                                 Manages = f.Rules.Any(r => r.Verbs.Contains(Verbs.Manage)),
                             }).ToListAsync(cancellationToken);

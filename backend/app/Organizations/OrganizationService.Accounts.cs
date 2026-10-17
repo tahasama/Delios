@@ -41,6 +41,9 @@ public sealed partial class OrganizationService
         var account = await db.AccountLinks.SingleOrDefaultAsync(a => a.LinkId == link.Id && a.HomeUserId == person.Id && a.EndedAt == null,
             cancellationToken);
         var host = await HostNameAsync(link.HostTenantId, cancellationToken);
+        // Their function at home, as we name it: shown on our project as "<us> / <function>".
+        var homeFunction = await db.Memberships.AsNoTracking().Where(m => m.UserId == person.Id && m.Active)
+            .OrderByDescending(m => m.Id).Select(m => m.Function!.Name).FirstOrDefaultAsync(cancellationToken);
 
         var (problem, hostUserId, project) = await TenantScope.RunAsync(scopes, link.HostTenantId, async (services, hostDb) =>
         {
@@ -48,7 +51,7 @@ public sealed partial class OrganizationService
                 .SingleOrDefaultAsync(p => p.ProjectId == projectId && p.PartyId == link.HostPartyId && p.Active, cancellationToken);
             if (part?.Project is null) return (Problems.NotFound("PROJECT_NOT_FOUND", $"We do not take part in that project of {host}'s."), Guid.Empty, "");
             if (request.Active && part.StartFunctionId is null)
-                return (Problems.Conflict("NO_START_FUNCTION", $"{host} has not said yet which function our people hold on {part.Project.Code}."), Guid.Empty, "");
+                return (Problems.Conflict("NO_START_FUNCTION", $"{host} has not said yet what our people may do on {part.Project.Code}: it gives us our role there first."), Guid.Empty, "");
             User? stand = account is null ? null : await hostDb.Users.SingleOrDefaultAsync(u => u.Id == account.HostUserId, cancellationToken);
             if (stand is null)
             {
@@ -70,6 +73,7 @@ public sealed partial class OrganizationService
                 hostDb.Users.Add(stand);
             }
             stand.Name = person.Name;
+            stand.HomeFunction = homeFunction;
             if (request.Active) stand.Active = true;
             var membership = await hostDb.Memberships.SingleOrDefaultAsync(m => m.ProjectId == projectId && m.UserId == stand.Id, cancellationToken);
             if (membership is null && request.Active)

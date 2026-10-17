@@ -500,6 +500,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   button and two ways, plus "Works on": optionally the project(s) the organization added or created is put on. An
   organization with its **own DELIOS** is never changed by us: its line there is read only (name, code, identifier,
   domain), we see it and link with it; only "In use" is ours.
+- People of another organization keep **their own function**, always shown with their company ("ACME / Lead Engineer",
+  `User.HomeFunction`), never confused with ours. What they may do on our project comes from their organization's
+  **role with us** (owner's choice "a"): the function of ours whose matrix rows are written for that role. A **guest
+  organization has one account** (backend ONE_GUEST_ACCOUNT): the person who stands for it and acts as its document
+  control; when it gets its own DELIOS, it claims. One not on DELIOS has nobody signing in.
+- **Claiming an entry** we or others recorded (owner): never on the claimer's word. The guest who stood for it confirms by
+  a link sent to their email (`/confirm-claim`); with no guest (not on DELIOS at all), the organization that recorded it
+  vouches, or refuses with why. Until then nothing passes: no documents, no account, no access (`OrganizationClaim`).
 - An organization is always told (notification and email, as always): put on a project (`TellJoinedAsync`: one with its
   own DELIOS through its administrators there; one whose people have accounts with us through them; one not on DELIOS at
   its email for transmittals), and when it is first recorded (one not on DELIOS at that email; one on DELIOS by its

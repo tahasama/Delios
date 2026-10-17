@@ -246,7 +246,7 @@ export async function claimAction(_prev: Result | undefined, formData: FormData)
     return failed(e);
   }
   revalidatePath("/organization");
-  return { ok: "Claimed: it is us now, under our code and name, in every list that held it." };
+  return { ok: "Asked. The guest who stood for it confirms by email, or the organization that recorded it vouches; until then nothing passes." };
 }
 
 /** We agree that two organizations are one, or refuse with why. */
@@ -262,4 +262,29 @@ export async function answerMergeAction(_prev: Result | undefined, formData: For
   }
   revalidatePath("/organization");
   return { ok: agree ? "Agreed. Once every side has, the app's owner merges them." : "Refused: they stay two." };
+}
+
+/** We recorded the entry: we vouch that the claimer is it, or refuse with why. */
+export async function answerClaimAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const id = text(formData, "claimId");
+  const vouch = text(formData, "answer") === "vouch";
+  const note = text(formData, "note");
+  if (!vouch && !note) return { error: "Say why it is not them." };
+  try {
+    await api(`/api/organization/claims/incoming/${id}/${vouch ? "vouch" : "refuse"}`, { method: "POST", body: vouch ? {} : { note } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization");
+  return { ok: vouch ? "Vouched: it is them now." : "Refused: nothing passes." };
+}
+
+/** The guest who stood for the entry opened the link: the claim is confirmed. */
+export async function confirmClaimAction(_prev: { error?: string; done?: string } | undefined, formData: FormData): Promise<{ error?: string; done?: string }> {
+  const response = await apiFetch("/api/auth/confirm-claim", { method: "POST", body: { token: text(formData, "token") } }).catch(() => null);
+  if (!response) return { error: "The server cannot be reached. Try again in a moment." };
+  if (response.status === 429) return { error: "Too many attempts. Wait a minute and try again." };
+  if (!response.ok) return { error: (await problemOf(response)).message };
+  const said = (await response.json()) as { organization: string };
+  return { done: `Confirmed: ${said.organization} is the organization you stood for.` };
 }

@@ -148,6 +148,11 @@ public static class JoinRequests
             if (request.PartyId is not null && party is null) return Problems.Invalid("PARTY_UNKNOWN", "Choose one of the organizations.", new { field = "partyId" });
             if (party is { IsInternal: false } && party.Participation == "BY_PROXY")
                 return Problems.Invalid("NOBODY_SIGNS_IN", $"{party.Name} is not on DELIOS: nobody of theirs signs in; one of ours records for them.", new { field = "partyId" });
+            // A guest organization has one account: the person who stands for it and acts as its document control.
+            if (party is { IsInternal: false } && await db.Users.AsNoTracking().Where(u => u.PartyId == party.Id && u.Active && u.HomeTenantId == null)
+                    .Select(u => u.Name).FirstOrDefaultAsync(cancellationToken) is { } holder)
+                return Problems.Conflict("ONE_GUEST_ACCOUNT",
+                    $"{party.Name} has its account already: {holder}. A guest organization has one person, who stands for it.", new { field = "partyId" });
             user = new User { TenantId = project.TenantId, Email = email, NormalizedEmail = normalized, Name = name, PasswordHash = "", PartyId = party?.Id };
             user.PasswordHash = hasher.HashPassword(user, Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
             db.Users.Add(user);

@@ -104,7 +104,11 @@ public sealed partial class OrganizationService
             row.ContractNumber = contract;
         }
         row.Role = role;
-        row.StartFunctionId = request.StartFunctionId;
+        // What their people may do here comes from the organization's role with us: the function of ours whose matrix
+        // rows are written for that role (Settings → Functions); one chosen by hand still stands.
+        row.StartFunctionId = request.StartFunctionId ?? (role is null ? null : await db.Functions.AsNoTracking()
+            .Where(f => f.Active && f.Rules.Any(r => r.ProjectRole == role)).OrderBy(f => f.Code).Select(f => (Guid?)f.Id)
+            .FirstOrDefaultAsync(cancellationToken));
         row.Active = request.Active;
         await audit.WriteAsync(actor, request.Active ? "PROJECT_PARTY_SET" : "PROJECT_PARTY_REMOVED", "Project", projectId, project.Code,
             request.Active ? $"{party.Name} takes part{(role is null ? "" : $" as {role}")}." : $"{party.Name} no longer takes part.",

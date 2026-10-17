@@ -2641,6 +2641,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("failed_sign_ins");
 
+                    b.Property<string>("HomeFunction")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("home_function");
+
                     b.Property<Guid?>("HomeTenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("home_tenant_id");
@@ -3148,6 +3153,78 @@ namespace Delios.Host.Platform.Migrations
                         .HasDatabaseName("ix_organization_links_host_tenant_id");
 
                     b.ToTable("organization_links", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Organizations.OrganizationClaim", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant?>("AnsweredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("answered_at");
+
+                    b.Property<string>("AnsweredByName")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("answered_by_name");
+
+                    b.Property<string>("ClaimedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("claimed_by_name");
+
+                    b.Property<Guid>("ClaimerIdentityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("claimer_identity_id");
+
+                    b.Property<Guid>("ClaimerTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("claimer_tenant_id");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entry_id");
+
+                    b.Property<Guid?>("MakerTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("maker_tenant_id");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("method");
+
+                    b.Property<string>("RefusedWhy")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("refused_why");
+
+                    b.Property<string>("SentTo")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("sent_to");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_organization_claims");
+
+                    b.HasIndex("EntryId")
+                        .HasDatabaseName("ix_organization_claims_entry_id");
+
+                    b.ToTable("organization_claims", (string)null);
                 });
 
             modelBuilder.Entity("Delios.Host.Organizations.OrganizationHolder", b =>

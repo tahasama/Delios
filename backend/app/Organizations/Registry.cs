@@ -118,6 +118,41 @@ public sealed class OrganizationMerge
     public Instant? DoneAt { get; set; }
 }
 
+/// <summary>
+/// An organization on DELIOS claiming an entry another organization made for it (as a guest, or not on DELIOS). Never
+/// taken on its word: the guest account that stood for it confirms by a link sent to its email; with no guest, the
+/// organization that made the entry vouches for it. Until then nothing passes. Kept outside any organization's data.
+/// </summary>
+public sealed class OrganizationClaim
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    /// <summary>The entry claimed, and the organization claiming it (its own, on DELIOS).</summary>
+    public Guid EntryId { get; set; }
+    public Guid ClaimerTenantId { get; set; }
+    public Guid ClaimerIdentityId { get; set; }
+    public required string ClaimedByName { get; set; }
+    /// <summary><see cref="ClaimMethods"/>: the guest's email confirms, or the maker vouches.</summary>
+    public required string Method { get; set; }
+    /// <summary>Where the link went (the guest's email), for the guest method.</summary>
+    public string? SentTo { get; set; }
+    public Guid? MakerTenantId { get; set; }
+    public string State { get; set; } = ClaimStates.Waiting;
+    public Instant CreatedAt { get; set; }
+    public Instant? AnsweredAt { get; set; }
+    public string? AnsweredByName { get; set; }
+    public string? RefusedWhy { get; set; }
+}
+
+public static class ClaimMethods
+{
+    public const string GuestEmail = "GUEST_EMAIL", Vouch = "VOUCH";
+}
+
+public static class ClaimStates
+{
+    public const string Waiting = "WAITING", Confirmed = "CONFIRMED", Refused = "REFUSED";
+}
+
 public static class MergeStates
 {
     public const string Asked = "ASKED", Agreed = "AGREED", Refused = "REFUSED", Done = "DONE";
@@ -133,8 +168,19 @@ public sealed class OrganizationHolder
 
 internal sealed class RegistryConfiguration :
     IEntityTypeConfiguration<ReservedValue>, IEntityTypeConfiguration<OrganizationIdentity>, IEntityTypeConfiguration<OrganizationHolder>,
-    IEntityTypeConfiguration<OrganizationMerge>
+    IEntityTypeConfiguration<OrganizationMerge>, IEntityTypeConfiguration<OrganizationClaim>
 {
+    public void Configure(EntityTypeBuilder<OrganizationClaim> b)
+    {
+        b.Property(x => x.ClaimedByName).HasMaxLength(200);
+        b.Property(x => x.Method).HasMaxLength(16);
+        b.Property(x => x.SentTo).HasMaxLength(254);
+        b.Property(x => x.State).HasMaxLength(16);
+        b.Property(x => x.AnsweredByName).HasMaxLength(254);
+        b.Property(x => x.RefusedWhy).HasMaxLength(2000);
+        b.HasIndex(x => x.EntryId);
+    }
+
     public void Configure(EntityTypeBuilder<OrganizationMerge> b)
     {
         b.Property(x => x.RequestedByName).HasMaxLength(200);
