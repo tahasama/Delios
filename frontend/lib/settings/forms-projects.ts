@@ -5,7 +5,7 @@ import { applyDefaults } from "@/lib/organization/defaults";
 import { revalidatePath } from "next/cache";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
-import { PROJECT_KINDS } from "@/lib/settings/profiles";
+import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { api, refusal } from "@/lib/client";
 import { projectSettings, setProjectSetting } from "@/lib/settings/api";

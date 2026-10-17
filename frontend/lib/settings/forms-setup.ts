@@ -1,6 +1,6 @@
 "use server";
 
-import { PROJECT_KINDS } from "@/lib/settings/profiles";
+import { PROJECT_KINDS } from "@/lib/settings/profiles/kinds";
 import { isContractRole } from "@/lib/settings/contract-roles";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";

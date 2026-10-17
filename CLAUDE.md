@@ -593,8 +593,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   new-document form's way.
 - Screens and the backend say "the control function" and "whoever holds Manage" (or "whoever plans"), never a job
   title; a function's own name is shown only as read from the data.
-- A project type's starter values are added in one go ("Add them"), on Disciplines, types & sets; Controlled changes no
-  longer exist.
+- No ready-made codes offered by a button (owner): the "starter profiles" ("Add them") are removed. Lists are filled by
+  the organization itself, typed on Disciplines, types & sets or imported. The project type only describes the project.
+  Controlled changes no longer exist.
 - **The plan is a document, not a setting** (owner): Assurance → The plan (`/conformance/plan`), written from how the
   project is set up, printed; nothing on it is typed and nothing on it repeats a Settings page. Scope is said once (This
   project); how it is measured once (Assurance, "How it is measured": target and how often, `MEASURE`; past it the

@@ -14,8 +14,6 @@ import { DeleteSetButton } from "./delete-set";
 import { SetNav, type SetNavGroup } from "./set-nav";
 import { Plus, Search, X, Pencil, Download } from "lucide-react";
 import { NoAccess } from "../no-access";
-import { profileForKind, missingFromProfile } from "@/lib/settings/profiles";
-import { draftProfileAction } from "@/lib/settings/forms-profiles";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Disciplines, types & sets" };
@@ -108,9 +106,6 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
     return `/settings/config?${p}`;
   };
   const editing = sp.edit ? allValues.find((v) => v.id === sp.edit) ?? null : null;
-  // The starter values this kind of project brings, not in the lists yet: added in one go.
-  const profile = profileForKind(ctx.project.kind);
-  const starter = profile ? (await missingFromProfile(ctx, profile)).reduce((n, one) => n + one.values.length, 0) : 0;
 
   return (
     <div className="space-y-4">
@@ -124,16 +119,6 @@ export default async function AdminConfigPage({ searchParams }: { searchParams: 
           </div>
         }
       />
-
-      {profile && starter ? (
-        <div className="register register-sheet flex flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-6">
-          <span className="text-[13px] text-slate-600">
-            <span className="font-semibold text-slate-800">{profile.name}:</span> {starter} starter value{starter === 1 ? "" : "s"} for this kind of project
-            {" "}not in your lists yet. Added as they are; rename or retire any of them afterwards.
-          </span>
-          <ActionForm action={draftProfileAction} submitLabel="Add them" size="sm" hidden={{ profile: profile.id }} className="space-y-0" />
-        </div>
-      ) : null}
 
       <SetNav groups={groups} current={currentKey}>
         {set ? (
