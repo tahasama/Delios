@@ -49,7 +49,7 @@ export async function askToJoinAction(_prev: State | undefined, formData: FormDa
   const text = (name: string) => String(formData.get(name) ?? "").trim();
   const { upload, filesOf } = await import("@/lib/documents/api-uploads");
   const proof = filesOf(formData, "proof")[0];
-  let result: { held: boolean; said: string; invited: boolean; link: string | null };
+  let result: { held: boolean; said: string; invited?: boolean; link?: string | null; brought?: string | null };
   try {
     const proofFileId = proof ? await upload(ctx, { loose: true, proof: true }, proof) : null;
     result = await api(projectPath(ctx, "/people/requests"), {
@@ -71,6 +71,8 @@ export async function askToJoinAction(_prev: State | undefined, formData: FormDa
   revalidatePath("/settings/users");
   revalidatePath("/directory");
   revalidatePath("/people/confirm");
+  // Someone of an organization on DELIOS: their organization came onto the project with them.
+  if (result.brought) return { ok: `${result.said}.` };
   if (result.held) return { ok: `Asked: ${result.said}. They join once confirmed, and are told then.` };
   return {
     ok: `Done: ${result.said}. They are told by notification and email.${result.link ? ` Email is off here: give them this link to choose their password (7 days, once): ${result.link}` : ""}`,

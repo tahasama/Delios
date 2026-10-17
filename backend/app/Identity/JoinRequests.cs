@@ -81,7 +81,7 @@ public static class JoinRequests
 
     private static async Task<IResult> AskAsync(JoinRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
         IPasswordHasher<User> hasher, IDataProtectionProvider protection, Notifications.Notifier notifier,
-        Transmittals.IncomingService incoming, CancellationToken cancellationToken)
+        Transmittals.IncomingService incoming, Organizations.OrganizationService organizations, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         var project = access.Project;
@@ -124,7 +124,25 @@ public static class JoinRequests
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(email)) return Problems.Invalid("NAME_AND_EMAIL_REQUIRED", "Give their name and email.");
             if (!email.Contains('@') || email.Length > 254) return Problems.Invalid("EMAIL_INVALID", "Give a valid email address.", new { field = "email" });
             var normalized = email.ToUpperInvariant();
-            if (await db.SignInNames.AnyAsync(n => n.NormalizedEmail == normalized, cancellationToken))
+            var home = await db.SignInNames.AsNoTracking().Where(n => n.NormalizedEmail == normalized).Select(n => (Guid?)n.TenantId)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (home is { } theirs && theirs != project.TenantId)
+            {
+                // Someone of an organization on DELIOS: their whole organization comes onto the project with them.
+                if (!mayAdd) return Problems.Forbidden("THEIR_OWN_DELIOS",
+                    $"{email} works from their own organization's DELIOS: the control function adds their organization to {project.Code}.", new { field = "email" });
+                var (organization, linked, refused) = await organizations.BringOrganizationAsync(new Actor(access.UserId, access.UserName), theirs, project.Id,
+                    function.Id, email, cancellationToken);
+                if (refused is not null) return refused;
+                return Results.Ok(new
+                {
+                    Held = false, Brought = organization,
+                    Said = linked
+                        ? $"{organization} works with us already: it now takes part in {project.Code}; their administrator puts {name} on"
+                        : $"{organization} is on DELIOS: it now takes part in {project.Code} and is invited to work with us; once their administrator accepts, they put {name} on",
+                });
+            }
+            if (home is not null)
                 return Problems.Conflict("EMAIL_TAKEN", $"{email} already has an account: they are added with “Add someone”.", new { field = "email" });
             var party = request.PartyId is { } pid ? await db.Parties.AsNoTracking().SingleOrDefaultAsync(p => p.Id == pid && p.Active, cancellationToken) : null;
             if (request.PartyId is not null && party is null) return Problems.Invalid("PARTY_UNKNOWN", "Choose one of the organizations.", new { field = "partyId" });

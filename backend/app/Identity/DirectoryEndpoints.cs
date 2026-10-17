@@ -44,9 +44,17 @@ public sealed record RuleRequest(
 public sealed record UpdateFunctionRequest(string? Name = null, bool? Active = null, RuleRequest[]? Rules = null, string? Clearance = null);
 
 /// <summary>Body of creating or changing an organization taking part in projects.</summary>
+/// <remarks>
+/// <c>IdentityId</c>: an organization already known to DELIOS, added as it is (its code and name; one on DELIOS is invited
+/// to link). Otherwise one is created: its code, name and identifier (<c>Country</c>, <c>IdentifierKind</c>,
+/// <c>IdentifierNumber</c>), or why it has none (<c>NoIdentifierReason</c>), and its email <c>Domain</c>. Organizations that
+/// look like it are named first (LOOKS_LIKE); <c>NotTheSame</c> says which of them it is not.
+/// </remarks>
 public sealed record PartyRequest(
     string? Code = null, string? Name = null, bool? IsInternal = null, bool? Active = null, string? Participation = null,
-    string? CustodianFunction = null, string? ExternalSystem = null, bool? EvidenceRequired = null, string? ContactEmail = null);
+    string? CustodianFunction = null, string? ExternalSystem = null, bool? EvidenceRequired = null, string? ContactEmail = null,
+    Guid? IdentityId = null, string? Country = null, string? IdentifierKind = null, string? IdentifierNumber = null,
+    string? NoIdentifierReason = null, string? Domain = null, Guid[]? NotTheSame = null);
 
 /// <summary>
 /// The organization's directory, kept by its administrators: people, projects and who is on them with which
@@ -743,6 +751,13 @@ public static class DirectoryEndpoints
                 Participation = p.ParticipationChangedAt is null ? null : new { Was = p.PreviousParticipation, By = p.ParticipationChangedByName, At = p.ParticipationChangedAt.Value.ToDateTimeOffset() },
                 // Another organization on DELIOS keeps its own code and name: only it changes them.
                 Theirs = o.TenantId is { } own && own != p.TenantId,
+                Identifier = o.IdentifierShown is null ? null : new { o.Country, Kind = o.IdentifierKind, Number = o.IdentifierNumber },
+                IdentifierWas = o.IdentifierChangedAt is null ? null : new { Was = o.PreviousIdentifier, By = o.IdentifierChangedByName, At = o.IdentifierChangedAt.Value.ToDateTimeOffset() },
+                o.NoIdentifierReason,
+                o.Domain,
+                DomainConfirmed = o.DomainConfirmedAt != null,
+                OnDelios = o.TenantId != null,
+                o.Id,
             } : null,
             People = people.FirstOrDefault(c => c.Key == p.Id)?.Count ?? 0,
             // Collaborator (linked to its own organization), guest, or not on DELIOS (docs/ORGANIZATIONS.md).
@@ -756,26 +771,84 @@ public static class DirectoryEndpoints
     /// DELIOS: one already known is added under its own; a code or name of another is refused.
     /// </summary>
     private static async Task<IResult> CreatePartyAsync(
-        PartyRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
+        PartyRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, Organizations.OrganizationService organizations,
+        CancellationToken cancellationToken)
     {
+        var tenantId = http.User.TenantId();
+        var actor = await ActorAsync(http, db, cancellationToken);
+        Party party;
+        Organizations.OrganizationIdentity identity;
+        if (request.IdentityId is { } known)
+        {
+            // Add: an organization DELIOS already knows, as it is.
+            var chosen = await Organizations.Registry.IdentityAsync(db, known, cancellationToken);
+            if (chosen is null) return Problems.NotFound("ORGANIZATION_NOT_FOUND", "No such organization on DELIOS.");
+            identity = chosen;
+            if (identity.TenantId == tenantId) return Problems.Invalid("SAME_ORGANIZATION", "That is us.");
+            if (await db.Parties.AnyAsync(p => p.OrganizationId == identity.Id, cancellationToken))
+                return Problems.Conflict("ALREADY_LISTED", $"{identity.Name} is already in your list of organizations.");
+            if (await db.Parties.AnyAsync(p => p.Code == identity.Code, cancellationToken))
+                return Problems.Conflict("PARTY_CODE_TAKEN", $"{identity.Code} is already the code of another organization in your list.");
+            party = new Party { TenantId = tenantId, Code = identity.Code, Name = identity.Name };
+            var onDelios = identity.TenantId is not null;
+            var problem = Apply(party, request with { Code = null, Name = null, Participation = onDelios ? Participations.InApp : request.Participation },
+                [], creating: true);
+            if (problem is not null) return problem;
+            db.Parties.Add(party);
+            await Organizations.Registry.HoldAsync(db, identity, party, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.WriteAsync(actor, "PARTY_CREATED", "Party", party.Id, party.Name, $"{party.Code}, added as DELIOS knows it.",
+                cancellationToken: cancellationToken);
+            // On DELIOS: invited to link at once; its administrator accepts, then puts its people on.
+            if (onDelios)
+            {
+                var (_, refused) = await organizations.InviteAsync(actor, party.Id, new Organizations.LinkRequest(null), cancellationToken);
+                if (refused is not null) return refused;
+            }
+            return Results.Created($"/api/admin/parties/{party.Id}", new { party.Id, invited = onDelios });
+        }
+
+        // Create: one DELIOS does not know yet, with its identifier (or why it has none).
         var code = Blank(request.Code)?.ToUpperInvariant();
         var name = Blank(request.Name);
         if (code is null || name is null) return Problems.Invalid("CODE_AND_NAME_REQUIRED", "An organization has a code and a name.");
         if (await db.Parties.AnyAsync(p => p.Code == code, cancellationToken))
             return Problems.Conflict("PARTY_CODE_TAKEN", $"{code} is already in your list of organizations.", new { field = "code" });
-        var tenantId = http.User.TenantId();
-        var (identity, refused) = await Organizations.Registry.OrganizationForAsync(db, code, name, tenantId,
-            request.IsInternal == true ? tenantId : null, cancellationToken);
-        if (refused is not null) return refused;
-        var party = new Party { TenantId = tenantId, Code = identity!.Code, Name = identity.Name };
-        var problem = Apply(party, request with { Code = null, Name = null }, [], creating: true);
-        if (problem is not null) return problem;
+        var number = Blank(request.IdentifierNumber);
+        if (number is null && Blank(request.NoIdentifierReason) is null)
+            return Problems.Invalid("IDENTIFIER_REQUIRED",
+                "Give its identifier with its country (company registration, else tax number, else professional register), or say why it has none.",
+                new { fields = new[] { "country", "identifierNumber" } });
+        var identifier = number is null ? null
+            : Organizations.Registry.IdentifierValue(Blank(request.Country) ?? "", Blank(request.IdentifierKind) ?? "", number);
+        var domain = Organizations.Registry.DomainOf(request.Domain);
+        if (domain is not null && Organizations.Registry.PublicMail.Contains(domain)) domain = null;
+        // What looks like it is named first: the same identifier, domain or a name that reads the same.
+        var lookalikes = (await Organizations.Registry.LookalikesAsync(db, name, identifier, domain, cancellationToken))
+            .Where(l => !(request.NotTheSame ?? []).Contains(l.Id)).ToList();
+        if (lookalikes.Count > 0)
+            return Problems.Conflict("LOOKS_LIKE", lookalikes.Count == 1
+                ? $"Is this the same as {lookalikes[0].Name} ({lookalikes[0].Code})? It has {lookalikes[0].Why}."
+                : $"Is this one of these {lookalikes.Count} organizations already on DELIOS?", new { lookalikes });
+        var ours = request.IsInternal == true ? tenantId : (Guid?)null;
+        var (found, refusedName) = await Organizations.Registry.OrganizationForAsync(db, code, name, tenantId, ours, cancellationToken);
+        if (refusedName is not null) return refusedName;
+        identity = found!;
+        var changes = new List<string>();
+        var badIdentifier = await Organizations.Registry.SetIdentifierAsync(db, identity, request.Country, request.IdentifierKind, number,
+            request.NoIdentifierReason, tenantId, actor.Name, changes, cancellationToken);
+        if (badIdentifier is not null) return badIdentifier;
+        if (domain is not null && identity.DomainConfirmedAt is null) identity.Domain = domain;
+        party = new Party { TenantId = tenantId, Code = identity.Code, Name = identity.Name };
+        var invalid = Apply(party, request with { Code = null, Name = null }, [], creating: true);
+        if (invalid is not null) return invalid;
         db.Parties.Add(party);
         await Organizations.Registry.HoldAsync(db, identity, party, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "PARTY_CREATED", "Party", party.Id, party.Name, code,
+        var said = request.NotTheSame is { Length: > 0 } ? $"; said not to be {request.NotTheSame.Length} look-alike(s)" : "";
+        await audit.WriteAsync(actor, "PARTY_CREATED", "Party", party.Id, party.Name, $"{code}{(changes.Count > 0 ? $"; {string.Join("; ", changes)}" : "")}{said}",
             cancellationToken: cancellationToken);
-        return Results.Created($"/api/admin/parties/{party.Id}", new { party.Id });
+        return Results.Created($"/api/admin/parties/{party.Id}", new { party.Id, invited = false });
     }
 
     /// <summary>
@@ -806,6 +879,24 @@ public static class DirectoryEndpoints
             elsewhere = others;
             party.Code = identity.Code;
             party.Name = identity.Name;
+        }
+        if (Blank(request.IdentifierNumber) is not null || Blank(request.NoIdentifierReason) is not null || request.Domain is not null)
+        {
+            identity ??= party.OrganizationId is { } oid2 ? await Organizations.Registry.IdentityAsync(db, oid2, cancellationToken) : null;
+            if (identity is not null)
+            {
+                var bad = await Organizations.Registry.SetIdentifierAsync(db, identity, request.Country, request.IdentifierKind, request.IdentifierNumber,
+                    request.NoIdentifierReason, party.TenantId, actor.Name, changes, cancellationToken);
+                if (bad is not null) return bad;
+                // The domain someone says for them, until they prove their own on DELIOS.
+                var said = Organizations.Registry.DomainOf(request.Domain);
+                if (request.Domain is not null && identity.DomainConfirmedAt is null && said != identity.Domain
+                    && (said is null || !Organizations.Registry.PublicMail.Contains(said)))
+                {
+                    identity.Domain = said;
+                    changes.Add($"email domain → {said ?? "none"}");
+                }
+            }
         }
         var problem = Apply(party, request with { Code = null, Name = null }, changes, creating: false, actor.Name);
         if (problem is not null) return problem;

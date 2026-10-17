@@ -4,7 +4,8 @@ namespace Delios.Host.Platform;
 
 /// <summary>
 /// One-shot commands run with the same build and settings as the app:
-/// <c>migrate</c>, <c>create-tenant</c>, <c>seed-demo</c>, <c>reindex</c>, <c>grant-all</c>.
+/// <c>migrate</c>, <c>create-tenant</c>, <c>seed-demo</c>, <c>reindex</c>, <c>grant-all</c>, <c>unshare-package</c>,
+/// <c>merge-organizations</c>.
 /// </summary>
 public static class Commands
 {
@@ -12,7 +13,7 @@ public static class Commands
     /// True when the first command-line argument names one of these commands. Program.cs then runs the command instead of starting the web server.
     /// </summary>
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0] is DatabaseMigrator.Command or "create-tenant" or "seed-demo" or "reindex" or "grant-all" or "unshare-package";
+        args.Length > 0 && args[0] is DatabaseMigrator.Command or "create-tenant" or "seed-demo" or "reindex" or "grant-all" or "unshare-package" or "merge-organizations";
 
     /// <summary>
     /// Runs the command named by the first argument and returns the process exit code (0 success, 2 wrong usage or refused).
@@ -74,9 +75,15 @@ public static class Commands
                 await Console.Out.WriteLineAsync(unshared);
                 return unshared.Contains("no longer shared") ? 0 : 2;
 
+            case "merge-organizations" when args.Length <= 2:
+                // The app's owner carries out a merge every side agreed to; without an id, lists those waiting.
+                var merged = await services.GetRequiredService<Organizations.MergeOrganizations>().RunAsync(args.Length == 2 ? args[1] : null);
+                await Console.Out.WriteLineAsync(merged);
+                return merged.StartsWith("No such") || merged.StartsWith("One of") ? 2 : 0;
+
             default:
                 await Console.Error.WriteLineAsync(
-                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex | grant-all <email> | unshare-package <email> <package-number>");
+                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex | grant-all <email> | unshare-package <email> <package-number> | merge-organizations [<merge-id>]");
                 return 2;
         }
     }

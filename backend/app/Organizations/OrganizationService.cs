@@ -51,10 +51,21 @@ public sealed partial class OrganizationService(
         if (party.IsInternal) return (null, Problems.Invalid("PARTY_INTERNAL", $"{party.Name} is our own organization."));
         if (!party.Active) return (null, Problems.Conflict("PARTY_INACTIVE", $"{party.Name} is switched off: switch it on first."));
         var email = (request.Email ?? "").Trim();
-        if (email.Length == 0 || !email.Contains('@')) return (null, Problems.Invalid("EMAIL_REQUIRED", "Give the email of someone you know there."));
-        var normalized = email.ToUpperInvariant();
-        var them = await db.SignInNames.AsNoTracking().Where(n => n.NormalizedEmail == normalized).Select(n => (Guid?)n.TenantId)
-            .SingleOrDefaultAsync(cancellationToken);
+        // An organization added from DELIOS is invited as itself: no email is needed to find it.
+        var known = party.OrganizationId is { } oid ? await Registry.IdentityAsync(db, oid, cancellationToken) : null;
+        Guid? them;
+        if (known?.TenantId is { } itself && email.Length == 0)
+        {
+            them = itself;
+            email = "(added from DELIOS)";
+        }
+        else
+        {
+            if (email.Length == 0 || !email.Contains('@')) return (null, Problems.Invalid("EMAIL_REQUIRED", "Give the email of someone you know there."));
+            var normalized = email.ToUpperInvariant();
+            them = await db.SignInNames.AsNoTracking().Where(n => n.NormalizedEmail == normalized).Select(n => (Guid?)n.TenantId)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
         if (them is null)
         {
             return (null, Problems.Conflict("NOT_ON_DELIOS",

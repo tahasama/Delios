@@ -108,6 +108,41 @@ public sealed partial class OrganizationService
         return null;
     }
 
+    /// <summary>
+    /// Someone of an organization on DELIOS is asked onto our project: their whole organization comes with them. It is
+    /// added to our list as DELIOS knows it (when not there yet), invited to link through that person's address (when not
+    /// invited or linked yet), and takes part in the project, its people starting with the function asked for. Their
+    /// administrator accepts the link, then puts them on. Returns its name, and whether it was linked already.
+    /// </summary>
+    public async Task<(string? Organization, bool Linked, IResult? Problem)> BringOrganizationAsync(Actor actor, Guid theirTenant, Guid projectId,
+        Guid startFunctionId, string email, CancellationToken cancellationToken)
+    {
+        var identity = await db.OrganizationIdentities.SingleOrDefaultAsync(o => o.TenantId == theirTenant && o.MergedIntoId == null, cancellationToken);
+        if (identity is null) return (null, false, Problems.Conflict("NOT_REGISTERED", "Their organization is not in DELIOS's register yet: try again in a moment."));
+        var party = await db.Parties.SingleOrDefaultAsync(p => p.OrganizationId == identity.Id, cancellationToken);
+        if (party is null)
+        {
+            if (await db.Parties.AnyAsync(p => p.Code == identity.Code, cancellationToken))
+                return (null, false, Problems.Conflict("PARTY_CODE_TAKEN", $"{identity.Name} is {identity.Code} on DELIOS, already another organization's code in our list."));
+            party = new Party { TenantId = tenant.Required, Code = identity.Code, Name = identity.Name, Participation = Participations.InApp };
+            db.Parties.Add(party);
+            await Registry.HoldAsync(db, identity, party, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.WriteAsync(actor, "PARTY_CREATED", "Party", party.Id, party.Name, $"{party.Code}, added with {email}.", cancellationToken: cancellationToken);
+        }
+        var link = await db.OrganizationLinks.AsNoTracking().FirstOrDefaultAsync(l => l.HostTenantId == tenant.Required && l.HostPartyId == party.Id
+            && (l.State == LinkStates.Invited || l.State == LinkStates.Linked), cancellationToken);
+        if (link is null)
+        {
+            var (_, refused) = await InviteAsync(actor, party.Id, new LinkRequest(email), cancellationToken);
+            if (refused is not null) return (null, false, refused);
+        }
+        var part = await db.ProjectParties.AsNoTracking().SingleOrDefaultAsync(p => p.ProjectId == projectId && p.PartyId == party.Id, cancellationToken);
+        var problem = await SetProjectPartyAsync(actor, projectId, party.Id,
+            new ProjectPartyRequest(part?.Role, part?.StartFunctionId ?? startFunctionId, true), cancellationToken);
+        return (party.Name, link?.State == LinkStates.Linked, problem);
+    }
+
     /// <summary>The roles the app knows before an organization publishes its own list (frontend lib/settings/profiles/roles.ts).</summary>
     private static readonly HashSet<string> BuiltInRoles = ["GENERIC", "EPC", "EPCM", "PMC", "DESIGN", "OWNER", "CM", "CONTRACTOR", "SUBCONTRACTOR", "SUPPLIER", "INSPECTOR"];
 

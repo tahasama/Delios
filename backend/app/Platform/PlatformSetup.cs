@@ -192,6 +192,7 @@ public static class PlatformSetup
         services.AddScoped<Seeding.DemoSeed>();
         services.AddScoped<Seeding.UnsharePackage>();
         services.AddScoped<Seeding.GrantAll>();
+        services.AddScoped<Organizations.MergeOrganizations>();
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null);
@@ -332,6 +333,7 @@ public static class PlatformSetup
             Identity.JoinRequests.MapJoinRequestEndpoints(app);
         Identity.ProjectDirectory.MapProjectDirectoryEndpoints(app);
             Organizations.OrganizationEndpoints.MapOrganizationEndpoints(app);
+            Organizations.RegistryEndpoints.MapRegistryEndpoints(app);
             Seeding.SignUpEndpoints.MapSignUpEndpoints(app);
             Notifications.NotificationEndpoints.MapNotificationEndpoints(app);
             Notifications.PushEndpoints.MapPushEndpoints(app);
