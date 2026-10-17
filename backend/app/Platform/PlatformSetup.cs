@@ -311,6 +311,9 @@ public static class PlatformSetup
             if (http.User.Identity?.IsAuthenticated == true)
             {
                 var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
+                // In a transaction of its own: the tenant is set on a transaction, and row-level security shows nothing
+                // outside one (the lists would silently be read as the organization's).
+                await using var look = await db.Database.BeginTransactionAsync(http.RequestAborted);
                 var project = Guid.TryParse(http.Request.Headers["X-Delios-Project"].ToString(), out var projectId)
                     ? await db.Projects.AsNoTracking().Where(p => p.Id == projectId)
                         .Select(p => new { p.Id, p.OwnLists }).SingleOrDefaultAsync(http.RequestAborted)
@@ -319,6 +322,7 @@ public static class PlatformSetup
                         .Where(m => m.UserId == http.User.UserId() && m.Active && m.Project!.Status == "ACTIVE" && m.Function!.Active)
                         .OrderBy(m => m.Project!.Code).Select(m => new { m.Project!.Id, m.Project.OwnLists })
                         .FirstOrDefaultAsync(http.RequestAborted);
+                await look.CommitAsync(http.RequestAborted);
                 if (project is not null) db.UseListsOf(project.Id, project.OwnLists);
             }
             await next(http);

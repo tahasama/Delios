@@ -63,7 +63,11 @@ function doesText(fields: PropField[] | undefined, props: Record<string, unknown
 
 type Params = { set?: string; q?: string; show?: string; edit?: string; panel?: string };
 
-type ListsAnswer = { own: boolean; mayChange: boolean; sets: { key: string; active: number; retired: number }[]; runsOn: string[] };
+type ListsAnswer = {
+  own: boolean; mayChange: boolean; sets: { key: string; active: number; retired: number }[];
+  /** Each list as the backend reads it (`ListRules`): whether the app runs on it, among the rest. */
+  lists: { key: string; app: boolean }[];
+};
 
 /**
  * Types & sets: the project's lists. Until the project changes one it reads the organization's (the default); its first
@@ -76,7 +80,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const [sets, lists] = await Promise.all([
     getSets(),
-    api<ListsAnswer>(projectPath(ctx, "/lists")).catch(() => ({ own: false, mayChange: false, sets: [], runsOn: [] } as ListsAnswer)),
+    api<ListsAnswer>(projectPath(ctx, "/lists")).catch(() => ({ own: false, mayChange: false, sets: [], lists: [] } as ListsAnswer)),
   ]);
   const countOf = (key: string) => lists.sets.find((c) => c.key === key)?.active ?? 0;
   const headingOf = (one: (typeof sets)[number]) =>
@@ -115,7 +119,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
   );
   const retiredCount = allValues.filter((v) => v.status === "RETIRED").length;
   const listUsed = Object.keys(places).length > 0;
-  const runsOn = !!set && lists.runsOn.includes(set.key);
+  const runsOn = !!set && (lists.lists ?? []).some((one) => one.key === set.key && one.app);
   const here = (extra: Record<string, string | undefined>) => {
     const p = new URLSearchParams({ set: currentKey, ...(q ? { q } : {}), ...(show !== "ACTIVE" ? { show } : {}) });
     for (const [k, v] of Object.entries(extra)) v === undefined ? p.delete(k) : p.set(k, v);
