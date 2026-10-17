@@ -553,9 +553,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Document Control changes its project's; an administrator may give that right to anyone they nominate. Once a project
   has its own version, later changes by the organization never touch it (no overriding projects afterwards: "pure
   chaos"). Until built, a page says plainly what is the organization's and what is the project's.
-- Document families come back (owner): each document type belongs to a family (internal drawings like DWG, supplier
-  documents like A109…); the family tells types apart and recommends a criticality. They were lost when the demo data
-  was renewed.
+- Document families are **on hold** (owner): the idea is to group document types (internal like DWG, supplier like C102)
+  to tell criticality and whether an outside stamp / wet signature is needed or the app's approval is enough, legally.
+  That needs research before deciding (`docs/gaps/families.md`). Meanwhile document types are grouped by deliverable
+  type. The families' stamp rule is not applied by the app, so nothing states it.
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
   of the hub (`CONTROL_ROOM`): how the project works, and what makes it work that way (the control function, who does
   what, releasing, adding people), opening on "Open the Control room". Everyone of ours reads it (`read: true`, "See
