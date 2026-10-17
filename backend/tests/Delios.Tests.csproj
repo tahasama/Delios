@@ -11,6 +11,8 @@
     <PackageReference Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <PackageReference Include="Testcontainers.RabbitMq" Version="4.15.0" />
     <PackageReference Include="Testcontainers.Redis" Version="4.15.0" />
+    <!-- Pulled in by the test packages at a version with known vulnerabilities (NU1903): held at the patched release. -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
