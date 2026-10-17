@@ -164,7 +164,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
           </div>
           {lists.mayChange ? (
             <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end">
-              <Link href={here({ panel: sp.panel === "new" ? undefined : "new", edit: undefined })} className={btn("primary")}><Plus className="h-4 w-4" /> New list</Link>
+              <Link scroll={false} href={here({ panel: sp.panel === "new" ? undefined : "new", edit: undefined })} className={btn("primary")}><Plus className="h-4 w-4" /> New list</Link>
               <Link href="/import" className="text-xs font-medium text-slate-500 transition hover:text-link">Got a list in a spreadsheet? Import it →</Link>
             </div>
           ) : null}
@@ -185,7 +185,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
             </div>
           </ActionForm>
           <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
-            <Link href={here({ panel: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+            <Link scroll={false} href={here({ panel: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
             <button type="submit" form="new-list" data-on="true" className="ask">Create the list</button>
           </div>
         </section>
@@ -211,8 +211,8 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                 ) : null}
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                {may ? <Link href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} data-on={sp.panel === "add"} className="ask mr-2"><Plus className="h-3.5 w-3.5" /> Add a value</Link> : null}
-                {may ? <Link href={here({ panel: sp.panel === "details" ? undefined : "details", edit: undefined })} title="Change this list" aria-label="Change this list" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil className="h-4 w-4" /></Link> : null}
+                {may ? <Link scroll={false} href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} data-on={sp.panel === "add"} className="ask mr-2"><Plus className="h-3.5 w-3.5" /> Add a value</Link> : null}
+                {may ? <Link scroll={false} href={here({ panel: sp.panel === "details" ? undefined : "details", edit: undefined })} title="Change this list" aria-label="Change this list" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil className="h-4 w-4" /></Link> : null}
                 <a href={`/api/export/config-set?set=${encodeURIComponent(set.key)}`} title="Download this list" aria-label="Download this list" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Download className="h-4 w-4" /></a>
                 {may && !runsOn && !listUsed ? <DeleteSetButton setKey={set.key} title={set.title} count={allValues.length} /> : null}
               </div>
@@ -236,7 +236,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                         <ActionForm action={switchSetAction} hidden={{ key: currentKey, setId: chosen.id, active: chosen.active ? "0" : "1" }} hideSubmit className="space-y-0">
                           <button type="submit" className="ask">{chosen.active ? "Switch off" : "Switch on"}</button>
                         </ActionForm>
-                        <Link href={here({ panel: sp.panel === "editset" ? undefined : "editset", edit: undefined, vs: chosen.id })} title="Change this set" aria-label="Change this set" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil className="h-4 w-4" /></Link>
+                        <Link scroll={false} href={here({ panel: sp.panel === "editset" ? undefined : "editset", edit: undefined, vs: chosen.id })} title="Change this set" aria-label="Change this set" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"><Pencil className="h-4 w-4" /></Link>
                         {!setUsed ? (
                           <ActionForm action={deleteSetAction} hidden={{ key: currentKey, setId: chosen.id }} hideSubmit className="space-y-0"
                             confirmText={`Delete the set ${chosen.name} and its values? None of them was ever used on ${ctx.project.code}; the log keeps it.`}>
@@ -279,7 +279,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                   )}
                 </ActionForm>
                 <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
-                  <Link href={here({ panel: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                  <Link scroll={false} href={here({ panel: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
                   <button type="submit" form="set-form" data-on="true" className="ask">{sp.panel === "newset" ? "Make the set" : "Save"}</button>
                 </div>
               </div>
@@ -297,7 +297,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                   </div>
                 </ActionForm>
                 <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
-                  <Link href={here({ panel: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                  <Link scroll={false} href={here({ panel: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
                   <button type="submit" form="add-value" data-on="true" className="ask">Add it</button>
                 </div>
               </div>
@@ -320,7 +320,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                   </div>
                 </ActionForm>
                 <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
-                  <Link href={here({ panel: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                  <Link scroll={false} href={here({ panel: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
                   <button type="submit" form="list-details" data-on="true" className="ask">Save</button>
                 </div>
               </div>
@@ -337,10 +337,10 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
               </label>
               <span className="flex items-center gap-2">
                 {([["ACTIVE", "In use"], ["RETIRED", `Retired${retiredCount ? ` ${retiredCount}` : ""}`], ["ALL", "All"]] as const).map(([value, label]) => (
-                  <Link key={value} href={here({ show: value === "ACTIVE" ? undefined : value, edit: undefined })} data-on={show === value} aria-current={show === value ? "true" : undefined} className="ask">{label}</Link>
+                  <Link scroll={false} key={value} href={here({ show: value === "ACTIVE" ? undefined : value, edit: undefined })} data-on={show === value} aria-current={show === value ? "true" : undefined} className="ask">{label}</Link>
                 ))}
               </span>
-              {q ? <Link href={here({ q: undefined, edit: undefined })} className="text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-slate-800 hover:underline">Clear</Link> : null}
+              {q ? <Link scroll={false} href={here({ q: undefined, edit: undefined })} className="text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-slate-800 hover:underline">Clear</Link> : null}
             </form>
 
             {values.length ? (
@@ -380,7 +380,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                         <Td className="whitespace-nowrap">{v.status === "ACTIVE" ? <ToneChip tone="done">in use</ToneChip> : v.status === "OFF" ? <ToneChip tone="idle">its set is off</ToneChip> : <ToneChip tone="idle">retired</ToneChip>}</Td>
                         {may ? (
                           <Td className="w-px whitespace-nowrap text-right">
-                            <Link href={`${here({ edit: open ? undefined : v.id, panel: undefined })}#value-${index}-line`} scroll={false} className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title={open ? "Close" : `Change ${v.code}`}>
+                            <Link scroll={false} href={`${here({ edit: open ? undefined : v.id, panel: undefined })}#value-${index}-line`} className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title={open ? "Close" : `Change ${v.code}`}>
                               {open ? <X aria-label={`Close ${v.code}`} className="h-4 w-4" /> : <Pencil aria-label={`Change ${v.code}`} className="h-4 w-4" />}
                             </Link>
                           </Td>
@@ -402,7 +402,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                               </div>
                             </ActionForm>
                             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line bg-tint-soft px-5 py-3 text-xs sm:px-6">
-                              <Link href={here({ edit: undefined })} className="font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                              <Link scroll={false} href={here({ edit: undefined })} className="font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
                               <form action={retireValueAction}>
                                 <input type="hidden" name="valueId" value={v.id} />
                                 <button className="font-semibold text-slate-500 hover:text-slate-800">{v.status !== "RETIRED" ? "Retire" : "Bring back"}</button>

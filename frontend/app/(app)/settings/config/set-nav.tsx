@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, Search } from "lucide-react";
 
@@ -26,6 +26,8 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
   const [q, setQ] = useState("");
   // A list opens on its sets with its + (which becomes −); the one shown on the right starts open.
   const [open, setOpen] = useState<Set<string>>(() => new Set([current]));
+  // The list chosen opens on its sets by itself, whichever way it was chosen.
+  useEffect(() => { setOpen((was) => (was.has(current) ? was : new Set(was).add(current))); }, [current]);
   const toggle = (key: string) => setOpen((was) => { const next = new Set(was); if (next.has(key)) next.delete(key); else next.add(key); return next; });
   const router = useRouter();
   const needle = q.trim().toLowerCase();
@@ -47,7 +49,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                 type="button"
                 role="tab"
                 aria-selected={on}
-                onClick={() => { setTab(i); setQ(""); const first = g.sets[0]; if (first && !g.sets.some((s) => s.key === current)) router.replace(`/settings/config?set=${first.key}`); }}
+                onClick={() => { setTab(i); setQ(""); const first = g.sets[0]; if (first && !g.sets.some((s) => s.key === current)) router.replace(`/settings/config?set=${first.key}`, { scroll: false }); }}
                 className={`-mb-px whitespace-nowrap border-b-2 px-0.5 pb-2 pt-1 text-[12px] leading-4 transition ${on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"}`}
               >
                 {g.title} <span className="ml-1 font-normal tabular-nums text-slate-500">{g.sets.length}</span>
@@ -72,6 +74,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                   <div className={`flex items-center rounded-sm ${on ? "bg-tint" : "hover:bg-tint-soft"}`}>
                     <Link
                       replace
+                      scroll={false}
                       href={`/settings/config?set=${one.key}`}
                       aria-current={on ? "page" : undefined}
                       className={`flex min-w-0 flex-1 items-center justify-between gap-2 py-2 pl-2.5 pr-1 text-[13px] ${on ? "font-semibold text-brand-ink" : "text-slate-600 hover:text-slate-900"}`}
@@ -98,6 +101,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                           <li key={part.id ?? "default"}>
                             <Link
                               replace
+                              scroll={false}
                               href={`/settings/config?set=${one.key}${part.id ? `&vs=${part.id}` : ""}`}
                               aria-current={here ? "page" : undefined}
                               className={`flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-[12px] ${here ? "bg-tint font-semibold text-brand-ink" : "text-slate-600 hover:bg-tint-soft hover:text-slate-900"} ${part.active ? "" : "opacity-60"}`}
@@ -110,7 +114,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                       })}
                       {mayAddSets && one.takesSets ? (
                         <li>
-                          <Link replace href={`/settings/config?set=${one.key}&panel=newset`} className="flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-[12px] font-semibold text-link hover:bg-tint-soft">
+                          <Link replace scroll={false} href={`/settings/config?set=${one.key}&panel=newset`} className="flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-[12px] font-semibold text-link hover:bg-tint-soft">
                             <Plus className="h-3 w-3" /> New set
                           </Link>
                         </li>
