@@ -47,7 +47,7 @@ export async function uploadPlanListAction(_prev: Result | undefined, formData: 
   } catch (e) {
     return { error: refusal(e).message };
   }
-  revalidatePath("/actions");
+  revalidatePath("/schedule");
   return { ok: `Read as the list of ${document.number} rev ${rev}. ${summary}`, link: placeholders(registered) };
 }
 
@@ -75,6 +75,6 @@ export async function uploadLooseListAction(_prev: Result | undefined, formData:
   } catch (e) {
     return { error: refusal(e).message };
   }
-  revalidatePath("/actions");
+  revalidatePath("/schedule");
   return { ok: `Applied. ${summary}`, link: placeholders(registered) };
 }

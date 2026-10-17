@@ -92,7 +92,7 @@ const WORKED_ON: Partial<Record<ReportId, { label: string; href: string }>> = {
   register: { label: "Work on them in the register", href: "/documents?view=all" },
   reviews: { label: "Open the reviews still open", href: "/reviews?status=OPEN" },
   transmittals: { label: "Open the transmittals", href: "/transmittals?view=all" },
-  readiness: { label: "Open the Schedule", href: "/actions" },
+  readiness: { label: "Open the Schedule", href: "/schedule" },
   asof: { label: "Open the register as it is now", href: "/documents?view=all" },
   exchange: { label: "Open the packages", href: "/packages" },
 };

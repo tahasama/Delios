@@ -5,7 +5,7 @@ import type { RevisionSeries } from "@/lib/settings/api-admin";
 
 /**
  * What the document management plan is written from that only the keepers read elsewhere, gathered by the backend for
- * everyone of ours on the project (`GET /api/projects/{id}/plan`, `PlanEndpoints`): numbering, how revisions are named,
+ * everyone of ours on the project (`GET /api/projects/{id}/management-plan`, `PlanEndpoints`): numbering, how revisions are named,
  * the review routes with who answers each step, the functions with what they may do and who holds them here.
  */
 export type ProjectPlan = {
@@ -26,4 +26,4 @@ export type ProjectPlan = {
 };
 
 export const projectPlan = cache(async (scope: { projectId: string }): Promise<ProjectPlan> =>
-  api<ProjectPlan>(projectPath(scope, "/plan")));
+  api<ProjectPlan>(projectPath(scope, "/management-plan")));

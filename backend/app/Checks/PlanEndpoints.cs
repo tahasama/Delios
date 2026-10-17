@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Delios.Host.Checks;
 
 /// <summary>
-/// <c>GET /api/projects/{projectId}/plan</c>: what the project's document management plan is written from and only the
+/// <c>GET /api/projects/{projectId}/management-plan</c>: what the project's document management plan is written from and only the
 /// keepers read elsewhere: the numbering, how revisions are named, the review routes with who answers each step, and
 /// each function with what it may do and who holds it here. Everyone of ours on the project reads it; another
 /// organization's people do not (the plan is ours). The lists, the project's answers and the directory are read where
@@ -18,7 +18,7 @@ public static class PlanEndpoints
 {
     public static void MapPlanEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGroup("/api/projects/{projectId:guid}/plan").WithTags("Assurance")
+        app.MapGroup("/api/projects/{projectId:guid}/management-plan").WithTags("Assurance")
             .AddEndpointFilter<TransactionFilter>().AddEndpointFilter<ProjectAccessFilter>()
             .MapGet("", PlanAsync);
     }

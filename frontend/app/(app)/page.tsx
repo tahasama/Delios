@@ -243,8 +243,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         : w.kind === "ADD_TO_ACTION"
         ? { href: `/actions/${w.code}#asked`, code: w.code ?? "", title: `${w.name}: ${w.from ?? "someone"} asks for ${w.ask === "DISCIPLINE" ? "a missing discipline" : "a document"} to be added (${w.number})`, tag: "asked", tone: "sky", at: at(w.since), cta: "Answer" }
         : w.kind === "UNTAGGED"
-          ? { href: "/actions?view=table&untagged=1", code: `${w.count}`, title: `action${w.count === 1 ? "" : "s"} with no discipline tagged`, tag: "untagged", tone: "amber", at: null, cta: "Tag them" }
-          : { href: "/actions", code: w.code ?? "", title: `the schedule could not be read${w.name ? `: ${w.name}` : ""}`, tag: "read failed", tone: "amber", at: at(w.since), cta: "Upload" }),
+          ? { href: "/schedule?view=table&untagged=1", code: `${w.count}`, title: `action${w.count === 1 ? "" : "s"} with no discipline tagged`, tag: "untagged", tone: "amber", at: null, cta: "Tag them" }
+          : { href: "/schedule", code: w.code ?? "", title: `the schedule could not be read${w.name ? `: ${w.name}` : ""}`, tag: "read failed", tone: "amber", at: at(w.since), cta: "Upload" }),
     drafts: revisionsOf(["DRAFT"]).map<Row>((w) => ({
       href: `/documents/${w.documentId}#workflow`, code: w.documentNumber, rev: w.revision, title: w.title,
       tag: w.note === "READY" ? "file attached" : w.note === "REJECTED" ? "file refused" : "file scanning", tone: "plain", at: at(w.since), cta: "Continue",
@@ -336,7 +336,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               index={3}
             />
           ) : (
-            <Fig href="/actions" value={atRisk.length} label="activities short of documents" index={3} />
+            <Fig href="/schedule" value={atRisk.length} label="activities short of documents" index={3} />
           )}
         </div>
 
@@ -482,7 +482,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   </Link>
                 );
               })}
-                            <Link href="/actions" className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">The whole schedule{atRisk.length > 3 ? ` · ${atRisk.length} at risk` : ""} →</Link>
+                            <Link href="/schedule" className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">The whole schedule{atRisk.length > 3 ? ` · ${atRisk.length} at risk` : ""} →</Link>
             </section>
           ) : null}
 

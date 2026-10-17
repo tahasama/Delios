@@ -29,7 +29,7 @@ function fixFor(d: DefectView): { label: string; href: string } {
   if (d.entityType === "Audit") return { label: "Audit trail", href: "/settings/audit" };
   const documentId = d.documentId;
   if (!documentId) {
-    if (family === "SCH") return { label: "Schedule", href: "/actions" };
+    if (family === "SCH") return { label: "Schedule", href: "/schedule" };
     return { label: "Settings", href: "/settings" };
   }
   const doc = `/documents/${documentId}`;

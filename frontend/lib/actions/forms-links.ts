@@ -21,7 +21,7 @@ type State = { error?: string; ok?: string };
 /** Everything that shows an action's disciplines or documents. */
 function refresh(code: string, transmittalId?: string | null) {
   revalidatePath(`/actions/${code}`);
-  revalidatePath("/actions");
+  revalidatePath("/schedule");
   revalidatePath("/");
   if (transmittalId) revalidatePath(`/transmittals/${transmittalId}`);
 }

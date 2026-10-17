@@ -524,7 +524,7 @@ export async function DocumentManagementPlan() {
 
       <Chapter n={n("schedule")} id="schedule" title="When documents are needed: the schedule"
         why="Documents are needed by actions on the project schedule. Each document is planned for the earliest day an action needs it, and the disciplines confirm the action can go ahead."
-        change={[{ href: "/actions", label: "Schedule" }]}>
+        change={[{ href: "/schedule", label: "Schedule" }]}>
         <Flow steps={[
           { what: "The schedule and its lists are released", who: "Whoever plans (or the control function)", detail: "The schedule, the disciplines per action and the documents each discipline needs are register documents, read when released.", rail: "rail-released" },
           { what: "Each document gets its planned day", who: "By itself", detail: `The earliest day an action needs it; sending for review is due on that day, released & issued on the action's day (${leadDays} days ahead by default).`, rail: "rail-ahead" },

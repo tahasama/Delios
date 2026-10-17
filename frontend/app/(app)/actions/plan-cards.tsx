@@ -44,7 +44,7 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
     <>
       {inForce("DEPARTMENTS")}
       {/* Only a problem is counted here: actions no discipline is tagged on. */}
-      {progress.untagged.length ? <>{" · "}<Link href="/actions?view=table&untagged=1" className="font-semibold text-amber-800 hover:underline">{progress.untagged.length} untagged</Link></> : null}
+      {progress.untagged.length ? <>{" · "}<Link href="/schedule?view=table&untagged=1" className="font-semibold text-amber-800 hover:underline">{progress.untagged.length} untagged</Link></> : null}
     </>,
     inForce("REQUIREMENTS"),
     // Counted only in the window: a month either side of today, or the dates chosen.

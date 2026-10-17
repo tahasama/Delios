@@ -162,7 +162,7 @@ export function PlanRegister({
     };
     startTransition(() => router.replace(href, { scroll: false }));
   };
-  const here = (params: URLSearchParams) => `/actions${params.size ? `?${params}` : ""}`;
+  const here = (params: URLSearchParams) => `/schedule${params.size ? `?${params}` : ""}`;
 
   useEffect(() => {
     if (pending || !kept.current) return;
@@ -230,7 +230,7 @@ export function PlanRegister({
         // as well as the query: an uncontrolled select keeps whatever the
         // reader chose until React is given a reason to replace it.
         key={`${filters.q}|${filters.code}|${filters.state}|${filters.happened}|${filters.discipline}|${filters.docType}|${filters.supplier}|${filters.on}|${filters.from}|${filters.to}`}
-        action="/actions"
+        action="/schedule"
         onSubmit={(event) => {
           event.preventDefault();
           setDirty(false);
@@ -325,7 +325,7 @@ export function PlanRegister({
           ))}
           <button
             type="button"
-            onClick={() => go(view === "table" ? "/actions?view=table" : "/actions")}
+            onClick={() => go(view === "table" ? "/schedule?view=table" : "/schedule")}
             className="ml-1 inline-flex items-center gap-1 rounded-sm bg-brand px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-brand-hover"
           >
             <X className="h-3 w-3" /> Clear all {facets.length}
@@ -395,7 +395,7 @@ export function PlanRegister({
                 {more.noNote?.count ? (
                   <button type="button" onClick={() => go(more.noNote!.href)} className="text-xs font-semibold text-red-700 hover:underline">{more.noNote.count.toLocaleString("en-GB")} went ahead with missing documents →</button>
                 ) : null}
-                {facets.length ? <button type="button" onClick={() => go("/actions")} className="text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
+                {facets.length ? <button type="button" onClick={() => go("/schedule")} className="text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
               </div>
             </div>
           ) : plan}
@@ -571,7 +571,7 @@ export function PlanRegister({
               <div className="px-6 py-20 text-center">
                 <p className="font-mono text-xs tracking-[0.2em] text-slate-500 uppercase">no actions</p>
                 <p className="mt-2 text-sm text-slate-700">Nothing in the schedule matches these filters.</p>
-                {facets.length ? <button type="button" onClick={() => go("/actions?view=table")} className="mt-3 text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
+                {facets.length ? <button type="button" onClick={() => go("/schedule?view=table")} className="mt-3 text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
               </div>
             )}
           </div>

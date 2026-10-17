@@ -255,7 +255,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Link href="/actions" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Schedule</Link>
+              <Link href="/schedule" className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> Schedule</Link>
               <ReadinessChip readiness={readiness} />
             </div>
           </div>

@@ -9,7 +9,7 @@ export const metadata = { title: "The plan" };
 
 /**
  * The project's document management plan: a document, not a setting. Everyone of ours reads it (Assurance is ours
- * only); the backend gathers what only the keepers read elsewhere (`GET /plan`). The contents stay beside it on screen.
+ * only); the backend gathers what only the keepers read elsewhere (`GET /management-plan`). The contents stay beside it on screen.
  */
 export default async function PlanPage() {
   await requireScope();

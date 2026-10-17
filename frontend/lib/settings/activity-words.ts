@@ -252,7 +252,7 @@ export function activityLink(entityType: string | null, entityId: string | null,
     case "Exception": return "/conformance/checks";
     case "ControlledVersion":
     case "RequirementCall":
-    case "Notice": return "/actions";
+    case "Notice": return "/schedule";
     default: return null;
   }
 }

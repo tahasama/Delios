@@ -97,7 +97,8 @@ frontend/
 │   │   ├── reviews/
 │   │   ├── transmittals/ + exposures/
 │   │   ├── packages/
-│   │   ├── actions/      the schedule, the same page for everyone (+ needed/: an old address, redirects)
+│   │   ├── schedule/     the schedule list (/schedule), the same page for everyone
+│   │   ├── actions/      each action's page (/actions/<code>); /actions and needed/ are old addresses, redirect
 │   │   ├── assets/
 │   │   ├── conformance/  + reports/
 │   │   ├── notifications/

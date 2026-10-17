@@ -325,14 +325,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   document Details, package lines, the supplier's schedule; `plannedState`):
   ready (released), submitted (received, accepted, in review), overdue · N
   days, due today, at risk · N days left (inside the risk window), in N days.
-- The menu and page are named **Schedule** (each action opens its own page); the rules below still say
+- The menu and page are named **Schedule**, at `/schedule` (each action keeps its own page at `/actions/<code>`; `/actions` redirects); the rules below still say
   "Schedule & actions" for the same page.
 - Schedule & actions is one page for everyone, narrowed by the backend to what is
   theirs (`OutsideViewAsync` / `Narrow` in `ScheduleEndpoints`): our people see every
   action; another organization's people see the actions needing a document they may
   see (their own, and those shared with them), and in each only those documents. Our
   disciplines, confirmations, notices and notes are ours: not shown to them; a
-  decision reads without who or why. `/needed` only redirects to `/actions`.
+  decision reads without who or why. `/needed` and `/actions` only redirect to `/schedule`.
 - A notice about a supplier's missing document proposes that supplier's
   people (chosen, marked recommended); they are sent to the document, since
   the schedule is ours only.
@@ -605,7 +605,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   transmittals, other organizations, the schedule, who sees what, keeping and ending, what is recorded, how it is
   checked): each with why, the steps (who, what, when, its state's side colour), the facts it runs on, and "the app
   makes sure of it" (`prevented.ts` by area); "Set in" links on screen only. Every sentence is read from how the
-  project is set up (`GET /plan`, `PlanEndpoints`, for what only the keepers read elsewhere); what is not set up is said
+  project is set up (`GET /management-plan`, `PlanEndpoints`, for what only the keepers read elsewhere); what is not set up is said
   where it belongs. Nothing on it is typed and nothing repeats a Settings page. Scope is said once (This project); the
   target once (Assurance, "How it is measured", `MEASURE`; the checks run by themselves every day, so no interval). The
   organization's name is its own. No exceptions register (it changed nothing): a check switched off, with why, is the

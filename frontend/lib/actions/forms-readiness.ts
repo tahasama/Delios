@@ -31,6 +31,7 @@ export async function confirmReadinessAction(_prev: State | undefined, formData:
   } catch (e) {
     return failed(e);
   }
+  revalidatePath("/schedule");
   revalidatePath("/actions", "layout");
   return { ok: "Recorded." };
 }
@@ -47,6 +48,7 @@ export async function revokeReadinessAction(_prev: State | undefined, formData: 
   } catch (e) {
     return failed(e);
   }
+  revalidatePath("/schedule");
   revalidatePath("/actions", "layout");
   return { ok: "Taken back. The discipline confirms again." };
 }

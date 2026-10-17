@@ -74,7 +74,7 @@ function primaryNav(p: NavPermissions): NavItem[] {
       { href: "/", label: "Home", description: "What is waiting on me", icon: LayoutDashboard, exact: true },
       { href: "/documents", label: "Documents", description: "The register", icon: FileText, when: p.canRead },
       // The same entry and the same page for everyone, narrowed to what is theirs.
-      { href: "/actions", label: "Schedule", description: "What is needed, and when", icon: CalendarRange, also: ["/needed"] },
+      { href: "/schedule", label: "Schedule", description: "What is needed, and when", icon: CalendarRange, also: ["/needed", "/actions"] },
       {
         href: "/transmittals",
         label: "Transmittals",

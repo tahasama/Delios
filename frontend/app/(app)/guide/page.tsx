@@ -27,7 +27,7 @@ type CapabilityItem = {
 const DAILY: CapabilityItem[] = [
   { href: "/documents", title: "Find, select and act on documents", text: "Search the register, switch metadata views, export, or select several documents to route and transmit together.", icon: FileText, action: "Open document register" },
   { href: "/reviews", title: "Review and approve", text: "See assignments, comments, workflow steps and decisions that need a response.", icon: ClipboardCheck, action: "Open reviews" },
-  { href: "/actions", title: "Know if scheduled work is ready", text: "Connect action codes and dates to the documents required for execution, use or handover.", icon: CalendarRange, action: "Open schedule readiness" },
+  { href: "/schedule", title: "Know if scheduled work is ready", text: "Connect action codes and dates to the documents required for execution, use or handover.", icon: CalendarRange, action: "Open schedule readiness" },
   { href: "/transmittals", title: "Issue and receive information", text: "Raise outgoing or incoming transmittals and follow notified, opened and acknowledged evidence.", icon: ArrowLeftRight, action: "Open transmittals" },
   { href: "/packages", title: "Assemble handover packages", text: "Define a package, track required status, assess shortfalls and close with evidence.", icon: FolderKanban, action: "Open packages" },
   { href: "/assets", title: "Retrieve by equipment or area", text: "See every document associated with an asset, system, equipment tag or project area.", icon: Boxes, action: "Open assets" },
