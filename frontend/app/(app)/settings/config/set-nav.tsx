@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
@@ -17,13 +17,31 @@ export function SetNav({ groups, current, children }: { groups: SetNavGroup[]; c
   const [q, setQ] = useState("");
   const router = useRouter();
   const needle = q.trim().toLowerCase();
+  // The sheet stands from where it starts to the foot of the window (the page keeps its own bottom margin), so the
+  // page never scrolls: only the table's rows do, and the list of lists when it is long. On a narrow screen it flows.
+  const box = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const fit = () => {
+      const el = box.current;
+      if (!el) return;
+      if (window.innerWidth < 1024) { setHeight(null); return; }
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const below = parseFloat(getComputedStyle(el.closest("main") ?? document.body).paddingBottom) || 0;
+      setHeight(Math.max(360, Math.floor(window.innerHeight - top - below)));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    document.fonts?.ready.then(fit).catch(() => {});
+    return () => window.removeEventListener("resize", fit);
+  }, []);
   const sets = needle
     ? groups.flatMap((g) => g.sets).filter((s) => s.title.toLowerCase().includes(needle) || s.key.toLowerCase().includes(needle))
     : groups[tab]?.sets ?? [];
 
   return (
-    <div className="register register-sheet register-sheet-open">
-      <div className="asking flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-line px-5 pt-2 sm:px-6">
+    <div ref={box} style={height ? { height } : undefined} className="register register-sheet register-sheet-open flex flex-col">
+      <div className="asking flex shrink-0 flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-line px-5 pt-2 sm:px-6">
         <div role="tablist" className="-mb-px flex flex-wrap gap-x-5">
           {groups.map((g, i) => {
             const on = !needle && i === tab;
@@ -47,8 +65,8 @@ export function SetNav({ groups, current, children }: { groups: SetNavGroup[]; c
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a list…" className="plain w-full pl-6!" />
         </label>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)]" role="tabpanel">
-        <nav aria-label="Lists" className="border-b border-line p-2 lg:border-b-0 lg:border-r">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)] lg:grid-rows-1" role="tabpanel">
+        <nav aria-label="Lists" className="scroll-quiet min-h-0 overflow-y-auto border-b border-line p-2 lg:border-b-0 lg:border-r">
           <ul className="space-y-px">
             {sets.map((one) => {
               const on = one.key === current;
@@ -69,7 +87,7 @@ export function SetNav({ groups, current, children }: { groups: SetNavGroup[]; c
             {!sets.length ? <li className="px-2.5 py-2 text-xs text-slate-500">No list matches “{q}”.</li> : null}
           </ul>
         </nav>
-        <div className="min-w-0">{children}</div>
+        <div className="flex min-h-0 min-w-0 flex-col">{children}</div>
       </div>
     </div>
   );

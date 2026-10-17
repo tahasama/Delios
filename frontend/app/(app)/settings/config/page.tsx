@@ -167,9 +167,9 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
 
       <SetNav groups={groups} current={currentKey}>
         {set ? (
-          <section className="min-w-0">
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col">
             {/* The list: its name, what it is for, where it stands; what may be done to it, on the right. */}
-            <div className="flex flex-col gap-3 border-b border-line px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex shrink-0 flex-col gap-3 border-b border-line px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-semibold text-slate-900">{set.title}</h2>
                 <p className="plate-meta mt-1">
@@ -194,7 +194,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
 
             {/* A form opened from the list takes its place under the head: grey fields, then the strip. */}
             {sp.panel === "add" && may ? (
-              <div className="border-b border-line">
+              <div className="shrink-0 border-b border-line">
                 <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6"><span className="stencil mr-1 text-slate-500">A new value</span><span className="text-[11px] text-slate-500">in {set.title.toLowerCase()}</span></div>
                 <ActionForm id="add-value" action={addValueAction} hideSubmit hidden={{ setKey: currentKey }} resetOnSuccess className="asking px-5 py-5 sm:px-6">
                   <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -210,7 +210,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
               </div>
             ) : null}
             {sp.panel === "details" && may ? (
-              <div className="border-b border-line">
+              <div className="shrink-0 border-b border-line">
                 <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6"><span className="stencil mr-1 text-slate-500">This list</span><span className="text-[11px] text-slate-500">{listUsed || runsOn ? "its short name stays: a value of it is used" : "never used: its short name may still change"}</span></div>
                 <ActionForm id="list-details" action={updateListAction} hideSubmit hidden={{ key: set.key }} className="asking px-5 py-5 sm:px-6">
                   <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -234,7 +234,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
             ) : null}
 
             {/* Narrowing: words, then which values, each choice acting at once. */}
-            <form className="asking flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-5 py-2.5 sm:px-6" action="/settings/config">
+            <form className="asking flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-5 py-2.5 sm:px-6" action="/settings/config">
               <input type="hidden" name="set" value={currentKey} />
               {show !== "ACTIVE" ? <input type="hidden" name="show" value={show} /> : null}
               <label className="search-field relative min-w-60 flex-1">
@@ -256,8 +256,10 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
               {may ? <form id="bulk-values" action={bulkValuesAction} className="hidden" /> : null}
               <DataTable
                 id={`set-values-${propFields ? currentKey : "plain"}`}
-                className="rounded-none border-0 shadow-none"
+                className="min-h-40 rounded-none border-0 shadow-none"
                 toolbar={false}
+                fill
+                stretch
                 head={<tr>{may ? <Th className="w-8"><SelectAll formId="bulk-values" count={values.length} /></Th> : null}<Th>Code</Th><Th>Name</Th>{propFields ? <Th>What it does</Th> : null}<Th>Used</Th><Th>Status</Th>{may ? <Th /> : null}</tr>}
               >
                 {values.map((v) => {
@@ -332,7 +334,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                   );
                 })}
               </DataTable>
-              {may ? <ValuesDock formId="bulk-values" /> : null}
+              {may ? <div className="shrink-0"><ValuesDock formId="bulk-values" /></div> : null}
               </>
             ) : (
               <p className="px-5 py-10 text-center text-sm text-slate-500 sm:px-6">
