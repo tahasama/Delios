@@ -11,7 +11,7 @@ import { SearchPick } from "@/components/search-pick";
 
 type SendPerson = { id: string; name: string; functionName: string; inMatrix?: boolean };
 export type SendStep = { title: string; act: "REVIEW" | "APPROVAL"; mode: string; proposed: { id: string; why: string }[]; fromFunctions: string[] };
-export type SendRoute = { id: string; name: string; description: string | null; isDefault: boolean; recommended?: boolean; steps: SendStep[]; verdicts: { title: string; values: { code: string; label: string; effectLabel: string }[] } | null };
+export type SendRoute = { id: string; name: string; description: string | null; isDefault: boolean; recommended?: boolean; steps: SendStep[]; verdicts: { title: string; values: { code: string; label: string; effectLabel: string }[]; warning?: string | null } | null };
 
 const MODE: Record<string, string> = {
   ALL: "all give input, any order",
@@ -64,6 +64,7 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, e
           {route.verdicts.values.map((v, i) => <span key={v.code} title={v.label}>{i ? " · " : ""}<span className="font-mono font-semibold">{v.code}</span> {v.effectLabel}</span>)}
         </p>
       ) : null}
+      {route?.verdicts?.warning ? <p className="rounded-md bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800 ring-1 ring-amber-200">{route.verdicts.warning}</p> : null}
 
       <div key={routeId} className="scroll-thin -mx-1 flex items-stretch gap-1 overflow-x-auto px-1 pb-1">
         {route?.steps.map((step, i) => (

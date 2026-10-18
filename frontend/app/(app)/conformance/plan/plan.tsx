@@ -138,9 +138,17 @@ export async function DocumentManagementPlan() {
   const label = (items: { code: string; label: string }[], code: string | null | undefined) => (code ? items.find((v) => v.code === code)?.label ?? code : null);
   const setTitle = (key: string) => sets.find((s) => s.key === key)?.title ?? key;
 
-  // The verdict lists the routes answer from, each with its verdicts and what each means.
-  const verdictKeys = [...new Set(plan.routes.map((r) => r.verdictSet))];
-  const verdictLists = await Promise.all(verdictKeys.map(async (key) => ({ key, title: setTitle(key), values: await getActiveSet(key) })));
+  // The sets of the review outcomes, each with whom it serves, the routes naming it, its verdicts and what each means.
+  const outcomeSets = (await api<{ lists: { key: string; sets: { id: string | null; name: string; isDefault: boolean; active: boolean; deliverableTypes: string[] }[] }[] }>(projectPath(ctx, "/lists"))
+    .catch(() => ({ lists: [] }))).lists.find((l) => l.key === "REVIEW_OUTCOMES")?.sets.filter((s) => s.active) ?? [];
+  const outcomeValues = await getActiveSet("REVIEW_OUTCOMES");
+  const defaultSetId = outcomeSets.find((s) => s.isDefault)?.id ?? null;
+  const verdictLists = outcomeSets.map((s) => ({
+    key: s.name, title: s.name,
+    serves: s.deliverableTypes.length ? s.deliverableTypes : null, isDefault: s.isDefault,
+    routes: plan.routes.filter((r) => r.verdicts === s.name).map((r) => r.name),
+    values: outcomeValues.filter((v) => (v.setId ?? defaultSetId) === s.id),
+  }));
 
   const orgs = directory?.organizations ?? [];
   const ours = orgs.find((o) => o.kind === "OURS");
@@ -471,13 +479,17 @@ export async function DocumentManagementPlan() {
         )) : <Missing>No review route yet: nothing can be reviewed.</Missing>}
         {verdictLists.map((v) => (
           <Part key={v.key} title={`Verdicts: ${v.title}`}>
+            <Say>
+              {v.serves ? `For ${v.serves.map((code) => label(deliverables, code) ?? code).join(", ")}` : v.isDefault ? "For every deliverable type no other set serves" : "For no deliverable type of its own"}
+              {v.routes.length ? `; the routes ${v.routes.join(", ")} decide with it` : ""}.
+            </Say>
             <Grid head={["Verdict", "Means", "What follows"]}
               rows={v.values.map((value) => {
                 const meaning = "proceed" in value.props ? verdictEffect(value.props) : null;
                 return [
                   <span key="v"><Code>{value.code}</Code> {value.label}</span>,
                   meaning ? <ToneChip tone={MEANING_TONE[meaning]}>{MEANING_WORDS[meaning]}</ToneChip> : <ToneChip tone="waiting">not chosen yet</ToneChip>,
-                  meaning ? VERDICT_EFFECT_BLURB[meaning] : "Given a meaning in Verdict lists before it is used.",
+                  meaning ? VERDICT_EFFECT_BLURB[meaning] : "Given a meaning in Types & sets before it is used.",
                 ];
               })} />
           </Part>

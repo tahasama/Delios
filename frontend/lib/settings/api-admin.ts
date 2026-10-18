@@ -83,6 +83,8 @@ type RouteStepView = {
 
 type AdminRoute = {
   id: string; name: string; description: string | null; isDefault: boolean; active: boolean; verdictSet?: string | null;
+  /** The set of the review outcomes it decides from (none: the one serving each document), and the deliverable types it serves that set does not. */
+  verdicts?: string | null; verdictsMismatch?: string[];
   patterns: { deliverableType: string | null; docType: string | null; discipline: string | null; criticality: string | null; originator: string | null }[];
   steps: RouteStepView[];
 };
@@ -270,7 +272,7 @@ export type EditorRouteStep = {
 export async function routesForEditor() {
   const [routes, parties] = await Promise.all([adminRoutes(), adminParties()]);
   return routes.filter((r) => r.active).map((r) => ({
-    id: r.id, name: r.name, description: r.description, isDefault: r.isDefault, outcomeSetKey: (r.verdictSet ?? "REVIEW_OUTCOMES") as string | null, createdAt: new Date(0),
+    id: r.id, name: r.name, description: r.description, isDefault: r.isDefault, outcomeSetKey: r.verdicts ?? "", verdictsMismatch: r.verdictsMismatch ?? [], createdAt: new Date(0),
     classes: r.patterns.length
       ? JSON.stringify(r.patterns.map((p) => Object.fromEntries(Object.entries(p).filter(([, v]) => v))))
       : "*",

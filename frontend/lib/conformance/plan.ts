@@ -12,7 +12,7 @@ export type ProjectPlan = {
   numbering: { name: string; delimiter: string; fields: { label: string; source: string; value: string | null; digits: number | null }[]; deliverableTypes: string[] }[];
   revisions: { name: string; isDefault: boolean; forwardOnly: boolean; series: RevisionSeries[]; deliverableTypes: string[] }[];
   routes: {
-    name: string; description: string | null; isDefault: boolean; verdictSet: string;
+    name: string; description: string | null; isDefault: boolean; verdictSet: string; verdicts: string | null;
     patterns: { deliverableType: string | null; docType: string | null; discipline: string | null; criticality: string | null; originator: string | null }[];
     steps: { title: string; functionCode: string | null; partyCode: string | null; reason: string | null; mode: string; days: number | null; grantsStatuses: string[]; people: string[]; holders: string[] }[];
   }[];

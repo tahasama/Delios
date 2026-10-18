@@ -328,8 +328,10 @@ public static class ProjectLists
             return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes its lists (on a project with none, whoever opened it).");
         if (set == ValueSets.ProjectCodes)
             return Problems.Invalid("FILLED_BY_ITSELF", "Project codes is filled by the app: each project's code is in it.");
-        if (set == ReviewSets.Verdicts || await IsVerdictListAsync(db, set, cancellationToken))
-            return Problems.Invalid("VERDICT_LIST", "A verdict list is kept in Settings, Verdict lists.");
+        // The review outcomes are kept here like any list; a verdict list of before, still holding a verdict whose code the
+        // review outcomes already had, stays as it is for the reviews decided from it.
+        if (set != ReviewSets.Verdicts && await IsVerdictListAsync(db, set, cancellationToken))
+            return Problems.Invalid("VERDICT_LIST", "This verdict list is kept as it was, for the reviews decided from it. Verdicts are kept in Review outcomes.");
         return null;
     }
 
@@ -338,6 +340,28 @@ public static class ProjectLists
         .Any(v => v.Contains("\"VERDICTS\"", StringComparison.Ordinal));
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// A verdict says which of the four meanings it has, chosen by the person; and every set of the review outcomes holding
+    /// a verdict in use keeps one that lets a revision be released (MEANING_REQUIRED, NO_VERDICT_ACCEPTS).
+    /// </summary>
+    private static async Task<IResult?> VerdictsHoldAsync(DeliosDbContext db, ValueEntry changed, bool removed, CancellationToken cancellationToken)
+    {
+        if (!removed && changed.Status != ValueStatus.Retired && Reviews.VerdictListEndpoints.MeaningOf(changed.Props) is null)
+            return Problems.Invalid("MEANING_REQUIRED", $"{changed.Label}: say what it means: accepted, accepted with comments, rejected, or for information.",
+                new { field = "effect" });
+        var sets = await db.ListSets.AsNoTracking().Where(s => s.ListKey == ReviewSets.Verdicts).ToListAsync(cancellationToken);
+        var defaultId = sets.FirstOrDefault(s => s.IsDefault)?.Id;
+        var all = await db.ValueEntries.Where(v => v.SetKey == ReviewSets.Verdicts).ToListAsync(cancellationToken);
+        if (!all.Contains(changed)) all.Add(changed);
+        if (removed) all.Remove(changed);
+        var setOf = changed.SetId ?? defaultId;
+        var inSet = all.Where(v => (v.SetId ?? defaultId) == setOf && v.Status != ValueStatus.Retired).ToList();
+        if (inSet.Count > 0 && !inSet.Any(v => Reviews.VerdictListEndpoints.MeaningOf(v.Props) is { } m && Reviews.VerdictListEndpoints.Meanings[m].Proceed))
+            return Problems.Invalid("NO_VERDICT_ACCEPTS",
+                $"No verdict left in {sets.FirstOrDefault(s => s.Id == setOf)?.Name ?? "this set"} would let a revision be released: keep one meaning accepted (or accepted with comments, or for information).");
+        return null;
+    }
 
     /// <summary>The list's default set, made when the list has none yet (a list made before it held a value).</summary>
     private static async Task<ValueSet> DefaultSetAsync(DeliosDbContext db, ProjectAccess access, string set, CancellationToken cancellationToken)
@@ -434,6 +458,7 @@ public static class ProjectLists
             if (propsChange) { value.Props = propsText is null ? null : JsonDocument.Parse(propsText); changes.Add("what it does changed"); }
         }
         if (changes.Count == 0) return Results.NoContent();
+        if (set == ReviewSets.Verdicts && await VerdictsHoldAsync(db, value, false, cancellationToken) is { } verdictProblem) return verdictProblem;
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "VALUE_CHANGED", "Value", value.Id, $"{set}/{value.Code}",
             string.Join("; ", changes), access.Project.Id, cancellationToken);
@@ -452,6 +477,7 @@ public static class ProjectLists
         await EnsureOwnAsync(db, access.Project.Id, cancellationToken);
         var value = await db.ValueEntries.SingleOrDefaultAsync(v => v.SetKey == set && v.Code == code, cancellationToken);
         if (value is null) return Problems.NotFound("VALUE_NOT_FOUND", "No such value.");
+        if (set == ReviewSets.Verdicts && await VerdictsHoldAsync(db, value, true, cancellationToken) is { } verdictProblem) return verdictProblem;
         db.ValueEntries.Remove(value);
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "VALUE_DELETED", "Value", value.Id, $"{set}/{code}",
@@ -667,6 +693,14 @@ public static class ProjectLists
             if (await db.ListSets.AnyAsync(s => s.ListKey == set && s.Name == name && s.Id != one.Id, cancellationToken))
                 return Problems.Conflict("SET_EXISTS", $"This list already has a set called {name}.");
             changes.Add($"name {one.Name} → {name}");
+            // Routes and the reviews still open name a set of verdicts by its name: they follow it.
+            if (set == ReviewSets.Verdicts)
+            {
+                var was = one.Name;
+                foreach (var route in await db.ReviewRoutes.Where(r => r.Verdicts == was).ToListAsync(cancellationToken)) route.Verdicts = name;
+                foreach (var review in await db.Reviews.Where(r => r.ProjectId == access.Project.Id && r.Verdicts == was && r.State == ReviewStates.InProgress)
+                    .ToListAsync(cancellationToken)) review.Verdicts = name;
+            }
             one.Name = name;
         }
         // The default set is theirs like any other (owner): renamed, switched off, deleted; switched off, the deliverable
@@ -710,6 +744,8 @@ public static class ProjectLists
         var used = await UsageAsync(db, access.Project, set, cancellationToken);
         if (values.FirstOrDefault(v => used.ContainsKey(v.Code)) is { } inUse)
             return Problems.Conflict("SET_IN_USE", $"{inUse.Code} of this set is used ({string.Join(", ", used[inUse.Code])}): switch the set off instead.");
+        if (set == ReviewSets.Verdicts && await db.ReviewRoutes.Where(r => r.Verdicts == one.Name).Select(r => r.Name).ToListAsync(cancellationToken) is { Count: > 0 } routes)
+            return Problems.Conflict("SET_IN_USE", $"The review routes {string.Join(", ", routes)} decide from {one.Name}: choose them another set first, or switch it off.");
         db.ValueEntries.RemoveRange(values);
         db.ListSets.Remove(one);
         await db.SaveChangesAsync(cancellationToken);

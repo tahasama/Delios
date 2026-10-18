@@ -10,7 +10,11 @@ namespace Delios.Host.Reviews;
 public sealed record ReturnHeldRequest(string? Reason);
 
 /// <summary>A review route offered for a document, as returned to the client by <c>GET .../documents/{documentId}/routes</c>.</summary>
-public sealed record RouteView(Guid Id, string Name, string? Description, bool IsDefault, IReadOnlyList<RouteStep> Steps, string VerdictSet = ReviewSets.Verdicts);
+/// <param name="Verdicts">The set of the review outcomes it decides from (the route's, else the one serving the document).</param>
+/// <param name="VerdictCodes">That set's verdicts, in order.</param>
+/// <param name="VerdictsMismatch">The route names a set that does not serve the document's deliverable type: said, never refused.</param>
+public sealed record RouteView(Guid Id, string Name, string? Description, bool IsDefault, IReadOnlyList<RouteStep> Steps, string VerdictSet = ReviewSets.Verdicts,
+    string? Verdicts = null, IReadOnlyList<string>? VerdictCodes = null, bool VerdictsMismatch = false);
 
 /// <summary>One person's answer on a review step, as shown inside a <see cref="StepView"/>.</summary>
 /// <param name="AnsweredBy">Somebody who answered in this person's place, by a hand-over.</param>
@@ -35,7 +39,9 @@ public sealed record ReviewView(Guid Id, string Number, Guid DocumentId, Guid Re
     DateTimeOffset? DecidedAt, DateTimeOffset? ClosedAt, string? ClosedBy, string? ReturnNote,
     IReadOnlyList<StepView> Steps, IReadOnlyList<CommentView> Comments, DateTimeOffset? ApprovalWithdrawnAt = null,
     string? ApprovalWithdrawnBy = null, string? ApprovalWithdrawnReason = null, string VerdictSet = ReviewSets.Verdicts,
-    Guid? StartedById = null, IReadOnlyList<SendBack>? SendBacks = null);
+    Guid? StartedById = null, IReadOnlyList<SendBack>? SendBacks = null, string? Verdicts = null,
+    /// <summary>The verdicts the deciding step may give: those of the review's set, in order.</summary>
+    IReadOnlyList<string>? VerdictCodes = null);
 
 /// <summary>
 /// The HTTP endpoints for reviews: listing routes, starting a review, commenting, answering, releasing, returning, rewinding and dispatching steps.
@@ -86,7 +92,14 @@ public static class ReviewEndpoints
             .AsNoTracking().SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         var routes = await reviews.RoutesForAsync(document, cancellationToken);
-        return Results.Ok(routes.Select(r => new RouteView(r.Id, r.Name, r.Description, r.IsDefault, r.Steps, r.VerdictSet ?? ReviewSets.Verdicts)));
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        var serving = catalog.ServingSetName(ReviewSets.Verdicts, document.DeliverableType);
+        return Results.Ok(routes.Select(r =>
+        {
+            var verdicts = r.Verdicts ?? serving;
+            return new RouteView(r.Id, r.Name, r.Description, r.IsDefault, r.Steps, ReviewSets.Verdicts, verdicts,
+                catalog.ActiveIn(ReviewSets.Verdicts, verdicts), r.Verdicts is not null && r.Verdicts != serving);
+        }));
     }
 
     /// <summary>
@@ -123,8 +136,10 @@ public static class ReviewEndpoints
                               select new { m.Function!.Code, u.Name }).ToListAsync(cancellationToken))
             .GroupBy(h => h.Code).ToDictionary(g => g.Key, g => g.Select(h => h.Name).Distinct().Order().ToList());
         var view = View(review);
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
         return Results.Ok(view with
         {
+            VerdictCodes = catalog.ActiveIn(review.VerdictSet, review.Verdicts),
             Steps = view.Steps.Select(step =>
             {
                 var s = review.Steps.Single(one => one.Index == step.Number - 1);
@@ -241,7 +256,7 @@ public static class ReviewEndpoints
             s.ForeignAnswer, s.RecordedByName, s.EvidenceFileId, s.WarnedAt?.ToDateTimeOffset())).ToList(),
         r.Comments.Where(c => c.Status != CommentStatuses.Withdrawn).OrderBy(c => c.CreatedAt).Select(View).ToList(),
         r.ApprovalWithdrawnAt?.ToDateTimeOffset(), r.ApprovalWithdrawnByName, r.ApprovalWithdrawnReason, r.VerdictSet, r.StartedById,
-        r.SendBacks is null ? [] : System.Text.Json.JsonSerializer.Deserialize<List<SendBack>>(r.SendBacks) ?? []);
+        r.SendBacks is null ? [] : System.Text.Json.JsonSerializer.Deserialize<List<SendBack>>(r.SendBacks) ?? [], r.Verdicts);
 
     /// <summary>Converts a review comment entity into the <see cref="CommentView"/> sent to clients.</summary>
     private static CommentView View(ReviewComment c) => new(

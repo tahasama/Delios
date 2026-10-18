@@ -376,7 +376,8 @@ What it turned out to be, in the built system:
   against what was asked rather than against the route as edited since.
 - **Each step answers from its own set, and that is one select, not two.** An
   advisory step's answer is read off its comments, so it has nothing to choose;
-  the deciding step answers from the route's verdict list. A per-step verdict
+  the deciding step answers from the set of the review outcomes serving the
+  document's deliverable type, or the set its route names. A per-step verdict
   list would have been a second place to say the same thing.
 - **The gate refuses.** Document Control publishes at what was decided, or —
   when the status is one it fixes — at what the answer turned out to be; and in

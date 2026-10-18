@@ -5,7 +5,8 @@ import { api, projectPath } from "@/lib/client";
 import { backendDocument, backendRevision } from "@/lib/documents/api";
 import type { Distribution, RouteView } from "@/lib/types";
 import { SendForReviewForm, type SendRoute } from "./send-for-review";
-import { verdictSets } from "@/lib/reviews/verdict-sets";
+import { getActiveSet } from "@/lib/settings/config";
+import { verdictEffect, VERDICT_EFFECT_SHORT } from "@/lib/reviews/verdict-effect";
 import { matrixBinds } from "@/lib/settings/control-activities";
 
 /**
@@ -31,7 +32,21 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
     matrixBinds(ctx),
   ]);
   const applicable = routeLists[0].filter((route) => routeLists.every((list) => list.some((one) => one.id === route.id)));
-  const setViews = await verdictSets(ctx, ["REVIEW_OUTCOMES", ...applicable.map((t) => t.verdictSet ?? "REVIEW_OUTCOMES")]);
+  // The verdicts each route decides with: its own set of the review outcomes, else the set serving each document.
+  const outcomes = await getActiveSet("REVIEW_OUTCOMES");
+  const verdictsOf = (routeId: string) => {
+    const views = routeLists.map((list) => list.find((one) => one.id === routeId)!);
+    const names = [...new Set(views.map((v) => v.verdicts ?? ""))];
+    const codes = views[0]?.verdictCodes ?? outcomes.map((o) => o.code);
+    const mismatched = docs.filter((_, i) => views[i]?.verdictsMismatch).map((d) => d.number);
+    return {
+      title: names.length === 1 && names[0] ? names[0] : "the set serving each document",
+      values: outcomes.filter((o) => codes.includes(o.code)).map((o) => ({ code: o.code, label: o.label, effectLabel: VERDICT_EFFECT_SHORT[verdictEffect(o.props)] })),
+      warning: mismatched.length
+        ? `${names[0]} does not serve the deliverable type of ${mismatched.join(", ")}: they will be decided with its verdicts all the same.`
+        : null,
+    };
+  };
   const routes: SendRoute[] = applicable.map((t) => ({
     id: t.id,
     name: t.name,
@@ -39,7 +54,7 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
     isDefault: t.isDefault,
     // The backend lists the routes that serve these documents most specific first: the first is the one recommended.
     recommended: t.id === applicable[0]?.id,
-    verdicts: setViews.get(t.verdictSet ?? "REVIEW_OUTCOMES") ?? null,
+    verdicts: verdictsOf(t.id),
     // The last step decides; earlier steps advise. Its people are whoever holds the step's function, and whoever it names.
     steps: t.steps.map((s, i) => {
       const deciding = i === t.steps.length - 1;

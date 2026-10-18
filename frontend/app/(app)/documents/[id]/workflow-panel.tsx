@@ -241,7 +241,8 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
     : null;
   // The last step answers from the verdicts; every earlier one from the advice list.
   const outcomeSetKey = run.currentStep === run.steps.length - 1 ? activeCycle?.outcomeSetKey ?? "REVIEW_OUTCOMES" : "REVIEW_ADVICE";
-  const outcomes = await getActiveSet(outcomeSetKey);
+  // The deciding step is offered the verdicts of the review's own set only.
+  const outcomes = (await getActiveSet(outcomeSetKey)).filter((one) => outcomeSetKey !== "REVIEW_OUTCOMES" || !review.verdictCodes || review.verdictCodes.includes(one.code));
   const statuses = await getActiveSet("STATUSES");
   const serialNext = step?.mode === "SERIAL" ? nextSerialParticipant(step) : null;
   const alreadyGave = !!step && step.mode === "ALL" && (step.decidedBy ?? []).includes(user.id);

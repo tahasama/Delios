@@ -292,15 +292,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   under the same value: only a release, or a review that returns it, makes
   the next one a new revision. Documents with no placeholder (letters,
   minutes…) are not held: the supplier sends another whenever they want.
-- Verdict lists are the organization's, any codes and names, but each value
-  says one of four meanings: accepted, accepted with comments (fix next
-  time), rejected (back to the author), for information. The app reads the
-  meaning (`verdictEffect`, props proceed/resubmit/information), never C1–C4.
-  Verdict lists are made and kept in Settings → Verdict lists (`VerdictListEndpoints`), as one: a name and its
-  verdicts, each with its code, label and meaning, chosen by the person (never filled in for them); at least one
-  lets a revision be released (backend MEANING_REQUIRED, NO_VERDICT_ACCEPTS). A route chooses its list from these
-  (Review routes); a route for supplier documents serves "Produced by" the supplier deliverable type, or "From
-  which organization". A value with no meaning reads "not chosen yet" until it is given one.
+- Verdicts are one list, **Review outcomes** (`REVIEW_OUTCOMES`), kept in Types & sets like every list (owner:
+  Settings is where things are changed); what were verdict lists are its sets (migration VerdictSets), each naming
+  the deliverable types it serves. Any codes and names, never a code twice in the list, but each verdict says one of
+  four meanings: accepted, accepted with comments (fix next time), rejected (back to the author), for information,
+  chosen by the person (never filled in for them); every set in use keeps one that lets a revision be released
+  (backend MEANING_REQUIRED, NO_VERDICT_ACCEPTS). The app reads the meaning (`verdictEffect`, props
+  proceed/resubmit/information), never C1–C4. A review decides with the set serving its document's deliverable
+  type, unless its route names a set (Review routes, "Verdicts"; `ReviewRoute.Verdicts`, by name); a route whose
+  set does not serve its documents' type is warned of, on the route and on Send for review, never refused. Each
+  review keeps its set (`Review.Verdicts`) and offers only its verdicts. A set a route names is not deleted
+  (SET_IN_USE); renamed, the routes follow. `/settings/verdicts` only redirects. A verdict list of before holding a
+  code Review outcomes already had stays as it was, read only, for the reviews decided from it.
 - Phase is a document's metadata (PHASES, published like any list): asked on the new-document form (row 2,
   column 3), in Details and Edit rev, and when a revision is started (it may move the document to its next
   phase). Each revision keeps the phase it was made in. The register shows, filters and sorts by it.
@@ -446,7 +449,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the person (`SETUP_PAGES` + `maySetup`, layout `canSettings`); a page they may not open says plainly who changes it
   and leads back to Settings (`settings/no-access.tsx`), never a red "Administrators only" dead end.
 - The hub has a Tip, "Setting up a project? Do it in this order": organizations, people, lists, numbering,
-  revisions, verdict lists, review routes; each says done or to do, with what it found, and opens its page (a page
+  revisions, verdicts (Review outcomes), review routes; each says done or to do, with what it found, and opens its page (a page
   the person may not open is named, "an administrator does this"). It goes once everything is set up. Each card
   carries a real figure, and what still needs doing reads "To do · …" in amber (an empty essential list, a
   deliverable type with no numbering, no revision scheme, a verdict without a meaning, only you on the project).
@@ -494,8 +497,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A value or a list **never used** on the project (no document, revision, review, transmittal, package, action,
   route, rule, numbering or other value carries it: backend `UsageAsync`) may be changed entirely or deleted. Once
   used: renamed or retired only (backend VALUE_IN_USE); anything else is a new value or a new list. A list the app
-  runs on is never deleted. Verdict lists (Settings → Verdict lists) and Project codes (filled by itself) read only
-  there. The "Used" column says where each value is used, or "never used".
+  runs on is never deleted. Project codes (filled by itself) read only. The "Used" column says where each value is used, or "never used".
 - **List → sets → values** (owner, Types & sets; `ListRules`, `ValueSet`, `ValueEntry.SetId`): a list holds sets, each
   naming the deliverable types it serves; the **default** set serves every type no other active set names, unless it is
   given types of its own, then those only (it is theirs like any other, owner: renamed, given types, switched off, deleted

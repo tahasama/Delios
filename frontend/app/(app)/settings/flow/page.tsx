@@ -389,7 +389,6 @@ export default async function ControlRoomPage() {
   // a live route uses, not only the default one.
   const routeSets = new Set<string>();
   for (const template of templates) {
-    if (template.outcomeSetKey) routeSets.add(template.outcomeSetKey);
     try {
       for (const step of JSON.parse(template.steps) as { outcomeSetKey?: string }[]) if (step.outcomeSetKey) routeSets.add(step.outcomeSetKey);
     } catch { /* a route that cannot be read lists nothing extra */ }

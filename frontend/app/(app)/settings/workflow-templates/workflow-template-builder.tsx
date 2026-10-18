@@ -43,7 +43,7 @@ const HOW: { value: WorkflowBuilderStep["mode"]; label: string; hint: string }[]
  * one deciding. Two names in a box means they work in parallel. Add a box
  * between any two, or at the end, and give it whoever should be on it.
  */
-export function WorkflowTemplateBuilder({ id, name = "", description = "", classes = "*", outcomeSetKey = "REVIEW_OUTCOMES", isDefault = false, initialSteps, users, functions = [], outsideParties = [], outcomeSets, classOptions, statuses }: {
+export function WorkflowTemplateBuilder({ id, name = "", description = "", classes = "*", outcomeSetKey = "", isDefault = false, initialSteps, users, functions = [], outsideParties = [], outcomeSets, classOptions, statuses }: {
   id?: string;
   name?: string;
   description?: string;
@@ -122,9 +122,10 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
           <input name="name" required defaultValue={name} className={inputCls} placeholder="Engineering drawings — lead engineer decides" />
         </Field>
         <Field label="When to use it"><input name="description" defaultValue={description} className={inputCls} placeholder="Tell the sender when this route is the right one" /></Field>
-        <Field label="Verdict list" hint="what the deciding step answers with (Settings, Verdict lists); the steps before it advise">
+        <Field label="Verdicts" hint="the set of Review outcomes the deciding step answers with (Types & sets); the steps before it advise">
           <select name="outcomeSetKey" defaultValue={outcomeSetKey} className={inputCls}>
-            {(outcomeSets.length ? outcomeSets : [{ key: "REVIEW_OUTCOMES", title: "Review outcomes" }]).map((one) => <option key={one.key} value={one.key}>{one.title}</option>)}
+            <option value="">The set serving each document&rsquo;s deliverable type</option>
+            {outcomeSets.map((one) => <option key={one.key} value={one.key}>{one.title}</option>)}
           </select>
         </Field>
         <label className="flex items-center gap-2 self-end pb-2 text-xs font-medium text-slate-700"><input type="checkbox" name="isDefault" defaultChecked={isDefault} /> Offer this route first</label>

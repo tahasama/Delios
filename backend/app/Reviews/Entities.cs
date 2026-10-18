@@ -17,8 +17,13 @@ public sealed class ReviewRoute
     /// <summary>Offered when no route's patterns match the document.</summary>
     public bool IsDefault { get; set; }
     public bool Active { get; set; } = true;
-    /// <summary>The value list its deciding step answers from. Null: the review outcomes (<see cref="ReviewSets.Verdicts"/>).</summary>
+    /// <summary>Before verdict lists became sets of the review outcomes: the list its deciding step answered from. No longer read.</summary>
     public string? VerdictSet { get; set; }
+    /// <summary>
+    /// The set of the review outcomes its deciding step answers from, by its name (names stay with a project's own copy).
+    /// Null: the set serving the document's deliverable type.
+    /// </summary>
+    public string? Verdicts { get; set; }
     /// <summary>Documents it serves. Empty serves every document. A null field in a pattern means any value.</summary>
     public List<RoutePattern> Patterns { get; set; } = [];
     public List<RouteStep> Steps { get; set; } = [];
@@ -85,6 +90,8 @@ public sealed class Review
     public string? GrantedStatus { get; set; }
     /// <summary>The value list the verdict comes from, copied from the route when the review starts.</summary>
     public string VerdictSet { get; set; } = ReviewSets.Verdicts;
+    /// <summary>The set of the review outcomes its verdicts are offered from, by name, fixed when it starts. Null: any.</summary>
+    public string? Verdicts { get; set; }
     public Guid StartedById { get; set; }
     public required string StartedByName { get; set; }
     /// <summary>Copied in when it was sent (cc): told of it and of what comes of it, never asked to answer.</summary>

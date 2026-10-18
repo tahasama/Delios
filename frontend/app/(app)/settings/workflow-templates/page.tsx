@@ -6,7 +6,7 @@ import { getSets, getActiveSet } from "@/lib/settings/config";
 import { WorkflowTemplateBuilder, type WorkflowBuilderStep } from "./workflow-template-builder";
 import { hasVerb } from "@/lib/core/auth";
 import { ArrowRight } from "lucide-react";
-import { verdictSets } from "@/lib/reviews/verdict-sets";
+import { VERDICT_EFFECT_SHORT } from "@/lib/reviews/verdict-effect";
 import { api } from "@/lib/client";
 import { adminFunctions, adminParties, adminUsers, routesForEditor } from "@/lib/settings/api-admin";
 
@@ -32,8 +32,9 @@ export default async function WorkflowTemplatesPage() {
     // supplier. How each of them answers is set in Parties & people.
     adminParties().then((all) => all.filter((p) => !p.isInternal && p.active).map((p) => ({ id: p.id, name: p.name, participation: p.participation }))),
   ]);
-  // A route answers from one of the organization's verdict lists (Settings, Verdict lists), each verdict with its meaning.
-  const outcomeSets = await api<{ key: string; title: string }[]>("/api/admin/verdict-lists").catch(() => [{ key: "REVIEW_OUTCOMES", title: "Review outcomes" }]);
+  // A route answers from a set of the review outcomes (Types & sets), each verdict with its meaning; none named, from the
+  // set serving each document's deliverable type.
+  const outcomeSets = await api<{ key: string; title: string; verdicts: { code: string; label: string; status: string; meaning: string | null }[] }[]>("/api/admin/verdict-lists").catch(() => []);
   // What each status lets a step do. The rules live in the status list, so a
   // route can only offer what the organization published.
   const statusChoices = (await getActiveSet("STATUSES")).map((value) => {
@@ -49,7 +50,10 @@ export default async function WorkflowTemplatesPage() {
     originators: classValues.filter((value) => value.setKey === "SUPPLIER_CODES").map(({ code, label }) => ({ code, label })),
   };
   const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
-  const setViews = await verdictSets(null, templates.map((t) => t.outcomeSetKey ?? "REVIEW_OUTCOMES"));
+  const setViews = new Map(outcomeSets.map((s) => [s.key, {
+    title: s.title,
+    values: s.verdicts.filter((v) => v.status === "ACTIVE").map((v) => ({ code: v.code, label: v.label, effectLabel: v.meaning ? VERDICT_EFFECT_SHORT[v.meaning] ?? "" : "meaning not chosen yet" })),
+  }]));
 
   return (
     <div className="space-y-4">
@@ -78,15 +82,23 @@ export default async function WorkflowTemplatesPage() {
                 </div>
               }>
                 {(() => {
-                  const v = setViews.get(t.outcomeSetKey ?? "REVIEW_OUTCOMES");
-                  return v ? (
+                  const v = t.outcomeSetKey ? setViews.get(t.outcomeSetKey) : null;
+                  const mismatch = (t.verdictsMismatch ?? []).map((code) => classOptions.deliverableTypes.find((d) => d.code === code)?.label ?? code);
+                  return !t.outcomeSetKey ? (
+                    <p className="mb-3 text-[11.5px] text-slate-600">Verdicts: the set of Review outcomes serving each document&rsquo;s deliverable type.</p>
+                  ) : v ? (<>
+                    {mismatch.length ? (
+                      <p className="mb-2 rounded-md bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800 ring-1 ring-amber-200">
+                        {v.title} does not serve {mismatch.join(", ")}, which this route serves: those documents will be decided with {v.title}&rsquo;s verdicts.
+                      </p>
+                    ) : null}
                     <div className="mb-3 rounded-md border border-line bg-tint-soft px-3 py-2 text-[11.5px] leading-[1.45]">
                       <span className="font-semibold text-slate-700">Verdicts: {v.title}</span>
                       <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
                         {v.values.map((x) => <span key={x.code} className="rounded bg-surface px-1.5 py-0.5 ring-1 ring-slate-200" title={`${x.label} — ${x.effectLabel}`}><span className="font-mono font-bold">{x.code}</span> <span className="text-slate-500">{x.effectLabel}</span></span>)}
                       </span>
                     </div>
-                  ) : null;
+                  </>) : null;
                 })()}
                 <div className="scroll-thin flex items-stretch gap-1 overflow-x-auto pb-1">
                   {steps.map((s, i) => {
@@ -113,7 +125,7 @@ export default async function WorkflowTemplatesPage() {
                   <details className="mt-3 rounded-md border border-line">
                     <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-600">Edit</summary>
                     <div className="border-t border-line p-3">
-                      <WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} id={t.id} name={t.name} description={t.description ?? ""} classes={t.classes} outcomeSetKey={t.outcomeSetKey ?? "REVIEW_OUTCOMES"} isDefault={t.isDefault} initialSteps={steps} users={users} outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} classOptions={classOptions} statuses={statusChoices} />
+                      <WorkflowTemplateBuilder outsideParties={outsideParties} functions={functions} id={t.id} name={t.name} description={t.description ?? ""} classes={t.classes} outcomeSetKey={t.outcomeSetKey ?? ""} isDefault={t.isDefault} initialSteps={steps} users={users} outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} classOptions={classOptions} statuses={statusChoices} />
                     </div>
                   </details>
                 ) : null}

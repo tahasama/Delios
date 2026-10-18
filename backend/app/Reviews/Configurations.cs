@@ -11,6 +11,7 @@ internal sealed class ReviewRouteConfiguration : IEntityTypeConfiguration<Review
     /// <summary>Called by Entity Framework when it builds the model (see <c>DeliosDbContext</c>).</summary>
     public void Configure(EntityTypeBuilder<ReviewRoute> b)
     {
+        b.Property(x => x.Verdicts).HasMaxLength(120);
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
         b.Property(x => x.Name).HasMaxLength(100);
@@ -25,6 +26,7 @@ internal sealed class ReviewConfiguration : IEntityTypeConfiguration<Review>
     /// <summary>Called by Entity Framework when it builds the model.</summary>
     public void Configure(EntityTypeBuilder<Review> b)
     {
+        b.Property(x => x.Verdicts).HasMaxLength(120);
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Document>().WithMany().HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Restrict);

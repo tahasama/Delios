@@ -49,7 +49,7 @@ public sealed partial class ReviewService
         if (step.Deciding)
         {
             answer = request.Verdict ?? "";
-            if (!catalog.IsActive(review.VerdictSet, answer))
+            if (!catalog.IsActive(review.VerdictSet, answer) || !catalog.InSet(review.VerdictSet, answer, review.Verdicts))
             {
                 return (null, Problems.Invalid("VALUE_NOT_PUBLISHED", $"{answer} is not a published verdict.",
                     new { field = "verdict", value = answer }));

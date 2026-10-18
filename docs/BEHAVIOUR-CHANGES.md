@@ -544,6 +544,10 @@ the installation sets its keys.
   with no phase, never used, is dropped by `seed-demo`.
 - **Verdict lists** have their own page (Settings → Verdict lists): a list is made with its verdicts and each one's
   meaning. "What it is" on a value list is gone.
+- **Verdicts are kept in Types & sets** (Review outcomes): the Verdict lists page is gone (its address leads there);
+  each verdict list became a set of Review outcomes, its verdicts in it. A review decides with the set serving its
+  document's deliverable type unless its route names one; a mismatch is warned of. A verdict whose code Review
+  outcomes already had stays in its old list, read only, for the reviews decided with it.
 - **Checks** are numbered by the app (SET, DOC, REV, RVW, STO, SCH, PKG); findings keep their history.
 - **New transmittal:** the kind is a dropdown, then its type; data with nothing attached offers to become
   information instead of only blocking.

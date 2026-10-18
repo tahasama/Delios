@@ -45,7 +45,8 @@ export async function saveTemplateAction(_prev: { error?: string } | undefined, 
   if ("error" in route) return { error: route.error };
   const body = {
     name, description: text(formData, "description") || null, isDefault: formData.get("isDefault") === "on",
-    verdictSet: text(formData, "outcomeSetKey") || "REVIEW_OUTCOMES", ...route,
+    // The set of the review outcomes it decides from; empty: the set serving each document's deliverable type.
+    verdicts: text(formData, "outcomeSetKey"), ...route,
   };
   try {
     if (id) await api(`/api/admin/routes/${id}`, { method: "PUT", body });

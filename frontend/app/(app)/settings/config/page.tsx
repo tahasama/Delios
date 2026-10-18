@@ -117,7 +117,8 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
   const inChosen = (v: { setId: string | null }) => !chosen || setsOfList.length <= 1 || v.setId === chosen.id || (chosen.isDefault && !v.setId);
   // Verdict lists are kept in Verdict lists, project codes by the app: shown here, changed there.
   const readOnlyWhy = !set ? null
-    : isVerdictSet(set.key, set.kind) ? "verdicts"
+    // A verdict list of before still holding a code the review outcomes had: kept as it was, for its decided reviews.
+    : set.key !== "REVIEW_OUTCOMES" && isVerdictSet(set.key, set.kind) ? "verdicts"
     : set.key === "PROJECT_CODES" ? "codes"
     : null;
   const may = lists.mayChange && !readOnlyWhy;
@@ -208,8 +209,8 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                 </h2>
                 {set.description ? <p className="mt-0.5 max-w-2xl truncate text-xs leading-5 text-slate-500" title={set.description}>{set.description}</p> : null}
                 {readOnlyWhy === "verdicts" ? (
-                  <p className="mt-1 text-xs text-slate-600">A verdict list: its verdicts and what each means are kept in{" "}
-                    <Link href="/settings/verdicts" className="font-semibold text-link hover:underline">Verdict lists</Link>.</p>
+                  <p className="mt-1 text-xs text-slate-600">Kept as it was, for the reviews decided from it: its codes were already in{" "}
+                    <Link href="/settings/config?set=REVIEW_OUTCOMES" className="font-semibold text-link hover:underline">Review outcomes</Link>, where verdicts are kept now.</p>
                 ) : readOnlyWhy === "codes" ? (
                   <p className="mt-1 text-xs text-slate-600">Filled by the app: each project&rsquo;s code is in it.</p>
                 ) : null}

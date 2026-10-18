@@ -142,7 +142,7 @@ export type RevisionView = {
   phase?: string | null;
 };
 /** GET /documents/{id}/routes (ReviewEndpoints RouteView). */
-export type RouteView = { id: string; name: string; description: string | null; isDefault: boolean; verdictSet?: string; steps: { title: string; functionCode: string | null; partyCode: string | null; mode: string; reason: string | null; userIds?: string[] }[] };
+export type RouteView = { id: string; name: string; description: string | null; isDefault: boolean; verdictSet?: string; verdicts?: string | null; verdictCodes?: string[] | null; verdictsMismatch?: boolean; steps: { title: string; functionCode: string | null; partyCode: string | null; mode: string; reason: string | null; userIds?: string[] }[] };
 
 /** GET /reviews (ReviewList.cs). */
 export type ReviewsPage = { total: number; page: number; pages: number; per: number; sizes: number[]; rows: ReviewListRow[] };
@@ -183,6 +183,8 @@ export type ReviewView = {
   sendBacks?: SendBack[];
   approvalWithdrawnAt?: string | null; approvalWithdrawnBy?: string | null; approvalWithdrawnReason?: string | null;
   verdictSet?: string;
+  /** The set of the review outcomes it decides from, and its verdicts: only those are offered to the deciding step. */
+  verdicts?: string | null; verdictCodes?: string[] | null;
   /** Who started the review: they may notify its people by hand. */
   startedById?: string | null;
 };

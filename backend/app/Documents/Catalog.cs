@@ -50,6 +50,31 @@ public sealed class Catalog
     public bool IsActive(string setKey, string code) =>
         _sets.TryGetValue(setKey, out var set) && set.TryGetValue(code, out var v) && v.Status == ValueStatus.Active;
 
+    /// <summary>The name of the set of a list serving a deliverable type (`ListRules.Serving`); null when none serves it.</summary>
+    public string? ServingSetName(string listKey, string? deliverableType) =>
+        _listSets.TryGetValue(listKey, out var sets) ? ListRules.Serving(sets, deliverableType)?.Name : null;
+
+    /// <summary>A set of a list by its name (names stay with a project's own copy); null when there is none.</summary>
+    public ValueSet? SetNamed(string listKey, string? name) =>
+        name is not null && _listSets.TryGetValue(listKey, out var sets) ? sets.FirstOrDefault(s => s.Name == name) : null;
+
+    /// <summary>Whether a value is in the set of that name; a value with no set is the default set's. No name: any set.</summary>
+    public bool InSet(string listKey, string code, string? setName)
+    {
+        if (setName is null) return true;
+        if (!_sets.TryGetValue(listKey, out var values) || !values.TryGetValue(code, out var value)) return false;
+        var sets = _listSets.GetValueOrDefault(listKey) ?? [];
+        var set = sets.FirstOrDefault(s => s.Name == setName);
+        if (set is null) return true;
+        return (value.SetId ?? sets.FirstOrDefault(s => s.IsDefault)?.Id) == set.Id;
+    }
+
+    /// <summary>The active codes of a set of a list, in order (no name: every active code of the list).</summary>
+    public IReadOnlyList<string> ActiveIn(string listKey, string? setName) =>
+        _sets.TryGetValue(listKey, out var values)
+            ? values.Values.Where(v => v.Status == ValueStatus.Active && InSet(listKey, v.Code, setName)).OrderBy(v => v.Sort).Select(v => v.Code).ToList()
+            : [];
+
     /// <summary>The set's active values, in their published order: code and label.</summary>
     public IReadOnlyList<(string Code, string Label)> Active(string setKey) =>
         _sets.TryGetValue(setKey, out var set)

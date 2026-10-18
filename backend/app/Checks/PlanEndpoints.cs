@@ -58,7 +58,7 @@ public static class PlanEndpoints
             }),
             Routes = routes.Select(r => new
             {
-                r.Name, r.Description, r.IsDefault, VerdictSet = r.VerdictSet ?? ReviewSets.Verdicts, r.Patterns,
+                r.Name, r.Description, r.IsDefault, VerdictSet = ReviewSets.Verdicts, r.Verdicts, r.Patterns,
                 Steps = r.Steps.Select(s => new
                 {
                     s.Title, s.FunctionCode, s.PartyCode, s.Reason, s.Mode, s.Days, s.GrantsStatuses,

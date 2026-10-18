@@ -139,7 +139,9 @@ public sealed partial class ReviewService
             RevisionId = revision.Id,
             Number = number,
             RouteName = route.Name,
-            VerdictSet = route.VerdictSet ?? ReviewSets.Verdicts,
+            VerdictSet = ReviewSets.Verdicts,
+            // The route's own set of verdicts, else the set serving the document's deliverable type (owner).
+            Verdicts = route.Verdicts ?? (await Catalog.LoadAsync(db, cancellationToken)).ServingSetName(ReviewSets.Verdicts, document.DeliverableType),
             StartedById = access.UserId,
             StartedByName = access.UserName,
             StartedAt = now,

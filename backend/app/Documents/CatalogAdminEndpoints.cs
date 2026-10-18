@@ -25,7 +25,9 @@ public sealed record SchemeRoutingRequest(string? DeliverableType, Guid? SchemeI
 /// <summary>Body of creating or changing a review route. A null field is left as it is; lists, when given, replace.</summary>
 public sealed record RouteRequest(
     string? Name = null, string? Description = null, bool? IsDefault = null, bool? Active = null, RoutePattern[]? Patterns = null,
-    RouteStep[]? Steps = null, string? VerdictSet = null);
+    RouteStep[]? Steps = null, string? VerdictSet = null,
+    /// <summary>The set of the review outcomes it decides from, by name; empty: the set serving the document's deliverable type.</summary>
+    string? Verdicts = null);
 
 /// <summary>
 /// What an administrator publishes for the organization: the value lists, how numbers are built and which scheme
@@ -234,10 +236,19 @@ public static class CatalogAdminEndpoints
     // ── Review routes ───────────────────────────────────────────────────────
 
     /// <summary><c>GET /api/admin/routes</c>: every review route, in use or not.</summary>
-    private static async Task<IResult> RoutesAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
-        Results.Ok(await db.ReviewRoutes.AsNoTracking().OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name)
-            .Select(r => new { r.Id, r.Name, r.Description, r.IsDefault, r.Active, r.Patterns, r.Steps, VerdictSet = r.VerdictSet ?? ReviewSets.Verdicts })
-            .ToListAsync(cancellationToken));
+    private static async Task<IResult> RoutesAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var routes = await db.ReviewRoutes.AsNoTracking().OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name).ToListAsync(cancellationToken);
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        // A route naming its own set of verdicts says which of the deliverable types it serves that set does not (owner:
+        // a warning, never a refusal).
+        return Results.Ok(routes.Select(r => new
+        {
+            r.Id, r.Name, r.Description, r.IsDefault, r.Active, r.Patterns, r.Steps, VerdictSet = ReviewSets.Verdicts, r.Verdicts,
+            VerdictsMismatch = r.Verdicts is null ? [] : r.Patterns.Select(p => p.DeliverableType).OfType<string>().Distinct()
+                .Where(t => catalog.ServingSetName(ReviewSets.Verdicts, t) != r.Verdicts).ToArray(),
+        }));
+    }
 
     private static async Task<IResult?> CheckStepsAsync(DeliosDbContext db, RouteStep[] steps, CancellationToken cancellationToken)
     {
@@ -267,18 +278,20 @@ public static class CatalogAdminEndpoints
         return null;
     }
 
-    /// <summary>A route's own verdict list: published, with a verdict that lets it proceed. Null: the review outcomes.</summary>
-    private static async Task<(string? Set, IResult? Problem)> CheckVerdictSetAsync(DeliosDbContext db, string? requested, CancellationToken cancellationToken)
+    /// <summary>A route's own set of the review outcomes, by name: there, with a verdict that lets a revision proceed. Empty: none.</summary>
+    private static async Task<(string? Set, IResult? Problem)> CheckVerdictsAsync(DeliosDbContext db, string? requested, CancellationToken cancellationToken)
     {
-        var set = Blank(requested);
-        if (set is null || set == ReviewSets.Verdicts) return (null, null);
+        var name = Blank(requested);
+        if (name is null) return (null, null);
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
-        var codes = await db.ValueEntries.AsNoTracking().Where(v => v.SetKey == set && v.Status == ValueStatus.Active).Select(v => v.Code).ToListAsync(cancellationToken);
-        if (codes.Count == 0) return (null, Problems.Invalid("VERDICT_SET_EMPTY", "That verdict list has no verdicts yet: add them in Settings, Verdict lists."));
-        if (!codes.Any(c => ReviewSets.Proceeds(catalog, set, c)))
+        if (catalog.SetNamed(ReviewSets.Verdicts, name) is null)
+            return (null, Problems.Invalid("VERDICT_SET_UNKNOWN", $"The review outcomes have no set called {name}."));
+        var codes = catalog.ActiveIn(ReviewSets.Verdicts, name);
+        if (codes.Count == 0) return (null, Problems.Invalid("VERDICT_SET_EMPTY", $"{name} has no verdicts yet: add them in Types & sets, Review outcomes."));
+        if (!codes.Any(c => ReviewSets.Proceeds(catalog, ReviewSets.Verdicts, c)))
             return (null, Problems.Invalid("VERDICT_SET_NEVER_PROCEEDS",
-                "None of that list's verdicts means accepted yet, so no revision could be released from it: give each its meaning in Settings, Verdict lists."));
-        return (set, null);
+                $"None of the verdicts of {name} means accepted yet, so no revision could be released from it: give one that meaning in Types & sets."));
+        return (name, null);
     }
 
     /// <summary><c>POST /api/admin/routes</c>: a new review route.</summary>
@@ -289,11 +302,11 @@ public static class CatalogAdminEndpoints
         if (name is null) return Problems.Invalid("NAME_REQUIRED", "A route has a name.");
         var steps = request.Steps ?? [];
         if (await CheckStepsAsync(db, steps, cancellationToken) is { } problem) return problem;
-        var (verdictSet, setProblem) = await CheckVerdictSetAsync(db, request.VerdictSet, cancellationToken);
+        var (verdicts, setProblem) = await CheckVerdictsAsync(db, request.Verdicts, cancellationToken);
         if (setProblem is not null) return setProblem;
         var route = new ReviewRoute
         {
-            VerdictSet = verdictSet,
+            Verdicts = verdicts,
             TenantId = http.User.TenantId(),
             Name = name,
             Description = Blank(request.Description),
@@ -326,11 +339,15 @@ public static class CatalogAdminEndpoints
             changes.Add(isDefault ? "the default" : "not the default");
         }
         if (request.Active is { } active && active != route.Active) { changes.Add(active ? "in use" : "out of use"); route.Active = active; }
-        if (request.VerdictSet is not null)
+        if (request.Verdicts is not null)
         {
-            var (verdictSet, setProblem) = await CheckVerdictSetAsync(db, request.VerdictSet, cancellationToken);
+            var (verdicts, setProblem) = await CheckVerdictsAsync(db, request.Verdicts, cancellationToken);
             if (setProblem is not null) return setProblem;
-            if (verdictSet != route.VerdictSet) { route.VerdictSet = verdictSet; changes.Add($"decides from {verdictSet ?? ReviewSets.Verdicts}"); }
+            if (verdicts != route.Verdicts)
+            {
+                route.Verdicts = verdicts;
+                changes.Add(verdicts is null ? "decides from the verdicts serving each document" : $"decides from the verdicts {verdicts}");
+            }
         }
         if (request.Patterns is { } patterns) { route.Patterns = patterns.ToList(); changes.Add($"serves {patterns.Length} pattern(s)"); }
         if (request.Steps is { } steps)

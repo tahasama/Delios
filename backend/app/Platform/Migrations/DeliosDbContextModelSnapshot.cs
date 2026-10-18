@@ -4636,6 +4636,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("verdict_set");
 
+                    b.Property<string>("Verdicts")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("verdicts");
+
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -4981,6 +4986,11 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<string>("VerdictSet")
                         .HasColumnType("text")
                         .HasColumnName("verdict_set");
+
+                    b.Property<string>("Verdicts")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("verdicts");
 
                     b.HasKey("Id")
                         .HasName("pk_review_routes");

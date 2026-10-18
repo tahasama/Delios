@@ -32,7 +32,7 @@ backend/
 ├── app/                  the program (API and worker)
 │   ├── Program.cs        start-up: what runs, in which order
 │   ├── Documents/        documents, revisions, files, the register; the lists, numbering and revision
-│   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (verdict lists)
+│   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (the sets of Review outcomes, read by routes)
 │   │                     ProjectLists: the project's lists (own copy on first change, where each value is used, who changes them)
 │   │                     ListRules: groups, the app's lists, which set of a list serves a deliverable type; Catalog.IsOfferedFor checks it
 │   │                     SheetGuard: every spreadsheet checked before it is read (type, size unpacked, macros, viruses)
@@ -124,7 +124,7 @@ frontend/
 │   ├── conformance/      (checks/prevented.ts: what the app refuses, listed by area under Default rules)
 │   ├── account/
 │   ├── organization/      organizations working together, the admin page, defaults for new projects
-│   └── settings/         (forms-revisions.ts: Settings → Revisions; forms-verdicts.ts: Verdict lists)
+│   └── settings/         (forms-revisions.ts: Settings → Revisions; verdicts are the list Review outcomes, kept in Types & sets)
 │
 ├── components/           only the pieces several areas use
 │                         (ui.tsx: buttons and fields; form, data-table, timeline, search-pick,

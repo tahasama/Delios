@@ -1203,6 +1203,15 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
   supplier documents get their own document types, criticality levels or review outcomes without a second list.
 - A value, a set and a list of one's own are switched off rather than deleted once used: what carries them keeps them.
 
+## 62 · Verdicts are one list, its sets serving deliverable types
+
+- **One list of verdicts** (Review outcomes), kept where every list is kept; what were separate verdict lists are its
+  sets. A set names the deliverable types it serves, as any set does; a code is never repeated in the list.
+- **Each verdict states its meaning** (accepted, accepted with comments, rejected, for information) when it is
+  written, and every set in use keeps one that lets a revision be released.
+- **A review decides with the set serving its document's deliverable type**, unless its route names another; a route
+  naming a set that does not serve its documents is warned of, never refused. The review keeps the set it was offered.
+
 ## Still open — decided in conversation, not yet built
 
 - **Every transmittal and every notification also goes by email**, showing what

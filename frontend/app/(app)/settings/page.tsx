@@ -10,7 +10,7 @@ import { SETUP_PAGES, SETUP_GROUPS, maySetup, mayChangeControlRoom, CONTROL_ROOM
 import { families } from "@/lib/settings/families";
 import {
   FolderKanban, Building2, Tags, FileDigit, BadgeCheck, Users, Workflow, ScrollText, Layers, Route, ClipboardList, ArrowRight, KeyRound,
-  GitBranch, Gavel,
+  GitBranch,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,7 +34,6 @@ const ICON: Record<string, LucideIcon> = {
   "/settings/users": Users,
   "/settings/security": KeyRound,
   "/settings/revisions": GitBranch,
-  "/settings/verdicts": Gavel,
   "/settings/audit": ScrollText,
 };
 
@@ -47,7 +46,7 @@ export default async function AdminPage() {
   const open = SETUP_PAGES.filter((p) => maySetup(user, p, managementAddsPeople));
   // The menu shows Settings only to whoever may open one of its pages; reached by its address, it says so plainly.
   if (!open.length) return <NoAccess title="Settings" who="admin" />;
-  const mayOpen = (href: string) => open.some((p) => p.href === href);
+  const mayOpen = (href: string) => open.some((p) => p.href === href.split("?")[0]);
 
   // One live figure per card, so the hub says what is there, and what still needs doing, not just where to go.
   const ESSENTIAL = ["DELIVERABLE_TYPES", "DOCUMENT_TYPES", "DISCIPLINES", "STATUSES", "REASONS_FOR_ISSUE"];
@@ -97,8 +96,6 @@ export default async function AdminPage() {
     "/settings/functions": { text: plural(functions, "function") },
     "/settings/users": people > 1 ? { text: `${plural(people, "person", "people")} on ${ctx.project.code}` } : { text: `only you on ${ctx.project.code}`, attention: true },
     "/settings/workflow-templates": routes ? { text: plural(routes, "route") } : { text: "none yet", attention: true },
-    "/settings/verdicts": !lists.length ? { text: "none yet", attention: true }
-      : noMeaning ? { text: `${plural(noMeaning, "verdict")} without a meaning`, attention: true } : { text: plural(lists.length, "list") },
     "/settings/security": security
       ? { text: `${security.mfaRequired ? "second step asked of everyone" : "second step optional"} · ${security.mfaEnrolled.enrolled} of ${security.mfaEnrolled.of} have it` }
       : { text: "" },
@@ -113,7 +110,7 @@ export default async function AdminPage() {
     { href: "/settings/config", label: "The lists (disciplines, types…)", done: emptyLists === 0, said: emptyLists ? `${emptyLists} essential still empty` : "filled" },
     { href: "/settings/numbering", label: "How numbers are built", done: schemes > 0 && notNumbered === 0, said: notNumbered ? `${notNumbered} deliverable type${notNumbered === 1 ? "" : "s"} not numbered` : schemes ? "every type numbered" : "no scheme yet" },
     { href: "/settings/revisions", label: "How revisions are named", done: revisionSchemes > 0, said: revisionSchemes ? "set" : "not set yet" },
-    { href: "/settings/verdicts", label: "What a review decides with", done: lists.length > 0 && noMeaning === 0, said: !lists.length ? "no verdict list yet" : noMeaning ? `${noMeaning} verdict${noMeaning === 1 ? "" : "s"} without a meaning` : "ready" },
+    { href: "/settings/config?set=REVIEW_OUTCOMES", label: "What a review decides with", done: lists.some((l) => l.verdicts.length > 0) && noMeaning === 0, said: !lists.some((l) => l.verdicts.length > 0) ? "no verdict yet in Review outcomes" : noMeaning ? `${noMeaning} verdict${noMeaning === 1 ? "" : "s"} without a meaning` : "ready" },
     { href: "/settings/workflow-templates", label: "The review routes", done: routes > 0, said: routes ? `${routes} route${routes === 1 ? "" : "s"}` : "none yet" },
   ];
   const nextStep = steps.find((step) => !step.done);
