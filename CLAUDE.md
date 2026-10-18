@@ -329,8 +329,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `NumberingScheme.ProjectId`); reset only from the organization's card (`POST /api/admin/numbering/projects/{id}/reset`,
   its schemes and routing go, numbers given stay). A scheme that gave a number (`Used`, marked when it gives one) keeps its parts and
   delimiter: renamed, re-noted or retired only (SCHEME_IN_USE); never used, it is changed entirely or deleted. To number differently (owner): a new scheme, chosen for what it should number, then the old one retired once it
-  numbers nothing; its opened row says so in that order (a Tip). The scheme form itself has "What it numbers": ticking a
-  deliverable type or record there numbers it by that scheme from then on (what it numbers already stays ticked). A scheme
+  numbers nothing; its opened row says so in that order (a Tip). A scheme
   still numbering something is not retired or deleted (SCHEME_ROUTED); a retired one numbers nothing (SCHEME_RETIRED).
   A part reads a list, a fixed text, the running number (1–9 digits), or who sends / receives it; the organization's
   numbering reads only the organization's lists (LIST_NOT_ORGANIZATIONS).
