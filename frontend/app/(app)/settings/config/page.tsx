@@ -200,13 +200,13 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
         {set ? (
           <section className="flex min-h-0 min-w-0 flex-1 flex-col">
             {/* The list: its name, what it is for, where it stands; what may be done to it, on the right. */}
-            <div className="flex shrink-0 flex-col gap-3 border-b border-line px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex shrink-0 flex-col gap-2 border-b border-line px-5 py-2.5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-semibold text-slate-900">{set.title}</h2>
-                <p className="plate-meta mt-1">
-                  {listUsed ? "Used on this project" : "Never used on this project"}{runsOn ? " · the app runs on it" : ""}
-                </p>
-                {set.description ? <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{set.description}</p> : null}
+                <h2 className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                  <span className="text-base font-semibold text-slate-900">{set.title}</span>
+                  <span className="plate-meta">{listUsed ? "Used on this project" : "Never used on this project"}{runsOn ? " · the app runs on it" : ""}</span>
+                </h2>
+                {set.description ? <p className="mt-0.5 max-w-2xl truncate text-xs leading-5 text-slate-500" title={set.description}>{set.description}</p> : null}
                 {readOnlyWhy === "verdicts" ? (
                   <p className="mt-1 text-xs text-slate-600">A verdict list: its verdicts and what each means are kept in{" "}
                     <Link href="/settings/verdicts" className="font-semibold text-link hover:underline">Verdict lists</Link>.</p>
@@ -220,7 +220,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                     <Switch on={listRead.active} label={listRead.active ? `Switch ${set.title} off: its values are no longer offered` : `Switch ${set.title} on again`} />
                   </ActionForm>
                 ) : null}
-                {may ? <Link scroll={false} href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} aria-current={sp.panel === "add" ? "true" : undefined} title="Add a value" aria-label="Add a value" className={`${ICON} aria-[current]:bg-tint aria-[current]:text-brand-ink`}><Plus className="h-4 w-4" /></Link> : null}
+                {may && !(chosen && listRead?.takesSets) ? <Link scroll={false} href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} aria-current={sp.panel === "add" ? "true" : undefined} title="Add a value" aria-label="Add a value" className={`${ICON} aria-[current]:bg-tint aria-[current]:text-brand-ink`}><Plus className="h-4 w-4" /></Link> : null}
                 {may ? <Link scroll={false} href={here({ panel: sp.panel === "details" ? undefined : "details", edit: undefined })} title="Change this list" aria-label="Change this list" className={ICON}><Pencil className="h-4 w-4" /></Link> : null}
                 <a href={`/api/export/config-set?set=${encodeURIComponent(set.key)}`} title="Download this list" aria-label="Download this list" className={ICON}><Download className="h-4 w-4" /></a>
                 {may && !runsOn && !listUsed ? <DeleteSetButton setKey={set.key} title={set.title} count={allValues.length} /> : null}
@@ -229,7 +229,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
 
             {/* The set shown: whom it serves, switched on or off; what may be done to it. */}
             {chosen && listRead?.takesSets ? (
-              <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+              <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-tint-soft px-5 py-1.5 sm:px-6">
                 <span className="stencil text-slate-500">Set</span>
                 <span className="text-sm font-semibold text-slate-800">{chosen.name}</span>
                 {!may || !chosen.id ? (chosen.active ? <ToneChip tone="done">on</ToneChip> : <ToneChip tone="idle">off</ToneChip>) : null}
@@ -240,6 +240,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                 </span>
                 {may ? (
                   <span className="ml-auto flex items-center gap-1">
+                    {may ? <Link scroll={false} href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} aria-current={sp.panel === "add" ? "true" : undefined} title={`Add a value to ${chosen.name}`} aria-label={`Add a value to ${chosen.name}`} className={`${ICON} aria-[current]:bg-tint aria-[current]:text-brand-ink`}><Plus className="h-4 w-4" /></Link> : null}
                     {chosen.id ? (
                       <>
                         <ActionForm action={switchSetAction} hidden={{ key: currentKey, setId: chosen.id, active: chosen.active ? "0" : "1" }} hideSubmit className="mr-2 space-y-0">
@@ -337,7 +338,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
             ) : null}
 
             {/* Narrowing: words, then which values, each choice acting at once. */}
-            <form className="asking flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-5 py-2.5 sm:px-6" action="/settings/config">
+            <form className="asking flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-5 py-2 sm:px-6" action="/settings/config">
               <input type="hidden" name="set" value={currentKey} />
               {show !== "ACTIVE" ? <input type="hidden" name="show" value={show} /> : null}
               <label className="search-field relative min-w-60 flex-1">

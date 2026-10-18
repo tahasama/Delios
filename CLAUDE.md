@@ -513,7 +513,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   left"); choosing a list opens its sets. In the menu a list counts its values in use, a set too when the list has several ("· off" when
   switched off); "New set" (name, the deliverable types it serves). The set shown has its bar: name, whom it serves,
   its switch, its pencil (name, types), delete while never used. Values are the set's; a value is added to the set
-  shown (`?vs=<set>`). Which values: the segmented choice (`.seg` / `.segment`, In use · Retired · All, with counts).
+  shown (`?vs=<set>`), its + on the set's bar (the list's head only for a list of one set). The list's name and where
+  it stands share one line. Which values: the segmented choice (`.seg` / `.segment`, In use · Retired · All, with counts).
   "Used" names what uses a value ("recommended by document types: Calculation"), only real references (`Pointers`).
   The bottom bar for ticked values: Retire, Bring back, and for those never used, Move to another set and Delete.
 - **On/off is a switch** (owner, everywhere): `components/switch.tsx` (`role="switch"`): `Switch` acts at once,
