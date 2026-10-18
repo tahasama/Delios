@@ -539,9 +539,7 @@ export async function DocumentManagementPlan() {
             rows={[...dataReasons, ...infoReasons].map((r) => [
               <span key="r"><Code>{r.code}</Code> {r.label}</span>,
               r.props.family === "Information" ? "Information" : "Data",
-              r.props.response === true
-                ? `expected${typeof r.props.responseDays === "number" ? `, within ${r.props.responseDays} working days` : ""}`
-                : "only if the sender asks for one",
+              r.props.response === true ? "expected" : "only if the sender asks for one",
             ])}
             empty="No reason for issue yet." />
         </Part>
