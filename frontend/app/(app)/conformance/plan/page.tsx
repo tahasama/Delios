@@ -21,14 +21,14 @@ export default async function PlanPage() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
         <DocumentManagementPlan />
         <aside className="no-print hidden xl:block">
-          <nav aria-label="Contents" className="register register-sheet register-sheet-open sticky top-20">
-            <p className="border-b border-line bg-tint-soft px-4 py-2.5"><span className="stencil text-slate-500">Contents</span></p>
-            <ol className="space-y-0.5 px-2 py-2">
+          <nav aria-label="Contents" className="register register-sheet register-sheet-open sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col">
+            <p className="shrink-0 border-b border-line bg-tint-soft px-4 py-2.5"><span className="stencil text-slate-500">Contents</span></p>
+            <ol className="scroll-quiet min-h-0 space-y-0.5 overflow-y-auto px-2 py-2">
               {CHAPTERS.map((c, i) => (
                 <li key={c.id}>
                   <a href={`#${c.id}`} className="flex gap-2 rounded-sm px-2 py-1 text-[12px] leading-5 text-slate-600 hover:bg-tint-soft hover:text-slate-900">
                     <span className="w-4 shrink-0 text-right font-mono text-[11px] text-slate-400">{i + 1}</span>
-                    <span>{c.title}</span>
+                    <span className="truncate" title={c.title}>{c.title}</span>
                   </a>
                 </li>
               ))}
