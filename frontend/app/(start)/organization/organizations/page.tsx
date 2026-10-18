@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { SwitchControl } from "@/components/switch";
 import Link from "next/link";
-import { Pencil, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, X } from "lucide-react";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { DataTable, Th, Td, Field, ToneChip } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -16,7 +16,9 @@ import { inviteOrganizationAction, endLinkAction } from "@/lib/organization/form
 import { IDENTIFIER_KINDS, countryName } from "@/lib/organization/countries";
 import { cn, fmtDate } from "@/lib/core/utils";
 import { organizationLinks, guestAccounts } from "@/lib/organization/api";
+import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { TheirProjectsLinks } from "../their-projects";
+import { PartyCard } from "./party-card";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Organizations" };
@@ -25,7 +27,7 @@ export const metadata = { title: "Organizations" };
 const field = "plain w-full";
 const icon = "inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800";
 
-type Search = { edit?: string };
+type Search = { edit?: string; open?: string };
 
 /**
  * The organization's list of the organizations it works with (organization level, administrators), People & access's
@@ -41,9 +43,11 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
   const links = await organizationLinks();
   const guestsThere = new Map(await Promise.all(links.filter((one) => one.side === "GUEST" && one.state === "LINKED")
     .map(async (one) => [one.id, await guestAccounts(one.id)] as const)));
-  const [parties, users, policy, projectList] = await Promise.all([
+  const [parties, users, policy, projectList, roleOptions] = await Promise.all([
     partiesWithAnswers(), adminUsers().catch(() => []), formPolicy({ orgId: scope.orgId, projectId: "" }, "PARTY"), adminProjects().catch(() => []),
+    contractRoleOptions(),
   ]);
+  const roleLabel = (code: string | null) => (code ? roleOptions.find((r) => r.code === code)?.label ?? code : null);
   const projects = projectList.filter((p) => p.status !== "ARCHIVED").map((p) => ({ id: p.id, code: p.code, name: p.name }));
   // Who of ours may work for an organization nobody of which signs in; nobody chosen: the control function.
   const ours = users.filter((one) => one.active && one.internal).map((one) => ({ id: one.id, name: one.name, detail: one.email }));
@@ -99,21 +103,32 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
       <section className="register register-sheet register-sheet-open" aria-labelledby="orgs-head">
         {band("orgs-head", "Every organization", `${parties.length} · its code, name, identifier and how it works with us change once each`)}
         <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
-          head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>People</Th><Th></Th></tr>}>
+          head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Projects</Th><Th></Th></tr>}>
           {parties.map((p) => {
             const c = p.changed;
             const open = sp.edit === p.id;
+            const shown = !open && sp.open === p.id;
             const others = parties.filter((o) => o.id !== p.id && o.changed?.id && o.changed.id !== c?.id);
+            const worked = p.projects ?? [];
+            const Chevron = shown ? ChevronDown : ChevronRight;
             return (
               <Fragment key={p.id}>
-                <tr id={`party-${p.id}`} className={cn("scroll-mt-20 align-top target:bg-tint-soft", !p.active && "opacity-60", open && "[&>td]:border-b-0")}>
+                <tr id={`party-${p.id}`} className={cn("scroll-mt-20 align-top target:bg-tint-soft", !p.active && "opacity-60", (open || shown) && "[&>td]:border-b-0", shown && "bg-tint-soft")}>
                   <Td>
-                    <code className="code-chip mr-1.5">{p.code}</code><span className="font-medium text-slate-800">{p.name}</span>
+                    {/* The name opens its card underneath, in place. */}
+                    <Link href={href(shown ? {} : { open: p.id }, `party-${p.id}`)} scroll={false} aria-expanded={shown}
+                      className="group inline-flex items-start gap-1 text-left">
+                      <Chevron className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 group-hover:text-link" aria-hidden="true" />
+                      <span>
+                        <code className="code-chip mr-1.5">{p.code}</code><span className="font-medium text-slate-800 group-hover:text-link group-hover:underline">{p.name}</span>
+                      </span>
+                    </Link>
                     {p.isInternal ? <span className="ml-1.5"><ToneChip tone="moving">ours</ToneChip></span> : null}
-                    <span className="block text-[11px] text-slate-500">
+                    <span className="block pl-5 text-[11px] text-slate-500">
                       {identifierShown(c) ?? (c?.noIdentifierReason ? `no identifier: ${c.noIdentifierReason}` : null)}
                       {c?.domain ? ` · ${c.domain}${c.domainConfirmed ? " (proven)" : ""}` : ""}
                     </span>
+                    {p.active ? null : <span className="block pl-5 text-[11px] font-semibold text-red-700">switched off</span>}
                   </Td>
                   <Td className="text-xs">
                     {p.isInternal ? <span className="text-slate-500">—</span> : (
@@ -123,9 +138,10 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                       </>
                     )}
                   </Td>
-                  <Td className="text-xs tabular-nums">
-                    {p._count.users ? <Link href={`/settings/users?org=${p.id}`} className="font-semibold text-link hover:underline">{p._count.users}</Link> : <span className="text-slate-500">0</span>}
-                    {p.active ? null : <span className="block text-[11px] font-semibold text-red-700">switched off</span>}
+                  <Td className="text-xs">
+                    {p.isInternal ? <span className="text-slate-500">—</span> : worked.length ? (
+                      <span className="flex flex-wrap gap-1">{worked.map((w) => <code key={w.id} className="code-chip" title={w.name}>{w.code}</code>)}</span>
+                    ) : <span className="text-slate-500">none yet</span>}
                   </Td>
                   <Td className="w-px whitespace-nowrap text-right">
                     {open
@@ -133,6 +149,14 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                       : <Link href={href({ edit: p.id }, `party-${p.id}`)} scroll={false} className={icon} title={`Change ${p.name}`}><Pencil aria-label={`Change ${p.name}`} className="h-4 w-4" /></Link>}
                   </Td>
                 </tr>
+                {shown ? (
+                  // Its card, open under its line: since when we work with it, and every project it worked on with us.
+                  <tr>
+                    <td colSpan={4} className="border-b border-line bg-tint-soft p-0">
+                      <PartyCard worked={worked} linkedAt={p.linkedAt ?? null} kind={p.isInternal ? null : kindLabel(p.kind)} roleLabel={roleLabel} ours={p.isInternal} />
+                    </td>
+                  </tr>
+                ) : null}
                 {open ? (
                   // The line goes on as the form: grey fields, then the strip with Cancel and Save.
                   <tr>

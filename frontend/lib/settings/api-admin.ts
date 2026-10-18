@@ -54,6 +54,13 @@ type AdminParty = {
   kind?: "COLLABORATOR" | "GUEST" | "NOT_ON_DELIOS" | null;
   /** Its open link with its own DELIOS organization: invited, or linked. */
   link?: { id: string; state: "INVITED" | "LINKED"; organization: string } | null;
+  /** When its link with its own DELIOS was accepted. */
+  linkedAt?: string | null;
+  /** The projects it works on with us: when it joined each, and the project's own start and finish. */
+  projects?: {
+    id: string; code: string; name: string; status: string; role: string | null; active: boolean; contractNumber: string | null;
+    joinedAt: string; startDate: string | null; endDate: string | null;
+  }[];
   /**
    * What was changed once and is fixed now: its code and name (one of each across DELIOS), how it works with us; and
    * whether it is another organization on DELIOS, which alone changes its own code and name.

@@ -750,7 +750,7 @@ public static class DirectoryEndpoints
     // ── Organizations taking part ───────────────────────────────────────────
 
     /// <summary><c>GET /api/admin/parties</c>: every organization, with how many of its people hold accounts.</summary>
-    private static async Task<IResult> PartiesAsync(DeliosDbContext db, Organizations.OrganizationService organizations,
+    private static async Task<IResult> PartiesAsync(HttpContext http, DeliosDbContext db, Organizations.OrganizationService organizations,
         CancellationToken cancellationToken)
     {
         var links = await organizations.PartyLinksAsync(cancellationToken);
@@ -759,6 +759,29 @@ public static class DirectoryEndpoints
         var identities = await db.OrganizationIdentities.AsNoTracking().Where(o => identityIds.Contains(o.Id)).ToDictionaryAsync(o => o.Id, cancellationToken);
         var people = await db.Users.AsNoTracking().Where(u => u.PartyId != null && u.Active).GroupBy(u => u.PartyId)
             .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
+        // The projects each one works on with us: when it joined each, the project's own start and finish (its answers).
+        var taking = await db.ProjectParties.AsNoTracking()
+            .Select(r => new { r.PartyId, r.ProjectId, r.Role, r.Active, r.AddedAt, r.ContractNumber, r.Project!.Code, r.Project.Name, r.Project.Status })
+            .ToListAsync(cancellationToken);
+        var takingIds = taking.Select(r => r.ProjectId).Distinct().ToList();
+        var infos = await db.Settings.AsNoTracking().Where(s => s.Key == "PROJECT_INFO" && s.ProjectId != null && takingIds.Contains(s.ProjectId.Value))
+            .ToDictionaryAsync(s => s.ProjectId!.Value, s => s.Value, cancellationToken);
+        static string? Day(string? json, string key)
+        {
+            if (json is null) return null;
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                return doc.RootElement.TryGetProperty(key, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String && v.GetString() is { Length: > 0 } s ? s : null;
+            }
+            catch (System.Text.Json.JsonException) { return null; }
+        }
+        // When a link with its own DELIOS was accepted: it works from there since.
+        var me = http.User.TenantId();
+        var linkedAt = (await db.OrganizationLinks.AsNoTracking()
+                .Where(l => l.HostTenantId == me && l.State == Organizations.LinkStates.Linked && l.AnsweredAt != null)
+                .Select(l => new { l.HostPartyId, l.AnsweredAt }).ToListAsync(cancellationToken))
+            .GroupBy(l => l.HostPartyId).ToDictionary(g => g.Key, g => g.Max(l => l.AnsweredAt!.Value).ToDateTimeOffset());
         return Results.Ok(parties.Select(p => new
         {
             p.Id,
@@ -792,6 +815,14 @@ public static class DirectoryEndpoints
             // Collaborator (linked to its own organization), guest, or not on DELIOS (docs/ORGANIZATIONS.md).
             Kind = p.IsInternal ? null : Organizations.OrganizationService.KindOf(p, links.TryGetValue(p.Id, out var l) && l.State == Organizations.LinkStates.Linked),
             Link = links.TryGetValue(p.Id, out var link) ? new { link.Id, link.State, link.Organization } : null,
+            LinkedAt = linkedAt.TryGetValue(p.Id, out var at) ? at : (DateTimeOffset?)null,
+            Projects = taking.Where(r => r.PartyId == p.Id).OrderBy(r => r.AddedAt).Select(r => new
+            {
+                Id = r.ProjectId, r.Code, r.Name, r.Status, r.Role, r.Active, r.ContractNumber,
+                JoinedAt = r.AddedAt.ToDateTimeOffset(),
+                StartDate = Day(infos.GetValueOrDefault(r.ProjectId), "startDate"),
+                EndDate = Day(infos.GetValueOrDefault(r.ProjectId), "endDate"),
+            }),
         }));
     }
 

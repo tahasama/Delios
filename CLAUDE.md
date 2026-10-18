@@ -463,7 +463,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Defaults for new projects, the cards by group, each chip saying where its switch stands), Who we are on DELIOS
   (`/organization/settings/identity`) and What is kept (`/organization/settings/tracking`) among them; Defaults has the
   form beside an aside (start from a project, the app's own defaults, reset). People (`/organization/people`) and
-  Organizations (with those whose projects we work on, and the links refused or ended) are each one list.
+  Organizations (with those whose projects we work on, and the links refused or ended) are each one list. On
+  Organizations a name opens its card under its line, in place (`?open=<id>`, `party-card.tsx`): joined, start, finish
+  (its projects' own dates), and every project it worked on with us (role, contract, joined, start, finish); no people
+  count on the list (owner: pointless).
 - The organization's page (`/organization`, administrators): projects ours and joined, people, organizations
   we work with, invitations (also on Home), defaults for new projects. Its projects, people and organizations
   are links (open or switch into a project; People & access; Organizations).
@@ -741,7 +744,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
 - **Two levels of settings** (owner): the organization's (`/organization`, its portal) and the project's (Settings).
   Every project, opening one, archiving and reopening are the organization's: **Projects** (`/organization/projects`,
-  administrators), People & access's way: plate (open · archived); "Open a new project" one sheet (`?new=1`: band, grey
+  administrators), People & access's way: plate (open · archived, one short line, its acts on its right: "Defaults for new projects" on
+  its own, never inside a sentence, and "New project"); "New project" opens one sheet under it (`?new=1`: band, grey
   fields, "Where approval sits under each role", whose people it starts with, Cancel / Open project; it starts from the
   organization's defaults); the table, code and name opening a project one is on, a pencil opening its line
   (`?edit=<id>`: name, code, type, our role, start, end, scope, description; Cancel / Save). The description (optional,

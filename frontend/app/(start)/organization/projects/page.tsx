@@ -79,24 +79,28 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     <>
       {/* The plate: how many projects, and what a project is made of. */}
       <section className="register register-sheet register-sheet-open">
-        <div className="px-5 pt-6 pb-4 sm:px-6">
-          <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{scope.organization.name}</p>
-          <h1 className="plate-title mt-1 text-slate-950">Projects</h1>
-          <p className="plate-meta mt-2">
-            {open} open{archived ? <> · {archived} archived</> : null}
-          </p>
-          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-            Each project has its own register, number counters, people and settings. A new one starts from the
-            organization&rsquo;s <Link href="/organization/defaults" className="font-semibold text-link hover:underline">defaults for new projects</Link>;
-            what is changed on a project changes that project only. A project&rsquo;s code and name are its own across DELIOS and never
-            given to another; its code changes once, for a mistake. Archiving puts its documents away with it; nothing is deleted.
-          </p>
+        <div className="flex flex-col gap-4 px-5 pt-6 pb-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+          <div className="min-w-0">
+            <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{scope.organization.name}</p>
+            <h1 className="plate-title mt-1 text-slate-950">Projects</h1>
+            <p className="plate-meta mt-2">
+              {open} open{archived ? <> · {archived} archived</> : null}
+            </p>
+            <p className="mt-1 max-w-xl text-xs leading-5 text-slate-500">
+              Each project keeps its own register, people and settings. Archiving puts it away; nothing is deleted.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+            <Link href="/organization/defaults" className="ask">Defaults for new projects</Link>
+            {opening ? null : <Link href="/organization/projects?new=1#new" scroll={false} data-on="true" className="ask">New project</Link>}
+          </div>
         </div>
       </section>
 
-      {/* Open a new project: one sheet; opened, it becomes the form. */}
-      <section id="new" className="register register-sheet register-sheet-open scroll-mt-24" aria-label="Open a new project">
-        {band("Open a new project", "it starts from the organization's defaults, which it then keeps as its own")}
+      {/* A new project: one sheet, opened from the plate; it becomes the form. */}
+      {opening ? (
+      <section id="new" className="register register-sheet register-sheet-open scroll-mt-24" aria-label="New project">
+        {band("New project", "it starts from the organization's defaults, which it then keeps as its own")}
         {opening ? (
           <>
             <ActionForm id="new-project" action={createProjectAction} hideSubmit resetOnSuccess className="asking space-y-5 px-5 py-5 sm:px-6">
@@ -143,12 +147,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
               </div>
             </div>
           </>
-        ) : (
-          <div className="px-5 py-4 sm:px-6">
-            <Link href="/organization/projects?new=1#new" scroll={false} className="ask w-fit">Open a new project</Link>
-          </div>
-        )}
+        ) : null}
       </section>
+      ) : null}
 
       {/* Every project: its code and name open it; the pencil opens its line. */}
       <section className="register register-sheet register-sheet-open" aria-labelledby="list-head">
