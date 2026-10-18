@@ -179,12 +179,19 @@ type FormView = {
   /** The fields of one's own a record of this form carries an answer to: retired, never taken away. */
   used?: string[];
 };
-/** Every form of a project, whether it keeps its own copy, and who may change them. */
-export type FormsAnswer = { forms: FormView[]; own: boolean; mayChange: boolean; mayChangeOrganization: boolean };
+/**
+ * Every form at one level: a project's (the forms it keeps its own copy of, whether the organization leaves forms free,
+ * whether this person may change them) or the organization's (its Settings).
+ */
+export type FormsAnswer = { level: "project" | "organization"; forms: FormView[]; owned: string[]; free: boolean; mayChange: boolean };
 
 /** The project's forms, read once a request (`GET /api/projects/{id}/forms`). */
 export const projectForms = cache(async (projectId: string): Promise<FormsAnswer | null> =>
   api<FormsAnswer>(`/api/projects/${projectId}/forms`).catch(() => null));
+
+/** The organization's forms, every one of them, as its Settings show them (`GET /api/admin/forms`, an administrator). */
+export const organizationForms = cache(async (): Promise<FormsAnswer | null> =>
+  api<FormsAnswer>("/api/admin/forms").catch(() => null));
 
 /** One form: the project's when a project is open, else (opening a project, adding an organization) the organization's. */
 async function formView(t: Tenant, kind: FieldKind): Promise<FormView | null> {

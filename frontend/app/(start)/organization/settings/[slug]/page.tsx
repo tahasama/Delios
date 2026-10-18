@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 
 /** Where a card's organization's version stands until it is moved onto this card, said plainly. */
 const TODAY: Record<string, React.ReactNode> = {
-  fields: <>The organization&rsquo;s forms come onto this card in the next steps. Until then a project&rsquo;s Forms &amp; fields changes its own copy.</>,
   functions: <>The organization&rsquo;s functions come onto this card in the next steps. Until then they are changed in a project&rsquo;s Settings → Functions &amp; permissions, for every project.</>,
   flow: <>The organization&rsquo;s version is what a project starts with: <Link href="/organization/defaults" className="font-semibold text-link hover:underline">Defaults for new projects</Link>. Each project then changes its own where it is free.</>,
 };

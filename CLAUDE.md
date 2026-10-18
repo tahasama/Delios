@@ -599,11 +599,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   moves forward, shown in the register…). Never a "Switch off" button or an on/off chip beside a button; a choice among
   several, or a confirmation, stays a tick. Acts whose icon says them are icons (add, change, download, delete, retire, order),
   their name on hover; Save, Cancel and a page's first act keep their words.
-- **Forms & fields are the project's** (owner; backend `Settings/FormRules.cs`, `GET/PUT /api/projects/{id}/forms`): until
-  a project changes one it reads the organization's, its first change gives it its own copy (`FORMS_OWN`), which the
-  organization's later changes never touch. The control function changes them (on a project with none, whoever opened
-  it), everyone of ours reads them; opening a project and adding an organization are the organization's (an
-  administrator; `GET /api/forms/{form}`). The backend refuses what a form insists on, for every way it arrives (a form,
+- **Forms & fields on two levels, form by form** (owner; backend `Settings/FormRules.cs`): the organization's forms are
+  the default every project reads, changed on the organization's Settings card (`/organization/settings/fields`,
+  `/api/admin/forms`, the same board `settings/fields/board.tsx` with `level`), opening a project and adding an
+  organization there only (ORGANIZATIONS_FORM on a project). Where the organization leaves forms Free (switch `FORMS`,
+  one for all forms), a project's first change of a form copies **that form only** (`FORMS_OWN` names the forms it
+  keeps; an old "1" was every form); Fixed, a project reads them only (FORMS_FIXED). Each form says on the project where
+  it stands, in the three sentences of the lists. The organization's card lists the projects keeping their own form and
+  puts one form back, for a mess, with why (SETTING_RESET). A field answered on any project reading the organization's
+  form keeps what it asks. The control function changes a project's forms (on a project with none, whoever opened
+  it), everyone of ours reads them (`GET /api/projects/{id}/forms`; the organization's, `GET /api/forms/{form}`). The backend refuses what a form insists on, for every way it arrives (a form,
   an import, a draft sent): documents (registered and changed), revisions started by hand, transmittals sent, packages,
   tags, opening a project and adding an organization (FIELDS_REQUIRED, `fields` outlined). On the review form, "Copied in"
   is must · asked · not asked like any field (not asked: nobody is copied in). **A field of one's own** is one row,
@@ -697,7 +702,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   how it works with us change once each (above). An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
 - Layered settings: built as the two levels above (the switches). Being moved onto them card by card: the switches
-  and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (done, per list), Forms & fields, Functions & permissions,
+  and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (done, per list), Forms & fields (done, per form), Functions & permissions,
   the Control room. Until a page is moved, it says plainly what is the organization's and what is the project's.
 - Document families are **on hold** (owner): the idea is to group document types (internal like DWG, supplier like C102)
   to tell criticality and whether an outside stamp / wet signature is needed or the app's approval is enough, legally.

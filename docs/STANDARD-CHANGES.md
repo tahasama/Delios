@@ -1233,6 +1233,9 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
 - **Lists are decided one by one**: each list has its own switch, and a project copies only the list it changes,
   where the organization leaves it free; a list the organization keeps fixed is the same on every project. Lists that
   describe projects themselves (their type, our role) are always the organization's.
+- **Forms are decided the same way, form by form**: one switch for all of them; a project copies only the form it
+  changes, where free. Opening a project and adding an organization are the organization's acts: their forms are
+  always the organization's.
 
 ## Still open — decided in conversation, not yet built
 

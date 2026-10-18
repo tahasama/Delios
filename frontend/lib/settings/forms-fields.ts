@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath, refusal } from "@/lib/client";
-import { KINDS, keyFromLabel, storedOwnFields, type Control, type FieldKind, type FieldRule } from "@/lib/settings/field-policy";
+import { KINDS, keyFromLabel, storedOwnFields, organizationForms, type Control, type FieldKind, type FieldRule } from "@/lib/settings/field-policy";
 
 /**
- * Forms & fields: what each form asks, saved into the project's own copy of its forms (the backend makes it, from the
- * organization's, on the first change: `FormRules`). The backend checks who may (the control function; the
- * organization's forms, an administrator) and keeps a field answered at least once: retired, never taken away, what it
- * asks unchanged.
+ * Forms & fields, on two levels as the form's hidden `level` says: a project's (the backend copies one form, from the
+ * organization's, on its first change there, where forms are free: `FormRules`) or the organization's (its Settings,
+ * an administrator). The backend checks who may and keeps a field answered at least once: retired, never taken away,
+ * what it asks unchanged.
  */
 type Result = { error?: string; ok?: string };
 const text = (formData: FormData, name: string) => String(formData.get(name) ?? "").trim();
@@ -18,13 +18,24 @@ const RULES: FieldRule[] = ["REQUIRED", "OPTIONAL", "OFF"];
 const CONTROLS: Control[] = ["TEXT", "LONG_TEXT", "NUMBER", "DATE", "YES_NO", "CHOICE"];
 
 function revalidate() {
-  for (const path of ["/settings/fields", "/documents/new", "/transmittals/new", "/packages", "/assets", "/documents"]) revalidatePath(path);
+  for (const path of ["/settings/fields", "/organization/settings/fields", "/documents/new", "/transmittals/new", "/packages", "/assets", "/documents"]) revalidatePath(path);
 }
 
-async function save(kind: FieldKind, body: Record<string, unknown>): Promise<Result | null> {
-  const ctx = await requireScope();
+const organizationLevel = (formData: FormData) => formData.get("level") === "organization";
+
+/** The fields of one's own a form holds now, at the form's level. */
+async function ownFields(formData: FormData, kind: FieldKind) {
+  if (organizationLevel(formData)) {
+    const view = (await organizationForms())?.forms.find((f) => f.form === kind);
+    return { own: view?.own ?? [], used: view?.used ?? [] };
+  }
+  return storedOwnFields(await requireScope(), kind);
+}
+
+async function save(formData: FormData, kind: FieldKind, body: Record<string, unknown>): Promise<Result | null> {
   try {
-    await api(projectPath(ctx, `/forms/${kind}`), { method: "PUT", body });
+    const path = organizationLevel(formData) ? `/api/admin/forms/${kind}` : projectPath(await requireScope(), `/forms/${kind}`);
+    await api(path, { method: "PUT", body });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -44,10 +55,9 @@ export async function setFieldRuleAction(formData: FormData): Promise<void> {
   const rule = text(formData, "rule") as FieldRule;
   if (!kind || !key || !RULES.includes(rule)) return;
   if (text(formData, "of") === "own") {
-    const ctx = await requireScope();
-    const { own } = await storedOwnFields(ctx, kind);
-    await save(kind, { own: own.map((row) => (row.key === key ? { ...row, rule } : row)) });
-  } else await save(kind, { rules: { [key]: rule } });
+    const { own } = await ownFields(formData, kind);
+    await save(formData, kind, { own: own.map((row) => (row.key === key ? { ...row, rule } : row)) });
+  } else await save(formData, kind, { rules: { [key]: rule } });
 }
 
 /** What one of the app's fields is called on this project's form. */
@@ -55,7 +65,7 @@ export async function renameFieldAction(_prev: Result | undefined, formData: For
   const kind = kindOf(formData);
   const key = text(formData, "key");
   if (!kind || !key) return { error: "No such field." };
-  return (await save(kind, { labels: { [key]: text(formData, "label").slice(0, 60) || null } })) ?? { ok: "Saved." };
+  return (await save(formData, kind, { labels: { [key]: text(formData, "label").slice(0, 60) || null } })) ?? { ok: "Saved." };
 }
 
 /**
@@ -74,8 +84,7 @@ export async function saveOwnFieldAction(_prev: Result | undefined, formData: Fo
   if (!CONTROLS.includes(control)) return { error: "Say what kind of answer it takes." };
   if (control === "CHOICE" && !setKey) return { error: "A field chosen from a list names the list it draws from." };
   if (!RULES.includes(rule)) return { error: "Say whether it must be filled." };
-  const ctx = await requireScope();
-  const { own } = await storedOwnFields(ctx, kind);
+  const { own } = await ownFields(formData, kind);
   const key = text(formData, "key");
   const fields = {
     label: label.slice(0, 60), control, setKey: control === "CHOICE" ? setKey : null, rule,
@@ -83,10 +92,10 @@ export async function saveOwnFieldAction(_prev: Result | undefined, formData: Fo
   };
   if (key) {
     if (!own.some((row) => row.key === key)) return { error: "No such field." };
-    return (await save(kind, { own: own.map((row) => (row.key === key ? { ...row, ...fields } : row)) })) ?? { ok: `${label} saved.` };
+    return (await save(formData, kind, { own: own.map((row) => (row.key === key ? { ...row, ...fields } : row)) })) ?? { ok: `${label} saved.` };
   }
   const row = { id: randomUUID(), key: keyFromLabel(label, own.map((o) => o.key)), retired: false, ...fields };
-  return (await save(kind, { own: [...own, row] })) ?? { ok: `${label} added.` };
+  return (await save(formData, kind, { own: [...own, row] })) ?? { ok: `${label} added.` };
 }
 
 /** Retires a field of one's own that was answered (no longer asked; its answers stay), or brings it back. */
@@ -94,9 +103,8 @@ export async function retireOwnFieldAction(formData: FormData): Promise<void> {
   const kind = kindOf(formData);
   const key = text(formData, "key");
   if (!kind || !key) return;
-  const ctx = await requireScope();
-  const { own } = await storedOwnFields(ctx, kind);
-  await save(kind, { own: own.map((row) => (row.key === key ? { ...row, retired: !row.retired } : row)) });
+  const { own } = await ownFields(formData, kind);
+  await save(formData, kind, { own: own.map((row) => (row.key === key ? { ...row, retired: !row.retired } : row)) });
 }
 
 /** Takes a field of one's own never answered off the form (one answered is retired instead: the backend refuses). */
@@ -104,7 +112,6 @@ export async function removeOwnFieldAction(formData: FormData): Promise<void> {
   const kind = kindOf(formData);
   const key = text(formData, "key");
   if (!kind || !key) return;
-  const ctx = await requireScope();
-  const { own } = await storedOwnFields(ctx, kind);
-  await save(kind, { own: own.filter((row) => row.key !== key) });
+  const { own } = await ownFields(formData, kind);
+  await save(formData, kind, { own: own.filter((row) => row.key !== key) });
 }

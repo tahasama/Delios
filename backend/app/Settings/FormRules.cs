@@ -23,18 +23,19 @@ public sealed record FormRequest(Dictionary<string, string?>? Rules, Dictionary<
 
 /// <summary>
 /// What each form asks for, and what it insists on (Forms &amp; fields), worked out once here and checked on every save
-/// (owner: rules live in the backend, an import or a script included). A project's forms are the project's: until it
-/// changes one it reads the organization's (the default), and its first change gives it its own copy, which later
-/// changes of the organization never touch (<c>FORMS_OWN</c>). Opening a project and adding an organization are the
-/// organization's acts, so their forms stay the organization's. The control function changes a project's forms (on a
-/// project with none, whoever opened it); an administrator the organization's.
+/// (owner: rules live in the backend, an import or a script included). On two levels (owner): the organization's forms
+/// (its Settings, <c>/api/admin/forms</c>, an administrator) are the default every project reads; where the organization
+/// leaves forms free (<see cref="Liberty.Forms"/>), a project's first change of one form copies that form only
+/// (<c>FORMS_OWN</c>: the forms it keeps), a copy later changes of the organization never touch; where fixed, a project
+/// reads them only. Opening a project and adding an organization are the organization's acts: their forms are changed in
+/// its Settings only. The control function changes a project's forms (on a project with none, whoever opened it).
 /// </summary>
 public static class FormRules
 {
     public const string RuleKey = "FIELD_RULE:";
     public const string LabelKey = "FIELD_LABEL:";
     public const string OwnKey = "OWN_FIELDS:";
-    /// <summary>Marks a project that keeps its own forms (its copy made on its first change).</summary>
+    /// <summary>The forms a project keeps its own copy of, comma-separated (once "1": every form, before forms were copied one by one).</summary>
     public const string OwnFormsKey = "FORMS_OWN";
 
     public const string Required = "REQUIRED";
@@ -69,14 +70,23 @@ public static class FormRules
     /// <summary>The forms that are the organization's (its acts), not a project's.</summary>
     public static readonly HashSet<string> OrganizationForms = ["PROJECT", "PARTY"];
 
-    /// <summary>Whether a project keeps its own forms.</summary>
-    private static async Task<bool> OwnsAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken) =>
-        await db.Set<Setting>().AsNoTracking().AnyAsync(s => s.ProjectId == projectId && s.Key == OwnFormsKey, cancellationToken);
+    /// <summary>The forms a project keeps its own copy of.</summary>
+    public static async Task<HashSet<string>> OwnedAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken) =>
+        OwnedOf(await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == projectId && s.Key == OwnFormsKey).Select(s => s.Value)
+            .FirstOrDefaultAsync(cancellationToken));
+
+    /// <summary>
+    /// The forms a <c>FORMS_OWN</c> value names; "1" (kept before forms were copied one by one) was every project form,
+    /// copied together.
+    /// </summary>
+    private static HashSet<string> OwnedOf(string? value) =>
+        value is null ? [] : value == "1" ? [.. Forms.Keys.Where(f => !OrganizationForms.Contains(f))]
+            : [.. value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
 
     /// <summary>The settings a form is read from: the project's own copy, else the organization's.</summary>
     private static async Task<Dictionary<string, string>> SourceAsync(DeliosDbContext db, Guid? projectId, string form, CancellationToken cancellationToken)
     {
-        Guid? scope = projectId is { } id && !OrganizationForms.Contains(form) && await OwnsAsync(db, id, cancellationToken) ? id : null;
+        Guid? scope = projectId is { } id && !OrganizationForms.Contains(form) && (await OwnedAsync(db, id, cancellationToken)).Contains(form) ? id : null;
         return await db.Set<Setting>().AsNoTracking()
             .Where(s => s.ProjectId == scope && (s.Key.StartsWith(RuleKey + form + ":") || s.Key.StartsWith(LabelKey + form + ":") || s.Key == OwnKey + form))
             .ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
@@ -205,57 +215,160 @@ public static class FormRules
         {
             var access = ProjectAccessFilter.Of(h);
             var forms = new List<FormView>();
-            foreach (var form in Forms.Keys) forms.Add(await ReadAsync(db, access.Project.Id, form, c));
+            foreach (var form in Forms.Keys.Where(f => !OrganizationForms.Contains(f))) forms.Add(await ReadAsync(db, access.Project.Id, form, c));
             return Results.Ok(new
             {
+                level = "project",
                 forms,
-                own = await OwnsAsync(db, access.Project.Id, c),
+                owned = await OwnedAsync(db, access.Project.Id, c),
+                free = await Liberty.IsFreeAsync(db, Liberty.Forms, c),
                 mayChange = await ProjectLists.MayChangeAsync(db, access, c),
-                mayChangeOrganization = await Keepers.ConfiguresAsync(h),
             });
         });
-        project.MapPut("/{form}", SaveAsync);
-        // The organization's forms (opening a project, adding an organization), read where no project is open.
+        project.MapPut("/{form}", async (string form, FormRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock,
+            CancellationToken cancellationToken) =>
+        {
+            var access = ProjectAccessFilter.Of(http);
+            form = form.ToUpperInvariant();
+            if (!Forms.ContainsKey(form)) return Problems.NotFound("FORM_NOT_FOUND", "No such form.");
+            const string where = "an administrator changes it in the organization's Settings, for every project";
+            if (OrganizationForms.Contains(form))
+                return Problems.Forbidden("ORGANIZATIONS_FORM", $"Opening a project and adding an organization are the organization's: {where}.");
+            if (!await ProjectLists.MayChangeAsync(db, access, cancellationToken))
+                return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project decides what its forms ask (on a project with none, whoever opened it).");
+            var owned = await OwnedAsync(db, access.Project.Id, cancellationToken);
+            if (!owned.Contains(form))
+            {
+                if (!await Liberty.IsFreeAsync(db, Liberty.Forms, cancellationToken))
+                    return Problems.Forbidden("FORMS_FIXED", $"Every project uses the organization's forms: {where}.");
+                await CopyAsync(db, access.Project.TenantId, access.Project.Id, form, owned, access.UserName, clock, cancellationToken);
+            }
+            return await SaveAsync(db, audit, clock, form, request, access.Project.Id, access.Project.TenantId, access.UserId, access.UserName, [access.Project.Id],
+                cancellationToken);
+        });
+
+        // The organization's forms, the default of every project: read by everyone of ours (opening a project, adding an
+        // organization), changed by an administrator in its Settings.
         app.MapGroup("/api/forms").WithTags("Settings").RequireAuthorization().AddEndpointFilter<TransactionFilter>()
             .MapGet("/{form}", async (string form, DeliosDbContext db, CancellationToken c) =>
                 Forms.ContainsKey(form.ToUpperInvariant()) ? Results.Ok(await ReadAsync(db, null, form.ToUpperInvariant(), c)) : Problems.NotFound("FORM_NOT_FOUND", "No such form."));
+        var organization = app.MapGroup("/api/admin/forms").WithTags("Settings")
+            .AddEndpointFilter<TransactionFilter>().AddEndpointFilter(Keepers.Configurers("An administrator changes the organization's forms."));
+        organization.MapGet("", async (DeliosDbContext db, CancellationToken c) =>
+        {
+            var readers = await ReadersAsync(db, null, c);
+            var forms = new List<FormView>();
+            foreach (var form in Forms.Keys)
+            {
+                var view = await ReadAsync(db, null, form, c);
+                var used = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var reader in readers.Where(r => OrganizationForms.Contains(form) || !r.Owned.Contains(form)))
+                    used.UnionWith(await UsedAsync(db, reader.Id, form, c));
+                forms.Add(view with { Used = [.. used] });
+            }
+            return Results.Ok(new { level = "organization", forms, owned = Array.Empty<string>(), free = true, mayChange = true });
+        });
+        organization.MapPut("/{form}", async (string form, FormRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock,
+            CancellationToken cancellationToken) =>
+        {
+            form = form.ToUpperInvariant();
+            if (!Forms.ContainsKey(form)) return Problems.NotFound("FORM_NOT_FOUND", "No such form.");
+            var me = await db.Users.AsNoTracking().Where(u => u.Id == http.User.UserId()).Select(u => u.Name).SingleAsync(cancellationToken);
+            // A field answered on any project reading the organization's form is kept as it is.
+            var readers = (await ReadersAsync(db, null, cancellationToken))
+                .Where(r => OrganizationForms.Contains(form) || !r.Owned.Contains(form)).Select(r => r.Id).ToList();
+            return await SaveAsync(db, audit, clock, form, request, null, http.User.TenantId(), http.User.UserId(), me, readers, cancellationToken);
+        });
+        // The projects keeping their own copy of forms, and putting one back (owner: here only, for a mess, with why).
+        organization.MapGet("/projects", async (DeliosDbContext db, CancellationToken c) =>
+            Results.Ok((await ReadersAsync(db, null, c)).Where(r => r.Owned.Count > 0)
+                .Select(r => new { r.Id, r.Code, r.Name, Forms = r.Owned.OrderBy(f => f).ToArray() })));
+        organization.MapPost("/projects/{projectId:guid}/reset", ResetAsync);
+    }
+
+    /// <summary>Every project, with the forms it keeps its own copy of.</summary>
+    private static async Task<List<(Guid Id, string Code, string Name, HashSet<string> Owned)>> ReadersAsync(DeliosDbContext db, Guid? only,
+        CancellationToken cancellationToken)
+    {
+        var projects = await db.Projects.AsNoTracking().Where(p => only == null || p.Id == only).OrderBy(p => p.Code)
+            .Select(p => new { p.Id, p.Code, p.Name }).ToListAsync(cancellationToken);
+        var marks = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId != null && s.Key == OwnFormsKey)
+            .ToDictionaryAsync(s => s.ProjectId!.Value, s => s.Value, cancellationToken);
+        return projects.Select(p => (p.Id, p.Code, p.Name, OwnedOf(marks.GetValueOrDefault(p.Id)))).ToList();
+    }
+
+    /// <summary>A project's own copy of one form, from the organization's, before its first change of it.</summary>
+    private static async Task CopyAsync(DeliosDbContext db, Guid tenantId, Guid projectId, string form, HashSet<string> owned, string by, IClock clock,
+        CancellationToken cancellationToken)
+    {
+        var originals = await db.Set<Setting>().AsNoTracking()
+            .Where(s => s.ProjectId == null && (s.Key.StartsWith(RuleKey + form + ":") || s.Key.StartsWith(LabelKey + form + ":") || s.Key == OwnKey + form))
+            .ToListAsync(cancellationToken);
+        foreach (var one in originals)
+            db.Add(new Setting { TenantId = tenantId, ProjectId = projectId, Key = one.Key, Value = one.Value, UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = by });
+        await MarkAsync(db, tenantId, projectId, [.. owned, form], by, clock, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task MarkAsync(DeliosDbContext db, Guid tenantId, Guid projectId, IEnumerable<string> forms, string by, IClock clock,
+        CancellationToken cancellationToken)
+    {
+        var value = string.Join(",", forms.Distinct().OrderBy(f => f));
+        var mark = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == projectId && s.Key == OwnFormsKey, cancellationToken);
+        if (value.Length == 0) { if (mark is not null) db.Remove(mark); }
+        else if (mark is null) db.Add(new Setting { TenantId = tenantId, ProjectId = projectId, Key = OwnFormsKey, Value = value, UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = by });
+        else { mark.Value = value; mark.UpdatedAt = clock.GetCurrentInstant(); mark.UpdatedByName = by; }
+    }
+
+    /// <summary>Body of putting one of a project's forms back to the organization's: which form, and why.</summary>
+    public sealed record FormResetRequest(string? Form, string? Reason);
+
+    /// <summary>
+    /// <c>POST /api/admin/forms/projects/{id}/reset</c>: the project's copy of one form goes, and it reads the
+    /// organization's again; always with why, in the log, its control function told. Answers already given stay on their
+    /// records.
+    /// </summary>
+    private static async Task<IResult> ResetAsync(Guid projectId, FormResetRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        Notifications.Notifier notifier, IClock clock, CancellationToken cancellationToken)
+    {
+        var reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
+        var form = request.Form?.Trim().ToUpperInvariant();
+        if (reason is null) return Problems.Invalid("REASON_REQUIRED", "Say why the form goes back to the organization's.");
+        var project = await db.Projects.AsNoTracking().SingleOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
+        var owned = await OwnedAsync(db, projectId, cancellationToken);
+        if (form is null || !owned.Contains(form)) return Problems.Invalid("NOT_OWN", $"{project.Code} already uses the organization's form.");
+        db.Set<Setting>().RemoveRange(await db.Set<Setting>()
+            .Where(s => s.ProjectId == projectId && (s.Key.StartsWith(RuleKey + form + ":") || s.Key.StartsWith(LabelKey + form + ":") || s.Key == OwnKey + form))
+            .ToListAsync(cancellationToken));
+        var me = await db.Users.AsNoTracking().Where(u => u.Id == http.User.UserId()).Select(u => u.Name).SingleAsync(cancellationToken);
+        await MarkAsync(db, project.TenantId, projectId, owned.Where(f => f != form), me, clock, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        var noun = $"{Noun(form)} form";
+        await audit.WriteAsync(new Actor(http.User.UserId(), me), "SETTING_RESET", "Project", project.Id, $"{project.Code}: {noun}", reason, project.Id,
+            cancellationToken);
+        await notifier.NotifyAsync(project.TenantId, project.Id, await Actions.NoticeLog.HoldersAsync(db, project.Id, Verbs.Control, cancellationToken),
+            Notifications.NotificationKinds.General, $"{project.Code} uses the organization's {noun} again",
+            $"{me} put {project.Code}'s {noun} back to the organization's: {reason}. Answers already given stay on their records.",
+            $"/settings/fields?form={form}", cancellationToken);
+        return Results.NoContent();
     }
 
     /// <summary>
-    /// <c>PUT /forms/{form}</c>: one form's rules, names, fields of one's own and lists' rules. A project's form is saved
-    /// into the project's own copy (made first, from the organization's); the organization's forms by an administrator.
+    /// One form's rules, names and fields of one's own, saved at its level: a project's own copy (<paramref name="scope"/>),
+    /// or the organization's (none). A field answered on a project reading this version keeps what it asks.
     /// </summary>
-    private static async Task<IResult> SaveAsync(string form, FormRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
-        IClock clock, CancellationToken cancellationToken)
+    private static async Task<IResult> SaveAsync(DeliosDbContext db, AuditLog audit, IClock clock, string form, FormRequest request, Guid? scope,
+        Guid tenantId, Guid userId, string userName, IReadOnlyList<Guid> readers, CancellationToken cancellationToken)
     {
-        var access = ProjectAccessFilter.Of(http);
-        form = form.ToUpperInvariant();
-        if (!Forms.ContainsKey(form)) return Problems.NotFound("FORM_NOT_FOUND", "No such form.");
-        var organization = OrganizationForms.Contains(form);
-        if (organization ? !await Keepers.ConfiguresAsync(http) : !await ProjectLists.MayChangeAsync(db, access, cancellationToken))
-            return Problems.Forbidden("CONTROL_ONLY", organization
-                ? "Opening a project and adding an organization are the organization's: an administrator decides what they ask."
-                : "Whoever acts as the control function on this project decides what its forms ask (on a project with none, whoever opened it).");
-        Guid? scope = organization ? null : access.Project.Id;
-        if (scope is { } projectId && !await OwnsAsync(db, projectId, cancellationToken))
-        {
-            // The project's own copy of every form, from the organization's, before its first change.
-            var originals = await db.Set<Setting>().AsNoTracking()
-                .Where(s => s.ProjectId == null && (s.Key.StartsWith(RuleKey) || s.Key.StartsWith(LabelKey) || s.Key.StartsWith(OwnKey)))
-                .ToListAsync(cancellationToken);
-            foreach (var one in originals.Where(o => !OrganizationForms.Any(f => o.Key.Contains(f + ":") || o.Key.EndsWith(":" + f) || o.Key == OwnKey + f)))
-                db.Add(new Setting { TenantId = access.Project.TenantId, ProjectId = projectId, Key = one.Key, Value = one.Value, UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = access.UserName });
-            db.Add(new Setting { TenantId = access.Project.TenantId, ProjectId = projectId, Key = OwnFormsKey, Value = "1", UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = access.UserName });
-            await db.SaveChangesAsync(cancellationToken);
-        }
         var changes = new List<string>();
         async Task PutAsync(string key, string? value)
         {
             var row = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == scope && s.Key == key, cancellationToken);
             var was = row?.Value;
             if (string.IsNullOrWhiteSpace(value)) { if (row is not null) db.Remove(row); }
-            else if (row is null) db.Add(new Setting { TenantId = access.Project.TenantId, ProjectId = scope, Key = key, Value = value.Trim(), UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = access.UserName });
-            else { row.Value = value.Trim(); row.UpdatedAt = clock.GetCurrentInstant(); row.UpdatedByName = access.UserName; }
+            else if (row is null) db.Add(new Setting { TenantId = tenantId, ProjectId = scope, Key = key, Value = value.Trim(), UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = userName });
+            else { row.Value = value.Trim(); row.UpdatedAt = clock.GetCurrentInstant(); row.UpdatedByName = userName; }
             if ((was ?? "") != (value?.Trim() ?? "")) changes.Add($"{key[(key.IndexOf(':') + 1)..]}: {was ?? "(default)"} → {(string.IsNullOrWhiteSpace(value) ? "(default)" : value.Trim())}");
         }
         var fields = Forms[form];
@@ -277,25 +390,22 @@ public static class FormRules
                 if (one.Control != "CHOICE" && one.SetKey is not null) return Problems.Invalid("LIST_ONLY_FOR_A_CHOICE", $"{one.Label}: only a field chosen from a list names a list.");
             }
             // A field answered at least once is retired, never taken away, and keeps the kind of answer and the list it asks.
-            if (scope is { } formProject)
+            var used = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var reader in readers) used.UnionWith(await UsedAsync(db, reader, form, cancellationToken));
+            var before = (await ReadAsync(db, scope, form, cancellationToken)).Own;
+            foreach (var was in before.Where(b => used.Contains(b.Key)))
             {
-                var used = await UsedAsync(db, formProject, form, cancellationToken);
-                var before = (await ReadAsync(db, formProject, form, cancellationToken)).Own;
-                foreach (var was in before.Where(b => used.Contains(b.Key)))
-                {
-                    var now = own.FirstOrDefault(o => o.Key == was.Key);
-                    if (now is null)
-                        return Problems.Conflict("FIELD_IN_USE", $"{was.Label} has been answered: retire it instead, and its answers stay on their records.");
-                    if (now.Control != was.Control || now.SetKey != was.SetKey)
-                        return Problems.Conflict("FIELD_IN_USE", $"{was.Label} has been answered: what it asks stays as it is. Retire it and add a new field instead.");
-                }
+                var now = own.FirstOrDefault(o => o.Key == was.Key);
+                if (now is null)
+                    return Problems.Conflict("FIELD_IN_USE", $"{was.Label} has been answered: retire it instead, and its answers stay on their records.");
+                if (now.Control != was.Control || now.SetKey != was.SetKey)
+                    return Problems.Conflict("FIELD_IN_USE", $"{was.Label} has been answered: what it asks stays as it is. Retire it and add a new field instead.");
             }
             await PutAsync(OwnKey + form, own.Length == 0 ? null : JsonSerializer.Serialize(own, JsonSerializerOptions.Web));
         }
         await db.SaveChangesAsync(cancellationToken);
         if (changes.Count > 0)
-            await audit.WriteAsync(new Actor(access.UserId, access.UserName), "FORM_CHANGED", "Setting", null, form, string.Join("; ", changes),
-                organization ? null : access.Project.Id, cancellationToken);
+            await audit.WriteAsync(new Actor(userId, userName), "FORM_CHANGED", "Setting", null, form, string.Join("; ", changes), scope, cancellationToken);
         return Results.NoContent();
     }
 }

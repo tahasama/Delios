@@ -443,3 +443,7 @@ export const revisionCopies = cache(async () =>
 /** The projects keeping their own copy of lists (the organization's Types & sets card), and which. */
 export const listCopies = cache(async () =>
   api<{ id: string; code: string; name: string; lists: string[] }[]>("/api/admin/lists/projects").catch(() => []));
+
+/** The projects keeping their own copy of forms (the organization's Forms & fields card), and which. */
+export const formCopies = cache(async () =>
+  api<{ id: string; code: string; name: string; forms: string[] }[]>("/api/admin/forms/projects").catch(() => []));

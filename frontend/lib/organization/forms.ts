@@ -410,3 +410,17 @@ export async function resetListAction(_prev: Result | undefined, formData: FormD
   revalidatePath("/settings/config");
   return { ok: "It uses the organization's list again." };
 }
+
+/** Puts one of a project's forms back to the organization's (its Settings only, for a mess): always with why. */
+export async function resetFormAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const reason = text(formData, "reason");
+  if (!reason) return { error: "Say why the form goes back to the organization's.", fields: ["reason"] };
+  try {
+    await api(`/api/admin/forms/projects/${text(formData, "projectId")}/reset`, { body: { form: text(formData, "form"), reason } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization/settings/fields");
+  revalidatePath("/settings/fields");
+  return { ok: "It uses the organization's form again." };
+}
