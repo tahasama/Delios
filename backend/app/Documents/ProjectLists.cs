@@ -261,8 +261,22 @@ public static class ProjectLists
         var counts = await db.ValueEntries.AsNoTracking().GroupBy(v => new { v.SetKey, v.SetId })
             .Select(g => new { g.Key.SetKey, g.Key.SetId, Active = g.Count(v => v.Status == ValueStatus.Active), Others = g.Count(v => v.Status != ValueStatus.Active) })
             .ToListAsync(cancellationToken);
-        var sets = await db.ListSets.AsNoTracking().OrderBy(s => s.Sort).ThenBy(s => s.Name).ToListAsync(cancellationToken);
         var meta = await ListRules.MetaAsync(db, access.Project.Id, cancellationToken);
+        // Every list has its default set as a set like any other (owner: every list behaves the same): one filled or made
+        // before sets existed gets it now, in the lists this project reads.
+        var known = await db.ListSets.AsNoTracking().Select(s => s.ListKey).Distinct().ToListAsync(cancellationToken);
+        var missing = counts.Select(c => c.SetKey).Concat(meta.Keys).Append(ValueSets.Phases).Append(ValueSets.ProjectKinds)
+            .Distinct().Where(k => k != ValueSets.ProjectCodes && !known.Contains(k)).ToList();
+        if (missing.Count > 0)
+        {
+            db.ListSets.AddRange(missing.Select(key => new ValueSet
+            {
+                TenantId = access.Project.TenantId, ProjectId = access.Project.OwnLists ? access.Project.Id : null,
+                ListKey = key, Name = "Default", IsDefault = true,
+            }));
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        var sets = await db.ListSets.AsNoTracking().OrderBy(s => s.Sort).ThenBy(s => s.Name).ToListAsync(cancellationToken);
         // Project codes are not a list anyone keeps (owner): filled by the app, one per project, shown on This project.
         var keys = counts.Select(c => c.SetKey).Concat(sets.Select(s => s.ListKey)).Concat(meta.Keys)
             .Append(ValueSets.Phases).Append(ValueSets.ProjectKinds).Distinct().Where(k => k != ValueSets.ProjectCodes).ToList();

@@ -511,8 +511,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   sets: filled by the app, one per project, shown on This project.
 - Types & sets shows the sets: nothing is chosen on arrival (Numbering & identity's lists, and "Choose a list on the
   left"); choosing a list opens its sets. In the menu a list counts its values in use, a set too when the list has several ("· off" when
-  switched off); "New set" (name, the deliverable types it serves). The set shown has its bar: name, whom it serves,
-  its switch, its pencil (name, types), delete while never used. Values are the set's; a value is added to the set
+  switched off); "New set" (name, the deliverable types it serves). The set shown has its bar, on every list: name, whom it
+  serves, its +, its switch, its pencil (name, types), delete while never used (a list of one set: + and its name only).
+  Every list has its default set as a real set (`ListsAsync` makes one missing). Values are the set's; a value is added to the set
   shown (`?vs=<set>`), its + on the set's bar (the list's head only for a list of one set). The list's name and where
   it stands share one line. Which values: the segmented choice (`.seg` / `.segment`, In use · Retired · All, with counts).
   "Used" names what uses a value ("recommended by document types: Calculation"), only real references (`Pointers`).

@@ -220,7 +220,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                     <Switch on={listRead.active} label={listRead.active ? `Switch ${set.title} off: its values are no longer offered` : `Switch ${set.title} on again`} />
                   </ActionForm>
                 ) : null}
-                {may && !(chosen && listRead?.takesSets) ? <Link scroll={false} href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} aria-current={sp.panel === "add" ? "true" : undefined} title="Add a value" aria-label="Add a value" className={`${ICON} aria-[current]:bg-tint aria-[current]:text-brand-ink`}><Plus className="h-4 w-4" /></Link> : null}
+                {may && !chosen ? <Link scroll={false} href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} aria-current={sp.panel === "add" ? "true" : undefined} title="Add a value" aria-label="Add a value" className={`${ICON} aria-[current]:bg-tint aria-[current]:text-brand-ink`}><Plus className="h-4 w-4" /></Link> : null}
                 {may ? <Link scroll={false} href={here({ panel: sp.panel === "details" ? undefined : "details", edit: undefined })} title="Change this list" aria-label="Change this list" className={ICON}><Pencil className="h-4 w-4" /></Link> : null}
                 <a href={`/api/export/config-set?set=${encodeURIComponent(set.key)}`} title="Download this list" aria-label="Download this list" className={ICON}><Download className="h-4 w-4" /></a>
                 {may && !runsOn && !listUsed ? <DeleteSetButton setKey={set.key} title={set.title} count={allValues.length} /> : null}
@@ -228,13 +228,14 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
             </div>
 
             {/* The set shown: whom it serves, switched on or off; what may be done to it. */}
-            {chosen && listRead?.takesSets ? (
+            {chosen ? (
               <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-tint-soft px-5 py-1.5 sm:px-6">
                 <span className="stencil text-slate-500">Set</span>
                 <span className="text-sm font-semibold text-slate-800">{chosen.name}</span>
                 {!may || !chosen.id ? (chosen.active ? <ToneChip tone="done">on</ToneChip> : <ToneChip tone="idle">off</ToneChip>) : null}
                 <span className="min-w-0 text-[11px] text-slate-600">
-                  {chosen.deliverableTypes.length ? `serves ${chosen.deliverableTypes.map(typeName).join(", ")}`
+                  {!listRead?.takesSets ? "one set: the same for every deliverable type"
+                    : chosen.deliverableTypes.length ? `serves ${chosen.deliverableTypes.map(typeName).join(", ")}`
                     : chosen.isDefault ? (setsOfList.length > 1 ? "serves every deliverable type no other set names" : "serves every deliverable type")
                     : "serves no deliverable type yet: say which"}
                 </span>
@@ -243,11 +244,11 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                     {may ? <Link scroll={false} href={here({ panel: sp.panel === "add" ? undefined : "add", edit: undefined })} aria-current={sp.panel === "add" ? "true" : undefined} title={`Add a value to ${chosen.name}`} aria-label={`Add a value to ${chosen.name}`} className={`${ICON} aria-[current]:bg-tint aria-[current]:text-brand-ink`}><Plus className="h-4 w-4" /></Link> : null}
                     {chosen.id ? (
                       <>
-                        <ActionForm action={switchSetAction} hidden={{ key: currentKey, setId: chosen.id, active: chosen.active ? "0" : "1" }} hideSubmit className="mr-2 space-y-0">
+                        {listRead?.takesSets ? <ActionForm action={switchSetAction} hidden={{ key: currentKey, setId: chosen.id, active: chosen.active ? "0" : "1" }} hideSubmit className="mr-2 space-y-0">
                           <Switch on={chosen.active} label={chosen.active ? `Switch the set ${chosen.name} off: its values are no longer offered` : `Switch the set ${chosen.name} on`} />
-                        </ActionForm>
+                        </ActionForm> : null}
                         <Link scroll={false} href={here({ panel: sp.panel === "editset" ? undefined : "editset", edit: undefined, vs: chosen.id })} title="Change this set" aria-label="Change this set" className={ICON}><Pencil className="h-4 w-4" /></Link>
-                        {!setUsed ? (
+                        {!setUsed && listRead?.takesSets ? (
                           <ActionForm action={deleteSetAction} hidden={{ key: currentKey, setId: chosen.id }} hideSubmit className="space-y-0"
                             confirmText={`Delete the set ${chosen.name} and its values? None of them was ever used on ${ctx.project.code}; the log keeps it.`}>
                             <button type="submit" title="Delete this set" aria-label="Delete this set" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
@@ -260,19 +261,19 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
               </div>
             ) : null}
 
-            {(sp.panel === "newset" || (sp.panel === "editset" && chosen?.id)) && may && listRead?.takesSets ? (
+            {((sp.panel === "newset" && listRead?.takesSets) || (sp.panel === "editset" && chosen?.id)) && may ? (
               <div className="shrink-0 border-b border-line">
                 <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
                   <span className="stencil mr-1 text-slate-500">{sp.panel === "newset" ? "A new set" : `The set ${chosen!.name}`}</span>
                   <span className="text-[11px] text-slate-500">its values are offered for the deliverable types it serves; two sets switched on never serve the same one</span>
                 </div>
                 <ActionForm id="set-form" action={sp.panel === "newset" ? createSetAction : updateSetAction} hideSubmit
-                  hidden={{ key: currentKey, ...(sp.panel === "editset" ? { setId: chosen!.id!, typesAsked: "1" } : {}) }}
+                  hidden={{ key: currentKey, ...(sp.panel === "editset" ? { setId: chosen!.id!, ...(listRead?.takesSets ? { typesAsked: "1" } : {}) } : {}) }}
                   className="asking space-y-4 px-5 py-5 sm:px-6">
                   <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                     <Field label="Name" required><input name="name" required defaultValue={sp.panel === "editset" ? chosen!.name : ""} placeholder="Supplier documents" className={field} /></Field>
                   </div>
-                  {(
+                  {listRead?.takesSets ? (
                     <fieldset>
                       <legend className="stencil mb-1.5 text-slate-500">
                         Deliverable types it serves
@@ -287,7 +288,7 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                         ))}
                       </div>
                     </fieldset>
-                  )}
+                  ) : null}
                 </ActionForm>
                 <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
                   <Link scroll={false} href={here({ panel: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
