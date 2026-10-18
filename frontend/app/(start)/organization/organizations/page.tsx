@@ -15,6 +15,8 @@ import { adminProjects, adminUsers, partiesWithAnswers } from "@/lib/settings/ap
 import { inviteOrganizationAction, endLinkAction } from "@/lib/organization/forms";
 import { IDENTIFIER_KINDS, countryName } from "@/lib/organization/countries";
 import { cn, fmtDate } from "@/lib/core/utils";
+import { organizationLinks, guestAccounts } from "@/lib/organization/api";
+import { TheirProjectsLinks } from "../their-projects";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Organizations" };
@@ -36,6 +38,9 @@ type Search = { edit?: string };
 export default async function OrganizationsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const scope = await requireOrgAdmin();
   const sp = await searchParams;
+  const links = await organizationLinks();
+  const guestsThere = new Map(await Promise.all(links.filter((one) => one.side === "GUEST" && one.state === "LINKED")
+    .map(async (one) => [one.id, await guestAccounts(one.id)] as const)));
   const [parties, users, policy, projectList] = await Promise.all([
     partiesWithAnswers(), adminUsers().catch(() => []), formPolicy({ orgId: scope.orgId, projectId: "" }, "PARTY"), adminProjects().catch(() => []),
   ]);
@@ -239,6 +244,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
         </DataTable>
       </section>
 
+      <TheirProjectsLinks links={links} guestsThere={guestsThere} />
       </>
   );
 }

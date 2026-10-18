@@ -18,7 +18,10 @@ const GROUPS = (inProjects: boolean): { title: string; items: Item[] }[] => [
     items: [
       { href: "/organization", label: "Overview", exact: true },
       { href: "/organization/projects", label: "Projects" },
+      { href: "/organization/people", label: "People" },
       { href: "/organization/organizations", label: "Organizations we work with" },
+      { href: "/organization/identity", label: "Who we are on DELIOS" },
+      { href: "/organization/tracking", label: "What is kept" },
     ],
   },
   {

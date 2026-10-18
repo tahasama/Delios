@@ -457,9 +457,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **The organization's space** (`organization/layout.tsx`): one band, then its menu on the left (`org-nav.tsx`:
   Organization — Overview, Projects, Organizations we work with; How it works — Settings and each of its cards,
   Defaults for new projects; Records — Sign-in & security, Audit trail, which open inside a project) and the page beside
-  it. The overview: masthead (code, name, Open a new project, figures: our projects, others' projects, people, who we
-  work with), invitations to answer, then Projects, People, Organizations we work with, Who we are as sheets, and an
-  aside "How every project starts" (Settings' fixed / free, the defaults) with What is kept. The organization's
+  it. The overview (owner: one click to whatever one came for, never a long page to work through): masthead (code,
+  name, Open a new project, figures), what waits for our answer (invitations answered there; merges and claims, to
+  Who we are), then one tile per part, each with its figure and its quickest ways in (the projects one is on open in one
+  click): Projects, People, Organizations we work with, Settings, Defaults, Who we are, What is kept, Sign-in & audit.
+  Each whole list is on its own page: Projects (ours, and other organizations' we take part in, with our people on
+  them), People (`/organization/people`), Organizations we work with (and those whose projects we work on, the links
+  refused or ended), Who we are (`/organization/identity`), What is kept (`/organization/tracking`). The organization's
   Settings are drawn like a project's hub (masthead with fixed / free / own copies, the Control room panel, the cards
   by group, each chip saying where its switch stands); Defaults has the form beside an aside (start from a project,
   the app's own defaults, reset).

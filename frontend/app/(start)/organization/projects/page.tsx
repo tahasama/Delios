@@ -14,6 +14,8 @@ import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { adminProjects, adminUsers } from "@/lib/settings/api-admin";
 import { projectSettings } from "@/lib/settings/api";
 import { ProjectFields } from "@/app/(app)/settings/projects/project-fields";
+import { joinedProjects } from "@/lib/organization/api";
+import { JoinedProjects } from "../joined";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
@@ -33,6 +35,7 @@ type Info = { kind?: string; startDate?: string; endDate?: string | null; scopeS
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ edit?: string; new?: string }> }) {
   const scope = await requireOrgAdmin();
   const sp = await searchParams;
+  const joined = await joinedProjects();
   const [policy, roleOptions, all, users] = await Promise.all([
     formPolicy({ orgId: scope.orgId, projectId: "" }, "PROJECT"), contractRoleOptions(), adminProjects().catch(() => []), adminUsers().catch(() => []),
   ]);
@@ -236,6 +239,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           })}
         </DataTable>
       </section>
+      <JoinedProjects scope={scope} joined={joined} roleLabel={(code) => (code ? roleLabel(code) : null)}
+        ours={users.filter((u) => u.internal).map((u) => ({ id: u.id, name: u.name, active: u.active }))} />
       </>
   );
 }

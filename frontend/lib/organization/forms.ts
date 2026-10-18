@@ -21,7 +21,7 @@ export async function inviteOrganizationAction(_prev: Result | undefined, formDa
     return failed(e);
   }
   revalidatePath("/settings/parties");
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   return { ok: "Invited. Their administrator accepts or refuses it on their organization's page." };
 }
 
@@ -32,7 +32,7 @@ export async function acceptLinkAction(_prev: Result | undefined, formData: Form
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   revalidatePath("/");
   return { ok: "Accepted. Their projects we take part in now appear under Projects." };
 }
@@ -46,7 +46,7 @@ export async function refuseLinkAction(_prev: Result | undefined, formData: Form
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   revalidatePath("/");
   return {};
 }
@@ -60,7 +60,7 @@ export async function endLinkAction(_prev: Result | undefined, formData: FormDat
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   revalidatePath("/settings/parties");
   return { ok: "Ended. Their accounts on our projects (or ours on theirs) have stopped." };
 }
@@ -78,7 +78,7 @@ export async function joinPersonAction(_prev: Result | undefined, formData: Form
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   return {};
 }
 
@@ -148,7 +148,7 @@ export async function makeDefaultsAction(_prev: Result | undefined, formData: Fo
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   revalidatePath("/organization/defaults");
   return { ok: `New projects now start with ${project.code}'s choices. Projects already open keep theirs.` };
 }
@@ -160,7 +160,7 @@ export async function bringOverAction(_prev: Result | undefined, formData: FormD
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   return { ok: "Brought over. They sign in here from now on, with the same password, and keep their projects there." };
 }
 
@@ -175,7 +175,7 @@ export async function resetDefaultsAction(_prev: Result | undefined, _formData: 
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   revalidatePath("/organization/defaults");
   return { ok: "Back on the app's own defaults. Projects already open keep theirs." };
 }
@@ -195,7 +195,7 @@ export async function setTrackingAction(_prev: Result | undefined, formData: For
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   revalidatePath("/settings/flow");
   return { ok: "Saved: it applies from now on, on every project." };
 }
@@ -213,7 +213,7 @@ export async function saveOwnIdentityAction(_prev: Result | undefined, formData:
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   return { ok: "Saved." };
 }
 
@@ -245,7 +245,7 @@ export async function claimAction(_prev: Result | undefined, formData: FormData)
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   return { ok: "Asked. The guest who stood for it confirms by email, or the organization that recorded it vouches; until then nothing passes." };
 }
 
@@ -260,7 +260,7 @@ export async function answerMergeAction(_prev: Result | undefined, formData: For
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   return { ok: agree ? "Agreed. Once every side has, the app's owner merges them." : "Refused: they stay two." };
 }
 
@@ -275,7 +275,7 @@ export async function answerClaimAction(_prev: Result | undefined, formData: For
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
   return { ok: vouch ? "Vouched: it is them now." : "Refused: nothing passes." };
 }
 
@@ -295,7 +295,7 @@ export async function setLibertyAction(formData: FormData): Promise<void> {
   if (!key) return;
   await api(`/api/liberty/${encodeURIComponent(key)}`, { method: "PUT", body: { free: text(formData, "free") === "1" } }).catch(() => undefined);
   revalidatePath("/organization/settings", "layout");
-  revalidatePath("/organization");
+  revalidatePath("/organization", "layout");
 }
 
 /** The cards a project may have its own copy of, and their backend: what a reset puts back. */

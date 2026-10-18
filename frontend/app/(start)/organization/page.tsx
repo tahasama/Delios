@@ -1,63 +1,48 @@
 import Link from "next/link";
+import { ArrowRight, BadgeCheck, Building2, FileClock, FolderKanban, Route, ScrollText, Settings2, Users, type LucideIcon } from "lucide-react";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { ActionForm } from "@/components/form";
-import { DataTable, Th, Td, Chip, Field, inputCls } from "@/components/ui";
+import { Field, inputCls } from "@/components/ui";
 import { adminParties, adminProjects, adminUsers } from "@/lib/settings/api-admin";
-import { organizationLinks, joinedProjects, guestAccounts, ownIdentity, claims, merges } from "@/lib/organization/api";
-import { WhoWeAre } from "./identity";
+import { organizationLinks, joinedProjects, ownIdentity, claims, merges } from "@/lib/organization/api";
 import { projectDefaults } from "@/lib/organization/defaults";
-import { acceptLinkAction, refuseLinkAction, endLinkAction, joinPersonAction, bringOverAction, switchOrganizationAction } from "@/lib/organization/forms";
+import { acceptLinkAction, refuseLinkAction, switchOrganizationAction } from "@/lib/organization/forms";
 import { switchProjectAction } from "@/lib/settings/forms-project-switch";
-import { POLICIES, effectiveAnswer } from "@/lib/settings/control-activities";
+import { effectiveAnswer } from "@/lib/settings/control-activities";
 import { liberty } from "@/lib/organization/liberty";
-import { TrackingSheet } from "./tracking";
 import { orgSettings } from "@/lib/settings/api";
-import { PARTY_KINDS } from "@/lib/settings/party-kinds";
-import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { fmtDate } from "@/lib/core/utils";
+import { Sheet } from "./sheet";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Organization" };
 
 /**
- * The organization's own page (docs/ORGANIZATIONS.md): its projects, ours and those of others we take part in; its
- * people; the organizations it works with and the invitations between them; the configuration a new project of ours
- * starts with; and the way to its sign-in rules and audit trail. Its administrators only. It needs no project: an
- * organization that only works on others' projects has it too.
+ * The organization's overview (owner: one click to whatever one came for, never a long page to work through): the
+ * masthead with its figures; what waits for an answer (invitations, merges and claims), answered there; then one tile
+ * per part of the organization, each with its figure and its quickest ways in (the projects one is on open in one
+ * click), the whole of it on its own page. Its administrators only; it needs no project.
  */
 export default async function OrganizationPage() {
   const scope = await requireOrgAdmin();
-  const [links, joined, projects, users, parties, defaults, roles, answers, own, claimable, mergeList] = await Promise.all([
-    organizationLinks(),
-    joinedProjects(),
-    adminProjects().catch(() => []),
-    adminUsers().catch(() => []),
-    adminParties().catch(() => []),
-    projectDefaults(),
-    contractRoleOptions(),
-    orgSettings().catch(() => new Map<string, string>()),
-    ownIdentity(), claims(), merges(),
+  const [links, joined, projects, users, parties, defaults, answers, own, claimable, mergeList, switches] = await Promise.all([
+    organizationLinks(), joinedProjects(), adminProjects().catch(() => []), adminUsers().catch(() => []), adminParties().catch(() => []),
+    projectDefaults(), orgSettings().catch(() => new Map<string, string>()), ownIdentity(), claims(), merges(), liberty(),
   ]);
-  const switches = await liberty();
-  const freeCount = switches.filter((one) => one.free).length;
-  const roleLabel = (code: string | null) => (code ? roles.find((r) => r.code === code)?.label ?? code : null);
   const received = links.filter((one) => one.side === "GUEST" && one.state === "INVITED");
-  const ours = users.filter((one) => one.internal).sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
-  const outside = parties.filter((one) => !one.isInternal).sort((a, b) => a.name.localeCompare(b.name));
-  const kindLabel = (kind: string | null | undefined) =>
-    PARTY_KINDS.find((k) => k.value === (kind === "NOT_ON_DELIOS" ? "OFFLINE" : kind))?.label ?? "—";
-  /** Where each of our people works elsewhere: the projects of other organizations' they are on. */
-  const elsewhereOf = (userId: string) => joined.filter((p) => p.ourPeople.some((one) => one.userId === userId && one.active));
-  /** I am on this project of ours: opening it is one click. */
-  const onIt = (projectId: string) => users.some((one) => one.id === scope.user.id && one.memberships.some((m) => m.active && m.projectId === projectId));
-  const changedCount = Object.entries(defaults?.values ?? {}).filter(([key, value]) => value !== effectiveAnswer(key, null)).length;
-  const history = links.filter((one) => one.state === "REFUSED" || one.state === "ENDED");
-  // Guest accounts other organizations made for our people before we linked: brought over, they sign in here.
-  const linkedAsGuest = links.filter((one) => one.side === "GUEST" && one.state === "LINKED");
-  const guestsThere = new Map(await Promise.all(linkedAsGuest.map(async (one) => [one.id, await guestAccounts(one.id)] as const)));
-
+  const ours = users.filter((one) => one.internal);
   const activePeople = ours.filter((one) => one.active).length;
-  const linkTo = (href: string, label: string) => <Link href={href} className="text-[11.5px] font-semibold text-link hover:underline">{label}</Link>;
+  const outside = parties.filter((one) => !one.isInternal);
+  const me = users.find((one) => one.id === scope.user.id);
+  const mineOurs = projects.filter((p) => p.status === "ACTIVE" && me?.memberships.some((m) => m.active && m.projectId === p.id));
+  const mineJoined = joined.filter((p) => p.ourPeople.some((one) => one.userId === scope.user.id && one.active));
+  const freeCount = switches.filter((one) => one.free).length;
+  const changedCount = Object.entries(defaults?.values ?? {}).filter(([key, value]) => value !== effectiveAnswer(key, null)).length;
+  const mergesWaiting = mergeList.filter((m) => m.waitsOnUs).length;
+  const claimsWaiting = claimable.incoming.length;
+  const reading = answers.get("TRACK_READING") !== "OFF";
+  const signIns = answers.get("TRACK_SIGN_INS") === "ON";
+  const linked = outside.filter((p) => p.link?.state === "LINKED").length;
 
   return (
     <>
@@ -119,232 +104,108 @@ export default async function OrganizationPage() {
         </Sheet>
       ) : null}
 
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="min-w-0 space-y-4">
-          <Sheet id="projects" title="Projects" note="ours, and those of other organizations we take part in" act={linkTo("/organization/projects", "Open, change or archive")}>
-          <DataTable className="rounded-none border-0 shadow-none" head={<tr><Th>Project</Th><Th>Whose</Th><Th>Our role</Th><Th>Status</Th><Th>Our people on it</Th></tr>}>
-            {projects.map((p) => (
-              <tr key={p.id} id={`project-${p.id}`} className="scroll-mt-4 target:bg-tint-soft">
-                <Td>
-                  {onIt(p.id) ? (
-                    <form action={switchProjectAction}>
-                      <input type="hidden" name="projectId" value={p.id} />
-                      <button type="submit" className="text-left hover:underline" title={`Open ${p.code}`}>
-                        <span className="font-mono text-xs font-semibold text-link">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span>
-                      </button>
-                    </form>
-                  ) : (
-                    <><span className="font-mono text-xs font-semibold">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span>
-                      <span className="block text-[11px] text-slate-400">you are not on it</span></>
-                  )}
-                </Td>
-                <Td className="text-xs">ours</Td>
-                <Td className="text-xs">{roleLabel(p.contractRole === "GENERIC" ? null : p.contractRole) ?? <span className="text-slate-400">not stated</span>}</Td>
-                <Td className="text-xs">{p.status.toLowerCase()}</Td>
-                <Td className="tabular-nums text-xs">{scope.projectCount ? <Link href={`/settings/users?project=${p.id}`} className="text-link hover:underline">{p.members}</Link> : p.members}</Td>
-              </tr>
-            ))}
-            {joined.map((p) => (
-              <tr key={`${p.linkId}-${p.projectId}`} id={`project-${p.projectId}`} className="scroll-mt-4 align-top target:bg-tint-soft">
-                <Td>
-                  {p.ourPeople.some((one) => one.userId === scope.user.id && one.active) ? (
-                    <form action={switchOrganizationAction}>
-                      <input type="hidden" name="tenantId" value={p.hostTenantId} />
-                      <input type="hidden" name="projectId" value={p.projectId} />
-                      <button type="submit" className="text-left hover:underline" title={`Open ${p.code} at ${p.hostOrganization}`}>
-                        <span className="font-mono text-xs font-semibold text-link">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span>
-                      </button>
-                    </form>
-                  ) : (
-                    <><span className="font-mono text-xs font-semibold">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span>
-                      <span className="block text-[11px] text-slate-400">you are not on it</span></>
-                  )}
-                </Td>
-                <Td className="text-xs">{p.hostOrganization}</Td>
-                <Td className="text-xs">{roleLabel(p.role) ?? <span className="text-slate-400">not stated</span>}</Td>
-                <Td className="text-xs">{p.status.toLowerCase()}</Td>
-                <Td className="text-xs">
-                  {p.ourPeople.length ? (
-                    <ul className="space-y-1">
-                      {p.ourPeople.map((person) => (
-                        <li key={person.userId} className="flex flex-wrap items-center gap-2">
-                          <a href={`#person-${person.userId}`} className={person.active ? "text-slate-700 hover:underline" : "text-slate-400 line-through"}>{person.name}</a>
-                          <span className="text-[11px] text-slate-400">{person.function}</span>
-                          {person.active ? (
-                            <ActionForm action={joinPersonAction} hideSubmit hidden={{ linkId: p.linkId, projectId: p.projectId, userId: person.userId, active: "off" }} className="space-y-0">
-                              <button className="text-[11px] font-semibold text-link hover:underline">take off</button>
-                            </ActionForm>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : <span className="text-slate-400">nobody yet</span>}
-                  <details className="mt-1">
-                    <summary className="cursor-pointer text-[11px] font-semibold text-link">+ Put someone of ours on it</summary>
-                    <div className="mt-2 w-72">
-                      {p.startFunction ? (
-                        <ActionForm action={joinPersonAction} submitLabel="Put on the project" size="sm" hidden={{ linkId: p.linkId, projectId: p.projectId }}>
-                          <Field label="Who" required>
-                            <select name="userId" required defaultValue="" className={inputCls}>
-                              <option value="" disabled>Choose…</option>
-                              {ours.filter((u) => u.active && !p.ourPeople.some((one) => one.userId === u.id && one.active)).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                            </select>
-                          </Field>
-                          <p className="text-[11px] text-slate-400">They work there as {p.startFunction}, signing in here as usual. {p.hostOrganization} may change it.</p>
-                        </ActionForm>
-                      ) : <p className="text-[11px] text-amber-700">{p.hostOrganization} has not said yet which function our people hold there.</p>}
-                    </div>
-                  </details>
-                </Td>
-              </tr>
-            ))}
-          </DataTable>
-            {!projects.length && !joined.length ? <p className="px-5 py-3 text-xs text-slate-500 sm:px-6">No project yet.</p> : null}
-          </Sheet>
+      {mergesWaiting || claimsWaiting ? (
+        <Sheet title="Waiting for our answer" tone="waiting" note="other organizations ask us to agree">
+          <p className="px-5 py-3 text-xs leading-5 text-slate-700 sm:px-6">
+            {mergesWaiting ? <>{mergesWaiting} merge{mergesWaiting === 1 ? "" : "s"} of organizations to agree or refuse. </> : null}
+            {claimsWaiting ? <>{claimsWaiting} claim{claimsWaiting === 1 ? "" : "s"} on entries we made, to vouch for or refuse. </> : null}
+            <Link href="/organization/identity" className="font-semibold text-link hover:underline">Answer them</Link>
+          </p>
+        </Sheet>
+      ) : null}
 
-          <Sheet id="people" title={`People (${activePeople})`} note="everyone of ours, and the projects each is on"
-            foot={scope.projectCount ? <>Add, switch off or unlock people in <Link href="/settings/users" className="font-semibold text-link hover:underline">People &amp; access</Link>. Switching someone off here stops them on other organizations&rsquo; projects too.</> : undefined}>
-          <DataTable className="rounded-none border-0 shadow-none" head={<tr><Th>Name</Th><Th>Email</Th><Th>Our projects</Th><Th>Other organizations&rsquo; projects</Th><Th>Two-step sign-in</Th><Th>Access</Th></tr>}>
-            {ours.map((u) => (
-              <tr key={u.id} id={`person-${u.id}`} className={u.active ? "scroll-mt-4 align-top target:bg-tint-soft" : "scroll-mt-4 align-top opacity-60 target:bg-tint-soft"}>
-                <Td className="text-xs font-semibold text-slate-800">
-                  {scope.projectCount ? <Link href={`/settings/users#person-${u.id}`} className="text-link hover:underline">{u.name}</Link> : u.name}{u.isAdmin ? <span className="ml-1 font-normal text-slate-400">· administrator</span> : null}</Td>
-                <Td className="text-xs text-slate-500">{u.email}</Td>
-                <Td className="text-xs">{u.memberships.filter((m) => m.active).map((m, i) => (
-                  <span key={m.projectId}>{i ? ", " : ""}<a href={`#project-${m.projectId}`} className="hover:underline">{m.projectCode}</a> ({m.functionName})</span>
-                ))}{u.memberships.some((m) => m.active) ? null : <span className="text-slate-400">—</span>}</Td>
-                <Td className="text-xs">{elsewhereOf(u.id).map((p, i) => (
-                  <span key={`${p.linkId}-${p.projectId}`}>{i ? ", " : ""}<a href={`#project-${p.projectId}`} className="hover:underline">{p.code}</a> at {p.hostOrganization}</span>
-                ))}{elsewhereOf(u.id).length ? null : <span className="text-slate-400">—</span>}</Td>
-                <Td className="text-xs">{u.mfa ? "on" : <span className="text-slate-400">off</span>}</Td>
-                <Td className="text-xs">{u.active ? (u.lockedUntil ? <span className="text-amber-700">locked</span> : "active") : "switched off"}</Td>
-              </tr>
-            ))}
-          </DataTable>
-          </Sheet>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <Tile icon={FolderKanban} title="Projects" href="/organization/projects"
+          figure={`${projects.filter((p) => p.status === "ACTIVE").length} open · ${projects.filter((p) => p.status !== "ACTIVE").length} archived`}
+          note={joined.length ? `and ${joined.length} of other organizations` : "ours, opened by us"}>
+          {mineOurs.length || mineJoined.length ? (
+            <ul className="space-y-0.5">
+              {mineOurs.slice(0, 5).map((p) => (
+                <li key={p.id}>
+                  <form action={switchProjectAction}>
+                    <input type="hidden" name="projectId" value={p.id} />
+                    <button type="submit" className="group/p flex w-full items-baseline gap-2 rounded-sm px-1 py-0.5 text-left hover:bg-tint-soft" title={`Open ${p.code}`}>
+                      <span className="font-mono text-xs font-semibold text-link">{p.code}</span>
+                      <span className="truncate text-xs text-slate-600">{p.name}</span>
+                    </button>
+                  </form>
+                </li>
+              ))}
+              {mineJoined.slice(0, Math.max(0, 5 - mineOurs.length)).map((p) => (
+                <li key={`${p.linkId}-${p.projectId}`}>
+                  <form action={switchOrganizationAction}>
+                    <input type="hidden" name="tenantId" value={p.hostTenantId} />
+                    <input type="hidden" name="projectId" value={p.projectId} />
+                    <button type="submit" className="flex w-full items-baseline gap-2 rounded-sm px-1 py-0.5 text-left hover:bg-tint-soft" title={`Open ${p.code} at ${p.hostOrganization}`}>
+                      <span className="font-mono text-xs font-semibold text-link">{p.code}</span>
+                      <span className="truncate text-xs text-slate-600">{p.name}</span>
+                      <span className="ml-auto shrink-0 text-[11px] text-slate-500">{p.hostOrganization}</span>
+                    </button>
+                  </form>
+                </li>
+              ))}
+              {mineOurs.length + mineJoined.length > 5 ? <li className="px-1 text-[11px] text-slate-500">and {mineOurs.length + mineJoined.length - 5} more you are on</li> : null}
+            </ul>
+          ) : <p className="text-[11.5px] text-slate-500">You are on none of them yet.</p>}
+        </Tile>
 
-          <Sheet id="organizations" title="Organizations we work with" note="how each works with us, and whether its DELIOS is linked to ours"
-            act={linkTo("/organization/organizations", "Add, create or change")}
-            foot={<>Each project says which of them work on it.</>}>
-          <DataTable className="rounded-none border-0 shadow-none" head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Their DELIOS</Th></tr>}>
-            {outside.map((p) => (
-              <tr key={p.id} className={p.active ? "" : "opacity-60"}>
-                <Td>
-                  {scope.projectCount ? (
-                    <Link href={`/organization/organizations?edit=${p.id}#party-${p.id}`} className="hover:underline">
-                      <span className="font-mono text-xs font-semibold text-link">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span>
-                    </Link>
-                  ) : <><span className="font-mono text-xs font-semibold">{p.code}</span> <span className="text-xs text-slate-600">{p.name}</span></>}
-                  {scope.projectCount ? <Link href={`/settings/users?org=${p.id}`} className="ml-2 text-[11px] text-slate-400 hover:underline">their people</Link> : null}
-                </Td>
-                <Td className="text-xs">{kindLabel(p.kind)}</Td>
-                <Td className="text-xs">{p.link ? (p.link.state === "LINKED" ? `linked to ${p.link.organization}` : `invited; ${p.link.organization} has not answered`) : <span className="text-slate-400">not linked</span>}</Td>
-              </tr>
-            ))}
-            {links.filter((one) => one.side === "GUEST" && one.state === "LINKED").map((one) => (
-              <tr key={one.id}>
-                <Td className="text-xs text-slate-600">{one.organization}</Td>
-                <Td className="text-xs">we work on their projects</Td>
-                <Td className="text-xs">
-                  linked since {fmtDate(one.answeredAt)}
-                  {guestsThere.get(one.id)?.length ? (
-                    <div className="mt-2 rounded-md bg-tint-soft p-2 ring-1 ring-line">
-                      <p className="text-[11px] text-slate-600">Guest accounts {one.organization} made for our people before we linked. Brought over, they sign in here with the same password and keep their projects there.</p>
-                      <ul className="mt-1 space-y-1">
-                        {guestsThere.get(one.id)!.map((guest) => (
-                          <li key={guest.id} className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] text-slate-700">{guest.name} <span className="text-slate-400">{guest.email}</span></span>
-                            <ActionForm action={bringOverAction} hideSubmit hidden={{ linkId: one.id, guestId: guest.id }} className="space-y-0">
-                              <button className="text-[11px] font-semibold text-link hover:underline">bring over</button>
-                            </ActionForm>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  <details className="mt-1"><summary className="cursor-pointer text-[11px] font-semibold text-link">End the link</summary>
-                    <div className="mt-2 w-72">
-                      <ActionForm action={endLinkAction} submitLabel="End the link" size="sm" variant="secondary" hidden={{ linkId: one.id }}>
-                        <p className="text-[11px] text-slate-500">Our people stop working on {one.organization}&rsquo;s projects. Everything they did there stays there.</p>
-                        <Field label="Why" required><input name="note" required className={inputCls} /></Field>
-                      </ActionForm>
-                    </div>
-                  </details>
-                </Td>
-              </tr>
-            ))}
-          </DataTable>
-          {history.length ? (
-            <details className="border-t border-line px-5 py-2.5 sm:px-6"><summary className="cursor-pointer text-xs font-semibold text-link">Refused and ended ({history.length})</summary>
-              <ul className="mt-2 space-y-1.5 text-xs text-slate-600">
-                {history.map((one) => (
-                  <li key={one.id}>
-                    <Chip className="bg-slate-50/40 text-slate-600 ring-slate-300">{one.state.toLowerCase()}</Chip>{" "}
-                    {one.side === "HOST" ? `${one.partyName} (${one.organization})` : one.organization}
-                    {one.state === "REFUSED"
-                      ? <> · refused {fmtDate(one.answeredAt)} by {one.answeredBy}{one.answerNote ? <>: {one.answerNote}</> : null}</>
-                      : <> · ended {fmtDate(one.endedAt)} by {one.endedBy}: {one.endReason}</>}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
-          </Sheet>
+        <Tile icon={Users} title="People" href="/organization/people"
+          figure={`${activePeople} can sign in${ours.length - activePeople ? ` · ${ours.length - activePeople} switched off` : ""}`}
+          note={`${ours.filter((u) => u.mfa).length} with two-step sign-in`}>
+          {scope.projectCount ? <Link href="/settings/users" className="text-[11.5px] font-semibold text-link hover:underline">Add someone, in People &amp; access</Link> : null}
+        </Tile>
 
-          <WhoWeAre own={own} claimable={claimable} mergeList={mergeList} />
-        </div>
+        <Tile icon={Building2} title="Organizations we work with" href="/organization/organizations"
+          figure={`${outside.filter((p) => p.active).length} organizations`}
+          note={`${linked} linked to their own DELIOS${received.length ? ` · ${received.length} invitation${received.length === 1 ? "" : "s"} to answer` : ""}`} />
 
-        <aside className="space-y-4 xl:sticky xl:top-5">
-          <section className="register register-sheet register-sheet-open">
-            <div className="flex items-center justify-between gap-2 border-b border-line bg-tint-soft px-4 py-2.5">
-              <span className="stencil text-slate-500">How every project starts</span>
-            </div>
-            <dl className="divide-y divide-line">
-              <div className="px-4 py-3">
-                <dt className="flex items-center justify-between gap-2 text-[11.5px] font-semibold text-slate-800">Settings {linkTo("/organization/settings", "Open")}</dt>
-                <dd className="mt-0.5 text-[11.5px] leading-[1.45] text-slate-600">{switches.length - freeCount} fixed for every project · {freeCount} a project may change</dd>
-              </div>
-              <div className="px-4 py-3">
-                <dt className="flex items-center justify-between gap-2 text-[11.5px] font-semibold text-slate-800">Defaults for new projects {linkTo("/organization/defaults", "Change")}</dt>
-                <dd className="mt-0.5 text-[11.5px] leading-[1.45] text-slate-600">
-                  {defaults
-                    ? <>{defaults.fromProject ? <>Taken from {defaults.fromProject}{defaults.edited ? ", then changed" : ""}</> : "Set here"}, {fmtDate(defaults.at)}. {changedCount} answer{changedCount === 1 ? "" : "s"} differ from the app&rsquo;s own.</>
-                    : "The app's own: nothing set yet."}
-                </dd>
-                <ul className="mt-2 space-y-1">
-                  {POLICIES.map((one) => {
-                    const value = defaults?.values[one.key] ?? one.options[0].value;
-                    return (
-                      <li key={one.key} className="text-[11px] leading-4">
-                        <span className="block text-slate-500">{one.title}</span>
-                        <span className="text-slate-800">{one.options.find((o) => o.value === value)?.label ?? value}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </dl>
-          </section>
-          <TrackingSheet reading={answers.get("TRACK_READING") !== "OFF"} signIns={answers.get("TRACK_SIGN_INS") === "ON"} />
-        </aside>
+        <Tile icon={Settings2} title="Settings" href="/organization/settings"
+          figure={`${switches.length - freeCount} fixed · ${freeCount} free`}
+          note="fixed: every project uses ours · free: a project may change it" />
+
+        <Tile icon={Route} title="Defaults for new projects" href="/organization/defaults"
+          figure={defaults ? (defaults.fromProject ? `Taken from ${defaults.fromProject}` : "Set here") : "The app's own"}
+          note={defaults ? `${changedCount} answer${changedCount === 1 ? "" : "s"} differ from the app's · ${fmtDate(defaults.at)}` : "nothing changed yet"} />
+
+        <Tile icon={BadgeCheck} title="Who we are on DELIOS" href="/organization/identity"
+          figure={own ? `${own.code} · ${own.number ? "identifier given" : own.noIdentifierReason ? "no identifier, said why" : "identifier not given yet"}` : "—"}
+          note={own?.domain ? (own.domainConfirmedAt ? `${own.domain}, proven` : `${own.domain}, not proven yet`) : "no email domain yet"} />
+
+        <Tile icon={FileClock} title="What is kept about people's activity" href="/organization/tracking"
+          figure={reading ? "Who opened and downloaded: kept" : "Who opened and downloaded: not kept"}
+          note={signIns ? "sign-ins shown on a person's activity" : "sign-ins kept for security only"} />
+
+        {scope.projectCount ? (
+          <Tile icon={ScrollText} title="Sign-in & audit" href="/settings/audit"
+            figure="The record of every act" note="across our projects">
+            <Link href="/settings/security" className="text-[11.5px] font-semibold text-link hover:underline">Sign-in &amp; security</Link>
+          </Tile>
+        ) : null}
       </div>
     </>
   );
 }
 
-/** A sheet of the organization's page: its band (what it is, the sentence about it, its way to where it is changed), then its body. */
-function Sheet({ id, title, note, act, tone, children, foot }: {
-  id?: string; title: string; note?: React.ReactNode; act?: React.ReactNode; tone?: "waiting"; children: React.ReactNode; foot?: React.ReactNode;
+/** One part of the organization: its name (opening its page), its figure, a line about it, and its quickest ways in. */
+function Tile({ icon: Icon, title, href, figure, note, children }: {
+  icon: LucideIcon; title: string; href: string; figure: string; note?: string; children?: React.ReactNode;
 }) {
   return (
-    <section id={id} className={`register register-sheet register-sheet-open scroll-mt-24 ${tone === "waiting" ? "ring-1 ring-amber-200" : ""}`}>
-      <div className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-line px-5 py-2.5 sm:px-6 ${tone === "waiting" ? "bg-amber-50" : "bg-tint-soft"}`}>
-        <span className={`stencil mr-1 ${tone === "waiting" ? "text-amber-900" : "text-slate-500"}`}>{title}</span>
-        {note ? <span className="text-[11px] text-slate-500">{note}</span> : null}
-        {act ? <span className="ml-auto">{act}</span> : null}
-      </div>
-      {children}
-      {foot ? <p className="border-t border-line px-5 py-2.5 text-[11px] text-slate-500 sm:px-6">{foot}</p> : null}
+    <section className="register register-sheet flex flex-col px-4 py-3.5">
+      <Link href={href} className="group flex gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-tint text-brand-ink">
+          <Icon className="h-4.5 w-4.5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center justify-between gap-2">
+            <span className="text-[13px] font-semibold leading-5 text-slate-900 group-hover:text-link">{title}</span>
+            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-500 transition group-hover:text-link" aria-hidden="true" />
+          </span>
+          <span className="mt-0.5 block text-[13px] font-medium tabular-nums text-slate-800">{figure}</span>
+          {note ? <span className="block text-[11px] leading-4 text-slate-500">{note}</span> : null}
+        </span>
+      </Link>
+      {children ? <div className="mt-2.5 border-t border-line pt-2.5 pl-12">{children}</div> : null}
     </section>
   );
 }
