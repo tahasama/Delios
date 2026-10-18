@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Route, Tags } from "lucide-react";
+import { ArrowRight, BadgeCheck, FileClock, Route, Tags } from "lucide-react";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { Chip } from "@/components/ui";
 import { liberty } from "@/lib/organization/liberty";
@@ -39,7 +39,7 @@ export default async function OrganizationSettingsPage() {
       free: n > 0,
     };
   };
-  const groupOf = (project: string) => SETUP_PAGES.find((p) => p.href === project)?.group ?? "Organization";
+  const groupOf = (card: (typeof ORG_CARDS)[number]) => card.group ?? SETUP_PAGES.find((p) => p.href === card.project)?.group ?? "Organization";
   const room = switches.filter((one) => one.area === "Control room");
 
   return (
@@ -109,14 +109,14 @@ export default async function OrganizationSettingsPage() {
 
       <div className="space-y-5">
         {SETUP_GROUPS.map((group) => {
-          const cards = ORG_CARDS.filter((card) => card.slug !== "flow" && groupOf(card.project) === group);
+          const cards = ORG_CARDS.filter((card) => card.slug !== "flow" && groupOf(card) === group);
           if (!cards.length) return null;
           return (
             <section key={group}>
               <h2 className="stencil mb-2 text-slate-600">{group}</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {cards.map((card) => {
-                  const Icon = SETUP_ICON[card.project] ?? Tags;
+                  const Icon = SETUP_ICON[card.project] ?? (card.slug === "identity" ? BadgeCheck : card.slug === "tracking" ? FileClock : Tags);
                   const state = said(card.area);
                   const href = card.slug ? `/organization/settings/${card.slug}` : card.elsewhere!;
                   return (

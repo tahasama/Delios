@@ -14,11 +14,12 @@ export type OrgCard = {
   elsewhere?: string;
   /** Still edited in a project's Settings, for the organization, until this card is moved here. */
   notMovedYet?: boolean;
+  /** Its group on the hub when it is not one of a project's cards. */
+  group?: "Organization" | "Classification" | "How work flows" | "Access" | "Change & evidence";
 };
 
 export const ORG_CARDS: OrgCard[] = [
-  { project: "/settings/projects", title: "Projects", text: "Every project of ours: open one, change it, archive or reopen it.", elsewhere: "/organization/projects" },
-  { project: "/settings/parties", title: "Organizations", text: "The organizations we work with, who they are, and how they work with us.", elsewhere: "/organization/organizations" },
+  { project: "identity", title: "Who we are on DELIOS", text: "Our code and name everywhere, our identifier and email domain; claims and merges asked of us.", slug: "identity", group: "Organization" },
   { project: "/settings/config", title: "Types & sets", text: "The lists every document is described with, and which of them a project may change.", slug: "types", area: "Types & sets", notMovedYet: true },
   { project: "/settings/fields", title: "Forms & fields", text: "What each form asks and insists on, for every project.", slug: "fields", area: "Forms & fields", notMovedYet: true },
   { project: "/settings/numbering", title: "Numbering", text: "How every number is built, and which scheme numbers what.", slug: "numbering", area: "Numbering" },
@@ -26,9 +27,9 @@ export const ORG_CARDS: OrgCard[] = [
   { project: "/settings/flow", title: "Control room", text: "How a project works when it opens: who carries each act out, releasing, stamps, planning.", slug: "flow", area: "Control room", elsewhere: "/organization/defaults" },
   { project: "/settings/workflow-templates", title: "Review routes", text: "Who reviews, and in which order.", slug: "routes", area: "Review routes" },
   { project: "/settings/functions", title: "Functions & permissions", text: "The organization's jobs, and what each may do.", slug: "functions", area: "Functions & permissions", notMovedYet: true },
-  { project: "/settings/users", title: "People & access", text: "Everyone in the organization, the projects each is on, sign-in.", elsewhere: "/organization" },
   { project: "/settings/security", title: "Sign-in & security", text: "The sign-in rules for everyone in the organization.", elsewhere: "/settings/security" },
-  { project: "/settings/audit", title: "Audit trail", text: "Every recorded act, across our projects; and what is kept about people's activity.", elsewhere: "/settings/audit" },
+  { project: "tracking", title: "What is kept about people's activity", text: "Whether who opened and downloaded is kept, and whether sign-ins show on a person's activity.", slug: "tracking", group: "Change & evidence" },
+  { project: "/settings/audit", title: "Audit trail", text: "Every recorded act, across our projects.", elsewhere: "/settings/audit" },
 ];
 
 export const orgCard = (slug: string) => ORG_CARDS.find((card) => card.slug === slug);

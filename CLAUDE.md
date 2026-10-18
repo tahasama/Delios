@@ -454,19 +454,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   them (`User.HomeTenantId`, no password, no sign-in name), linked to theirs (`AccountLink`). They sign in
   at home and switch in and back (`POST /api/auth/switch`; the 7 days run from the sign-in). Switched off
   at home, or the link ended: those accounts stop.
-- **The organization's space** (`organization/layout.tsx`): one band, then its menu on the left (`org-nav.tsx`:
-  Organization — Overview, Projects, Organizations we work with; How it works — Settings and each of its cards,
-  Defaults for new projects; Records — Sign-in & security, Audit trail, which open inside a project) and the page beside
-  it. The overview (owner: one click to whatever one came for, never a long page to work through): masthead (code,
-  name, Open a new project, figures), what waits for our answer (invitations answered there; merges and claims, to
-  Who we are), then one tile per part, each with its figure and its quickest ways in (the projects one is on open in one
-  click): Projects, People, Organizations we work with, Settings, Defaults, Who we are, What is kept, Sign-in & audit.
-  Each whole list is on its own page: Projects (ours, and other organizations' we take part in, with our people on
-  them), People (`/organization/people`), Organizations we work with (and those whose projects we work on, the links
-  refused or ended), Who we are (`/organization/identity`), What is kept (`/organization/tracking`). The organization's
-  Settings are drawn like a project's hub (masthead with fixed / free / own copies, the Control room panel, the cards
-  by group, each chip saying where its switch stands); Defaults has the form beside an aside (start from a project,
-  the app's own defaults, reset).
+- **The organization's space** (`organization/layout.tsx`; owner, after Autodesk's account admin and GitHub's
+  organization): the band, then four tabs under it (`org-tabs.tsx`): **Projects · People · Organizations · Settings**;
+  no side menu, no overview of tiles. `/organization` opens on Projects (ours with Open a new project, and other
+  organizations' we take part in, with our people on them). What waits for our answer shows as one amber banner above
+  every tab: invitations answered there, merges and claims one click away. Settings holds every card of how the
+  organization works, drawn like a project's hub (masthead with fixed / free / own copies, the Control room panel with
+  Defaults for new projects, the cards by group, each chip saying where its switch stands), Who we are on DELIOS
+  (`/organization/settings/identity`) and What is kept (`/organization/settings/tracking`) among them; Defaults has the
+  form beside an aside (start from a project, the app's own defaults, reset). People (`/organization/people`) and
+  Organizations (with those whose projects we work on, and the links refused or ended) are each one list.
 - The organization's page (`/organization`, administrators): projects ours and joined, people, organizations
   we work with, invitations (also on Home), defaults for new projects. Its projects, people and organizations
   are links (open or switch into a project; People & access; Organizations).
