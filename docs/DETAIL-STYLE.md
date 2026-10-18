@@ -149,6 +149,9 @@ inside a form: "Add documents" opens the register for it, as for an action. A re
 card's purpose ("Request a document", "Request a discipline") is a plain link (`text-link`), not a button;
 an edit on a line is a pencil icon on its right.
 
+A choice whose options need saying (a scheme with its example number) is `Choice` (`components/choice.tsx`): the
+app's own list, each option its name and a line under it; a plain list of words stays a select.
+
 People are always picked with `SearchPick` (the transmittal picker): name,
 organization, function; recommended ones first and marked.
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Pencil, Plus } from "lucide-react";
 import { SwitchControl } from "@/components/switch";
+import { Choice } from "@/components/choice";
 import { inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { cn } from "@/lib/core/utils";
@@ -108,14 +109,11 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
                   <ActionForm action={saveSchemeRoutingAction} submitLabel="Save" size="sm" variant="secondary"
                     hidden={{ level, deliverableType: r.code, status: "1", ...(r.route ? {} : { active: "on" }) }}
                     className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 space-y-0 md:grid-cols-[12rem_minmax(0,1fr)_7rem_auto]">
-                    <label className="col-span-2 md:col-span-1">
-                      <span className="sr-only">Scheme for {r.label}</span>
-                      <select name="schemeName" required defaultValue={r.route?.schemeName ?? ""} className={`${inputCls} w-full`}>
-                        {r.route ? null : <option value="" disabled>Choose a scheme…</option>}
-                        {options.concat(r.route && !options.some((o) => o.name === r.route!.schemeName) ? schemes.filter((s) => s.name === r.route!.schemeName) : [])
-                          .map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
-                      </select>
-                    </label>
+                    <div className="col-span-2 md:col-span-1">
+                      <Choice name="schemeName" label={`Scheme for ${r.label}`} defaultValue={r.route?.schemeName ?? ""} placeholder="Choose a scheme…"
+                        options={options.concat(r.route && !options.some((o) => o.name === r.route!.schemeName) ? schemes.filter((s) => s.name === r.route!.schemeName) : [])
+                          .map((s) => ({ value: s.name, label: s.name, hint: example(s.name) ?? "no parts yet" }))} />
+                    </div>
                     <span className="col-span-2 min-w-0 truncate font-mono text-[12px] text-slate-500 md:col-span-1" title={r.route ? example(r.route.schemeName) ?? undefined : undefined}>
                       {r.route ? example(r.route.schemeName) ?? <span className="font-sans text-[11px] text-amber-700">its scheme has no parts yet</span> : r.fallback ? <span className="font-sans text-[11px]">keeps the short form <span className="font-mono">{r.fallback}</span></span> : <span className="font-sans text-[11px] text-amber-700">To do · nothing of it can be numbered until it has a scheme</span>}
                     </span>
