@@ -30,11 +30,10 @@ export function ProjectSwitches({ items, title = "Projects may change it" }: { i
                   : null}
               </p>
             </div>
-            <span className={`w-12 text-right text-[11.5px] font-semibold ${one.free ? "text-emerald-700" : "text-slate-600"}`}>{one.free ? "Free" : "Fixed"}</span>
             <form action={setLibertyAction}>
               <input type="hidden" name="key" value={one.key} />
               <input type="hidden" name="free" value={one.free ? "0" : "1"} />
-              <Switch on={one.free} disabled={!!one.locked} label={one.free ? `Fix ${one.title} for every project` : `Let projects change ${one.title}`} />
+              <Switch on={one.free} words={["Free", "Fixed"]} disabled={!!one.locked} label={one.free ? `Fix ${one.title} for every project` : `Let projects change ${one.title}`} />
             </form>
           </li>
         ))}

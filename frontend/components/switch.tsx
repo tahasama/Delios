@@ -2,8 +2,10 @@
  * On or off, as a switch: the one control for anything switched on and off (a set, a list, a person's sign-in…). It
  * submits the form it sits in, which carries what turning it means; its label says what it switches and how it stands.
  */
-export function Switch({ on, label, disabled, form }: {
+export function Switch({ on, label, disabled, form, words = ["On", "Off"] }: {
   on: boolean;
+  /** How it reads on and off, when plain On / Off would say less ("Free" / "Fixed"). */
+  words?: [string, string];
   /** What it switches, read by screen readers and shown on hover ("Switch the set off"). */
   label: string;
   disabled?: boolean;
@@ -27,7 +29,7 @@ export function Switch({ on, label, disabled, form }: {
       >
         <span className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out ${on ? "translate-x-[18px]" : "translate-x-0.5"}`} />
       </span>
-      <span className={on ? "text-emerald-800" : "text-slate-500"}>{on ? "On" : "Off"}</span>
+      <span className={on ? "text-emerald-800" : "text-slate-500"}>{on ? words[0] : words[1]}</span>
     </button>
   );
 }

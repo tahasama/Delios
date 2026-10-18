@@ -8,12 +8,19 @@ import { saveSchemeRoutingAction, retireNumberingSchemeAction, deleteNumberingSc
 import { NumberingSchemeBuilder } from "./numbering-scheme-builder";
 
 /** Everything the application numbers that is not a document, routed to a scheme as a deliverable type is. */
-const RECORDS: { code: string; label: string; fallback: string }[] = [
-  { code: "TRANSMITTAL", label: "Transmittals: every handover in or out", fallback: "TR-0001" },
-  { code: "ACTION", label: "Actions: what somebody has been asked to do", fallback: "AC-0001" },
-  { code: "REVIEW", label: "Reviews: one cycle of comments and a verdict", fallback: "RV-0001" },
-  { code: "PACKAGE", label: "Packages: documents handed over together", fallback: "PK-001" },
-  { code: "ASSET", label: "Asset tags: equipment, systems and areas", fallback: "TAG-0001" },
+const RECORDS: { code: string; label: string; note: string; fallback: string }[] = [
+  { code: "TRANSMITTAL", label: "Transmittals", note: "every handover in or out", fallback: "TR-0001" },
+  { code: "ACTION", label: "Actions", note: "what somebody has been asked to do", fallback: "AC-0001" },
+  { code: "REVIEW", label: "Reviews", note: "one cycle of comments and a verdict", fallback: "RV-0001" },
+  { code: "PACKAGE", label: "Packages", note: "documents handed over together", fallback: "PK-001" },
+  { code: "ASSET", label: "Asset tags", note: "equipment, systems and areas", fallback: "TAG-0001" },
+];
+
+/** The app's lists a part may read, by their names: offered even where a list is not shown on Types & sets (Project codes). */
+const APP_LISTS: { key: string; title: string }[] = [
+  { key: "PROJECT_CODES", title: "Project codes" }, { key: "SUBPROJECTS", title: "Subprojects" },
+  { key: "SUPPLIER_CODES", title: "Supplier codes" }, { key: "PURCHASE_ORDERS", title: "Purchase orders" },
+  { key: "DISCIPLINES", title: "Disciplines" }, { key: "DOCUMENT_TYPES", title: "Document types" },
 ];
 
 /** What a part prints when it reads the record itself rather than a list. */
@@ -63,18 +70,22 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
   /** The page's own path, for the links that open a row. */
   here: string;
 }) {
+  // Every app list a part may read is offered and named, whatever the page found; then the organization's own.
+  const lists = [...APP_LISTS.map((app) => sets.find((one) => one.key === app.key) ?? app), ...sets.filter((one) => !APP_LISTS.some((app) => app.key === one.key))];
+  const listName = (key: string) => lists.find((one) => one.key === key)?.title ?? key.replaceAll("_", " ").toLowerCase();
   const firstCode = (setKey: string | null) => (setKey ? SET_SAMPLE[setKey] ?? setKey.replace(/_.*$/, "").slice(0, 3).toUpperCase() : "—");
   const shown = (field: BoardScheme["fields"][number]) => (field.rule ? ruleSample(field.rule) : null) ?? (field.rule ? "00001" : firstCode(field.valueSetKey));
   const example = (name: string) => {
     const scheme = schemes.find((s) => s.name === name);
-    return scheme ? scheme.fields.map(shown).join(scheme.delimiter) : "—";
+    return scheme?.fields.length ? scheme.fields.map(shown).join(scheme.delimiter) : null;
   };
   const kinds = [
-    ...deliverables.map((d) => ({ code: d.code, label: d.label, fallback: "" })),
+    ...deliverables.map((d) => ({ code: d.code, label: d.label, note: "", fallback: "" })),
     ...RECORDS,
   ];
   const rows = kinds.map((kind) => ({ ...kind, route: routing.find((r) => r.deliverableType === kind.code) ?? null }));
   const options = schemes.filter((s) => s.active);
+  const nameOf = (code: string) => kinds.find((k) => k.code === code)?.label ?? code;
   const toBuilder = (s: BoardScheme) => s.fields.map((f) => ({ label: f.label, valueSetKey: f.valueSetKey ?? "", rule: f.rule ?? "" }));
 
   return (
@@ -90,32 +101,32 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
             return (
               <li key={r.code} id={`route-${r.code}`} className={cn("grid grid-cols-1 items-center gap-x-4 gap-y-2 px-5 py-2.5 target:bg-amber-50 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] sm:px-6", r.route && !on ? "opacity-70" : "")}>
                 <div className="min-w-0">
-                  <span className="font-mono text-xs font-semibold text-slate-800">{r.code}</span>
-                  <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">{r.label}</span>
+                  <span className="text-[13px] font-semibold text-slate-800">{r.label}</span>
+                  <span className="mt-0.5 block truncate text-[11px] leading-4 text-slate-500">{r.note || <span className="font-mono">{r.code}</span>}</span>
                 </div>
                 {editable ? (
-                  <ActionForm action={saveSchemeRoutingAction} submitLabel="Save" size="sm" variant={r.route ? "primary" : "secondary"}
+                  <ActionForm action={saveSchemeRoutingAction} submitLabel="Save" size="sm" variant="secondary"
                     hidden={{ level, deliverableType: r.code, status: "1", ...(r.route ? {} : { active: "on" }) }}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-2 space-y-0">
-                    <label>
-                      <span className="sr-only">Scheme for {r.code}</span>
-                      <select name="schemeName" required defaultValue={r.route?.schemeName ?? ""} className={`${inputCls} w-48`}>
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 space-y-0 md:grid-cols-[12rem_minmax(0,1fr)_7rem_auto]">
+                    <label className="col-span-2 md:col-span-1">
+                      <span className="sr-only">Scheme for {r.label}</span>
+                      <select name="schemeName" required defaultValue={r.route?.schemeName ?? ""} className={`${inputCls} w-full`}>
                         {r.route ? null : <option value="" disabled>Choose a scheme…</option>}
                         {options.concat(r.route && !options.some((o) => o.name === r.route!.schemeName) ? schemes.filter((s) => s.name === r.route!.schemeName) : [])
                           .map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
                       </select>
                     </label>
-                    <span className="min-w-40 font-mono text-[12px] text-slate-500">
-                      {r.route ? example(r.route.schemeName) : r.fallback ? <span className="font-sans text-[11px]">keeps the short form <span className="font-mono">{r.fallback}</span></span> : <span className="font-sans text-[11px] text-amber-700">To do · nothing of it can be numbered until it has a scheme</span>}
+                    <span className="col-span-2 min-w-0 truncate font-mono text-[12px] text-slate-500 md:col-span-1" title={r.route ? example(r.route.schemeName) ?? undefined : undefined}>
+                      {r.route ? example(r.route.schemeName) ?? <span className="font-sans text-[11px] text-amber-700">its scheme has no parts yet</span> : r.fallback ? <span className="font-sans text-[11px]">keeps the short form <span className="font-mono">{r.fallback}</span></span> : <span className="font-sans text-[11px] text-amber-700">To do · nothing of it can be numbered until it has a scheme</span>}
                     </span>
                     {r.route ? (
                       <label className="flex cursor-pointer items-center gap-2 text-[11px] text-slate-600"><SwitchControl name="active" defaultChecked={on} /> Numbered</label>
-                    ) : null}
+                    ) : <span className="hidden md:block" />}
                   </ActionForm>
                 ) : (
                   <div className="flex flex-wrap items-center gap-x-4 text-[12.5px]">
                     <span className="w-48 font-semibold text-slate-700">{r.route?.schemeName ?? "—"}</span>
-                    <span className="font-mono text-[12px] text-slate-500">{r.route ? example(r.route.schemeName) : r.fallback ? `short form ${r.fallback}` : "no scheme"}</span>
+                    <span className="font-mono text-[12px] text-slate-500">{r.route ? example(r.route.schemeName) ?? "no parts yet" : r.fallback ? `short form ${r.fallback}` : "no scheme"}</span>
                     {r.route && !on ? <span className="text-[11px] text-slate-500">not numbered</span> : null}
                   </div>
                 )}
@@ -137,8 +148,7 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
         </div>
         {editable && adding ? (
           <div id="new-scheme" className="border-b border-line">
-            <NumberingSchemeBuilder level={level} sets={sets} />
-            <div className="flex justify-end px-5 pb-3 sm:px-6"><Link href={here} className="text-xs font-semibold text-slate-500 hover:underline">Cancel</Link></div>
+            <NumberingSchemeBuilder level={level} sets={lists} cancelHref={here} />
           </div>
         ) : null}
         <ul className="divide-y divide-line">
@@ -148,8 +158,9 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
               return (
                 <li key={s.id} id={`scheme-${s.id}`}>
                   <NumberingSchemeBuilder level={level} id={s.id} initialName={s.name} initialDelimiter={s.delimiter} initialNotes={s.notes ?? ""}
-                    initialFields={toBuilder(s)} sets={sets} fixedParts={s.used} />
-                  <div className="flex flex-wrap items-start justify-end gap-2 px-5 pb-3 sm:px-6">
+                    initialFields={toBuilder(s)} sets={lists} fixedParts={s.used} cancelHref={here} />
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3 sm:px-6">
+                    <span className="mr-auto text-[11.5px] text-slate-500">{s.used ? (s.active ? "It has given numbers: retire it to stop using it." : "Retired: bring it back to use it again.") : "It never gave a number: it may go."}</span>
                     {s.used ? (
                       <ActionForm action={retireNumberingSchemeAction} size="sm" variant="secondary" submitLabel={s.active ? "Retire it" : "Bring it back"}
                         hidden={{ level, id: s.id, active: s.active ? "0" : "1" }} className="space-y-1" />
@@ -157,7 +168,6 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
                       <ActionForm action={deleteNumberingSchemeAction} size="sm" variant="danger" submitLabel="Delete it"
                         confirmText={`Delete ${s.name}? It never gave a number.`} hidden={{ level, id: s.id }} className="space-y-1" />
                     )}
-                    <Link href={here} className="self-center text-xs font-semibold text-slate-500 hover:underline">Cancel</Link>
                   </div>
                 </li>
               );
@@ -172,21 +182,23 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
                   </p>
                   {s.notes ? <p className="text-[11.5px] leading-4 text-slate-500">{s.notes}</p> : null}
                   <div className="scroll-thin mt-2 overflow-x-auto">
-                    <div className="flex items-end gap-1">
+                    <div className="flex items-start gap-1.5">
                       {s.fields.map((f, i) => (
-                        <div key={f.id} className="flex items-end gap-1">
-                          {i ? <span className="pb-6 font-mono text-lg text-slate-300">{s.delimiter}</span> : null}
+                        <div key={f.id} className="flex items-start gap-1.5">
+                          {i ? <span className="flex h-8 items-center font-mono text-base font-bold text-slate-400" aria-hidden="true">{s.delimiter}</span> : null}
                           <div className="text-center">
-                            <span className="block rounded-md bg-slate-100 px-2.5 py-1.5 font-mono text-sm font-bold text-slate-800">{shown(f)}</span>
+                            <span className="flex h-8 items-center justify-center rounded-md bg-slate-100 px-2.5 font-mono text-sm font-bold text-slate-800">{shown(f)}</span>
                             <span className="mt-1 block max-w-28 text-[11px] leading-3 text-slate-500">{f.label}</span>
-                            <span className="block text-[11px] text-slate-400">{f.rule ? ruleSource(f.rule) : f.valueSetKey ? sets.find((x) => x.key === f.valueSetKey)?.title ?? f.valueSetKey : ""}</span>
+                            <span className="block text-[11px] text-slate-400">{f.rule ? ruleSource(f.rule) : f.valueSetKey ? listName(f.valueSetKey) : ""}</span>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
+                  {s.fields.length ? null : <p className="mt-1 text-[11.5px] text-amber-700">No parts yet: it gives no number until it has some.</p>}
                   <p className="mt-2 text-[11.5px] text-slate-500">
-                    Looks like <span className="font-mono text-slate-700">{example(s.name)}</span> · {used.length ? `numbers ${used.map((u) => u.deliverableType).join(", ")}` : "numbers nothing"}
+                    {example(s.name) ? <>Looks like <span className="font-mono text-slate-700">{example(s.name)}</span> · </> : null}
+                    {used.length ? `numbers ${used.map((u) => nameOf(u.deliverableType)).join(", ")}` : "numbers nothing"}
                   </p>
                 </div>
                 {editable ? (

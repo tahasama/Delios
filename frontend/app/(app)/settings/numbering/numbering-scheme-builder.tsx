@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { useFormStatus } from "react-dom";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls, btn } from "@/components/ui";
 import { saveNumberingSchemeAction } from "@/lib/settings/forms-numbering";
+import { cn } from "@/lib/core/utils";
 
 type NumberField = { label: string; valueSetKey: string; rule: string };
 type Kind = "LIST" | "FIXED" | "COUNTER" | "SENDER" | "RECEIVER";
@@ -33,7 +36,13 @@ const fixedOf = (rule: string) => rule.match(/^FIXED\(([^)]*)\)$/i)?.[1] ?? "";
  * list, holds a fixed text, is the running number (with its digits), or is who sends or receives it. A scheme that gave
  * numbers (`fixedParts`) keeps its parts and delimiter: only its name and note change.
  */
-export function NumberingSchemeBuilder({ level, id, initialName = "", initialDelimiter = "-", initialNotes = "", initialFields, sets, fixedParts }: {
+/** The act that sends the scheme, showing while it is sent. */
+function Send({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+  return <button type="submit" disabled={pending} className={btn("primary", "sm")}>{pending ? "Working…" : label}</button>;
+}
+
+export function NumberingSchemeBuilder({ level, id, initialName = "", initialDelimiter = "-", initialNotes = "", initialFields, sets, fixedParts, cancelHref }: {
   level: "organization" | "project";
   id?: string;
   initialName?: string;
@@ -42,6 +51,8 @@ export function NumberingSchemeBuilder({ level, id, initialName = "", initialDel
   initialFields?: NumberField[];
   sets: { key: string; title: string }[];
   fixedParts?: boolean;
+  /** Where Cancel leads: the page as it was, nothing opened. */
+  cancelHref: string;
 }) {
   const [fields, setFields] = useState<NumberField[]>(initialFields?.length ? initialFields : [
     { label: "Project code", valueSetKey: "PROJECT_CODES", rule: "" },
@@ -54,11 +65,11 @@ export function NumberingSchemeBuilder({ level, id, initialName = "", initialDel
     update(index, { rule, valueSetKey: kind === "LIST" ? fields[index].valueSetKey : "" });
   }
 
-  return <ActionForm action={saveNumberingSchemeAction} submitLabel={id ? "Save" : "Add the scheme"} resetOnSuccess={!id}
+  return <ActionForm action={saveNumberingSchemeAction} hideSubmit resetOnSuccess={!id}
     hidden={{ level, ...(id ? { id } : {}), ...(fixedParts ? { fixedParts: "1" } : {}) }} className="asking space-y-4 px-5 py-5 sm:px-6">
-    <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,1fr)_7rem_minmax(0,2fr)]">
+    <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,1fr)_9rem_minmax(0,2fr)]">
       <Field label="Name" required><input name="name" required maxLength={100} defaultValue={initialName} className={inputCls} placeholder="Supplier documents" /></Field>
-      <Field label="Delimiter" required hint={fixedParts ? "has given numbers: stays" : "one character"}>
+      <Field label="Delimiter" required hint={fixedParts ? "stays" : "one sign"}>
         <input name="delimiter" required maxLength={1} defaultValue={initialDelimiter} disabled={fixedParts} className={`${inputCls} text-center font-mono`} />
       </Field>
       <Field label="When it is used"><input name="notes" maxLength={300} defaultValue={initialNotes} className={inputCls} placeholder="In plain words: what it numbers, and why" /></Field>
@@ -89,7 +100,7 @@ export function NumberingSchemeBuilder({ level, id, initialName = "", initialDel
             <input value={fixedOf(field.rule)} onChange={(event) => update(index, { rule: `FIXED(${event.target.value.replace(/[()]/g, "")})` })} required maxLength={12} disabled={fixedParts} className={`${inputCls} font-mono max-sm:col-span-2 max-sm:col-start-2`} placeholder="TAG" aria-label={`Text of part ${index + 1}`} />
           ) : kind === "COUNTER" ? (
             <label className="flex items-center gap-2 text-xs text-slate-600 max-sm:col-span-2 max-sm:col-start-2">
-              <input type="number" min={1} max={9} value={digitsOf(field.rule)} onChange={(event) => update(index, { rule: `COUNTER:DIGITS(${Math.min(9, Math.max(1, Number(event.target.value) || 1))})` })} disabled={fixedParts} className={`${inputCls} w-16 text-center`} aria-label={`Digits of part ${index + 1}`} />
+              <input type="number" min={1} max={9} value={digitsOf(field.rule)} onChange={(event) => update(index, { rule: `COUNTER:DIGITS(${Math.min(9, Math.max(1, Number(event.target.value) || 1))})` })} disabled={fixedParts} className={cn(inputCls, "w-16 shrink-0 text-center")} aria-label={`Digits of part ${index + 1}`} />
               digits
             </label>
           ) : <span className="text-[11.5px] text-slate-500 max-sm:col-span-2 max-sm:col-start-2">the organization&rsquo;s code</span>}
@@ -106,6 +117,10 @@ export function NumberingSchemeBuilder({ level, id, initialName = "", initialDel
           </>}
         </div>;
       })}</div>
+    </div>
+    <div className="flex items-center justify-end gap-3 border-t border-line pt-3">
+      <Link href={cancelHref} className="text-xs font-semibold text-slate-500 hover:text-slate-800 hover:underline">Cancel</Link>
+      <Send label={id ? "Save" : "Add the scheme"} />
     </div>
   </ActionForm>;
 }
