@@ -505,11 +505,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   A value, a set and a list of one's own are switched off and on (a value then reads OFF: not offered, kept on what
   carries it); the app's lists are not switched here, their field is left out in Forms & fields (APP_LIST_STAYS). Never
   used: a value or a set is deleted (SET_IN_USE otherwise); a list only if it is one's own (the app's stay).
-- Counts only where they help (owner: too many overwhelm): Types & sets counts sets per list and values per set in its
-  menu, and the retired values; no counts on its tabs, its plate or "In use / All". Project codes are not on Types &
+- Counts only where they help (owner: too many overwhelm): Types & sets counts its lists on each tab, the values in use on
+  each list of its menu and, under a list of several sets, on each set (one set alone repeats nothing), and the retired
+  values; none on its plate or "In use / All". Project codes are not on Types &
   sets: filled by the app, one per project, shown on This project.
 - Types & sets shows the sets: nothing is chosen on arrival (Numbering & identity's lists, and "Choose a list on the
-  left"); choosing a list opens its sets. In the menu a list counts its sets, a set its values in use ("· off" when
+  left"); choosing a list opens its sets. In the menu a list counts its values in use, a set too when the list has several ("· off" when
   switched off); "New set" (name, the deliverable types it serves). The set shown has its bar: name, whom it serves,
   its switch, its pencil (name, types), delete while never used. Values are the set's; a value is added to the set
   shown (`?vs=<set>`). Which values: the segmented choice (`.seg` / `.segment`, In use · Retired · All, with counts).

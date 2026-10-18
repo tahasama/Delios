@@ -50,7 +50,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                 onClick={() => { setTab(i); setQ(""); }}
                 className={`inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-0.5 text-[12px] leading-4 transition ${on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"}`}
               >
-                {g.title}
+                {g.title} <span className="ml-1 font-normal tabular-nums text-slate-500">{g.sets.length}</span>
               </button>
             );
           })}
@@ -78,7 +78,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                       className={`flex min-w-0 flex-1 items-center justify-between gap-2 py-2 pl-2.5 pr-1 text-[13px] ${on ? "font-semibold text-brand-ink" : "text-slate-600 hover:text-slate-900"}`}
                     >
                       <span className="truncate">{one.title}</span>
-                      <span title={`${one.parts.length} ${one.parts.length === 1 ? "set" : "sets"}`} className={`shrink-0 text-[11px] tabular-nums ${on ? "text-brand-ink/70" : "text-slate-500"}`}>{one.parts.length}</span>
+                      <span title={`${one.count} ${one.count === 1 ? "value" : "values"} in use`} className={`shrink-0 text-[11px] tabular-nums ${on ? "text-brand-ink/70" : "text-slate-500"}`}>{one.count}</span>
                     </Link>
                     <button
                       type="button"
@@ -105,7 +105,8 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                               className={`flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-[12px] ${here ? "bg-tint font-semibold text-brand-ink" : "text-slate-600 hover:bg-tint-soft hover:text-slate-900"} ${part.active ? "" : "opacity-60"}`}
                             >
                               <span className="truncate">{part.name}{part.active ? "" : " · off"}</span>
-                              <span title={`${part.count} ${part.count === 1 ? "value" : "values"} in use`} className="shrink-0 text-[11px] tabular-nums text-slate-500">{part.count}</span>
+                              {/* A list with only its default set: the list's own count already says it. */}
+                              {one.parts.length > 1 ? <span title={`${part.count} ${part.count === 1 ? "value" : "values"} in use`} className="shrink-0 text-[11px] tabular-nums text-slate-500">{part.count}</span> : null}
                             </Link>
                           </li>
                         );
