@@ -1756,7 +1756,7 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasIndex("TenantId", "ProjectId", "DeliverableType")
                         .IsUnique()
-                        .HasDatabaseName("ix_revision_scheme_routings_tenant_id_project_id_deliverable_ty");
+                        .HasDatabaseName("ix_revision_scheme_routings_tenant_id_project_id_deliverable_t");
 
                     NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("TenantId", "ProjectId", "DeliverableType"), false);
 

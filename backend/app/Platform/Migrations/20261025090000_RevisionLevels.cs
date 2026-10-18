@@ -28,7 +28,7 @@ namespace Delios.Host.Platform.Migrations
             migrationBuilder.CreateIndex(name: "ix_revision_schemes_tenant_id_project_id_name", table: "revision_schemes",
                 columns: ["tenant_id", "project_id", "name"], unique: true).Annotation("Npgsql:NullsDistinct", false);
             migrationBuilder.CreateIndex(name: "ix_revision_scheme_routings_project_id", table: "revision_scheme_routings", column: "project_id");
-            migrationBuilder.CreateIndex(name: "ix_revision_scheme_routings_tenant_id_project_id_deliverable_ty", table: "revision_scheme_routings",
+            migrationBuilder.CreateIndex(name: "ix_revision_scheme_routings_tenant_id_project_id_deliverable_t", table: "revision_scheme_routings",
                 columns: ["tenant_id", "project_id", "deliverable_type"], unique: true).Annotation("Npgsql:NullsDistinct", false);
 
             migrationBuilder.AddForeignKey(name: "fk_revision_schemes_projects_project_id", table: "revision_schemes", column: "project_id",
@@ -46,7 +46,7 @@ namespace Delios.Host.Platform.Migrations
             migrationBuilder.DropIndex(name: "ix_revision_schemes_one_default", table: "revision_schemes");
             migrationBuilder.DropIndex(name: "ix_revision_schemes_tenant_id_project_id_name", table: "revision_schemes");
             migrationBuilder.DropIndex(name: "ix_revision_scheme_routings_project_id", table: "revision_scheme_routings");
-            migrationBuilder.DropIndex(name: "ix_revision_scheme_routings_tenant_id_project_id_deliverable_ty", table: "revision_scheme_routings");
+            migrationBuilder.DropIndex(name: "ix_revision_scheme_routings_tenant_id_project_id_deliverable_t", table: "revision_scheme_routings");
             migrationBuilder.DropColumn(name: "project_id", table: "revision_schemes");
             migrationBuilder.DropColumn(name: "project_id", table: "revision_scheme_routings");
             migrationBuilder.CreateIndex(name: "ix_revision_schemes_one_default", table: "revision_schemes", column: "tenant_id", unique: true, filter: "is_default");

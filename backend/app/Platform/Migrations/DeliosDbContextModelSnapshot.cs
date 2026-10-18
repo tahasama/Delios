@@ -1754,7 +1754,7 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasIndex("TenantId", "ProjectId", "DeliverableType")
                         .IsUnique()
-                        .HasDatabaseName("ix_revision_scheme_routings_tenant_id_project_id_deliverable_ty");
+                        .HasDatabaseName("ix_revision_scheme_routings_tenant_id_project_id_deliverable_t");
 
                     NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("TenantId", "ProjectId", "DeliverableType"), false);
 
@@ -2271,6 +2271,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("active");
 
+                    b.Property<bool>("ActsAsControl")
+                        .HasColumnType("boolean")
+                        .HasColumnName("acts_as_control");
+
                     b.Property<Guid?>("ConfirmTransmittalId")
                         .HasColumnType("uuid")
                         .HasColumnName("confirm_transmittal_id");
@@ -2299,10 +2303,6 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<Guid>("FunctionId")
                         .HasColumnType("uuid")
                         .HasColumnName("function_id");
-
-                    b.Property<bool>("ActsAsControl")
-                        .HasColumnType("boolean")
-                        .HasColumnName("acts_as_control");
 
                     b.Property<bool>("InviteOnJoin")
                         .HasColumnType("boolean")
@@ -2373,6 +2373,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("active");
 
+                    b.Property<Guid?>("CarriedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("carried_by_user_id");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -2408,23 +2412,15 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
                     b.Property<string>("Participation")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
                         .HasColumnName("participation");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<Guid?>("CarriedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("carried_by_user_id");
-
-                    b.Property<Guid?>("OrganizationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("organization_id");
 
                     b.Property<Instant?>("ParticipationChangedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2440,15 +2436,19 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("previous_participation");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.HasKey("Id")
                         .HasName("pk_parties");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("ix_parties_organization_id");
 
                     b.HasIndex("TenantId", "Code")
                         .IsUnique()
                         .HasDatabaseName("ix_parties_tenant_id_code");
-
-                    b.HasIndex("OrganizationId")
-                        .HasDatabaseName("ix_parties_organization_id");
 
                     b.ToTable("parties", (string)null);
                 });
@@ -2530,6 +2530,15 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("code");
 
+                    b.Property<Instant?>("CodeChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("code_changed_at");
+
+                    b.Property<string>("CodeChangedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("code_changed_by_name");
+
                     b.Property<string>("ContentExtraction")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -2561,6 +2570,19 @@ namespace Delios.Host.Platform.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
+
+                    b.Property<Guid?>("OpenedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("opened_by_id");
+
+                    b.Property<bool>("OwnLists")
+                        .HasColumnType("boolean")
+                        .HasColumnName("own_lists");
+
+                    b.Property<string>("PreviousCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("previous_code");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -2594,28 +2616,6 @@ namespace Delios.Host.Platform.Migrations
                         .IsRequired()
                         .HasColumnType("integer[]")
                         .HasColumnName("weekend_days");
-
-                    b.Property<Instant?>("CodeChangedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("code_changed_at");
-
-                    b.Property<string>("CodeChangedByName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("code_changed_by_name");
-
-                    b.Property<Guid?>("OpenedById")
-                        .HasColumnType("uuid")
-                        .HasColumnName("opened_by_id");
-
-                    b.Property<bool>("OwnLists")
-                        .HasColumnType("boolean")
-                        .HasColumnName("own_lists");
-
-                    b.Property<string>("PreviousCode")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("previous_code");
 
                     b.HasKey("Id")
                         .HasName("pk_projects");
@@ -3179,110 +3179,6 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("account_links", (string)null);
                 });
 
-            modelBuilder.Entity("Delios.Host.Organizations.OrganizationLink", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AnswerNote")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("answer_note");
-
-                    b.Property<Instant?>("AnsweredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("answered_at");
-
-                    b.Property<string>("AnsweredByName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("answered_by_name");
-
-                    b.Property<string>("EndReason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("end_reason");
-
-                    b.Property<Instant?>("EndedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("ended_at");
-
-                    b.Property<string>("EndedByName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("ended_by_name");
-
-                    b.Property<string>("EndedBySide")
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
-                        .HasColumnName("ended_by_side");
-
-                    b.Property<Guid>("GuestTenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("guest_tenant_id");
-
-                    b.Property<string>("HostPartyCode")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("host_party_code");
-
-                    b.Property<Guid>("HostPartyId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("host_party_id");
-
-                    b.Property<string>("HostPartyName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("host_party_name");
-
-                    b.Property<Guid>("HostTenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("host_tenant_id");
-
-                    b.Property<Instant>("InvitedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("invited_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("InvitedByName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("invited_by_name");
-
-                    b.Property<string>("InvitedEmail")
-                        .IsRequired()
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)")
-                        .HasColumnName("invited_email");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("state");
-
-                    b.HasKey("Id")
-                        .HasName("pk_organization_links");
-
-                    b.HasIndex("GuestTenantId")
-                        .HasDatabaseName("ix_organization_links_guest_tenant_id");
-
-                    b.HasIndex("HostPartyId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_organization_links_host_party_id")
-                        .HasFilter("state IN ('INVITED', 'LINKED')");
-
-                    b.HasIndex("HostTenantId")
-                        .HasDatabaseName("ix_organization_links_host_tenant_id");
-
-                    b.ToTable("organization_links", (string)null);
-                });
-
             modelBuilder.Entity("Delios.Host.Organizations.OrganizationClaim", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3396,43 +3292,14 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("code_changed_by_name");
 
-                    b.Property<Instant>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<Instant?>("NameChangedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("name_changed_at");
-
-                    b.Property<string>("NameChangedByName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name_changed_by_name");
-
-                    b.Property<string>("PreviousCode")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("previous_code");
-
-                    b.Property<string>("PreviousName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("previous_name");
-
-                    b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
                     b.Property<string>("Country")
                         .HasMaxLength(2)
                         .HasColumnType("character varying(2)")
                         .HasColumnName("country");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<Guid?>("CreatedByTenantId")
                         .HasColumnType("uuid")
@@ -3474,27 +3341,160 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("merged_into_id");
 
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<Instant?>("NameChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("name_changed_at");
+
+                    b.Property<string>("NameChangedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name_changed_by_name");
+
                     b.Property<string>("NoIdentifierReason")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("no_identifier_reason");
+
+                    b.Property<string>("PreviousCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("previous_code");
 
                     b.Property<string>("PreviousIdentifier")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("previous_identifier");
 
+                    b.Property<string>("PreviousName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("previous_name");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.HasKey("Id")
                         .HasName("pk_organization_identities");
-
-                    b.HasIndex("Domain")
-                        .HasDatabaseName("ix_organization_identities_domain");
 
                     b.HasIndex("Code")
                         .IsUnique()
                         .HasDatabaseName("ix_organization_identities_code");
 
+                    b.HasIndex("Domain")
+                        .HasDatabaseName("ix_organization_identities_domain");
+
                     b.ToTable("organization_identities", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Organizations.OrganizationLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AnswerNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("answer_note");
+
+                    b.Property<Instant?>("AnsweredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("answered_at");
+
+                    b.Property<string>("AnsweredByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("answered_by_name");
+
+                    b.Property<string>("EndReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("end_reason");
+
+                    b.Property<Instant?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
+
+                    b.Property<string>("EndedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("ended_by_name");
+
+                    b.Property<string>("EndedBySide")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("ended_by_side");
+
+                    b.Property<Guid>("GuestTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("guest_tenant_id");
+
+                    b.Property<string>("HostPartyCode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("host_party_code");
+
+                    b.Property<Guid>("HostPartyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("host_party_id");
+
+                    b.Property<string>("HostPartyName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("host_party_name");
+
+                    b.Property<Guid>("HostTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("host_tenant_id");
+
+                    b.Property<Instant>("InvitedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("invited_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("InvitedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("invited_by_name");
+
+                    b.Property<string>("InvitedEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("invited_email");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_organization_links");
+
+                    b.HasIndex("GuestTenantId")
+                        .HasDatabaseName("ix_organization_links_guest_tenant_id");
+
+                    b.HasIndex("HostPartyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_organization_links_host_party_id")
+                        .HasFilter("state IN ('INVITED', 'LINKED')");
+
+                    b.HasIndex("HostTenantId")
+                        .HasDatabaseName("ix_organization_links_host_tenant_id");
+
+                    b.ToTable("organization_links", (string)null);
                 });
 
             modelBuilder.Entity("Delios.Host.Organizations.OrganizationMerge", b =>
@@ -3503,7 +3503,7 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid[]>("AgreedTenantIds")
+                    b.PrimitiveCollection<Guid[]>("AgreedTenantIds")
                         .IsRequired()
                         .HasColumnType("uuid[]")
                         .HasColumnName("agreed_tenant_ids");
@@ -3566,6 +3566,81 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("organization_merges", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Organizations.ProjectParty", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.Property<Instant>("AddedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("added_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("AddedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("added_by_name");
+
+                    b.Property<Instant?>("ContractChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("contract_changed_at");
+
+                    b.Property<string>("ContractChangedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("contract_changed_by_name");
+
+                    b.Property<string>("ContractNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("contract_number");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("party_id");
+
+                    b.Property<string>("PreviousContractNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("previous_contract_number");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("role");
+
+                    b.Property<Guid?>("StartFunctionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("start_function_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_project_parties");
+
+                    b.HasIndex("StartFunctionId")
+                        .HasDatabaseName("ix_project_parties_start_function_id");
+
+                    b.HasIndex("ProjectId", "PartyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_project_parties_project_id_party_id");
+
+                    b.ToTable("project_parties", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Organizations.ReservedValue", b =>
                 {
                     b.Property<string>("Kind")
@@ -3603,81 +3678,6 @@ namespace Delios.Host.Platform.Migrations
                         .HasDatabaseName("ix_reserved_values_holder_id");
 
                     b.ToTable("reserved_values", (string)null);
-                });
-
-            modelBuilder.Entity("Delios.Host.Organizations.ProjectParty", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<bool>("Active")
-                        .HasColumnType("boolean")
-                        .HasColumnName("active");
-
-                    b.Property<Instant>("AddedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("added_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("AddedByName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("added_by_name");
-
-                    b.Property<Guid>("PartyId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("party_id");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<string>("Role")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("role");
-
-                    b.Property<Guid?>("StartFunctionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("start_function_id");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<Instant?>("ContractChangedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("contract_changed_at");
-
-                    b.Property<string>("ContractChangedByName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("contract_changed_by_name");
-
-                    b.Property<string>("ContractNumber")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("contract_number");
-
-                    b.Property<string>("PreviousContractNumber")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("previous_contract_number");
-
-                    b.HasKey("Id")
-                        .HasName("pk_project_parties");
-
-                    b.HasIndex("StartFunctionId")
-                        .HasDatabaseName("ix_project_parties_start_function_id");
-
-                    b.HasIndex("ProjectId", "PartyId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_project_parties_project_id_party_id");
-
-                    b.ToTable("project_parties", (string)null);
                 });
 
             modelBuilder.Entity("Delios.Host.Packages.Package", b =>
@@ -6593,18 +6593,18 @@ namespace Delios.Host.Platform.Migrations
 
             modelBuilder.Entity("Delios.Host.Documents.RevisionSchemeRouting", b =>
                 {
+                    b.HasOne("Delios.Host.Identity.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_revision_scheme_routings_projects_project_id");
+
                     b.HasOne("Delios.Host.Documents.RevisionScheme", "Scheme")
                         .WithMany()
                         .HasForeignKey("SchemeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_revision_scheme_routings_revision_schemes_scheme_id");
-
-                    b.HasOne("Delios.Host.Identity.Project", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_revision_scheme_routings_projects_project_id");
 
                     b.HasOne("Delios.Host.Identity.Tenant", null)
                         .WithMany()
@@ -6618,18 +6618,18 @@ namespace Delios.Host.Platform.Migrations
 
             modelBuilder.Entity("Delios.Host.Documents.SchemeRouting", b =>
                 {
+                    b.HasOne("Delios.Host.Identity.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_scheme_routings_projects_project_id");
+
                     b.HasOne("Delios.Host.Documents.NumberingScheme", "Scheme")
                         .WithMany()
                         .HasForeignKey("SchemeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_scheme_routings_numbering_schemes_scheme_id");
-
-                    b.HasOne("Delios.Host.Identity.Project", null)
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_scheme_routings_projects_project_id");
 
                     b.HasOne("Delios.Host.Identity.Tenant", null)
                         .WithMany()
