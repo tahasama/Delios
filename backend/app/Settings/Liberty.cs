@@ -112,7 +112,9 @@ public static class Liberty
         return items.Select(item =>
         {
             var row = rows.FirstOrDefault(r => r.Key == Prefix + item.Key);
-            var locked = item.Key.StartsWith("LIST:") && numbered.Contains(item.Key[5..]) ? "A number part reads it: it follows the numbering" : null;
+            var locked = item.Key.StartsWith("LIST:") && numbered.Contains(item.Key[5..]) ? "A number part reads it: it follows the numbering"
+                // A project's own version of what a function may do is not built: what each may do is the same everywhere.
+                : item.Key == Functions ? "Not yet: what each function may do is the same on every project" : null;
             var free = locked is null && (row?.Value is { } value ? value == Free : item.FreeByDefault);
             return new LibertyView(item.Key, item.Area, item.Title, item.Why, free, item.FreeByDefault,
                 row?.UpdatedAt.ToDateTimeOffset(), row?.UpdatedByName, locked);
@@ -124,6 +126,7 @@ public static class Liberty
     /// </summary>
     public static async Task<bool> IsFreeAsync(DeliosDbContext db, string key, CancellationToken cancellationToken)
     {
+        if (key == Functions) return false;
         if (key.StartsWith("LIST:") && (await NumberedListsAsync(db, cancellationToken)).Contains(key[5..]))
             return await IsFreeAsync(db, Numbering, cancellationToken);
         var value = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && s.Key == Prefix + key)

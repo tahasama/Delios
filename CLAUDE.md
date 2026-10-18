@@ -702,7 +702,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   how it works with us change once each (above). An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
 - Layered settings: built as the two levels above (the switches). Being moved onto them card by card: the switches
-  and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (done, per list), Forms & fields (done, per form), Functions & permissions,
+  and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (done, per list), Forms & fields (done, per form), Functions & permissions (step 1 done: the organization's only, created and changed
+  on its Settings card `/organization/settings/functions` by an administrator, backend Configurers; a project's page reads
+  them, with who holds each there; its switch held Fixed, "Not yet", `Liberty.IsFreeAsync` false; a project's own
+  version of what a function may do is step 2, built only when a project needs it),
   the Control room. Until a page is moved, it says plainly what is the organization's and what is the project's.
 - Document families are **on hold** (owner): the idea is to group document types (internal like DWG, supplier like C102)
   to tell criticality and whether an outside stamp / wet signature is needed or the app's approval is enough, legally.

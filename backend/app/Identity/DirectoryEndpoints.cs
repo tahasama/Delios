@@ -91,8 +91,13 @@ public static class DirectoryEndpoints
         // Reading the functions and organizations is open to whoever holds Manage too: People & access chooses from them.
         people.MapGet("/functions", FunctionsAsync);
         keepers.MapGet("/users/{userId:guid}/activity", ActivityAsync);
-        keepers.MapPost("/functions", CreateFunctionAsync);
-        keepers.MapPut("/functions/{functionId:guid}", UpdateFunctionAsync);
+        // The functions and what each may do are the organization's, the same on every project (owner): an administrator
+        // changes them, in its Settings.
+        var functions = app.MapGroup("/api/admin").WithTags("Administration")
+            .AddEndpointFilter<TransactionFilter>()
+            .AddEndpointFilter(Keepers.Configurers("An administrator changes the organization's functions, in its Settings, for every project."));
+        functions.MapPost("/functions", CreateFunctionAsync);
+        functions.MapPut("/functions/{functionId:guid}", UpdateFunctionAsync);
         people.MapGet("/parties", PartiesAsync);
         keepers.MapPost("/parties", CreatePartyAsync);
         keepers.MapPut("/parties/{partyId:guid}", UpdatePartyAsync);

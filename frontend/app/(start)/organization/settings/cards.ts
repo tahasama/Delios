@@ -26,7 +26,7 @@ export const ORG_CARDS: OrgCard[] = [
   { project: "/settings/revisions", title: "Revisions", text: "How revisions are named, line by line for each phase.", slug: "revisions", area: "Revisions" },
   { project: "/settings/flow", title: "Control room", text: "How a project works when it opens: who carries each act out, releasing, stamps, planning.", slug: "flow", area: "Control room", elsewhere: "/organization/defaults" },
   { project: "/settings/workflow-templates", title: "Review routes", text: "Who reviews, and in which order.", slug: "routes", area: "Review routes" },
-  { project: "/settings/functions", title: "Functions & permissions", text: "The organization's jobs, and what each may do.", slug: "functions", area: "Functions & permissions", notMovedYet: true },
+  { project: "/settings/functions", title: "Functions & permissions", text: "The organization's jobs, and what each may do.", slug: "functions", area: "Functions & permissions" },
   { project: "/settings/security", title: "Sign-in & security", text: "The sign-in rules for everyone in the organization.", elsewhere: "/settings/security" },
   { project: "tracking", title: "What is kept about people's activity", text: "Whether who opened and downloaded is kept, and whether sign-ins show on a person's activity.", slug: "tracking", group: "Change & evidence" },
   { project: "/settings/audit", title: "Audit trail", text: "Every recorded act, across our projects.", elsewhere: "/settings/audit" },

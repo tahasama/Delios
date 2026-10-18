@@ -59,6 +59,7 @@ export async function createFunctionAction(_prev: Result | undefined, formData: 
     return { error: refusal(e).message };
   }
   revalidatePath("/settings/functions");
+  revalidatePath("/organization/settings/functions");
   return { ok: `${name} published.` };
 }
 
@@ -82,6 +83,7 @@ export async function updateFunctionAction(_prev: Result | undefined, formData: 
     return { error: refusal(e).message };
   }
   revalidatePath("/settings/functions");
+  revalidatePath("/organization/settings/functions");
   return { ok: "Saved." };
 }
 
@@ -126,6 +128,7 @@ export async function savePermissionRuleAction(_prev: Result | undefined, formDa
   const failed = await saveRules(fn, rules);
   if (failed) return failed;
   revalidatePath("/settings/functions");
+  revalidatePath("/organization/settings/functions");
   return { ok: "Rule published." };
 }
 
@@ -139,6 +142,7 @@ export async function deletePermissionRuleAction(_prev: Result | undefined, form
   const failed = await saveRules(fn, fn.rules.filter((r) => r.id !== ruleId));
   if (failed) return failed;
   revalidatePath("/settings/functions");
+  revalidatePath("/organization/settings/functions");
   return { ok: "Rule withdrawn." };
 }
 
@@ -172,6 +176,7 @@ async function toggleFunctionVerbAction(_prev: Result | undefined, formData: For
   const failed = await saveRules(fn, rules);
   if (failed) return failed;
   revalidatePath("/settings/functions");
+  revalidatePath("/organization/settings/functions");
   revalidatePath("/distribution");
   return { ok: `${fn.name}: ${has ? "removed" : "granted"} ${verb.toLowerCase()}.` };
 }
