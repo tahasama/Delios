@@ -158,21 +158,23 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
               return (
                 <li key={s.id} id={`scheme-${s.id}`}>
                   <NumberingSchemeBuilder level={level} id={s.id} initialName={s.name} initialDelimiter={s.delimiter} initialNotes={s.notes ?? ""}
-                    initialFields={toBuilder(s)} sets={lists} fixedParts={s.used} cancelHref={here} />
-                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3 sm:px-6">
-                    <span className="mr-auto text-[11.5px] text-slate-500">{s.used
-                      ? s.active
-                        ? used.length ? `Retire it once nothing is numbered by it: choose another scheme for ${used.map((u) => nameOf(u.deliverableType)).join(", ")} first.` : "It numbers nothing now: retire it. Numbers it gave stay as they are."
-                        : "Retired: bring it back to use it again."
-                      : "It never gave a number: it may go."}</span>
-                    {s.used ? (
-                      <ActionForm action={retireNumberingSchemeAction} size="sm" variant="secondary" submitLabel={s.active ? "Retire it" : "Bring it back"}
-                        hidden={{ level, id: s.id, active: s.active ? "0" : "1" }} className="space-y-1" />
-                    ) : (
-                      <ActionForm action={deleteNumberingSchemeAction} size="sm" variant="danger" submitLabel="Delete it"
-                        confirmText={`Delete ${s.name}? It never gave a number.`} hidden={{ level, id: s.id }} className="space-y-1" />
-                    )}
-                  </div>
+                    initialFields={toBuilder(s)} sets={lists} fixedParts={s.used} cancelHref={here}
+                    aside={<>
+                      <span className="text-[11px] text-slate-500">{s.used
+                        ? s.active
+                          ? used.length ? `Retire it once nothing is numbered by it: choose another scheme for ${used.map((u) => nameOf(u.deliverableType)).join(", ")} first.` : "It numbers nothing now: it may be retired; numbers it gave stay."
+                          : "Retired: bring it back to use it again."
+                        : used.length
+                          ? `It never gave a number, but numbers ${used.map((u) => nameOf(u.deliverableType)).join(", ")}: choose another scheme for it, then it may go.`
+                          : "It never gave a number: it may go."}</span>
+                      {s.used ? (
+                        <ActionForm action={retireNumberingSchemeAction} size="sm" variant="secondary" submitLabel={s.active ? "Retire it" : "Bring it back"}
+                          hidden={{ level, id: s.id, active: s.active ? "0" : "1" }} className="flex items-center gap-2 space-y-0" />
+                      ) : used.length ? null : (
+                        <ActionForm action={deleteNumberingSchemeAction} size="sm" variant="danger" submitLabel="Delete it"
+                          confirmText={`Delete ${s.name}? It never gave a number.`} hidden={{ level, id: s.id }} className="flex items-center gap-2 space-y-0" />
+                      )}
+                    </>} />
                 </li>
               );
             }
