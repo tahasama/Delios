@@ -183,6 +183,7 @@ public static class DirectoryEndpoints
     {
         var users = await db.Users.AsNoTracking().Include(u => u.Party).OrderBy(u => u.Name).ToListAsync(cancellationToken);
         var memberships = await db.Memberships.AsNoTracking().Include(m => m.Function).Include(m => m.Project).ToListAsync(cancellationToken);
+        var seen = await SeenAsync(db, cancellationToken);
         return Results.Ok(users.Select(u => new
         {
             u.Id,
@@ -199,8 +200,15 @@ public static class DirectoryEndpoints
             Mfa = u.MfaEnabledAt != null,
             LockedUntil = u.LockedUntil?.ToDateTimeOffset(),
             CreatedAt = u.CreatedAt.ToDateTimeOffset(),
+            u.HomeFunction,
+            // The last time they signed in (or switched in from their own DELIOS), from the audit trail.
+            LastSignInAt = seen.SignIns.TryGetValue(u.Id, out var signedIn) ? signedIn.ToDateTimeOffset() : (DateTimeOffset?)null,
             Memberships = memberships.Where(m => m.UserId == u.Id).Select(m => new
             {
+                // On the project since: confirmed, else first put on it (the audit trail), else their account's day.
+                Since = (m.ConfirmedAt ?? (seen.Joined.TryGetValue((u.Id, m.ProjectId), out var joined) ? joined : u.CreatedAt)).ToDateTimeOffset(),
+                // Their last act on the project.
+                LastSeenAt = seen.Acts.TryGetValue((u.Id, m.ProjectId), out var last) ? last.ToDateTimeOffset() : (DateTimeOffset?)null,
                 m.Id,
                 m.ProjectId,
                 ProjectCode = m.Project!.Code,
@@ -221,6 +229,26 @@ public static class DirectoryEndpoints
                 m.ConfirmedByName,
             }),
         }));
+    }
+
+    /// <summary>
+    /// What the audit trail says of each person: their last sign-in (or switch in from their own DELIOS), when they were
+    /// first put on each project, and their last act on each.
+    /// </summary>
+    internal static async Task<(Dictionary<Guid, Instant> SignIns, Dictionary<(Guid, Guid), Instant> Joined, Dictionary<(Guid, Guid), Instant> Acts)>
+        SeenAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        string[] signIns = ["SIGN_IN", "SIGN_IN_MFA", "SIGN_IN_SSO", "LOGIN", "SWITCHED_IN"];
+        string[] joins = ["MEMBERSHIP_CHANGED", "PERSON_JOINED_PROJECT"];
+        var signedIn = await db.AuditEvents.AsNoTracking().Where(e => e.ActorId != null && signIns.Contains(e.Action))
+            .GroupBy(e => e.ActorId!.Value).Select(g => new { g.Key, At = g.Max(e => e.At) }).ToListAsync(cancellationToken);
+        var joined = await db.AuditEvents.AsNoTracking().Where(e => e.EntityType == "User" && e.EntityId != null && e.ProjectId != null && joins.Contains(e.Action))
+            .GroupBy(e => new { User = e.EntityId!.Value, Project = e.ProjectId!.Value }).Select(g => new { g.Key, At = g.Min(e => e.At) }).ToListAsync(cancellationToken);
+        var acts = await db.AuditEvents.AsNoTracking().Where(e => e.ActorId != null && e.ProjectId != null)
+            .GroupBy(e => new { User = e.ActorId!.Value, Project = e.ProjectId!.Value }).Select(g => new { g.Key, At = g.Max(e => e.At) }).ToListAsync(cancellationToken);
+        return (signedIn.ToDictionary(r => r.Key, r => r.At),
+            joined.ToDictionary(r => (r.Key.User, r.Key.Project), r => r.At),
+            acts.ToDictionary(r => (r.Key.User, r.Key.Project), r => r.At));
     }
 
     /// <summary><c>POST /api/admin/users</c>: a new person. Their email signs them in to this organization alone.</summary>
@@ -782,6 +810,13 @@ public static class DirectoryEndpoints
                 .Where(l => l.HostTenantId == me && l.State == Organizations.LinkStates.Linked && l.AnsweredAt != null)
                 .Select(l => new { l.HostPartyId, l.AnsweredAt }).ToListAsync(cancellationToken))
             .GroupBy(l => l.HostPartyId).ToDictionary(g => g.Key, g => g.Max(l => l.AnsweredAt!.Value).ToDateTimeOffset());
+        // Their people's last act on each project: until when they worked on it.
+        var seen = await SeenAsync(db, cancellationToken);
+        var peopleOf = (await db.Users.AsNoTracking().Where(u => u.PartyId != null).Select(u => new { u.Id, u.PartyId }).ToListAsync(cancellationToken))
+            .GroupBy(u => u.PartyId!.Value).ToDictionary(g => g.Key, g => g.Select(u => u.Id).ToList());
+        DateTimeOffset? LastSeen(Guid partyId, Guid projectId) =>
+            peopleOf.TryGetValue(partyId, out var ids) && ids.Select(id => seen.Acts.TryGetValue((id, projectId), out var at) ? at : (Instant?)null).Max() is { } last
+                ? last.ToDateTimeOffset() : null;
         return Results.Ok(parties.Select(p => new
         {
             p.Id,
@@ -822,6 +857,7 @@ public static class DirectoryEndpoints
                 JoinedAt = r.AddedAt.ToDateTimeOffset(),
                 StartDate = Day(infos.GetValueOrDefault(r.ProjectId), "startDate"),
                 EndDate = Day(infos.GetValueOrDefault(r.ProjectId), "endDate"),
+                LastSeenAt = LastSeen(p.Id, r.ProjectId),
             }),
         }));
     }

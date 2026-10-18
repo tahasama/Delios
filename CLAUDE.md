@@ -465,8 +465,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   form beside an aside (start from a project, the app's own defaults, reset). People (`/organization/people`) and
   Organizations (with those whose projects we work on, and the links refused or ended) are each one list. On
   Organizations a name opens its card under its line, in place (`?open=<id>`, `party-card.tsx`): joined, start, finish
-  (its projects' own dates), and every project it worked on with us (role, contract, joined, start, finish); no people
-  count on the list (owner: pointless).
+  (its projects' own dates), last active, and every project it worked on with us (role, contract, from when it joined
+  until its people's last act there, the project's dates); no people count on the list (owner: pointless). **People**
+  is everyone with an account here (owner): ours, accounts we made for other organizations, and those from their own
+  DELIOS (segmented choice); each line: organization, projects with function, account since, last sign-in, and "May
+  sign in", a switch acting at once (`setSignInAction`, `PUT /api/admin/users/{id}`; a linked account signs in at home).
+  Its name opens its card in place: every project with function, department, from (confirmed, else first put on it)
+  until (last act there; backend `DirectoryEndpoints.SeenAsync`, from the audit trail). No "other organizations'
+  projects" on People. No eyebrow above a plate's title; the Projects plate has its two acts and four figures.
 - The organization's page (`/organization`, administrators): projects ours and joined, people, organizations
   we work with, invitations (also on Home), defaults for new projects. Its projects, people and organizations
   are links (open or switch into a project; People & access; Organizations).

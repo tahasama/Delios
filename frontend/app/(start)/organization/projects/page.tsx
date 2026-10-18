@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { Pencil, X } from "lucide-react";
+import { Pencil, Plus, SlidersHorizontal, X } from "lucide-react";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { DataTable, Th, Td, Field, ToneChip } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -52,6 +52,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     }));
   const open = projects.filter((p) => p.status !== "ARCHIVED").length;
   const archived = projects.length - open;
+  const openIds = new Set(projects.filter((p) => p.status !== "ARCHIVED").map((p) => p.id));
+  const onOpen = users.filter((u) => u.internal && u.active && u.memberships.some((m) => m.active && openIds.has(m.projectId))).length;
   const kinds = await projectKinds();
   const kindLabel = kinds.label;
   const roleLabel = (code: string) => roleOptions.find((r) => r.code === code)?.label ?? code;
@@ -77,25 +79,35 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      {/* The plate: how many projects, and what a project is made of. */}
-      <section className="register register-sheet register-sheet-open">
-        <div className="flex flex-col gap-4 px-5 pt-6 pb-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+      {/* The plate: what a project is here, its two acts, then the figures that matter across them. */}
+      <header className="register register-sheet register-sheet-open">
+        <div className="flex flex-col gap-4 px-5 pt-5 pb-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="min-w-0">
-            <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{scope.organization.name}</p>
-            <h1 className="plate-title mt-1 text-slate-950">Projects</h1>
-            <p className="plate-meta mt-2">
-              {open} open{archived ? <> · {archived} archived</> : null}
-            </p>
-            <p className="mt-1 max-w-xl text-xs leading-5 text-slate-500">
-              Each project keeps its own register, people and settings. Archiving puts it away; nothing is deleted.
+            <h1 className="plate-title text-slate-950">Projects</h1>
+            <p className="plate-meta mt-1.5 max-w-xl font-normal">
+              Each project keeps its own register, people and settings. Archiving puts one away; nothing is deleted.
             </p>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-            <Link href="/organization/defaults" className="ask">Defaults for new projects</Link>
-            {opening ? null : <Link href="/organization/projects?new=1#new" scroll={false} data-on="true" className="ask">New project</Link>}
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Link href="/organization/defaults" className="ask"><SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" /> Defaults for new projects</Link>
+            {opening ? null : <Link href="/organization/projects?new=1#new" scroll={false} data-on="true" className="ask"><Plus className="h-3.5 w-3.5" aria-hidden="true" /> New project</Link>}
           </div>
         </div>
-      </section>
+        <dl className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
+          {[
+            { term: "Open", value: open, said: open === 1 ? "project of ours" : "projects of ours" },
+            { term: "Archived", value: archived, said: archived ? "put away, kept whole" : "none put away" },
+            { term: "People", value: onOpen, said: "of ours on an open project" },
+            { term: "Elsewhere", value: joined.length, said: joined.length === 1 ? "other organization's project we work on" : "other organizations' projects we work on" },
+          ].map((f) => (
+            <div key={f.term} className="bg-surface px-5 py-3 sm:px-6">
+              <dt className="stencil text-slate-500">{f.term}</dt>
+              <dd className="mt-1 text-[13px] font-medium tabular-nums text-slate-900">{f.value}</dd>
+              <dd className="text-[11px] text-slate-500">{f.said}</dd>
+            </div>
+          ))}
+        </dl>
+      </header>
 
       {/* A new project: one sheet, opened from the plate; it becomes the form. */}
       {opening ? (

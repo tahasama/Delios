@@ -15,6 +15,8 @@ type AdminMembership = {
   pendingSince?: string | null; proposedByName?: string | null; confirmerName?: string | null;
   refusedAt?: string | null; refusedByName?: string | null; refusedReason?: string | null;
   confirmedAt?: string | null; confirmedByName?: string | null;
+  /** On the project since (confirmed, else first put on it); their last act on it. */
+  since?: string; lastSeenAt?: string | null;
 };
 
 type AdminUser = {
@@ -23,6 +25,8 @@ type AdminUser = {
   /** Works here from its own organization's DELIOS: signs in at home; name and email are theirs. */
   linked?: boolean;
   mfa: boolean; lockedUntil: string | null; createdAt: string; memberships: AdminMembership[];
+  /** Their function in their own organization (a linked account), and their last sign-in. */
+  homeFunction?: string | null; lastSignInAt?: string | null;
 };
 
 type AdminProject = {
@@ -60,6 +64,8 @@ type AdminParty = {
   projects?: {
     id: string; code: string; name: string; status: string; role: string | null; active: boolean; contractNumber: string | null;
     joinedAt: string; startDate: string | null; endDate: string | null;
+    /** Their people's last act on it: until when they worked on it. */
+    lastSeenAt?: string | null;
   }[];
   /**
    * What was changed once and is fixed now: its code and name (one of each across DELIOS), how it works with us; and

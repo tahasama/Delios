@@ -323,3 +323,12 @@ export async function resetProjectAction(_prev: Result | undefined, formData: Fo
   for (const page of card.pages) revalidatePath(page);
   return { ok: `It uses the organization's ${card.words} again.` };
 }
+
+/** An administrator lets someone sign in again, or stops them: their account stops on every project; nothing is deleted. */
+export async function setSignInAction(formData: FormData): Promise<void> {
+  const userId = text(formData, "userId");
+  const active = text(formData, "active") === "on";
+  await api(`/api/admin/users/${userId}`, { method: "PUT", body: { active } });
+  revalidatePath("/organization", "layout");
+  revalidatePath("/settings/users");
+}
