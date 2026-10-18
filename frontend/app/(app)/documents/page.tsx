@@ -9,7 +9,8 @@ import type { ActivitySummary, RegisterPage } from "@/lib/types";
 import { RegisterPlate } from "./register-plate";
 import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState } from "@/lib/core/standard";
 import { getSet } from "@/lib/settings/config";
-import { DocumentRegister } from "./document-register";
+import { DocumentRegister, REGISTER_FILTERS_COOKIE, REGISTER_FILTERS_DEFAULT } from "./document-register";
+import { cookies } from "next/headers";
 import { activityDetail, scheduleSource } from "@/lib/actions/api";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { controlDoes } from "@/lib/settings/control-activities";
@@ -131,6 +132,24 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       // The questions this reader keeps, oldest first so the list stays put.
       api<{ id: string; name: string; query: string; createdAt: string }[]>(projectPath(scope, "/register/views")).catch(() => []),
     ]);
+  // Each list's sets, so a filter offers every set's values under the set's name and whom it serves (owner).
+  const listSets = new Map(((await api<{ lists: { key: string; sets: { id: string | null; name: string; isDefault: boolean; deliverableTypes: string[] }[] }[] }>(projectPath(scope, "/lists"))
+    .catch(() => ({ lists: [] }))).lists).map((l) => [l.key, l.sets]));
+  const typeName = (code: string) => deliverableTypes.find((d) => d.code === code)?.label ?? code;
+  const inSets = <T extends { code: string; setId?: string | null }>(key: string, rows: T[], label: (row: T) => string) => {
+    const sets = listSets.get(key) ?? [];
+    const defaultId = sets.find((one) => one.isDefault)?.id ?? null;
+    return rows.map((row) => {
+      const set = sets.length > 1 ? sets.find((one) => one.id === (row.setId ?? defaultId)) : null;
+      return {
+        code: row.code, label: label(row),
+        ...(set ? { group: `${set.name} · ${set.deliverableTypes.length ? `for ${set.deliverableTypes.map(typeName).join(", ")}` : set.isDefault ? "for the other types" : "for no type yet"}` } : {}),
+      };
+    });
+  };
+  // The filters this person keeps shown (the Filters menu), else the usual ones.
+  const keptFilters = (await cookies()).get(REGISTER_FILTERS_COOKIE)?.value;
+  const shownFilters = keptFilters !== undefined ? decodeURIComponent(keptFilters).split(",").filter(Boolean) : REGISTER_FILTERS_DEFAULT;
   const actionCodes = activities.filter((a) => a.needs > 0).sort((a, b) => a.code.localeCompare(b.code)).map((a) => ({ code: a.code, name: a.name }));
   const matchCount = register.total;
   const pages = Math.max(1, register.pages);
@@ -306,6 +325,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       sort={{ key: sort, dir }}
       picking={picking}
       mayAddToAction={scope.can("CONTROL")}
+      shownFilters={shownFilters}
       userCanAct={!isReadOnly(user)} filters={{ pick: pickKey, q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
       { code: "NONE", label: "No revision yet" },
       { code: "IN_PREPARATION", label: names.IN_PREPARATION },
@@ -315,7 +335,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       { code: "RELEASED", label: together ? names.RELEASED_ISSUED : names.RELEASED },
       { code: "SUPERSEDED", label: names.SUPERSEDED },
       { code: "VOID", label: names.VOID },
-    ], statuses: statuses.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), verdicts: verdictSet.map((item) => ({ code: item.code, label: `${item.code} — ${item.label}` })), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: poCodes.map((item) => ({ code: item.code, label: item.label })), disciplines: disciplines.filter((item) => usedDisciplines.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), types: types.filter((item) => usedTypes.has(item.code)).map((item) => ({ code: item.code, label: item.status === "RETIRED" ? `${item.label} (retired)` : item.label })), criticalities: criticalities.map((item) => ({ code: item.code, label: item.label })), deliverables: deliverableTypes.map((item) => ({ code: item.code, label: item.label })), confidentialities: confidentialities.map((item) => ({ code: item.code, label: item.label.split(" — ")[0] })), phases: phases.map((item) => ({ code: item.code, label: item.label })), actions: actionCodes.map((item) => ({ code: item.code, label: `${item.code} — ${item.name}` })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
+    ], statuses: inSets("STATUSES", statuses, (item) => `${item.code} — ${item.label}`), verdicts: inSets("REVIEW_OUTCOMES", verdictSet, (item) => `${item.code} — ${item.label}`), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: inSets("PURCHASE_ORDERS", poCodes, (item) => item.label), disciplines: inSets("DISCIPLINES", disciplines.filter((item) => usedDisciplines.has(item.code)), (item) => item.status === "RETIRED" ? `${item.label} (retired)` : item.label), types: inSets("DOCUMENT_TYPES", types.filter((item) => usedTypes.has(item.code)), (item) => item.status === "RETIRED" ? `${item.label} (retired)` : item.label), criticalities: inSets("CRITICALITY", criticalities, (item) => item.label), deliverables: deliverableTypes.map((item) => ({ code: item.code, label: item.label })), confidentialities: inSets("CONFIDENTIALITY", confidentialities, (item) => item.label.split(" — ")[0]), phases: inSets("PHASES", phases, (item) => item.label), actions: actionCodes.map((item) => ({ code: item.code, label: `${item.code} — ${item.name}` })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
   </div>;
 }
 

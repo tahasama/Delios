@@ -530,6 +530,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`GET /api/values/serving`, `lib/settings/serving.ts` `forType`); the backend refuses any other (VALUE_NOT_FOR_TYPE,
   `Catalog.IsOfferedFor`), and its defaults (confidentiality, retention) come from that set too. Values already carried
   are still read by their names.
+- **Filters follow the sets** (owner): a register filter on a list offers every value of every set, under each set's
+  name and whom it serves (`<optgroup>`, `inSets` in `documents/page.tsx`). Which filters show is the person's
+  choice ("Filters" menu, `REGISTER_FILTERS`, cookie `edms_register_filters` the server reads); a filter holding a
+  value always shows. "More filters / Less filters" is gone (the menu does it for any filter).
 - A refused form keeps everything written (`ActionForm` gives it back after React empties it), to put right and send again.
 - Types & sets: the menu card is as tall as the window under the top bar (`set-nav.tsx`): the title scrolls
   away, then only its table and its list of lists scroll.
