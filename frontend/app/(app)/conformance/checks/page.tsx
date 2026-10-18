@@ -1,20 +1,18 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin, isController } from "@/lib/core/auth";
-import { PageHeader, Card, inputCls } from "@/components/ui";
+import { Card, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { FAMILY_TITLES, PHASE_LABEL, PHASE_BLURB, CATALOG, CHECK_BY_ID, type Phase, type CheckDef } from "@/lib/conformance/checks/catalog";
 import { latestResults } from "@/lib/conformance/checks/engine";
 import { optOutsOf, scopeOf } from "@/lib/conformance/api";
 import { HowMeasured } from "@/app/(app)/conformance/measure";
-import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
+import { AssuranceHead } from "@/app/(app)/conformance/head";
 import { retireCheckAction, restoreCheckAction } from "@/lib/conformance/forms";
 import { OWNER_LABEL } from "@/lib/core/problems";
 import { OneKind } from "@/app/(app)/conformance/one-kind";
 import { CheckFilters } from "./check-filters";
 import { fmtDate } from "@/lib/core/utils";
-import { AssuranceFigure } from "@/app/(app)/conformance/figure";
-import { RunChecksButton } from "@/app/(app)/conformance/run-button";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "What is checked" };
@@ -122,14 +120,10 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Assurance"
-        subtitle={`What the register is checked against, and how it stands. ${narrowed ? `${shown.length} of ${CATALOG.length} checks shown.` : `All ${CATALOG.length} are questions the application answers from the records it holds.`}`}
-        actions={controller ? <RunChecksButton /> : undefined}
-      >
-        <AssuranceFigure />
-      </PageHeader>
-      <AssuranceTabs current="/conformance/checks" />
+      <AssuranceHead
+        current="/conformance/checks"
+        lead={`What the register is checked against, and how it stands: ${CATALOG.length} questions the application answers from the records it holds.`}
+      />
       <HowMeasured scope={scope} mayChange={controller} />
 
       <CheckFilters

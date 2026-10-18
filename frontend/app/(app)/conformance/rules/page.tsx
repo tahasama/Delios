@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
-import { PageHeader, DataTable, Th, Td } from "@/components/ui";
-import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
+import { DataTable, Th, Td } from "@/components/ui";
+import { AssuranceHead } from "@/app/(app)/conformance/head";
 import { PREVENTED } from "@/lib/conformance/checks/prevented";
 import { CATALOG } from "@/lib/conformance/checks/catalog";
 import { POLICIES, SKIPPABLE, SKIP_KEY, CONTROL_ACTIVITIES, policy } from "@/lib/settings/control-activities";
@@ -51,11 +51,10 @@ export default async function DefaultRulesPage({ searchParams }: { searchParams:
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Default rules"
-        subtitle={`What the application refuses outright, and what this project has settled where there was a choice. None of it is among the ${CATALOG.length} checks: there is nothing to find, because the act that would create the condition does not complete.`}
+      <AssuranceHead
+        current="/conformance/rules"
+        lead={`What the application refuses outright, and what this project has settled where there was a choice. None of it is among the ${CATALOG.length} checks: the act that would create the condition does not complete.`}
       />
-      <AssuranceTabs current="/conformance/rules" />
 
       <div className="space-y-4">
         <section className="register register-sheet register-sheet-open">

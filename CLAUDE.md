@@ -666,6 +666,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   how fine the matrix is cut. A setting the app does not apply is never stated (the families' outside stamp is not).
   **Plan v1** (owner: "I like it; if the next one doesn't work we fall back to it") is commit `ef95589`
   (`frontend/app/(app)/conformance/plan/`, `backend/app/Checks/PlanEndpoints.cs`): restore those files from it.
+- **Assurance tabs share one top** (owner: tabs must not jump): `conformance/head.tsx` (`AssuranceHead`): the same plate
+  "Assurance", its figure, its acts (Print where the tab prints, Run the checks), the tabs on the same line, then one
+  line saying what the tab is; a click changes only what is under them.
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
 - **Two levels of settings** (owner): the organization's (`/organization`, its portal) and the project's (Settings).
   Every project, opening one, archiving and reopening are the organization's: **Projects** (`/organization/projects`,

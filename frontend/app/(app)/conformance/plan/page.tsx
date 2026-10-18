@@ -1,7 +1,5 @@
 import { requireScope } from "@/lib/core/scope";
-import { PageHeader } from "@/components/ui";
-import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
-import { PrintButton } from "@/app/(app)/conformance/statement/print-button";
+import { AssuranceHead } from "@/app/(app)/conformance/head";
 import { DocumentManagementPlan, CHAPTERS } from "./plan";
 
 export const dynamic = "force-dynamic";
@@ -15,14 +13,11 @@ export default async function PlanPage() {
   await requireScope();
   return (
     <div className="space-y-4">
-      <div className="no-print">
-        <PageHeader
-          title="The plan"
-          subtitle="How documents are controlled on this project: how each thing is done, why, by whom, where and when. Written from how the project is set up, so it is always true."
-          actions={<PrintButton />}
-        />
-        <AssuranceTabs current="/conformance/plan" />
-      </div>
+      <AssuranceHead
+        current="/conformance/plan"
+        lead="How documents are controlled on this project: how each thing is done, why, by whom, where and when. Written from how the project is set up, so it is always true."
+        print
+      />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
         <DocumentManagementPlan />
         <aside className="no-print hidden xl:block">

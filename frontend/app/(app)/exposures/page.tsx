@@ -2,14 +2,14 @@ import Link from "next/link";
 import { unresolvedVoids } from "@/lib/documents/api-readers";
 import { requireScope } from "@/lib/core/scope";
 import { isController, isAdmin } from "@/lib/core/auth";
-import { PageHeader, Card, Chip, Banner, btn } from "@/components/ui";
+import { Card, Banner, btn } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { EXPOSURES } from "@/lib/core/standard";
 import { recordVoidReassessmentAction } from "@/lib/documents/forms-revisions";
 import { untoldRecipients, sendCurrentLink } from "@/lib/documents/supersession";
 import { haltedRevisions } from "@/lib/reviews/halted";
 import { orphanedNeeds } from "@/lib/conformance/exposure-counts";
-import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
+import { AssuranceHead } from "@/app/(app)/conformance/head";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Exposures" };
@@ -35,12 +35,11 @@ export default async function ExposuresPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Out-of-date risks"
-        subtitle="Replaced or withdrawn information that may still be in use, and who must act."
-        actions={<Chip className={total > 0 ? "bg-amber-100 text-amber-800 ring-amber-300" : "bg-emerald-100 text-emerald-800 ring-emerald-300"}>{total} open</Chip>}
+      <AssuranceHead
+        current="/conformance/checks"
+        internal={user.isInternal}
+        lead={`Replaced or withdrawn information that may still be in use, and who must act: ${total} open.`}
       />
-      <AssuranceTabs current="/conformance/checks" internal={user.isInternal} />
 
       {total === 0 ? <Banner tone="good" title="No exposures">Nobody holds a replaced revision without knowing, no work is blocked, and nothing withdrawn or voided is still relied on.</Banner> : null}
 

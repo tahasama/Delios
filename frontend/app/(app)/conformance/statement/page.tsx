@@ -1,8 +1,6 @@
 import { requireScope } from "@/lib/core/scope";
-import { PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
-import { PrintButton } from "./print-button";
-import { AssuranceTabs } from "@/app/(app)/conformance/tabs";
+import { AssuranceHead } from "@/app/(app)/conformance/head";
 import { CATALOG, CHECK_BY_ID, PHASE_LABEL, type Phase } from "@/lib/conformance/checks/catalog";
 import { PREVENTED } from "@/lib/conformance/checks/prevented";
 import { checksOf, documentCount, flawedDocuments, liveDefects, optOutsOf, scopeOf } from "@/lib/conformance/api";
@@ -66,17 +64,14 @@ export default async function ConformancePage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div className="no-print">
-        <PageHeader
-          title="Conformance"
-          subtitle="One page for somebody outside the project: what the register is checked against, what was found, and what is still open. Read from the last run — nothing on it is typed."
-          actions={<PrintButton />}
-        />
-        <AssuranceTabs current="/conformance/statement" />
-      </div>
+    <div className="space-y-4">
+      <AssuranceHead
+        current="/conformance/statement"
+        lead="One page for somebody outside the project: what the register is checked against, what was found, and what is still open. Read from the last run; nothing on it is typed."
+        print
+      />
 
-      <article className="print-sheet register register-sheet px-8 py-8 print:border-0 print:p-0 print:shadow-none">
+      <article className="mx-auto max-w-3xl print-sheet register register-sheet px-8 py-8 print:border-0 print:p-0 print:shadow-none">
         <header className="border-b border-line pb-4 text-center">
           <p className="stencil text-slate-400">Statement of conformance</p>
           <h1 className="mt-2 text-xl font-semibold text-slate-900">{scope?.organizationName ?? "—"}</h1>
