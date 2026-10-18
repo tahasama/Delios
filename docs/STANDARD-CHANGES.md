@@ -1237,6 +1237,37 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
   changes, where free. Opening a project and adding an organization are the organization's acts: their forms are
   always the organization's.
 
+## 65 · A numbering scheme that gave numbers keeps its shape
+
+- **The Standard treats the numbering scheme as something that can be redesigned.** In practice, once a scheme has given
+  one number, that number is on documents, transmittals and drawings outside the system: its parts and delimiter stay
+  as they are. It can be renamed, given a note, or retired; nothing else.
+- **To number differently**: make a new scheme, choose it for what it should number, then retire the old one once it
+  numbers nothing. Numbers already given keep their shape for good.
+- **Until its first number, a scheme is entirely free**: a new organization changes every default it was given, parts,
+  order and delimiter, and deletes what it does not want.
+- **Turning a scheme off for a deliverable type stops registering that type** until a scheme is chosen again; records
+  (transmittals, reviews, packages, actions, tags) fall back to a short form instead.
+
+## 66 · Organizations link by themselves once proven, never on their word
+
+- **The Standard assumes every party is on the same system.** In practice another organization works with us in one
+  of three ways: from its own DELIOS, through accounts we make for it, or not on DELIOS at all (one of ours records for
+  it). Nobody is forced to register.
+- **When an organization we recorded joins DELIOS and proves it is the one recorded** (its guest's email link, the
+  word of whoever recorded it, an agreed merge, or a guest making their own DELIOS with the account made for them),
+  every organization that recorded it is linked with it at once, and the accounts made for its people move to it:
+  same sign-in, now from home, everything they did kept. Nobody is invited or asked; the host's administrators are told.
+
+## 67 · How the project works, on two levels
+
+- **The Control room's answers** (who carries each act out, how releasing, stamping, readiness and the matrix work, the
+  risk window, escalation) follow the same two levels: where the organization keeps an answer fixed, a project reads it
+  and cannot change it; where free, the project chooses. A project keeps the answers it already held when an answer is
+  made fixed later.
+- **Functions and what they may do are the organization's**, the same on every project, for now: a project's own
+  version is built only when a project needs it.
+
 ## Still open — decided in conversation, not yet built
 
 - **Every transmittal and every notification also goes by email**, showing what
