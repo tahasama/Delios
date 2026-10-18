@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/core/scope";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";
 import { api, forgetShortLived, projectPath, refusal } from "@/lib/client";
-import { adminNumbering, adminUsers, backendField, RECORD_KIND } from "@/lib/settings/api-admin";
+import { adminUsers } from "@/lib/settings/api-admin";
 
 /**
  * The organization's directory and lists. The backend keeps them, checks who
@@ -97,63 +97,6 @@ export async function removeAssetAction(_prev: (Result & { ok?: string }) | unde
   }
   revalidatePath("/assets");
   return { ok: "Removed from the list." };
-}
-
-/** Create or revise an organization numbering scheme and its ordered fields. */
-export async function saveNumberingSchemeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  await requireScope();
-  const id = text(formData, "id");
-  const name = text(formData, "name");
-  const delimiter = text(formData, "delimiter") || "-";
-  const labels = formData.getAll("fieldLabel").map((value) => String(value).trim());
-  const setKeys = formData.getAll("fieldSetKey").map((value) => String(value).trim());
-  const rules = formData.getAll("fieldRule").map((value) => String(value).trim());
-  if (!name) return { error: "Give the scheme a name." };
-  if (delimiter.length !== 1 || /[A-Za-z0-9]/.test(delimiter)) return { error: "The delimiter must be one non-alphanumeric character." };
-  if (!labels.length || labels.some((label) => !label)) return { error: "Every numbering field needs a label." };
-  if (!rules.some((rule) => rule.startsWith("COUNTER:"))) return { error: "Add one sequence counter field so numbers remain unique." };
-  if (rules.filter((rule) => rule.startsWith("COUNTER:")).length > 1) return { error: "Use one sequence counter per scheme." };
-  const existing = (await adminNumbering()).schemes;
-  if (existing.some((one) => one.name === name && one.id !== id)) return { error: "A scheme with this name already exists." };
-  const fields = labels.map((label, index) => backendField(label, setKeys[index] ?? "", rules[index] ?? ""));
-  try {
-    if (id) await api(`/api/admin/numbering/schemes/${id}`, { method: "PUT", body: { name, delimiter, fields } });
-    else await api("/api/admin/numbering/schemes", { body: { name, delimiter, fields } });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/numbering");
-  return { ok: `Published ${name}.` };
-}
-
-export async function saveSchemeRoutingAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  await requireScope();
-  const deliverableType = text(formData, "deliverableType");
-  const schemeName = text(formData, "schemeName");
-  // Rows edited in place send "status"; a new routing is always active.
-  const active = formData.has("status") ? formData.get("active") === "on" : true;
-  if (!deliverableType || !schemeName) return { error: "Choose a deliverable type and a scheme." };
-  const scheme = (await adminNumbering()).schemes.find((one) => one.name === schemeName);
-  if (!scheme || !scheme.active) return { error: "That numbering scheme is not active." };
-  try {
-    await api("/api/admin/numbering/routing", {
-      method: "PUT", body: { deliverableType: RECORD_KIND[deliverableType] ?? deliverableType, schemeId: active ? scheme.id : null },
-    });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/settings/numbering");
-  return { ok: active ? `${deliverableType} now uses ${schemeName}.` : `Numbering for ${deliverableType} switched off — no new numbers of this type.` };
-}
-
-/** A scheme nothing routes to is taken out of use; numbers it gave keep it. */
-export async function removeNumberingSchemeAction(formData: FormData) {
-  await requireScope();
-  const id = text(formData, "id");
-  const numbering = await adminNumbering();
-  if (numbering.routing.some((r) => r.schemeId === id && r.active)) return;
-  await api(`/api/admin/numbering/schemes/${id}`, { method: "PUT", body: { active: false } }).catch(() => undefined);
-  revalidatePath("/settings/numbering");
 }
 
 /**

@@ -92,9 +92,22 @@ public sealed class NumberingScheme
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
+    /// <summary>
+    /// Empty: the organization's, the numbering of every project. Set: one project's own copy, made when numbering is
+    /// free for projects (<see cref="Settings.Liberty"/>) and the project changed it.
+    /// </summary>
+    public Guid? ProjectId { get; set; }
     public required string Name { get; set; }
     public string Delimiter { get; set; } = "-";
+    /// <summary>False: retired, numbers nothing more; the numbers it gave keep it.</summary>
     public bool Active { get; set; } = true;
+    /// <summary>When it is used, in plain words.</summary>
+    public string? Notes { get; set; }
+    /// <summary>
+    /// It gave a number at least once: from then on its parts and delimiter stay as they are (renamed or retired only),
+    /// so every number it gave keeps meaning what it says.
+    /// </summary>
+    public bool Used { get; set; }
     /// <summary>The parts of the number, in order. Stored as JSON inside the scheme's row.</summary>
     public List<SchemeField> Fields { get; set; } = [];
 }
@@ -146,6 +159,8 @@ public sealed class SchemeRouting
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
+    /// <summary>Empty: the organization's; set: one project's own copy (see <see cref="NumberingScheme.ProjectId"/>).</summary>
+    public Guid? ProjectId { get; set; }
     public required string DeliverableType { get; set; }
     public Guid SchemeId { get; set; }
     public NumberingScheme? Scheme { get; set; }

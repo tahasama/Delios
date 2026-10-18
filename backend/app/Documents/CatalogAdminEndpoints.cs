@@ -17,7 +17,7 @@ public sealed record ValueRequest(string? SetKey, string? Code, string? Label = 
     JsonElement? Props = null);
 
 /// <summary>Body of creating or changing a numbering scheme: its fields in order, joined by the delimiter.</summary>
-public sealed record SchemeRequest(string? Name, string? Delimiter = null, bool? Active = null, SchemeField[]? Fields = null);
+public sealed record SchemeRequest(string? Name, string? Delimiter = null, bool? Active = null, SchemeField[]? Fields = null, string? Notes = null);
 
 /// <summary>Body of routing a deliverable type (or a record kind such as @TRANSMITTAL) to a numbering scheme. No scheme: unrouted.</summary>
 public sealed record SchemeRoutingRequest(string? DeliverableType, Guid? SchemeId);
@@ -48,10 +48,7 @@ public static class CatalogAdminEndpoints
         var keepers = app.MapGroup("/api/admin").WithTags("Administration")
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter(Keepers.Filter);
-        keepers.MapGet("/numbering", NumberingAsync);
-        keepers.MapPost("/numbering/schemes", CreateSchemeAsync);
-        keepers.MapPut("/numbering/schemes/{schemeId:guid}", UpdateSchemeAsync);
-        keepers.MapPut("/numbering/routing", RouteSchemeAsync);
+        // Numbering: NumberingLevels (the organization's and a project's).
         keepers.MapGet("/routes", RoutesAsync);
         keepers.MapPost("/routes", CreateRouteAsync);
         keepers.MapPut("/routes/{routeId:guid}", UpdateRouteAsync);
@@ -120,117 +117,6 @@ public static class CatalogAdminEndpoints
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "VALUE_CHANGED", "Value", value.Id, $"{set}/{code}",
             string.Join("; ", changes), cancellationToken: cancellationToken);
-        return Results.NoContent();
-    }
-
-    // ── Numbering ───────────────────────────────────────────────────────────
-
-    /// <summary><c>GET /api/admin/numbering</c>: the numbering schemes, which scheme numbers what, and the revision schemes.</summary>
-    private static async Task<IResult> NumberingAsync(DeliosDbContext db, CancellationToken cancellationToken)
-    {
-        var schemes = await db.NumberingSchemes.AsNoTracking().OrderBy(s => s.Name).ToListAsync(cancellationToken);
-        var routing = await db.SchemeRoutings.AsNoTracking().OrderBy(r => r.DeliverableType).ToListAsync(cancellationToken);
-        var revisions = await db.RevisionSchemes.AsNoTracking().OrderBy(s => s.Name).ToListAsync(cancellationToken);
-        var revisionRouting = await db.RevisionSchemeRoutings.AsNoTracking().ToListAsync(cancellationToken);
-        return Results.Ok(new
-        {
-            Schemes = schemes.Select(s => new { s.Id, s.Name, s.Delimiter, s.Active, s.Fields }),
-            Routing = routing.Select(r => new { r.Id, r.DeliverableType, r.SchemeId, r.Active }),
-            RevisionSchemes = revisions.Select(s => new { s.Id, s.Name, s.IsDefault, s.ForwardOnly, s.Series }),
-            RevisionRouting = revisionRouting.Select(r => new { r.DeliverableType, r.SchemeId }),
-        });
-    }
-
-    private static IResult? CheckFields(SchemeField[] fields)
-    {
-        if (fields.Length == 0) return Problems.Invalid("FIELDS_REQUIRED", "A number is built from at least one field.");
-        string[] sources = [FieldSources.Project, FieldSources.Subproject, FieldSources.Originator, FieldSources.ContractRef, FieldSources.Discipline,
-            FieldSources.DocType, FieldSources.Sequence, FieldSources.Fixed, FieldSources.Sender, FieldSources.Receiver];
-        if (fields.FirstOrDefault(f => !sources.Contains(f.Source)
-                && !(f.Source.StartsWith(FieldSources.ListPrefix, StringComparison.Ordinal) && f.Source.Length > FieldSources.ListPrefix.Length)) is { } bad)
-            return Problems.Invalid("FIELD_SOURCE_UNKNOWN", $"{bad.Source} is not something a number can be built from.", new { source = bad.Source });
-        if (fields.Count(f => f.Source == FieldSources.Sequence) != 1)
-            return Problems.Invalid("SEQUENCE_REQUIRED", "A number has exactly one sequence, so no two documents share it.");
-        if (fields.Any(f => f.Source == FieldSources.Fixed && string.IsNullOrWhiteSpace(f.Value)))
-            return Problems.Invalid("FIXED_VALUE_REQUIRED", "A fixed field says the text it always holds.");
-        return null;
-    }
-
-    /// <summary><c>POST /api/admin/numbering/schemes</c>: a new numbering scheme.</summary>
-    private static async Task<IResult> CreateSchemeAsync(
-        SchemeRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
-    {
-        var name = Blank(request.Name);
-        if (name is null) return Problems.Invalid("NAME_REQUIRED", "A scheme has a name.");
-        var fields = request.Fields ?? [];
-        if (CheckFields(fields) is { } problem) return problem;
-        var scheme = new NumberingScheme
-        {
-            TenantId = http.User.TenantId(),
-            Name = name,
-            Delimiter = request.Delimiter ?? "-",
-            Active = request.Active ?? true,
-            Fields = fields.ToList(),
-        };
-        db.NumberingSchemes.Add(scheme);
-        await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "NUMBERING_SCHEME_CREATED", "NumberingScheme", scheme.Id, name,
-            string.Join(scheme.Delimiter, fields.Select(f => f.Label)), cancellationToken: cancellationToken);
-        return Results.Created($"/api/admin/numbering/schemes/{scheme.Id}", new { scheme.Id });
-    }
-
-    /// <summary>
-    /// <c>PUT /api/admin/numbering/schemes/{id}</c>: changes a scheme. Numbers already given are kept as they are; the
-    /// change applies to the next number.
-    /// </summary>
-    private static async Task<IResult> UpdateSchemeAsync(
-        Guid schemeId, SchemeRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
-    {
-        var scheme = await db.NumberingSchemes.SingleOrDefaultAsync(s => s.Id == schemeId, cancellationToken);
-        if (scheme is null) return Problems.NotFound("SCHEME_NOT_FOUND", "No such numbering scheme.");
-        var changes = new List<string>();
-        if (Blank(request.Name) is { } name && name != scheme.Name) { changes.Add($"name → {name}"); scheme.Name = name; }
-        if (request.Delimiter is { } delimiter && delimiter != scheme.Delimiter) { changes.Add($"delimiter → '{delimiter}'"); scheme.Delimiter = delimiter; }
-        if (request.Active is { } active && active != scheme.Active) { changes.Add(active ? "in use" : "out of use"); scheme.Active = active; }
-        if (request.Fields is { } fields)
-        {
-            if (CheckFields(fields) is { } problem) return problem;
-            scheme.Fields = fields.ToList();
-            changes.Add($"fields → {string.Join(scheme.Delimiter, fields.Select(f => f.Label))}");
-        }
-        if (changes.Count == 0) return Results.NoContent();
-        await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "NUMBERING_SCHEME_UPDATED", "NumberingScheme", scheme.Id, scheme.Name,
-            string.Join("; ", changes), cancellationToken: cancellationToken);
-        return Results.NoContent();
-    }
-
-    /// <summary><c>PUT /api/admin/numbering/routing</c>: which scheme numbers a deliverable type or a record kind.</summary>
-    private static async Task<IResult> RouteSchemeAsync(
-        SchemeRoutingRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
-    {
-        var type = Blank(request.DeliverableType);
-        if (type is null) return Problems.Invalid("DELIVERABLE_TYPE_REQUIRED", "Say what the scheme numbers.");
-        if (request.SchemeId is { } id && !await db.NumberingSchemes.AnyAsync(s => s.Id == id, cancellationToken))
-            return Problems.Invalid("SCHEME_NOT_FOUND", "No such numbering scheme.");
-        var routing = await db.SchemeRoutings.SingleOrDefaultAsync(r => r.DeliverableType == type, cancellationToken);
-        if (request.SchemeId is null)
-        {
-            if (routing is null) return Results.NoContent();
-            routing.Active = false;
-        }
-        else if (routing is null)
-        {
-            db.SchemeRoutings.Add(new SchemeRouting { TenantId = http.User.TenantId(), DeliverableType = type, SchemeId = request.SchemeId.Value });
-        }
-        else
-        {
-            routing.SchemeId = request.SchemeId.Value;
-            routing.Active = true;
-        }
-        await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "NUMBERING_ROUTED", "SchemeRouting", null, type,
-            request.SchemeId is null ? "unrouted" : $"scheme {request.SchemeId}", cancellationToken: cancellationToken);
         return Results.NoContent();
     }
 

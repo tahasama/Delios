@@ -44,8 +44,11 @@ public sealed class Numbering(DeliosDbContext db)
     public async Task<Allocation> AllocateAsync(
         Guid tenantId, Guid projectId, string deliverableType, NumberFields fields, CancellationToken cancellationToken)
     {
-        var (scheme, parts, refusal) = await PrefixAsync(deliverableType, fields, cancellationToken);
+        var (scheme, parts, refusal) = await PrefixAsync(projectId, deliverableType, fields, cancellationToken);
         if (refusal is not null) return refusal;
+        // From its first number on, a scheme's parts stay as they are (NumberingLevels: SCHEME_IN_USE).
+        if (!scheme!.Used)
+            await db.NumberingSchemes.Where(s => s.Id == scheme.Id && !s.Used).ExecuteUpdateAsync(u => u.SetProperty(s => s.Used, true), cancellationToken);
 
         var prefix = string.Join(scheme!.Delimiter, parts);
         var digits = scheme.Fields.Single(f => f.Source == FieldSources.Sequence).Digits ?? 5;
@@ -64,15 +67,19 @@ public sealed class Numbering(DeliosDbContext db)
     /// Whether a number could be built for these fields, without reserving one: null when it could, else the reason
     /// (no scheme, or a field the scheme is built from left empty). What a check before registering asks.
     /// </summary>
-    public async Task<Allocation?> RefusalAsync(string deliverableType, NumberFields fields, CancellationToken cancellationToken) =>
-        (await PrefixAsync(deliverableType, fields, cancellationToken)).Refusal;
+    public async Task<Allocation?> RefusalAsync(Guid projectId, string deliverableType, NumberFields fields, CancellationToken cancellationToken) =>
+        (await PrefixAsync(projectId, deliverableType, fields, cancellationToken)).Refusal;
 
-    /// <summary>The scheme routed to the deliverable type and the parts of the number before its sequence.</summary>
+    /// <summary>
+    /// The scheme routed to the deliverable type, in the numbering the project uses (its own copy, else the organization's),
+    /// and the parts of the number before its sequence.
+    /// </summary>
     private async Task<(NumberingScheme? Scheme, List<string> Parts, Allocation? Refusal)> PrefixAsync(
-        string deliverableType, NumberFields fields, CancellationToken cancellationToken)
+        Guid projectId, string deliverableType, NumberFields fields, CancellationToken cancellationToken)
     {
+        var scope = await NumberingLevels.ScopeAsync(db, projectId, cancellationToken);
         var scheme = await db.SchemeRoutings.AsNoTracking()
-            .Where(r => r.DeliverableType == deliverableType && r.Active && r.Scheme!.Active)
+            .Where(r => r.ProjectId == scope && r.DeliverableType == deliverableType && r.Active && r.Scheme!.Active)
             .Select(r => r.Scheme)
             .SingleOrDefaultAsync(cancellationToken);
         var parts = new List<string>();

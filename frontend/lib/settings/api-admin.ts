@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
-import { api } from "@/lib/client";
+import { api, projectPath } from "@/lib/client";
+import { requireScope } from "@/lib/core/scope";
 
 /**
  * The organization's directory and published rules, as administrators keep
@@ -70,7 +71,7 @@ type AdminParty = {
 type SchemeField = { label: string; source: string; value: string | null; digits: number | null };
 
 type AdminNumbering = {
-  schemes: { id: string; name: string; delimiter: string; active: boolean; fields: SchemeField[] }[];
+  schemes: { id: string; name: string; delimiter: string; active: boolean; notes: string | null; used: boolean; fields: SchemeField[] }[];
   routing: { id: string; deliverableType: string; schemeId: string; active: boolean }[];
   revisionSchemes: { id: string; name: string; isDefault: boolean; forwardOnly: boolean; series: RevisionSeries[] }[];
   revisionRouting: { deliverableType: string; schemeId: string }[];
@@ -109,6 +110,15 @@ export type RevisionSeries = {
 };
 
 export const adminNumbering = cache(async () => api<AdminNumbering>("/api/admin/numbering"));
+/**
+ * The numbering a project uses (its own copy, else the organization's), whether numbering is free for projects
+ * (What projects may change), and whether the person may change it here.
+ */
+type ProjectNumbering = Pick<AdminNumbering, "schemes" | "routing"> & { own: boolean; free: boolean; mayChange: boolean; mayChangeOrganization: boolean };
+export const projectNumbering = cache(async () => {
+  const ctx = await requireScope();
+  return api<ProjectNumbering>(projectPath(ctx, "/numbering"));
+});
 export const adminRoutes = cache(async () => api<AdminRoute[]>("/api/admin/routes"));
 export const adminValueSets = cache(async () => api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets"));
 
@@ -141,7 +151,7 @@ const SET_BY_SOURCE = Object.fromEntries(Object.entries(SOURCE_BY_SET).map(([set
 export const RECORD_KIND: Record<string, string> = { TRANSMITTAL: "@TRANSMITTAL", REVIEW: "@REVIEW", PACKAGE: "@PACKAGE", ASSET: "@ASSET", ACTION: "@ACTION" };
 
 type EditorScheme = {
-  id: string; name: string; delimiter: string; active: boolean; notes: string | null;
+  id: string; name: string; delimiter: string; active: boolean; notes: string | null; used: boolean;
   fields: { id: string; position: number; label: string; valueSetKey: string | null; rule: string | null }[];
 };
 
@@ -166,18 +176,24 @@ export function backendField(label: string, valueSetKey: string, rule: string): 
   return { label, source: SOURCE_BY_SET[valueSetKey] ?? `LIST:${valueSetKey}`, value: null, digits: null };
 }
 
-/** The schemes and what each numbers, in the screen's shapes. */
-export async function numberingForEditor() {
-  const numbering = await adminNumbering();
+/**
+ * The schemes and what each numbers, in the screen's shapes: the organization's (its page), or the project's (its own
+ * copy, else the organization's), with whether it may be changed there.
+ */
+export async function numberingForEditor(level: "organization" | "project" = "project") {
+  const numbering = level === "organization"
+    ? { ...(await adminNumbering()), own: false, free: false, mayChange: true, mayChangeOrganization: true }
+    : await projectNumbering();
   const schemes: EditorScheme[] = numbering.schemes.map((s) => ({
-    id: s.id, name: s.name, delimiter: s.delimiter, active: s.active, notes: null, fields: s.fields.map((f, i) => editorField(f, i, s.id)),
+    id: s.id, name: s.name, delimiter: s.delimiter, active: s.active, notes: s.notes ?? null, used: !!s.used,
+    fields: s.fields.map((f, i) => editorField(f, i, s.id)),
   }));
   const kindOf = Object.fromEntries(Object.entries(RECORD_KIND).map(([screen, backend]) => [backend, screen]));
   const routing = numbering.routing.map((r) => ({
     deliverableType: kindOf[r.deliverableType] ?? r.deliverableType, schemeName: schemes.find((s) => s.id === r.schemeId)?.name ?? "",
     status: r.active ? "ACTIVE" : "INACTIVE",
   }));
-  return { schemes, routing };
+  return { schemes, routing, own: numbering.own, free: numbering.free, mayChange: numbering.mayChange, mayChangeOrganization: numbering.mayChangeOrganization };
 }
 
 // ── Functions, as the matrix screen reads them ───────────────────────────────

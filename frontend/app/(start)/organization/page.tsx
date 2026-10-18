@@ -269,6 +269,10 @@ export default async function OrganizationPage() {
           </ul>
         </Card>
 
+        <Card title="Numbering" actions={<Link href="/organization/numbering" className="text-xs font-semibold text-link hover:underline">See and change it</Link>}>
+          <p className="text-xs text-slate-600">How every number is built, and which scheme numbers what: the numbering of every project.</p>
+        </Card>
+
         <Card title="What projects may change" actions={<Link href="/organization/liberty" className="text-xs font-semibold text-link hover:underline">See and change them</Link>}>
           <p className="text-xs text-slate-600">
             Each setting is fixed (every project uses ours as it is) or free (a project may take its own copy and change it).

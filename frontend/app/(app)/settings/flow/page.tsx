@@ -18,7 +18,7 @@ import { SceneDeck, type Flow, type Scene } from "./scene-deck";
 import { ActSwitch } from "./act-switch";
 import { cn } from "@/lib/core/utils";
 
-import { adminFunctions, adminNumbering, partiesWithAnswers, routesForEditor, orEmpty } from "@/lib/settings/api-admin";
+import { adminFunctions, projectNumbering, partiesWithAnswers, routesForEditor, orEmpty } from "@/lib/settings/api-admin";
 import { getSet, getSets } from "@/lib/settings/config";
 import { NoAccess } from "../no-access";
 
@@ -363,7 +363,7 @@ export default async function ControlRoomPage() {
       setKey: one.key, code: v.code, label: v.label, status: v.status, props: Object.keys(v.props).length ? JSON.stringify(v.props) : null,
     }))))).flat()),
     routesForEditor().catch(() => []),
-    adminNumbering().then((n) => n.schemes.filter((one) => one.active).length).catch(() => 0),
+    projectNumbering().then((n) => n.schemes.filter((one) => one.active).length).catch(() => 0),
     // Who receives what is the matrix's Receive rows.
     orEmpty(adminFunctions).then((all) => all.reduce((n, f) => n + f.rules.filter((r) => r.verbs.includes("RECEIVE")).length, 0)),
     stateNames(ctx),

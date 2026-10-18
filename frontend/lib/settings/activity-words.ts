@@ -208,6 +208,7 @@ const WORDS: Record<string, string> = {
   SET_DELETED: "Deleted a set never used",
   NUMBERING_SCHEME_CREATED: "Made a numbering scheme",
   NUMBERING_SCHEME_UPDATED: "Changed a numbering scheme",
+  NUMBERING_SCHEME_DELETED: "Deleted a numbering scheme",
   NUMBERING_ROUTED: "Chose which numbering a type follows",
   REVISION_SCHEME_CREATED: "Made a revision scheme",
   REVISION_SCHEME_UPDATED: "Changed a revision scheme",

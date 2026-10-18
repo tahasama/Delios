@@ -54,9 +54,11 @@ internal sealed class NumberingSchemeConfiguration : IEntityTypeConfiguration<Nu
     public void Configure(EntityTypeBuilder<NumberingScheme> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
-        b.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
+        b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.TenantId, x.ProjectId, x.Name }).IsUnique().AreNullsDistinct(false);
         b.Property(x => x.Name).HasMaxLength(100);
         b.Property(x => x.Delimiter).HasMaxLength(4);
+        b.Property(x => x.Notes).HasMaxLength(300);
         b.OwnsMany(x => x.Fields, f => f.ToJson());
     }
 }
@@ -72,7 +74,8 @@ internal sealed class SchemeRoutingConfiguration : IEntityTypeConfiguration<Sche
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Scheme).WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
-        b.HasIndex(x => new { x.TenantId, x.DeliverableType }).IsUnique();
+        b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.TenantId, x.ProjectId, x.DeliverableType }).IsUnique().AreNullsDistinct(false);
         b.Property(x => x.DeliverableType).HasMaxLength(64);
     }
 }

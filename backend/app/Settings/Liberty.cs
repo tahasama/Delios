@@ -134,7 +134,7 @@ public static class Liberty
     /// <summary>The lists a part of a numbering scheme reads (<c>LIST:&lt;key&gt;</c>, and the app's lists numbering reads).</summary>
     private static async Task<HashSet<string>> NumberedListsAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {
-        var schemes = await db.NumberingSchemes.AsNoTracking().Where(s => s.Active).ToListAsync(cancellationToken);
+        var schemes = await db.NumberingSchemes.AsNoTracking().Where(s => s.ProjectId == null && s.Active).ToListAsync(cancellationToken);
         return schemes.SelectMany(s => s.Fields)
             .Where(f => f.Source.StartsWith(FieldSources.ListPrefix, StringComparison.Ordinal))
             .Select(f => f.Source[FieldSources.ListPrefix.Length..]).ToHashSet();

@@ -641,3 +641,7 @@ in the code; it lives only in your local database.
   a part of the number; the Numbering builder no longer offers lists a number cannot be built from.
 - **A field of your own is one row** on Forms & fields: added and changed with the same form, taken off while never
   answered, retired once answered. Lists are no longer added to the document form by themselves (that made two fields).
+- **Numbering is the organization's.** It is changed on the organization's page (Numbering), by an administrator, for
+  every project; a project's Settings → Numbering reads it. The control function no longer changes it there, unless the
+  organization makes numbering free for projects (What projects may change). A scheme that has given numbers keeps its
+  parts: rename or retire it, or make a new one. "When this scheme is used" is now kept.

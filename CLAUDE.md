@@ -315,6 +315,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Phase is a document's metadata (PHASES, published like any list): asked on the new-document form (row 2,
   column 3), in Details and Edit rev, and when a revision is started (it may move the document to its next
   phase). Each revision keeps the phase it was made in. The register shows, filters and sorts by it.
+- **Numbering is the organization's** (owner: one numbering across projects; switch `NUMBERING`, Fixed by default):
+  schemes and which scheme numbers what are edited on `/organization/numbering` by an administrator, for every project
+  (backend `NumberingLevels`, `/api/admin/numbering`); Settings → Numbering reads them, saying so. Where the switch is
+  Free, the control function changes them on the project, its first change making its own copy (`NUMBERING_OWN`,
+  `NumberingScheme.ProjectId`). A scheme that gave a number (`Used`, marked when it gives one) keeps its parts and
+  delimiter: renamed, re-noted or retired only (SCHEME_IN_USE); never used, it is changed entirely or deleted. A scheme
+  still numbering something is not retired or deleted (SCHEME_ROUTED); a retired one numbers nothing (SCHEME_RETIRED).
+  A part reads a list, a fixed text, the running number (1–9 digits), or who sends / receives it; the organization's
+  numbering reads only the organization's lists (LIST_NOT_ORGANIZATIONS).
 - How revisions are named is Settings → Revisions (`RevisionSchemeEndpoints`): schemes of lines, one line per
   phase, as many as wanted, plus one default line for any phase without its own (no phase published: that one
   line names every revision). A line counts in letters or numbers, with a prefix, a start (empty: A or 0) and

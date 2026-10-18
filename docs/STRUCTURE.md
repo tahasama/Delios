@@ -31,7 +31,7 @@ delios/
 backend/
 ├── app/                  the program (API and worker)
 │   ├── Program.cs        start-up: what runs, in which order
-│   ├── Documents/        documents, revisions, files, the register; the lists, numbering and revision
+│   ├── Documents/        documents, revisions, files, the register; the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
 │   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (the sets of Review outcomes, read by routes)
 │   │                     ProjectLists: the project's lists (own copy on first change, where each value is used, who changes them)
 │   │                     ListRules: groups, the app's lists, which set of a list serves a deliverable type; Catalog.IsOfferedFor checks it
@@ -91,7 +91,7 @@ frontend/
 │   │   ├── setup/        after registering an organization: add people, open the first project
 │   │   ├── no-project/   on no project yet (lists other organizations' projects they work on)
 │   │   └── organization/ the organization's admin page: projects (ours and joined), people,
-│   │                     organizations we work with, invitations; + defaults/ (defaults for new projects), liberty/ (what projects may change)
+│   │                     organizations we work with, invitations; + defaults/ (defaults for new projects), liberty/ (what projects may change), numbering/ (the organization's numbering)
 │   ├── (app)/            inside a project
 │   │   ├── layout.tsx    the frame: menu, project switcher, theme
 │   │   ├── page.tsx      Home (with home-parts.tsx, tally.tsx)

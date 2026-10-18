@@ -1398,16 +1398,34 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<bool>("Used")
+                        .HasColumnType("boolean")
+                        .HasColumnName("used");
+
                     b.HasKey("Id")
                         .HasName("pk_numbering_schemes");
 
-                    b.HasIndex("TenantId", "Name")
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("ix_numbering_schemes_project_id");
+
+                    b.HasIndex("TenantId", "ProjectId", "Name")
                         .IsUnique()
-                        .HasDatabaseName("ix_numbering_schemes_tenant_id_name");
+                        .HasDatabaseName("ix_numbering_schemes_tenant_id_project_id_name");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("TenantId", "ProjectId", "Name"), false);
 
                     b.ToTable("numbering_schemes", (string)null);
                 });
@@ -1739,6 +1757,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("deliverable_type");
 
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
                     b.Property<Guid>("SchemeId")
                         .HasColumnType("uuid")
                         .HasColumnName("scheme_id");
@@ -1750,12 +1772,17 @@ namespace Delios.Host.Platform.Migrations
                     b.HasKey("Id")
                         .HasName("pk_scheme_routings");
 
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("ix_scheme_routings_project_id");
+
                     b.HasIndex("SchemeId")
                         .HasDatabaseName("ix_scheme_routings_scheme_id");
 
-                    b.HasIndex("TenantId", "DeliverableType")
+                    b.HasIndex("TenantId", "ProjectId", "DeliverableType")
                         .IsUnique()
-                        .HasDatabaseName("ix_scheme_routings_tenant_id_deliverable_type");
+                        .HasDatabaseName("ix_scheme_routings_tenant_id_project_id_deliverable_type");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("TenantId", "ProjectId", "DeliverableType"), false);
 
                     b.ToTable("scheme_routings", (string)null);
                 });
@@ -6348,6 +6375,12 @@ namespace Delios.Host.Platform.Migrations
 
             modelBuilder.Entity("Delios.Host.Documents.NumberingScheme", b =>
                 {
+                    b.HasOne("Delios.Host.Identity.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_numbering_schemes_projects_project_id");
+
                     b.HasOne("Delios.Host.Identity.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -6550,6 +6583,12 @@ namespace Delios.Host.Platform.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_scheme_routings_numbering_schemes_scheme_id");
+
+                    b.HasOne("Delios.Host.Identity.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_scheme_routings_projects_project_id");
 
                     b.HasOne("Delios.Host.Identity.Tenant", null)
                         .WithMany()

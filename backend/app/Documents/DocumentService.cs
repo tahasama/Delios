@@ -145,7 +145,7 @@ public sealed class DocumentService(
         var kind = recordType || request.Kind?.ToUpperInvariant() == DocumentKinds.Record ? DocumentKinds.Record : DocumentKinds.Document;
         if (checkOnly)
         {
-            var refusal = await numbering.RefusalAsync(request.DeliverableType, new NumberFields(access.Project.Code, Blank(request.Subproject),
+            var refusal = await numbering.RefusalAsync(access.Project.Id, request.DeliverableType, new NumberFields(access.Project.Code, Blank(request.Subproject),
                 originator, Blank(request.ContractRef), request.Discipline, request.DocType, Lists: listAnswers), cancellationToken);
             return refusal switch
             {

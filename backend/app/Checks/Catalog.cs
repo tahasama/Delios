@@ -107,7 +107,8 @@ public static class CheckCatalog
         new("SET-01", Phases.Setup, "A deliverable type no numbering scheme serves",
             "Each published deliverable type is routed to a numbering scheme (Settings → Numbering); otherwise nothing of that type can be registered", Severities.Critical, "OG", async ctx =>
             {
-                var routed = await ctx.Db.SchemeRoutings.Where(r => r.Active).Select(r => r.DeliverableType).ToListAsync(ctx.CancellationToken);
+                var numbering = await NumberingLevels.ScopeAsync(ctx.Db, ctx.Project.Id, ctx.CancellationToken);
+                var routed = await ctx.Db.SchemeRoutings.Where(r => r.ProjectId == numbering && r.Active).Select(r => r.DeliverableType).ToListAsync(ctx.CancellationToken);
                 return Fail(Active(ctx, ValueSets.DeliverableTypes).Where(t => !routed.Contains(t.Code))
                     .Select(t => Setting("NUMBERING", t.Code, $"{t.Label} cannot be registered: no numbering scheme serves it.")));
             }),

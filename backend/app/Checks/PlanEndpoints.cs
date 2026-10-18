@@ -29,8 +29,9 @@ public static class PlanEndpoints
         if (!access.IsInternal) return Problems.Forbidden("OURS_ONLY", "The plan is the project's own organization's.");
         var project = access.Project;
 
-        var schemes = await db.NumberingSchemes.AsNoTracking().Where(s => s.Active).OrderBy(s => s.Name).ToListAsync(cancellationToken);
-        var routing = await db.SchemeRoutings.AsNoTracking().Where(r => r.Active).OrderBy(r => r.DeliverableType).ToListAsync(cancellationToken);
+        var numbering = await NumberingLevels.ScopeAsync(db, project.Id, cancellationToken);
+        var schemes = await db.NumberingSchemes.AsNoTracking().Where(s => s.ProjectId == numbering && s.Active).OrderBy(s => s.Name).ToListAsync(cancellationToken);
+        var routing = await db.SchemeRoutings.AsNoTracking().Where(r => r.ProjectId == numbering && r.Active).OrderBy(r => r.DeliverableType).ToListAsync(cancellationToken);
         var revisions = await db.RevisionSchemes.AsNoTracking().OrderByDescending(s => s.IsDefault).ThenBy(s => s.Name).ToListAsync(cancellationToken);
         var revisionRouting = await db.RevisionSchemeRoutings.AsNoTracking().ToListAsync(cancellationToken);
         var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.Active).OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name)
