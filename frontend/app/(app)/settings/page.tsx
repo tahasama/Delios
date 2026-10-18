@@ -9,11 +9,8 @@ import { api } from "@/lib/client";
 import { getActiveSet } from "@/lib/settings/config";
 import { SETUP_PAGES, SETUP_GROUPS, maySetup, mayChangeControlRoom, CONTROL_ROOM, type SetupPage } from "./setup-pages";
 import { families } from "@/lib/settings/families";
-import {
-  FolderKanban, Building2, Tags, FileDigit, BadgeCheck, Users, Workflow, ScrollText, Layers, Route, ClipboardList, ArrowRight, KeyRound,
-  GitBranch,
-  type LucideIcon,
-} from "lucide-react";
+import { Tags, Route, ArrowRight } from "lucide-react";
+import { SETUP_ICON } from "./icons";
 
 import { adminAudit, adminFunctions, adminNumbering, projectNumbering, projectRevisions, projectRoutes, adminParties, adminProjects, adminUsers, orEmpty } from "@/lib/settings/api-admin";
 import { orgSettings, projectSettings } from "@/lib/settings/api";
@@ -22,21 +19,7 @@ import { getSets } from "@/lib/settings/config";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings" };
 
-const ICON: Record<string, LucideIcon> = {
-  "/settings/projects": FolderKanban,
-  "/settings/parties": Building2,
-  "/settings/config": Tags,
-  "/settings/families": Layers,
-  "/settings/fields": ClipboardList,
-  "/settings/numbering": FileDigit,
-  "/settings/flow": Route,
-  "/settings/workflow-templates": Workflow,
-  "/settings/functions": BadgeCheck,
-  "/settings/users": Users,
-  "/settings/security": KeyRound,
-  "/settings/revisions": GitBranch,
-  "/settings/audit": ScrollText,
-};
+const ICON = SETUP_ICON;
 
 
 export default async function AdminPage() {

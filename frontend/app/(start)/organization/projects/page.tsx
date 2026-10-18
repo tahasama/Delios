@@ -14,7 +14,6 @@ import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { adminProjects, adminUsers } from "@/lib/settings/api-admin";
 import { projectSettings } from "@/lib/settings/api";
 import { ProjectFields } from "@/app/(app)/settings/projects/project-fields";
-import { OrgHeader } from "../org-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
@@ -74,9 +73,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   );
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <OrgHeader scope={scope} back={{ href: "/organization", label: "Organization" }} />
-      <main className="mx-auto max-w-6xl space-y-4 px-6 py-6">
+    <>
       {/* The plate: how many projects, and what a project is made of. */}
       <section className="register register-sheet register-sheet-open">
         <div className="px-5 pt-6 pb-4 sm:px-6">
@@ -239,7 +236,6 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           })}
         </DataTable>
       </section>
-      </main>
-    </div>
+      </>
   );
 }

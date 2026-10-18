@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { ActionForm } from "@/components/form";
-import { Card, DataTable, Th, Td, Chip, Field, inputCls } from "@/components/ui";
+import { DataTable, Th, Td, Chip, Field, inputCls } from "@/components/ui";
 import { adminParties, adminProjects, adminUsers } from "@/lib/settings/api-admin";
 import { organizationLinks, joinedProjects, guestAccounts, ownIdentity, claims, merges } from "@/lib/organization/api";
 import { WhoWeAre } from "./identity";
@@ -9,7 +9,7 @@ import { projectDefaults } from "@/lib/organization/defaults";
 import { acceptLinkAction, refuseLinkAction, endLinkAction, joinPersonAction, bringOverAction, switchOrganizationAction } from "@/lib/organization/forms";
 import { switchProjectAction } from "@/lib/settings/forms-project-switch";
 import { POLICIES, effectiveAnswer } from "@/lib/settings/control-activities";
-import { OrgHeader } from "./org-header";
+import { liberty } from "@/lib/organization/liberty";
 import { TrackingSheet } from "./tracking";
 import { orgSettings } from "@/lib/settings/api";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
@@ -38,6 +38,8 @@ export default async function OrganizationPage() {
     orgSettings().catch(() => new Map<string, string>()),
     ownIdentity(), claims(), merges(),
   ]);
+  const switches = await liberty();
+  const freeCount = switches.filter((one) => one.free).length;
   const roleLabel = (code: string | null) => (code ? roles.find((r) => r.code === code)?.label ?? code : null);
   const received = links.filter((one) => one.side === "GUEST" && one.state === "INVITED");
   const ours = users.filter((one) => one.internal).sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
@@ -54,14 +56,49 @@ export default async function OrganizationPage() {
   const linkedAsGuest = links.filter((one) => one.side === "GUEST" && one.state === "LINKED");
   const guestsThere = new Map(await Promise.all(linkedAsGuest.map(async (one) => [one.id, await guestAccounts(one.id)] as const)));
 
-  return (
-    <div className="min-h-screen bg-canvas">
-      <OrgHeader scope={scope} />
+  const activePeople = ours.filter((one) => one.active).length;
+  const linkTo = (href: string, label: string) => <Link href={href} className="text-[11.5px] font-semibold text-link hover:underline">{label}</Link>;
 
-      <main className="mx-auto max-w-6xl space-y-5 px-6 py-6">
-        {received.length ? (
-          <Card title={`Invitations waiting for your answer (${received.length})`}>
-            <ul className="divide-y divide-line">
+  return (
+    <>
+      <header className="register register-sheet register-sheet-open">
+        <div className="flex flex-col gap-3 px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            {own ? <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{own.code}</p> : null}
+            <h1 className="plate-name mt-1 min-w-0">{scope.organization.name}</h1>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+              The organization: its projects and those of others it works on, its people, the organizations it works with, and how every project starts.
+            </p>
+          </div>
+          <Link href="/organization/projects?new=1" className="ask shrink-0 self-start">Open a new project</Link>
+        </div>
+        <dl className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4 [&>div]:bg-surface">
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-slate-500">Our projects</dt>
+            <dd className="mt-1 text-[13px] font-medium tabular-nums text-slate-900">{projects.filter((p) => p.status === "ACTIVE").length} open</dd>
+            <dd className="text-[11px] text-slate-500">{projects.filter((p) => p.status !== "ACTIVE").length} archived</dd>
+          </div>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-slate-500">Others&rsquo; projects</dt>
+            <dd className="mt-1 text-[13px] font-medium tabular-nums text-slate-900">{joined.length}</dd>
+            <dd className="text-[11px] text-slate-500">we take part in</dd>
+          </div>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-slate-500">People</dt>
+            <dd className="mt-1 text-[13px] font-medium tabular-nums text-slate-900">{activePeople}</dd>
+            <dd className="text-[11px] text-slate-500">{ours.length - activePeople ? `${ours.length - activePeople} switched off` : "all can sign in"}</dd>
+          </div>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-slate-500">We work with</dt>
+            <dd className="mt-1 text-[13px] font-medium tabular-nums text-slate-900">{outside.filter((p) => p.active).length} organizations</dd>
+            <dd className="text-[11px] text-slate-500">{received.length ? `${received.length} invitation${received.length === 1 ? "" : "s"} to answer` : "no invitation waiting"}</dd>
+          </div>
+        </dl>
+      </header>
+
+      {received.length ? (
+        <Sheet title={`Invitations waiting for your answer (${received.length})`} note="another organization asks us to work on its projects" tone="waiting">
+          <ul className="divide-y divide-line [&>li]:px-5 sm:[&>li]:px-6">
               {received.map((one) => (
                 <li key={one.id} className="space-y-2 py-3">
                   <p className="text-sm text-slate-700">
@@ -78,15 +115,14 @@ export default async function OrganizationPage() {
                   </div>
                 </li>
               ))}
-            </ul>
-          </Card>
-        ) : null}
+          </ul>
+        </Sheet>
+      ) : null}
 
-        <WhoWeAre own={own} claimable={claimable} mergeList={mergeList} />
-
-        <Card title="Projects" actions={<Link href="/organization/projects" className="text-xs font-semibold text-link hover:underline">Open a new project, change or archive one</Link>}>
-          <p className="mb-3 text-xs text-slate-500">Ours, opened by us, and those of other organizations we take part in.</p>
-          <DataTable head={<tr><Th>Project</Th><Th>Whose</Th><Th>Our role</Th><Th>Status</Th><Th>Our people on it</Th></tr>}>
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 space-y-4">
+          <Sheet id="projects" title="Projects" note="ours, and those of other organizations we take part in" act={linkTo("/organization/projects", "Open, change or archive")}>
+          <DataTable className="rounded-none border-0 shadow-none" head={<tr><Th>Project</Th><Th>Whose</Th><Th>Our role</Th><Th>Status</Th><Th>Our people on it</Th></tr>}>
             {projects.map((p) => (
               <tr key={p.id} id={`project-${p.id}`} className="scroll-mt-4 target:bg-tint-soft">
                 <Td>
@@ -163,11 +199,12 @@ export default async function OrganizationPage() {
               </tr>
             ))}
           </DataTable>
-          {!projects.length && !joined.length ? <p className="text-xs text-slate-500">No project yet.</p> : null}
-        </Card>
+            {!projects.length && !joined.length ? <p className="px-5 py-3 text-xs text-slate-500 sm:px-6">No project yet.</p> : null}
+          </Sheet>
 
-        <Card title={`People (${ours.filter((one) => one.active).length})`}>
-          <DataTable head={<tr><Th>Name</Th><Th>Email</Th><Th>Our projects</Th><Th>Other organizations&rsquo; projects</Th><Th>Two-step sign-in</Th><Th>Access</Th></tr>}>
+          <Sheet id="people" title={`People (${activePeople})`} note="everyone of ours, and the projects each is on"
+            foot={scope.projectCount ? <>Add, switch off or unlock people in <Link href="/settings/users" className="font-semibold text-link hover:underline">People &amp; access</Link>. Switching someone off here stops them on other organizations&rsquo; projects too.</> : undefined}>
+          <DataTable className="rounded-none border-0 shadow-none" head={<tr><Th>Name</Th><Th>Email</Th><Th>Our projects</Th><Th>Other organizations&rsquo; projects</Th><Th>Two-step sign-in</Th><Th>Access</Th></tr>}>
             {ours.map((u) => (
               <tr key={u.id} id={`person-${u.id}`} className={u.active ? "scroll-mt-4 align-top target:bg-tint-soft" : "scroll-mt-4 align-top opacity-60 target:bg-tint-soft"}>
                 <Td className="text-xs font-semibold text-slate-800">
@@ -184,11 +221,12 @@ export default async function OrganizationPage() {
               </tr>
             ))}
           </DataTable>
-          {scope.projectCount ? <p className="mt-2 text-[11px] text-slate-400">Add, switch off or unlock people in <Link href="/settings/users" className="font-semibold text-link hover:underline">People &amp; access</Link>. Switching someone off here stops them on other organizations&rsquo; projects too.</p> : null}
-        </Card>
+          </Sheet>
 
-        <Card title="Organizations we work with">
-          <DataTable head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Their DELIOS</Th></tr>}>
+          <Sheet id="organizations" title="Organizations we work with" note="how each works with us, and whether its DELIOS is linked to ours"
+            act={linkTo("/organization/organizations", "Add, create or change")}
+            foot={<>Each project says which of them work on it.</>}>
+          <DataTable className="rounded-none border-0 shadow-none" head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Their DELIOS</Th></tr>}>
             {outside.map((p) => (
               <tr key={p.id} className={p.active ? "" : "opacity-60"}>
                 <Td>
@@ -210,7 +248,7 @@ export default async function OrganizationPage() {
                 <Td className="text-xs">
                   linked since {fmtDate(one.answeredAt)}
                   {guestsThere.get(one.id)?.length ? (
-                    <div className="mt-2 rounded-lg bg-tint-soft p-2">
+                    <div className="mt-2 rounded-md bg-tint-soft p-2 ring-1 ring-line">
                       <p className="text-[11px] text-slate-600">Guest accounts {one.organization} made for our people before we linked. Brought over, they sign in here with the same password and keep their projects there.</p>
                       <ul className="mt-1 space-y-1">
                         {guestsThere.get(one.id)!.map((guest) => (
@@ -237,7 +275,7 @@ export default async function OrganizationPage() {
             ))}
           </DataTable>
           {history.length ? (
-            <details className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-link">Refused and ended ({history.length})</summary>
+            <details className="border-t border-line px-5 py-2.5 sm:px-6"><summary className="cursor-pointer text-xs font-semibold text-link">Refused and ended ({history.length})</summary>
               <ul className="mt-2 space-y-1.5 text-xs text-slate-600">
                 {history.map((one) => (
                   <li key={one.id}>
@@ -251,41 +289,62 @@ export default async function OrganizationPage() {
               </ul>
             </details>
           ) : null}
-          <p className="mt-2 text-[11px] text-slate-400">Add, create and change them, and invite them to link, in <Link href="/organization/organizations" className="font-semibold text-link hover:underline">Organizations we work with</Link>; each project says which of them work on it.</p>
-        </Card>
+          </Sheet>
 
-        <Card title="Defaults for new projects" actions={<Link href="/organization/defaults" className="text-xs font-semibold text-link hover:underline">See and change them</Link>}>
-          <p className="text-xs text-slate-600">
-            {defaults
-              ? <>{defaults.fromProject ? <>Taken from {defaults.fromProject}{defaults.edited ? ", then changed" : ""}</> : "Set here"}; last changed {fmtDate(defaults.at)} by {defaults.by}. {changedCount} answer{changedCount === 1 ? "" : "s"} differ from the app&rsquo;s own.</>
-              : "None set: a new project starts with the app's own."}
-            {" "}Each project then changes them freely, and can go back to them; changing the defaults never changes a project already open. A project of another organization&rsquo;s follows its owner.
-          </p>
-          <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
-            {POLICIES.map((one) => {
-              const value = defaults?.values[one.key] ?? one.options[0].value;
-              return <li key={one.key}><span className="text-slate-500">{one.title}:</span> {one.options.find((o) => o.value === value)?.label ?? value}</li>;
-            })}
-          </ul>
-        </Card>
+          <WhoWeAre own={own} claimable={claimable} mergeList={mergeList} />
+        </div>
 
-        <Card title="Settings" actions={<Link href="/organization/settings" className="text-xs font-semibold text-link hover:underline">Open the Settings</Link>}>
-          <p className="text-xs text-slate-600">
-            How the organization works, the default of every project: the same cards as a project&rsquo;s Settings, each saying whether projects may change it.
-          </p>
-        </Card>
+        <aside className="space-y-4 xl:sticky xl:top-5">
+          <section className="register register-sheet register-sheet-open">
+            <div className="flex items-center justify-between gap-2 border-b border-line bg-tint-soft px-4 py-2.5">
+              <span className="stencil text-slate-500">How every project starts</span>
+            </div>
+            <dl className="divide-y divide-line">
+              <div className="px-4 py-3">
+                <dt className="flex items-center justify-between gap-2 text-[11.5px] font-semibold text-slate-800">Settings {linkTo("/organization/settings", "Open")}</dt>
+                <dd className="mt-0.5 text-[11.5px] leading-[1.45] text-slate-600">{switches.length - freeCount} fixed for every project · {freeCount} a project may change</dd>
+              </div>
+              <div className="px-4 py-3">
+                <dt className="flex items-center justify-between gap-2 text-[11.5px] font-semibold text-slate-800">Defaults for new projects {linkTo("/organization/defaults", "Change")}</dt>
+                <dd className="mt-0.5 text-[11.5px] leading-[1.45] text-slate-600">
+                  {defaults
+                    ? <>{defaults.fromProject ? <>Taken from {defaults.fromProject}{defaults.edited ? ", then changed" : ""}</> : "Set here"}, {fmtDate(defaults.at)}. {changedCount} answer{changedCount === 1 ? "" : "s"} differ from the app&rsquo;s own.</>
+                    : "The app's own: nothing set yet."}
+                </dd>
+                <ul className="mt-2 space-y-1">
+                  {POLICIES.map((one) => {
+                    const value = defaults?.values[one.key] ?? one.options[0].value;
+                    return (
+                      <li key={one.key} className="text-[11px] leading-4">
+                        <span className="block text-slate-500">{one.title}</span>
+                        <span className="text-slate-800">{one.options.find((o) => o.value === value)?.label ?? value}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </dl>
+          </section>
+          <TrackingSheet reading={answers.get("TRACK_READING") !== "OFF"} signIns={answers.get("TRACK_SIGN_INS") === "ON"} />
+        </aside>
+      </div>
+    </>
+  );
+}
 
-        <TrackingSheet reading={answers.get("TRACK_READING") !== "OFF"} signIns={answers.get("TRACK_SIGN_INS") === "ON"} />
-
-        {scope.projectCount ? (
-          <Card title="Sign-in and audit">
-            <p className="text-xs text-slate-600">
-              <Link href="/settings/security" className="font-semibold text-link hover:underline">Sign-in &amp; security</Link> — the rules for everyone in {scope.organization.name}.{" "}
-              <Link href="/settings/audit" className="font-semibold text-link hover:underline">Audit trail</Link> — every recorded act, across our projects.
-            </p>
-          </Card>
-        ) : null}
-      </main>
-    </div>
+/** A sheet of the organization's page: its band (what it is, the sentence about it, its way to where it is changed), then its body. */
+function Sheet({ id, title, note, act, tone, children, foot }: {
+  id?: string; title: string; note?: React.ReactNode; act?: React.ReactNode; tone?: "waiting"; children: React.ReactNode; foot?: React.ReactNode;
+}) {
+  return (
+    <section id={id} className={`register register-sheet register-sheet-open scroll-mt-24 ${tone === "waiting" ? "ring-1 ring-amber-200" : ""}`}>
+      <div className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-line px-5 py-2.5 sm:px-6 ${tone === "waiting" ? "bg-amber-50" : "bg-tint-soft"}`}>
+        <span className={`stencil mr-1 ${tone === "waiting" ? "text-amber-900" : "text-slate-500"}`}>{title}</span>
+        {note ? <span className="text-[11px] text-slate-500">{note}</span> : null}
+        {act ? <span className="ml-auto">{act}</span> : null}
+      </div>
+      {children}
+      {foot ? <p className="border-t border-line px-5 py-2.5 text-[11px] text-slate-500 sm:px-6">{foot}</p> : null}
+    </section>
   );
 }

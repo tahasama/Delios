@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { liberty } from "@/lib/organization/liberty";
-import { OrgHeader } from "../../org-header";
 import { ProjectSwitches } from "../switches";
 import { orgCard } from "../cards";
 
@@ -25,9 +24,7 @@ export default async function OrganizationCardPage({ params }: { params: Promise
   const switches = (await liberty()).filter((one) => one.area === card.area);
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <OrgHeader scope={scope} back={{ href: "/organization/settings", label: "Settings" }} />
-      <main className="mx-auto max-w-6xl space-y-4 px-6 py-6">
+    <>
         <section className="register register-sheet register-sheet-open">
           <div className="px-5 pt-6 pb-4 sm:px-6">
             <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
@@ -39,7 +36,6 @@ export default async function OrganizationCardPage({ params }: { params: Promise
           </div>
         </section>
         <ProjectSwitches items={switches} title={switches.length > 1 ? "Which projects may change" : "Projects may change it"} />
-      </main>
-    </div>
+      </>
   );
 }

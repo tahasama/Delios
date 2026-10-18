@@ -8,7 +8,6 @@ import { adminProjects } from "@/lib/settings/api-admin";
 import { POLICIES, CONFIRMABLE, CONTROL_ACTIVITIES } from "@/lib/settings/control-activities";
 import { DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
 import { fmtDate } from "@/lib/core/utils";
-import { OrgHeader } from "../org-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Defaults for new projects" };
@@ -19,88 +18,112 @@ export const metadata = { title: "Defaults for new projects" };
  * to the app's own. Copied when a project opens; never changes a project already open.
  */
 export default async function DefaultsPage() {
-  const scope = await requireOrgAdmin();
+  await requireOrgAdmin();
   const [defaults, projects] = await Promise.all([projectDefaults(), adminProjects().catch(() => [])]);
   const answers = new Map(Object.entries(defaults?.values ?? {}));
   const source = defaults
-    ? `${defaults.fromProject ? `Taken from ${defaults.fromProject}${defaults.edited ? ", then changed here" : ""}` : "Set here"}; last changed ${fmtDate(defaults.at)} by ${defaults.by}.`
-    : "None set: a new project starts with the app's own, listed below.";
+    ? defaults.fromProject ? `Taken from ${defaults.fromProject}${defaults.edited ? ", then changed here" : ""}` : "Set here"
+    : "The app's own";
+  const open = projects.filter((p) => p.status === "ACTIVE");
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <OrgHeader scope={scope} back={{ href: "/organization", label: "Organization" }} />
-      <main className="mx-auto max-w-6xl space-y-4 px-6 py-6">
-        <section className="register register-sheet register-sheet-open">
-          <div className="px-5 pt-6 pb-4 sm:px-6">
-            <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{scope.organization.name}</p>
-            <h1 className="plate-name mt-1">Defaults for new projects</h1>
-            <p className="plate-meta mt-2">{source}</p>
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-              What a project of ours starts with: who carries the acts out, and how it works. Copied when a project opens; the project then
-              changes it freely, and can go back to these. Changing them never changes a project already open. A project of another
-              organization&rsquo;s follows its owner&rsquo;s.
-            </p>
+    <>
+      <header className="register register-sheet register-sheet-open">
+        <div className="px-5 pt-5 pb-4 sm:px-6">
+          <h1 className="plate-title text-slate-950">Defaults for new projects</h1>
+          <p className="plate-meta mt-1.5 font-normal">
+            What a project of ours starts with: who carries the acts out, and how it works. Copied when a project opens; the project then
+            changes what is free, and can go back to these.
+          </p>
+        </div>
+        <dl className="grid grid-cols-1 divide-y divide-line border-t border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-slate-500">Where they come from</dt>
+            <dd className="mt-1 text-[13px] font-medium text-slate-900">{source}</dd>
+            <dd className="text-[11px] text-slate-500">{defaults ? `last changed ${fmtDate(defaults.at)} by ${defaults.by}` : "nothing set by the organization yet"}</dd>
           </div>
-        </section>
-
-        <HowItWorks target="defaults" answers={answers} follows />
-
-        <section className="register register-sheet register-sheet-open">
-          <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-            <span className="stencil mr-1 text-slate-500">The app&rsquo;s own defaults</span>
-            <span className="text-[11px] text-slate-500">what a project starts with when the organization says nothing; the answers above marked &ldquo;the app&rsquo;s&rdquo;</span>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-slate-500">Projects already open</dt>
+            <dd className="mt-1 text-[13px] font-medium text-slate-900">Keep their own</dd>
+            <dd className="text-[11px] text-slate-500">changing these never changes them</dd>
           </div>
-          <ul className="divide-y divide-line">
-            <li className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6">
-              <span className="font-semibold text-slate-800">Who carries the acts out:</span> as each project is set up — The control function when somebody
-              holds the control function, else the people doing the work
-              {CONTROL_ACTIVITIES.some((one) => one.workByDefault) ? <> (except {CONTROL_ACTIVITIES.filter((one) => one.workByDefault).map((one) => one.title.toLowerCase()).join(", ")}, left with the work)</> : null}.
-            </li>
-            <li className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6">
-              <span className="font-semibold text-slate-800">Confirmation by whoever holds Manage:</span> not asked
-              ({Object.keys(CONFIRMABLE).map((key) => CONTROL_ACTIVITIES.find((one) => one.key === key)?.title.toLowerCase() ?? key).join(", ")}).
-            </li>
-            {POLICIES.map((one) => (
-              <li key={one.key} className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6">
-                <span className="font-semibold text-slate-800">{one.title}:</span> {one.options[0].label}.
-              </li>
-            ))}
-            <li className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6">
-              <span className="font-semibold text-slate-800">When a discipline does not answer:</span> notified after {DEFAULT_ESCALATE_AFTER} working days.
-            </li>
-          </ul>
-          <div className="flex flex-wrap items-start gap-2 border-t border-line px-5 py-3 sm:px-6">
-            {defaults ? (
-              <ActionForm
-                action={resetDefaultsAction}
-                submitLabel="Reset to the app's defaults"
-                variant="secondary"
-                size="sm"
-                confirmText="The organization's defaults are forgotten; new projects start with the app's own. Projects already open keep theirs. Go ahead?"
-              />
-            ) : <p className="text-xs text-slate-500">These are the ones used now.</p>}
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-slate-500">Another organization&rsquo;s project</dt>
+            <dd className="mt-1 text-[13px] font-medium text-slate-900">Follows its owner</dd>
+            <dd className="text-[11px] text-slate-500">we take part as it is set up there</dd>
           </div>
-        </section>
+        </dl>
+      </header>
 
-        {projects.some((p) => p.status === "ACTIVE") ? (
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0">
+          <HowItWorks target="defaults" answers={answers} follows />
+        </div>
+
+        <aside className="space-y-4 xl:sticky xl:top-5">
+          {open.length ? (
+            <section className="register register-sheet register-sheet-open">
+              <div className="border-b border-line bg-tint-soft px-4 py-2.5">
+                <span className="stencil text-slate-500">Start from a project</span>
+                <p className="mt-0.5 text-[11px] leading-4 text-slate-500">its answers replace the defaults, all at once</p>
+              </div>
+              <div className="px-4 py-4">
+                <ActionForm action={makeDefaultsAction} submitLabel="Make its choices the defaults" size="sm">
+                  <Field label="Project" required>
+                    <select name="projectId" required defaultValue="" className={inputCls}>
+                      <option value="" disabled>Choose…</option>
+                      {open.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+                    </select>
+                  </Field>
+                </ActionForm>
+              </div>
+            </section>
+          ) : null}
+
           <section className="register register-sheet register-sheet-open">
-            <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-              <span className="stencil mr-1 text-slate-500">Start from a project</span>
-              <span className="text-[11px] text-slate-500">its answers replace the defaults above, all at once</span>
+            <div className="border-b border-line bg-tint-soft px-4 py-2.5">
+              <span className="stencil text-slate-500">The app&rsquo;s own defaults</span>
+              <p className="mt-0.5 text-[11px] leading-4 text-slate-500">what a project starts with when we say nothing; marked &ldquo;the app&rsquo;s&rdquo; beside</p>
             </div>
-            <div className="max-w-md px-5 py-4 sm:px-6">
-              <ActionForm action={makeDefaultsAction} submitLabel="Make its choices the defaults" size="sm">
-                <Field label="Project" required>
-                  <select name="projectId" required defaultValue="" className={inputCls}>
-                    <option value="" disabled>Choose…</option>
-                    {projects.filter((p) => p.status === "ACTIVE").map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-                  </select>
-                </Field>
-              </ActionForm>
+            <dl className="divide-y divide-line">
+              <div className="px-4 py-2.5">
+                <dt className="text-[11.5px] font-semibold text-slate-800">Who carries the acts out</dt>
+                <dd className="text-[11.5px] leading-[1.45] text-slate-600">
+                  The control function where somebody holds it, else the people doing the work
+                  {CONTROL_ACTIVITIES.some((one) => one.workByDefault) ? <> (except {CONTROL_ACTIVITIES.filter((one) => one.workByDefault).map((one) => one.title.toLowerCase()).join(", ")}, left with the work)</> : null}.
+                </dd>
+              </div>
+              <div className="px-4 py-2.5">
+                <dt className="text-[11.5px] font-semibold text-slate-800">Confirmation by whoever holds Manage</dt>
+                <dd className="text-[11.5px] leading-[1.45] text-slate-600">
+                  Not asked ({Object.keys(CONFIRMABLE).map((key) => CONTROL_ACTIVITIES.find((one) => one.key === key)?.title.toLowerCase() ?? key).join(", ")}).
+                </dd>
+              </div>
+              {POLICIES.map((one) => (
+                <div key={one.key} className="px-4 py-2.5">
+                  <dt className="text-[11.5px] font-semibold text-slate-800">{one.title}</dt>
+                  <dd className="text-[11.5px] leading-[1.45] text-slate-600">{one.options[0].label}.</dd>
+                </div>
+              ))}
+              <div className="px-4 py-2.5">
+                <dt className="text-[11.5px] font-semibold text-slate-800">When a discipline does not answer</dt>
+                <dd className="text-[11.5px] leading-[1.45] text-slate-600">Notified after {DEFAULT_ESCALATE_AFTER} working days.</dd>
+              </div>
+            </dl>
+            <div className="border-t border-line px-4 py-3">
+              {defaults ? (
+                <ActionForm
+                  action={resetDefaultsAction}
+                  submitLabel="Reset to the app's defaults"
+                  variant="secondary"
+                  size="sm"
+                  confirmText="The organization's defaults are forgotten; new projects start with the app's own. Projects already open keep theirs. Go ahead?"
+                />
+              ) : <p className="text-[11.5px] text-slate-500">These are the ones used now.</p>}
             </div>
           </section>
-        ) : null}
-      </main>
-    </div>
+        </aside>
+      </div>
+    </>
   );
 }

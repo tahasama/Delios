@@ -454,6 +454,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   them (`User.HomeTenantId`, no password, no sign-in name), linked to theirs (`AccountLink`). They sign in
   at home and switch in and back (`POST /api/auth/switch`; the 7 days run from the sign-in). Switched off
   at home, or the link ended: those accounts stop.
+- **The organization's space** (`organization/layout.tsx`): one band, then its menu on the left (`org-nav.tsx`:
+  Organization — Overview, Projects, Organizations we work with; How it works — Settings and each of its cards,
+  Defaults for new projects; Records — Sign-in & security, Audit trail, which open inside a project) and the page beside
+  it. The overview: masthead (code, name, Open a new project, figures: our projects, others' projects, people, who we
+  work with), invitations to answer, then Projects, People, Organizations we work with, Who we are as sheets, and an
+  aside "How every project starts" (Settings' fixed / free, the defaults) with What is kept. The organization's
+  Settings are drawn like a project's hub (masthead with fixed / free / own copies, the Control room panel, the cards
+  by group, each chip saying where its switch stands); Defaults has the form beside an aside (start from a project,
+  the app's own defaults, reset).
 - The organization's page (`/organization`, administrators): projects ours and joined, people, organizations
   we work with, invitations (also on Home), defaults for new projects. Its projects, people and organizations
   are links (open or switch into a project; People & access; Organizations).

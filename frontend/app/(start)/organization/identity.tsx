@@ -1,5 +1,5 @@
 import { ActionForm } from "@/components/form";
-import { Card, Field, inputCls } from "@/components/ui";
+import { Field, inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
 import { COUNTRIES, IDENTIFIER_KINDS, countryName } from "@/lib/organization/countries";
 import type { Claims, MergeView, OwnIdentity } from "@/lib/organization/api";
@@ -16,8 +16,12 @@ export function WhoWeAre({ own, claimable, mergeList }: { own: OwnIdentity | nul
   const waiting = mergeList.filter((m) => m.waitsOnUs);
   const kind = IDENTIFIER_KINDS.find((k) => k.value === own.kind)?.label.toLowerCase();
   return (
-    <Card title="Who we are on DELIOS">
-      <div className="space-y-4">
+    <section id="who-we-are" className="register register-sheet register-sheet-open scroll-mt-24">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+        <span className="stencil mr-1 text-slate-500">Who we are on DELIOS</span>
+        <span className="text-[11px] text-slate-500">our identifier and domain keep us one organization, whoever adds us</span>
+      </div>
+      <div className="space-y-4 px-5 py-4 sm:px-6">
         <p className="text-xs leading-5 text-slate-600">
           <span className="font-mono font-semibold">{own.code}</span> — {own.name}: our code and name everywhere on DELIOS. Our identifier
           keeps us one organization whoever adds us; our domain, once proven, lets us claim what others made for us before we came.
@@ -154,6 +158,6 @@ export function WhoWeAre({ own, claimable, mergeList }: { own: OwnIdentity | nul
           </div>
         ) : null}
       </div>
-    </Card>
+    </section>
   );
 }

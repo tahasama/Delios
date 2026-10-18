@@ -7,7 +7,6 @@ import { liberty } from "@/lib/organization/liberty";
 import { NumberingBoard } from "@/app/(app)/settings/numbering/board";
 import { ProjectCopies } from "../copies";
 import { ProjectSwitches } from "../switches";
-import { OrgHeader } from "../../org-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Numbering" };
@@ -37,9 +36,7 @@ export default async function OrganizationNumberingPage({ searchParams }: { sear
   const mine = switches.filter((one) => one.area === "Numbering");
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <OrgHeader scope={scope} back={{ href: "/organization/settings", label: "Settings" }} />
-      <main className="mx-auto max-w-6xl space-y-4 px-6 py-6">
+    <>
         <section className="register register-sheet register-sheet-open">
           <div className="px-5 pt-6 pb-4 sm:px-6">
             <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
@@ -60,7 +57,6 @@ export default async function OrganizationNumberingPage({ searchParams }: { sear
           deliverables={deliverables.map((d) => ({ code: d.code, label: d.label }))} sets={sets.map((s) => ({ key: s.key, title: s.title }))}
           editId={params.edit} adding={params.new === "1"} here="/organization/settings/numbering" />
         <ProjectCopies what="numbering" copies={copies} />
-      </main>
-    </div>
+      </>
   );
 }

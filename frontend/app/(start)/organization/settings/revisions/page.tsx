@@ -6,7 +6,6 @@ import { liberty } from "@/lib/organization/liberty";
 import { RevisionBoard } from "@/app/(app)/settings/revisions/board";
 import { ProjectCopies } from "../copies";
 import { ProjectSwitches } from "../switches";
-import { OrgHeader } from "../../org-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Revisions" };
@@ -22,9 +21,7 @@ export default async function OrganizationRevisionsPage() {
   ]);
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <OrgHeader scope={scope} back={{ href: "/organization/settings", label: "Settings" }} />
-      <main className="mx-auto max-w-6xl space-y-4 px-6 py-6">
+    <>
         <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
           <Link href="/organization/settings" className="hover:underline">{scope.organization.name} · Settings</Link>
         </p>
@@ -33,7 +30,6 @@ export default async function OrganizationRevisionsPage() {
           lead={`How every project's revisions are named. Changed here, it changes for every project reading it; ${copies.length ? `${copies.length} project${copies.length === 1 ? " has" : "s have"} its own.` : "every project reads it."}`} />
         <ProjectSwitches items={switches.filter((one) => one.area === "Revisions")} />
         <ProjectCopies what="revisions" copies={copies} />
-      </main>
-    </div>
+      </>
   );
 }

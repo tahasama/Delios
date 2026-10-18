@@ -10,7 +10,6 @@ import { savePartyAction, askMergeAction } from "@/lib/settings/forms-parties";
 import { PartyKindFields } from "@/app/(app)/settings/parties/party-fields";
 import { OrganizationJoins } from "@/app/(app)/settings/parties/organization-joins";
 import { IdentifierFields } from "@/app/(app)/settings/parties/identifier-fields";
-import { OrgHeader } from "../org-header";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
 import { adminProjects, adminUsers, partiesWithAnswers } from "@/lib/settings/api-admin";
 import { inviteOrganizationAction, endLinkAction } from "@/lib/organization/forms";
@@ -73,9 +72,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
   const fold = "w-fit cursor-pointer list-none text-xs font-semibold text-slate-500 hover:text-slate-800 [&::-webkit-details-marker]:hidden";
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <OrgHeader scope={scope} back={{ href: "/organization", label: "Organization" }} />
-      <main className="mx-auto max-w-6xl space-y-4 px-6 py-6">
+    <>
       {/* The plate: who we work with. */}
       <section className="register register-sheet register-sheet-open">
         <div className="px-5 pt-6 pb-4 sm:px-6">
@@ -242,7 +239,6 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
         </DataTable>
       </section>
 
-      </main>
-    </div>
+      </>
   );
 }
