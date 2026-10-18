@@ -40,10 +40,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Nothing is deleted except by the app owner. Exception: an empty package
   that never went out may be deleted by whoever composes it (it holds no content;
   removing a package never removes documents).
-- Every setting there is today is the project's, not the organization's (no
-  organization administration page exists yet). Document Control keeps its
-  freedom on them (people, functions, organizations, numbering, routes); it
-  acts on the projects it is on.
+- **Two levels of settings** (owner, for every setting): the organization's level is everything the app gives by
+  default, adapted by its administrator, and it is the default of every project; the project's level inherits it and
+  changes only what the organization left free. Each setting has one switch on the organization's page "What projects
+  may change" (`/organization/liberty`, backend `Settings/Liberty.cs`, `LIBERTY:<key>`): **Fixed** (every project uses
+  the organization's; only an administrator changes it, for all) or **Free** (a project may take its own copy; the
+  organization's later changes never touch it). Two degrees only, never a third. Made stricter later, what a project
+  already changed stays, read as changed before the rule. Where each starts, and why, is in `Liberty.Items`, chosen
+  from what depends on it (numbering, revisions, cross-project search and reports, the meanings the app reads, the
+  law, security), never from an example. Each list of Types & sets has its own switch; a list a number part reads
+  follows the numbering. No switch: the organizations and their identity, sign-in, what is kept about activity, the
+  audit trail and the defaults are the organization's; the project itself, its organizations, people, control
+  function, distribution matrix and checks switched off are the project's.
 - The owner's full-rights account: `grant-all <email>` (backend command) makes
   that person an administrator, unlocks them, and puts them on every project
   with Document Control, which is given every verb.
@@ -621,11 +629,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Document Control keeps it) are the project's. Who answers is optional and never blocks a save. Its code, name and
   how it works with us change once each (above). An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
-- Layered settings (owner's decision, to build): the app gives defaults; the organization makes the originals; a
-  project may change only what is marked as open to change for projects. An administrator changes the organization's;
-  Document Control changes its project's; an administrator may give that right to anyone they nominate. Once a project
-  has its own version, later changes by the organization never touch it (no overriding projects afterwards: "pure
-  chaos"). Until built, a page says plainly what is the organization's and what is the project's.
+- Layered settings: built as the two levels above (the switches). Being moved onto them page by page: the switches
+  first, then Numbering, Revisions, Types & sets (per list), Forms & fields, Review routes, Functions & permissions,
+  the Control room. Until a page is moved, it says plainly what is the organization's and what is the project's.
 - Document families are **on hold** (owner): the idea is to group document types (internal like DWG, supplier like C102)
   to tell criticality and whether an outside stamp / wet signature is needed or the app's approval is enough, legally.
   That needs research before deciding (`docs/gaps/families.md`). Meanwhile document types are grouped by deliverable

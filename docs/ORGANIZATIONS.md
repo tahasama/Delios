@@ -76,6 +76,9 @@ Defaults          the configuration a new project of ours starts with: who does 
                   marked "as the defaults" or "changed here", and "Reset to the organization's defaults"
                   puts it back. Changing the defaults later changes only projects opened afterwards.
                   A project we join follows its owner's configuration.
+What projects     one switch per setting (/organization/liberty): Fixed, every project uses ours as it is,
+may change        only an administrator changes it; Free, a project may take its own copy and change it,
+                  which our later changes never touch. Made fixed later, a project's copy stays.
 Security, audit   sign-in rules for the whole organization; the audit trail of all its projects.
 ```
 

@@ -384,6 +384,7 @@ public static class PlatformSetup
             Audit.ActivityEndpoints.MapActivityEndpoints(app);
             Settings.SettingEndpoints.MapSettingEndpoints(app);
             Settings.FormRules.MapFormEndpoints(app);
+            Settings.Liberty.MapLibertyEndpoints(app);
             Identity.HolderEndpoints.MapHolderEndpoints(app);
             Reports.ReportEndpoints.MapReportEndpoints(app);
             Documents.RegisterEndpoints.MapRegisterEndpoints(app);

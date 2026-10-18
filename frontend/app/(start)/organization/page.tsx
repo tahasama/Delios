@@ -269,6 +269,12 @@ export default async function OrganizationPage() {
           </ul>
         </Card>
 
+        <Card title="What projects may change" actions={<Link href="/organization/liberty" className="text-xs font-semibold text-link hover:underline">See and change them</Link>}>
+          <p className="text-xs text-slate-600">
+            Each setting is fixed (every project uses ours as it is) or free (a project may take its own copy and change it).
+          </p>
+        </Card>
+
         <TrackingSheet reading={answers.get("TRACK_READING") !== "OFF"} signIns={answers.get("TRACK_SIGN_INS") === "ON"} />
 
         {scope.projectCount ? (

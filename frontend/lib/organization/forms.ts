@@ -288,3 +288,12 @@ export async function confirmClaimAction(_prev: { error?: string; done?: string 
   const said = (await response.json()) as { organization: string };
   return { done: `Confirmed: ${said.organization} is the organization you stood for.` };
 }
+
+/** An administrator moves one switch of what projects may change (Fixed or Free). Projects' copies already made stay. */
+export async function setLibertyAction(formData: FormData): Promise<void> {
+  const key = text(formData, "key");
+  if (!key) return;
+  await api(`/api/liberty/${encodeURIComponent(key)}`, { method: "PUT", body: { free: text(formData, "free") === "1" } }).catch(() => undefined);
+  revalidatePath("/organization/liberty");
+  revalidatePath("/organization");
+}

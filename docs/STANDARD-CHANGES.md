@@ -1221,6 +1221,16 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
 - **A list the project creates is a field of the document** by that alone, offered for each deliverable type from the
   set serving it, and read, filtered and shown like the app's own fields.
 
+## 64 · Two levels of settings: what a project may change is the organization's choice
+
+- **The organization's settings are the default of every project**: what the app gives, adapted by the organization.
+- **For each setting the organization decides, once, whether projects may change it**: fixed (every project uses the
+  organization's) or free (a project keeps its own version, which later changes of the organization never touch).
+- **What stays the same across projects by default is what other things depend on**: numbering, revision naming,
+  what verdicts, statuses and reasons mean, classification and keeping, functions and their rights; what is the
+  project's own work (its sub-projects, orders, routes, forms, who does what) is free.
+- **Making a setting fixed later undoes nothing** a project already changed.
+
 ## Still open — decided in conversation, not yet built
 
 - **Every transmittal and every notification also goes by email**, showing what

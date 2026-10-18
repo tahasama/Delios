@@ -49,7 +49,7 @@ backend/
 │   │                     unique across DELIOS: codes, names, identifiers, contract numbers; changed once;
 │   │                     look-alikes, claims, merges), RegistryEndpoints (on DELIOS, our identity and domain,
 │   │                     claims, merges; command merge-organizations)
-│   ├── Settings/         the organization's and the project's settings and lists; FormRules (Forms & fields: what each form asks, checked on save)
+│   ├── Settings/         the organization's and the project's settings and lists; FormRules (Forms & fields: what each form asks, checked on save); Liberty (what projects may change: Fixed or Free per setting)
 │   ├── Notifications/    notifications, email, pop-ups
 │   ├── Audit/            the audit trail
 │   ├── Extraction/       reading text out of files
@@ -91,7 +91,7 @@ frontend/
 │   │   ├── setup/        after registering an organization: add people, open the first project
 │   │   ├── no-project/   on no project yet (lists other organizations' projects they work on)
 │   │   └── organization/ the organization's admin page: projects (ours and joined), people,
-│   │                     organizations we work with, invitations; + defaults/ (defaults for new projects)
+│   │                     organizations we work with, invitations; + defaults/ (defaults for new projects), liberty/ (what projects may change)
 │   ├── (app)/            inside a project
 │   │   ├── layout.tsx    the frame: menu, project switcher, theme
 │   │   ├── page.tsx      Home (with home-parts.tsx, tally.tsx)
