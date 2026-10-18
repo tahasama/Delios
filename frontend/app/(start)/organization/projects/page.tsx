@@ -20,6 +20,13 @@ import { JoinedProjects } from "../joined";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
 
+/** Where a project stands: active, suspended (on hold) or archived, each said once. */
+const STANDS = [
+  { code: "ACTIVE", label: "Active", tone: "done", said: "Activated", means: "Its people work on it as usual." },
+  { code: "ON_HOLD", label: "Suspended", tone: "waiting", said: "Suspended", means: "Nobody opens it until it is activated again; its documents stay as they are." },
+  { code: "ARCHIVED", label: "Archived", tone: "idle", said: "Archived", means: "Put away with its documents; it leaves the picker. Nothing is deleted." },
+] as const;
+
 /** A field as on the new-document form: grey, no box, inside the sheet's `asking` body. */
 const field = "plain w-full";
 
@@ -43,16 +50,18 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const onIt = (id: string) => users.some((one) => one.id === scope.user.id && one.memberships.some((m) => m.active && m.projectId === id));
 
   const projects = await Promise.all(all
-    .sort((a, b) => a.status.localeCompare(b.status) || a.code.localeCompare(b.code))
+    // By code only: changing where a project stands never moves its line.
+    .sort((a, b) => a.code.localeCompare(b.code))
     .map(async (one) => {
       // Its type, dates and scope are the project's own answers, in its settings.
       let info: Info = {};
       try { info = JSON.parse((await projectSettings(one.id).catch(() => new Map<string, string>())).get("PROJECT_INFO") ?? "{}"); } catch { info = {}; }
       return { ...one, info, kind: one.kind ?? info.kind ?? "GENERIC", startDate: info.startDate ?? one.createdAt.slice(0, 10), endDate: info.endDate ?? null };
     }));
-  const open = projects.filter((p) => p.status !== "ARCHIVED").length;
-  const archived = projects.length - open;
-  const openIds = new Set(projects.filter((p) => p.status !== "ARCHIVED").map((p) => p.id));
+  const open = projects.filter((p) => p.status === "ACTIVE").length;
+  const suspended = projects.filter((p) => p.status === "ON_HOLD").length;
+  const archived = projects.filter((p) => p.status === "ARCHIVED").length;
+  const openIds = new Set(projects.filter((p) => p.status === "ACTIVE").map((p) => p.id));
   const onOpen = users.filter((u) => u.internal && u.active && u.memberships.some((m) => m.active && openIds.has(m.projectId))).length;
   const kinds = await projectKinds();
   const kindLabel = kinds.label;
@@ -96,9 +105,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         <dl className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
           {[
             { term: "Open", value: open, said: open === 1 ? "project of ours" : "projects of ours" },
+            { term: "Suspended", value: suspended, said: suspended ? "nobody works on them until activated" : "none suspended" },
             { term: "Archived", value: archived, said: archived ? "put away, kept whole" : "none put away" },
             { term: "People", value: onOpen, said: "of ours on an open project" },
-            { term: "Elsewhere", value: joined.length, said: joined.length === 1 ? "other organization's project we work on" : "other organizations' projects we work on" },
           ].map((f) => (
             <div key={f.term} className="bg-surface px-5 py-3 sm:px-6">
               <dt className="stencil text-slate-500">{f.term}</dt>
@@ -146,7 +155,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 <Field label="Its people" hint="the same functions; take anyone off afterwards in People & access">
                   <select name="copyFrom" defaultValue="" className={field}>
                     <option value="">Only you, to start</option>
-                    {projects.filter((p) => p.status !== "ARCHIVED").map((p) => <option key={p.id} value={p.id}>Everyone on {p.code}</option>)}
+                    {projects.filter((p) => p.status === "ACTIVE").map((p) => <option key={p.id} value={p.id}>Everyone on {p.code}</option>)}
                   </select>
                 </Field>
               </div>
@@ -167,10 +176,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       <section className="register register-sheet register-sheet-open" aria-labelledby="list-head">
         {band("Every project", `${projects.length} · type, dates and scope are each project's own`)}
         <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
-          head={<tr><Th>Project</Th><Th>Type</Th><Th>Our role</Th><Th>People</Th><Th>Documents</Th><Th>Dates</Th><Th>Status</Th><Th></Th></tr>}>
+          head={<tr><Th>Project</Th><Th>Type</Th><Th>Our role</Th><Th>People</Th><Th>Documents</Th><Th>Start → planned end</Th><Th>Status</Th><Th></Th></tr>}>
           {projects.map((p) => {
             const here = onIt(p.id);
-            const active = p.status !== "ARCHIVED";
+            const active = p.status === "ACTIVE";
+            const stands = STANDS.find((one) => one.code === p.status) ?? STANDS[0];
             const isOpen = editing === p.id;
             const lineHref = (edit?: string) => `/organization/projects${edit ? `?edit=${edit}` : ""}#project-${p.id}`;
             const title = <><code className="code-chip mr-1.5">{p.code}</code><span className="font-medium">{p.name}</span></>;
@@ -189,7 +199,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                     {p.info.description ? <span className="mt-0.5 block max-w-md truncate text-[11px] text-slate-500" title={p.info.description}>{p.info.description}</span> : null}
                     {p.statusReason ? (
                       <span className="block text-[11px] whitespace-pre-line text-slate-500">
-                        {active ? "Reopened" : "Archived"}{p.statusChangedAt ? ` ${fmtDate(p.statusChangedAt)}` : ""}{p.statusChangedByName ? ` by ${p.statusChangedByName}` : ""}: {p.statusReason}
+                        {stands.said}{p.statusChangedAt ? ` ${fmtDate(p.statusChangedAt)}` : ""}{p.statusChangedByName ? ` by ${p.statusChangedByName}` : ""}: {p.statusReason}
                       </span>
                     ) : null}
                   </Td>
@@ -198,10 +208,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                   <Td className="text-xs tabular-nums">{p.members}</Td>
                   <Td className="text-xs tabular-nums">{p.documents}</Td>
                   <Td className="text-xs whitespace-nowrap">
-                    {fmtDate(p.startDate)}
-                    {p.endDate ? <span className="block text-slate-500">to {fmtDate(p.endDate)}</span> : null}
+                    {fmtDate(p.startDate)} <span className="text-slate-400">→</span> {p.endDate ? fmtDate(p.endDate) : <span className="text-slate-500">not set</span>}
                   </Td>
-                  <Td>{active ? <ToneChip tone="done">open</ToneChip> : <ToneChip tone="idle">archived</ToneChip>}</Td>
+                  <Td><ToneChip tone={stands.tone}>{stands.label}</ToneChip></Td>
                   <Td className="w-px whitespace-nowrap text-right">
                     {isOpen ? (
                       <Link href={lineHref()} scroll={false} className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Close">
@@ -224,20 +233,29 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                       </ActionForm>
                       <details className="border-t border-line px-5 py-3 sm:px-6">
                         <summary className="w-fit cursor-pointer list-none text-xs font-semibold text-slate-500 hover:text-slate-800 [&::-webkit-details-marker]:hidden">
-                          {active ? `Archive ${p.code}` : `Reopen ${p.code}`}
+                          Activate, suspend or archive {p.code}
                         </summary>
-                        <ActionForm action={setProjectStatusAction} hideSubmit hidden={{ projectId: p.id, status: active ? "ARCHIVED" : "ACTIVE" }}
-                          className="asking mt-3 space-y-3"
-                          confirmText={active ? `Archive ${p.code}? Its documents are put away with it and it leaves the picker. Nothing is deleted.` : undefined}>
-                          <p className="text-xs leading-5 text-slate-600">
-                            {active
-                              ? `Its documents are archived with it and it leaves the project picker. Nothing is deleted; reopening brings everything back.`
-                              : `Its documents come back as they were, and it is in the project picker again.`}
-                          </p>
-                          <Field label="Why" required hint="kept on the project's line and in the audit trail">
-                            <textarea name="reason" required rows={2} className={field} />
-                          </Field>
-                          <button type="submit" className="ask">{active ? "Archive it" : "Reopen it"}</button>
+                        <ActionForm action={setProjectStatusAction} hideSubmit hidden={{ projectId: p.id }} className="asking mt-3 space-y-3">
+                          <dl className="grid grid-cols-1 gap-2 text-xs leading-5 sm:grid-cols-3">
+                            {STANDS.map((one) => (
+                              <div key={one.code}>
+                                <dt className="font-semibold text-slate-700">{one.label}{one.code === p.status ? " (now)" : ""}</dt>
+                                <dd className="text-slate-500">{one.means}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-[14rem_minmax(0,1fr)]">
+                            <Field label="It becomes" required>
+                              <select name="status" required defaultValue="" className={field}>
+                                <option value="" disabled>Choose…</option>
+                                {STANDS.filter((one) => one.code !== p.status).map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
+                              </select>
+                            </Field>
+                            <Field label="Why" required hint="kept on the project's line and in the audit trail">
+                              <input name="reason" required className={field} />
+                            </Field>
+                          </div>
+                          <button type="submit" className="ask">Change it</button>
                         </ActionForm>
                       </details>
                       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">

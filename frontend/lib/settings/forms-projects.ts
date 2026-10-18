@@ -83,13 +83,13 @@ export async function setProjectStatusAction(_prev: ProjectState | undefined, fo
   const projectId = String(formData.get("projectId") ?? "");
   const status = String(formData.get("status") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
-  if (status !== "ACTIVE" && status !== "ARCHIVED") return { error: "Choose active or archived." };
+  if (status !== "ACTIVE" && status !== "ON_HOLD" && status !== "ARCHIVED") return { error: "Choose active, suspended or archived." };
   if (!reason) return { error: "Say why: it is kept on the project's line." };
   const projects = await adminProjects();
   const project = projects.find((one) => one.id === projectId);
   if (!project) return { error: "That project is not in your organization." };
-  if (status === "ARCHIVED" && !projects.some((one) => one.status === "ACTIVE" && one.id !== projectId)) {
-    return { error: "This is your only active project — archiving it would leave nobody anywhere to work." };
+  if (status !== "ACTIVE" && !projects.some((one) => one.status === "ACTIVE" && one.id !== projectId)) {
+    return { error: "This is your only active project: suspending or archiving it would leave nobody anywhere to work." };
   }
   try {
     await api(`/api/admin/projects/${projectId}`, { method: "PUT", body: { status, reason } });
@@ -97,7 +97,7 @@ export async function setProjectStatusAction(_prev: ProjectState | undefined, fo
     return { error: refusal(e).message };
   }
   revalidateProjects();
-  return { ok: `${project.code} is now ${status.toLowerCase()}.` };
+  return { ok: `${project.code} is now ${status === "ON_HOLD" ? "suspended" : status.toLowerCase()}.` };
 }
 
 /**

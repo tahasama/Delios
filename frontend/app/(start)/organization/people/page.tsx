@@ -17,8 +17,9 @@ type Who = "all" | "ours" | "guests" | "linked";
 /**
  * Everyone with an account here (owner): ours, the people of other organizations we made accounts for, and those who
  * joined from their own DELIOS. Each line: their organization, the projects they are on with their function, since
- * when, their last sign-in, and whether they may sign in (a switch, at once). A name opens their card under the line,
- * in place: every project they were on, with function, department, from when and until when (their last act there).
+ * when, their last sign-in, and whether they may sign in (a switch, at once). A name opens their card under the line, in place: every project
+ * they were on, with function, department and since when. The card shows no sign-ins or acts (owner: we are not
+ * monitoring people; a person's activity stays in Settings, for its purpose only).
  */
 export default async function OrganizationPeoplePage({ searchParams }: { searchParams: Promise<Search> }) {
   const scope = await requireOrgAdmin();
@@ -30,7 +31,8 @@ export default async function OrganizationPeoplePage({ searchParams }: { searchP
   const who: Who = sp.who === "ours" || sp.who === "guests" || sp.who === "linked" ? sp.who : "all";
   const shown = users
     .filter((u) => who === "all" || whoOf(u) === who)
-    .sort((a, b) => Number(b.internal) - Number(a.internal) || Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
+    // Ours first, then by name: switching someone off never moves their line.
+    .sort((a, b) => Number(b.internal) - Number(a.internal) || a.name.localeCompare(b.name));
   const signingIn = users.filter((u) => u.active && !u.linked).length;
   const href = (q: Search, anchor?: string) => {
     const next = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1] && e[1] !== "all"));
@@ -76,6 +78,7 @@ export default async function OrganizationPeoplePage({ searchParams }: { searchP
                     </Link>
                     {u.isAdmin ? <span className="ml-1.5"><ToneChip tone="moving">administrator</ToneChip></span> : null}
                     <span className="block pl-5 text-[11px] text-slate-500">{u.email}</span>
+                    {u.lockedUntil && new Date(u.lockedUntil) > new Date() ? <span className="block pl-5 text-[11px] font-semibold text-amber-700">locked until {fmtDateTime(u.lockedUntil)}</span> : null}
                   </Td>
                   <Td className="text-xs">
                     {u.internal ? <span className="text-slate-700">{scope.organization.name}</span> : (
@@ -96,8 +99,8 @@ export default async function OrganizationPeoplePage({ searchParams }: { searchP
                   </Td>
                   <Td className="text-xs whitespace-nowrap">{fmtDate(u.createdAt)}</Td>
                   <Td className="text-xs whitespace-nowrap">
-                    {u.lastSignInAt ? <span title={fmtDateTime(u.lastSignInAt)}>{timeAgo(u.lastSignInAt)}</span> : <span className="text-slate-500">never</span>}
-                    {u.lockedUntil && new Date(u.lockedUntil) > new Date() ? <span className="block text-[11px] font-semibold text-amber-700">locked until {fmtDateTime(u.lockedUntil)}</span> : null}
+                    {u.linked ? <span className="text-slate-500">at home</span>
+                      : u.lastSignInAt ? <span title={fmtDateTime(u.lastSignInAt)}>{timeAgo(u.lastSignInAt)}</span> : <span className="text-slate-500">never</span>}
                   </Td>
                   <Td className="w-px whitespace-nowrap text-right">
                     {u.linked ? <span className="text-[11px] text-slate-500">signs in at home</span> : me ? <span className="text-[11px] text-slate-500">you</span> : (
@@ -147,9 +150,8 @@ function PersonCard({ user: u }: { user: Awaited<ReturnType<typeof adminUsers>>[
 
   return (
     <div className="border-t border-line">
-      <dl className="grid grid-cols-1 divide-y divide-line sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+      <dl className="grid grid-cols-1 divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         {fact("Account made", fmtDate(u.createdAt), u.linked ? "stands for their own account at home" : undefined)}
-        {fact("Last sign-in", u.lastSignInAt ? fmtDateTime(u.lastSignInAt) : "Never", u.linked ? "switching in from their own DELIOS" : undefined)}
         {fact("Two-step sign-in", u.linked ? "At home" : u.mfa ? "On" : "Off")}
         {fact("Projects", `${u.memberships.filter((m) => m.active).length} now`, `${u.memberships.length} in all`)}
       </dl>
@@ -157,7 +159,7 @@ function PersonCard({ user: u }: { user: Awaited<ReturnType<typeof adminUsers>>[
         <table className="w-full border-t border-line text-left text-xs">
           <thead>
             <tr className="text-slate-500">
-              {["Project", "Function", "Department", "From", "Until (last act)", ""].map((h, i) => (
+              {["Project", "Function", "Department", "On it since", ""].map((h, i) => (
                 <th key={i} className="stencil px-5 py-2 font-normal sm:first:pl-6">{h}</th>
               ))}
             </tr>
@@ -169,9 +171,6 @@ function PersonCard({ user: u }: { user: Awaited<ReturnType<typeof adminUsers>>[
                 <td className="px-5 py-2">{m.functionName}</td>
                 <td className="px-5 py-2">{m.department ?? <span className="text-slate-500">—</span>}</td>
                 <td className="px-5 py-2 whitespace-nowrap">{m.since ? fmtDate(m.since) : "—"}</td>
-                <td className="px-5 py-2 whitespace-nowrap">
-                  {m.lastSeenAt ? <span title={fmtDateTime(m.lastSeenAt)}>{fmtDate(m.lastSeenAt)}</span> : <span className="text-slate-500">nothing done yet</span>}
-                </td>
                 <td className="px-5 py-2 text-right">
                   {state(m)}
                   {m.refusedReason ? <span className="mt-0.5 block text-[11px] text-slate-500">{m.refusedReason}</span> : null}

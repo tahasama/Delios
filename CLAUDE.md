@@ -470,9 +470,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   is everyone with an account here (owner): ours, accounts we made for other organizations, and those from their own
   DELIOS (segmented choice); each line: organization, projects with function, account since, last sign-in, and "May
   sign in", a switch acting at once (`setSignInAction`, `PUT /api/admin/users/{id}`; a linked account signs in at home).
-  Its name opens its card in place: every project with function, department, from (confirmed, else first put on it)
-  until (last act there; backend `DirectoryEndpoints.SeenAsync`, from the audit trail). No "other organizations'
-  projects" on People. No eyebrow above a plate's title; the Projects plate has its two acts and four figures.
+  Its name opens its card in place: every project with function, department and since when (confirmed, else first put
+  on it; backend `DirectoryEndpoints.SeenAsync`); the card shows no sign-ins or acts (owner: we are not monitoring
+  people), the list keeps "Last sign-in". Lines keep their order when switched (by name, never by state). No "other
+  organizations' projects" on People. An organization is suspended by its "In use" switch on its line
+  (`setPartyActiveAction`; its people's sessions stop). No eyebrow above a plate's title; the Projects plate has its two
+  acts and four figures (open, suspended, archived, people). A project is **Active**, **Suspended** (`ON_HOLD`: nobody
+  opens it until activated; its documents stay) or **Archived**, changed in its opened line, always with why; its
+  dates read "start → planned end".
 - The organization's page (`/organization`, administrators): projects ours and joined, people, organizations
   we work with, invitations (also on Home), defaults for new projects. Its projects, people and organizations
   are links (open or switch into a project; People & access; Organizations).

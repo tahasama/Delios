@@ -332,3 +332,12 @@ export async function setSignInAction(formData: FormData): Promise<void> {
   revalidatePath("/organization", "layout");
   revalidatePath("/settings/users");
 }
+
+/** An administrator suspends an organization, or puts it back in use: suspended, its people no longer sign in; everything done stays. */
+export async function setPartyActiveAction(formData: FormData): Promise<void> {
+  const partyId = text(formData, "partyId");
+  const active = text(formData, "active") === "on";
+  await api(`/api/admin/parties/${partyId}`, { method: "PUT", body: { active } });
+  revalidatePath("/organization", "layout");
+  revalidatePath("/settings/parties");
+}

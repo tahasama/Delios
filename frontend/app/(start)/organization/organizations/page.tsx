@@ -12,7 +12,8 @@ import { OrganizationJoins } from "@/app/(app)/settings/parties/organization-joi
 import { IdentifierFields } from "@/app/(app)/settings/parties/identifier-fields";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
 import { adminProjects, adminUsers, partiesWithAnswers } from "@/lib/settings/api-admin";
-import { inviteOrganizationAction, endLinkAction } from "@/lib/organization/forms";
+import { inviteOrganizationAction, endLinkAction, setPartyActiveAction } from "@/lib/organization/forms";
+import { Switch } from "@/components/switch";
 import { IDENTIFIER_KINDS, countryName } from "@/lib/organization/countries";
 import { cn, fmtDate, timeAgo } from "@/lib/core/utils";
 import { organizationLinks, guestAccounts } from "@/lib/organization/api";
@@ -102,7 +103,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
       <section className="register register-sheet register-sheet-open" aria-labelledby="orgs-head">
         {band("orgs-head", "Every organization", `${parties.length} · its code, name, identifier and how it works with us change once each`)}
         <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
-          head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Projects</Th><Th>Joined</Th><Th>Last active</Th><Th></Th></tr>}>
+          head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Projects</Th><Th>Joined</Th><Th>Last active</Th><Th className="text-right">In use</Th><Th></Th></tr>}>
           {parties.map((p) => {
             const c = p.changed;
             const open = sp.edit === p.id;
@@ -127,7 +128,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                       {identifierShown(c) ?? (c?.noIdentifierReason ? `no identifier: ${c.noIdentifierReason}` : null)}
                       {c?.domain ? ` · ${c.domain}${c.domainConfirmed ? " (proven)" : ""}` : ""}
                     </span>
-                    {p.active ? null : <span className="block pl-5 text-[11px] font-semibold text-red-700">switched off</span>}
+                    {p.active ? null : <span className="block pl-5 text-[11px] font-semibold text-red-700">suspended: its people no longer sign in</span>}
                   </Td>
                   <Td className="text-xs">
                     {p.isInternal ? <span className="text-slate-500">—</span> : (
@@ -152,6 +153,15 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                     })()}
                   </Td>
                   <Td className="w-px whitespace-nowrap text-right">
+                    {p.isInternal ? <span className="text-[11px] text-slate-500">us</span> : (
+                      <form action={setPartyActiveAction} className="inline-flex">
+                        <input type="hidden" name="partyId" value={p.id} />
+                        <input type="hidden" name="active" value={p.active ? "off" : "on"} />
+                        <Switch on={p.active} label={p.active ? `Suspend ${p.name}: its people no longer sign in` : `Put ${p.name} back in use`} />
+                      </form>
+                    )}
+                  </Td>
+                  <Td className="w-px whitespace-nowrap text-right">
                     {open
                       ? <Link href={href({}, `party-${p.id}`)} scroll={false} className={icon} title="Close"><X aria-label={`Close ${p.name}`} className="h-4 w-4" /></Link>
                       : <Link href={href({ edit: p.id }, `party-${p.id}`)} scroll={false} className={icon} title={`Change ${p.name}`}><Pencil aria-label={`Change ${p.name}`} className="h-4 w-4" /></Link>}
@@ -160,7 +170,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                 {shown ? (
                   // Its card, open under its line: since when we work with it, and every project it worked on with us.
                   <tr>
-                    <td colSpan={6} className="border-b border-line bg-tint-soft p-0">
+                    <td colSpan={7} className="border-b border-line bg-tint-soft p-0">
                       <PartyCard worked={worked} linkedAt={p.linkedAt ?? null} kind={p.isInternal ? null : kindLabel(p.kind)} roleLabel={roleLabel} ours={p.isInternal} />
                     </td>
                   </tr>
@@ -168,7 +178,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                 {open ? (
                   // The line goes on as the form: grey fields, then the strip with Cancel and Save.
                   <tr>
-                    <td colSpan={6} className="border-b border-line p-0">
+                    <td colSpan={7} className="border-b border-line p-0">
                       {c?.theirs ? (
                         // Its own DELIOS: its details are its own; we see them, and switch it off for us if need be.
                         <ActionForm id={`party-form-${p.id}`} action={savePartyAction} hideSubmit
