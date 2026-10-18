@@ -532,15 +532,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   administrator; `GET /api/forms/{form}`). The backend refuses what a form insists on, for every way it arrives (a form,
   an import, a draft sent): documents (registered and changed), revisions started by hand, transmittals sent, packages,
   tags, opening a project and adding an organization (FIELDS_REQUIRED, `fields` outlined). On the review form, "Copied in"
-  is must · asked · not asked like any field (not asked: nobody is copied in). Every **list of one's own** (Types & sets, Numbering & identity or Classification & keeping) is a document
-  field by itself (must · asked · not asked; optional unless chosen): offered by the set serving the document's
-  deliverable type (backend VALUE_NOT_FOR_TYPE), kept with the document (`Document.Extras`), shown and changed in
-  Details / Edit rev, a register column and a filter (`own.<key>`, backend `RegisterFilter.Own`). Fields added by hand
-  stay (any answer kind; a column of the register by its switch). The page is Types & sets' way: the forms on the left,
-  the chosen form's fields as rows (what it is, the answer it takes, the segmented choice acting at once, a pencil to
-  rename, a bin for one's own, + to add). The forms that no longer existed in the app (readiness, adding a person) and
-  the fields it no longer asks (a revision's separate reason and "released as", the file, the received date, a
-  transmittal's response day and covering files, a package's status and acceptor) are gone from it.
+  is must · asked · not asked like any field (not asked: nobody is copied in). **A field of one's own** is one row,
+  added and changed with the same form (owner): what it is called, the kind of answer, the list it is chosen from (a list
+  chosen makes it a choice from that list: never two fields), must it be filled, the note under the box, a column of the
+  register. Never answered: changed entirely, or taken off (bin). Answered at least once (`FormRules.UsedAsync`): only
+  retired (no longer asked, its answers stay on their records; brought back), its kind and list fixed (backend
+  FIELD_IN_USE). Chosen from a list, it offers the values of the set serving the document's deliverable type (backend
+  VALUE_NOT_FOR_TYPE), kept with the record (`Extras`), shown and changed in Details / Edit rev, a register filter
+  (`own.<key>`) and, if chosen, a column. A list is never added to a form by itself. A number part reading a list of
+  one's own (`LIST:<key>`) takes the answer to the document form's field chosen from that list.
 - **Forms follow the sets**: a document is offered, for each list, only the values of the set serving its deliverable
   type (new document, once the type is chosen; Details and Edit rev by the document's own type), read from the backend
   (`GET /api/values/serving`, `lib/settings/serving.ts` `forType`); the backend refuses any other (VALUE_NOT_FOR_TYPE,

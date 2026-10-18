@@ -134,9 +134,11 @@ public sealed class DocumentService(
         };
         if (await Settings.FormRules.CheckAsync(db, access.Project.Id, "DOCUMENT", formGiven, request.Extras, cancellationToken) is { } formProblem)
             return Fail(formProblem);
-        if (await Settings.FormRules.CheckListAnswersAsync(db, access.Project.Id, catalog, request.DeliverableType, request.Extras, cancellationToken) is { } listProblem)
+        if (await Settings.FormRules.CheckChoiceAnswersAsync(db, access.Project.Id, catalog, request.DeliverableType, request.Extras, cancellationToken) is { } listProblem)
             return Fail(listProblem);
 
+        // A number part reading a list of one's own takes the answer to the document form's field drawing from it.
+        var listAnswers = await Settings.FormRules.ListAnswersAsync(db, access.Project.Id, request.Extras, cancellationToken);
         // A record type (Settings, on the type) is always a record: nobody is asked whether it is revised.
         var recordType = (await Catalog.LoadAsync(db, cancellationToken)).Prop(ValueSets.DocumentTypes, request.DocType!, "record")
             is { ValueKind: System.Text.Json.JsonValueKind.True };
@@ -144,7 +146,7 @@ public sealed class DocumentService(
         if (checkOnly)
         {
             var refusal = await numbering.RefusalAsync(request.DeliverableType, new NumberFields(access.Project.Code, Blank(request.Subproject),
-                originator, Blank(request.ContractRef), request.Discipline, request.DocType, Lists: request.Extras), cancellationToken);
+                originator, Blank(request.ContractRef), request.Discipline, request.DocType, Lists: listAnswers), cancellationToken);
             return refusal switch
             {
                 Allocation.NoScheme => Fail(Problems.Invalid("NO_NUMBERING_SCHEME",
@@ -160,7 +162,7 @@ public sealed class DocumentService(
         await ProjectCodes.EnsurePublishedAsync(db, access.Project.TenantId, access.Project.Code, access.Project.Name, cancellationToken);
         var allocation = await numbering.AllocateAsync(access.Project.TenantId, access.Project.Id, request.DeliverableType,
             new NumberFields(access.Project.Code, Blank(request.Subproject), originator, Blank(request.ContractRef),
-                request.Discipline, request.DocType, Lists: request.Extras), cancellationToken);
+                request.Discipline, request.DocType, Lists: listAnswers), cancellationToken);
         if (allocation is Allocation.NoScheme)
         {
             return Fail(Problems.Invalid("NO_NUMBERING_SCHEME",
@@ -338,12 +340,11 @@ public sealed class DocumentService(
         {
             var form = await Settings.FormRules.ReadAsync(db, document.ProjectId, "DOCUMENT", cancellationToken);
             var emptied = extraChanges.Where(c => c.Value is null).Select(c => c.Key)
-                .Select(k => form.Own.FirstOrDefault(o => o.Key == k && o.Rule == Settings.FormRules.Required)?.Label
-                    ?? form.Lists.FirstOrDefault(l => l.Key == k && l.Rule == Settings.FormRules.Required)?.Title).OfType<string>().ToList();
+                .Select(k => form.Own.FirstOrDefault(o => o.Key == k && o.Rule == Settings.FormRules.Required)?.Label).OfType<string>().ToList();
             if (emptied.Count > 0)
                 return Fail(Problems.Invalid("FIELDS_REQUIRED", $"{string.Join(", ", emptied)} cannot be emptied: the project's document form insists on it.",
                     new { fields = extraChanges.Where(c => c.Value is null).Select(c => c.Key).ToList() }));
-            if (await Settings.FormRules.CheckListAnswersAsync(db, document.ProjectId, catalog, document.DeliverableType, extraChanges, cancellationToken) is { } listProblem)
+            if (await Settings.FormRules.CheckChoiceAnswersAsync(db, document.ProjectId, catalog, document.DeliverableType, extraChanges, cancellationToken) is { } listProblem)
                 return Fail(listProblem);
         }
         // An order stays the document's supplier's, whichever of the two changed.

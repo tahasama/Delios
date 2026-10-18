@@ -639,3 +639,5 @@ in the code; it lives only in your local database.
   "A column of the register" now really makes one. "Copied in" on Send for review can be required or left out. Opening a
   project and adding an organization are checked by the backend too. A list of one's own in Numbering & identity can be
   a part of the number; the Numbering builder no longer offers lists a number cannot be built from.
+- **A field of your own is one row** on Forms & fields: added and changed with the same form, taken off while never
+  answered, retired once answered. Lists are no longer added to the document form by themselves (that made two fields).

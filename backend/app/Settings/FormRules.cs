@@ -10,18 +10,16 @@ using NodaTime;
 namespace Delios.Host.Settings;
 
 /// <summary>A field the organization or the project added to a form, as kept (setting <c>OWN_FIELDS:{form}</c>).</summary>
-public sealed record OwnField(string Id, string Key, string Label, string Control, string? SetKey, string Rule, string? Help, bool InRegister);
-
-/// <summary>One list of one's own asked on the document form, by itself (owner): the list's key, its title, and its rule.</summary>
-public sealed record ListField(string Key, string Title, string Rule);
+/// <param name="Retired">Answered at least once, then taken off the form: no longer asked; the answers given stay on their records.</param>
+public sealed record OwnField(string Id, string Key, string Label, string Control, string? SetKey, string Rule, string? Help, bool InRegister,
+    bool Retired = false);
 
 /// <summary>What one form asks, as the screens and the checks read it.</summary>
 public sealed record FormView(string Form, IReadOnlyDictionary<string, string> Rules, IReadOnlyDictionary<string, string> Labels,
-    IReadOnlyList<OwnField> Own, IReadOnlyList<ListField> Lists);
+    IReadOnlyList<OwnField> Own, IReadOnlyList<string>? Used = null);
 
 /// <summary>Body of saving one form: each field's rule and name, the fields of one's own, and each list's rule.</summary>
-public sealed record FormRequest(Dictionary<string, string?>? Rules, Dictionary<string, string?>? Labels, OwnField[]? Own,
-    Dictionary<string, string?>? Lists);
+public sealed record FormRequest(Dictionary<string, string?>? Rules, Dictionary<string, string?>? Labels, OwnField[]? Own);
 
 /// <summary>
 /// What each form asks for, and what it insists on (Forms &amp; fields), worked out once here and checked on every save
@@ -91,15 +89,6 @@ public static class FormRules
         catch (JsonException) { return []; }
     }
 
-    /// <summary>The lists of one's own a document is asked by itself: those in Numbering &amp; identity or Classification &amp; keeping.</summary>
-    private static async Task<List<(string Key, string Title)>> OwnListsAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken)
-    {
-        var meta = await ListRules.MetaAsync(db, projectId, cancellationToken);
-        return meta.Where(m => !ListRules.IsAppList(m.Key) && m.Value.Kind != "VERDICTS" && m.Value.Active && m.Value.Group is not null
-                && ListRules.GroupOf(m.Key, m.Value) is ListRules.Numbering or ListRules.Classification)
-            .Select(m => (m.Key, ListRules.TitleOf(m.Key, m.Value))).OrderBy(m => m.Item2).ToList();
-    }
-
     /// <summary>What one form asks on a project (or, for the organization's forms, on none).</summary>
     public static async Task<FormView> ReadAsync(DeliosDbContext db, Guid? projectId, string form, CancellationToken cancellationToken)
     {
@@ -108,13 +97,35 @@ public static class FormRules
         var rules = fields.ToDictionary(f => f.Key, f => source.GetValueOrDefault($"{RuleKey}{form}:{f.Key}") is { } r && IsRule(r) ? r : f.Fallback);
         var labels = source.Where(s => s.Key.StartsWith($"{LabelKey}{form}:")).ToDictionary(s => s.Key[(LabelKey.Length + form.Length + 1)..], s => s.Value);
         var own = ReadOwn(source.GetValueOrDefault(OwnKey + form));
-        List<ListField> lists = [];
-        if (form == "DOCUMENT" && projectId is { } project)
+        return new FormView(form, rules, labels, own, projectId is { } id ? [.. await UsedAsync(db, id, form, cancellationToken)] : []);
+    }
+
+    /// <summary>
+    /// The fields of one's own a record of this form on the project carries an answer to: answered at least once, they
+    /// are retired, never taken away, and what they ask (the kind of answer, the list) stays as it was.
+    /// </summary>
+    public static async Task<HashSet<string>> UsedAsync(DeliosDbContext db, Guid projectId, string form, CancellationToken cancellationToken)
+    {
+        IQueryable<string?> stored = form switch
         {
-            lists = [.. (await OwnListsAsync(db, project, cancellationToken)).Select(l => new ListField(l.Key, l.Title,
-                source.GetValueOrDefault($"{RuleKey}{form}:list:{l.Key}") is { } r && IsRule(r) ? r : Optional))];
+            "DOCUMENT" => db.Documents.AsNoTracking().Where(d => d.ProjectId == projectId).Select(d => d.Extras),
+            "TRANSMITTAL" => db.Transmittals.AsNoTracking().Where(t => t.ProjectId == projectId).Select(t => t.Extras),
+            "PACKAGE" => db.Packages.AsNoTracking().Where(p => p.ProjectId == projectId).Select(p => p.Extras),
+            "ASSET" => db.Set<Records.Asset>().AsNoTracking().Where(a => a.ProjectId == projectId).Select(a => a.Extras),
+            _ => Enumerable.Empty<string?>().AsQueryable(),
+        };
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        if (stored is not IAsyncEnumerable<string?>) return used;
+        foreach (var json in await stored.Where(e => e != null).ToListAsync(cancellationToken))
+        {
+            try
+            {
+                foreach (var (key, value) in JsonSerializer.Deserialize<Dictionary<string, string>>(json!) ?? [])
+                    if (!string.IsNullOrWhiteSpace(value)) used.Add(key);
+            }
+            catch (JsonException) { }
         }
-        return new FormView(form, rules, labels, own, lists);
+        return used;
     }
 
     private static bool IsRule(string value) => value is Required or Optional or Off;
@@ -138,8 +149,7 @@ public static class FormRules
         if (only is null)
         {
             bool Filled(string key) => extras is not null && !string.IsNullOrWhiteSpace(extras.GetValueOrDefault(key));
-            foreach (var own in view.Own.Where(o => o.Rule == Required && !Filled(o.Key))) missing.Add(($"own:{own.Key}", own.Label));
-            foreach (var list in view.Lists.Where(l => l.Rule == Required && !Filled(l.Key))) missing.Add(($"own:{list.Key}", list.Title));
+            foreach (var own in view.Own.Where(o => !o.Retired && o.Rule == Required && !Filled(o.Key))) missing.Add(($"own:{own.Key}", own.Label));
         }
         if (missing.Count == 0) return null;
         var names = missing.Select(m => m.Label.ToLowerInvariant()).ToList();
@@ -155,22 +165,36 @@ public static class FormRules
     };
 
     /// <summary>
-    /// The answers kept with a document for the lists of one's own: each must be a value of its list, offered for the
-    /// document's deliverable type (owner: forms follow the sets); a list switched off is not read.
+    /// The answers kept with a document to the fields of the project's own that are chosen from a list: each must be a
+    /// value of that list in use, offered for the document's deliverable type (owner: forms follow the sets).
     /// </summary>
-    public static async Task<IResult?> CheckListAnswersAsync(DeliosDbContext db, Guid projectId, Catalog catalog, string? deliverableType,
+    public static async Task<IResult?> CheckChoiceAnswersAsync(DeliosDbContext db, Guid projectId, Catalog catalog, string? deliverableType,
         IReadOnlyDictionary<string, string?>? extras, CancellationToken cancellationToken)
     {
         if (extras is null || extras.Count == 0) return null;
-        foreach (var (key, _) in await OwnListsAsync(db, projectId, cancellationToken))
+        foreach (var field in (await ReadAsync(db, projectId, "DOCUMENT", cancellationToken)).Own.Where(o => o.Control == "CHOICE" && o.SetKey is not null))
         {
-            if (extras.GetValueOrDefault(key) is not { Length: > 0 } value) continue;
-            if (!catalog.IsActive(key, value))
-                return Problems.Invalid("VALUE_NOT_PUBLISHED", $"{value} is not a value of {key} in use.", new { field = $"own:{key}", value });
-            if (!catalog.IsOfferedFor(key, value, deliverableType))
-                return Problems.Invalid("VALUE_NOT_FOR_TYPE", $"{value} is not offered for this deliverable type.", new { field = $"own:{key}", value });
+            if (extras.GetValueOrDefault(field.Key) is not { Length: > 0 } value) continue;
+            if (!catalog.IsActive(field.SetKey!, value))
+                return Problems.Invalid("VALUE_NOT_PUBLISHED", $"{value} is not a value of {field.Label} in use.", new { field = $"own:{field.Key}", value });
+            if (!catalog.IsOfferedFor(field.SetKey!, value, deliverableType))
+                return Problems.Invalid("VALUE_NOT_FOR_TYPE", $"{value} is not offered for this deliverable type.", new { field = $"own:{field.Key}", value });
         }
         return null;
+    }
+
+    /// <summary>
+    /// A document's answers by the list they are chosen from, for a number part reading a list of one's own
+    /// (<c>LIST:&lt;key&gt;</c>): the answer to the document form's field drawing from that list.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<string, string?>> ListAnswersAsync(DeliosDbContext db, Guid projectId,
+        IReadOnlyDictionary<string, string?>? extras, CancellationToken cancellationToken)
+    {
+        var answers = new Dictionary<string, string?>();
+        if (extras is null) return answers;
+        foreach (var field in (await ReadAsync(db, projectId, "DOCUMENT", cancellationToken)).Own.Where(o => o.Control == "CHOICE" && o.SetKey is not null))
+            if (extras.GetValueOrDefault(field.Key) is { Length: > 0 } value) answers.TryAdd(field.SetKey!, value);
+        return answers;
     }
 
     public static void MapFormEndpoints(this IEndpointRouteBuilder app)
@@ -243,8 +267,6 @@ public static class FormRules
         }
         foreach (var (key, label) in request.Labels ?? [])
             await PutAsync($"{LabelKey}{form}:{key}", label is { Length: > 0 } && label.Trim().Length <= 60 ? label : null);
-        foreach (var (key, rule) in request.Lists ?? [])
-            if (rule is not null && IsRule(rule)) await PutAsync($"{RuleKey}{form}:list:{key}", rule == Optional ? null : rule);
         if (request.Own is { } own)
         {
             foreach (var one in own)
@@ -252,6 +274,21 @@ public static class FormRules
                 if (string.IsNullOrWhiteSpace(one.Label) || one.Label.Length > 60) return Problems.Invalid("LABEL_REQUIRED", "A field has a name of at most 60 characters.");
                 if (!IsRule(one.Rule)) return Problems.Invalid("RULE_INVALID", $"{one.Label}: say whether it must be filled.");
                 if (one.Control == "CHOICE" && string.IsNullOrWhiteSpace(one.SetKey)) return Problems.Invalid("LIST_REQUIRED", $"{one.Label}: a field chosen from a list names the list.");
+                if (one.Control != "CHOICE" && one.SetKey is not null) return Problems.Invalid("LIST_ONLY_FOR_A_CHOICE", $"{one.Label}: only a field chosen from a list names a list.");
+            }
+            // A field answered at least once is retired, never taken away, and keeps the kind of answer and the list it asks.
+            if (scope is { } formProject)
+            {
+                var used = await UsedAsync(db, formProject, form, cancellationToken);
+                var before = (await ReadAsync(db, formProject, form, cancellationToken)).Own;
+                foreach (var was in before.Where(b => used.Contains(b.Key)))
+                {
+                    var now = own.FirstOrDefault(o => o.Key == was.Key);
+                    if (now is null)
+                        return Problems.Conflict("FIELD_IN_USE", $"{was.Label} has been answered: retire it instead, and its answers stay on their records.");
+                    if (now.Control != was.Control || now.SetKey != was.SetKey)
+                        return Problems.Conflict("FIELD_IN_USE", $"{was.Label} has been answered: what it asks stays as it is. Retire it and add a new field instead.");
+                }
             }
             await PutAsync(OwnKey + form, own.Length == 0 ? null : JsonSerializer.Serialize(own, JsonSerializerOptions.Web));
         }

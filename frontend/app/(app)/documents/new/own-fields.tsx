@@ -38,7 +38,7 @@ export function OwnFields({ fields, values, className, deliverableType, serving 
             ) : field.control === "CHOICE" ? (
               <select name={name} required={required} defaultValue={value} className={inputCls}>
                 <option value="">{required ? "Choose…" : "—"}</option>
-                {(field.fromList && serving && field.setKey ? forType(serving, field.setKey, deliverableType, field.options ?? []) : field.options ?? []).map((o) => (
+                {(serving && field.setKey ? forType(serving, field.setKey, deliverableType, field.options ?? []) : field.options ?? []).map((o) => (
                   <option key={o.code} value={o.code}>{o.label}</option>
                 ))}
               </select>

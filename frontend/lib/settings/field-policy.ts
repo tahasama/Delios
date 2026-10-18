@@ -175,7 +175,9 @@ export type Rules = Record<string, FieldRule>;
 /** One form as the backend works it out (`FormRules`): the project's own copy, else the organization's. */
 type FormView = {
   form: FieldKind; rules: Record<string, FieldRule>; labels: Record<string, string>;
-  own: Omit<OwnField, "options" | "fromList">[]; lists: { key: string; title: string; rule: FieldRule }[];
+  own: Omit<OwnField, "options">[];
+  /** The fields of one's own a record of this form carries an answer to: retired, never taken away. */
+  used?: string[];
 };
 /** Every form of a project, whether it keeps its own copy, and who may change them. */
 export type FormsAnswer = { forms: FormView[]; own: boolean; mayChange: boolean; mayChangeOrganization: boolean };
@@ -206,7 +208,7 @@ export async function fieldLabels(t: Tenant, kind: FieldKind): Promise<Record<st
   return out;
 }
 
-/** A field added to a form, as a form needs it; `fromList` for a list of one's own asked by itself on the document. */
+/** A field added to a form, as a form needs it. Chosen from a list, it offers the values of the set serving the document. */
 export type OwnField = {
   id: string;
   key: string;
@@ -216,7 +218,8 @@ export type OwnField = {
   rule: FieldRule;
   help: string | null;
   inRegister: boolean;
-  fromList?: boolean;
+  /** Answered at least once, then taken off the form: no longer asked, its answers read back where they are. */
+  retired?: boolean;
   /** For a choice: the live values of the list it draws from (with their set, so a form offers the serving one's). */
   options?: { code: string; label: string; setId?: string | null }[];
 };
@@ -228,20 +231,17 @@ export type OwnField = {
 export async function ownFields(t: Tenant, kind: FieldKind): Promise<OwnField[]> {
   const view = await formView(t, kind);
   const { getActiveSet } = await import("@/lib/settings/config");
-  const own = (view?.own ?? []).filter((r) => r.rule !== "OFF");
-  const lists = (view?.lists ?? []).filter((l) => l.rule !== "OFF").map((l) => ({
-    id: `list:${l.key}`, key: l.key, label: l.title, control: "CHOICE" as Control, setKey: l.key, rule: l.rule, help: null, inRegister: true, fromList: true,
-  }));
-  return Promise.all([...own, ...lists].map(async (r) => ({
+  const own = (view?.own ?? []).filter((r) => r.rule !== "OFF" && !r.retired);
+  return Promise.all(own.map(async (r) => ({
     ...r,
     options: r.setKey ? (await getActiveSet(r.setKey)).map((v) => ({ code: v.code, label: `${v.code} — ${v.label}`, setId: v.setId ?? null })) : undefined,
   })));
 }
 
 /** The fields added to a form, as kept, every rule included; and the lists of one's own with their rules. */
-export async function storedOwnFields(t: Tenant, kind: FieldKind): Promise<{ own: Omit<OwnField, "options">[]; lists: { key: string; title: string; rule: FieldRule }[] }> {
+export async function storedOwnFields(t: Tenant, kind: FieldKind): Promise<{ own: Omit<OwnField, "options">[]; used: string[] }> {
   const view = await formView(t, kind);
-  return { own: view?.own ?? [], lists: view?.lists ?? [] };
+  return { own: view?.own ?? [], used: view?.used ?? [] };
 }
 
 /** The answers a record carries to its organization's own fields. */

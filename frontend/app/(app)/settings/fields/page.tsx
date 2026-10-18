@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
 import { inputCls, Field } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { Switch, SwitchControl } from "@/components/switch";
-import { setFieldRuleAction, renameFieldAction, addOwnFieldAction, removeOwnFieldAction, ownInRegisterAction } from "@/lib/settings/forms-fields";
+import { SwitchControl } from "@/components/switch";
+import { setFieldRuleAction, renameFieldAction, saveOwnFieldAction, removeOwnFieldAction, retireOwnFieldAction } from "@/lib/settings/forms-fields";
 import {
   KINDS, KIND_LABEL, KIND_TAB, KIND_TEXT, RULE_LABEL, CONTROL_LABEL, ORGANIZATION_KINDS, fieldsOf, projectForms,
   type FieldKind, type FieldRule, type Control,
@@ -21,15 +21,17 @@ const ICON = "inline-flex rounded-sm p-1.5 text-slate-500 transition hover:bg-sl
 const SHORT: Record<FieldRule, string> = { REQUIRED: "Must", OPTIONAL: "Asked", OFF: "Not asked" };
 
 type Row = {
-  key: string; label: string; text: string; control: Control; setKey?: string | null; of: "app" | "list" | "own";
+  key: string; label: string; text: string; control: Control; setKey?: string | null; of: "app" | "own";
   rule: FieldRule; fixed?: string; computedBy?: string; help?: string | null; inRegister?: boolean;
+  /** One's own field answered at least once: retired, never taken away, what it asks unchanged. */
+  used?: boolean; retired?: boolean;
 };
 
 /**
  * Forms & fields, Types & sets' way (owner): the forms in a menu on the left, the chosen form's fields as rows on the
  * right. Each row: what it is, what it is called here, and how it stands, the segmented choice (must · asked · not
- * asked) acting at once; a pencil renames it, a bin takes a field of one's own away. On the document form, every list of
- * one's own (Types & sets) is a field by itself. A project's forms are the project's (`FormRules`): the control function
+ * asked) acting at once; a pencil renames one of the app's fields, or opens a field of one's own in the very form that
+ * added it; a bin takes one never answered away, and one answered is retired (and brought back). A project's forms are the project's (`FormRules`): the control function
  * changes them, everyone of ours reads them; opening a project and adding an organization are the organization's.
  */
 export default async function FieldsPage({ searchParams }: { searchParams: Promise<{ form?: string; edit?: string; panel?: string }> }) {
@@ -52,13 +54,9 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
       key: f.key, label: view?.labels[f.key] ?? f.label, text: f.text, control: f.control, setKey: f.setKey, of: "app" as const,
       rule: (f.fixed ? f.fallback : view?.rules[f.key] ?? f.fallback) as FieldRule, fixed: f.fixed, computedBy: f.computedBy,
     })),
-    ...(view?.lists ?? []).map((l) => ({
-      key: l.key, label: l.title, text: "A list of your own, asked by itself: the values of the set serving the document's deliverable type.",
-      control: "CHOICE" as Control, setKey: l.key, of: "list" as const, rule: l.rule,
-    })),
     ...(view?.own ?? []).map((o) => ({
       key: o.key, label: o.label, text: o.help ?? "", control: o.control, setKey: o.setKey, of: "own" as const, rule: o.rule,
-      help: o.help, inRegister: o.inRegister,
+      help: o.help, inRegister: o.inRegister, used: (view?.used ?? []).includes(o.key), retired: !!o.retired,
     })),
   ];
 
@@ -112,27 +110,7 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                 <span className="stencil mr-1 text-slate-500">A field of your own</span>
                 <span className="text-[11px] text-slate-500">asked on this form, kept with the record, read back under its name; the app computes nothing with it</span>
               </div>
-              <ActionForm id="new-field" action={addOwnFieldAction} hideSubmit resetOnSuccess hidden={{ kind }} className="asking px-5 py-5 sm:px-6">
-                <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <Field label="What it is called" required><input name="label" required maxLength={60} placeholder="Client reference" className={inputCls} /></Field>
-                  <Field label="What kind of answer">
-                    <select name="control" defaultValue="TEXT" className={inputCls}>{OWN_CONTROLS.map((c) => <option key={c} value={c}>{CONTROL_LABEL[c]}</option>)}</select>
-                  </Field>
-                  <Field label="If a list, which list">
-                    <select name="setKey" defaultValue="" className={inputCls}>
-                      <option value="">Not a list</option>
-                      {sets.map((s) => <option key={s.key} value={s.key}>{s.title}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Must it be filled">
-                    <select name="rule" defaultValue="OPTIONAL" className={inputCls}>{RULES.map((one) => <option key={one} value={one}>{RULE_LABEL[one]}</option>)}</select>
-                  </Field>
-                  <div className="sm:col-span-2 lg:col-span-3"><Field label="Note under the box"><input name="help" maxLength={140} placeholder="What to put in it, in your words" className={inputCls} /></Field></div>
-                  {kind === "DOCUMENT" ? (
-                    <label className="inline-flex cursor-pointer items-center gap-2 self-end pb-1.5 text-xs text-slate-700"><SwitchControl name="inRegister" /> a column of the register</label>
-                  ) : null}
-                </div>
-              </ActionForm>
+              <OwnFieldForm id="new-field" kind={kind} sets={sets} />
               <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
                 <Link scroll={false} href={here({})} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
                 <button type="submit" form="new-field" data-on="true" className="ask">Add it</button>
@@ -153,14 +131,23 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
               {rows.map((row) => {
                 const editing = may && sp.edit === `${row.of}:${row.key}`;
                 const list = titleOf(row.setKey);
-                return editing ? (
+                return editing && row.of === "own" ? (
+                  <tr key={`${row.of}:${row.key}`} className="bg-tint-soft/60">
+                    <td colSpan={4} className="p-0">
+                      <OwnFieldForm id="edit-field" kind={kind} sets={sets} field={row} />
+                      <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
+                        <Link scroll={false} href={here({})} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                        <button type="submit" form="edit-field" data-on="true" className="ask">Save</button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : editing ? (
                   <tr key={`${row.of}:${row.key}`} className="bg-tint-soft/60">
                     <td colSpan={4} className="p-0">
                       <ActionForm id="rename-field" action={renameFieldAction} hideSubmit hidden={{ kind, key: row.key, of: row.of }} className="asking grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-2 sm:px-6">
                         <Field label={`What ${row.of === "app" ? fieldsOf(kind).find((f) => f.key === row.key)?.label ?? row.label : "it"} is called here`}>
                           <input name="label" defaultValue={row.label} maxLength={60} className={inputCls} />
                         </Field>
-                        {row.of === "own" ? <Field label="Note under the box"><input name="help" defaultValue={row.help ?? ""} maxLength={140} className={inputCls} /></Field> : null}
                       </ActionForm>
                       <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
                         <Link scroll={false} href={here({})} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
@@ -169,22 +156,16 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                     </td>
                   </tr>
                 ) : (
-                  <tr key={`${row.of}:${row.key}`} className="align-top">
+                  <tr key={`${row.of}:${row.key}`} className={`align-top ${row.retired ? "opacity-60" : ""}`}>
                     <td className="px-5 py-3 sm:px-6">
                       <p className="text-[13px] font-medium leading-5 text-slate-900">
                         {row.label}
-                        {row.of === "own" ? <span className="ml-2 text-[11px] font-normal text-brand-ink">yours</span> : null}
-                        {row.of === "list" ? <span className="ml-2 text-[11px] font-normal text-brand-ink">your list</span> : null}
+                        {row.of === "own" ? <span className="ml-2 text-[11px] font-normal text-brand-ink">{row.retired ? "yours · retired" : "yours"}</span> : null}
                       </p>
                       {row.text ? <p className="mt-0.5 max-w-xl text-[11.5px] leading-[1.45] text-slate-500">{row.text}</p> : null}
                       {row.fixed ? <p className="mt-0.5 max-w-xl text-[11px] leading-4 text-slate-500">Always asked: {row.fixed}</p> : null}
-                      {row.of === "own" && kind === "DOCUMENT" ? (
-                        <form action={ownInRegisterAction} className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
-                          <input type="hidden" name="kind" value={kind} /><input type="hidden" name="key" value={row.key} />
-                          <Switch on={!!row.inRegister} disabled={!may} label={row.inRegister ? "Take it out of the register's columns" : "Make it a column of the register"} />
-                          a column of the register
-                        </form>
-                      ) : null}
+                      {row.of === "own" && kind === "DOCUMENT" && row.inRegister ? <p className="mt-0.5 text-[11px] text-slate-500">A column of the register.</p> : null}
+                      {row.retired ? <p className="mt-0.5 text-[11px] text-slate-500">No longer asked; its answers stay on their records.</p> : null}
                     </td>
                     <td className="hidden px-3 py-3 text-[11.5px] leading-[1.45] text-slate-600 md:table-cell">
                       {CONTROL_LABEL[row.control]}
@@ -192,7 +173,9 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                       {row.computedBy ? <span className="mt-0.5 block text-[11px] text-slate-500">{row.computedBy}</span> : null}
                     </td>
                     <td className="px-3 py-2.5">
-                      {row.fixed ? (
+                      {row.retired ? (
+                        <span className="inline-block py-1.5 text-[12px] font-medium text-slate-500">Retired</span>
+                      ) : row.fixed ? (
                         <span className="inline-block py-1.5 text-[12px] font-medium text-slate-500">Always asked</span>
                       ) : (
                         <form action={setFieldRuleAction} className="seg w-fit">
@@ -209,13 +192,20 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
                     <td className="px-3 py-2.5 text-right">
                       {may ? (
                         <span className="inline-flex items-center gap-1">
-                          {row.of !== "list" ? (
-                            <Link scroll={false} href={here({ edit: `${row.of}:${row.key}` })} title="Change what it is called" aria-label="Change what it is called" className={ICON}><Pencil className="h-4 w-4" /></Link>
+                          {!row.retired ? (
+                            <Link scroll={false} href={here({ edit: `${row.of}:${row.key}` })} title={row.of === "own" ? "Change this field" : "Change what it is called"} aria-label="Change this field" className={ICON}><Pencil className="h-4 w-4" /></Link>
                           ) : null}
-                          {row.of === "own" ? (
+                          {row.of === "own" && row.used ? (
+                            <form action={retireOwnFieldAction}>
+                              <input type="hidden" name="kind" value={kind} /><input type="hidden" name="key" value={row.key} />
+                              <button type="submit" title={row.retired ? "Bring it back on the form" : "Retire it: answered already, so it stays on its records and is no longer asked"} aria-label={row.retired ? "Bring it back" : "Retire it"} className={ICON}>
+                                {row.retired ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                              </button>
+                            </form>
+                          ) : row.of === "own" ? (
                             <form action={removeOwnFieldAction}>
                               <input type="hidden" name="kind" value={kind} /><input type="hidden" name="key" value={row.key} />
-                              <button type="submit" title="Take it off the form (answers already given stay)" aria-label="Take it off the form" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                              <button type="submit" title="Take it off the form (never answered)" aria-label="Take it off the form" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                             </form>
                           ) : null}
                         </span>
@@ -230,5 +220,43 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
         </section>
       </div>
     </div>
+  );
+}
+
+/**
+ * A field of one's own, the same form to add it and to change it (owner): what it is called, the kind of answer, the
+ * list it is chosen from (a list chosen makes it a choice from that list), must it be filled, the note under the box,
+ * and a column of the register. Once answered, the kind of answer and the list stay as they are.
+ */
+function OwnFieldForm({ id, kind, sets, field }: {
+  id: string; kind: FieldKind; sets: { key: string; title: string }[];
+  field?: { key: string; label: string; control: Control; setKey?: string | null; rule: FieldRule; help?: string | null; inRegister?: boolean; used?: boolean };
+}) {
+  const fixed = !!field?.used;
+  return (
+    <ActionForm id={id} action={saveOwnFieldAction} hideSubmit resetOnSuccess={!field} hidden={{ kind, key: field?.key ?? "", ...(fixed ? { control: field!.control, setKey: field!.setKey ?? "" } : {}) }}
+      className="asking px-5 py-5 sm:px-6">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="What it is called" required><input name="label" required maxLength={60} defaultValue={field?.label ?? ""} placeholder="Client reference" className={inputCls} /></Field>
+        <Field label="What kind of answer" hint={fixed ? "answered already: stays as it is" : undefined}>
+          <select name={fixed ? undefined : "control"} defaultValue={field?.control ?? "TEXT"} disabled={fixed} className={inputCls}>
+            {OWN_CONTROLS.map((c) => <option key={c} value={c}>{CONTROL_LABEL[c]}</option>)}
+          </select>
+        </Field>
+        <Field label="If a list, which list" hint={fixed ? "answered already: stays as it is" : "chosen: the answer is one of its values, whatever the kind says"}>
+          <select name={fixed ? undefined : "setKey"} defaultValue={field?.setKey ?? ""} disabled={fixed} className={inputCls}>
+            <option value="">Not a list</option>
+            {sets.map((s) => <option key={s.key} value={s.key}>{s.title}</option>)}
+          </select>
+        </Field>
+        <Field label="Must it be filled">
+          <select name="rule" defaultValue={field?.rule ?? "OPTIONAL"} className={inputCls}>{RULES.map((one) => <option key={one} value={one}>{RULE_LABEL[one]}</option>)}</select>
+        </Field>
+        <div className="sm:col-span-2 lg:col-span-3"><Field label="Note under the box"><input name="help" maxLength={140} defaultValue={field?.help ?? ""} placeholder="What to put in it, in your words" className={inputCls} /></Field></div>
+        {kind === "DOCUMENT" ? (
+          <label className="inline-flex cursor-pointer items-center gap-2 self-end pb-1.5 text-xs text-slate-700"><SwitchControl name="inRegister" defaultChecked={!!field?.inRegister} /> a column of the register</label>
+        ) : null}
+      </div>
+    </ActionForm>
   );
 }

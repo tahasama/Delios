@@ -294,7 +294,7 @@ export default async function DocumentDetailPage({
   // What is offered to choose: the set of each list serving this document's deliverable type (Types & sets); every
   // value is still read by its name wherever the document already carries it.
   const serving = await servingOf(["DOCUMENT_TYPES", "DISCIPLINES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES", "PHASES",
-    ...own.filter((f) => f.fromList && f.setKey).map((f) => f.setKey!)]);
+    ...own.filter((f) => f.setKey).map((f) => f.setKey!)]);
   const offer = <T extends { setId?: string | null }>(list: string, rows: T[]) => forType(serving, list, doc.deliverableType, rows);
   // The document's details, as one set of fields: the revision's edit step and
   // the Details tab both use these, so the two can never ask different things.

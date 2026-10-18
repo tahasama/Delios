@@ -197,8 +197,7 @@ export async function DocumentManagementPlan() {
     const [rules, labels, stored] = await Promise.all([fieldRules(ctx, kind), fieldLabels(ctx, kind), storedOwnFields(ctx, kind)]);
     const changed = fieldsOf(kind).filter((f) => !f.fixed && rules[f.key] !== f.fallback)
       .map((f) => ({ label: labels[f.key] ?? f.label, rule: rules[f.key], own: false }));
-    const added = [...stored.own, ...stored.lists.map((l) => ({ label: l.title, rule: l.rule }))]
-      .filter((f) => f.rule !== "OFF").map((f) => ({ label: f.label, rule: f.rule as FieldRule, own: true }));
+    const added = stored.own.filter((f) => f.rule !== "OFF" && !f.retired).map((f) => ({ label: f.label, rule: f.rule as FieldRule, own: true }));
     return { kind, lines: [...changed, ...added] };
   }))).filter((one) => one.lines.length);
   const leftOut = reading.rows.filter((row) => row.off);
