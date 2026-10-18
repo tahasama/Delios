@@ -134,6 +134,8 @@ const SOURCE_BY_SET: Record<string, string> = {
   PROJECT_CODES: "PROJECT", SUBPROJECTS: "SUBPROJECT", SUPPLIER_CODES: "ORIGINATOR", PURCHASE_ORDERS: "CONTRACT_REF",
   DISCIPLINES: "DISCIPLINE", DOCUMENT_TYPES: "DOC_TYPE",
 };
+/** The app's lists a number part may read; besides them, the project's own lists in Numbering & identity. */
+export const NUMBERING_SETS = Object.keys(SOURCE_BY_SET);
 const SET_BY_SOURCE = Object.fromEntries(Object.entries(SOURCE_BY_SET).map(([set, source]) => [source, set]));
 /** What the screen calls a record kind, and the backend's name for it. */
 export const RECORD_KIND: Record<string, string> = { TRANSMITTAL: "@TRANSMITTAL", REVIEW: "@REVIEW", PACKAGE: "@PACKAGE", ASSET: "@ASSET", ACTION: "@ACTION" };
@@ -149,6 +151,8 @@ function editorField(field: SchemeField, index: number, schemeId: string): Edito
   if (field.source === "SEQUENCE") return { ...base, valueSetKey: null, rule: `COUNTER:DIGITS(${field.digits ?? 4})` };
   if (field.source === "FIXED") return { ...base, valueSetKey: null, rule: `FIXED(${field.value ?? ""})` };
   if (field.source === "SENDER" || field.source === "RECEIVER") return { ...base, valueSetKey: null, rule: field.source };
+  // A list of the project's own (Numbering & identity), read from the document's answer to it.
+  if (field.source.startsWith("LIST:")) return { ...base, valueSetKey: field.source.slice(5), rule: null };
   return { ...base, valueSetKey: SET_BY_SOURCE[field.source] ?? null, rule: SET_BY_SOURCE[field.source] ? null : field.source };
 }
 
@@ -159,7 +163,7 @@ export function backendField(label: string, valueSetKey: string, rule: string): 
   const fixed = rule.trim().match(/^FIXED\(([^)]*)\)$/i);
   if (fixed) return { label, source: "FIXED", value: fixed[1], digits: null };
   if (said) return { label, source: said, value: null, digits: null };
-  return { label, source: SOURCE_BY_SET[valueSetKey] ?? valueSetKey, value: null, digits: null };
+  return { label, source: SOURCE_BY_SET[valueSetKey] ?? `LIST:${valueSetKey}`, value: null, digits: null };
 }
 
 /** The schemes and what each numbers, in the screen's shapes. */

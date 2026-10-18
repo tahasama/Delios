@@ -20,7 +20,8 @@ public sealed record UpdateUserRequest(
     string? Password = null);
 
 /// <summary>Body of creating a project.</summary>
-public sealed record CreateProjectRequest(string? Code, string? Name, string? ContractRole = null, string? TimeZone = null, string? Kind = null);
+public sealed record CreateProjectRequest(string? Code, string? Name, string? ContractRole = null, string? TimeZone = null, string? Kind = null,
+    DateOnly? StartDate = null, DateOnly? EndDate = null, string? ScopeStatement = null);
 
 /// <summary>Body of changing a project. A null field is left as it is.</summary>
 /// <remarks>A new <c>Code</c> shapes new numbers only; numbers already given keep the old one.</remarks>
@@ -54,7 +55,8 @@ public sealed record PartyRequest(
     string? Code = null, string? Name = null, bool? IsInternal = null, bool? Active = null, string? Participation = null,
     string? CustodianFunction = null, string? ExternalSystem = null, bool? EvidenceRequired = null, string? ContactEmail = null,
     Guid? IdentityId = null, string? Country = null, string? IdentifierKind = null, string? IdentifierNumber = null,
-    string? NoIdentifierReason = null, string? Domain = null, Guid[]? NotTheSame = null, string? CarriedBy = null);
+    string? NoIdentifierReason = null, string? Domain = null, Guid[]? NotTheSame = null, string? CarriedBy = null,
+    Guid? ContactId = null, Guid? BackupId = null);
 
 /// <summary>
 /// The organization's directory, kept by its administrators: people, projects and who is on them with which
@@ -390,6 +392,12 @@ public static class DirectoryEndpoints
         var zone = Blank(request.TimeZone) ?? "UTC";
         if (DateTimeZoneProviders.Tzdb.GetZoneOrNull(zone) is null) return Problems.Invalid("TIME_ZONE_UNKNOWN", $"{zone} is not a time zone.");
         if (await KindRefusedAsync(db, request.Kind, cancellationToken) is { } refusedKind) return refusedKind;
+        // What the organization's form for opening a project insists on (Settings, Forms & fields).
+        if (await Settings.FormRules.CheckAsync(db, null, "PROJECT", new Dictionary<string, bool>
+            {
+                ["startDate"] = request.StartDate is not null, ["endDate"] = request.EndDate is not null,
+                ["scopeStatement"] = !string.IsNullOrWhiteSpace(request.ScopeStatement),
+            }, null, cancellationToken) is { } formProblem) return formProblem;
         var project = new Project
         {
             TenantId = http.User.TenantId(),
@@ -797,6 +805,12 @@ public static class DirectoryEndpoints
     {
         var tenantId = http.User.TenantId();
         var actor = await ActorAsync(http, db, cancellationToken);
+        // What the organization's form for adding an organization insists on (Settings, Forms & fields), for one created here.
+        if (request.IdentityId is null && await Settings.FormRules.CheckAsync(db, null, "PARTY", new Dictionary<string, bool>
+            {
+                ["contactId"] = request.ContactId is not null, ["backupId"] = request.BackupId is not null,
+                ["liaisonFunction"] = !string.IsNullOrWhiteSpace(request.CarriedBy),
+            }, null, cancellationToken) is { } formProblem) return formProblem;
         Party party;
         Organizations.OrganizationIdentity identity;
         if (request.IdentityId is { } known)

@@ -89,5 +89,5 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
   const pool = (named: { id: string; name: string; functionName: string }[]) => strict
     ? named.map(person)
     : [...named.map(person), ...everyone.filter((one) => !named.some((n) => n.id === one.id)).map((one) => ({ ...one, inMatrix: false }))];
-  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} reviewers={pool(reviewers)} approvers={pool(approvers)} everyone={everyone} strict={strict} ownFields={policy.own} />;
+  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} reviewers={pool(reviewers)} approvers={pool(approvers)} everyone={everyone} strict={strict} ownFields={policy.own} copies={policy.rules.copies} />;
 }

@@ -144,7 +144,7 @@ public sealed class DocumentService(
         if (checkOnly)
         {
             var refusal = await numbering.RefusalAsync(request.DeliverableType, new NumberFields(access.Project.Code, Blank(request.Subproject),
-                originator, Blank(request.ContractRef), request.Discipline, request.DocType), cancellationToken);
+                originator, Blank(request.ContractRef), request.Discipline, request.DocType, Lists: request.Extras), cancellationToken);
             return refusal switch
             {
                 Allocation.NoScheme => Fail(Problems.Invalid("NO_NUMBERING_SCHEME",
@@ -160,7 +160,7 @@ public sealed class DocumentService(
         await ProjectCodes.EnsurePublishedAsync(db, access.Project.TenantId, access.Project.Code, access.Project.Name, cancellationToken);
         var allocation = await numbering.AllocateAsync(access.Project.TenantId, access.Project.Id, request.DeliverableType,
             new NumberFields(access.Project.Code, Blank(request.Subproject), originator, Blank(request.ContractRef),
-                request.Discipline, request.DocType), cancellationToken);
+                request.Discipline, request.DocType, Lists: request.Extras), cancellationToken);
         if (allocation is Allocation.NoScheme)
         {
             return Fail(Problems.Invalid("NO_NUMBERING_SCHEME",

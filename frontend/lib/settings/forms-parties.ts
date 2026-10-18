@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath, refusal, refusalForForm } from "@/lib/client";
-import { formPolicy, checkForm } from "@/lib/settings/field-policy";
 import { adminParties } from "@/lib/settings/api-admin";
 
 /** One organization already on DELIOS that looks like the one being created, and why (the backend's LOOKS_LIKE). */
@@ -94,13 +93,11 @@ export async function savePartyAction(_prev: Result | undefined, formData: FormD
       saidName = text(formData, "identityName") || "The organization";
       if (added.invited) saidName += " (invited to work with us: their administrator accepts, then puts their people on)";
     } else {
-      // What this organization asks when it adds another one.
-      const policy = await formPolicy(ctx, "PARTY");
-      const asked = checkForm("PARTY", policy, { code, name, kind, contactId, backupId, liaisonFunction: carriedBy || null }, (n) => String(formData.get(n) ?? ""));
-      if (asked.error) return { error: asked.error };
+      // What the organization's form insists on is checked by the backend (FIELDS_REQUIRED).
       const created = await api<{ id: string }>("/api/admin/parties", {
         body: {
           code, name, isInternal: false, participation, carriedBy, evidenceRequired: kind === "OFFLINE", contactEmail, ...identity,
+          contactId: contactId || null, backupId: backupId || null,
           notTheSame: text(formData, "notTheSame").split(",").filter(Boolean),
         },
       });

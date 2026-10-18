@@ -125,6 +125,8 @@ public static class FieldSources
     /// <summary>On a transmittal: the party code of who sends it, and of who receives it.</summary>
     public const string Sender = "SENDER";
     public const string Receiver = "RECEIVER";
+    /// <summary>A list of the project's own in Numbering &amp; identity, read from the document's answer to it: <c>LIST:&lt;key&gt;</c>.</summary>
+    public const string ListPrefix = "LIST:";
 }
 
 /// <summary>

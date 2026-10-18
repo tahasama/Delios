@@ -636,4 +636,6 @@ in the code; it lives only in your local database.
   packages, tags). Your lists are document fields by themselves, a register column and filter. Gone from the page, as
   the app no longer asks them: the Readiness and Person forms, a revision's separate reason and "released as", the
   document's file and received date, a transmittal's response day and covering files, a package's status and acceptor.
-  "A column of the register" now really makes one.
+  "A column of the register" now really makes one. "Copied in" on Send for review can be required or left out. Opening a
+  project and adding an organization are checked by the backend too. A list of one's own in Numbering & identity can be
+  a part of the number; the Numbering builder no longer offers lists a number cannot be built from.

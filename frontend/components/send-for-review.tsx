@@ -29,7 +29,9 @@ const MODE: Record<string, string> = {
  * assigns (by the documents' discipline when the route names nobody); the
  * sender removes or adds anyone the matrix allows.
  */
-export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, everyone = [], strict = true, ownFields = [] }: {
+export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, everyone = [], strict = true, ownFields = [], copies = "OPTIONAL" }: {
+  /** How the project's review form asks "Copied in" (Forms & fields): must, asked, or not asked. */
+  copies?: "REQUIRED" | "OPTIONAL" | "OFF";
   revisionIds: string[];
   routes: SendRoute[];
   reviewers: SendPerson[];
@@ -82,12 +84,13 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, e
 
       {/* Copied in: told it went out for review and able to follow it, never
           asked to answer — so the route never waits on them. */}
-      {everyone.length ? (
+      {everyone.length && copies !== "OFF" ? (
         <SearchPick
           name="copyUsers"
           items={everyone.map((p) => ({ id: p.id, name: p.name, detail: p.functionName }))}
           label="Copy to (cc)"
-          hint="kept informed, never asked to review — optional"
+          required={copies === "REQUIRED"}
+          hint={copies === "REQUIRED" ? "kept informed, never asked to review: someone is copied in on this project" : "kept informed, never asked to review — optional"}
           placeholder="Nobody copied in"
         />
       ) : null}

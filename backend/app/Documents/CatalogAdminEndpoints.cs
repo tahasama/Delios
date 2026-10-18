@@ -146,7 +146,8 @@ public static class CatalogAdminEndpoints
         if (fields.Length == 0) return Problems.Invalid("FIELDS_REQUIRED", "A number is built from at least one field.");
         string[] sources = [FieldSources.Project, FieldSources.Subproject, FieldSources.Originator, FieldSources.ContractRef, FieldSources.Discipline,
             FieldSources.DocType, FieldSources.Sequence, FieldSources.Fixed, FieldSources.Sender, FieldSources.Receiver];
-        if (fields.FirstOrDefault(f => !sources.Contains(f.Source)) is { } bad)
+        if (fields.FirstOrDefault(f => !sources.Contains(f.Source)
+                && !(f.Source.StartsWith(FieldSources.ListPrefix, StringComparison.Ordinal) && f.Source.Length > FieldSources.ListPrefix.Length)) is { } bad)
             return Problems.Invalid("FIELD_SOURCE_UNKNOWN", $"{bad.Source} is not something a number can be built from.", new { source = bad.Source });
         if (fields.Count(f => f.Source == FieldSources.Sequence) != 1)
             return Problems.Invalid("SEQUENCE_REQUIRED", "A number has exactly one sequence, so no two documents share it.");

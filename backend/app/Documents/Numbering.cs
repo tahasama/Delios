@@ -10,7 +10,9 @@ namespace Delios.Host.Documents;
 /// </summary>
 public sealed record NumberFields(
     string ProjectCode, string? Subproject, string? Originator, string? ContractRef, string? Discipline, string? DocType,
-    string? Sender = null, string? Receiver = null)
+    string? Sender = null, string? Receiver = null,
+    /// <summary>A document's answers to the lists of the project's own (Forms &amp; fields), for a part reading one (<c>LIST:&lt;key&gt;</c>).</summary>
+    IReadOnlyDictionary<string, string?>? Lists = null)
 {
     /// <summary>For records that are not documents: the project, fixed fields, and who sends to whom.</summary>
     public static NumberFields ForRecord(string projectCode, string? sender = null, string? receiver = null) =>
@@ -89,6 +91,7 @@ public sealed class Numbering(DeliosDbContext db)
                 FieldSources.Fixed => field.Value,
                 FieldSources.Sender => fields.Sender,
                 FieldSources.Receiver => fields.Receiver,
+                var list when list.StartsWith(FieldSources.ListPrefix, StringComparison.Ordinal) => fields.Lists?.GetValueOrDefault(list[FieldSources.ListPrefix.Length..]),
                 _ => null,
             };
             if (string.IsNullOrEmpty(value)) return (scheme, parts, new Allocation.MissingField(field.Label));

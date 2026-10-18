@@ -128,7 +128,7 @@ const FIELDS: FieldDef[] = [
   // ── Sending something for review ──
   { control: "CHOICE", computedBy: "The route is the steps themselves.", kind: "REVIEW", key: "route", label: "Route", text: "Which sequence of reviewers it goes through.", fallback: "REQUIRED", fixed: "A review with no route has no steps to answer." },
   { control: "PEOPLE", kind: "REVIEW", key: "steps", label: "Who answers each step", text: "The people the route puts on it, from those the matrix allows.", fallback: "REQUIRED", fixed: "A step with nobody on it is never answered." },
-  { control: "PEOPLE", kind: "REVIEW", key: "copies", label: "Copied in", text: "Told it went out, never asked to answer.", fallback: "OPTIONAL", fixed: "Nothing waits on them, so nothing can be insisted on." },
+  { control: "PEOPLE", kind: "REVIEW", key: "copies", label: "Copied in", text: "Told it went out and of what comes of it, never asked to answer.", fallback: "OPTIONAL" },
 
   // ── Putting a package together ──
   { control: "TEXT", kind: "PACKAGE", key: "title", label: "Title", text: "What the package is called.", fallback: "REQUIRED", fixed: "A package nobody can name cannot be handed to anybody." },

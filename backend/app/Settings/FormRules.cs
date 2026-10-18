@@ -61,7 +61,7 @@ public static class FormRules
         ],
         ["REVISION"] = [new("changeDescription", "What changed, and why", Required)],
         ["TRANSMITTAL"] = [new("subject", "Subject", Required), new("message", "Message", Optional), new("cc", "Copy to", Optional)],
-        ["REVIEW"] = [],
+        ["REVIEW"] = [new("copies", "Copied in", Optional)],
         ["PACKAGE"] = [new("description", "Description", Optional), new("completionDate", "Due", Optional), new("po", "Contract or purchase order", Optional)],
         ["ASSET"] = [new("system", "System", Optional), new("area", "Area", Optional), new("unit", "Unit", Optional)],
         ["PROJECT"] = [new("startDate", "Start date", Optional), new("endDate", "End date", Optional), new("scopeStatement", "Scope", Optional)],

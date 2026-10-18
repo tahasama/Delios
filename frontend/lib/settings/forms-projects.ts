@@ -3,7 +3,6 @@
 import { applyDefaults } from "@/lib/organization/defaults";
 
 import { revalidatePath } from "next/cache";
-import { formPolicy, checkForm } from "@/lib/settings/field-policy";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { api, refusal } from "@/lib/client";
@@ -45,14 +44,13 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
   const chosenRole = (await contractRoleOptions()).find((r) => r.code === role);
   if (!chosenRole) return { error: "Choose what this organization does on the project." };
   if (startDate && endDate && endDate < startDate) return { error: "The end date cannot fall before the start date." };
-  // What this organization asks of a project.
-  const policy = await formPolicy({ orgId: ctx.orgId, projectId: "" }, "PROJECT");
-  const asked = checkForm("PROJECT", policy, { code, name, kind, role, startDate, endDate, scopeStatement }, (n) => String(formData.get(n) ?? ""));
-  if (asked.error) return { error: asked.error };
+  // What the organization's form insists on is checked by the backend (FIELDS_REQUIRED).
 
   let carried = 0;
   try {
-    const project = await api<{ id: string }>("/api/admin/projects", { body: { code, name, contractRole: role, kind } });
+    const project = await api<{ id: string }>("/api/admin/projects", {
+      body: { code, name, contractRole: role, kind, startDate: startDate || null, endDate: endDate || null, scopeStatement: scopeStatement || null },
+    });
     // §1.6 — a project is measured against the scope it states for itself.
     await setProjectSetting(project.id, PROJECT_INFO, JSON.stringify({
       kind, startDate: startDate || new Date().toISOString().slice(0, 10), endDate: endDate || null, description: description || null,

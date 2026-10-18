@@ -56,6 +56,11 @@ public sealed partial class ReviewService
                 : "That route does not serve this document."));
         }
 
+        // What the project's review form insists on (Settings, Forms & fields): someone copied in, where it says so.
+        var reviewForm = await Settings.FormRules.ReadAsync(db, access.Project.Id, "REVIEW", cancellationToken);
+        if (await Settings.FormRules.CheckAsync(db, access.Project.Id, "REVIEW",
+                new Dictionary<string, bool> { ["copies"] = request.Copies is { Length: > 0 } }, null, cancellationToken) is { } formProblem)
+            return Fail(formProblem);
         // The sender's choice of people on a step of ours replaces the route's for this
         // review: they answer it, and nobody else. The route itself is unchanged.
         var chosenBySender = new List<string>();
@@ -169,7 +174,8 @@ public sealed partial class ReviewService
             }).ToList(),
         };
         // Copied in: people on the project, told now and of what comes of it.
-        var copies = (request.Copies ?? []).Distinct().ToList();
+        // Not asked on this project: nobody is copied in.
+        var copies = reviewForm.Rules.GetValueOrDefault("copies") == Settings.FormRules.Off ? [] : (request.Copies ?? []).Distinct().ToList();
         review.CopyUserIds = copies.Count == 0 ? [] : [.. await db.Memberships.AsNoTracking()
             .Where(m => m.ProjectId == access.Project.Id && m.Active && copies.Contains(m.UserId)).Select(m => m.UserId).Distinct().ToListAsync(cancellationToken)];
         db.Reviews.Add(review);

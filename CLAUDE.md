@@ -531,8 +531,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   it), everyone of ours reads them; opening a project and adding an organization are the organization's (an
   administrator; `GET /api/forms/{form}`). The backend refuses what a form insists on, for every way it arrives (a form,
   an import, a draft sent): documents (registered and changed), revisions started by hand, transmittals sent, packages,
-  tags (FIELDS_REQUIRED, `fields` outlined); opening a project and adding an organization are still checked by their
-  screens. Every **list of one's own** (Types & sets, Numbering & identity or Classification & keeping) is a document
+  tags, opening a project and adding an organization (FIELDS_REQUIRED, `fields` outlined). On the review form, "Copied in"
+  is must · asked · not asked like any field (not asked: nobody is copied in). Every **list of one's own** (Types & sets, Numbering & identity or Classification & keeping) is a document
   field by itself (must · asked · not asked; optional unless chosen): offered by the set serving the document's
   deliverable type (backend VALUE_NOT_FOR_TYPE), kept with the document (`Document.Extras`), shown and changed in
   Details / Edit rev, a register column and a filter (`own.<key>`, backend `RegisterFilter.Own`). Fields added by hand
@@ -557,7 +557,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Groups (`ListRules.Groups`): Numbering & identity, Classification & keeping, Review & issue, File formats, Schedule
   (no "Other": activity decisions in Schedule, control outcomes in Review & issue, generic title words in Numbering &
   identity). A list of one's own is a document field and goes only in the first two (LIST_NOT_HERE); in Numbering &
-  identity it may also go into the numbering. Project codes are used by every document of their project.
+  identity it may also go into the numbering: a number part reads it from the document's answer (`LIST:<key>`,
+  `FieldSources.ListPrefix`); the Numbering builder offers the app's numbering lists and these, nothing it cannot build. Project codes are used by every document of their project.
 - **Organizations, two levels** (owner): Settings → Organizations is the **project's**: one field to find an organization,
   always there (our list first, then any DELIOS knows; choosing it adds it to the project), and beside it one button
   "Create an organization" that opens the form (guests, or not on DELIOS). No two-button steps, no project code repeated on
