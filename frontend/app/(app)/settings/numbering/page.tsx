@@ -48,7 +48,7 @@ export default async function NumberingPage({ searchParams }: { searchParams: Pr
         {said}
         {!numbering.free && !numbering.own ? (
           numbering.mayChangeOrganization
-            ? <> An administrator changes it on the organization&rsquo;s page: <Link href="/organization/numbering" className="font-semibold text-link hover:underline">Numbering</Link>.</>
+            ? <> An administrator changes it in the organization&rsquo;s Settings: <Link href="/organization/settings/numbering" className="font-semibold text-link hover:underline">Numbering</Link>.</>
             : <> An administrator changes it, for every project.</>
         ) : null}
         {numbering.free && !numbering.mayChange ? <> Whoever acts as the control function changes it.</> : null}

@@ -1,62 +1,6 @@
-import Link from "next/link";
-import { requireOrgAdmin } from "@/lib/core/org-scope";
-import { getSets, getActiveSet, SET_KEY } from "@/lib/settings/config";
-import { orgSettings } from "@/lib/settings/api";
-import { numberingForEditor, NUMBERING_SETS } from "@/lib/settings/api-admin";
-import { liberty } from "@/lib/organization/liberty";
-import { NumberingBoard } from "@/app/(app)/settings/numbering/board";
-import { OrgHeader } from "../org-header";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-export const metadata = { title: "Numbering" };
-
-/**
- * The organization's numbering (owner): how every number is built and which scheme numbers what, the numbering of every
- * project. An administrator changes it here, for all of them. Where What projects may change leaves numbering free, a
- * project may make its own copy; otherwise every project reads this.
- */
-export default async function OrganizationNumberingPage({ searchParams }: { searchParams: Promise<{ edit?: string; new?: string }> }) {
-  const scope = await requireOrgAdmin();
-  const params = await searchParams;
-  const [numbering, all, settings, deliverables, switches] = await Promise.all([
-    numberingForEditor("organization"), getSets(), orgSettings(), getActiveSet("DELIVERABLE_TYPES"), liberty(),
-  ]);
-  // A part reads one of the app's numbering lists, or one of the organization's own lists in Numbering & identity:
-  // a list one project made alone cannot build every project's numbers.
-  const ownOfOrganization = (key: string) => {
-    try {
-      const meta = JSON.parse(settings.get(SET_KEY + key) ?? "null") as { group?: string } | null;
-      return !!meta && (meta.group === "NUMBERING" || meta.group === "Numbering & identity");
-    } catch {
-      return false;
-    }
-  };
-  const sets = all.filter((one) => NUMBERING_SETS.includes(one.key) || ownOfOrganization(one.key));
-  const free = switches.find((one) => one.key === "NUMBERING")?.free ?? false;
-
-  return (
-    <div className="min-h-screen bg-canvas">
-      <OrgHeader scope={scope} back={{ href: "/organization", label: "Organization" }} />
-      <main className="mx-auto max-w-6xl space-y-4 px-6 py-6">
-        <section className="register register-sheet register-sheet-open">
-          <div className="px-5 pt-6 pb-4 sm:px-6">
-            <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{scope.organization.name}</p>
-            <h1 className="plate-name mt-1">Numbering</h1>
-            <p className="plate-meta mt-2">{numbering.schemes.filter((s) => s.active).length} schemes in use · {free ? "projects may change it" : "the same on every project"}</p>
-            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">
-              How every number is built, and which scheme numbers what: the numbering of every project. Changed here, it changes for every
-              project reading it; numbers already given never change.{" "}
-              {free
-                ? "Projects may change it: one that does keeps its own copy, which changes here never touch."
-                : "Projects read it as it is."}{" "}
-              <Link href="/organization/liberty" className="font-semibold text-link hover:underline">What projects may change</Link>
-            </p>
-          </div>
-        </section>
-        <NumberingBoard level="organization" editable schemes={numbering.schemes} routing={numbering.routing}
-          deliverables={deliverables.map((d) => ({ code: d.code, label: d.label }))} sets={sets.map((s) => ({ key: s.key, title: s.title }))}
-          editId={params.edit} adding={params.new === "1"} here="/organization/numbering" />
-      </main>
-    </div>
-  );
+/** The organization's numbering is a card of its Settings. */
+export default function OldNumbering() {
+  redirect("/organization/settings/numbering");
 }

@@ -1,5 +1,6 @@
 using Delios.Host.Audit;
 using Delios.Host.Identity;
+using Delios.Host.Notifications;
 using Delios.Host.Platform;
 using Delios.Host.Settings;
 using Delios.Host.Tenancy;
@@ -37,6 +38,8 @@ public static class NumberingLevels
         org.MapDelete("/schemes/{schemeId:guid}", (Guid schemeId, HttpContext h, DeliosDbContext db, AuditLog a, CancellationToken c) =>
             DeleteAsync(null, schemeId, h, db, a, c));
         org.MapPut("/routing", (SchemeRoutingRequest r, HttpContext h, DeliosDbContext db, AuditLog a, CancellationToken c) => RouteAsync(null, r, h, db, a, c));
+        org.MapGet("/projects", OwnCopiesAsync);
+        org.MapPost("/projects/{projectId:guid}/reset", ResetAsync);
 
         // A project's: what it numbers by, and, where numbering is free, its own copy.
         var project = app.MapGroup("/api/projects/{projectId:guid}/numbering").WithTags("Settings")
@@ -143,6 +146,46 @@ public static class NumberingLevels
         });
         await db.SaveChangesAsync(cancellationToken);
         return map;
+    }
+
+    /// <summary><c>GET /api/admin/numbering/projects</c>: the projects numbering by their own copy, since when and by whom.</summary>
+    private static async Task<IResult> OwnCopiesAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var rows = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId != null && s.Key == OwnKey)
+            .Join(db.Projects.AsNoTracking(), s => s.ProjectId, p => (Guid?)p.Id, (s, p) => new { p.Id, p.Code, p.Name, s.UpdatedAt, s.UpdatedByName })
+            .OrderBy(x => x.Code).ToListAsync(cancellationToken);
+        return Results.Ok(rows.Select(r => new { r.Id, r.Code, r.Name, Since = r.UpdatedAt.ToDateTimeOffset(), By = r.UpdatedByName }));
+    }
+
+    /// <summary>Body of putting a project back on the organization's: why, always.</summary>
+    public sealed record ResetRequest(string? Reason);
+
+    /// <summary>
+    /// <c>POST /api/admin/numbering/projects/{id}/reset</c> (owner: for special messes only, from the organization's
+    /// Settings): the project numbers by the organization's again. Its own schemes and routing go; every number it gave
+    /// stays as it was given. Always with why, logged, and the project's control function is told.
+    /// </summary>
+    private static async Task<IResult> ResetAsync(Guid projectId, ResetRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        Notifier notifier, CancellationToken cancellationToken)
+    {
+        var reason = Blank(request.Reason);
+        if (reason is null) return Problems.Invalid("REASON_REQUIRED", "Say why the project goes back to the organization's numbering.");
+        var project = await db.Projects.AsNoTracking().SingleOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
+        var mark = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == projectId && s.Key == OwnKey, cancellationToken);
+        if (mark is null) return Problems.Invalid("NOT_OWN", $"{project.Code} already numbers by the organization's.");
+        db.SchemeRoutings.RemoveRange(await db.SchemeRoutings.Where(r => r.ProjectId == projectId).ToListAsync(cancellationToken));
+        await db.SaveChangesAsync(cancellationToken);
+        db.NumberingSchemes.RemoveRange(await db.NumberingSchemes.Where(s => s.ProjectId == projectId).ToListAsync(cancellationToken));
+        db.Remove(mark);
+        await db.SaveChangesAsync(cancellationToken);
+        var actor = await ActorAsync(http, db, cancellationToken);
+        await audit.WriteAsync(actor, "SETTING_RESET", "Project", project.Id, $"{project.Code}: numbering", reason, project.Id, cancellationToken);
+        await notifier.NotifyAsync(project.TenantId, project.Id, await Actions.NoticeLog.HoldersAsync(db, project.Id, Verbs.Control, cancellationToken),
+            NotificationKinds.General, $"{project.Code} numbers by the organization's again",
+            $"{actor.Name} put {project.Code}'s numbering back to the organization's: {reason}. Numbers already given stay as they are.",
+            "/settings/numbering", cancellationToken);
+        return Results.NoContent();
     }
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

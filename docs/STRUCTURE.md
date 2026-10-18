@@ -91,7 +91,7 @@ frontend/
 │   │   ├── setup/        after registering an organization: add people, open the first project
 │   │   ├── no-project/   on no project yet (lists other organizations' projects they work on)
 │   │   └── organization/ the organization's admin page: projects (ours and joined), people,
-│   │                     organizations we work with, invitations; + defaults/ (defaults for new projects), liberty/ (what projects may change), numbering/ (the organization's numbering)
+│   │                     organizations we work with, invitations; + defaults/ (defaults for new projects), settings/ (the organization's Settings: the same cards as a project's, each with its switch and the projects with their own copy; numbering/ built, [slug] for cards not moved yet)
 │   ├── (app)/            inside a project
 │   │   ├── layout.tsx    the frame: menu, project switcher, theme
 │   │   ├── page.tsx      Home (with home-parts.tsx, tally.tsx)

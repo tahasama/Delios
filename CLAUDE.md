@@ -42,8 +42,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   removing a package never removes documents).
 - **Two levels of settings** (owner, for every setting): the organization's level is everything the app gives by
   default, adapted by its administrator, and it is the default of every project; the project's level inherits it and
-  changes only what the organization left free. Each setting has one switch on the organization's page "What projects
-  may change" (`/organization/liberty`, backend `Settings/Liberty.cs`, `LIBERTY:<key>`): **Fixed** (every project uses
+  changes only what the organization left free. **Two Settings with the same cards** (owner): the organization's
+  Settings (`/organization/settings`, administrators) open each card on the organization's version; a project's Settings
+  open the same cards on the project's version, with fewer rights. An administrator changes the organization's only in
+  the organization's Settings; in a project's Settings they act as that project's admin (the control function's
+  rights), nothing more, and nothing there changes the organization's. Each card of the organization's Settings carries
+  its switch on the page itself (`ProjectSwitches`; backend `Settings/Liberty.cs`, `LIBERTY:<key>`; the separate
+  page `/organization/liberty` only redirects), and lists the projects with their own copy (`ProjectCopies`): there,
+  and only there, one may be put back to the organization's, for a mess, always with why, logged (SETTING_RESET), the
+  project's control function told. No reset inside a project, ever. **Fixed** (every project uses
   the organization's; only an administrator changes it, for all) or **Free** (a project may take its own copy; the
   organization's later changes never touch it). Two degrees only, never a third. Made stricter later, what a project
   already changed stays, read as changed before the rule. Where each starts, and why, is in `Liberty.Items`, chosen
@@ -316,10 +323,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   column 3), in Details and Edit rev, and when a revision is started (it may move the document to its next
   phase). Each revision keeps the phase it was made in. The register shows, filters and sorts by it.
 - **Numbering is the organization's** (owner: one numbering across projects; switch `NUMBERING`, Fixed by default):
-  schemes and which scheme numbers what are edited on `/organization/numbering` by an administrator, for every project
+  schemes and which scheme numbers what are edited on the organization's Settings card (`/organization/settings/numbering`) by an administrator, for every project
   (backend `NumberingLevels`, `/api/admin/numbering`); Settings → Numbering reads them, saying so. Where the switch is
   Free, the control function changes them on the project, its first change making its own copy (`NUMBERING_OWN`,
-  `NumberingScheme.ProjectId`). A scheme that gave a number (`Used`, marked when it gives one) keeps its parts and
+  `NumberingScheme.ProjectId`); reset only from the organization's card (`POST /api/admin/numbering/projects/{id}/reset`,
+  its schemes and routing go, numbers given stay). A scheme that gave a number (`Used`, marked when it gives one) keeps its parts and
   delimiter: renamed, re-noted or retired only (SCHEME_IN_USE); never used, it is changed entirely or deleted. A scheme
   still numbering something is not retired or deleted (SCHEME_ROUTED); a retired one numbers nothing (SCHEME_RETIRED).
   A part reads a list, a fixed text, the running number (1–9 digits), or who sends / receives it; the organization's
@@ -638,8 +646,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Document Control keeps it) are the project's. Who answers is optional and never blocks a save. Its code, name and
   how it works with us change once each (above). An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
-- Layered settings: built as the two levels above (the switches). Being moved onto them page by page: the switches
-  first, then Numbering, Revisions, Types & sets (per list), Forms & fields, Review routes, Functions & permissions,
+- Layered settings: built as the two levels above (the switches). Being moved onto them card by card: the switches
+  and the organization's Settings first, then Numbering (done), Revisions, Types & sets (per list), Forms & fields, Review routes, Functions & permissions,
   the Control room. Until a page is moved, it says plainly what is the organization's and what is the project's.
 - Document families are **on hold** (owner): the idea is to group document types (internal like DWG, supplier like C102)
   to tell criticality and whether an outside stamp / wet signature is needed or the app's approval is enough, legally.

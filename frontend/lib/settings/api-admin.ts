@@ -400,3 +400,7 @@ export async function scopeConfig(projectId?: string): Promise<ScopeConfig> {
     measuredBy: measure.by && measure.at ? { name: measure.by, at: measure.at } : null,
   };
 }
+
+/** The projects numbering by their own copy (where numbering was free for projects), since when and by whom. */
+export const numberingCopies = cache(async () =>
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/numbering/projects").catch(() => []));

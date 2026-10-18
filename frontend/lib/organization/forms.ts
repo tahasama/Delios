@@ -294,6 +294,6 @@ export async function setLibertyAction(formData: FormData): Promise<void> {
   const key = text(formData, "key");
   if (!key) return;
   await api(`/api/liberty/${encodeURIComponent(key)}`, { method: "PUT", body: { free: text(formData, "free") === "1" } }).catch(() => undefined);
-  revalidatePath("/organization/liberty");
+  revalidatePath("/organization/settings", "layout");
   revalidatePath("/organization");
 }
