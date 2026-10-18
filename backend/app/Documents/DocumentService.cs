@@ -517,7 +517,7 @@ public sealed class DocumentService(
             : await UploadedFilesAsync(access, document, request.FileIds, cancellationToken);
         if (filesProblem is not null) return (null, filesProblem);
 
-        var scheme = await RevisionSchemeForAsync(document.DeliverableType, existing.Count > 0 ? existing[0].Series : null, cancellationToken);
+        var scheme = await RevisionSchemeForAsync(document.ProjectId, document.DeliverableType, existing.Count > 0 ? existing[0].Series : null, cancellationToken);
         if (scheme is null)
         {
             return (null, Problems.Invalid("NO_REVISION_SCHEME",
@@ -689,7 +689,7 @@ public sealed class DocumentService(
         ProjectAccess access, Document document, List<StoredFile> files, string? party, string? status, Instant sentAt, string sentBy,
         CancellationToken cancellationToken)
     {
-        var scheme = await RevisionSchemeForAsync(document.DeliverableType, null, cancellationToken);
+        var scheme = await RevisionSchemeForAsync(document.ProjectId, document.DeliverableType, null, cancellationToken);
         if (scheme is null)
         {
             return (null, Problems.Invalid("NO_REVISION_SCHEME",
@@ -873,17 +873,19 @@ public sealed class DocumentService(
             : null;
 
     /// <summary>
-    /// The scheme routed to the deliverable type, else the organization's default. A document already started keeps
+    /// The scheme routed to the deliverable type, else the default, in the naming the project uses. A document already started keeps
     /// counting the way it began: when its first revision's series is not in that scheme, the scheme that has it (the
     /// default first) names its next one. A new scheme so applies to documents not revised yet.
     /// </summary>
-    private async Task<RevisionScheme?> RevisionSchemeForAsync(string deliverableType, string? startedIn, CancellationToken cancellationToken)
+    private async Task<RevisionScheme?> RevisionSchemeForAsync(Guid projectId, string deliverableType, string? startedIn, CancellationToken cancellationToken)
     {
-        var scheme = await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.DeliverableType == deliverableType)
+        // The revision naming the project uses: its own copy, else the organization's.
+        var scope = await RevisionSchemeEndpoints.ScopeAsync(db, projectId, cancellationToken);
+        var scheme = await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.ProjectId == scope && r.DeliverableType == deliverableType)
             .Select(r => r.Scheme).SingleOrDefaultAsync(cancellationToken)
-            ?? await db.RevisionSchemes.AsNoTracking().SingleOrDefaultAsync(s => s.IsDefault, cancellationToken);
+            ?? await db.RevisionSchemes.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == scope && s.IsDefault, cancellationToken);
         if (startedIn is null || scheme is null || scheme.Series.Any(s => s.Code == startedIn)) return scheme;
-        var all = await db.RevisionSchemes.AsNoTracking().OrderByDescending(s => s.IsDefault).ThenBy(s => s.Name).ToListAsync(cancellationToken);
+        var all = await db.RevisionSchemes.AsNoTracking().Where(s => s.ProjectId == scope).OrderByDescending(s => s.IsDefault).ThenBy(s => s.Name).ToListAsync(cancellationToken);
         return all.FirstOrDefault(s => s.Series.Any(x => x.Code == startedIn)) ?? scheme;
     }
 

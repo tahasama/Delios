@@ -90,9 +90,10 @@ internal sealed class RevisionSchemeConfiguration : IEntityTypeConfiguration<Rev
     public void Configure(EntityTypeBuilder<RevisionScheme> b)
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
-        b.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
-        // At most one default per organization.
-        b.HasIndex(x => x.TenantId).IsUnique().HasFilter("is_default").HasDatabaseName("ix_revision_schemes_one_default");
+        b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.TenantId, x.ProjectId, x.Name }).IsUnique().AreNullsDistinct(false);
+        // At most one default per organization, and per project's own copy.
+        b.HasIndex(x => new { x.TenantId, x.ProjectId }).IsUnique().AreNullsDistinct(false).HasFilter("is_default").HasDatabaseName("ix_revision_schemes_one_default");
         b.Property(x => x.Name).HasMaxLength(100);
         b.OwnsMany(x => x.Series, s => s.ToJson());
     }
@@ -109,7 +110,8 @@ internal sealed class RevisionSchemeRoutingConfiguration : IEntityTypeConfigurat
     {
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Scheme).WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
-        b.HasIndex(x => new { x.TenantId, x.DeliverableType }).IsUnique();
+        b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.TenantId, x.ProjectId, x.DeliverableType }).IsUnique().AreNullsDistinct(false);
         b.Property(x => x.DeliverableType).HasMaxLength(64);
     }
 }

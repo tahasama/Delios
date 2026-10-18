@@ -645,3 +645,8 @@ in the code; it lives only in your local database.
   every project; a project's Settings → Numbering reads it. The control function no longer changes it there, unless the
   organization makes numbering free for projects (What projects may change). A scheme that has given numbers keeps its
   parts: rename or retire it, or make a new one. "When this scheme is used" is now kept.
+- **Revision naming is the organization's**, as numbering: changed in the organization's Settings (Revisions), by an
+  administrator, for every project; a project's Settings → Revisions reads it, unless the organization makes it free.
+- **The organization's Settings** (Organization → Settings) hold the same cards as a project's, each with its switch
+  (may projects change it) and the projects with their own copy; a project is put back to the organization's only there.
+

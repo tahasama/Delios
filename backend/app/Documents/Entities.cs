@@ -369,6 +369,11 @@ public sealed class RevisionScheme
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
+    /// <summary>
+    /// Empty: the organization's, naming every project's revisions. Set: one project's own copy, made where revisions are
+    /// free for projects (<see cref="Settings.Liberty"/>) and the project changed them.
+    /// </summary>
+    public Guid? ProjectId { get; set; }
     public required string Name { get; set; }
     /// <summary>Used for any deliverable type no routing names.</summary>
     public bool IsDefault { get; set; }
@@ -411,6 +416,8 @@ public sealed class RevisionSchemeRouting
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
+    /// <summary>Empty: the organization's; set: one project's own copy (see <see cref="RevisionScheme.ProjectId"/>).</summary>
+    public Guid? ProjectId { get; set; }
     public required string DeliverableType { get; set; }
     public Guid SchemeId { get; set; }
     public RevisionScheme? Scheme { get; set; }

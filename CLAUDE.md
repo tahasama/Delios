@@ -332,6 +332,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   still numbering something is not retired or deleted (SCHEME_ROUTED); a retired one numbers nothing (SCHEME_RETIRED).
   A part reads a list, a fixed text, the running number (1–9 digits), or who sends / receives it; the organization's
   numbering reads only the organization's lists (LIST_NOT_ORGANIZATIONS).
+- **Revision naming is the organization's** (switch `REVISIONS`, Fixed by default), as numbering: edited on the
+  organization's Settings card (`/organization/settings/revisions`, `/api/admin/revisions`, administrators); Settings →
+  Revisions reads it (`/api/projects/{id}/revisions`). Free: the control function changes it on the project, its first
+  change making its own copy (`REVISIONS_OWN`, `RevisionScheme.ProjectId`), one default per level; reset only from the
+  organization's card (revisions already named keep their values).
 - How revisions are named is Settings → Revisions (`RevisionSchemeEndpoints`): schemes of lines, one line per
   phase, as many as wanted, plus one default line for any phase without its own (no phase published: that one
   line names every revision). A line counts in letters or numbers, with a prefix, a start (empty: A or 0) and
@@ -647,7 +652,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   how it works with us change once each (above). An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
 - Layered settings: built as the two levels above (the switches). Being moved onto them card by card: the switches
-  and the organization's Settings first, then Numbering (done), Revisions, Types & sets (per list), Forms & fields, Review routes, Functions & permissions,
+  and the organization's Settings first, then Numbering (done), Revisions (done), Types & sets (per list), Forms & fields, Review routes, Functions & permissions,
   the Control room. Until a page is moved, it says plainly what is the organization's and what is the project's.
 - Document families are **on hold** (owner): the idea is to group document types (internal like DWG, supplier like C102)
   to tell criticality and whether an outside stamp / wet signature is needed or the app's approval is enough, legally.

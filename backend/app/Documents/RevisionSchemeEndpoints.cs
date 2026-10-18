@@ -1,8 +1,11 @@
 using Delios.Host.Audit;
 using Delios.Host.Identity;
+using Delios.Host.Notifications;
 using Delios.Host.Platform;
+using Delios.Host.Settings;
 using Delios.Host.Tenancy;
 using Microsoft.EntityFrameworkCore;
+using NodaTime;
 
 namespace Delios.Host.Documents;
 
@@ -22,18 +25,139 @@ public sealed record RevisionRoutingRequest(string? DeliverableType, Guid? Schem
 /// which scheme. A scheme chosen for a type names the revisions of its documents not revised yet; a document already
 /// started keeps counting the way it began. A series some revision already carries stays in its scheme: it may be
 /// relabelled, never dropped or recounted (backend SERIES_IN_USE). Every change is audited.
+/// Two levels (owner), as numbering: the organization's schemes and routing (project empty) name every project's
+/// revisions, changed by an administrator from the organization's Settings; a project changes them only where the
+/// organization left revisions free (<see cref="Liberty"/>), its first change making its own copy (<c>REVISIONS_OWN</c>),
+/// which the organization's later changes never touch. Put back to the organization's only from its Settings, with why.
 /// </summary>
 public static class RevisionSchemeEndpoints
 {
+    /// <summary>The project's setting saying it names revisions by its own copy.</summary>
+    public const string OwnKey = "REVISIONS_OWN";
+
+    /// <summary>The revision naming a project uses: its own copy where it made one (its id), else the organization's (null).</summary>
+    public static async Task<Guid?> ScopeAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken) =>
+        await db.Set<Setting>().AnyAsync(s => s.ProjectId == projectId && s.Key == OwnKey, cancellationToken) ? projectId : null;
+
     public static void MapRevisionSchemeEndpoints(this IEndpointRouteBuilder app)
     {
-        // The control function keeps these, as well as administrators: the same as numbering.
-        var keepers = app.MapGroup("/api/admin/revisions").WithTags("Administration")
-            .AddEndpointFilter<TransactionFilter>()
-            .AddEndpointFilter(Keepers.Filter);
-        keepers.MapPost("/schemes", CreateAsync);
-        keepers.MapPut("/schemes/{schemeId:guid}", UpdateAsync);
-        keepers.MapPut("/routing", RouteAsync);
+        var org = app.MapGroup("/api/admin/revisions").WithTags("Administration").AddEndpointFilter<TransactionFilter>()
+            .AddEndpointFilter(Keepers.Configurers("The organization's revision naming is the same on every project: an administrator changes it."));
+        org.MapPost("/schemes", (RevisionSchemeRequest r, HttpContext h, DeliosDbContext db, AuditLog a, CancellationToken c) => CreateAsync(null, r, h, db, a, c));
+        org.MapPut("/schemes/{schemeId:guid}", (Guid schemeId, RevisionSchemeRequest r, HttpContext h, DeliosDbContext db, AuditLog a, CancellationToken c) =>
+            UpdateAsync(null, schemeId, r, h, db, a, c));
+        org.MapPut("/routing", (RevisionRoutingRequest r, HttpContext h, DeliosDbContext db, AuditLog a, CancellationToken c) => RouteAsync(null, r, h, db, a, c));
+        org.MapGet("/projects", OwnCopiesAsync);
+        org.MapPost("/projects/{projectId:guid}/reset", ResetAsync);
+
+        var project = app.MapGroup("/api/projects/{projectId:guid}/revisions").WithTags("Settings")
+            .AddEndpointFilter<TransactionFilter>().AddEndpointFilter<ProjectAccessFilter>();
+        project.MapGet("", async (HttpContext h, DeliosDbContext db, CancellationToken c) =>
+        {
+            var access = ProjectAccessFilter.Of(h);
+            var scope = await ScopeAsync(db, access.Project.Id, c);
+            var free = await Liberty.IsFreeAsync(db, Liberty.Revisions, c);
+            var schemes = await db.RevisionSchemes.AsNoTracking().Where(s => s.ProjectId == scope).OrderBy(s => s.Name).ToListAsync(c);
+            var routing = await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.ProjectId == scope).ToListAsync(c);
+            return Results.Ok(new
+            {
+                RevisionSchemes = schemes.Select(s => new { s.Id, s.Name, s.IsDefault, s.ForwardOnly, s.Series }),
+                RevisionRouting = routing.Select(r => new { r.DeliverableType, r.SchemeId }),
+                Own = scope is not null, Free = free,
+                MayChange = free && await ProjectLists.MayChangeAsync(db, access, c),
+                MayChangeOrganization = await Keepers.ConfiguresAsync(h),
+            });
+        });
+        project.MapPost("/schemes", (RevisionSchemeRequest r, HttpContext h, DeliosDbContext db, AuditLog a, IClock clock, CancellationToken c) =>
+            ProjectAsync(h, db, clock, c, scope => CreateAsync(scope, r, h, db, a, c)));
+        project.MapPut("/schemes/{schemeId:guid}", (Guid schemeId, RevisionSchemeRequest r, HttpContext h, DeliosDbContext db, AuditLog a, IClock clock, CancellationToken c) =>
+            ProjectAsync(h, db, clock, c, scope => UpdateAsync(scope, schemeId, r, h, db, a, c), schemeId));
+        project.MapPut("/routing", (RevisionRoutingRequest r, HttpContext h, DeliosDbContext db, AuditLog a, IClock clock, CancellationToken c) =>
+            ProjectAsync(h, db, clock, c, scope => RouteAsync(scope, r, h, db, a, c), r.SchemeId));
+    }
+
+    /// <summary>A change on a project: only where revisions are free, by whoever changes the project's settings; its own copy made first.</summary>
+    private static async Task<IResult> ProjectAsync(HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken,
+        Func<Guid?, Task<IResult>> act, Guid? schemeId = null)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!await Liberty.IsFreeAsync(db, Liberty.Revisions, cancellationToken))
+            return Problems.Forbidden("REVISIONS_FIXED", "Revision naming is the organization's, the same on every project: an administrator changes it in the organization's Settings.");
+        if (!await ProjectLists.MayChangeAsync(db, access, cancellationToken))
+            return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes its revision naming (on a project with none, whoever opened it).");
+        var copied = await EnsureOwnAsync(db, access, clock, cancellationToken);
+        if (copied.TryGetValue(schemeId ?? Guid.Empty, out var mine)) http.Items["revisions.scheme"] = mine;
+        return await act(access.Project.Id);
+    }
+
+    private static Guid Mapped(HttpContext http, Guid schemeId) => http.Items["revisions.scheme"] is Guid mine ? mine : schemeId;
+
+    /// <summary>The project's own copy of the organization's revision naming, made once: the organization's ids and their copies.</summary>
+    private static async Task<Dictionary<Guid, Guid>> EnsureOwnAsync(DeliosDbContext db, ProjectAccess access, IClock clock, CancellationToken cancellationToken)
+    {
+        var map = new Dictionary<Guid, Guid>();
+        if (await ScopeAsync(db, access.Project.Id, cancellationToken) is not null) return map;
+        foreach (var scheme in await db.RevisionSchemes.AsNoTracking().Where(s => s.ProjectId == null).ToListAsync(cancellationToken))
+        {
+            var copy = new RevisionScheme
+            {
+                TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Name = scheme.Name, IsDefault = scheme.IsDefault, ForwardOnly = scheme.ForwardOnly,
+                Series = scheme.Series.Select(r => new RevisionSeriesRule
+                {
+                    Code = r.Code, Label = r.Label, Phase = r.Phase, Kind = r.Kind, Prefix = r.Prefix, Start = r.Start, Width = r.Width,
+                    Lowercase = r.Lowercase, ExcludedLetters = [.. r.ExcludedLetters],
+                }).ToList(),
+            };
+            db.RevisionSchemes.Add(copy);
+            map[scheme.Id] = copy.Id;
+        }
+        foreach (var route in await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.ProjectId == null).ToListAsync(cancellationToken))
+            if (map.TryGetValue(route.SchemeId, out var schemeId))
+                db.RevisionSchemeRoutings.Add(new RevisionSchemeRouting { TenantId = access.Project.TenantId, ProjectId = access.Project.Id, DeliverableType = route.DeliverableType, SchemeId = schemeId });
+        db.Add(new Setting
+        {
+            TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Key = OwnKey, Value = "ON",
+            UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = access.UserName,
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        return map;
+    }
+
+    /// <summary><c>GET /api/admin/revisions/projects</c>: the projects naming revisions by their own copy, since when and by whom.</summary>
+    private static async Task<IResult> OwnCopiesAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var rows = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId != null && s.Key == OwnKey)
+            .Join(db.Projects.AsNoTracking(), s => s.ProjectId, p => (Guid?)p.Id, (s, p) => new { p.Id, p.Code, p.Name, s.UpdatedAt, s.UpdatedByName })
+            .OrderBy(x => x.Code).ToListAsync(cancellationToken);
+        return Results.Ok(rows.Select(r => new { r.Id, r.Code, r.Name, Since = r.UpdatedAt.ToDateTimeOffset(), By = r.UpdatedByName }));
+    }
+
+    /// <summary>
+    /// <c>POST /api/admin/revisions/projects/{id}/reset</c> (owner: from the organization's Settings, for a mess only): the
+    /// project names revisions by the organization's again; its own schemes go, revisions already named keep their values.
+    /// Always with why, logged, its control function told.
+    /// </summary>
+    private static async Task<IResult> ResetAsync(Guid projectId, NumberingLevels.ResetRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        Notifier notifier, CancellationToken cancellationToken)
+    {
+        var reason = Blank(request.Reason);
+        if (reason is null) return Problems.Invalid("REASON_REQUIRED", "Say why the project goes back to the organization's revision naming.");
+        var project = await db.Projects.AsNoTracking().SingleOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
+        var mark = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == projectId && s.Key == OwnKey, cancellationToken);
+        if (mark is null) return Problems.Invalid("NOT_OWN", $"{project.Code} already names revisions by the organization's.");
+        db.RevisionSchemeRoutings.RemoveRange(await db.RevisionSchemeRoutings.Where(r => r.ProjectId == projectId).ToListAsync(cancellationToken));
+        await db.SaveChangesAsync(cancellationToken);
+        db.RevisionSchemes.RemoveRange(await db.RevisionSchemes.Where(s => s.ProjectId == projectId).ToListAsync(cancellationToken));
+        db.Remove(mark);
+        await db.SaveChangesAsync(cancellationToken);
+        var actor = await ActorAsync(http, db, cancellationToken);
+        await audit.WriteAsync(actor, "SETTING_RESET", "Project", project.Id, $"{project.Code}: revision naming", reason, project.Id, cancellationToken);
+        await notifier.NotifyAsync(project.TenantId, project.Id, await Actions.NoticeLog.HoldersAsync(db, project.Id, Verbs.Control, cancellationToken),
+            NotificationKinds.General, $"{project.Code} names revisions by the organization's again",
+            $"{actor.Name} put {project.Code}'s revision naming back to the organization's: {reason}. Revisions already named keep their values.",
+            "/settings/revisions", cancellationToken);
+        return Results.NoContent();
     }
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -100,12 +224,17 @@ public static class RevisionSchemeEndpoints
     /// <summary>The deliverable types a scheme serves now: those routed to it, and for the default every type routed nowhere.</summary>
     private static async Task<IQueryable<Document>> ServedAsync(DeliosDbContext db, RevisionScheme scheme, CancellationToken cancellationToken)
     {
-        var routed = await db.RevisionSchemeRoutings.AsNoTracking().Select(r => new { r.DeliverableType, r.SchemeId }).ToListAsync(cancellationToken);
+        var routed = await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.ProjectId == scheme.ProjectId)
+            .Select(r => new { r.DeliverableType, r.SchemeId }).ToListAsync(cancellationToken);
         var mine = routed.Where(r => r.SchemeId == scheme.Id).Select(r => r.DeliverableType).ToList();
         var elsewhere = routed.Where(r => r.SchemeId != scheme.Id).Select(r => r.DeliverableType).ToList();
+        // The organization's names the documents of every project without its own copy; a project's copy, that project's.
+        var own = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId != null && s.Key == OwnKey).Select(s => s.ProjectId!.Value).ToListAsync(cancellationToken);
+        var documents = db.Documents.IgnoreQueryFilters().Where(d => d.TenantId == scheme.TenantId
+            && (scheme.ProjectId == null ? !own.Contains(d.ProjectId) : d.ProjectId == scheme.ProjectId));
         return scheme.IsDefault
-            ? db.Documents.IgnoreQueryFilters().Where(d => d.TenantId == scheme.TenantId && !elsewhere.Contains(d.DeliverableType))
-            : db.Documents.IgnoreQueryFilters().Where(d => d.TenantId == scheme.TenantId && mine.Contains(d.DeliverableType));
+            ? documents.Where(d => !elsewhere.Contains(d.DeliverableType))
+            : documents.Where(d => mine.Contains(d.DeliverableType));
     }
 
     /// <summary>The series codes revisions of these documents already carry.</summary>
@@ -121,17 +250,18 @@ public static class RevisionSchemeEndpoints
             : null;
 
     /// <summary><c>POST /api/admin/revisions/schemes</c>: a new revision scheme.</summary>
-    private static async Task<IResult> CreateAsync(RevisionSchemeRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
+    private static async Task<IResult> CreateAsync(Guid? scope, RevisionSchemeRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
         var name = Blank(request.Name);
         if (name is null) return Problems.Invalid("NAME_REQUIRED", "A scheme has a name.");
-        if (await db.RevisionSchemes.AnyAsync(s => s.Name == name, cancellationToken))
+        if (await db.RevisionSchemes.AnyAsync(s => s.ProjectId == scope && s.Name == name, cancellationToken))
             return Problems.Conflict("NAME_TAKEN", $"A revision scheme is already called {name}.");
         var (series, problem) = await CheckAsync(db, request.Series ?? [], cancellationToken);
         if (problem is not null) return problem;
         var scheme = new RevisionScheme
         {
             TenantId = http.User.TenantId(),
+            ProjectId = scope,
             Name = name,
             ForwardOnly = request.ForwardOnly ?? true,
             Series = series!,
@@ -139,7 +269,7 @@ public static class RevisionSchemeEndpoints
         db.RevisionSchemes.Add(scheme);
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "REVISION_SCHEME_CREATED", "RevisionScheme", scheme.Id, name,
-            string.Join(" → ", scheme.Series.Select(s => $"{s.Label} {s.Prefix}{s.Start}")), cancellationToken: cancellationToken);
+            string.Join(" → ", scheme.Series.Select(s => $"{s.Label} {s.Prefix}{s.Start}")), scope, cancellationToken);
         return Results.Created($"/api/admin/revisions/schemes/{scheme.Id}", new { scheme.Id });
     }
 
@@ -147,15 +277,16 @@ public static class RevisionSchemeEndpoints
     /// <c>PUT /api/admin/revisions/schemes/{id}</c>: changes a scheme. Revisions already named keep their values; a
     /// series they carry stays, and is not recounted.
     /// </summary>
-    private static async Task<IResult> UpdateAsync(Guid schemeId, RevisionSchemeRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+    private static async Task<IResult> UpdateAsync(Guid? scope, Guid schemeId, RevisionSchemeRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
         CancellationToken cancellationToken)
     {
-        var scheme = await db.RevisionSchemes.SingleOrDefaultAsync(s => s.Id == schemeId, cancellationToken);
+        schemeId = Mapped(http, schemeId);
+        var scheme = await db.RevisionSchemes.SingleOrDefaultAsync(s => s.Id == schemeId && s.ProjectId == scope, cancellationToken);
         if (scheme is null) return Problems.NotFound("SCHEME_NOT_FOUND", "No such revision scheme.");
         var changes = new List<string>();
         if (Blank(request.Name) is { } name && name != scheme.Name)
         {
-            if (await db.RevisionSchemes.AnyAsync(s => s.Name == name && s.Id != schemeId, cancellationToken))
+            if (await db.RevisionSchemes.AnyAsync(s => s.ProjectId == scope && s.Name == name && s.Id != schemeId, cancellationToken))
                 return Problems.Conflict("NAME_TAKEN", $"A revision scheme is already called {name}.");
             changes.Add($"name → {name}");
             scheme.Name = name;
@@ -183,7 +314,7 @@ public static class RevisionSchemeEndpoints
         if (request.IsDefault is true && !scheme.IsDefault)
         {
             // Documents already started under the old default keep counting the way they began.
-            if (await db.RevisionSchemes.SingleOrDefaultAsync(s => s.IsDefault, cancellationToken) is { } current)
+            if (await db.RevisionSchemes.SingleOrDefaultAsync(s => s.ProjectId == scope && s.IsDefault, cancellationToken) is { } current)
             {
                 current.IsDefault = false;
                 await db.SaveChangesAsync(cancellationToken);
@@ -194,7 +325,7 @@ public static class RevisionSchemeEndpoints
         if (changes.Count == 0) return Results.NoContent();
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "REVISION_SCHEME_UPDATED", "RevisionScheme", scheme.Id, scheme.Name,
-            string.Join("; ", changes), cancellationToken: cancellationToken);
+            string.Join("; ", changes), scope, cancellationToken);
         return Results.NoContent();
     }
 
@@ -202,15 +333,16 @@ public static class RevisionSchemeEndpoints
     /// <c>PUT /api/admin/revisions/routing</c>: which scheme a deliverable type follows; none, the default. It names the
     /// revisions of that type's documents not revised yet; one already started keeps counting the way it began.
     /// </summary>
-    private static async Task<IResult> RouteAsync(RevisionRoutingRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
+    private static async Task<IResult> RouteAsync(Guid? scope, RevisionRoutingRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
         var type = Blank(request.DeliverableType);
         if (type is null) return Problems.Invalid("DELIVERABLE_TYPE_REQUIRED", "Say which deliverable type follows the scheme.");
-        var target = request.SchemeId is { } id
-            ? await db.RevisionSchemes.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id, cancellationToken)
-            : await db.RevisionSchemes.AsNoTracking().SingleOrDefaultAsync(s => s.IsDefault, cancellationToken);
+        Guid? schemeId = request.SchemeId is { } named ? Mapped(http, named) : null;
+        var target = schemeId is { } id
+            ? await db.RevisionSchemes.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id && s.ProjectId == scope, cancellationToken)
+            : await db.RevisionSchemes.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == scope && s.IsDefault, cancellationToken);
         if (target is null) return Problems.Invalid("SCHEME_NOT_FOUND", "No such revision scheme.");
-        var routing = await db.RevisionSchemeRoutings.SingleOrDefaultAsync(r => r.DeliverableType == type, cancellationToken);
+        var routing = await db.RevisionSchemeRoutings.SingleOrDefaultAsync(r => r.ProjectId == scope && r.DeliverableType == type, cancellationToken);
         if (request.SchemeId is null || target.IsDefault)
         {
             if (routing is null) return Results.NoContent();
@@ -218,7 +350,7 @@ public static class RevisionSchemeEndpoints
         }
         else if (routing is null)
         {
-            db.RevisionSchemeRoutings.Add(new RevisionSchemeRouting { TenantId = http.User.TenantId(), DeliverableType = type, SchemeId = target.Id });
+            db.RevisionSchemeRoutings.Add(new RevisionSchemeRouting { TenantId = http.User.TenantId(), ProjectId = scope, DeliverableType = type, SchemeId = target.Id });
         }
         else
         {
@@ -226,7 +358,7 @@ public static class RevisionSchemeEndpoints
         }
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "REVISION_SCHEME_ROUTED", "RevisionSchemeRouting", null, type,
-            $"follows {target.Name}", cancellationToken: cancellationToken);
+            $"follows {target.Name}", scope, cancellationToken);
         return Results.NoContent();
     }
 }

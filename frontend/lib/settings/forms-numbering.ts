@@ -107,19 +107,3 @@ export async function deleteNumberingSchemeAction(_prev: Result | undefined, for
   return { ok: "Deleted." };
 }
 
-/**
- * Puts a project back on the organization's numbering (owner: from the organization's Settings, for special messes
- * only). Always with why; the project's control function is told; numbers already given stay as they are.
- */
-export async function resetProjectNumberingAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  const projectId = text(formData, "projectId");
-  const reason = text(formData, "reason");
-  if (!reason) return { error: "Say why it goes back to the organization's numbering." };
-  try {
-    await api(`/api/admin/numbering/projects/${projectId}/reset`, { body: { reason } });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidate();
-  return { ok: "It numbers by the organization's again." };
-}

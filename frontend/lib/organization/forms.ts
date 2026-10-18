@@ -297,3 +297,28 @@ export async function setLibertyAction(formData: FormData): Promise<void> {
   revalidatePath("/organization/settings", "layout");
   revalidatePath("/organization");
 }
+
+/** The cards a project may have its own copy of, and their backend: what a reset puts back. */
+const RESETTABLE: Record<string, { path: string; words: string; pages: string[] }> = {
+  numbering: { path: "/api/admin/numbering", words: "numbering", pages: ["/settings/numbering", "/organization/settings/numbering"] },
+  revisions: { path: "/api/admin/revisions", words: "revision naming", pages: ["/settings/revisions", "/organization/settings/revisions"] },
+};
+
+/**
+ * Puts a project back on the organization's version of one card (owner: from the organization's Settings, for a mess
+ * only). Always with why; the project's control function is told; what the project already gave stays as it is.
+ */
+export async function resetProjectAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const card = RESETTABLE[text(formData, "what")];
+  const projectId = text(formData, "projectId");
+  const reason = text(formData, "reason");
+  if (!card) return { error: "Nothing to put back." };
+  if (!reason) return { error: `Say why it goes back to the organization's ${card.words}.` };
+  try {
+    await api(`${card.path}/projects/${projectId}/reset`, { body: { reason } });
+  } catch (e) {
+    return failed(e);
+  }
+  for (const page of card.pages) revalidatePath(page);
+  return { ok: `It uses the organization's ${card.words} again.` };
+}

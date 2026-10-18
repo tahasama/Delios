@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireScope } from "@/lib/core/scope";
-import { api, refusal } from "@/lib/client";
-import { adminNumbering, type RevisionSeries } from "@/lib/settings/api-admin";
+import { getScope } from "@/lib/core/scope";
+import { api, projectPath, refusal } from "@/lib/client";
+import { adminNumbering, projectRevisions, type RevisionSeries } from "@/lib/settings/api-admin";
 
 /**
  * How revisions are named (Settings, Revisions): the schemes and which deliverable type follows which. The backend
@@ -13,6 +13,22 @@ import { adminNumbering, type RevisionSeries } from "@/lib/settings/api-admin";
 type Result = { error?: string; ok?: string };
 const failed = (e: unknown): Result => ({ error: refusal(e).message });
 const text = (formData: FormData, name: string) => String(formData.get(name) ?? "").trim();
+
+/**
+ * Where a change goes: the organization's naming (its Settings, an administrator), or the project's (only where
+ * revisions are free; its first change makes the project's own copy). The backend checks both.
+ */
+const organization = (formData: FormData) => text(formData, "level") === "organization";
+async function base(formData: FormData): Promise<string> {
+  if (organization(formData)) return "/api/admin/revisions";
+  const scope = await getScope();
+  if (!scope) throw new Error("No project is open.");
+  return projectPath(scope, "/revisions");
+}
+function revalidate() {
+  revalidatePath("/settings/revisions");
+  revalidatePath("/organization/settings/revisions");
+}
 
 /** The lines of the form, in order: each for a phase, or the default line (no phase). */
 function seriesOf(formData: FormData): RevisionSeries[] {
@@ -33,24 +49,22 @@ function seriesOf(formData: FormData): RevisionSeries[] {
 
 /** A new revision scheme. */
 export async function createRevisionSchemeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  await requireScope();
   const name = text(formData, "name");
   if (!name) return { error: "Give the scheme a name." };
   try {
-    await api("/api/admin/revisions/schemes", { body: { name, forwardOnly: formData.get("forwardOnly") === "on", series: seriesOf(formData) } });
+    await api(`${await base(formData)}/schemes`, { body: { name, forwardOnly: formData.get("forwardOnly") === "on", series: seriesOf(formData) } });
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/settings/revisions");
+  revalidate();
   return { ok: `${name} added. Choose which deliverable types follow it.` };
 }
 
 /** A scheme changed: its name, its series, whether it only goes forward, and whether it is the default. */
 export async function updateRevisionSchemeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  await requireScope();
   const id = text(formData, "id");
   try {
-    await api(`/api/admin/revisions/schemes/${id}`, {
+    await api(`${await base(formData)}/schemes/${id}`, {
       method: "PUT",
       body: {
         name: text(formData, "name"), forwardOnly: formData.get("forwardOnly") === "on", series: seriesOf(formData),
@@ -60,23 +74,22 @@ export async function updateRevisionSchemeAction(_prev: Result | undefined, form
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/settings/revisions");
+  revalidate();
   return { ok: "Saved. Revisions already named keep their values." };
 }
 
 /** Which scheme each deliverable type follows; none chosen, the default. Only the ones changed are sent. */
 export async function routeRevisionSchemeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  await requireScope();
-  const { revisionRouting } = await adminNumbering();
+  const { revisionRouting } = organization(formData) ? await adminNumbering() : await projectRevisions();
   const changed = formData.getAll("deliverableType").map(String).filter((type) =>
     (text(formData, `scheme_${type}`) || null) !== (revisionRouting.find((r) => r.deliverableType === type)?.schemeId ?? null));
   try {
     for (const deliverableType of changed) {
-      await api("/api/admin/revisions/routing", { method: "PUT", body: { deliverableType, schemeId: text(formData, `scheme_${deliverableType}`) || null } });
+      await api(`${await base(formData)}/routing`, { method: "PUT", body: { deliverableType, schemeId: text(formData, `scheme_${deliverableType}`) || null } });
     }
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/settings/revisions");
+  revalidate();
   return { ok: changed.length ? `Saved: ${changed.join(", ")}. Documents not revised yet follow it; those already started keep counting the way they began.` : "Nothing changed." };
 }

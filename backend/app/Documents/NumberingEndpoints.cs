@@ -82,8 +82,8 @@ public static class NumberingLevels
     private static async Task<IResult> ViewAsync(DeliosDbContext db, Guid? scope, CancellationToken cancellationToken)
     {
         var view = await ReadAsync(db, scope, cancellationToken);
-        var revisions = await db.RevisionSchemes.AsNoTracking().OrderBy(s => s.Name).ToListAsync(cancellationToken);
-        var revisionRouting = await db.RevisionSchemeRoutings.AsNoTracking().ToListAsync(cancellationToken);
+        var revisions = await db.RevisionSchemes.AsNoTracking().Where(s => s.ProjectId == null).OrderBy(s => s.Name).ToListAsync(cancellationToken);
+        var revisionRouting = await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.ProjectId == null).ToListAsync(cancellationToken);
         return Results.Ok(new
         {
             view.Schemes, view.Routing,

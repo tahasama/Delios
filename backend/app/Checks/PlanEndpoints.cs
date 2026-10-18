@@ -32,8 +32,9 @@ public static class PlanEndpoints
         var numbering = await NumberingLevels.ScopeAsync(db, project.Id, cancellationToken);
         var schemes = await db.NumberingSchemes.AsNoTracking().Where(s => s.ProjectId == numbering && s.Active).OrderBy(s => s.Name).ToListAsync(cancellationToken);
         var routing = await db.SchemeRoutings.AsNoTracking().Where(r => r.ProjectId == numbering && r.Active).OrderBy(r => r.DeliverableType).ToListAsync(cancellationToken);
-        var revisions = await db.RevisionSchemes.AsNoTracking().OrderByDescending(s => s.IsDefault).ThenBy(s => s.Name).ToListAsync(cancellationToken);
-        var revisionRouting = await db.RevisionSchemeRoutings.AsNoTracking().ToListAsync(cancellationToken);
+        var naming = await RevisionSchemeEndpoints.ScopeAsync(db, project.Id, cancellationToken);
+        var revisions = await db.RevisionSchemes.AsNoTracking().Where(s => s.ProjectId == naming).OrderByDescending(s => s.IsDefault).ThenBy(s => s.Name).ToListAsync(cancellationToken);
+        var revisionRouting = await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.ProjectId == naming).ToListAsync(cancellationToken);
         var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.Active).OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name)
             .ToListAsync(cancellationToken);
 

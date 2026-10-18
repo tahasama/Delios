@@ -12,7 +12,6 @@ export const dynamic = "force-dynamic";
 const TODAY: Record<string, React.ReactNode> = {
   types: <>The organization&rsquo;s lists come onto this card in the next steps. Until then a project&rsquo;s Types &amp; sets changes its own copy.</>,
   fields: <>The organization&rsquo;s forms come onto this card in the next steps. Until then a project&rsquo;s Forms &amp; fields changes its own copy.</>,
-  revisions: <>The organization&rsquo;s revision schemes come onto this card in the next steps. Until then they are changed in a project&rsquo;s Settings → Revisions, for every project.</>,
   routes: <>The organization&rsquo;s review routes come onto this card in the next steps. Until then they are changed in a project&rsquo;s Settings → Review routes, for every project.</>,
   functions: <>The organization&rsquo;s functions come onto this card in the next steps. Until then they are changed in a project&rsquo;s Settings → Functions &amp; permissions, for every project.</>,
   flow: <>The organization&rsquo;s version is what a project starts with: <Link href="/organization/defaults" className="font-semibold text-link hover:underline">Defaults for new projects</Link>. Each project then changes its own where it is free.</>,

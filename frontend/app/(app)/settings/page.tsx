@@ -15,7 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { adminAudit, adminFunctions, adminNumbering, projectNumbering, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty } from "@/lib/settings/api-admin";
+import { adminAudit, adminFunctions, adminNumbering, projectNumbering, projectRevisions, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty } from "@/lib/settings/api-admin";
 import { orgSettings, projectSettings } from "@/lib/settings/api";
 import { getSets } from "@/lib/settings/config";
 
@@ -55,9 +55,12 @@ export default async function AdminPage() {
     orEmpty(adminProjects).then((all) => all.filter((p) => p.status === "ACTIVE").length),
     orEmpty(adminParties).then((all) => all.filter((p) => p.active)),
     getSets().then((all) => all.length),
-    // The numbering this project uses (its own copy, else the organization's); the revision schemes stay the organization's.
-    Promise.all([projectNumbering().catch(() => null), adminNumbering().catch(() => null)])
-      .then(([mine, org]) => (org ? { ...org, schemes: mine?.schemes ?? org.schemes, routing: mine?.routing ?? org.routing } : null)),
+    // The numbering and revision naming this project uses (its own copy, else the organization's).
+    Promise.all([projectNumbering().catch(() => null), projectRevisions().catch(() => null), adminNumbering().catch(() => null)])
+      .then(([mine, naming, org]) => (mine || org ? {
+        schemes: mine?.schemes ?? org?.schemes ?? [], routing: mine?.routing ?? org?.routing ?? [],
+        revisionSchemes: naming?.revisionSchemes ?? org?.revisionSchemes ?? [],
+      } : null)),
     orEmpty(adminFunctions).then((all) => all.filter((f) => f.active).length),
     orEmpty(adminUsers).then((all) => all.filter((u) => u.memberships.some((m) => m.projectId === ctx.projectId && m.active)).length),
     orEmpty(adminRoutes).then((all) => all.filter((r) => r.active).length),

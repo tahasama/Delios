@@ -155,7 +155,8 @@ public static class ProjectLists
                 await CountAsync(docs.Select(d => (string?)d.DeliverableType), "document");
                 var numbering = await NumberingLevels.ScopeAsync(db, pid, cancellationToken);
                 Mark(await db.SchemeRoutings.AsNoTracking().Where(r => r.ProjectId == numbering).Select(r => r.DeliverableType).ToListAsync(cancellationToken), "numbering");
-                Mark(await db.RevisionSchemeRoutings.AsNoTracking().Select(r => r.DeliverableType).ToListAsync(cancellationToken), "revision naming");
+                var naming = await RevisionSchemeEndpoints.ScopeAsync(db, pid, cancellationToken);
+                Mark(await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.ProjectId == naming).Select(r => r.DeliverableType).ToListAsync(cancellationToken), "revision naming");
                 break;
             case ValueSets.Criticality: await CountAsync(docs.Select(d => d.Criticality), "document"); break;
             case ValueSets.Confidentiality:

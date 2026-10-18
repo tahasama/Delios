@@ -404,3 +404,14 @@ export async function scopeConfig(projectId?: string): Promise<ScopeConfig> {
 /** The projects numbering by their own copy (where numbering was free for projects), since when and by whom. */
 export const numberingCopies = cache(async () =>
   api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/numbering/projects").catch(() => []));
+
+/** The revision naming a project uses (its own copy, else the organization's), whether it is free for projects, and who may change it here. */
+type ProjectRevisions = Pick<AdminNumbering, "revisionSchemes" | "revisionRouting"> & { own: boolean; free: boolean; mayChange: boolean; mayChangeOrganization: boolean };
+export const projectRevisions = cache(async () => {
+  const ctx = await requireScope();
+  return api<ProjectRevisions>(projectPath(ctx, "/revisions"));
+});
+
+/** The projects naming revisions by their own copy, since when and by whom. */
+export const revisionCopies = cache(async () =>
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/revisions/projects").catch(() => []));
