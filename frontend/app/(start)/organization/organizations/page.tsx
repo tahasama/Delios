@@ -246,14 +246,13 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                       ) : null}
                       {c?.id && others.length ? (
                         <details className="border-t border-line px-5 py-3 sm:px-6">
-                          <summary className={fold}>Is it the same as another organization?</summary>
+                          <summary className={fold}>Listed twice? Merge it with its other line</summary>
                           <ActionForm action={askMergeAction} hideSubmit hidden={{ mergeId: c.id }} className="asking mt-3 space-y-3">
                             <p className="text-xs leading-5 text-slate-600">
-                              Two lines for one company: ask for {p.name} to be merged into the other. Each side agrees, then the app&rsquo;s owner merges
-                              them. Nothing is deleted: {p.code} stays reserved and points to the one kept.
+                              Pick the other line and say how you know; once each side agrees, the two become one and nothing is lost.
                             </p>
                             <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                              <Field label="It is the same as" required>
+                              <Field label="Its other line" required>
                                 <select name="keepId" required defaultValue="" className={field}>
                                   <option value="" disabled>Choose…</option>
                                   {others.map((o) => <option key={o.id} value={o.changed!.id}>{o.code} — {o.name}</option>)}
@@ -261,7 +260,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                               </Field>
                               <Field label="Why" required hint="how you know they are one company"><input name="why" required className={field} /></Field>
                             </div>
-                            <button type="submit" className="ask">Ask for the merge</button>
+                            <button type="submit" className="ask">Ask to merge</button>
                           </ActionForm>
                         </details>
                       ) : null}

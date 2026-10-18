@@ -664,7 +664,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   LOOKS_LIKE: same identifier, same domain, or a name reading the same once legal forms and punctuation are left out):
   "Is this the same as…?" → "Yes, add that one" or "No, it's a different company" (kept in the record). Every
   organization: a pencil opens its line (name, code, identifier, how it works with us: once each; domain; who answers
-  here; linking; "Is it the same as another organization?" asks a merge). "Working on <project>": which of them work on
+  here; linking; "Listed twice? Merge it with its other line" asks a merge, shown only when another line could be it). "Working on <project>": which of them work on
   the project (role here, the number of their contract with us, the function their people get), "Add one to <project>",
   each line opened by its pencil. The identifier's number is named by its kind (Registration number, Tax number, Number
   on the register, Government identifier). Names of buttons are plain acts, never "on DELIOS".
