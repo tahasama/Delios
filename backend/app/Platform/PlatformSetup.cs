@@ -383,6 +383,7 @@ public static class PlatformSetup
             Documents.SheetGuard.MapSheetGuardEndpoints(app);
             Audit.ActivityEndpoints.MapActivityEndpoints(app);
             Settings.SettingEndpoints.MapSettingEndpoints(app);
+            Settings.FormRules.MapFormEndpoints(app);
             Identity.HolderEndpoints.MapHolderEndpoints(app);
             Reports.ReportEndpoints.MapReportEndpoints(app);
             Documents.RegisterEndpoints.MapRegisterEndpoints(app);

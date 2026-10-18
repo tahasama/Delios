@@ -6,7 +6,7 @@ import { isEmptyTitle } from "@/lib/core/standard";
 import { revalidatePath } from "next/cache";
 import { mayCreateDocument } from "@/lib/core/auth";
 import { getActiveSet } from "@/lib/settings/config";
-import { fieldRules, missingRequiredFields, ownFields, takeExtras } from "@/lib/settings/field-policy";
+import { ownFields, takeExtras } from "@/lib/settings/field-policy";
 import { api, refusalForForm, projectPath, refusal } from "@/lib/client";
 import { backendDocument } from "@/lib/documents/api";
 import { upload, filesOf } from "@/lib/documents/api-uploads";
@@ -64,31 +64,9 @@ export async function createDocumentAction(_prev: { error?: string; fields?: str
 
   // What the deliverable type insists on (who it comes from, under which order) is checked by the backend, once.
 
-  // What this organization has said its own form insists on. The screen asks
-  // for exactly these, but the screen is not the gate: an importer, a script or
-  // a stale tab arrives here too.
-  const asked = await fieldRules(ctx, "DOCUMENT");
-  const shortFields = missingRequiredFields(asked, "DOCUMENT", {
-    subProject, phase, originator, contractRef, receivedDate, criticality, confidentiality,
-    retentionClass: chosenRetention,
-    plannedDate: String(formData.get("plannedDate") ?? ""),
-    assetCode: String(formData.get("assetCode") ?? ""),
-    file: filesOf(formData, "renditionFile", "nativeFile").length ? "yes" : "",
-    title, docType, discipline,
-  });
-  const shortOf = shortFields.map((f) => f.label.toLowerCase());
-  if (shortOf.length) {
- return { error: `This organization registers nothing without ${shortOf.join(", ")}. Fill ${shortOf.length === 1 ? "it" : "them"} in, or change what the form asks for in Settings → Forms & fields.`, fields: shortFields.map((f) => f.key) };
-  }
-
-  // The fields this organization added for itself. They are kept with the
-  // document and computed with nowhere, so they are read last and refused for
-  // one reason only: the organization said they must be filled.
-  const own = await ownFields(ctx, "DOCUMENT");
-  const answered = takeExtras(own, (name) => String(formData.get(name) ?? ""));
-  if (answered.missing.length) {
- return { error: `${answered.missing.join(", ")} ${answered.missing.length === 1 ? "is" : "are"} asked of every document here.` };
-  }
+  // The answers to the fields added to the form, and to the lists of one's own asked on it, kept with the document.
+  // What the project's form insists on is checked by the backend, once (FIELDS_REQUIRED outlines what is missing).
+  const answered = takeExtras(await ownFields(ctx, "DOCUMENT"), (name) => String(formData.get(name) ?? ""));
   // The backend allocates the number and checks every value again.
   let doc: { id: string; number: string };
   try {
@@ -139,6 +117,10 @@ export async function updateDocumentAction(_prev: { error?: string; ok?: string 
     const name = field === "subProject" ? "subproject" : field === "previousId" ? "previousNumber" : field;
     changes[name] = String(formData.get(field) ?? "").trim() || null;
   }
+  // The answers to the form's own fields and lists of one's own, kept with the document (`extra:<key>`).
+  for (const [name, value] of formData.entries()) {
+    if (name.startsWith("own:") && name.length > 4) changes[`extra:${name.slice(4)}`] = String(value).trim() || null;
+  }
   try {
     const before = await backendDocument(ctx, id);
     if (!before) return { error: "Document not found." };
@@ -147,6 +129,7 @@ export async function updateDocumentAction(_prev: { error?: string; ok?: string 
       contractRef: before.contractRef, criticality: before.criticality, confidentiality: before.confidentiality, retentionClass: before.retentionClass,
       receivedDate: before.receivedDate, previousNumber: before.previousNumber, legacyScheme: before.legacyScheme, appVersion: before.appVersion,
     };
+    for (const [key, value] of Object.entries(before.extras ?? {})) current[`extra:${key}`] = value || null;
     const changed = Object.fromEntries(Object.entries(changes).filter(([field, value]) => (current[field] ?? null) !== value));
     if (!Object.keys(changed).length) return { ok: "No changes to record." };
     await api(projectPath(ctx, `/documents/${id}`), { method: "PUT", body: { changes: changed } });

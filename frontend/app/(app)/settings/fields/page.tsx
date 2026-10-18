@@ -1,259 +1,233 @@
 import Link from "next/link";
-import { SwitchControl } from "@/components/switch";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
-import { isAdmin } from "@/lib/core/auth";
-import { PageHeader, Card, Chip, inputCls } from "@/components/ui";
+import { inputCls, Field } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { setFieldPolicyAction, addOwnFieldAction, removeOwnFieldOnRow } from "@/lib/settings/forms-how-it-works";
+import { Switch, SwitchControl } from "@/components/switch";
+import { setFieldRuleAction, renameFieldAction, addOwnFieldAction, removeOwnFieldAction, ownInRegisterAction } from "@/lib/settings/forms-fields";
 import {
-  KINDS, KIND_LABEL, KIND_TAB, KIND_TEXT, RULE_LABEL, CONTROL_LABEL, fieldsOf, allFieldRules, FIELD_LABEL_KEY, storedOwnFields,
+  KINDS, KIND_LABEL, KIND_TAB, KIND_TEXT, RULE_LABEL, CONTROL_LABEL, ORGANIZATION_KINDS, fieldsOf, projectForms,
   type FieldKind, type FieldRule, type Control,
 } from "@/lib/settings/field-policy";
 import { getSets } from "@/lib/settings/config";
-import { orgSettings } from "@/lib/settings/api";
-import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Forms & fields" };
 
 const RULES: FieldRule[] = ["REQUIRED", "OPTIONAL", "OFF"];
-/** What an organization may choose for a field of its own. */
+/** What a field of one's own may take. */
 const OWN_CONTROLS: Control[] = ["TEXT", "LONG_TEXT", "NUMBER", "DATE", "YES_NO", "CHOICE"];
+const ICON = "inline-flex rounded-sm p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:ring-3 focus-visible:ring-link/25 outline-none";
+const SHORT: Record<FieldRule, string> = { REQUIRED: "Must", OPTIONAL: "Asked", OFF: "Not asked" };
 
-/** How a rule reads at a glance, on the tab and beside the field. */
-const RULE_TONE: Record<FieldRule, string> = {
-  REQUIRED: "bg-tint text-brand-ink ring-brand-line",
-  OPTIONAL: "bg-slate-100 text-slate-600 ring-slate-300",
-  OFF: "bg-slate-100 text-slate-500 ring-slate-200",
+type Row = {
+  key: string; label: string; text: string; control: Control; setKey?: string | null; of: "app" | "list" | "own";
+  rule: FieldRule; fixed?: string; computedBy?: string; help?: string | null; inRegister?: boolean;
 };
 
 /**
- * What every form asks for, one form at a time.
- *
- * Ten forms and sixty fields will not fit on a page anybody reads, so the form
- * is chosen first and its fields stand alone underneath — the same shape as the
- * register's own screens, where you pick what you are looking at before you
- * look at it.
- *
- * Three questions per field, and the page is honest about which an organization
- * may answer: what it is called (always theirs), whether it is insisted on
- * (theirs, unless the record stops being a record without it), and what kind of
- * answer it takes (the application's, wherever it computes with the value).
- * Anything it does not compute with, an organization adds itself — and then all
- * three answers are its own.
+ * Forms & fields, Types & sets' way (owner): the forms in a menu on the left, the chosen form's fields as rows on the
+ * right. Each row: what it is, what it is called here, and how it stands, the segmented choice (must · asked · not
+ * asked) acting at once; a pencil renames it, a bin takes a field of one's own away. On the document form, every list of
+ * one's own (Types & sets) is a field by itself. A project's forms are the project's (`FormRules`): the control function
+ * changes them, everyone of ours reads them; opening a project and adding an organization are the organization's.
  */
-export default async function FieldsPage({ searchParams }: { searchParams: Promise<{ form?: string }> }) {
+export default async function FieldsPage({ searchParams }: { searchParams: Promise<{ form?: string; edit?: string; panel?: string }> }) {
   const ctx = await requireScope();
-  if (!isAdmin(ctx.user)) return <NoAccess title="Forms & fields" who="admin" />;
   const sp = await searchParams;
   const kind: FieldKind = KINDS.includes(sp.form as FieldKind) ? (sp.form as FieldKind) : "DOCUMENT";
+  const [answer, sets] = await Promise.all([projectForms(ctx.projectId), getSets()]);
+  const view = answer?.forms.find((f) => f.form === kind);
+  const organization = ORGANIZATION_KINDS.includes(kind);
+  const may = organization ? !!answer?.mayChangeOrganization : !!answer?.mayChange;
+  const titleOf = (key: string | null | undefined) => (key ? sets.find((s) => s.key === key)?.title ?? key : null);
+  const here = (extra: Record<string, string | undefined>) => {
+    const p = new URLSearchParams({ form: kind });
+    for (const [k, v] of Object.entries(extra)) if (v !== undefined) p.set(k, v);
+    return `/settings/fields?${p}`;
+  };
 
-  const [rules, labels, own, sets] = await Promise.all([
-    allFieldRules(ctx),
-    // The organization's own words for fields, and the fields it added, are its settings.
-    orgSettings().then((all) => [...all.entries()].filter(([key]) => key.startsWith(FIELD_LABEL_KEY)).map(([key, label]) => {
-      const [kindOf, field] = key.slice(FIELD_LABEL_KEY.length).split(":");
-      return { kind: kindOf, field, label };
+  const rows: Row[] = [
+    ...fieldsOf(kind).map((f) => ({
+      key: f.key, label: view?.labels[f.key] ?? f.label, text: f.text, control: f.control, setKey: f.setKey, of: "app" as const,
+      rule: (f.fixed ? f.fallback : view?.rules[f.key] ?? f.fallback) as FieldRule, fixed: f.fixed, computedBy: f.computedBy,
     })),
-    Promise.all(KINDS.map(async (one) => (await storedOwnFields(one)).map((row) => ({ ...row, kind: one, addedByName: null as string | null })))).then((all) => all.flat()),
-    getSets(),
-  ]);
-  const labelOf = (key: string, fallback: string) =>
-    labels.find((l) => l.kind === kind && l.field === key)?.label ?? fallback;
-
-  const fields = fieldsOf(kind);
-  const mine = own.filter((o) => o.kind === kind);
-  const required = fields.filter((f) => rules[kind][f.key] === "REQUIRED").length;
-  const off = fields.filter((f) => rules[kind][f.key] === "OFF").length;
+    ...(view?.lists ?? []).map((l) => ({
+      key: l.key, label: l.title, text: "A list of your own, asked by itself: the values of the set serving the document's deliverable type.",
+      control: "CHOICE" as Control, setKey: l.key, of: "list" as const, rule: l.rule,
+    })),
+    ...(view?.own ?? []).map((o) => ({
+      key: o.key, label: o.label, text: o.help ?? "", control: o.control, setKey: o.setKey, of: "own" as const, rule: o.rule,
+      help: o.help, inRegister: o.inRegister,
+    })),
+  ];
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Forms & fields"
-        subtitle="What each form asks for, what it calls it, and what it insists on. A field switched off is not asked and not stored; one made required is refused empty on the screen and by the importer alike."
-      />
+      <section className="register register-sheet register-sheet-open">
+        <div className="px-5 pt-6 pb-4 sm:px-6">
+          <h1 className="plate-title text-slate-950">Forms & fields</h1>
+          <p className="plate-meta mt-1.5 max-w-3xl font-normal">
+            What each form asks, and what it insists on. This project&rsquo;s forms are its own: {answer?.own ? "changed here, the organization's later changes never touch them" : "until the first change it reads the organization's"}.
+            The app refuses an empty field the form insists on, whichever way it arrives (a form, an import).
+            {answer?.mayChange ? "" : " Whoever acts as the control function changes them; everyone of ours reads them."}
+          </p>
+        </div>
+      </section>
 
-      {/* The form first, as cards: each says how many fields it asks and how
-          many it insists on, so the choice is made knowing what is behind it. */}
-      <nav aria-label="Which form" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        {KINDS.map((one) => {
-          const all = fieldsOf(one);
-          const must = all.filter((f) => rules[one][f.key] === "REQUIRED").length;
-          const theirs = own.filter((o) => o.kind === one).length;
-          const on = one === kind;
-          return (
-            <Link
-              key={one}
-              href={`/settings/fields?form=${one}`}
-              scroll={false}
-              aria-current={on ? "page" : undefined}
-              className={`register register-sheet px-3 py-2.5 transition ${on ? "border-brand-line ring-1 ring-brand-line/40" : "hover:border-brand-line/50"}`}
-            >
-              <span className={`block text-[13px] font-semibold leading-5 ${on ? "text-slate-900" : "text-slate-700"}`}>{KIND_TAB[one]}</span>
-              <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">
-                {all.length + theirs} fields · {must} must
-                {theirs ? <span className="block text-brand-ink">{theirs} of yours</span> : null}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="register register-sheet register-sheet-open grid grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)]">
+        <nav aria-label="Forms" className="border-b border-line p-2 lg:border-b-0 lg:border-r">
+          <ul className="space-y-px">
+            {KINDS.map((one) => (
+              <li key={one}>
+                <Link
+                  href={`/settings/fields?form=${one}`}
+                  scroll={false}
+                  aria-current={one === kind ? "page" : undefined}
+                  className={`flex items-center justify-between gap-2 rounded-sm py-2 pl-2.5 pr-2 text-[13px] ${one === kind ? "bg-tint font-semibold text-brand-ink" : "text-slate-600 hover:bg-tint-soft hover:text-slate-900"}`}
+                >
+                  <span className="truncate">{KIND_TAB[one]}</span>
+                  {ORGANIZATION_KINDS.includes(one) ? <span className="shrink-0 text-[11px] font-normal text-slate-500">organization&rsquo;s</span> : null}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
-      <div className="max-w-5xl space-y-4">
-        <Card
-          title={KIND_LABEL[kind]}
-          description={`${KIND_TEXT[kind]} ${fields.length} of ours${mine.length ? `, ${mine.length} of yours` : ""} · ${required} must be filled${off ? ` · ${off} not asked` : ""}`}
-        >
-          <ActionForm action={setFieldPolicyAction} submitLabel="Save this form" size="sm" hidden={{ kind }}>
-            <ul className="divide-y divide-line">
-              {fields.map((field) => {
-                const rule = rules[kind][field.key];
-                const set = field.setKey ? sets.find((s) => s.key === field.setKey) : null;
-                return (
-                  <li key={field.key} className="grid grid-cols-1 items-start gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_11rem_11rem]">
-                    <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-2 text-[13px] leading-5 text-slate-800">
-                        {field.label}
-                        {field.fixed ? <Chip className={RULE_TONE[rule]}>always asked</Chip> : null}
+        <section className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-5 py-2.5 sm:px-6">
+            <h2 className="text-base font-semibold text-slate-900">{KIND_LABEL[kind]}</h2>
+            <span className="plate-meta min-w-0 flex-1">{KIND_TEXT[kind]}{organization ? " An administrator decides it, for every project." : ""}</span>
+            {may ? (
+              <Link scroll={false} href={sp.panel === "new" ? here({}) : here({ panel: "new" })} title="Add a field" aria-label="Add a field"
+                aria-current={sp.panel === "new" ? "true" : undefined} className={`${ICON} aria-[current]:bg-tint aria-[current]:text-brand-ink`}>
+                <Plus className="h-4 w-4" />
+              </Link>
+            ) : null}
+          </div>
+
+          {sp.panel === "new" && may ? (
+            <div className="border-b border-line">
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+                <span className="stencil mr-1 text-slate-500">A field of your own</span>
+                <span className="text-[11px] text-slate-500">asked on this form, kept with the record, read back under its name; the app computes nothing with it</span>
+              </div>
+              <ActionForm id="new-field" action={addOwnFieldAction} hideSubmit resetOnSuccess hidden={{ kind }} className="asking px-5 py-5 sm:px-6">
+                <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Field label="What it is called" required><input name="label" required maxLength={60} placeholder="Client reference" className={inputCls} /></Field>
+                  <Field label="What kind of answer">
+                    <select name="control" defaultValue="TEXT" className={inputCls}>{OWN_CONTROLS.map((c) => <option key={c} value={c}>{CONTROL_LABEL[c]}</option>)}</select>
+                  </Field>
+                  <Field label="If a list, which list">
+                    <select name="setKey" defaultValue="" className={inputCls}>
+                      <option value="">Not a list</option>
+                      {sets.map((s) => <option key={s.key} value={s.key}>{s.title}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Must it be filled">
+                    <select name="rule" defaultValue="OPTIONAL" className={inputCls}>{RULES.map((one) => <option key={one} value={one}>{RULE_LABEL[one]}</option>)}</select>
+                  </Field>
+                  <div className="sm:col-span-2 lg:col-span-3"><Field label="Note under the box"><input name="help" maxLength={140} placeholder="What to put in it, in your words" className={inputCls} /></Field></div>
+                  {kind === "DOCUMENT" ? (
+                    <label className="inline-flex cursor-pointer items-center gap-2 self-end pb-1.5 text-xs text-slate-700"><SwitchControl name="inRegister" /> a column of the register</label>
+                  ) : null}
+                </div>
+              </ActionForm>
+              <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
+                <Link scroll={false} href={here({})} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                <button type="submit" form="new-field" data-on="true" className="ask">Add it</button>
+              </div>
+            </div>
+          ) : null}
+
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-line bg-tint-soft">
+                <th className="stencil px-5 py-2 text-slate-500 sm:px-6">Field</th>
+                <th className="stencil hidden px-3 py-2 text-slate-500 md:table-cell">Answer</th>
+                <th className="stencil px-3 py-2 text-slate-500">On the form</th>
+                <th className="w-20 px-3 py-2"><span className="sr-only">Acts</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {rows.map((row) => {
+                const editing = may && sp.edit === `${row.of}:${row.key}`;
+                const list = titleOf(row.setKey);
+                return editing ? (
+                  <tr key={`${row.of}:${row.key}`} className="bg-tint-soft/60">
+                    <td colSpan={4} className="p-0">
+                      <ActionForm id="rename-field" action={renameFieldAction} hideSubmit hidden={{ kind, key: row.key, of: row.of }} className="asking grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-2 sm:px-6">
+                        <Field label={`What ${row.of === "app" ? fieldsOf(kind).find((f) => f.key === row.key)?.label ?? row.label : "it"} is called here`}>
+                          <input name="label" defaultValue={row.label} maxLength={60} className={inputCls} />
+                        </Field>
+                        {row.of === "own" ? <Field label="Note under the box"><input name="help" defaultValue={row.help ?? ""} maxLength={140} className={inputCls} /></Field> : null}
+                      </ActionForm>
+                      <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
+                        <Link scroll={false} href={here({})} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                        <button type="submit" form="rename-field" data-on="true" className="ask">Save</button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={`${row.of}:${row.key}`} className="align-top">
+                    <td className="px-5 py-3 sm:px-6">
+                      <p className="text-[13px] font-medium leading-5 text-slate-900">
+                        {row.label}
+                        {row.of === "own" ? <span className="ml-2 text-[11px] font-normal text-brand-ink">yours</span> : null}
+                        {row.of === "list" ? <span className="ml-2 text-[11px] font-normal text-brand-ink">your list</span> : null}
                       </p>
-                      <p className="mt-0.5 text-[11.5px] leading-[1.45] text-slate-500">
-                        {field.text}
-                        {field.fixed ? <span className="text-slate-500"> {field.fixed}</span> : null}
-                      </p>
-                      <p className="mt-1 text-[11px] leading-4 text-slate-500">
-                        {CONTROL_LABEL[field.control]}
-                        {set ? (
-                          <>
-                            {" — "}
-                            <Link href={`/settings/config?set=${set.key}`} className="font-medium text-link hover:underline">{set.title}</Link>
-                            , where its values are added and retired
-                          </>
-                        ) : null}
-                        {field.computedBy ? <span className="block">Fixed as that: {field.computedBy}</span> : null}
-                      </p>
-                    </div>
-                    <label className="min-w-0">
-                      <span className="stencil mb-1 block text-slate-500 sm:hidden">Called</span>
-                      <input
-                        name={`label:${field.key}`}
-                        defaultValue={labelOf(field.key, field.label)}
-                        maxLength={60}
-                        aria-label={`What ${field.label} is called here`}
-                        className={inputCls}
-                      />
-                    </label>
-                    {field.fixed ? (
-                      <span className="pt-1.5 text-[11.5px] text-slate-500">{RULE_LABEL[rule]}</span>
-                    ) : (
-                      <label className="min-w-0">
-                        <span className="sr-only">{field.label}</span>
-                        <select name={`rule:${field.key}`} defaultValue={rule} className={inputCls}>
-                          {RULES.map((one) => <option key={one} value={one}>{RULE_LABEL[one]}</option>)}
-                        </select>
-                      </label>
-                    )}
-                  </li>
+                      {row.text ? <p className="mt-0.5 max-w-xl text-[11.5px] leading-[1.45] text-slate-500">{row.text}</p> : null}
+                      {row.fixed ? <p className="mt-0.5 max-w-xl text-[11px] leading-4 text-slate-500">Always asked: {row.fixed}</p> : null}
+                      {row.of === "own" && kind === "DOCUMENT" ? (
+                        <form action={ownInRegisterAction} className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                          <input type="hidden" name="kind" value={kind} /><input type="hidden" name="key" value={row.key} />
+                          <Switch on={!!row.inRegister} disabled={!may} label={row.inRegister ? "Take it out of the register's columns" : "Make it a column of the register"} />
+                          a column of the register
+                        </form>
+                      ) : null}
+                    </td>
+                    <td className="hidden px-3 py-3 text-[11.5px] leading-[1.45] text-slate-600 md:table-cell">
+                      {CONTROL_LABEL[row.control]}
+                      {list ? <> · <Link href={`/settings/config?set=${row.setKey}`} className="text-link hover:underline">{list}</Link></> : null}
+                      {row.computedBy ? <span className="mt-0.5 block text-[11px] text-slate-500">{row.computedBy}</span> : null}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {row.fixed ? (
+                        <span className="inline-block py-1.5 text-[12px] font-medium text-slate-500">Always asked</span>
+                      ) : (
+                        <form action={setFieldRuleAction} className="seg w-fit">
+                          <input type="hidden" name="kind" value={kind} /><input type="hidden" name="key" value={row.key} /><input type="hidden" name="of" value={row.of} />
+                          {RULES.map((one) => (
+                            <button key={one} type="submit" name="rule" value={one} disabled={!may || row.rule === one} aria-current={row.rule === one ? "page" : undefined}
+                              title={RULE_LABEL[one]} className="segment disabled:cursor-default">
+                              {SHORT[one]}
+                            </button>
+                          ))}
+                        </form>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      {may ? (
+                        <span className="inline-flex items-center gap-1">
+                          {row.of !== "list" ? (
+                            <Link scroll={false} href={here({ edit: `${row.of}:${row.key}` })} title="Change what it is called" aria-label="Change what it is called" className={ICON}><Pencil className="h-4 w-4" /></Link>
+                          ) : null}
+                          {row.of === "own" ? (
+                            <form action={removeOwnFieldAction}>
+                              <input type="hidden" name="kind" value={kind} /><input type="hidden" name="key" value={row.key} />
+                              <button type="submit" title="Take it off the form (answers already given stay)" aria-label="Take it off the form" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                            </form>
+                          ) : null}
+                        </span>
+                      ) : null}
+                    </td>
+                  </tr>
                 );
               })}
-
-              {mine.map((field) => (
-                <li key={field.id} className="grid grid-cols-1 items-start gap-x-4 gap-y-2 py-3 last:pb-0 sm:grid-cols-[minmax(0,1fr)_11rem_11rem]">
-                  <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-2 text-[13px] leading-5 text-slate-800">
-                      {field.label}
-                      <Chip className="bg-tint text-brand-ink ring-brand-line">yours</Chip>
-                    </p>
-                    <p className="mt-0.5 text-[11.5px] leading-[1.45] text-slate-500">{field.help ?? "No note under the box."}</p>
-                    <p className="mt-1 text-[11px] leading-4 text-slate-500">
-                      {CONTROL_LABEL[field.control as Control]}
-                      {field.setKey ? ` — ${sets.find((s) => s.key === field.setKey)?.title ?? field.setKey}` : ""}
-                      {" · added by "}{field.addedByName}
-                    </p>
-                    <label className="mt-1 inline-flex cursor-pointer items-center gap-2 text-[11px] text-slate-500">
-                      <SwitchControl name={`own-register:${field.id}`} defaultChecked={field.inRegister} /> shown in the register
-                    </label>
-                  </div>
-                  <label className="min-w-0">
-                    <span className="sr-only">What {field.label} is called</span>
-                    <input name={`own-label:${field.id}`} defaultValue={field.label} maxLength={60} className={inputCls} />
-                  </label>
-                  <div className="min-w-0">
-                    <label className="block">
-                      <span className="sr-only">Whether {field.label} must be filled</span>
-                      <select name={`own-rule:${field.id}`} defaultValue={field.rule} className={inputCls}>
-                        {RULES.map((one) => <option key={one} value={one}>{RULE_LABEL[one]}</option>)}
-                      </select>
-                    </label>
-                    {/* The button carries the field's id as its own value, so one
-                        form saves every row and still drops a single one. */}
-                    <button
-                      formAction={removeOwnFieldOnRow}
-                      name="id"
-                      value={field.id}
-                      className="mt-1.5 text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-red-700 hover:underline"
-                    >
-                      Remove this field
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </ActionForm>
-        </Card>
-
-        <Card title="A field of your own" description={`Asked on ${KIND_LABEL[kind].toLowerCase()}, kept with the record, and read back under your own name for it.`}>
-          <ActionForm action={addOwnFieldAction} submitLabel="Add it" size="sm" resetOnSuccess hidden={{ kind }}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="min-w-0">
-                <span className="stencil mb-1 block text-slate-500">What it is called</span>
-                <input name="label" required maxLength={60} placeholder="Client reference" className={inputCls} />
-              </label>
-              <label className="min-w-0">
-                <span className="stencil mb-1 block text-slate-500">What kind of answer</span>
-                <select name="control" defaultValue="TEXT" className={inputCls}>
-                  {OWN_CONTROLS.map((c) => <option key={c} value={c}>{CONTROL_LABEL[c]}</option>)}
-                </select>
-              </label>
-              <label className="min-w-0">
-                <span className="stencil mb-1 block text-slate-500">If a list, which list</span>
-                <select name="setKey" defaultValue="" className={inputCls}>
-                  <option value="">— not a list —</option>
-                  {sets.map((s) => <option key={s.key} value={s.key}>{s.title}</option>)}
-                </select>
-              </label>
-              <label className="min-w-0">
-                <span className="stencil mb-1 block text-slate-500">Must it be filled</span>
-                <select name="rule" defaultValue="OPTIONAL" className={inputCls}>
-                  {RULES.map((one) => <option key={one} value={one}>{RULE_LABEL[one]}</option>)}
-                </select>
-              </label>
-              <label className="min-w-0 sm:col-span-2 lg:col-span-3">
-                <span className="stencil mb-1 block text-slate-500">Note under the box</span>
-                <input name="help" maxLength={140} placeholder="what to put in it, in your words" className={inputCls} />
-              </label>
-              <label className="inline-flex cursor-pointer items-center gap-2 self-end pb-1.5 text-[11.5px] text-slate-600">
-                <SwitchControl name="inRegister" /> a column in the register
-              </label>
-            </div>
-            <p className="text-[11px] leading-4 text-slate-500">
-              Nothing in the application computes with a field of yours — no number is built from it, no authority read from
-              it, no check asks about it — which is exactly why you may shape it however you like.
-            </p>
-          </ActionForm>
-
-          {mine.length ? (
-            <p className="mt-3 border-t border-line pt-3 text-[11px] leading-4 text-slate-500">
-              To take one away, use <span className="font-medium text-slate-500">Remove this field</span> on its row above. It
-              stops being asked at once; answers already given stay on the records that carry them.
-            </p>
-          ) : null}
-        </Card>
-
-        <p className="max-w-prose text-[11px] leading-4 text-slate-500">
-          Two things override what is set here, and both make a field stricter, never looser: a numbering scheme that draws
-          on a field makes it required for whatever is routed to it, and the type-to-field matrix can insist on supplier,
-          order or date received for a particular deliverable type.
-        </p>
+              {!rows.length ? <tr><td colSpan={4} className="px-5 py-8 text-center text-[13px] text-slate-500 sm:px-6">This form asks nothing more than the route and its people.</td></tr> : null}
+            </tbody>
+          </table>
+        </section>
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import { getSet } from "@/lib/settings/config";
 import { DocumentRegister } from "./document-register";
 import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
 import { setGrouping } from "@/lib/settings/in-sets";
+import { ownFields } from "@/lib/settings/field-policy";
 import { activityDetail, scheduleSource } from "@/lib/actions/api";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { controlDoes } from "@/lib/settings/control-activities";
@@ -105,6 +106,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // It decides the numbering scheme, so the register both shows it and narrows
   // by it.
   const deliverable = sp.deliverable ?? "";
+  // The project's own fields and lists of its own (Forms & fields): each answer a filter, own.<key>=<value>.
+  const ownAsked = (sp as Record<string, string | undefined>);
+  const ownFilter = Object.entries(ownAsked).filter(([k, v]) => k.startsWith("own.") && v).map(([k, v]) => `${k.slice(4)}=${v}`).join(";");
   // Which date, and between which two days. Every date the register already
   // knows — nothing new is stored to make this work. Either end may be left
   // open: "released, from 1 March" is a question people actually ask.
@@ -122,7 +126,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       api<RegisterPage>(projectPath(scope, "/register"), {
         query: {
           q, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, criticality, confidentiality,
-          deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "", view, sort, dir, page, per: perPage,
+          deliverable, phase: sp.phase ?? "", action: sp.action ?? "", own: ownFilter, on: dateOn, from: sp.from ?? "", to: sp.to ?? "", view, sort, dir, page, per: perPage,
         },
       }),
       getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
@@ -136,6 +140,12 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // A filter on a list of several sets offers every set's values under the set's name and whom it serves (owner).
   const inSets = await setGrouping(scope);
   // The filters this person keeps shown (the Filters menu), else the usual ones.
+  // The project's own fields: a column when asked for in the register, a filter when it has choices.
+  const ownAsks = (await ownFields(scope, "DOCUMENT")).filter((f) => f.inRegister || f.control === "CHOICE");
+  const ownColumns = ownAsks.map((f) => ({
+    key: f.key, label: f.label, column: f.inRegister, value: ownAsked[`own.${f.key}`] ?? "",
+    options: f.control === "CHOICE" && f.options ? (f.setKey ? inSets(f.setKey, f.options.map((o) => ({ ...o, setId: o.setId ?? null })), (o) => o.label) : f.options) : null,
+  }));
   const shownFilters = await keptFilters("register", ["state", "rev", "status", "verdict", "supplier", "po", "discipline", "docType", "date"]);
   const actionCodes = activities.filter((a) => a.needs > 0).sort((a, b) => a.code.localeCompare(b.code)).map((a) => ({ code: a.code, name: a.name }));
   const matchCount = register.total;
@@ -174,6 +184,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       phase: doc.phase ?? null,
       phaseLabel: doc.phase ? phaseLabel.get(doc.phase) ?? doc.phase : null,
       actions: doc.activities.map((entry) => ({ code: entry.code, name: entry.name })),
+      extras: doc.extras ?? null,
       deliverableLabel: deliverableLabel.get(doc.deliverableType) ?? pretty(doc.deliverableType), docTypeLabel: typeLabel.get(doc.docType) ?? doc.docType, disciplineLabel: disciplineLabel.get(doc.discipline) ?? doc.discipline, originator: doc.originator, subProject: doc.subproject,
       contractRef: doc.contractRef, criticality: doc.criticality, confidentiality: doc.confidentiality,
       retentionClass: doc.retentionClass,
@@ -313,6 +324,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       picking={picking}
       mayAddToAction={scope.can("CONTROL")}
       shownFilters={shownFilters}
+      own={ownColumns}
       userCanAct={!isReadOnly(user)} filters={{ pick: pickKey, q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
       { code: "NONE", label: "No revision yet" },
       { code: "IN_PREPARATION", label: names.IN_PREPARATION },

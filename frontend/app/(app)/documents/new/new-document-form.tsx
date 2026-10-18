@@ -364,7 +364,7 @@ export function NewDocumentForm({
                 ) : null}
               </>
             ) : null}
-            <OwnFields fields={ownFields} />
+            <OwnFields fields={ownFields} deliverableType={producer} serving={serving} />
 
           </div>
           {foot(received ? null : 1,

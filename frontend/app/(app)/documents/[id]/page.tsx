@@ -1,4 +1,5 @@
 import { plannedState, plannedProgress } from "@/lib/actions/planned-state";
+import { OwnFields } from "@/app/(app)/documents/new/own-fields";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { ReadersPanel } from "./readers-panel";
 import { documentAssets, projectAssets } from "@/lib/records/api";
@@ -292,7 +293,8 @@ export default async function DocumentDetailPage({
   // closed as withdrawn, everyone on it told, its comments kept.
   // What is offered to choose: the set of each list serving this document's deliverable type (Types & sets); every
   // value is still read by its name wherever the document already carries it.
-  const serving = await servingOf(["DOCUMENT_TYPES", "DISCIPLINES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES", "PHASES"]);
+  const serving = await servingOf(["DOCUMENT_TYPES", "DISCIPLINES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES", "PHASES",
+    ...own.filter((f) => f.fromList && f.setKey).map((f) => f.setKey!)]);
   const offer = <T extends { setId?: string | null }>(list: string, rows: T[]) => forType(serving, list, doc.deliverableType, rows);
   // The document's details, as one set of fields: the revision's edit step and
   // the Details tab both use these, so the two can never ask different things.
@@ -307,6 +309,8 @@ export default async function DocumentDetailPage({
       <Field label="Phase" hint="names its next revision"><select name="phase" defaultValue={doc.phase ?? ""} className={inputCls}><option value="">—</option>{offer("PHASES", phases).map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}</select></Field>
       <Field label="Previous number"><input name="previousId" defaultValue={doc.previousId ?? ""} className={inputCls} /></Field>
     </div>
+    {/* What the project's form adds (Forms & fields): its own fields and lists, each list offering its serving set. */}
+    {own.length ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><OwnFields fields={own} values={answers} deliverableType={doc.deliverableType} serving={serving} /></div> : null}
     <input type="hidden" name="appVersion" value={doc.appVersion ?? ""} />
     <input type="hidden" name="legacyScheme" value={doc.legacyScheme ?? ""} />
   </>);

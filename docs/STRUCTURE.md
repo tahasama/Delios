@@ -49,7 +49,7 @@ backend/
 │   │                     unique across DELIOS: codes, names, identifiers, contract numbers; changed once;
 │   │                     look-alikes, claims, merges), RegistryEndpoints (on DELIOS, our identity and domain,
 │   │                     claims, merges; command merge-organizations)
-│   ├── Settings/         the organization's and the project's settings and lists
+│   ├── Settings/         the organization's and the project's settings and lists; FormRules (Forms & fields: what each form asks, checked on save)
 │   ├── Notifications/    notifications, email, pop-ups
 │   ├── Audit/            the audit trail
 │   ├── Extraction/       reading text out of files

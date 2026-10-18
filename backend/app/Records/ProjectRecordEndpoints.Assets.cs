@@ -64,6 +64,11 @@ public static partial class ProjectRecordEndpoints
         if (!await KeepsAsync(h, access)) return KeepersOnly("the asset list");
         var name = r.Name?.Trim() ?? "";
         if (name.Length == 0) return Problems.Invalid("NAME_REQUIRED", "A tag needs a name.");
+        // What the project's tag form insists on (Settings, Forms & fields).
+        if (await Settings.FormRules.CheckAsync(db, access.Project.Id, "ASSET", new Dictionary<string, bool>
+            {
+                ["system"] = !string.IsNullOrWhiteSpace(r.System), ["area"] = !string.IsNullOrWhiteSpace(r.Area), ["unit"] = !string.IsNullOrWhiteSpace(r.Unit),
+            }, r.Extras, c) is { } formProblem) return formProblem;
         // The tag is numbered as a package is: from its scheme (Settings, Numbering), else P1001-TAG-0001. Never typed.
         var code = await numbering.RecordAsync(access.Project.TenantId, access.Project.Id, RecordKinds.Asset,
             NumberFields.ForRecord(access.Project.Code), "TAG", c);

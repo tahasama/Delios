@@ -73,6 +73,8 @@ export type RegisterPage = {
 };
 
 export type RegisterRow = {
+  /** The answers kept with it to the project's own fields and lists of its own. */
+  extras?: Record<string, string> | null;
   id: string; number: string; title: string; deliverableType: string; docType: string; discipline: string;
   originator: string | null; subproject: string | null; contractRef: string | null; criticality: string | null;
   confidentiality: string | null; retentionClass: string | null; isPlaceholder: boolean; state: string;

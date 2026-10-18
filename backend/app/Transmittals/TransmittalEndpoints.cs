@@ -242,6 +242,7 @@ public static class TransmittalEndpoints
             var (draft, refused) = await transmittals.SaveDraftAsync(access, request, cancellationToken);
             return refused ?? Results.Ok(new[] { new { draft!.Id, Number = "Draft", ToName = draft.Subject } });
         }
+        if (await transmittals.FormProblemAsync(access, request, cancellationToken) is { } formProblem) return formProblem;
         var (sent, problem) = await transmittals.ComposeAsync(access, request, cancellationToken);
         return problem ?? Results.Ok(sent.Select(t => new { t.Id, t.Number, t.ToName }));
     }

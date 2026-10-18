@@ -525,6 +525,22 @@ a screen only words it. A new rule goes in the backend, never in a page.
   moves forward, shown in the register…). Never a "Switch off" button or an on/off chip beside a button; a choice among
   several, or a confirmation, stays a tick. Acts whose icon says them are icons (add, change, download, delete, retire, order),
   their name on hover; Save, Cancel and a page's first act keep their words.
+- **Forms & fields are the project's** (owner; backend `Settings/FormRules.cs`, `GET/PUT /api/projects/{id}/forms`): until
+  a project changes one it reads the organization's, its first change gives it its own copy (`FORMS_OWN`), which the
+  organization's later changes never touch. The control function changes them (on a project with none, whoever opened
+  it), everyone of ours reads them; opening a project and adding an organization are the organization's (an
+  administrator; `GET /api/forms/{form}`). The backend refuses what a form insists on, for every way it arrives (a form,
+  an import, a draft sent): documents (registered and changed), revisions started by hand, transmittals sent, packages,
+  tags (FIELDS_REQUIRED, `fields` outlined); opening a project and adding an organization are still checked by their
+  screens. Every **list of one's own** (Types & sets, Numbering & identity or Classification & keeping) is a document
+  field by itself (must · asked · not asked; optional unless chosen): offered by the set serving the document's
+  deliverable type (backend VALUE_NOT_FOR_TYPE), kept with the document (`Document.Extras`), shown and changed in
+  Details / Edit rev, a register column and a filter (`own.<key>`, backend `RegisterFilter.Own`). Fields added by hand
+  stay (any answer kind; a column of the register by its switch). The page is Types & sets' way: the forms on the left,
+  the chosen form's fields as rows (what it is, the answer it takes, the segmented choice acting at once, a pencil to
+  rename, a bin for one's own, + to add). The forms that no longer existed in the app (readiness, adding a person) and
+  the fields it no longer asks (a revision's separate reason and "released as", the file, the received date, a
+  transmittal's response day and covering files, a package's status and acceptor) are gone from it.
 - **Forms follow the sets**: a document is offered, for each list, only the values of the set serving its deliverable
   type (new document, once the type is chosen; Details and Edit rev by the document's own type), read from the backend
   (`GET /api/values/serving`, `lib/settings/serving.ts` `forType`); the backend refuses any other (VALUE_NOT_FOR_TYPE,

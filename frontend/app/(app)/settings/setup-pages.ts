@@ -73,8 +73,10 @@ export const SETUP_PAGES: SetupPage[] = [
   {
     href: "/settings/fields",
     title: "Forms & fields",
-    text: "What each form asks for, and what it insists on — for documents, transmittals, reviews and activities.",
+    text: "What each form asks, and what it insists on: documents, revisions, transmittals, reviews, packages, tags.",
     group: "Classification",
+    control: true,
+    read: true,
   },
   {
     href: "/settings/numbering",

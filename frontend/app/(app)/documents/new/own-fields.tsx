@@ -2,6 +2,7 @@
 
 import { inputCls } from "@/components/ui";
 import type { OwnField } from "@/lib/settings/field-policy";
+import { forType, type Serving } from "@/lib/settings/serving";
 
 /**
  * The fields this organization added, drawn as it asked for them.
@@ -10,7 +11,11 @@ import type { OwnField } from "@/lib/settings/field-policy";
  * application's own fields without a list of exceptions, and so a field added
  * tomorrow needs no change here.
  */
-export function OwnFields({ fields, values, className }: { fields: OwnField[]; values?: Record<string, string>; className?: string }) {
+export function OwnFields({ fields, values, className, deliverableType, serving }: {
+  fields: OwnField[]; values?: Record<string, string>; className?: string;
+  /** A list of one's own offers the values of the set serving this deliverable type (owner: forms follow the sets). */
+  deliverableType?: string | null; serving?: Serving;
+}) {
   if (!fields.length) return null;
   return (
     <>
@@ -33,7 +38,7 @@ export function OwnFields({ fields, values, className }: { fields: OwnField[]; v
             ) : field.control === "CHOICE" ? (
               <select name={name} required={required} defaultValue={value} className={inputCls}>
                 <option value="">{required ? "Choose…" : "—"}</option>
-                {(field.options ?? []).map((o) => (
+                {(field.fromList && serving && field.setKey ? forType(serving, field.setKey, deliverableType, field.options ?? []) : field.options ?? []).map((o) => (
                   <option key={o.code} value={o.code}>{o.label}</option>
                 ))}
               </select>

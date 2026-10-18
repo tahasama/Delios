@@ -48,7 +48,9 @@ public sealed record RegisterFilter(
     string? Q = null, string? State = null, string? Rev = null, string? Status = null, string? Verdict = null, string? Supplier = null,
     string? Discipline = null, string? DocType = null, string? Criticality = null, string? Confidentiality = null, string? Deliverable = null,
     string? Action = null, string? On = null, DateOnly? From = null, DateOnly? To = null, string? View = null, string? Sort = null, string? Dir = null,
-    string? Ids = null, bool? Released = null, string? Po = null, string? Phase = null);
+    string? Ids = null, bool? Released = null, string? Po = null, string? Phase = null,
+    /// <summary>Answers to the project's own fields and lists of its own, <c>KEY=value</c>, several joined by <c>;</c>.</summary>
+    string? Own = null);
 
 /// <summary>One row of the register: the document and the facts about its newest and its current revision.</summary>
 public sealed record RegisterRow(
@@ -58,7 +60,9 @@ public sealed record RegisterRow(
     string? ProposedStatus, string? ReleasedStatus, DateTimeOffset? ReleasedAt,
     string? Verdict, string? DecidedBy, DateOnly? PlannedDate, DateTimeOffset? IssuedAt, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     DateTimeOffset? RevisionStartedAt, DateTimeOffset? FileAddedAt, int Packages, IReadOnlyList<RegisterActivity> Activities,
-    string? Supplier = null, bool? WithSupplier = null, string? Phase = null);
+    string? Supplier = null, bool? WithSupplier = null, string? Phase = null,
+    /// <summary>The answers kept with it to the project's own fields and lists of its own.</summary>
+    IReadOnlyDictionary<string, string>? Extras = null);
 
 public sealed record RegisterActivity(string Code, string Name);
 
@@ -292,6 +296,12 @@ public static class RegisterEndpoints
         if (Has(f.Confidentiality)) query = query.Where(d => d.Confidentiality == f.Confidentiality);
         if (Has(f.Deliverable)) query = query.Where(d => d.DeliverableType == f.Deliverable);
         if (Has(f.Phase)) query = query.Where(d => d.Phase == f.Phase);
+        foreach (var pair in (f.Own ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(10))
+        {
+            if (pair.Split('=', 2) is not [{ Length: > 0 } key, { Length: > 0 } value]) continue;
+            var json = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string> { [key] = value });
+            query = query.Where(d => d.Extras != null && EF.Functions.JsonContains(d.Extras, json));
+        }
         if (Has(f.Action))
             query = query.Where(d => db.Requirements.Any(n => n.DocumentId == d.Id
                 && db.Activities.Any(a => a.Id == n.ActivityId && a.Code == f.Action && a.State == ActivityStates.Active)));
@@ -433,7 +443,8 @@ public static class RegisterEndpoints
                 verdict?.Verdict, decider, d.PlannedDate?.ToDateOnly(), issued.TryGetValue(id, out var at) ? at.ToDateTimeOffset() : null,
                 d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), latest?.CreatedAt.ToDateTimeOffset(),
                 files.TryGetValue(id, out var added) ? added.ToDateTimeOffset() : null, packages.GetValueOrDefault(id),
-                activities.GetValueOrDefault(id) ?? [], SupplierStage(asked.Contains(id), latest?.State, latest?.ResentAt, latest?.ReturnedAt), d.WithSupplier, d.Phase);
+                activities.GetValueOrDefault(id) ?? [], SupplierStage(asked.Contains(id), latest?.State, latest?.ResentAt, latest?.ReturnedAt), d.WithSupplier, d.Phase,
+                d.Extras is null ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(d.Extras));
         }).ToList();
     }
 

@@ -67,6 +67,17 @@ public sealed partial class TransmittalService
         return (sent, null);
     }
 
+    /// <summary>
+    /// What the project's transmittal form insists on (Settings, Forms &amp; fields), for a transmittal one of ours sends:
+    /// checked when it is sent, never on a draft.
+    /// </summary>
+    public Task<IResult?> FormProblemAsync(ProjectAccess access, ComposeRequest request, CancellationToken cancellationToken) =>
+        Settings.FormRules.CheckAsync(db, access.Project.Id, "TRANSMITTAL", new Dictionary<string, bool>
+        {
+            ["subject"] = !string.IsNullOrWhiteSpace(request.Subject), ["message"] = !string.IsNullOrWhiteSpace(request.Message),
+            ["cc"] = request.CopyUserIds is { Length: > 0 },
+        }, request.Extras, cancellationToken);
+
     private async Task<(Prepared? Prepared, IResult? Problem)> PrepareAsync(ProjectAccess access, ComposeRequest request, CancellationToken cancellationToken)
     {
         static (Prepared?, IResult?) Fail(IResult problem) => (null, problem);

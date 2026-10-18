@@ -631,3 +631,9 @@ Testing on your local copy added a few records to the demo data: some test docum
 transmittals, a schedule note, a delivered draft letter ("Draft letter (e2e)"), and activities A100
 and A300 now carry the departments CI and ME (from a test of the departments list). None of this is
 in the code; it lives only in your local database.
+
+- **Forms & fields is the project's** and the backend refuses what a form insists on (documents, revisions, transmittals,
+  packages, tags). Your lists are document fields by themselves, a register column and filter. Gone from the page, as
+  the app no longer asks them: the Readiness and Person forms, a revision's separate reason and "released as", the
+  document's file and received date, a transmittal's response day and covering files, a package's status and acceptor.
+  "A column of the register" now really makes one.

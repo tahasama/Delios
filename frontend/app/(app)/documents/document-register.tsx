@@ -28,6 +28,8 @@ const DATE_COLUMN: Record<string, string> = {
 };
 
 type RegisterRow = {
+  /** The answers to the project's own fields and lists of its own (Forms & fields). */
+  extras?: Record<string, string> | null;
   id: string; docNumber: string; title: string; deliverableType: string; docType: string; discipline: string;
   originator: string | null; subProject: string | null;
   /** For an outside organization: who asked it of them. Their sendable revision, once a file is on it. */
@@ -134,7 +136,7 @@ function withDocs(back: string, ids: string[]) {
   return `${path}?${params.toString()}`;
 }
 
-export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort, views, supplier, picking, mayAddToAction, shownFilters }: {
+export function DocumentRegister({ rows, total, userCanAct, filters, filterOptions, exportHref, plate, paging, codes, sort, views, supplier, picking, mayAddToAction, shownFilters, own = [] }: {
   /** Opened from an action, by the control function: tick to add, untick to take off. */
   picking?: Picking | null;
   /** the control function: the selection can be added to an action. */
@@ -154,6 +156,11 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   filters: Filters;
   /** The filters this person keeps shown (Filters menu); one holding a value always shows. */
   shownFilters: string[];
+  /**
+   * The project's own fields and lists of its own (Forms & fields): each a column when asked for in the register, and
+   * one with choices a filter (`own.<key>`), with the value it holds now.
+   */
+  own?: { key: string; label: string; column: boolean; value: string; options: { code: string; label: string; group?: string }[] | null }[];
   filterOptions: { states: Opt[]; revStates: Opt[]; statuses: Opt[]; verdicts: Opt[]; suppliers: Opt[]; pos: Opt[]; disciplines: Opt[]; types: Opt[]; criticalities: Opt[]; confidentialities: Opt[]; deliverables: Opt[]; phases: Opt[]; actions: Opt[]; dateFields: Opt[] };
   exportHref: string;
 }) {
@@ -168,7 +175,15 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   // Apply is lit only while typed words or dates wait to be applied; a dropdown applies by itself.
   const [dirty, setDirty] = useState(false);
   useEffect(() => setDirty(false), [filters.q, filters.on, filters.from, filters.to]);
-  const held = (key: string) => key === "date" ? !!(filters.on && (filters.from || filters.to)) : !!(filters as unknown as Record<string, string>)[key];
+  const held = (key: string) => key === "date" ? !!(filters.on && (filters.from || filters.to))
+    : key.startsWith("own.") ? !!own.find((o) => `own.${o.key}` === key)?.value
+    : !!(filters as unknown as Record<string, string>)[key];
+  // The project's own columns, after the app's.
+  const ownColumns: Column[] = own.filter((o) => o.column).map((o) => ({
+    key: `own.${o.key}`, label: o.label, cellClass: "text-[13px] text-slate-700",
+    cell: (row) => { const held = row.extras?.[o.key]; return held ? o.options?.find((x) => x.code === held)?.label ?? held : <Muted />; },
+  }));
+  const allColumns = [...COLUMNS, ...ownColumns];
   const visible = (key: string) => shownFilters.includes(key) || held(key);
 
   // The order someone dragged their columns into, and whether they keep the
@@ -181,10 +196,10 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
     } catch {}
   }, []);
   const columns = useMemo(() => {
-    if (!order) return COLUMNS;
-    const byKey = new Map(COLUMNS.map((column) => [column.key, column]));
+    if (!order) return allColumns;
+    const byKey = new Map(allColumns.map((column) => [column.key, column]));
     const moved = order.map((key) => byKey.get(key)).filter((column): column is Column => !!column);
-    return [...moved, ...COLUMNS.filter((column) => !order.includes(column.key))];
+    return [...moved, ...allColumns.filter((column) => !order.includes(column.key))];
   }, [order]);
   /** Drop one column where another sits, by name — the menu's drag. */
   const moveTo = (label: string, before: string) => {
@@ -251,7 +266,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
     } catch {
       for (const label of OPTIONAL) hidden.add(label);
     }
-    return COLUMNS.map((column) => column.label).filter((label) => !hidden.has(label));
+    return allColumns.map((column) => column.label).filter((label) => !hidden.has(label));
   };
   const exportWith = (href: string) => {
     const url = new URL(href, window.location.origin);
@@ -413,8 +428,10 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           {visible("deliverable") ? <Filter name="deliverable" value={filters.deliverable} empty="Deliverable type" options={filterOptions.deliverables} /> : null}
           {visible("phase") ? <Filter name="phase" value={filters.phase} empty="Phase" options={filterOptions.phases} /> : null}
           {visible("action") && filterOptions.actions.length ? <Filter name="action" value={filters.action} empty="Owed by activity" options={filterOptions.actions} /> : null}
+          {own.filter((o) => o.options && visible(`own.${o.key}`)).map((o) => <Filter key={o.key} name={`own.${o.key}`} value={o.value} empty={o.label} options={o.options!} />)}
           <FilterMenu page="register" shown={shownFilters}
-            filters={REGISTER_FILTERS.filter((f) => f.key !== "action" || filterOptions.actions.length).map((f) => ({ key: f.key, label: f.label, held: held(f.key) }))} />
+            filters={[...REGISTER_FILTERS.filter((f) => f.key !== "action" || filterOptions.actions.length).map((f) => ({ key: f.key, label: f.label as string })),
+              ...own.filter((o) => o.options).map((o) => ({ key: `own.${o.key}`, label: o.label }))].map((f) => ({ ...f, held: held(f.key) }))} />
           <input type="hidden" name="view" value={filters.view} />
           <noscript><button className="stencil text-brand-ink">Apply</button></noscript>
         </div>

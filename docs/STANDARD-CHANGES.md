@@ -1212,6 +1212,15 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
 - **A review decides with the set serving its document's deliverable type**, unless its route names another; a route
   naming a set that does not serve its documents is warned of, never refused. The review keeps the set it was offered.
 
+## 63 · What a form asks is the project's, and the system holds it
+
+- **Each project decides what its forms ask** (made required, asked, or left out; fields of its own), starting from
+  the organization's; its own version never changes when the organization's does.
+- **What a form insists on is refused by the system itself**, whichever way the record arrives (a person, an import,
+  another tool), never only by the screen.
+- **A list the project creates is a field of the document** by that alone, offered for each deliverable type from the
+  set serving it, and read, filtered and shown like the app's own fields.
+
 ## Still open — decided in conversation, not yet built
 
 - **Every transmittal and every notification also goes by email**, showing what

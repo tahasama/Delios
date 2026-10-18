@@ -61,7 +61,9 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     const scheme = schemes.find((sc) => sc.name === r.schemeName);
     numberingSets[r.deliverableType] = (scheme?.fields ?? []).map((f) => f.valueSetKey).filter((k): k is string => !!k);
   }
-  const serving = await servingOf(["DOCUMENT_TYPES", "DISCIPLINES", "SUBPROJECTS", "PHASES", "PURCHASE_ORDERS", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES"]);
+  // The lists of one's own asked on the form follow the sets too.
+  const serving = await servingOf(["DOCUMENT_TYPES", "DISCIPLINES", "SUBPROJECTS", "PHASES", "PURCHASE_ORDERS", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES",
+    ...own.filter((f) => f.fromList && f.setKey).map((f) => f.setKey!)]);
   const defaultConf = confidentialities.find((c) => c.props.default === true)?.code ?? null;
   // A value's own one-line meaning travels with it, so the form can say what
   // "Restricted" or "Asset life" means where it is chosen.

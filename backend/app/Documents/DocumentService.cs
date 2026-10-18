@@ -122,6 +122,21 @@ public sealed class DocumentService(
                 new { fields = missing }));
         }
 
+        // What the project's document form insists on (Settings, Forms & fields), and the answers to its lists of one's
+        // own: checked here, for every way a document is registered, an import included.
+        var formGiven = new Dictionary<string, bool>
+        {
+            ["subProject"] = Blank(request.Subproject) is not null, ["phase"] = Blank(request.Phase) is not null,
+            ["contractRef"] = Blank(request.ContractRef) is not null, ["criticality"] = Blank(request.Criticality) is not null,
+            ["confidentiality"] = confidentiality is not null,
+            ["retentionClass"] = (Blank(request.RetentionClass) ?? catalog.RetentionFor(Blank(request.Criticality), request.DeliverableType)) is not null,
+            ["plannedDate"] = request.PlannedDate is not null,
+        };
+        if (await Settings.FormRules.CheckAsync(db, access.Project.Id, "DOCUMENT", formGiven, request.Extras, cancellationToken) is { } formProblem)
+            return Fail(formProblem);
+        if (await Settings.FormRules.CheckListAnswersAsync(db, access.Project.Id, catalog, request.DeliverableType, request.Extras, cancellationToken) is { } listProblem)
+            return Fail(listProblem);
+
         // A record type (Settings, on the type) is always a record: nobody is asked whether it is revised.
         var recordType = (await Catalog.LoadAsync(db, cancellationToken)).Prop(ValueSets.DocumentTypes, request.DocType!, "record")
             is { ValueKind: System.Text.Json.JsonValueKind.True };
@@ -304,6 +319,33 @@ public sealed class DocumentService(
             if (before != value) changes.Add($"{field}: {before ?? "—"} → {value ?? "—"}");
         }
         if (changes.Count == 0) return (document, null);
+        // A change never empties what the project's document form insists on, and an answer to a list of one's own is
+        // one of its values offered for the document's deliverable type.
+        var formKey = new Dictionary<string, string> { ["subproject"] = "subProject", ["phase"] = "phase", ["contractRef"] = "contractRef",
+            ["criticality"] = "criticality", ["confidentiality"] = "confidentiality", ["retentionClass"] = "retentionClass", ["plannedDate"] = "plannedDate" };
+        var touched = (request.Changes ?? []).Keys.Where(formKey.ContainsKey).Select(k => formKey[k]).ToList();
+        var nowGiven = new Dictionary<string, bool>
+        {
+            ["subProject"] = document.Subproject is not null, ["phase"] = document.Phase is not null, ["contractRef"] = document.ContractRef is not null,
+            ["criticality"] = document.Criticality is not null, ["confidentiality"] = document.Confidentiality is not null,
+            ["retentionClass"] = document.RetentionClass is not null, ["plannedDate"] = document.PlannedDate is not null,
+        };
+        if (touched.Count > 0 && await Settings.FormRules.CheckAsync(db, document.ProjectId, "DOCUMENT", nowGiven, null, cancellationToken, touched) is { } formProblem)
+            return Fail(formProblem);
+        var extraChanges = (request.Changes ?? []).Where(c => c.Key.StartsWith("extra:", StringComparison.Ordinal) && c.Key.Length > 6)
+            .ToDictionary(c => c.Key[6..], c => Blank(c.Value));
+        if (extraChanges.Count > 0)
+        {
+            var form = await Settings.FormRules.ReadAsync(db, document.ProjectId, "DOCUMENT", cancellationToken);
+            var emptied = extraChanges.Where(c => c.Value is null).Select(c => c.Key)
+                .Select(k => form.Own.FirstOrDefault(o => o.Key == k && o.Rule == Settings.FormRules.Required)?.Label
+                    ?? form.Lists.FirstOrDefault(l => l.Key == k && l.Rule == Settings.FormRules.Required)?.Title).OfType<string>().ToList();
+            if (emptied.Count > 0)
+                return Fail(Problems.Invalid("FIELDS_REQUIRED", $"{string.Join(", ", emptied)} cannot be emptied: the project's document form insists on it.",
+                    new { fields = extraChanges.Where(c => c.Value is null).Select(c => c.Key).ToList() }));
+            if (await Settings.FormRules.CheckListAnswersAsync(db, document.ProjectId, catalog, document.DeliverableType, extraChanges, cancellationToken) is { } listProblem)
+                return Fail(listProblem);
+        }
         // An order stays the document's supplier's, whichever of the two changed.
         if (await PurchaseOrderProblemAsync(catalog, document.ContractRef, document.Originator, cancellationToken) is { } poProblem) return Fail(poProblem);
         document.UpdatedAt = clock.GetCurrentInstant();
@@ -463,6 +505,11 @@ public sealed class DocumentService(
                 new { revision = latest.Value, state = latest.State }));
         }
 
+        // What the project's revision form insists on (Settings, Forms & fields), when one of ours starts it by hand.
+        if (incoming is null && existing.Count > 0
+            && await Settings.FormRules.CheckAsync(db, access.Project.Id, "REVISION",
+                new Dictionary<string, bool> { ["changeDescription"] = !string.IsNullOrWhiteSpace(request.ChangeDescription) }, null, cancellationToken) is { } formProblem)
+            return (null, formProblem);
         var later = request.FilesLater && (request.FileIds?.Length ?? 0) == 0;
         var (files, filesProblem) = later
             ? ([], null)

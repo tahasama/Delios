@@ -53,6 +53,7 @@ public sealed partial class TransmittalService
         if (draft is null) return ([], NotFound());
         if (draft.IssuedAt is not null) return ([], Problems.Conflict("ALREADY_ISSUED", $"This draft was issued as {draft.IssuedAs}."));
         var body = JsonSerializer.Deserialize<ComposeRequest>(draft.Body)!;
+        if (await FormProblemAsync(access, body, cancellationToken) is { } formProblem) return ([], formProblem);
         // Dated the day it goes, unless the draft named a day.
         var (sent, problem) = await ComposeAsync(access, body, cancellationToken);
         if (problem is not null) return ([], problem);

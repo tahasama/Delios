@@ -194,10 +194,11 @@ export async function DocumentManagementPlan() {
   // added of its own. A form nobody changed asks what the app asks, and is not repeated here.
   const RULE_WORDS: Record<FieldRule, string> = { REQUIRED: "must be filled", OPTIONAL: "asked, may be left", OFF: "not asked" };
   const asked = (await Promise.all(KINDS.map(async (kind) => {
-    const [rules, labels, own] = await Promise.all([fieldRules(ctx, kind), fieldLabels(ctx, kind), storedOwnFields(kind)]);
+    const [rules, labels, stored] = await Promise.all([fieldRules(ctx, kind), fieldLabels(ctx, kind), storedOwnFields(ctx, kind)]);
     const changed = fieldsOf(kind).filter((f) => !f.fixed && rules[f.key] !== f.fallback)
       .map((f) => ({ label: labels[f.key] ?? f.label, rule: rules[f.key], own: false }));
-    const added = own.filter((f) => f.rule !== "OFF").map((f) => ({ label: f.label, rule: f.rule, own: true }));
+    const added = [...stored.own, ...stored.lists.map((l) => ({ label: l.title, rule: l.rule }))]
+      .filter((f) => f.rule !== "OFF").map((f) => ({ label: f.label, rule: f.rule as FieldRule, own: true }));
     return { kind, lines: [...changed, ...added] };
   }))).filter((one) => one.lines.length);
   const leftOut = reading.rows.filter((row) => row.off);

@@ -1,4 +1,5 @@
 import { controlDoes, controlSettings, policies, PROJECT_MODE_LABEL, PEOPLE_MODE_LABEL } from "@/lib/settings/control-activities";
+import { projectForms, fieldsOf } from "@/lib/settings/field-policy";
 import { holdersOf } from "@/lib/core/permissions";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
@@ -59,7 +60,9 @@ export default async function AdminPage() {
     orEmpty(adminUsers).then((all) => all.filter((u) => u.memberships.some((m) => m.projectId === ctx.projectId && m.active)).length),
     orEmpty(adminRoutes).then((all) => all.filter((r) => r.active).length),
     adminAudit({ from: new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10), per: 10 }).then((page) => page.total).catch(() => 0),
-    orgSettings().then((all) => [...all.keys()].filter((k) => k.startsWith("FIELD_RULE:") || k.startsWith("FIELD_LABEL:")).length).catch(() => 0),
+    // What the project's forms ask beyond the app's (Forms & fields): fields made required or left out, and fields added.
+    projectForms(ctx.projectId).then((answer) => (answer?.forms ?? []).reduce((n, form) =>
+      n + Object.entries(form.rules).filter(([key, rule]) => fieldsOf(form.form).find((f) => f.key === key)?.fallback !== rule).length + form.own.length, 0)).catch(() => 0),
     api<{ verdicts: { status: string; meaning: string | null }[] }[]>("/api/admin/verdict-lists").catch(() => null),
     api<{ mfaRequired: boolean; mfaEnrolled: { enrolled: number; of: number } }>("/api/admin/security").catch(() => null),
     getActiveSet("DELIVERABLE_TYPES").catch(() => []),
@@ -88,7 +91,7 @@ export default async function AdminPage() {
     "/settings/config": emptyLists ? { text: `${plural(emptyLists, "essential list")} still empty`, attention: true } : { text: plural(sets, "list") },
     "/settings/families": { text: plural(familyList.length, "family", "families") },
     "/settings/flow": { text: `who does what on ${ctx.project.code}` },
-    "/settings/fields": { text: fieldsSet ? `${plural(fieldsSet, "field")} changed` : "nothing changed yet" },
+    "/settings/fields": { text: fieldsSet ? `${plural(fieldsSet, "field")} decided here` : "as the app asks" },
     "/settings/numbering": notNumbered
       ? { text: `${plural(notNumbered, "deliverable type")} with no numbering yet`, attention: true }
       : { text: plural(schemes, "scheme") },
