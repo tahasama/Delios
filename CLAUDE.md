@@ -445,8 +445,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Another organization works on our project in one of three ways: **collaborator** (its own DELIOS,
   linked; its people use their own sign-in), **guest** (accounts we make), **not on DELIOS** (a code; one of
   ours records for them). Nobody is forced to register. A collaborator is never chosen by hand: it is a party
-  linked to its organization (invite by an email known there; their administrator accepts or refuses, with
-  why; either side ends it, with why).
+  linked to its organization. **Linking is automatic** (owner): never "Invite them to link" by hand on the
+  organization's list. Once an organization on DELIOS is proven to be one others recorded (a claim confirmed by its
+  guest's email link, vouched for by whoever recorded it, an agreed merge, or a guest making their own DELIOS with the
+  account made for them), every organization that listed it is linked with it by itself and every guest account made for
+  its people moves to it (`Organizations/ClaimLinking.cs`): same email, password and two-step sign-in, signing in at home
+  and switching into the projects they were on, as a collaborator; the account with the host stays, standing for them,
+  with everything it did. The host's administrators are told; nothing is asked of them. **Sign-up with a guest's email**
+  (`GUEST_ACCOUNT`): the screen offers to take the account along, proven by that account's password; that person is the
+  new organization's administrator. Either side ends a link, with why.
 - A project belongs to the organization that opened it; its data stays there (`TenantScope` is the only
   way across). Each project says which organizations take part, their role, and the function a
   collaborator's people start with (`ProjectParty`).
@@ -642,6 +649,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Claiming an entry** we or others recorded (owner): never on the claimer's word. The guest who stood for it confirms by
   a link sent to their email (`/confirm-claim`); with no guest (not on DELIOS at all), the organization that recorded it
   vouches, or refuses with why. Until then nothing passes: no documents, no account, no access (`OrganizationClaim`).
+  Confirmed, the link and the guest accounts follow by themselves (above).
 - An organization is always told (notification and email, as always): put on a project (`TellJoinedAsync`: one with its
   own DELIOS through its administrators there; one whose people have accounts with us through them; one not on DELIOS at
   its email for transmittals), and when it is first recorded (one not on DELIOS at that email; one on DELIOS by its

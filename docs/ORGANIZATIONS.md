@@ -104,7 +104,12 @@ both lines. Asking for someone of an organization on DELIOS brings that organiza
 
 A claim (an organization on DELIOS saying an entry others recorded is it) passes nothing until it is confirmed: by the
 guest who stood for that entry, through a link sent to their email; or, with no guest, by the organization that recorded
-it, which vouches or refuses with why. People of another organization keep their own function, shown with their company
+it, which vouches or refuses with why. Once confirmed, nobody invites or accepts anything: every organization that
+recorded the entry is linked with the claimer by itself, and the guest accounts made for its people move to it
+(`ClaimLinking`): they keep their email, password, two-step sign-in, projects and history, sign in at home and switch
+into the host's projects as collaborators. The same follows an agreed merge, and a guest who makes their organization's
+DELIOS with the account made for them (sign-up recognises the email, `GUEST_ACCOUNT`, and asks that account's password;
+they become its administrator). People of another organization keep their own function, shown with their company
 ("ACME / Lead Engineer"); what they may do here follows their organization's role with us. A guest organization has one
 account.
 

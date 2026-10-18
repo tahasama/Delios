@@ -155,7 +155,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         var own = new Party { TenantId = t, Code = await Organizations.Registry.FreeOrganizationCodeAsync(db, organizationName, cancellationToken), Name = organizationName, IsInternal = true };
         db.Parties.Add(own);
         var (control, _, _, _, _) = AddFunctions(t);
-        var admin = await db.Users.SingleAsync(u => u.NormalizedEmail == email.Trim().ToUpperInvariant(), cancellationToken);
+        var admin = await db.Users.SingleAsync(u => u.TenantId == t && u.NormalizedEmail == email.Trim().ToUpperInvariant(), cancellationToken);
         admin.PartyId = own.Id;
         AddConfiguration(t, demo: false);
         await EnsureReviewSetupAsync(t, cancellationToken);

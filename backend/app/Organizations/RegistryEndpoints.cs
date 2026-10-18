@@ -271,6 +271,8 @@ public static class RegistryEndpoints
         claim.AnsweredByName = by;
         if (entry.MergedIntoId is null) await Registry.MergeAsync(db, scopes, keep, entry, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        // Proven: every organization that recorded it is linked with it by itself, and its guest accounts move to it.
+        await ClaimLinking.LinkAsync(scopes, claim.ClaimerTenantId, [keep.Id, entry.Id], by, cancellationToken);
     }
 
     /// <summary><c>POST /api/auth/confirm-claim</c>: the guest who stood for the entry opened the link: it is them.</summary>
@@ -466,6 +468,8 @@ public sealed class MergeOrganizations(DeliosDbContext db, IServiceScopeFactory 
         merge.State = MergeStates.Done;
         merge.DoneAt = SystemClock.Instance.GetCurrentInstant();
         await db.SaveChangesAsync(cancellationToken);
-        return $"Merged: {folded.Name} ({folded.Code}) is {keep.Name} ({keep.Code}) now.";
+        // The one kept is on DELIOS: whoever recorded the other is linked with it by itself, its guests moving to it.
+        var moved = keep.TenantId is { } home ? await ClaimLinking.LinkAsync(scopes, home, [keep.Id, folded.Id], "the merge", cancellationToken) : 0;
+        return $"Merged: {folded.Name} ({folded.Code}) is {keep.Name} ({keep.Code}) now." + (moved > 0 ? $" {moved} guest account(s) moved to it." : "");
     }
 }

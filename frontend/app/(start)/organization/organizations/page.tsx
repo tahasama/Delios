@@ -11,7 +11,7 @@ import { OrganizationJoins } from "@/app/(app)/settings/parties/organization-joi
 import { IdentifierFields } from "@/app/(app)/settings/parties/identifier-fields";
 import { PARTY_KINDS } from "@/lib/settings/party-kinds";
 import { adminProjects, adminUsers, partiesWithAnswers } from "@/lib/settings/api-admin";
-import { inviteOrganizationAction, endLinkAction, setPartyActiveAction } from "@/lib/organization/forms";
+import { endLinkAction, setPartyActiveAction } from "@/lib/organization/forms";
 import { Switch } from "@/components/switch";
 import { IDENTIFIER_KINDS, countryName } from "@/lib/organization/countries";
 import { cn, fmtDate } from "@/lib/core/utils";
@@ -225,29 +225,24 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                         </div>
                       </ActionForm>
                       )}
-                      {!p.isInternal && p.active ? (
+                      {/* Linking is never asked by hand (owner): it follows by itself once they prove, on DELIOS, that they are this
+                          organization (their guest confirms, or we vouch); then every guest account moves to them. Only ending it is ours. */}
+                      {!p.isInternal && p.link ? (
                         <details className="border-t border-line px-5 py-3 sm:px-6">
-                          <summary className={fold}>
-                            {p.link ? (p.link.state === "LINKED" ? `End the link with ${p.link.organization}` : "Take back the invitation") : "Invite them to link"}
-                          </summary>
-                          {p.link ? (
-                            <ActionForm action={endLinkAction} hideSubmit hidden={{ linkId: p.link.id }} className="asking mt-3 space-y-3">
-                              <p className="text-xs leading-5 text-slate-600">
-                                {p.link.state === "LINKED" ? `Their people stop working here with their own accounts. Everything they did stays under ${p.code}.` : `${p.link.organization} has not answered yet.`}
-                              </p>
-                              <Field label="Why" required><input name="note" required className={field} /></Field>
-                              <button type="submit" className="ask">{p.link.state === "LINKED" ? "End the link" : "Take it back"}</button>
-                            </ActionForm>
-                          ) : (
-                            <ActionForm action={inviteOrganizationAction} hideSubmit hidden={{ partyId: p.id }} className="asking mt-3 space-y-3">
-                              <p className="text-xs leading-5 text-slate-600">
-                                If {p.name} has its own DELIOS, its people can work here with their own accounts. Their administrator accepts. Nothing done until now is lost.
-                              </p>
-                              <Field label="Email of someone you know there" required><input type="email" name="email" required className={field} /></Field>
-                              <button type="submit" className="ask">Invite them</button>
-                            </ActionForm>
-                          )}
+                          <summary className={fold}>{p.link.state === "LINKED" ? `End the link with ${p.link.organization}` : "Take back the invitation"}</summary>
+                          <ActionForm action={endLinkAction} hideSubmit hidden={{ linkId: p.link.id }} className="asking mt-3 space-y-3">
+                            <p className="text-xs leading-5 text-slate-600">
+                              {p.link.state === "LINKED" ? `Their people stop working here with their own accounts. Everything they did stays under ${p.code}.` : `${p.link.organization} has not answered yet.`}
+                            </p>
+                            <Field label="Why" required><input name="note" required className={field} /></Field>
+                            <button type="submit" className="ask">{p.link.state === "LINKED" ? "End the link" : "Take it back"}</button>
+                          </ActionForm>
                         </details>
+                      ) : !p.isInternal ? (
+                        <p className="border-t border-line px-5 py-3 text-[11px] leading-5 text-slate-500 sm:px-6">
+                          When {p.name} opens its own DELIOS and proves it is this organization, it is linked with us by itself, and the accounts we made
+                          for its people move to it: they keep their projects, as collaborators.
+                        </p>
                       ) : null}
                       {c?.id && others.length ? (
                         <details className="border-t border-line px-5 py-3 sm:px-6">

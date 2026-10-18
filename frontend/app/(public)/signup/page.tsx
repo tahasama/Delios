@@ -15,6 +15,21 @@ export default function SignupPage() {
   const [missing, setMissing] = useState<MissingField[]>([]);
   const v = state?.values ?? {};
 
+  const guest = state?.guest;
+
+  if (state?.ready) {
+    return (
+      <AuthShell>
+        <h2 className="text-xl font-semibold text-slate-900">{state.ready.organization} is on DELIOS</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          Your account came with you: sign in as usual, with the same email and password. You land in {state.ready.organization}&rsquo;s DELIOS,
+          and switch into {state.ready.host}&rsquo;s projects from there, as before. {state.ready.host} is told; nothing is asked of them.
+        </p>
+        <Link href="/login" className={`${btn("primary")} mt-6 w-full`}>Go to sign in</Link>
+      </AuthShell>
+    );
+  }
+
   if (state?.confirmEmail) {
     return (
       <AuthShell>
@@ -95,6 +110,15 @@ export default function SignupPage() {
                 <label htmlFor="email" className="mb-1 block text-xs font-medium text-slate-700">Email</label>
                 <input id="email" name="email" type="email" autoComplete="email" required defaultValue={v.email} className={inputCls} placeholder="you@company.com" />
               </div>
+              {guest ? (
+                <div>
+                  <input type="hidden" name="takeGuestAccount" value="1" />
+                  <input type="hidden" name="guestHost" value={guest.host} />
+                  <input type="hidden" name="guestOrganization" value={guest.organization} />
+                  <label htmlFor="password" className="mb-1 block text-xs font-medium text-slate-700">Password of your account at {guest.host}</label>
+                  <input id="password" name="password" type="password" autoComplete="current-password" required className={inputCls} />
+                </div>
+              ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label htmlFor="password" className="mb-1 block text-xs font-medium text-slate-700">Password</label>
@@ -105,14 +129,21 @@ export default function SignupPage() {
                   <input id="confirm" name="confirm" type="password" autoComplete="new-password" required minLength={8} className={inputCls} placeholder="repeat it" />
                 </div>
               </div>
+              )}
             </fieldset>
 
+            {guest ? (
+              <p role="status" className="rounded-lg bg-amber-50 px-3 py-2.5 text-sm leading-6 text-amber-900 ring-1 ring-amber-200">
+                This email is the account {guest.host} made for you, for {guest.organization}. Create {guest.organization}&rsquo;s own DELIOS and take
+                it with you: give that account&rsquo;s password. You keep every project you are on at {guest.host}, as a collaborator from now on.
+              </p>
+            ) : null}
             <MissingSummary missing={missing} />
             <BotCheck renew={state} />
             {state?.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}
 
             <button type="submit" disabled={pending} className={`${btn("primary")} w-full`}>
-              {pending ? "Creating your organization…" : "Create organization"}
+              {pending ? "Creating your organization…" : guest ? `Create ${guest.organization}'s DELIOS and take my account` : "Create organization"}
             </button>
           </form>
 
