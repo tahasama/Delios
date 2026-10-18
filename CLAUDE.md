@@ -472,7 +472,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   sign in", a switch acting at once (`setSignInAction`, `PUT /api/admin/users/{id}`; a linked account signs in at home).
   Its name opens its card in place: every project with function, department and since when (confirmed, else first put
   on it; backend `DirectoryEndpoints.SeenAsync`); the card shows no sign-ins or acts (owner: we are not monitoring
-  people), the list keeps "Last sign-in". Lines keep their order when switched (by name, never by state). No "other
+  people), the list keeps "Last sign-in". **The organization's level controls everything** (owner): each person's pencil
+  opens their line as the form (`savePersonEverywhereAction`): name and email (a linked account's are its own
+  organization's), may sign in, administrator (ours), and on every project their function, department and whether they
+  stay on it, plus another project to put them on; a project's People & access does the same for that project only. Lines keep their order when switched (by name, never by state). No "other
   organizations' projects" on People. An organization is suspended by its "In use" switch on its line
   (`setPartyActiveAction`; its people's sessions stop). No eyebrow above a plate's title; the Projects plate has its two
   acts and four figures (open, suspended, archived, people). A project is **Active**, **Suspended** (`ON_HOLD`: nobody

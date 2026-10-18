@@ -6,7 +6,7 @@ import { api, apiFetch, problemOf, projectPath, refusal } from "@/lib/client";
 import { createSession } from "@/lib/core/auth";
 import { requireScope, rememberProject } from "@/lib/core/scope";
 
-type Result = { error?: string; ok?: string };
+type Result = { error?: string; ok?: string; fields?: string[] };
 const text = (formData: FormData, name: string) => String(formData.get(name) ?? "").trim();
 const failed = (e: unknown): Result => ({ error: refusal(e).message });
 
@@ -340,4 +340,59 @@ export async function setPartyActiveAction(formData: FormData): Promise<void> {
   await api(`/api/admin/parties/${partyId}`, { method: "PUT", body: { active } });
   revalidatePath("/organization", "layout");
   revalidatePath("/settings/parties");
+}
+
+/**
+ * The organization's People tab changes everything about a person (owner: the organization's level controls
+ * everything): name and email (not a linked account's, which are its own organization's), administrator, may sign in,
+ * and on each project their function, department, and whether they are on it; or puts them on another project.
+ */
+export async function savePersonEverywhereAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const { adminUsers } = await import("@/lib/settings/api-admin");
+  const userId = text(formData, "userId");
+  const target = (await adminUsers()).find((one) => one.id === userId);
+  if (!target) return { error: "That person no longer exists." };
+  const linked = !!target.linked;
+  const person: Record<string, unknown> = {};
+  if (!linked) {
+    const name = text(formData, "name");
+    const email = text(formData, "email").toLowerCase();
+    if (!name) return { error: "A person needs a name.", fields: ["name"] };
+    if (!/^\S+@\S+\.\S+$/.test(email)) return { error: "Give a valid email address.", fields: ["email"] };
+    if (name !== target.name) person.name = name;
+    if (email !== target.email.toLowerCase()) person.email = email;
+    if (formData.has("sendsActive")) {
+      const active = formData.get("active") === "on";
+      if (active !== target.active) person.active = active;
+    }
+    if (target.internal && formData.has("sendsAdmin")) {
+      const isAdmin = formData.get("isAdmin") === "on";
+      if (isAdmin !== target.isAdmin) person.isAdmin = isAdmin;
+    }
+  }
+  const newProject = text(formData, "newProject");
+  const newFunction = text(formData, "newFunction");
+  if (newProject && !newFunction) return { error: "Choose the function they hold on that project.", fields: ["newFunction"] };
+  try {
+    if (Object.keys(person).length) await api(`/api/admin/users/${userId}`, { method: "PUT", body: person });
+    for (const seat of target.memberships) {
+      if (seat.pendingSince) continue;
+      const functionId = text(formData, `fn:${seat.projectId}`) || seat.functionId;
+      const department = text(formData, `dep:${seat.projectId}`) || null;
+      const on = formData.get(`on:${seat.projectId}`) === "on";
+      if (functionId !== seat.functionId || department !== (seat.department ?? null) || on !== seat.active) {
+        await api(`/api/admin/projects/${seat.projectId}/members`, { method: "PUT", body: { userId, functionId, department, active: on } });
+      }
+    }
+    if (newProject) {
+      await api(`/api/admin/projects/${newProject}/members`, {
+        method: "PUT", body: { userId, functionId: newFunction, department: text(formData, "newDepartment") || null, active: true },
+      });
+    }
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization", "layout");
+  revalidatePath("/settings/users");
+  return { ok: `${text(formData, "name") || target.name} saved.` };
 }
