@@ -10,6 +10,7 @@ import {
   type FieldKind, type FieldRule, type Control,
 } from "@/lib/settings/field-policy";
 import { getSets } from "@/lib/settings/config";
+import { AnswerKind } from "./answer-kind";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Forms & fields" };
@@ -225,7 +226,7 @@ export default async function FieldsPage({ searchParams }: { searchParams: Promi
 
 /**
  * A field of one's own, the same form to add it and to change it (owner): what it is called, the kind of answer, the
- * list it is chosen from (a list chosen makes it a choice from that list), must it be filled, the note under the box,
+ * list it is chosen from (only for an answer chosen from a list), must it be filled, the note under the box,
  * and a column of the register. Once answered, the kind of answer and the list stay as they are.
  */
 function OwnFieldForm({ id, kind, sets, field }: {
@@ -238,17 +239,8 @@ function OwnFieldForm({ id, kind, sets, field }: {
       className="asking px-5 py-5 sm:px-6">
       <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="What it is called" required><input name="label" required maxLength={60} defaultValue={field?.label ?? ""} placeholder="Client reference" className={inputCls} /></Field>
-        <Field label="What kind of answer" hint={fixed ? "answered already: stays as it is" : undefined}>
-          <select name={fixed ? undefined : "control"} defaultValue={field?.control ?? "TEXT"} disabled={fixed} className={inputCls}>
-            {OWN_CONTROLS.map((c) => <option key={c} value={c}>{CONTROL_LABEL[c]}</option>)}
-          </select>
-        </Field>
-        <Field label="If a list, which list" hint={fixed ? "answered already: stays as it is" : "chosen: the answer is one of its values, whatever the kind says"}>
-          <select name={fixed ? undefined : "setKey"} defaultValue={field?.setKey ?? ""} disabled={fixed} className={inputCls}>
-            <option value="">Not a list</option>
-            {sets.map((s) => <option key={s.key} value={s.key}>{s.title}</option>)}
-          </select>
-        </Field>
+        <AnswerKind controls={OWN_CONTROLS.map((c) => ({ value: c, label: CONTROL_LABEL[c] }))} sets={sets}
+          control={field?.control ?? "TEXT"} setKey={field?.setKey ?? ""} fixed={fixed} />
         <Field label="Must it be filled">
           <select name="rule" defaultValue={field?.rule ?? "OPTIONAL"} className={inputCls}>{RULES.map((one) => <option key={one} value={one}>{RULE_LABEL[one]}</option>)}</select>
         </Field>

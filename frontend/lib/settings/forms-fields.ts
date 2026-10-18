@@ -59,16 +59,16 @@ export async function renameFieldAction(_prev: Result | undefined, formData: For
 }
 
 /**
- * A field of one's own, added or changed with the same form: what it is called, the kind of answer (a list chosen
- * makes it a choice from that list), whether it must be filled, the note under the box, and a column of the register.
+ * A field of one's own, added or changed with the same form: what it is called, the kind of answer (and, only for
+ * one chosen from a list, which list), whether it must be filled, the note under the box, and a column of the register.
  */
 export async function saveOwnFieldAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const kind = kindOf(formData);
   if (!kind) return { error: "No such form." };
   const label = text(formData, "label");
-  const setKey = text(formData, "setKey") || null;
-  // A list chosen is the answer: the field is a choice from it, whatever kind was left in the other box.
-  const control = (setKey ? "CHOICE" : text(formData, "control")) as Control;
+  const control = text(formData, "control") as Control;
+  // A list is named only for an answer chosen from a list.
+  const setKey = control === "CHOICE" ? text(formData, "setKey") || null : null;
   const rule = (text(formData, "rule") || "OPTIONAL") as FieldRule;
   if (!label) return { error: "Give the field a name: it is what people filling the form read." };
   if (!CONTROLS.includes(control)) return { error: "Say what kind of answer it takes." };

@@ -533,8 +533,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   an import, a draft sent): documents (registered and changed), revisions started by hand, transmittals sent, packages,
   tags, opening a project and adding an organization (FIELDS_REQUIRED, `fields` outlined). On the review form, "Copied in"
   is must · asked · not asked like any field (not asked: nobody is copied in). **A field of one's own** is one row,
-  added and changed with the same form (owner): what it is called, the kind of answer, the list it is chosen from (a list
-  chosen makes it a choice from that list: never two fields), must it be filled, the note under the box, a column of the
+  added and changed with the same form (owner): what it is called, the kind of answer, the list it is chosen from (open
+  only when the kind is "chosen from a list", then required: never two fields), must it be filled, the note under the box, a column of the
   register. Never answered: changed entirely, or taken off (bin). Answered at least once (`FormRules.UsedAsync`): only
   retired (no longer asked, its answers stay on their records; brought back), its kind and list fixed (backend
   FIELD_IN_USE). Chosen from a list, it offers the values of the set serving the document's deliverable type (backend
