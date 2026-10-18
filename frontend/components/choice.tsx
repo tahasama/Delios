@@ -62,7 +62,10 @@ export function Choice({ name, options, defaultValue = "", placeholder = "Choose
       <input type="hidden" name={name} value={value} />
       <button type="button" role="combobox" aria-expanded={open} aria-controls={list} aria-haspopup="listbox" aria-label={label}
         onClick={() => (open ? setOpen(false) : show())} onKeyDown={key}
-        className={cn(inputCls, "flex cursor-pointer items-center justify-between gap-2 text-left")}>
+        className={cn(inputCls, "flex cursor-pointer items-center justify-between gap-2 rounded-t-sm px-2 text-left",
+          // Grey like the asking fields (.asking .plain), so it reads as a field to fill wherever it sits.
+          "bg-[color-mix(in_oklab,var(--color-canvas)_60%,var(--color-surface))] hover:bg-[color-mix(in_oklab,var(--color-canvas)_85%,var(--color-surface))]",
+          "aria-expanded:bg-[color-mix(in_oklab,var(--color-canvas)_85%,var(--color-surface))]")}>
         <span className={cn("truncate", chosen ? "" : "text-slate-400")}>{chosen?.label ?? placeholder}</span>
         <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform duration-150", open && "rotate-180")} aria-hidden="true" />
       </button>
