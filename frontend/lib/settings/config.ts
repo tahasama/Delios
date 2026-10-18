@@ -60,15 +60,27 @@ type SetInfo = { key: string; title: string; description: string | null; group: 
  * administrator named before giving it values. A list's name and description
  * are the organization's settings; its values are the backend's.
  */
-export const getSets = cache(async (): Promise<SetInfo[]> => {
+export const getSets = cache(async (): Promise<SetInfo[]> => readSets("project"));
+
+/** The organization's lists and their names, as its Settings show them (an administrator's). */
+export const organizationSets = cache(async (): Promise<SetInfo[]> => readSets("organization"));
+
+/** The organization's values of a list, as its Settings show them (not the project's copy). */
+export const organizationSet = cache(async (setKey: string): Promise<ValueRow[]> =>
+  (await api<RawRow[]>(`/api/admin/lists/${encodeURIComponent(setKey)}/values`).catch(() => [] as RawRow[]))
+    .map((row) => ({ code: row.code, label: row.label, status: row.status, props: row.props ?? {}, setId: row.setId ?? null })));
+
+async function readSets(level: "project" | "organization"): Promise<SetInfo[]> {
   const { orgSettings, projectSettings } = await import("@/lib/settings/api");
   const { getScope } = await import("@/lib/core/scope");
-  const scope = await getScope();
+  const scope = level === "project" ? await getScope() : null;
   // The project's lists (its own, else the organization's) and their names: the project's over the organization's.
   const [counted, org, own] = await Promise.all([
     scope
       ? api<{ sets: { key: string; active: number; retired: number }[] }>(`/api/projects/${scope.projectId}/lists`).then((r) => r.sets).catch(() => [])
-      : api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets").catch(() => []),
+      : level === "organization"
+        ? api<{ sets: { key: string; active: number; retired: number }[] }>("/api/admin/lists").then((r) => r.sets).catch(() => [])
+        : api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets").catch(() => []),
     orgSettings().catch(() => new Map<string, string>()),
     scope ? projectSettings(scope.projectId).catch(() => new Map<string, string>()) : Promise.resolve(new Map<string, string>()),
   ]);
@@ -82,4 +94,4 @@ export const getSets = cache(async (): Promise<SetInfo[]> => {
     const humane = key.replaceAll("_", " ").toLowerCase();
     return { key, title: info.title ?? APP_TITLES[key]?.title ?? humane.charAt(0).toUpperCase() + humane.slice(1), description: info.description ?? APP_TITLES[key]?.description ?? null, group: info.group ?? null, version: info.version ?? 1, kind: info.kind ?? null };
   });
-});
+}

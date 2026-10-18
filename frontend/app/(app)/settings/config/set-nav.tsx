@@ -12,7 +12,9 @@ export type SetNavGroup = { title: string; sets: { key: string; title: string; c
  * The lists as tabs by purpose (they wrap, never scroll); under a tab, its lists on the left and the chosen list on the
  * right, flush in the same sheet. Typing in Find searches every tab at once.
  */
-export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
+export function SetNav({ page = "/settings/config", groups, current, currentSet, mayAddSets, children }: {
+  /** The page the lists are on: a project's Settings, or the organization's. */
+  page?: string;
   groups: SetNavGroup[]; current: string;
   /** The set shown on the right. */
   currentSet: string | null;
@@ -73,7 +75,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                     <Link
                       replace
                       scroll={false}
-                      href={`/settings/config?set=${one.key}`}
+                      href={`${page}?set=${one.key}`}
                       aria-current={on ? "page" : undefined}
                       className={`flex min-w-0 flex-1 items-center justify-between gap-2 py-2 pl-2.5 pr-1 text-[13px] ${on ? "font-semibold text-brand-ink" : "text-slate-600 hover:text-slate-900"}`}
                     >
@@ -100,7 +102,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                             <Link
                               replace
                               scroll={false}
-                              href={`/settings/config?set=${one.key}${part.id ? `&vs=${part.id}` : ""}`}
+                              href={`${page}?set=${one.key}${part.id ? `&vs=${part.id}` : ""}`}
                               aria-current={here ? "page" : undefined}
                               className={`flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-[12px] ${here ? "bg-tint font-semibold text-brand-ink" : "text-slate-600 hover:bg-tint-soft hover:text-slate-900"} ${part.active ? "" : "opacity-60"}`}
                             >
@@ -113,7 +115,7 @@ export function SetNav({ groups, current, currentSet, mayAddSets, children }: {
                       })}
                       {mayAddSets && one.takesSets ? (
                         <li>
-                          <Link replace scroll={false} href={`/settings/config?set=${one.key}&panel=newset`} className="flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-[12px] font-semibold text-link hover:bg-tint-soft">
+                          <Link replace scroll={false} href={`${page}?set=${one.key}&panel=newset`} className="flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-[12px] font-semibold text-link hover:bg-tint-soft">
                             <Plus className="h-3 w-3" /> New set
                           </Link>
                         </li>

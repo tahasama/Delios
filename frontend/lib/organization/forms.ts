@@ -396,3 +396,17 @@ export async function savePersonEverywhereAction(_prev: Result | undefined, form
   revalidatePath("/settings/users");
   return { ok: `${text(formData, "name") || target.name} saved.` };
 }
+
+/** Puts one of a project's lists back to the organization's (its Settings only, for a mess): always with why. */
+export async function resetListAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const reason = text(formData, "reason");
+  if (!reason) return { error: "Say why the list goes back to the organization's.", fields: ["reason"] };
+  try {
+    await api(`/api/admin/lists/projects/${text(formData, "projectId")}/reset`, { body: { list: text(formData, "list"), reason } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization/settings/types");
+  revalidatePath("/settings/config");
+  return { ok: "It uses the organization's list again." };
+}

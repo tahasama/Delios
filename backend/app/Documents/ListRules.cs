@@ -105,8 +105,8 @@ public static class ListRules
         return char.ToUpperInvariant(words[0]) + words[1..];
     }
 
-    /// <summary>Every list's meta, the project's over the organization's.</summary>
-    public static async Task<Dictionary<string, ListMeta>> MetaAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken)
+    /// <summary>Every list's meta, the project's over the organization's (none: the organization's only).</summary>
+    public static async Task<Dictionary<string, ListMeta>> MetaAsync(DeliosDbContext db, Guid? projectId, CancellationToken cancellationToken)
     {
         var rows = await db.Set<Setting>().AsNoTracking()
             .Where(s => (s.ProjectId == null || s.ProjectId == projectId) && s.Key.StartsWith(ProjectLists.SetPrefix))

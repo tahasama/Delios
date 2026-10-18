@@ -11,18 +11,19 @@ import { deleteListAction } from "@/lib/settings/forms-lists";
  * review route still points at the set — it says which one, instead of looking
  * like a button that does nothing.
  */
-export function DeleteSetButton({ setKey, title, count }: { setKey: string; title: string; count: number }) {
+export function DeleteSetButton({ level, setKey, title, count }: { level: "project" | "organization"; setKey: string; title: string; count: number }) {
   const [state, formAction, pending] = useActionState(deleteListAction, undefined);
   return (
     <form
       action={formAction}
       onSubmit={(event) => {
-        if (!confirm(`Delete “${title}” and its ${count} value(s)? None of them was ever used on this project; the log keeps it.`)) {
+        if (!confirm(`Delete “${title}” and its ${count} value(s)? None of them was ever used${level === "organization" ? " on a project reading it" : " on this project"}; the log keeps it.`)) {
           event.preventDefault();
         }
       }}
       className="relative"
     >
+      <input type="hidden" name="level" value={level} />
       <input type="hidden" name="key" value={setKey} />
       <button
         type="submit"

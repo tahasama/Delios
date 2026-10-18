@@ -439,3 +439,7 @@ export const projectRevisions = cache(async () => {
 /** The projects naming revisions by their own copy, since when and by whom. */
 export const revisionCopies = cache(async () =>
   api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/revisions/projects").catch(() => []));
+
+/** The projects keeping their own copy of lists (the organization's Types & sets card), and which. */
+export const listCopies = cache(async () =>
+  api<{ id: string; code: string; name: string; lists: string[] }[]>("/api/admin/lists/projects").catch(() => []));

@@ -20,7 +20,7 @@ export type OrgCard = {
 
 export const ORG_CARDS: OrgCard[] = [
   { project: "identity", title: "Who we are on DELIOS", text: "Our code and name everywhere, our identifier and email domain; claims and merges asked of us.", slug: "identity", group: "Organization" },
-  { project: "/settings/config", title: "Types & sets", text: "The lists every document is described with, and which of them a project may change.", slug: "types", area: "Types & sets", notMovedYet: true },
+  { project: "/settings/config", title: "Types & sets", text: "The lists every document is described with, and which of them a project may change.", slug: "types", area: "Types & sets" },
   { project: "/settings/fields", title: "Forms & fields", text: "What each form asks and insists on, for every project.", slug: "fields", area: "Forms & fields", notMovedYet: true },
   { project: "/settings/numbering", title: "Numbering", text: "How every number is built, and which scheme numbers what.", slug: "numbering", area: "Numbering" },
   { project: "/settings/revisions", title: "Revisions", text: "How revisions are named, line by line for each phase.", slug: "revisions", area: "Revisions" },

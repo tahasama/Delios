@@ -14,7 +14,7 @@ public static class ProjectCodes
 {
     public static async Task EnsurePublishedAsync(DeliosDbContext db, Guid tenantId, string code, string name, CancellationToken cancellationToken)
     {
-        var owners = await db.Projects.AsNoTracking().Where(p => p.TenantId == tenantId && p.OwnLists).Select(p => (Guid?)p.Id).ToListAsync(cancellationToken);
+        var owners = await db.Projects.AsNoTracking().Where(p => p.TenantId == tenantId && p.OwnListKeys.Contains(ValueSets.ProjectCodes)).Select(p => (Guid?)p.Id).ToListAsync(cancellationToken);
         foreach (var projectId in owners.Prepend(null))
         {
             var known = db.ValueEntries.Local.Any(v => v.TenantId == tenantId && v.ProjectId == projectId && v.SetKey == ValueSets.ProjectCodes && v.Code == code)

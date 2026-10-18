@@ -2575,9 +2575,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("opened_by_id");
 
-                    b.Property<bool>("OwnLists")
-                        .HasColumnType("boolean")
-                        .HasColumnName("own_lists");
+                    b.PrimitiveCollection<string[]>("OwnListKeys")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("own_list_keys");
 
                     b.Property<string>("PreviousCode")
                         .HasMaxLength(32)

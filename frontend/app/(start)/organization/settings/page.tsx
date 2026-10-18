@@ -4,7 +4,7 @@ import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { Chip } from "@/components/ui";
 import { liberty } from "@/lib/organization/liberty";
 import { projectDefaults } from "@/lib/organization/defaults";
-import { numberingCopies, revisionCopies, routeCopies } from "@/lib/settings/api-admin";
+import { numberingCopies, revisionCopies, routeCopies, listCopies } from "@/lib/settings/api-admin";
 import { SETUP_PAGES, SETUP_GROUPS } from "@/app/(app)/settings/setup-pages";
 import { SETUP_ICON } from "@/app/(app)/settings/icons";
 import { fmtDate } from "@/lib/core/utils";
@@ -21,11 +21,11 @@ export const metadata = { title: "The organization's Settings" };
  */
 export default async function OrganizationSettingsPage() {
   const scope = await requireOrgAdmin();
-  const [switches, defaults, numbering, revisions, routes] = await Promise.all([
-    liberty(), projectDefaults(), numberingCopies(), revisionCopies(), routeCopies(),
+  const [switches, defaults, numbering, revisions, routes, lists] = await Promise.all([
+    liberty(), projectDefaults(), numberingCopies(), revisionCopies(), routeCopies(), listCopies(),
   ]);
   const free = switches.filter((one) => one.free).length;
-  const copies = new Map([["Numbering", numbering.length], ["Revisions", revisions.length], ["Review routes", routes.length]]);
+  const copies = new Map([["Numbering", numbering.length], ["Revisions", revisions.length], ["Review routes", routes.length], ["Types & sets", lists.length]]);
   const ownCopies = [...copies.values()].reduce((a, b) => a + b, 0);
   const said = (area?: string): { text: string; free: boolean } | null => {
     if (!area) return null;

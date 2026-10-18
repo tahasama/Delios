@@ -94,25 +94,32 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     /// </summary>
     /// <summary>The project whose lists this request reads; none: the organization's.</summary>
     public Guid? ListsProject { get; private set; }
-    /// <summary>That project keeps its own lists; otherwise it reads the organization's, the default.</summary>
-    public bool ListsOwn { get; private set; }
+    /// <summary>The lists that project keeps its own copy of; every other list is read as the organization's, the default.</summary>
+    public string[] ListsOwnKeys { get; private set; } = [];
 
     /// <summary>
-    /// Reads the lists as this project sees them from now on in the request: its own copy once it has one, else the
-    /// organization's. Set by <c>ProjectAccessFilter</c> and by the <c>X-Delios-Project</c> header.
+    /// Reads the lists as this project sees them from now on in the request: its own copy of the lists it keeps, the
+    /// organization's of the others. Set by <c>ProjectAccessFilter</c> and by the <c>X-Delios-Project</c> header.
     /// </summary>
-    public void UseListsOf(Guid projectId, bool own)
+    public void UseListsOf(Guid projectId, string[] ownKeys)
     {
         ListsProject = projectId;
-        ListsOwn = own;
+        ListsOwnKeys = ownKeys;
+    }
+
+    /// <summary>Reads every list as the organization's (the organization's Settings).</summary>
+    public void UseOrganizationLists()
+    {
+        ListsProject = null;
+        ListsOwnKeys = [];
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DeliosDbContext).Assembly);
-        // A list is read as the project in hand sees it: its own copy, else the organization's.
-        modelBuilder.Entity<ValueEntry>().HasQueryFilter(v => ListsOwn ? v.ProjectId == ListsProject : v.ProjectId == null);
-        modelBuilder.Entity<ValueSet>().HasQueryFilter(v => ListsOwn ? v.ProjectId == ListsProject : v.ProjectId == null);
+        // A list is read as the project in hand sees it: its own copy of the lists it keeps, the organization's of the others.
+        modelBuilder.Entity<ValueEntry>().HasQueryFilter(v => ListsOwnKeys.Contains(v.SetKey) ? v.ProjectId == ListsProject : v.ProjectId == null);
+        modelBuilder.Entity<ValueSet>().HasQueryFilter(v => ListsOwnKeys.Contains(v.ListKey) ? v.ProjectId == ListsProject : v.ProjectId == null);
 
         // Every Guid id is made in code (Guid.CreateVersion7), never by the database.
         // Saying so lets a new row reached through a navigation be inserted rather

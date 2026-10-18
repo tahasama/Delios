@@ -316,14 +316,14 @@ public static class PlatformSetup
                 await using var look = await db.Database.BeginTransactionAsync(http.RequestAborted);
                 var project = Guid.TryParse(http.Request.Headers["X-Delios-Project"].ToString(), out var projectId)
                     ? await db.Projects.AsNoTracking().Where(p => p.Id == projectId)
-                        .Select(p => new { p.Id, p.OwnLists }).SingleOrDefaultAsync(http.RequestAborted)
+                        .Select(p => new { p.Id, p.OwnListKeys }).SingleOrDefaultAsync(http.RequestAborted)
                     // None said: the project the screens open first, as /api/me lists them.
                     : await db.Memberships.AsNoTracking()
                         .Where(m => m.UserId == http.User.UserId() && m.Active && m.Project!.Status == "ACTIVE" && m.Function!.Active)
-                        .OrderBy(m => m.Project!.Code).Select(m => new { m.Project!.Id, m.Project.OwnLists })
+                        .OrderBy(m => m.Project!.Code).Select(m => new { m.Project!.Id, m.Project.OwnListKeys })
                         .FirstOrDefaultAsync(http.RequestAborted);
                 await look.CommitAsync(http.RequestAborted);
-                if (project is not null) db.UseListsOf(project.Id, project.OwnLists);
+                if (project is not null) db.UseListsOf(project.Id, project.OwnListKeys);
             }
             await next(http);
         });

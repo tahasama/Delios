@@ -25,9 +25,11 @@ public sealed record ProjectListRequest(string? Key, string? Title, string? Desc
 public sealed record ProjectSetRequest(string? Name, string[]? DeliverableTypes = null, bool? Active = null);
 
 /// <summary>
-/// The project's lists (<c>/api/projects/{projectId}/lists</c>). The organization's lists are the default every project
-/// starts from; the first change a project makes gives it its own copy of them all (<see cref="Project.OwnLists"/>), which
-/// the organization's later changes never touch. While a value (or a list) was never used on the project, everything about
+/// The lists, on two levels (owner): the organization's (<c>/api/admin/lists</c>, its Settings, administrators) are the
+/// default every project reads; a project's (<c>/api/projects/{projectId}/lists</c>) copies one list on its first change,
+/// that list only and only where the organization leaves it free (<c>LIST:&lt;key&gt;</c>, <see cref="Settings.Liberty"/>;
+/// <see cref="Project.OwnListKeys"/>), a copy the organization's later changes never touch. A list the organization keeps
+/// fixed is read only on a project. While a value (or a list) was never used on the project, everything about
 /// it may change and it may be deleted; once used, only its name changes (and it may be retired): anything else is a new
 /// value. Whoever acts as the control function on the project changes them; on a project with none, only whoever opened it.
 /// Every change is in the log.
@@ -51,7 +53,101 @@ public static class ProjectLists
         lists.MapPost("/{set}/sets", CreateSetAsync);
         lists.MapPut("/{set}/sets/{setId:guid}", UpdateSetAsync);
         lists.MapDelete("/{set}/sets/{setId:guid}", DeleteSetAsync);
+        lists.AddEndpointFilter(async (context, next) =>
+        {
+            var http = context.HttpContext;
+            var access = ProjectAccessFilter.Of(http);
+            http.Items[LevelItem] = new ListLevel(access.Project.TenantId, access.Project, access.UserId, access.UserName, access);
+            return await next(context);
+        });
+
+        // The organization's lists, the default of every project: changed by an administrator, in its Settings.
+        var organization = app.MapGroup("/api/admin/lists").WithTags("Settings")
+            .AddEndpointFilter<TransactionFilter>().AddEndpointFilter(Keepers.Configurers("An administrator changes the organization's lists."));
+        organization.MapGet("", ListsAsync);
+        organization.MapGet("/{set}/usage", UsageEndpointAsync);
+        // The organization's values of a list, as /api/values gives a project's.
+        organization.MapGet("/{set}/values", async (string set, DeliosDbContext db, CancellationToken cancellationToken) =>
+            Results.Ok(await db.ValueEntries.AsNoTracking().Where(v => v.SetKey == set.ToUpperInvariant())
+                .OrderBy(v => v.Status == ValueStatus.Active ? 0 : 1).ThenBy(v => v.Sort).ThenBy(v => v.Code)
+                .Select(v => new { v.Code, v.Label, v.Status, v.Props, v.SetId }).ToListAsync(cancellationToken)));
+        organization.MapPost("", CreateListAsync);
+        organization.MapPut("/{set}", UpdateListAsync);
+        organization.MapDelete("/{set}", DeleteListAsync);
+        organization.MapPut("/{set}/values", ValueAsync);
+        organization.MapDelete("/{set}/values/{code}", DeleteValueAsync);
+        organization.MapPost("/{set}/sets", CreateSetAsync);
+        organization.MapPut("/{set}/sets/{setId:guid}", UpdateSetAsync);
+        organization.MapDelete("/{set}/sets/{setId:guid}", DeleteSetAsync);
+        // The projects keeping their own copy of lists, and putting one back (owner: here only, for a mess, with why).
+        organization.MapGet("/projects", async (DeliosDbContext db, CancellationToken cancellationToken) =>
+            Results.Ok(await db.Projects.AsNoTracking().Where(p => p.OwnListKeys.Length > 0).OrderBy(p => p.Code)
+                .Select(p => new { p.Id, p.Code, p.Name, Lists = p.OwnListKeys }).ToListAsync(cancellationToken)));
+        organization.MapPost("/projects/{projectId:guid}/reset", ResetAsync);
+        organization.AddEndpointFilter(async (context, next) =>
+        {
+            var http = context.HttpContext;
+            var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
+            db.UseOrganizationLists();
+            var me = await db.Users.AsNoTracking().Where(u => u.Id == http.User.UserId()).Select(u => u.Name).SingleAsync(http.RequestAborted);
+            http.Items[LevelItem] = new ListLevel(http.User.TenantId(), null, http.User.UserId(), me, null);
+            return await next(context);
+        });
     }
+
+    /// <summary>Body of putting one of a project's lists back to the organization's: which list, and why.</summary>
+    public sealed record ListResetRequest(string? List, string? Reason);
+
+    /// <summary>
+    /// <c>POST /api/admin/lists/projects/{id}/reset</c>: the project's copy of one list goes, and it reads the
+    /// organization's again; always with why, in the log, and its control function is told. What its documents carry
+    /// stays as it is (a value no longer in the list is still read by its name where it is shown).
+    /// </summary>
+    private static async Task<IResult> ResetAsync(Guid projectId, ListResetRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        Notifications.Notifier notifier, CancellationToken cancellationToken)
+    {
+        var level = LevelOf(http);
+        var reason = Blank(request.Reason);
+        var list = Blank(request.List)?.ToUpperInvariant();
+        if (reason is null) return Problems.Invalid("REASON_REQUIRED", "Say why the list goes back to the organization's.");
+        var project = await db.Projects.SingleOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
+        if (list is null || !project.OwnListKeys.Contains(list)) return Problems.Invalid("NOT_OWN", $"{project.Code} already uses the organization's list.");
+        db.ValueEntries.RemoveRange(await db.ValueEntries.IgnoreQueryFilters()
+            .Where(v => v.TenantId == level.TenantId && v.ProjectId == projectId && v.SetKey == list).ToListAsync(cancellationToken));
+        await db.SaveChangesAsync(cancellationToken);
+        db.ListSets.RemoveRange(await db.ListSets.IgnoreQueryFilters()
+            .Where(v => v.TenantId == level.TenantId && v.ProjectId == projectId && v.ListKey == list).ToListAsync(cancellationToken));
+        if (await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == projectId && s.Key == SetPrefix + list, cancellationToken) is { } meta)
+            db.Remove(meta);
+        project.OwnListKeys = [.. project.OwnListKeys.Where(k => k != list)];
+        await db.SaveChangesAsync(cancellationToken);
+        var title = ListRules.TitleOf(list, (await ListRules.MetaAsync(db, null, cancellationToken)).GetValueOrDefault(list) ?? ListRules.ListMeta.Read(null));
+        await audit.WriteAsync(new Actor(level.UserId, level.UserName), "SETTING_RESET", "Project", project.Id, $"{project.Code}: {title}", reason,
+            project.Id, cancellationToken);
+        await notifier.NotifyAsync(project.TenantId, project.Id, await Actions.NoticeLog.HoldersAsync(db, project.Id, Verbs.Control, cancellationToken),
+            Notifications.NotificationKinds.General, $"{project.Code} uses the organization's {title} again",
+            $"{level.UserName} put {project.Code}'s {title} back to the organization's: {reason}. What its documents carry stays as it is.",
+            $"/settings/config?set={list}", cancellationToken);
+        return Results.NoContent();
+    }
+
+    private const string LevelItem = "lists.level";
+
+    /// <summary>
+    /// Which lists a request changes: a project's (its own copies, the organization's where it has none) or the
+    /// organization's. Writes carry <see cref="ProjectId"/>: the project, or none for the organization's.
+    /// </summary>
+    private sealed record ListLevel(Guid TenantId, Project? Project, Guid UserId, string UserName, ProjectAccess? Access)
+    {
+        public Guid? ProjectId => Project?.Id;
+        public bool Organization => Project is null;
+    }
+
+    private static ListLevel LevelOf(HttpContext http) => (ListLevel)http.Items[LevelItem]!;
+
+    /// <summary>The lists that describe projects themselves, kept by the organization for all of them: never a project's copy.</summary>
+    private static readonly HashSet<string> OrganizationOnly = [ValueSets.ProjectKinds, "CONTRACT_ROLES"];
 
     /// <summary>
     /// Whoever may change the project's lists: whoever acts as its control function; on a project with none, whoever opened
@@ -66,35 +162,37 @@ public static class ProjectLists
     }
 
     /// <summary>
-    /// The project gets its own copy of the organization's lists, once, before its first change: from then on it reads its
-    /// own. Returns whether the copy was made now.
+    /// The project gets its own copy of one of the organization's lists, once, before its first change of it: its sets, each
+    /// under a new id its values point to, and its values. From then on it reads its own copy of that list. Returns whether
+    /// the copy was made now.
     /// </summary>
-    public static async Task<bool> EnsureOwnAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken)
+    public static async Task<bool> EnsureOwnAsync(DeliosDbContext db, Guid projectId, string listKey, CancellationToken cancellationToken)
     {
         var project = await db.Projects.SingleAsync(p => p.Id == projectId, cancellationToken);
-        if (project.OwnLists)
+        if (project.OwnListKeys.Contains(listKey))
         {
-            db.UseListsOf(project.Id, true);
+            db.UseListsOf(project.Id, project.OwnListKeys);
             return false;
         }
-        // The sets first, each under a new id the copied values point to.
-        var sets = await db.ListSets.IgnoreQueryFilters().AsNoTracking().Where(s => s.ProjectId == null).ToListAsync(cancellationToken);
+        var sets = await db.ListSets.IgnoreQueryFilters().AsNoTracking()
+            .Where(s => s.ProjectId == null && s.TenantId == project.TenantId && s.ListKey == listKey).ToListAsync(cancellationToken);
         var newId = sets.ToDictionary(s => s.Id, _ => Guid.CreateVersion7());
         db.ListSets.AddRange(sets.Select(s => new ValueSet
         {
             Id = newId[s.Id], TenantId = s.TenantId, ProjectId = project.Id, ListKey = s.ListKey, Name = s.Name,
             DeliverableTypes = [.. s.DeliverableTypes], IsDefault = s.IsDefault, Active = s.Active, Sort = s.Sort,
         }));
-        var originals = await db.ValueEntries.IgnoreQueryFilters().AsNoTracking().Where(v => v.ProjectId == null).ToListAsync(cancellationToken);
+        var originals = await db.ValueEntries.IgnoreQueryFilters().AsNoTracking()
+            .Where(v => v.ProjectId == null && v.TenantId == project.TenantId && v.SetKey == listKey).ToListAsync(cancellationToken);
         db.ValueEntries.AddRange(originals.Select(v => new ValueEntry
         {
             TenantId = v.TenantId, ProjectId = project.Id, SetKey = v.SetKey, Code = v.Code, Label = v.Label, Status = v.Status,
             SetId = v.SetId is { } setId && newId.TryGetValue(setId, out var copied) ? copied : null,
             Sort = v.Sort, Props = v.Props is null ? null : JsonDocument.Parse(v.Props.RootElement.GetRawText()),
         }));
-        project.OwnLists = true;
+        project.OwnListKeys = [.. project.OwnListKeys, listKey];
         await db.SaveChangesAsync(cancellationToken);
-        db.UseListsOf(project.Id, true);
+        db.UseListsOf(project.Id, project.OwnListKeys);
         return true;
     }
 
@@ -102,11 +200,32 @@ public static class ProjectLists
     /// For the writers that are not about one project (a request saying which project it is in): the project to write the
     /// change into, with its own copy made first; none, the organization's lists.
     /// </summary>
-    public static async Task<Guid?> WriteScopeAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    /// <remarks>A list the organization keeps fixed, or one describing projects, is written as the organization's.</remarks>
+    public static async Task<Guid?> WriteScopeAsync(DeliosDbContext db, string listKey, CancellationToken cancellationToken)
     {
         if (db.ListsProject is not { } projectId) return null;
-        await EnsureOwnAsync(db, projectId, cancellationToken);
+        if (!db.ListsOwnKeys.Contains(listKey)
+            && (OrganizationOnly.Contains(listKey) || !await Liberty.IsFreeAsync(db, Liberty.ListKey(listKey), cancellationToken))) return null;
+        await EnsureOwnAsync(db, projectId, listKey, cancellationToken);
         return projectId;
+    }
+
+    /// <summary>
+    /// Where each value is used for the level in hand: on the project; for the organization's list, on every project that
+    /// reads it (those with no copy of their own), each place naming its project.
+    /// </summary>
+    private static async Task<Dictionary<string, List<string>>> UsageAsync(DeliosDbContext db, ListLevel level, string set, CancellationToken cancellationToken)
+    {
+        if (level.Project is { } project) return await UsageAsync(db, project, set, cancellationToken);
+        var readers = await db.Projects.AsNoTracking().Where(p => !p.OwnListKeys.Contains(set)).ToListAsync(cancellationToken);
+        var all = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var reader in readers)
+            foreach (var (code, places) in await UsageAsync(db, reader, set, cancellationToken))
+            {
+                if (!all.TryGetValue(code, out var list)) all[code] = list = [];
+                list.AddRange(places.Select(place => $"{place} on {reader.Code}"));
+            }
+        return all;
     }
 
     /// <summary>
@@ -260,11 +379,12 @@ public static class ProjectLists
     /// </summary>
     private static async Task<IResult> ListsAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
     {
-        var access = ProjectAccessFilter.Of(http);
+        var level = LevelOf(http);
         var counts = await db.ValueEntries.AsNoTracking().GroupBy(v => new { v.SetKey, v.SetId })
             .Select(g => new { g.Key.SetKey, g.Key.SetId, Active = g.Count(v => v.Status == ValueStatus.Active), Others = g.Count(v => v.Status != ValueStatus.Active) })
             .ToListAsync(cancellationToken);
-        var meta = await ListRules.MetaAsync(db, access.Project.Id, cancellationToken);
+        var meta = await ListRules.MetaAsync(db, level.ProjectId, cancellationToken);
+        var owned = level.Project?.OwnListKeys ?? [];
         // Every list has its default set as a set like any other (owner: every list behaves the same): one filled or made
         // before sets existed gets it now, in the lists this project reads.
         var known = await db.ListSets.AsNoTracking().Select(s => s.ListKey).Distinct().ToListAsync(cancellationToken);
@@ -274,7 +394,7 @@ public static class ProjectLists
         {
             db.ListSets.AddRange(missing.Select(key => new ValueSet
             {
-                TenantId = access.Project.TenantId, ProjectId = access.Project.OwnLists ? access.Project.Id : null,
+                TenantId = level.TenantId, ProjectId = owned.Contains(key) ? level.ProjectId : null,
                 ListKey = key, Name = "Default", IsDefault = true,
             }));
             await db.SaveChangesAsync(cancellationToken);
@@ -283,6 +403,10 @@ public static class ProjectLists
         // Project codes are not a list anyone keeps (owner): filled by the app, one per project, shown on This project.
         var keys = counts.Select(c => c.SetKey).Concat(sets.Select(s => s.ListKey)).Concat(meta.Keys)
             .Append(ValueSets.Phases).Append(ValueSets.ProjectKinds).Distinct().Where(k => k != ValueSets.ProjectCodes).ToList();
+        // Where each list stands for a project: its own copy, the organization's it may change (a copy on its first
+        // change), or the organization's alone (fixed, or describing projects).
+        var switches = (await Liberty.ReadAsync(db, cancellationToken)).ToDictionary(i => i.Key, i => i.Free);
+        bool Free(string key) => !OrganizationOnly.Contains(key) && (switches.TryGetValue(Liberty.ListKey(key), out var free) ? free : true);
         var lists = keys.Select(key =>
         {
             var info = meta.GetValueOrDefault(key) ?? ListRules.ListMeta.Read(null);
@@ -301,6 +425,8 @@ public static class ProjectLists
                 active = info.Active,
                 rank = ListRules.Rank(key),
                 count = counts.Where(c => c.SetKey == key).Sum(c => c.Active),
+                own = owned.Contains(key),
+                free = Free(key),
                 // A list filled before it had sets reads as its one default set, made on its first change.
                 sets = own.Count > 0
                     ? own.Select(s => new { Id = (Guid?)s.Id, s.Name, s.IsDefault, s.Active, s.DeliverableTypes, inUse = Count(s.Id, true), others = Count(s.Id, false) }).ToList()
@@ -309,8 +435,8 @@ public static class ProjectLists
         }).OrderBy(l => l.rank).ThenBy(l => l.title).ToList();
         return Results.Ok(new
         {
-            own = access.Project.OwnLists,
-            mayChange = await MayChangeAsync(db, access, cancellationToken),
+            level = level.Organization ? "organization" : "project",
+            mayChange = level.Access is { } access ? await MayChangeAsync(db, access, cancellationToken) : true,
             groups = ListRules.Groups,
             lists,
             // Kept for the screens that only count: each list with its values in use and the rest.
@@ -319,22 +445,41 @@ public static class ProjectLists
     }
 
     /// <summary><c>GET /lists/{set}/usage</c>: where each value is used on the project; a value not named was never used.</summary>
-    private static async Task<IResult> UsageEndpointAsync(string set, HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
-    {
-        var access = ProjectAccessFilter.Of(http);
-        return Results.Ok(await UsageAsync(db, access.Project, set.ToUpperInvariant(), cancellationToken));
-    }
+    private static async Task<IResult> UsageEndpointAsync(string set, HttpContext http, DeliosDbContext db, CancellationToken cancellationToken) =>
+        Results.Ok(await UsageAsync(db, LevelOf(http), set.ToUpperInvariant(), cancellationToken));
 
-    private static async Task<IResult?> RefusedAsync(DeliosDbContext db, ProjectAccess access, string set, CancellationToken cancellationToken)
+    /// <summary>
+    /// Refuses what this level may not change; on a project, a list it has no copy of yet is copied here, before its first
+    /// change, when the organization leaves it free (LIST_FIXED otherwise).
+    /// </summary>
+    private static async Task<IResult?> RefusedAsync(DeliosDbContext db, ListLevel level, string set, CancellationToken cancellationToken)
     {
-        if (!await MayChangeAsync(db, access, cancellationToken))
+        if (level.Access is { } access && !await MayChangeAsync(db, access, cancellationToken))
             return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes its lists (on a project with none, whoever opened it).");
+        if (await RefusedForLevelAsync(db, level, set, cancellationToken) is { } fixedHere) return fixedHere;
         if (set == ValueSets.ProjectCodes)
             return Problems.Invalid("FILLED_BY_ITSELF", "Project codes is filled by the app: each project's code is in it.");
         // The review outcomes are kept here like any list; a verdict list of before, still holding a verdict whose code the
         // review outcomes already had, stays as it is for the reviews decided from it.
         if (set != ReviewSets.Verdicts && await IsVerdictListAsync(db, set, cancellationToken))
             return Problems.Invalid("VERDICT_LIST", "This verdict list is kept as it was, for the reviews decided from it. Verdicts are kept in Review outcomes.");
+        if (level.Project is { } project && !project.OwnListKeys.Contains(set))
+        {
+            await EnsureOwnAsync(db, project.Id, set, cancellationToken);
+            if (!project.OwnListKeys.Contains(set)) project.OwnListKeys = [.. project.OwnListKeys, set];
+        }
+        return null;
+    }
+
+    /// <summary>A project changes only the lists it has a copy of, or those the organization leaves free.</summary>
+    private static async Task<IResult?> RefusedForLevelAsync(DeliosDbContext db, ListLevel level, string set, CancellationToken cancellationToken)
+    {
+        if (level.Project is not { } project || project.OwnListKeys.Contains(set)) return null;
+        const string where = "an administrator changes it in the organization's Settings, for every project";
+        if (OrganizationOnly.Contains(set))
+            return Problems.Forbidden("ORGANIZATIONS_LIST", $"This list describes the projects themselves: {where}.");
+        if (!await Liberty.IsFreeAsync(db, Liberty.ListKey(set), cancellationToken))
+            return Problems.Forbidden("LIST_FIXED", $"Every project uses the organization's list: {where}.");
         return null;
     }
 
@@ -367,18 +512,18 @@ public static class ProjectLists
     }
 
     /// <summary>The list's default set, made when the list has none yet (a list made before it held a value).</summary>
-    private static async Task<ValueSet> DefaultSetAsync(DeliosDbContext db, ProjectAccess access, string set, CancellationToken cancellationToken)
+    private static async Task<ValueSet> DefaultSetAsync(DeliosDbContext db, ListLevel level, string set, CancellationToken cancellationToken)
     {
         var found = await db.ListSets.SingleOrDefaultAsync(s => s.ListKey == set && s.IsDefault, cancellationToken);
         if (found is not null) return found;
-        found = new ValueSet { TenantId = access.Project.TenantId, ProjectId = access.Project.Id, ListKey = set, Name = "Default", IsDefault = true };
+        found = new ValueSet { TenantId = level.TenantId, ProjectId = level.ProjectId, ListKey = set, Name = "Default", IsDefault = true };
         db.ListSets.Add(found);
         await db.SaveChangesAsync(cancellationToken);
         return found;
     }
 
     /// <summary>Whether the values of a set are offered: the set is on and so is its list.</summary>
-    private static async Task<bool> OfferedAsync(DeliosDbContext db, Guid projectId, ValueSet set, CancellationToken cancellationToken) =>
+    private static async Task<bool> OfferedAsync(DeliosDbContext db, Guid? projectId, ValueSet set, CancellationToken cancellationToken) =>
         set.Active && ((await ListRules.MetaAsync(db, projectId, cancellationToken)).GetValueOrDefault(set.ListKey)?.Active ?? true);
 
     /// <summary>
@@ -388,19 +533,18 @@ public static class ProjectLists
     private static async Task<IResult> ValueAsync(string set, ProjectValueRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
         CancellationToken cancellationToken)
     {
-        var access = ProjectAccessFilter.Of(http);
+        var level = LevelOf(http);
         set = set.ToUpperInvariant();
-        if (await RefusedAsync(db, access, set, cancellationToken) is { } refused) return refused;
+        if (await RefusedAsync(db, level, set, cancellationToken) is { } refused) return refused;
         if (Blank(request.Code) is not { } code) return Problems.Invalid("CODE_REQUIRED", "A value has a code.");
         var status = Blank(request.Status)?.ToUpperInvariant();
         if (status is not (null or ValueStatus.Active or ValueStatus.Retired)) return Problems.Invalid("STATUS_INVALID", "A value is in use or retired.");
         ValueSet? target = null;
         if (request.SetId is { } setId)
         {
-            target = await OwnSetAsync(db, access, set, setId, cancellationToken);
+            target = await OwnSetAsync(db, level, set, setId, cancellationToken);
             if (target is null) return Problems.NotFound("SET_NOT_FOUND", "That set is not in this list.");
         }
-        await EnsureOwnAsync(db, access.Project.Id, cancellationToken);
 
         var value = await db.ValueEntries.SingleOrDefaultAsync(v => v.SetKey == set && v.Code == code, cancellationToken);
         var changes = new List<string>();
@@ -408,12 +552,12 @@ public static class ProjectLists
         {
             if (code.Length > 64) return Problems.Invalid("CODE_TOO_LONG", "A code has at most 64 characters.");
             if (Blank(request.Label) is not { } label) return Problems.Invalid("LABEL_REQUIRED", "A value has a name people read.");
-            target ??= await DefaultSetAsync(db, access, set, cancellationToken);
+            target ??= await DefaultSetAsync(db, level, set, cancellationToken);
             var sort = request.Sort ?? (await db.ValueEntries.Where(v => v.SetKey == set).MaxAsync(v => (int?)v.Sort, cancellationToken) ?? 0) + 10;
-            var offered = await OfferedAsync(db, access.Project.Id, target, cancellationToken);
+            var offered = await OfferedAsync(db, level.ProjectId, target, cancellationToken);
             value = new ValueEntry
             {
-                TenantId = access.Project.TenantId, ProjectId = access.Project.Id, SetKey = set, SetId = target.Id, Code = code, Label = label, Sort = sort,
+                TenantId = level.TenantId, ProjectId = level.ProjectId, SetKey = set, SetId = target.Id, Code = code, Label = label, Sort = sort,
                 Status = status == ValueStatus.Retired ? ValueStatus.Retired : offered ? ValueStatus.Active : ValueStatus.Off,
                 Props = request.Props is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } p ? JsonDocument.Parse(p.GetRawText()) : null,
             };
@@ -422,7 +566,7 @@ public static class ProjectLists
         }
         else
         {
-            var usedAt = (await UsageAsync(db, access.Project, set, cancellationToken)).GetValueOrDefault(code);
+            var usedAt = (await UsageAsync(db, level, set, cancellationToken)).GetValueOrDefault(code);
             var newCode = Blank(request.NewCode);
             var propsText = request.Props is { } props ? (props.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined ? null : props.GetRawText()) : value.Props?.RootElement.GetRawText();
             var propsChange = request.Props is not null && propsText != value.Props?.RootElement.GetRawText();
@@ -450,7 +594,7 @@ public static class ProjectLists
             {
                 // Brought back into a set (or a list) switched off, it waits there, off, until that is switched on.
                 var wanted = status == ValueStatus.Retired ? ValueStatus.Retired
-                    : current is null || await OfferedAsync(db, access.Project.Id, current, cancellationToken) ? ValueStatus.Active : ValueStatus.Off;
+                    : current is null || await OfferedAsync(db, level.ProjectId, current, cancellationToken) ? ValueStatus.Active : ValueStatus.Off;
                 if (wanted != value.Status && !(status == ValueStatus.Active && value.Status == ValueStatus.Off && wanted == ValueStatus.Off))
                 {
                     changes.Add(wanted == ValueStatus.Retired ? "retired" : "in use again");
@@ -463,8 +607,8 @@ public static class ProjectLists
         if (changes.Count == 0) return Results.NoContent();
         if (set == ReviewSets.Verdicts && await VerdictsHoldAsync(db, value, false, cancellationToken) is { } verdictProblem) return verdictProblem;
         await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "VALUE_CHANGED", "Value", value.Id, $"{set}/{value.Code}",
-            string.Join("; ", changes), access.Project.Id, cancellationToken);
+        await audit.WriteAsync(new Actor(level.UserId, level.UserName), "VALUE_CHANGED", "Value", value.Id, $"{set}/{value.Code}",
+            string.Join("; ", changes), level.ProjectId, cancellationToken);
         return Results.NoContent();
     }
 
@@ -472,19 +616,18 @@ public static class ProjectLists
     private static async Task<IResult> DeleteValueAsync(string set, string code, HttpContext http, DeliosDbContext db, AuditLog audit,
         CancellationToken cancellationToken)
     {
-        var access = ProjectAccessFilter.Of(http);
+        var level = LevelOf(http);
         set = set.ToUpperInvariant();
-        if (await RefusedAsync(db, access, set, cancellationToken) is { } refused) return refused;
-        if ((await UsageAsync(db, access.Project, set, cancellationToken)).GetValueOrDefault(code) is { Count: > 0 } usedAt)
+        if (await RefusedAsync(db, level, set, cancellationToken) is { } refused) return refused;
+        if ((await UsageAsync(db, level, set, cancellationToken)).GetValueOrDefault(code) is { Count: > 0 } usedAt)
             return Problems.Conflict("VALUE_IN_USE", $"{code} is used ({string.Join(", ", usedAt)}): it is retired, never deleted.");
-        await EnsureOwnAsync(db, access.Project.Id, cancellationToken);
         var value = await db.ValueEntries.SingleOrDefaultAsync(v => v.SetKey == set && v.Code == code, cancellationToken);
         if (value is null) return Problems.NotFound("VALUE_NOT_FOUND", "No such value.");
         if (set == ReviewSets.Verdicts && await VerdictsHoldAsync(db, value, true, cancellationToken) is { } verdictProblem) return verdictProblem;
         db.ValueEntries.Remove(value);
         await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "VALUE_DELETED", "Value", value.Id, $"{set}/{code}",
-            $"Deleted, never used: {value.Label}", access.Project.Id, cancellationToken);
+        await audit.WriteAsync(new Actor(level.UserId, level.UserName), "VALUE_DELETED", "Value", value.Id, $"{set}/{code}",
+            $"Deleted, never used: {value.Label}", level.ProjectId, cancellationToken);
         return Results.NoContent();
     }
 
@@ -495,7 +638,7 @@ public static class ProjectLists
     private static async Task<IResult> CreateListAsync(ProjectListRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
         IClock clock, CancellationToken cancellationToken)
     {
-        var access = ProjectAccessFilter.Of(http);
+        var level = LevelOf(http);
         var key = Blank(request.Key)?.ToUpperInvariant();
         var title = Blank(request.Title);
         if (key is null || title is null) return Problems.Invalid("KEY_AND_TITLE_REQUIRED", "A list has a name and a short name.");
@@ -504,15 +647,14 @@ public static class ProjectLists
         var group = ListRules.Groups.FirstOrDefault(g => g.Key == Blank(request.Group) || g.Title == Blank(request.Group));
         if (group is not { TakesLists: true })
             return Problems.Invalid("LIST_NOT_HERE", $"A list of your own is a document field: it goes in {string.Join(" or ", ListRules.Groups.Where(g => g.TakesLists).Select(g => g.Title))}.");
-        if (await RefusedAsync(db, access, key, cancellationToken) is { } refused) return refused;
-        await EnsureOwnAsync(db, access.Project.Id, cancellationToken);
+        if (await RefusedAsync(db, level, key, cancellationToken) is { } refused) return refused;
         if (await db.ValueEntries.AnyAsync(v => v.SetKey == key, cancellationToken) || ListRules.IsAppList(key)
             || await db.ListSets.AnyAsync(s => s.ListKey == key, cancellationToken)
-            || await db.Set<Setting>().AnyAsync(s => s.ProjectId == access.Project.Id && s.Key == SetPrefix + key, cancellationToken))
+            || await db.Set<Setting>().AnyAsync(s => s.ProjectId == level.ProjectId && s.Key == SetPrefix + key, cancellationToken))
             return Problems.Conflict("LIST_EXISTS", $"There is already a list called {key}.");
-        await SaveMetaAsync(db, clock, access, key, title, request.Description, group.Title, true, cancellationToken);
-        await DefaultSetAsync(db, access, key, cancellationToken);
-        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "LIST_CREATED", "List", null, key, $"{title} ({group.Title})", access.Project.Id, cancellationToken);
+        await SaveMetaAsync(db, clock, level, key, title, request.Description, group.Title, true, cancellationToken);
+        await DefaultSetAsync(db, level, key, cancellationToken);
+        await audit.WriteAsync(new Actor(level.UserId, level.UserName), "LIST_CREATED", "List", null, key, $"{title} ({group.Title})", level.ProjectId, cancellationToken);
         return Results.Ok(new { key });
     }
 
@@ -523,17 +665,16 @@ public static class ProjectLists
     private static async Task<IResult> UpdateListAsync(string set, ProjectListRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
         IClock clock, CancellationToken cancellationToken)
     {
-        var access = ProjectAccessFilter.Of(http);
+        var level = LevelOf(http);
         set = set.ToUpperInvariant();
-        if (await RefusedAsync(db, access, set, cancellationToken) is { } refused) return refused;
+        if (await RefusedAsync(db, level, set, cancellationToken) is { } refused) return refused;
         var title = Blank(request.Title);
         if (title is null) return Problems.Invalid("TITLE_REQUIRED", "A list has a name.");
         var app = ListRules.IsAppList(set);
         if (request.Active is not null && app)
             return Problems.Invalid("APP_LIST_STAYS", "The app runs on this list: it is not switched off here. Whether its field is asked is set in Forms & fields.");
-        await EnsureOwnAsync(db, access.Project.Id, cancellationToken);
-        var meta = (await ListRules.MetaAsync(db, access.Project.Id, cancellationToken)).GetValueOrDefault(set) ?? ListRules.ListMeta.Read(null);
-        var used = (await UsageAsync(db, access.Project, set, cancellationToken)).Count > 0;
+        var meta = (await ListRules.MetaAsync(db, level.ProjectId, cancellationToken)).GetValueOrDefault(set) ?? ListRules.ListMeta.Read(null);
+        var used = (await UsageAsync(db, level, set, cancellationToken)).Count > 0;
         var changes = new List<string> { $"name: {title}" };
 
         var group = meta.Group;
@@ -557,7 +698,7 @@ public static class ProjectLists
                 return Problems.Conflict("LIST_EXISTS", $"There is already a list called {newKey}.");
             foreach (var value in await db.ValueEntries.Where(v => v.SetKey == set).ToListAsync(cancellationToken)) value.SetKey = newKey;
             foreach (var one in await db.ListSets.Where(s => s.ListKey == set).ToListAsync(cancellationToken)) one.ListKey = newKey;
-            var old = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == access.Project.Id && s.Key == SetPrefix + set, cancellationToken);
+            var old = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == level.ProjectId && s.Key == SetPrefix + set, cancellationToken);
             if (old is not null) db.Remove(old);
             changes.Add($"short name {set} → {newKey}");
             set = newKey;
@@ -578,9 +719,9 @@ public static class ProjectLists
         }
         // Switching alone (nothing else asked) keeps the description as it was.
         var description = request.Active is not null && request.Description is null ? meta.Description : request.Description;
-        await SaveMetaAsync(db, clock, access, set, title, description, group, active, cancellationToken);
-        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "LIST_CHANGED", "List", null, set, string.Join("; ", changes),
-            access.Project.Id, cancellationToken);
+        await SaveMetaAsync(db, clock, level, set, title, description, group, active, cancellationToken);
+        await audit.WriteAsync(new Actor(level.UserId, level.UserName), "LIST_CHANGED", "List", null, set, string.Join("; ", changes),
+            level.ProjectId, cancellationToken);
         return Results.Ok(new { key = set });
     }
 
@@ -590,20 +731,19 @@ public static class ProjectLists
     /// </summary>
     private static async Task<IResult> DeleteListAsync(string set, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
-        var access = ProjectAccessFilter.Of(http);
+        var level = LevelOf(http);
         set = set.ToUpperInvariant();
-        if (await RefusedAsync(db, access, set, cancellationToken) is { } refused) return refused;
+        if (await RefusedAsync(db, level, set, cancellationToken) is { } refused) return refused;
         if (ListRules.IsAppList(set)) return Problems.Invalid("LIST_RUNS_THE_APP", "The app runs on this list: its values change, the list stays.");
-        if ((await UsageAsync(db, access.Project, set, cancellationToken)).Count > 0)
+        if ((await UsageAsync(db, level, set, cancellationToken)).Count > 0)
             return Problems.Conflict("LIST_IN_USE", "A value of this list is used: switch the list off instead.");
-        await EnsureOwnAsync(db, access.Project.Id, cancellationToken);
         db.ValueEntries.RemoveRange(await db.ValueEntries.Where(v => v.SetKey == set).ToListAsync(cancellationToken));
         db.ListSets.RemoveRange(await db.ListSets.Where(s => s.ListKey == set).ToListAsync(cancellationToken));
-        var meta = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == access.Project.Id && s.Key == SetPrefix + set, cancellationToken);
+        var meta = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == level.ProjectId && s.Key == SetPrefix + set, cancellationToken);
         if (meta is not null) db.Remove(meta);
         await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "LIST_DELETED", "List", null, set, "Deleted, never used.",
-            access.Project.Id, cancellationToken);
+        await audit.WriteAsync(new Actor(level.UserId, level.UserName), "LIST_DELETED", "List", null, set, "Deleted, never used.",
+            level.ProjectId, cancellationToken);
         return Results.NoContent();
     }
 
@@ -641,19 +781,18 @@ public static class ProjectLists
     private static async Task<IResult> CreateSetAsync(string set, ProjectSetRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
         CancellationToken cancellationToken)
     {
-        var access = ProjectAccessFilter.Of(http);
+        var level = LevelOf(http);
         set = set.ToUpperInvariant();
-        if (await RefusedAsync(db, access, set, cancellationToken) is { } refused) return refused;
+        if (await RefusedAsync(db, level, set, cancellationToken) is { } refused) return refused;
         if (!ListRules.TakesSets(set)) return Problems.Invalid("ONE_SET_ONLY", "This list holds one set: it is the same for every deliverable type.");
         if (Blank(request.Name) is not { } name) return Problems.Invalid("NAME_REQUIRED", "A set has a name.");
-        await EnsureOwnAsync(db, access.Project.Id, cancellationToken);
         // A list filled before it had sets first gets its default set, for the values it already holds.
-        if (!await db.ListSets.AnyAsync(s => s.ListKey == set, cancellationToken)) await DefaultSetAsync(db, access, set, cancellationToken);
+        if (!await db.ListSets.AnyAsync(s => s.ListKey == set, cancellationToken)) await DefaultSetAsync(db, level, set, cancellationToken);
         if (await db.ListSets.AnyAsync(s => s.ListKey == set && s.Name == name, cancellationToken))
             return Problems.Conflict("SET_EXISTS", $"This list already has a set called {name}.");
         var added = new ValueSet
         {
-            TenantId = access.Project.TenantId, ProjectId = access.Project.Id, ListKey = set, Name = name, Active = request.Active ?? true,
+            TenantId = level.TenantId, ProjectId = level.ProjectId, ListKey = set, Name = name, Active = request.Active ?? true,
             Sort = (await db.ListSets.Where(s => s.ListKey == set).MaxAsync(s => (int?)s.Sort, cancellationToken) ?? 0) + 10,
         };
         var (types, problem) = await TypesForAsync(db, added, request.DeliverableTypes ?? [], added.Active, cancellationToken);
@@ -661,21 +800,21 @@ public static class ProjectLists
         added.DeliverableTypes = types!;
         db.ListSets.Add(added);
         await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "SET_CREATED", "List", added.Id, set,
-            $"{name}: {(types!.Length > 0 ? string.Join(", ", types) : "no deliverable type yet")}", access.Project.Id, cancellationToken);
+        await audit.WriteAsync(new Actor(level.UserId, level.UserName), "SET_CREATED", "List", added.Id, set,
+            $"{name}: {(types!.Length > 0 ? string.Join(", ", types) : "no deliverable type yet")}", level.ProjectId, cancellationToken);
         return Results.Ok(new { id = added.Id });
     }
 
     /// <summary>
-    /// The project's own set the screen named: the project gets its own copy first, and a set named while it still read
-    /// the organization's is found again in that copy by its list and name.
+    /// The set the screen named, in the lists this level reads: a set named while the project still read the organization's
+    /// list (copied since, on this change) is found again in its copy by its list and name.
     /// </summary>
-    private static async Task<ValueSet?> OwnSetAsync(DeliosDbContext db, ProjectAccess access, string set, Guid setId, CancellationToken cancellationToken)
+    private static async Task<ValueSet?> OwnSetAsync(DeliosDbContext db, ListLevel level, string set, Guid setId, CancellationToken cancellationToken)
     {
-        var named = await db.ListSets.AsNoTracking().SingleOrDefaultAsync(s => s.Id == setId && s.ListKey == set, cancellationToken);
-        if (await EnsureOwnAsync(db, access.Project.Id, cancellationToken) && named is not null)
-            return await db.ListSets.SingleOrDefaultAsync(s => s.ListKey == set && s.Name == named.Name, cancellationToken);
-        return await db.ListSets.SingleOrDefaultAsync(s => s.Id == setId && s.ListKey == set, cancellationToken);
+        if (await db.ListSets.SingleOrDefaultAsync(s => s.Id == setId && s.ListKey == set, cancellationToken) is { } found) return found;
+        var named = await db.ListSets.IgnoreQueryFilters().AsNoTracking()
+            .SingleOrDefaultAsync(s => s.Id == setId && s.ListKey == set && s.TenantId == level.TenantId, cancellationToken);
+        return named is null ? null : await db.ListSets.SingleOrDefaultAsync(s => s.ListKey == set && s.Name == named.Name, cancellationToken);
     }
 
     /// <summary>
@@ -685,10 +824,10 @@ public static class ProjectLists
     private static async Task<IResult> UpdateSetAsync(string set, Guid setId, ProjectSetRequest request, HttpContext http, DeliosDbContext db,
         AuditLog audit, CancellationToken cancellationToken)
     {
-        var access = ProjectAccessFilter.Of(http);
+        var level = LevelOf(http);
         set = set.ToUpperInvariant();
-        if (await RefusedAsync(db, access, set, cancellationToken) is { } refused) return refused;
-        var one = await OwnSetAsync(db, access, set, setId, cancellationToken);
+        if (await RefusedAsync(db, level, set, cancellationToken) is { } refused) return refused;
+        var one = await OwnSetAsync(db, level, set, setId, cancellationToken);
         if (one is null) return Problems.NotFound("SET_NOT_FOUND", "That set is not in this list.");
         var changes = new List<string>();
         if (Blank(request.Name) is { } name && name != one.Name)
@@ -701,7 +840,9 @@ public static class ProjectLists
             {
                 var was = one.Name;
                 foreach (var route in await db.ReviewRoutes.Where(r => r.Verdicts == was).ToListAsync(cancellationToken)) route.Verdicts = name;
-                foreach (var review in await db.Reviews.Where(r => r.ProjectId == access.Project.Id && r.Verdicts == was && r.State == ReviewStates.InProgress)
+                List<Guid> readers = level.ProjectId is { } here ? [here]
+                    : await db.Projects.Where(p => !p.OwnListKeys.Contains(set)).Select(p => p.Id).ToListAsync(cancellationToken);
+                foreach (var review in await db.Reviews.Where(r => readers.Contains(r.ProjectId) && r.Verdicts == was && r.State == ReviewStates.InProgress)
                     .ToListAsync(cancellationToken)) review.Verdicts = name;
             }
             one.Name = name;
@@ -719,7 +860,7 @@ public static class ProjectLists
         if (active != one.Active)
         {
             one.Active = active;
-            var listOn = (await ListRules.MetaAsync(db, access.Project.Id, cancellationToken)).GetValueOrDefault(set)?.Active ?? true;
+            var listOn = (await ListRules.MetaAsync(db, level.ProjectId, cancellationToken)).GetValueOrDefault(set)?.Active ?? true;
             foreach (var value in await ValuesOfAsync(db, one, cancellationToken))
             {
                 if (!active && value.Status == ValueStatus.Active) value.Status = ValueStatus.Off;
@@ -729,8 +870,8 @@ public static class ProjectLists
         }
         if (changes.Count == 0) return Results.NoContent();
         await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "SET_CHANGED", "List", one.Id, set, $"{one.Name}: {string.Join("; ", changes)}",
-            access.Project.Id, cancellationToken);
+        await audit.WriteAsync(new Actor(level.UserId, level.UserName), "SET_CHANGED", "List", one.Id, set, $"{one.Name}: {string.Join("; ", changes)}",
+            level.ProjectId, cancellationToken);
         return Results.NoContent();
     }
 
@@ -738,13 +879,13 @@ public static class ProjectLists
     private static async Task<IResult> DeleteSetAsync(string set, Guid setId, HttpContext http, DeliosDbContext db, AuditLog audit,
         CancellationToken cancellationToken)
     {
-        var access = ProjectAccessFilter.Of(http);
+        var level = LevelOf(http);
         set = set.ToUpperInvariant();
-        if (await RefusedAsync(db, access, set, cancellationToken) is { } refused) return refused;
-        var one = await OwnSetAsync(db, access, set, setId, cancellationToken);
+        if (await RefusedAsync(db, level, set, cancellationToken) is { } refused) return refused;
+        var one = await OwnSetAsync(db, level, set, setId, cancellationToken);
         if (one is null) return Problems.NotFound("SET_NOT_FOUND", "That set is not in this list.");
         var values = await ValuesOfAsync(db, one, cancellationToken);
-        var used = await UsageAsync(db, access.Project, set, cancellationToken);
+        var used = await UsageAsync(db, level, set, cancellationToken);
         if (values.FirstOrDefault(v => used.ContainsKey(v.Code)) is { } inUse)
             return Problems.Conflict("SET_IN_USE", $"{inUse.Code} of this set is used ({string.Join(", ", used[inUse.Code])}): switch the set off instead.");
         if (set == ReviewSets.Verdicts && await db.ReviewRoutes.Where(r => r.Verdicts == one.Name).Select(r => r.Name).ToListAsync(cancellationToken) is { Count: > 0 } routes)
@@ -752,27 +893,27 @@ public static class ProjectLists
         db.ValueEntries.RemoveRange(values);
         db.ListSets.Remove(one);
         await db.SaveChangesAsync(cancellationToken);
-        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "SET_DELETED", "List", one.Id, set,
-            $"{one.Name}, never used ({values.Count} values)", access.Project.Id, cancellationToken);
+        await audit.WriteAsync(new Actor(level.UserId, level.UserName), "SET_DELETED", "List", one.Id, set,
+            $"{one.Name}, never used ({values.Count} values)", level.ProjectId, cancellationToken);
         return Results.NoContent();
     }
 
     /// <summary>A list's own name, description, group and switch, kept as the project's setting (it stands over the organization's).</summary>
-    private static async Task SaveMetaAsync(DeliosDbContext db, IClock clock, ProjectAccess access, string key, string title, string? description,
+    private static async Task SaveMetaAsync(DeliosDbContext db, IClock clock, ListLevel level, string key, string title, string? description,
         string? group, bool active, CancellationToken cancellationToken)
     {
         var org = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && s.Key == SetPrefix + key).Select(s => s.Value)
             .SingleOrDefaultAsync(cancellationToken);
         var kind = org is not null && org.Contains("\"VERDICTS\"", StringComparison.Ordinal) ? "VERDICTS" : null;
         var value = JsonSerializer.Serialize(new { title, description = Blank(description), group = Blank(group), kind, active }, JsonSerializerOptions.Web);
-        var row = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == access.Project.Id && s.Key == SetPrefix + key, cancellationToken);
+        var row = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == level.ProjectId && s.Key == SetPrefix + key, cancellationToken);
         if (row is null)
-            db.Add(new Setting { TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Key = SetPrefix + key, Value = value, UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = access.UserName });
+            db.Add(new Setting { TenantId = level.TenantId, ProjectId = level.ProjectId, Key = SetPrefix + key, Value = value, UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = level.UserName });
         else
         {
             row.Value = value;
             row.UpdatedAt = clock.GetCurrentInstant();
-            row.UpdatedByName = access.UserName;
+            row.UpdatedByName = level.UserName;
         }
         await db.SaveChangesAsync(cancellationToken);
     }

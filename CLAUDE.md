@@ -553,9 +553,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   linked, "Can sign in" on every project, "Take off <project>", asked first). A linked account (works here from its
   own DELIOS) changes only its function and department here. The organization's own extra fields on a person (Forms
   & fields) are no longer asked when adding (they were checked on the screen only).
-- **Lists are the project's** (owner, Types & sets): the organization's lists are the default every project starts
-  from; a project's first change gives it its own copy (`ProjectLists.EnsureOwnAsync`, `Project.OwnLists`,
-  `ValueEntry.ProjectId`), a customization that never becomes the default for new projects. Which lists a request
+- **Lists on two levels, list by list** (owner, Types & sets): the organization's lists are the default every project
+  reads, changed on the organization's Settings card (`/organization/settings/types`, `/api/admin/lists`, the same board
+  `settings/config/board.tsx` with `level`). A project's first change of a list copies **that list only**, and only where
+  the organization leaves it Free (`LIST:<key>`; `ProjectLists.EnsureOwnAsync(db, project, list)`, `Project.OwnListKeys`,
+  `ValueEntry.ProjectId`); a Fixed list is read only on a project (backend LIST_FIXED), and Project types and Contract
+  roles describe the projects themselves, the organization's only (ORGANIZATIONS_LIST). Each list says on the project
+  where it stands: its own copy, the organization's and free (copied on its first change), or the organization's. The
+  organization's card lists the projects keeping their own copy of a list; one list goes back to the organization's
+  there only, for a mess, with why, logged (SETTING_RESET), its control function told. A copy never becomes the default
+  for new projects. Projects that had copied everything keep each list as their own (migration ListsPerProject). Which lists a request
   reads is set once per request (`DeliosDbContext.UseListsOf`, query filter on `ValueEntry`): the project of the
   page (header `X-Delios-Project` from the `edms_project` cookie), else the person's first project.
   `/api/projects/{id}/lists` (`ProjectLists.cs`, `lib/settings/forms-lists.ts`). Only whoever acts as the control
@@ -690,7 +697,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   how it works with us change once each (above). An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
 - Layered settings: built as the two levels above (the switches). Being moved onto them card by card: the switches
-  and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (per list), Forms & fields, Functions & permissions,
+  and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (done, per list), Forms & fields, Functions & permissions,
   the Control room. Until a page is moved, it says plainly what is the organization's and what is the project's.
 - Document families are **on hold** (owner): the idea is to group document types (internal like DWG, supplier like C102)
   to tell criticality and whether an outside stamp / wet signature is needed or the app's approval is enough, legally.

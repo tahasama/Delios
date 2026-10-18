@@ -13,8 +13,8 @@ public sealed class ValueEntry
     public Guid TenantId { get; set; }
     /// <summary>
     /// The project whose own list it belongs to; none: the organization's list, the default every project starts from.
-    /// A project reads the organization's lists until it changes one; then it gets its own copy of them all
-    /// (<see cref="Identity.Project.OwnLists"/>), which later changes to the organization's never touch.
+    /// A project reads the organization's lists until it changes one; then it gets its own copy of that list
+    /// (<see cref="Identity.Project.OwnListKeys"/>), which later changes to the organization's never touch.
     /// </summary>
     public Guid? ProjectId { get; set; }
     /// <summary>The list it belongs to (disciplines, criticality…). Its code is unique across every set of that list.</summary>

@@ -211,10 +211,10 @@ public sealed class Project
     /// <summary>Who opened the project. Where nobody acts as its control function, they alone change its lists.</summary>
     public Guid? OpenedById { get; set; }
     /// <summary>
-    /// The project keeps its own lists (it changed one): it reads its own copy, never the organization's again.
-    /// Until then it reads the organization's lists, the default.
+    /// The lists the project keeps its own copy of (each copied on its first change, where the organization leaves the list
+    /// free): it reads its copy of those, never the organization's again, and the organization's of every other list.
     /// </summary>
-    public bool OwnLists { get; set; }
+    public string[] OwnListKeys { get; set; } = [];
 }
 
 /// <summary>A job as the organization names it: Lead Electrical Engineer, the control function.</summary>

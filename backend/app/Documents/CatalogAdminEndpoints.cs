@@ -111,7 +111,7 @@ public static class CatalogAdminEndpoints
         if (status is not (null or ValueStatus.Active or ValueStatus.Retired))
             return Problems.Invalid("STATUS_INVALID", "A value is ACTIVE or RETIRED.");
         // Said from inside a project: the project's own lists (its copy made first); else the organization's.
-        var scope = await ProjectLists.WriteScopeAsync(db, cancellationToken);
+        var scope = await ProjectLists.WriteScopeAsync(db, set, cancellationToken);
         var value = await db.ValueEntries.SingleOrDefaultAsync(v => v.SetKey == set && v.Code == code, cancellationToken);
         var changes = new List<string>();
         if (value is null)
