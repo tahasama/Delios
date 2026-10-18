@@ -649,4 +649,7 @@ in the code; it lives only in your local database.
   administrator, for every project; a project's Settings → Revisions reads it, unless the organization makes it free.
 - **The organization's Settings** (Organization → Settings) hold the same cards as a project's, each with its switch
   (may projects change it) and the projects with their own copy; a project is put back to the organization's only there.
+- **Review routes have two levels.** The organization's are changed in the organization's Settings (Review routes), by
+  an administrator, and offered on every project. A project changes its own where free (the default): its first change
+  makes its own copy, and the organization's later changes do not reach it.
 

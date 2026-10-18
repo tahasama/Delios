@@ -6,7 +6,7 @@ import { resetProjectAction } from "@/lib/organization/forms";
 type Copy = { id: string; code: string; name: string; since: string; by: string };
 
 /** The cards a project may have its own copy of, in words. */
-const WORDS = { numbering: "numbering", revisions: "revision naming" } as const;
+const WORDS = { numbering: "numbering", revisions: "revision naming", routes: "review routes" } as const;
 
 /**
  * The projects that took their own copy of a card (where projects may change it), since when and by whom, each with its

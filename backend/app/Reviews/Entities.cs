@@ -12,6 +12,11 @@ public sealed class ReviewRoute
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
+    /// <summary>
+    /// Empty: the organization's, offered on every project. Set: one project's own copy, made where routes are free for
+    /// projects (<see cref="Settings.Liberty"/>) and the project changed them.
+    /// </summary>
+    public Guid? ProjectId { get; set; }
     public required string Name { get; set; }
     public string? Description { get; set; }
     /// <summary>Offered when no route's patterns match the document.</summary>

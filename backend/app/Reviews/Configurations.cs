@@ -13,7 +13,8 @@ internal sealed class ReviewRouteConfiguration : IEntityTypeConfiguration<Review
     {
         b.Property(x => x.Verdicts).HasMaxLength(120);
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
-        b.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
+        b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.TenantId, x.ProjectId, x.Name }).IsUnique().AreNullsDistinct(false);
         b.Property(x => x.Name).HasMaxLength(100);
         b.OwnsMany(x => x.Patterns, p => p.ToJson());
         b.OwnsMany(x => x.Steps, s => s.ToJson());

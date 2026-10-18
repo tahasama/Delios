@@ -302,6 +302,7 @@ export async function setLibertyAction(formData: FormData): Promise<void> {
 const RESETTABLE: Record<string, { path: string; words: string; pages: string[] }> = {
   numbering: { path: "/api/admin/numbering", words: "numbering", pages: ["/settings/numbering", "/organization/settings/numbering"] },
   revisions: { path: "/api/admin/revisions", words: "revision naming", pages: ["/settings/revisions", "/organization/settings/revisions"] },
+  routes: { path: "/api/admin/routes", words: "review routes", pages: ["/settings/workflow-templates", "/organization/settings/routes"] },
 };
 
 /**

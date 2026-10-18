@@ -17,7 +17,9 @@ public sealed partial class ReviewService
     /// <summary>The routes that serve a document, most specific first; the default last.</summary>
     public async Task<IReadOnlyList<ReviewRoute>> RoutesForAsync(Document document, CancellationToken cancellationToken)
     {
-        var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.Active).ToListAsync(cancellationToken);
+        // The routes the project offers: its own copy, else the organization's.
+        var scope = await CatalogAdminEndpoints.RouteScopeAsync(db, document.ProjectId, cancellationToken);
+        var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.ProjectId == scope && r.Active).ToListAsync(cancellationToken);
         // A step naming a function and no people can come back with no list at all: read it as empty.
         foreach (var step in routes.SelectMany(r => r.Steps))
         {

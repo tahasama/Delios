@@ -652,7 +652,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   how it works with us change once each (above). An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
 - Layered settings: built as the two levels above (the switches). Being moved onto them card by card: the switches
-  and the organization's Settings first, then Numbering (done), Revisions (done), Types & sets (per list), Forms & fields, Review routes, Functions & permissions,
+  and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (per list), Forms & fields, Functions & permissions,
   the Control room. Until a page is moved, it says plainly what is the organization's and what is the project's.
 - Document families are **on hold** (owner): the idea is to group document types (internal like DWG, supplier like C102)
   to tell criticality and whether an outside stamp / wet signature is needed or the app's approval is enough, legally.
@@ -723,6 +723,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Assurance tabs share one top** (owner: tabs must not jump): `conformance/head.tsx` (`AssuranceHead`): the same plate
   "Assurance", its figure, its acts (Print where the tab prints, Run the checks), the tabs on the same line, then one
   line saying what the tab is; a click changes only what is under them.
+- **Review routes on two levels** (switch `ROUTES`, Free by default): the organization's routes are edited on its
+  Settings card (`/organization/settings/routes`, `/api/admin/routes` writes, administrators) and offered on every project;
+  a project changes them where free (`/api/projects/{id}/routes`, the control function), its first change making its own
+  copy (`ROUTES_OWN`, `ReviewRoute.ProjectId`); Send for review offers the project's routes. Reset only from the
+  organization's card (reviews already sent keep their steps).
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
 - **Two levels of settings** (owner): the organization's (`/organization`, its portal) and the project's (Settings).
   Every project, opening one, archiving and reopening are the organization's: **Projects** (`/organization/projects`,

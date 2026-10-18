@@ -15,7 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { adminAudit, adminFunctions, adminNumbering, projectNumbering, projectRevisions, adminParties, adminProjects, adminRoutes, adminUsers, orEmpty } from "@/lib/settings/api-admin";
+import { adminAudit, adminFunctions, adminNumbering, projectNumbering, projectRevisions, projectRoutes, adminParties, adminProjects, adminUsers, orEmpty } from "@/lib/settings/api-admin";
 import { orgSettings, projectSettings } from "@/lib/settings/api";
 import { getSets } from "@/lib/settings/config";
 
@@ -63,7 +63,7 @@ export default async function AdminPage() {
       } : null)),
     orEmpty(adminFunctions).then((all) => all.filter((f) => f.active).length),
     orEmpty(adminUsers).then((all) => all.filter((u) => u.memberships.some((m) => m.projectId === ctx.projectId && m.active)).length),
-    orEmpty(adminRoutes).then((all) => all.filter((r) => r.active).length),
+    projectRoutes().then((p) => p.routes.filter((r) => r.active).length).catch(() => 0),
     adminAudit({ from: new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10), per: 10 }).then((page) => page.total).catch(() => 0),
     // What the project's forms ask beyond the app's (Forms & fields): fields made required or left out, and fields added.
     projectForms(ctx.projectId).then((answer) => (answer?.forms ?? []).reduce((n, form) =>

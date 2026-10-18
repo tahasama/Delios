@@ -8,7 +8,6 @@ import { backendRevision, backendReview } from "@/lib/documents/api";
 import { upload, filesOf } from "@/lib/documents/api-uploads";
 import { requestFromForm, issueAsk } from "@/lib/transmittals/issue-requests";
 import { backendRoute, type EditorRouteStep } from "@/lib/settings/api-admin";
-import { hasVerb } from "@/lib/core/auth";
 
 /**
  * Review routes and the answers given on them. A run on these screens is the
@@ -23,9 +22,21 @@ const text = (formData: FormData, name: string) => String(formData.get(name) ?? 
 
 // ── Workflow templates (organization-defined routing) ────────────────────────
 
+/**
+ * Where a route change goes: the organization's routes (its Settings, an administrator) or the project's (only where
+ * routes are free; its first change makes the project's own copy). The backend checks who may.
+ */
+async function routesBase(formData: FormData): Promise<string> {
+  if (text(formData, "level") === "organization") return "/api/admin/routes";
+  return projectPath(await requireScope(), "/routes");
+}
+
+function revalidateRoutes() {
+  revalidatePath("/settings/workflow-templates");
+  revalidatePath("/organization/settings/routes");
+}
+
 export async function saveTemplateAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
-  const ctx = await requireScope();
-  if (!hasVerb(ctx.user, "ROUTES") && !ctx.can("CONTROL")) return { error: "Maintaining review routes needs the Review routes permission — an administrator grants it in the distribution matrix." };
   const id = text(formData, "id");
   const name = text(formData, "name");
   const classes = text(formData, "classes") || "*";
@@ -49,20 +60,20 @@ export async function saveTemplateAction(_prev: { error?: string } | undefined, 
     verdicts: text(formData, "outcomeSetKey"), ...route,
   };
   try {
-    if (id) await api(`/api/admin/routes/${id}`, { method: "PUT", body });
-    else await api("/api/admin/routes", { body });
+    const base = await routesBase(formData);
+    if (id) await api(`${base}/${id}`, { method: "PUT", body });
+    else await api(base, { body });
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/settings/workflow-templates");
+  revalidateRoutes();
   return {};
 }
 
 /** A route is taken out of use, never deleted: reviews that ran on it keep its name. */
 export async function deleteTemplateAction(formData: FormData) {
-  await requireScope();
-  await api(`/api/admin/routes/${text(formData, "id")}`, { method: "PUT", body: { active: false } }).catch(() => undefined);
-  revalidatePath("/settings/workflow-templates");
+  await api(`${await routesBase(formData)}/${text(formData, "id")}`, { method: "PUT", body: { active: false } }).catch(() => undefined);
+  revalidateRoutes();
 }
 
 /**

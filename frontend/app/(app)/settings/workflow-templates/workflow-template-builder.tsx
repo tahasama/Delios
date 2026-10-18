@@ -43,7 +43,9 @@ const HOW: { value: WorkflowBuilderStep["mode"]; label: string; hint: string }[]
  * one deciding. Two names in a box means they work in parallel. Add a box
  * between any two, or at the end, and give it whoever should be on it.
  */
-export function WorkflowTemplateBuilder({ id, name = "", description = "", classes = "*", outcomeSetKey = "", isDefault = false, initialSteps, users, functions = [], outsideParties = [], outcomeSets, classOptions, statuses }: {
+export function WorkflowTemplateBuilder({ level = "project", id, name = "", description = "", classes = "*", outcomeSetKey = "", isDefault = false, initialSteps, users, functions = [], outsideParties = [], outcomeSets, classOptions, statuses }: {
+  /** Where the route is kept: the organization's routes, or the project's (its own copy where routes are free). */
+  level?: "organization" | "project";
   id?: string;
   name?: string;
   description?: string;
@@ -111,7 +113,7 @@ export function WorkflowTemplateBuilder({ id, name = "", description = "", class
   }
 
   return (
-    <ActionForm action={saveTemplateAction} submitLabel={id ? "Save route" : "Publish route"} hidden={id ? { id } : {}}>
+    <ActionForm action={saveTemplateAction} submitLabel={id ? "Save route" : "Publish route"} hidden={id ? { level, id } : { level }}>
       <input type="hidden" name="steps" value={JSON.stringify(steps)} />
       <input type="hidden" name="classes" value={allClasses ? "*" : JSON.stringify([scope])} />
 

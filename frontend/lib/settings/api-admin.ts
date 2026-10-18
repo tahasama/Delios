@@ -289,8 +289,19 @@ export type EditorRouteStep = {
   functionIds?: string[]; title?: string; days?: number; grantsStatuses?: string[];
 };
 
-export async function routesForEditor() {
-  const [routes, parties] = await Promise.all([adminRoutes(), adminParties()]);
+/** The review routes a project offers (its own copy, else the organization's), whether they are free, and who may change them here. */
+type ProjectRoutes = { routes: AdminRoute[]; own: boolean; free: boolean; mayChange: boolean; mayChangeOrganization: boolean };
+export const projectRoutes = cache(async () => {
+  const ctx = await requireScope();
+  return api<ProjectRoutes>(projectPath(ctx, "/routes"));
+});
+
+/** The projects offering their own copy of the review routes, since when and by whom. */
+export const routeCopies = cache(async () =>
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/routes/projects").catch(() => []));
+
+export async function routesForEditor(level: "organization" | "project" = "project") {
+  const [routes, parties] = await Promise.all([level === "organization" ? adminRoutes() : projectRoutes().then((p) => p.routes), adminParties()]);
   return routes.filter((r) => r.active).map((r) => ({
     id: r.id, name: r.name, description: r.description, isDefault: r.isDefault, outcomeSetKey: r.verdicts ?? "", verdictsMismatch: r.verdictsMismatch ?? [], createdAt: new Date(0),
     classes: r.patterns.length

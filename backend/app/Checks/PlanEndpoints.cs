@@ -35,7 +35,8 @@ public static class PlanEndpoints
         var naming = await RevisionSchemeEndpoints.ScopeAsync(db, project.Id, cancellationToken);
         var revisions = await db.RevisionSchemes.AsNoTracking().Where(s => s.ProjectId == naming).OrderByDescending(s => s.IsDefault).ThenBy(s => s.Name).ToListAsync(cancellationToken);
         var revisionRouting = await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.ProjectId == naming).ToListAsync(cancellationToken);
-        var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.Active).OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name)
+        var routeScope = await CatalogAdminEndpoints.RouteScopeAsync(db, project.Id, cancellationToken);
+        var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.ProjectId == routeScope && r.Active).OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name)
             .ToListAsync(cancellationToken);
 
         // Who is on the project, by function: the people named on steps and the holders of each function read by name.

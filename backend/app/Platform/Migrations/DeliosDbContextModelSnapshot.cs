@@ -5026,6 +5026,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -5042,9 +5046,14 @@ namespace Delios.Host.Platform.Migrations
                     b.HasKey("Id")
                         .HasName("pk_review_routes");
 
-                    b.HasIndex("TenantId", "Name")
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("ix_review_routes_project_id");
+
+                    b.HasIndex("TenantId", "ProjectId", "Name")
                         .IsUnique()
-                        .HasDatabaseName("ix_review_routes_tenant_id_name");
+                        .HasDatabaseName("ix_review_routes_tenant_id_project_id_name");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("TenantId", "ProjectId", "Name"), false);
 
                     b.ToTable("review_routes", (string)null);
                 });
@@ -7185,6 +7194,12 @@ namespace Delios.Host.Platform.Migrations
 
             modelBuilder.Entity("Delios.Host.Reviews.ReviewRoute", b =>
                 {
+                    b.HasOne("Delios.Host.Identity.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_review_routes_projects_project_id");
+
                     b.HasOne("Delios.Host.Identity.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")

@@ -200,7 +200,8 @@ public static class ProjectLists
         await CountAsync(db.Reviews.AsNoTracking().Where(r => r.ProjectId == pid && r.VerdictSet == set).Select(r => r.Verdict), "review");
 
         // Routes and who may do what name values of the document lists.
-        var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.Active).ToListAsync(cancellationToken);
+        var routeScope = await CatalogAdminEndpoints.RouteScopeAsync(db, pid, cancellationToken);
+        var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.ProjectId == routeScope && r.Active).ToListAsync(cancellationToken);
         Mark(routes.SelectMany(r => r.Patterns.Select(p => set switch
         {
             ValueSets.DeliverableTypes => p.DeliverableType,

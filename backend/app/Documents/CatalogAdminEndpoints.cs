@@ -3,6 +3,7 @@ using Delios.Host.Audit;
 using Delios.Host.Identity;
 using Delios.Host.Platform;
 using Delios.Host.Reviews;
+using Delios.Host.Settings;
 using Delios.Host.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
@@ -49,9 +50,33 @@ public static class CatalogAdminEndpoints
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter(Keepers.Filter);
         // Numbering: NumberingLevels (the organization's and a project's).
-        keepers.MapGet("/routes", RoutesAsync);
-        keepers.MapPost("/routes", CreateRouteAsync);
-        keepers.MapPut("/routes/{routeId:guid}", UpdateRouteAsync);
+        // Review routes on two levels: the organization's (an administrator, from its Settings) and a project's own copy.
+        keepers.MapGet("/routes", (DeliosDbContext db, CancellationToken c) => RoutesAsync(db, null, c));
+        var routes = app.MapGroup("/api/admin/routes").WithTags("Administration").AddEndpointFilter<TransactionFilter>()
+            .AddEndpointFilter(Keepers.Configurers("The organization's review routes are offered on every project: an administrator changes them."));
+        routes.MapPost("", (RouteRequest r, HttpContext h, DeliosDbContext db, AuditLog a, CancellationToken c) => CreateRouteAsync(null, r, h, db, a, c));
+        routes.MapPut("/{routeId:guid}", (Guid routeId, RouteRequest r, HttpContext h, DeliosDbContext db, AuditLog a, CancellationToken c) =>
+            UpdateRouteAsync(null, routeId, r, h, db, a, c));
+        routes.MapGet("/projects", RouteCopiesAsync);
+        routes.MapPost("/projects/{projectId:guid}/reset", ResetRoutesAsync);
+        var project = app.MapGroup("/api/projects/{projectId:guid}/routes").WithTags("Settings")
+            .AddEndpointFilter<TransactionFilter>().AddEndpointFilter<ProjectAccessFilter>();
+        project.MapGet("", async (HttpContext h, DeliosDbContext db, CancellationToken c) =>
+        {
+            var access = ProjectAccessFilter.Of(h);
+            var free = await Liberty.IsFreeAsync(db, Liberty.Routes, c);
+            return Results.Ok(new
+            {
+                Routes = await RouteViewsAsync(db, await RouteScopeAsync(db, access.Project.Id, c), c),
+                Own = await RouteScopeAsync(db, access.Project.Id, c) is not null, Free = free,
+                MayChange = free && await ProjectLists.MayChangeAsync(db, access, c),
+                MayChangeOrganization = await Keepers.ConfiguresAsync(h),
+            });
+        });
+        project.MapPost("", (RouteRequest r, HttpContext h, DeliosDbContext db, AuditLog a, IClock clock, CancellationToken c) =>
+            ProjectRoutesAsync(h, db, clock, c, scope => CreateRouteAsync(scope, r, h, db, a, c)));
+        project.MapPut("/{routeId:guid}", (Guid routeId, RouteRequest r, HttpContext h, DeliosDbContext db, AuditLog a, IClock clock, CancellationToken c) =>
+            ProjectRoutesAsync(h, db, clock, c, scope => UpdateRouteAsync(scope, routeId, r, h, db, a, c), routeId));
         admin.MapGet("/audit", AuditAsync);
     }
 
@@ -122,19 +147,100 @@ public static class CatalogAdminEndpoints
 
     // ── Review routes ───────────────────────────────────────────────────────
 
-    /// <summary><c>GET /api/admin/routes</c>: every review route, in use or not.</summary>
-    private static async Task<IResult> RoutesAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    /// <summary>The project's setting saying it offers its own copy of the review routes.</summary>
+    public const string RoutesOwnKey = "ROUTES_OWN";
+
+    /// <summary>The routes a project offers: its own copy where it made one (its id), else the organization's (null).</summary>
+    public static async Task<Guid?> RouteScopeAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken) =>
+        await db.Set<Settings.Setting>().AnyAsync(s => s.ProjectId == projectId && s.Key == RoutesOwnKey, cancellationToken) ? projectId : null;
+
+    /// <summary>A change on a project: only where routes are free, by whoever changes the project's settings; its own copy made first.</summary>
+    private static async Task<IResult> ProjectRoutesAsync(HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken,
+        Func<Guid?, Task<IResult>> act, Guid? routeId = null)
     {
-        var routes = await db.ReviewRoutes.AsNoTracking().OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name).ToListAsync(cancellationToken);
+        var access = ProjectAccessFilter.Of(http);
+        if (!await Liberty.IsFreeAsync(db, Liberty.Routes, cancellationToken))
+            return Problems.Forbidden("ROUTES_FIXED", "The review routes are the organization's, the same on every project: an administrator changes them in the organization's Settings.");
+        if (!await ProjectLists.MayChangeAsync(db, access, cancellationToken))
+            return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes its review routes (on a project with none, whoever opened it).");
+        var map = new Dictionary<Guid, Guid>();
+        if (await RouteScopeAsync(db, access.Project.Id, cancellationToken) is null)
+        {
+            foreach (var route in await db.ReviewRoutes.AsNoTracking().Where(r => r.ProjectId == null).ToListAsync(cancellationToken))
+            {
+                var copy = new ReviewRoute
+                {
+                    TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Name = route.Name, Description = route.Description,
+                    IsDefault = route.IsDefault, Active = route.Active, Verdicts = route.Verdicts,
+                    Patterns = route.Patterns.Select(x => new RoutePattern { DeliverableType = x.DeliverableType, DocType = x.DocType, Discipline = x.Discipline, Criticality = x.Criticality, Originator = x.Originator }).ToList(),
+                    Steps = System.Text.Json.JsonSerializer.Deserialize<List<RouteStep>>(System.Text.Json.JsonSerializer.Serialize(route.Steps)) ?? [],
+                };
+                db.ReviewRoutes.Add(copy);
+                map[route.Id] = copy.Id;
+            }
+            db.Add(new Settings.Setting
+            {
+                TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Key = RoutesOwnKey, Value = "ON",
+                UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = access.UserName,
+            });
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        if (map.TryGetValue(routeId ?? Guid.Empty, out var mine)) http.Items["routes.route"] = mine;
+        return await act(access.Project.Id);
+    }
+
+    /// <summary><c>GET /api/admin/routes/projects</c>: the projects offering their own copy of the review routes.</summary>
+    private static async Task<IResult> RouteCopiesAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var rows = await db.Set<Settings.Setting>().AsNoTracking().Where(s => s.ProjectId != null && s.Key == RoutesOwnKey)
+            .Join(db.Projects.AsNoTracking(), s => s.ProjectId, p => (Guid?)p.Id, (s, p) => new { p.Id, p.Code, p.Name, s.UpdatedAt, s.UpdatedByName })
+            .OrderBy(x => x.Code).ToListAsync(cancellationToken);
+        return Results.Ok(rows.Select(r => new { r.Id, r.Code, r.Name, Since = r.UpdatedAt.ToDateTimeOffset(), By = r.UpdatedByName }));
+    }
+
+    /// <summary>
+    /// <c>POST /api/admin/routes/projects/{id}/reset</c> (owner: from the organization's Settings, for a mess only): the
+    /// project offers the organization's routes again; its own go, reviews already sent keep their steps. Always with why,
+    /// logged, its control function told.
+    /// </summary>
+    private static async Task<IResult> ResetRoutesAsync(Guid projectId, NumberingLevels.ResetRequest request, HttpContext http, DeliosDbContext db,
+        AuditLog audit, Notifications.Notifier notifier, CancellationToken cancellationToken)
+    {
+        var reason = Blank(request.Reason);
+        if (reason is null) return Problems.Invalid("REASON_REQUIRED", "Say why the project goes back to the organization's review routes.");
+        var project = await db.Projects.AsNoTracking().SingleOrDefaultAsync(p => p.Id == projectId, cancellationToken);
+        if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
+        var mark = await db.Set<Settings.Setting>().SingleOrDefaultAsync(s => s.ProjectId == projectId && s.Key == RoutesOwnKey, cancellationToken);
+        if (mark is null) return Problems.Invalid("NOT_OWN", $"{project.Code} already offers the organization's review routes.");
+        db.ReviewRoutes.RemoveRange(await db.ReviewRoutes.Where(r => r.ProjectId == projectId).ToListAsync(cancellationToken));
+        db.Remove(mark);
+        await db.SaveChangesAsync(cancellationToken);
+        var actor = await ActorAsync(http, db, cancellationToken);
+        await audit.WriteAsync(actor, "SETTING_RESET", "Project", project.Id, $"{project.Code}: review routes", reason, project.Id, cancellationToken);
+        await notifier.NotifyAsync(project.TenantId, project.Id, await Actions.NoticeLog.HoldersAsync(db, project.Id, Verbs.Control, cancellationToken),
+            Notifications.NotificationKinds.General, $"{project.Code} offers the organization's review routes again",
+            $"{actor.Name} put {project.Code}'s review routes back to the organization's: {reason}. Reviews already sent keep their steps.",
+            "/settings/workflow-templates", cancellationToken);
+        return Results.NoContent();
+    }
+
+    /// <summary><c>GET /api/admin/routes</c>: every review route of the organization's, in use or not.</summary>
+    private static async Task<IResult> RoutesAsync(DeliosDbContext db, Guid? scope, CancellationToken cancellationToken) =>
+        Results.Ok(await RouteViewsAsync(db, scope, cancellationToken));
+
+    /// <summary>The routes of one level (the organization's, or a project's own copy), in use or not.</summary>
+    private static async Task<object[]> RouteViewsAsync(DeliosDbContext db, Guid? scope, CancellationToken cancellationToken)
+    {
+        var routes = await db.ReviewRoutes.AsNoTracking().Where(r => r.ProjectId == scope).OrderByDescending(r => r.IsDefault).ThenBy(r => r.Name).ToListAsync(cancellationToken);
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         // A route naming its own set of verdicts says which of the deliverable types it serves that set does not (owner:
         // a warning, never a refusal).
-        return Results.Ok(routes.Select(r => new
+        return routes.Select(r => (object)new
         {
             r.Id, r.Name, r.Description, r.IsDefault, r.Active, r.Patterns, r.Steps, VerdictSet = ReviewSets.Verdicts, r.Verdicts,
             VerdictsMismatch = r.Verdicts is null ? [] : r.Patterns.Select(p => p.DeliverableType).OfType<string>().Distinct()
                 .Where(t => catalog.ServingSetName(ReviewSets.Verdicts, t) != r.Verdicts).ToArray(),
-        }));
+        }).ToArray();
     }
 
     private static async Task<IResult?> CheckStepsAsync(DeliosDbContext db, RouteStep[] steps, CancellationToken cancellationToken)
@@ -182,11 +288,13 @@ public static class CatalogAdminEndpoints
     }
 
     /// <summary><c>POST /api/admin/routes</c>: a new review route.</summary>
-    private static async Task<IResult> CreateRouteAsync(
+    private static async Task<IResult> CreateRouteAsync(Guid? scope,
         RouteRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
         var name = Blank(request.Name);
         if (name is null) return Problems.Invalid("NAME_REQUIRED", "A route has a name.");
+        if (await db.ReviewRoutes.AnyAsync(r => r.ProjectId == scope && r.Name == name, cancellationToken))
+            return Problems.Invalid("NAME_TAKEN", $"A route is already called {name}.");
         var steps = request.Steps ?? [];
         if (await CheckStepsAsync(db, steps, cancellationToken) is { } problem) return problem;
         var (verdicts, setProblem) = await CheckVerdictsAsync(db, request.Verdicts, cancellationToken);
@@ -195,6 +303,7 @@ public static class CatalogAdminEndpoints
         {
             Verdicts = verdicts,
             TenantId = http.User.TenantId(),
+            ProjectId = scope,
             Name = name,
             Description = Blank(request.Description),
             IsDefault = request.IsDefault ?? false,
@@ -202,26 +311,33 @@ public static class CatalogAdminEndpoints
             Patterns = (request.Patterns ?? []).ToList(),
             Steps = steps.ToList(),
         };
-        if (route.IsDefault) await db.ReviewRoutes.Where(r => r.IsDefault).ExecuteUpdateAsync(r => r.SetProperty(x => x.IsDefault, false), cancellationToken);
+        if (route.IsDefault) await db.ReviewRoutes.Where(r => r.ProjectId == scope && r.IsDefault).ExecuteUpdateAsync(r => r.SetProperty(x => x.IsDefault, false), cancellationToken);
         db.ReviewRoutes.Add(route);
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "ROUTE_CREATED", "ReviewRoute", route.Id, name,
-            string.Join(" → ", steps.Select(s => s.Title)), cancellationToken: cancellationToken);
+            string.Join(" → ", steps.Select(s => s.Title)), scope, cancellationToken);
         return Results.Created($"/api/admin/routes/{route.Id}", new { route.Id });
     }
 
     /// <summary><c>PUT /api/admin/routes/{id}</c>: changes a route. Reviews already running keep the steps they started with.</summary>
-    private static async Task<IResult> UpdateRouteAsync(
+    private static async Task<IResult> UpdateRouteAsync(Guid? scope,
         Guid routeId, RouteRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
-        var route = await db.ReviewRoutes.SingleOrDefaultAsync(r => r.Id == routeId, cancellationToken);
+        if (http.Items["routes.route"] is Guid mine) routeId = mine;
+        var route = await db.ReviewRoutes.SingleOrDefaultAsync(r => r.Id == routeId && r.ProjectId == scope, cancellationToken);
         if (route is null) return Problems.NotFound("ROUTE_NOT_FOUND", "No such route.");
         var changes = new List<string>();
-        if (Blank(request.Name) is { } name && name != route.Name) { changes.Add($"name → {name}"); route.Name = name; }
+        if (Blank(request.Name) is { } name && name != route.Name)
+        {
+            if (await db.ReviewRoutes.AnyAsync(r => r.ProjectId == scope && r.Name == name && r.Id != route.Id, cancellationToken))
+                return Problems.Invalid("NAME_TAKEN", $"A route is already called {name}.");
+            changes.Add($"name → {name}");
+            route.Name = name;
+        }
         if (request.Description is not null && Blank(request.Description) != route.Description) { route.Description = Blank(request.Description); changes.Add("description"); }
         if (request.IsDefault is { } isDefault && isDefault != route.IsDefault)
         {
-            if (isDefault) await db.ReviewRoutes.Where(r => r.IsDefault && r.Id != routeId).ExecuteUpdateAsync(r => r.SetProperty(x => x.IsDefault, false), cancellationToken);
+            if (isDefault) await db.ReviewRoutes.Where(r => r.ProjectId == scope && r.IsDefault && r.Id != route.Id).ExecuteUpdateAsync(r => r.SetProperty(x => x.IsDefault, false), cancellationToken);
             route.IsDefault = isDefault;
             changes.Add(isDefault ? "the default" : "not the default");
         }
@@ -246,7 +362,7 @@ public static class CatalogAdminEndpoints
         if (changes.Count == 0) return Results.NoContent();
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "ROUTE_UPDATED", "ReviewRoute", route.Id, route.Name,
-            string.Join("; ", changes), cancellationToken: cancellationToken);
+            string.Join("; ", changes), scope, cancellationToken);
         return Results.NoContent();
     }
 
