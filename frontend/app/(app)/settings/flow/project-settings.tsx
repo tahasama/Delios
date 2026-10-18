@@ -1,3 +1,4 @@
+import { liberty } from "@/lib/organization/liberty";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
 import { inputCls } from "@/components/ui";
@@ -23,19 +24,23 @@ import { fmtDate } from "@/lib/core/utils";
  */
 export async function ProjectSettings({ readOnly = false }: { readOnly?: boolean }) {
   const ctx = await requireScope();
-  const [answers, controllers, names, defaults] = await Promise.all([
+  const [answers, controllers, names, defaults, switches] = await Promise.all([
     projectSettings(ctx.projectId).catch(() => new Map<string, string>()),
     holders(ctx.projectId, "CONTROL").catch(() => []),
     stateNames(ctx),
     projectDefaults().catch(() => null),
+    liberty(),
   ]);
+  // What the organization keeps the same on every project: shown, never chosen here (backend ROOM_FIXED).
+  const fixed = switches.filter((one) => one.area === "Control room" && !one.free).map((one) => one.key);
   const admin = isAdmin(ctx.user);
 
   return (
     // Read only for whoever may not change it: every answer shows, nothing can be chosen or saved.
     <fieldset disabled={readOnly} className="min-w-0 space-y-4">
       <div id="how-it-works" className="scroll-mt-24">
-        <HowItWorks target="project" answers={answers} follows={controllers.length > 0} base={defaults?.values ?? null} />
+        <HowItWorks target="project" answers={answers} follows={controllers.length > 0} base={defaults?.values ?? null}
+          fixed={fixed} />
       </div>
 
       <section className="register register-sheet register-sheet-open">

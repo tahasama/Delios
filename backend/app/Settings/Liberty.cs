@@ -134,6 +134,43 @@ public static class Liberty
         return value is not null ? value == Free : Items.FirstOrDefault(i => i.Key == key)?.FreeByDefault ?? true;
     }
 
+    /// <summary>The acts of "who carries each act out", stored one setting each (with <c>SKIP:</c> and <c>CONFIRM:</c> beside them).</summary>
+    private static readonly HashSet<string> Acts =
+        ["REVIEW_ISSUE", "RETURN_OUTCOME", "ISSUE", "DELEGATE", "AUTHORIZE_REVISION", "WITHDRAW", "ACTION_NOTE", "ACTION_LINKS", "PROJECT_PEOPLE", "VOID", "__ALL__"];
+
+    /// <summary>The Control room answer a project's setting belongs to (its switch), or none for a setting no switch covers.</summary>
+    public static string? RoomItemOf(string settingKey) => settingKey switch
+    {
+        _ when Acts.Contains(settingKey) || settingKey.StartsWith("SKIP:") || settingKey.StartsWith("CONFIRM:") => "WHO_DOES_WHAT",
+        "POLICY_RELEASE" or "POLICY_READY" or "POLICY_MATRIX" or "POLICY_MATRIX_DETAIL" or "ESCALATE_AFTER_DAYS" => settingKey,
+        "POLICY_PDF_STAMP" or "STAMP_COMMENTS" => "POLICY_PDF_STAMP",
+        _ when settingKey.StartsWith("STAMP:") => "POLICY_PDF_STAMP",
+        _ => null,
+    };
+
+    /// <summary>
+    /// Refuses a project's change of a Control room answer the organization keeps fixed (ROOM_FIXED), unless the answer
+    /// is the organization's own default for new projects (putting the project back on it is always allowed).
+    /// </summary>
+    public static async Task<IResult?> RoomRefusalAsync(DeliosDbContext db, string settingKey, string? value, CancellationToken cancellationToken)
+    {
+        if (RoomItemOf(settingKey) is not { } item || await IsFreeAsync(db, item, cancellationToken)) return null;
+        var defaults = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && s.Key == "PROJECT_DEFAULTS")
+            .Select(s => s.Value).FirstOrDefaultAsync(cancellationToken);
+        string? standard = null;
+        try
+        {
+            if (defaults is not null && System.Text.Json.JsonDocument.Parse(defaults).RootElement.TryGetProperty("values", out var values)
+                && values.TryGetProperty(settingKey, out var one)) standard = one.GetString();
+        }
+        catch (System.Text.Json.JsonException) { }
+        var asked = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        if (asked == standard) return null;
+        var title = Items.FirstOrDefault(i => i.Key == item)?.Title ?? item;
+        return Problems.Forbidden("ROOM_FIXED",
+            $"{title}: the organization keeps it the same on every project. An administrator changes it in the organization's Settings (Defaults for new projects).");
+    }
+
     /// <summary>The lists a part of a numbering scheme reads (<c>LIST:&lt;key&gt;</c>, and the app's lists numbering reads).</summary>
     private static async Task<HashSet<string>> NumberedListsAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {

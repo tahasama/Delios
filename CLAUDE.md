@@ -706,7 +706,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   on its Settings card `/organization/settings/functions` by an administrator, backend Configurers; a project's page reads
   them, with who holds each there; its switch held Fixed, "Not yet", `Liberty.IsFreeAsync` false; a project's own
   version of what a function may do is step 2, built only when a project needs it),
-  the Control room. Until a page is moved, it says plainly what is the organization's and what is the project's.
+  the Control room (done: an answer whose switch is Fixed is read only on a project, "the organization's", backend
+  ROOM_FIXED via `Liberty.RoomItemOf` / `RoomRefusalAsync`, accepted only when it equals the organization's default;
+  the risk window likewise; a project keeps the answers it already held). Until a page is moved, it says plainly what is the organization's and what is the project's.
 - Document families are **on hold** (owner): the idea is to group document types (internal like DWG, supplier like C102)
   to tell criticality and whether an outside stamp / wet signature is needed or the app's approval is enough, legally.
   That needs research before deciding (`docs/gaps/families.md`). Meanwhile document types are grouped by deliverable

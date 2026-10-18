@@ -73,6 +73,8 @@ public static class SettingEndpoints
             var access = ProjectAccessFilter.Of(h);
             if (!await Keepers.ConfiguresAsync(h) && !access.Holds(Verbs.Control))
                 return Problems.Forbidden("CONTROL_ONLY", "An administrator or the control function answers for the project.");
+            // What the organization keeps fixed is the same on every project (owner: two levels of settings).
+            if (await Liberty.RoomRefusalAsync(db, key.Trim(), r.Value, c) is { } fixedHere) return fixedHere;
             return await SetAsync(db, audit, clock, access.Project.TenantId, access.Project.Id, key, r.Value, access.UserId, access.UserName, c);
         });
     }

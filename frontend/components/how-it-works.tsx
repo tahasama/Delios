@@ -15,6 +15,7 @@ import {
   PROJECT_MODE_LABEL,
   STAMP_KINDS,
   STAMP_COMMENTS_KEY,
+  roomItemOf,
   type ControlMode,
   type ProjectMode,
 } from "@/lib/settings/control-activities";
@@ -31,6 +32,7 @@ export function HowItWorks({
   answers,
   follows,
   base,
+  fixed = [],
 }: {
   target: "project" | "defaults";
   /** The answers shown: the project's, or the defaults'. */
@@ -39,6 +41,8 @@ export function HowItWorks({
   follows: boolean;
   /** For a project: the defaults it is compared with (none: the app's own). */
   base?: Record<string, string> | null;
+  /** For a project: the answers the organization keeps fixed (their switches' keys), read only here. */
+  fixed?: string[];
 }) {
   const { projectMode, set, rows } = controlFrom(answers, follows);
   const chosen = policiesFrom(answers);
@@ -46,8 +50,13 @@ export function HowItWorks({
   const defaults = target === "defaults";
   const hidden = { target };
 
+  /** On a project, whether the organization keeps this answer the same on every project. */
+  const isFixed = (item: string) => !defaults && fixed.includes(item);
+  const fixedNote = <p className="text-[11px] leading-5 text-slate-500">The organization keeps this the same on every project: an administrator changes it in the organization&rsquo;s Settings.</p>;
+
   /** Where one answer comes from, as a chip. */
   const from = (key: string) => {
+    if (!defaults && fixed.includes(roomItemOf(key) ?? "")) return <ToneChip tone="idle">the organization&rsquo;s</ToneChip>;
     const value = effectiveAnswer(key, answers.get(key));
     if (defaults) return value !== effectiveAnswer(key, null) ? <ToneChip tone="moving">ours</ToneChip> : <ToneChip tone="idle">the app&rsquo;s</ToneChip>;
     if (value === effectiveAnswer(key, base?.[key])) return <ToneChip tone="idle">{base ? "as the defaults" : "the app’s"}</ToneChip>;
@@ -74,6 +83,8 @@ export function HowItWorks({
           <span className="ml-auto">{from(PROJECT_KEY)}</span>
         </div>
         <ActionForm action={setControlActivitiesAction} submitLabel="Save" hidden={hidden} className="space-y-0">
+          <fieldset disabled={isFixed("WHO_DOES_WHAT")} className="min-w-0 disabled:opacity-70">
+          {isFixed("WHO_DOES_WHAT") ? <div className="px-5 pt-3 sm:px-6">{fixedNote}</div> : null}
           <div className="space-y-2 px-5 py-4 sm:px-6">
             {modes.map((mode) => (
               <label
@@ -144,6 +155,7 @@ export function HowItWorks({
           <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
             The acts one by one are used when the answer is &ldquo;it depends on the act&rdquo;.
           </p>
+          </fieldset>
         </ActionForm>
       </section>
 
@@ -155,12 +167,14 @@ export function HowItWorks({
         <ActionForm action={setPolicyAction} submitLabel="Save" hidden={hidden} className="space-y-0">
           <ul className="divide-y divide-line">
             {chosen.map(({ policy, value }) => (
-              <li key={policy.key} className="space-y-2 px-5 py-4 sm:px-6">
+              <li key={policy.key} className="px-5 py-4 sm:px-6">
+                <fieldset disabled={isFixed(roomItemOf(policy.key) ?? "")} className="min-w-0 space-y-2 disabled:opacity-70">
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                   <p className="text-sm font-semibold text-slate-800">{policy.title}</p>
                   {from(policy.key)}
                 </div>
                 <p className="text-xs leading-5 text-slate-600">{policy.text}</p>
+                {isFixed(roomItemOf(policy.key) ?? "") ? fixedNote : null}
                 <div className="grid gap-2 md:grid-cols-2">
                   {policy.options.map((option) => (
                     <label
@@ -175,10 +189,12 @@ export function HowItWorks({
                     </label>
                   ))}
                 </div>
+                </fieldset>
               </li>
             ))}
             {/* Which stamps, when the PDF is stamped, and whether a verdict's comments go with its stamp. */}
-            <li className="space-y-2 px-5 py-4 sm:px-6">
+            <li className="px-5 py-4 sm:px-6">
+              <fieldset disabled={isFixed("POLICY_PDF_STAMP")} className="min-w-0 space-y-2 disabled:opacity-70">
               <input type="hidden" name="stamps" value="1" />
               <p className="text-sm font-semibold text-slate-800">Which stamps</p>
               <p className="text-xs leading-5 text-slate-600">Used when the PDF is stamped (above). Untick a stamp to leave it off.</p>
@@ -204,8 +220,10 @@ export function HowItWorks({
                   {from(STAMP_COMMENTS_KEY)}
                 </label>
               </div>
+              </fieldset>
             </li>
-            <li className="space-y-2 px-5 py-4 sm:px-6">
+            <li className="px-5 py-4 sm:px-6">
+              <fieldset disabled={isFixed("ESCALATE_AFTER_DAYS")} className="min-w-0 space-y-2 disabled:opacity-70">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <p className="text-sm font-semibold text-slate-800">When a discipline does not answer</p>
                 {from(ESCALATE_AFTER_KEY)}
@@ -220,6 +238,8 @@ export function HowItWorks({
                 <input type="number" name={ESCALATE_AFTER_KEY} min={1} max={60} defaultValue={escalateAfter ?? DEFAULT_ESCALATE_AFTER} className={`${inputCls} w-20`} />
                 working days
               </label>
+              {isFixed("ESCALATE_AFTER_DAYS") ? fixedNote : null}
+              </fieldset>
             </li>
           </ul>
         </ActionForm>

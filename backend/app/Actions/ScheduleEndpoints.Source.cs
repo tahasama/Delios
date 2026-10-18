@@ -39,6 +39,10 @@ public static partial class ScheduleEndpoints
         if (request.Columns is { DateOrder: var order } && order is not ("DMY" or "MDY"))
             return Problems.Invalid("DATE_ORDER_INVALID", "Numeric dates are read day first (DMY) or month first (MDY).");
         var source = await db.ScheduleSources.SingleOrDefaultAsync(s => s.ProjectId == access.Project.Id, cancellationToken);
+        // The risk window is the organization's where it keeps it fixed: the project's stays as it was.
+        if (request.RiskWindowDays is { } window && window != (source?.RiskWindowDays ?? 7)
+            && !await Settings.Liberty.IsFreeAsync(db, "RISK_WINDOW", cancellationToken))
+            return Problems.Forbidden("ROOM_FIXED", "The risk window: the organization keeps it the same on every project. An administrator changes it in the organization's Settings.");
         if (source is null)
         {
             source = new ScheduleSource { TenantId = access.Project.TenantId, ProjectId = access.Project.Id, DocumentId = document.Id };

@@ -455,3 +455,17 @@ export function effectiveAnswer(key: string, value: string | null | undefined): 
   if (key.startsWith("SKIP:")) return "ON";
   return "FOLLOW";
 }
+
+/** The acts of "who carries each act out", one setting each (as the backend, `Liberty.RoomItemOf`). */
+const ACT_KEYS = new Set(["REVIEW_ISSUE", "RETURN_OUTCOME", "ISSUE", "DELEGATE", "AUTHORIZE_REVISION", "WITHDRAW", "ACTION_NOTE", "ACTION_LINKS", "PROJECT_PEOPLE", "VOID", "__ALL__"]);
+
+/**
+ * The Control room answer (its switch, `LIBERTY:<key>`) a project's setting belongs to, as the backend reads it
+ * (`Liberty.RoomItemOf`, which refuses a fixed one: ROOM_FIXED); none for a setting no switch covers.
+ */
+export function roomItemOf(key: string): string | null {
+  if (ACT_KEYS.has(key) || key.startsWith("SKIP:") || key.startsWith("CONFIRM:")) return "WHO_DOES_WHAT";
+  if (["POLICY_RELEASE", "POLICY_READY", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL", "ESCALATE_AFTER_DAYS"].includes(key)) return key;
+  if (key === "POLICY_PDF_STAMP" || key === "STAMP_COMMENTS" || key.startsWith("STAMP:")) return "POLICY_PDF_STAMP";
+  return null;
+}
