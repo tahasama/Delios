@@ -231,9 +231,9 @@ export async function ListsBoard({ level, sp }: { level: "project" | "organizati
                 {/* On a project, where this list stands: its own copy, the organization's it may change, or the organization's alone. */}
                 {!organization && listRead && !readOnlyWhy ? (
                   <p className="mt-1 text-xs text-slate-600">
-                    {listRead.own ? <>{whose}&rsquo;s own copy: the organization&rsquo;s later changes don&rsquo;t touch it.</>
-                      : listRead.free ? <>The organization&rsquo;s list, free here: {whose}&rsquo;s first change gives it its own copy of this list.</>
-                      : <>The organization&rsquo;s list, the same on every project: an administrator changes it in the organization&rsquo;s Settings.</>}
+                    {listRead.own ? <>{whose} changed this list: it uses its own version. Changes made by the organization don&rsquo;t reach it.</>
+                      : listRead.free ? <>This is the organization&rsquo;s list. You may change it here: {whose} then keeps its own version.</>
+                      : <>This is the organization&rsquo;s list, the same on every project. Only an administrator changes it, in the organization&rsquo;s Settings.</>}
                   </p>
                 ) : null}
               </div>
