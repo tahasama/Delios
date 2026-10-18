@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { ActionForm } from "@/components/form";
-import { Field, inputCls, btn } from "@/components/ui";
+import { Field, inputCls, btn, Tip } from "@/components/ui";
 import { saveNumberingSchemeAction } from "@/lib/settings/forms-numbering";
 import { cn } from "@/lib/core/utils";
 
@@ -74,9 +74,18 @@ export function NumberingSchemeBuilder({ level, id, initialName = "", initialDel
       </Field>
       <Field label="When it is used"><input name="notes" maxLength={300} defaultValue={initialNotes} className={inputCls} placeholder="In plain words: what it numbers, and why" /></Field>
     </div>
+    {fixedParts ? (
+      <Tip lead="Its parts can't change: documents carry its numbers." steps={[
+        { label: "Make a new scheme with the parts you want", href: `${cancelHref}?new=1#new-scheme` },
+        { label: "Under What is numbered, choose the new one for what it should number", href: cancelHref },
+        { label: "Retire this one, once it numbers nothing" },
+      ]}>
+        To number differently, in this order. Numbers already given stay as they are.
+      </Tip>
+    ) : null}
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold text-slate-700">Parts, in order{fixedParts ? <span className="ml-2 font-normal text-slate-500">· it has given numbers: its parts stay as they are</span> : null}</p>
+        <p className="text-xs font-semibold text-slate-700">Parts, in order{fixedParts ? <span className="ml-2 font-normal text-slate-500">· fixed: it has given numbers</span> : null}</p>
         {fixedParts ? null : (
           <button type="button" onClick={() => setFields((current) => [...current, { label: "", valueSetKey: "", rule: "" }])} className={btn("secondary", "sm")} title="Add a part">
             <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Part

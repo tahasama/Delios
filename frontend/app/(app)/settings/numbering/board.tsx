@@ -160,7 +160,11 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
                   <NumberingSchemeBuilder level={level} id={s.id} initialName={s.name} initialDelimiter={s.delimiter} initialNotes={s.notes ?? ""}
                     initialFields={toBuilder(s)} sets={lists} fixedParts={s.used} cancelHref={here} />
                   <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3 sm:px-6">
-                    <span className="mr-auto text-[11.5px] text-slate-500">{s.used ? (s.active ? "It has given numbers: retire it to stop using it." : "Retired: bring it back to use it again.") : "It never gave a number: it may go."}</span>
+                    <span className="mr-auto text-[11.5px] text-slate-500">{s.used
+                      ? s.active
+                        ? used.length ? `Retire it once nothing is numbered by it: choose another scheme for ${used.map((u) => nameOf(u.deliverableType)).join(", ")} first.` : "It numbers nothing now: retire it. Numbers it gave stay as they are."
+                        : "Retired: bring it back to use it again."
+                      : "It never gave a number: it may go."}</span>
                     {s.used ? (
                       <ActionForm action={retireNumberingSchemeAction} size="sm" variant="secondary" submitLabel={s.active ? "Retire it" : "Bring it back"}
                         hidden={{ level, id: s.id, active: s.active ? "0" : "1" }} className="space-y-1" />
@@ -178,7 +182,7 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
                   <p className="text-[13px] font-semibold text-slate-800">
                     {s.name}
                     {s.active ? null : <span className="ml-2 text-[11px] font-semibold text-slate-500">retired</span>}
-                    {s.used ? <span className="ml-2 text-[11px] font-normal text-slate-500">has given numbers</span> : null}
+                    {s.used ? <span className="ml-2 text-[11px] font-normal text-slate-500">has given numbers · its parts are fixed</span> : null}
                   </p>
                   {s.notes ? <p className="text-[11.5px] leading-4 text-slate-500">{s.notes}</p> : null}
                   <div className="scroll-thin mt-2 overflow-x-auto">
