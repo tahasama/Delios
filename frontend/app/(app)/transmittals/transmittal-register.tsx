@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowDownLeft, ArrowUp, ArrowUpDown, ArrowUpRight, ChevronLeft, ChevronRight, Download, Pin, PinOff, Search, X } from "lucide-react";
 import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
+import { FilterMenu } from "@/components/filter-menu";
+import { FilterOptions } from "@/components/filter-options";
 import { Th, Td, Info } from "@/components/ui";
 import { useCardHeight } from "@/components/card-height";
 
@@ -29,7 +31,7 @@ type Row = {
   receivedAt: string | null; checkedBy: string | null;
   replyNeeded: boolean; replyDays: number | null;
 };
-type Opt = { code: string; label: string };
+type Opt = { code: string; label: string; group?: string };
 type Filters = { q: string; terms: string[]; way: string; status: string; reason: string; party: string; on: string; from: string; to: string };
 
 type Paging = {
@@ -58,7 +60,18 @@ type Column = {
   cell: (row: Row, notes: Record<string, string>) => React.ReactNode;
 };
 
-export function TransmittalRegister({ rows, total, filters, filterOptions, exportHref, plate, paging, sort, reasonNotes }: {
+/** The filters a person may show or hide here (the Filters menu, `components/filter-menu.tsx`), in the order they stand. */
+const FILTERS = [
+  { key: "way", label: "Direction" },
+  { key: "status", label: "Status" },
+  { key: "reason", label: "Why" },
+  { key: "party", label: "Party" },
+  { key: "date", label: "Dates" },
+];
+
+export function TransmittalRegister({ rows, total, filters, filterOptions, exportHref, plate, paging, sort, reasonNotes, shownFilters }: {
+  /** The filters this person keeps shown (Filters menu); one holding a value always shows. None kept: all. */
+  shownFilters?: string[];
   rows: Row[]; total: number;
   /** What each reason for issue means, as the organization published it. */
   reasonNotes: Record<string, string>;
@@ -69,6 +82,9 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
   filterOptions: { ways: Opt[]; statuses: Opt[]; reasons: Opt[]; parties: Opt[]; dateFields: Opt[] };
   exportHref: string;
 }) {
+  // Which filters show: the person's choice (Filters menu), and always one holding a value.
+  const held = (key: string) => key === "date" ? !!(filters.on && (filters.from || filters.to)) : !!(filters as unknown as Record<string, string>)[key];
+  const show = (key: string) => !shownFilters || shownFilters.includes(key) || held(key);
   const router = useRouter();
   // Every register is the height the schedule's plan set.
   const cardHeight = useCardHeight();
@@ -212,11 +228,12 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
 
         {/* Five to a row, one row: a handover has fewer questions than a document. */}
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3 md:grid-cols-5">
-          <Filter name="way" value={filters.way} empty="Direction" options={filterOptions.ways} />
-          <Filter name="status" value={filters.status} empty="Status" options={filterOptions.statuses} />
-          <Filter name="reason" value={filters.reason} empty="Why" options={filterOptions.reasons} />
-          <Filter name="party" value={filters.party} empty="Party" options={filterOptions.parties} />
-          <DateWindow fields={filterOptions.dateFields} on={filters.on} from={filters.from} to={filters.to} />
+          {show("way") ? <Filter name="way" value={filters.way} empty="Direction" options={filterOptions.ways} /> : null}
+          {show("status") ? <Filter name="status" value={filters.status} empty="Status" options={filterOptions.statuses} /> : null}
+          {show("reason") ? <Filter name="reason" value={filters.reason} empty="Why" options={filterOptions.reasons} /> : null}
+          {show("party") ? <Filter name="party" value={filters.party} empty="Party" options={filterOptions.parties} /> : null}
+          {show("date") ? <DateWindow fields={filterOptions.dateFields} on={filters.on} from={filters.from} to={filters.to} /> : null}
+          <FilterMenu page="transmittals" shown={shownFilters ?? FILTERS.map((f) => f.key)} filters={FILTERS.map((f) => ({ ...f, held: held(f.key) }))} />
         </div>
       </form>
 
@@ -476,7 +493,7 @@ function Filter({ name, value, empty, options }: { name: string; value: string; 
         className="plain w-full"
       >
         <option value="">{empty}</option>
-        {options.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
+        <FilterOptions options={options} />
       </select>
     </label>
   );

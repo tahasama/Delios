@@ -1,4 +1,6 @@
 import { requireScope } from "@/lib/core/scope";
+import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
+import { setGrouping } from "@/lib/settings/in-sets";
 import { addressees, ourOrganizationName, transmittalDrafts, transmittalLog } from "@/lib/transmittals/api";
 import { REASONS_FOR_ISSUE, REASON_LABEL, type ReasonForIssue } from "@/lib/core/standard";
 import { TransmittalRegister } from "./transmittal-register";
@@ -142,7 +144,10 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
     const reply = item.props.response ? `\nAn answer is owed${owed}.` : "\nNo answer is owed.";
     reasonNotes[item.code] = `${item.label}${maturity}${reply}`;
   }
-  const reasonOptions = (publishedReasons.length ? publishedReasons.map((item) => ({ code: item.code, label: item.label })) : REASONS_FOR_ISSUE.map((code) => ({ code, label: REASON_LABEL[code] })));
+  // Every set's values under its name (owner), and the filters this person keeps shown.
+  const inSets = await setGrouping(scope);
+  const shownFilters = await keptFilters("transmittals", ["way", "status", "reason", "party", "date"]);
+  const reasonOptions = (publishedReasons.length ? inSets("REASONS_FOR_ISSUE", publishedReasons, (item) => item.label) : REASONS_FOR_ISSUE.map((code) => ({ code, label: REASON_LABEL[code] })));
 
 
   const pages = Math.max(1, Math.ceil(total / perPage));
@@ -216,6 +221,7 @@ export default async function TransmittalsPage({ searchParams }: { searchParams:
   return (
     <div>
       <TransmittalRegister
+        shownFilters={shownFilters}
         plate={<TransmittalPlate project={{ code: project.code, name: project.name }} canCreate={!isReadOnly(user)} />}
         rows={rows}
         total={total}

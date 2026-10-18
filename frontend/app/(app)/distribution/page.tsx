@@ -1,4 +1,6 @@
 import { Fragment } from "react";
+import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
+import { FilterMenu } from "@/components/filter-menu";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
@@ -55,6 +57,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
   // Who produced it is a view on the grid, not a row axis: crossing it with
   // discipline made hundreds of rows that said the same thing.
   const producer = sp.producer && producers.some((p) => p.code === sp.producer) ? sp.producer : null;
+  const shown = await keptFilters("distribution", ["discipline", "producer", "type", "inuse"]);
 
   // The page reads the same sheet as the file people download and the reader
   // that takes it back. It used to build its own grid, keyed on discipline
@@ -101,31 +104,35 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
         description={`${visible.length} discipline${visible.length === 1 ? "" : "s"} × ${sheet.columns.length} functions · ${producer ? producers.find((p) => p.code === producer)!.label.toLowerCase() : "any producer"} · ${docType ? `document type ${docType}` : "any document type"} · internal classification`}
       >
         <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 px-3 py-3">
-          <label className="text-xs">
+          {shown.includes("discipline") || one ? <label className="text-xs">
             <span className="mb-1 block font-medium text-slate-700">Discipline</span>
             <select name="discipline" defaultValue={one ?? ""} className={`${inputCls} py-1.5 text-xs`}>
               <option value="">Every discipline</option>
               {disciplines.map((d) => <option key={d.code} value={d.code}>{d.code} — {d.label}</option>)}
             </select>
-          </label>
-          <label className="text-xs">
+          </label> : null}
+          {shown.includes("producer") || producer ? <label className="text-xs">
             <span className="mb-1 block font-medium text-slate-700">Who produced it</span>
             <select name="producer" defaultValue={producer ?? ""} className={`${inputCls} py-1.5 text-xs`}>
               <option value="">Any producer</option>
               {producers.map((p) => <option key={p.code} value={p.code}>{p.code} — {p.label}</option>)}
             </select>
-          </label>
-          <label className="text-xs">
+          </label> : null}
+          {shown.includes("type") || docType ? <label className="text-xs">
             <span className="mb-1 block font-medium text-slate-700">Document type <span className="font-normal text-slate-400">— optional</span></span>
             <select name="type" defaultValue={docType ?? ""} className={`${inputCls} py-1.5 text-xs`}>
               <option value="">Any type</option>
               {docTypes.map((t) => <option key={t.code} value={t.code}>{t.code} — {t.label}</option>)}
             </select>
-          </label>
-          <label className="flex items-center gap-2 pb-2 text-xs text-slate-600">
+          </label> : null}
+          {shown.includes("inuse") || inUseOnly ? <label className="flex items-center gap-2 pb-2 text-xs text-slate-600">
             <input type="checkbox" name="inuse" value="1" defaultChecked={inUseOnly} />
             Only the disciplines this project already works in
-          </label>
+          </label> : null}
+          <div className="pb-2"><FilterMenu page="distribution" shown={shown} filters={[
+            { key: "discipline", label: "Discipline", held: !!one }, { key: "producer", label: "Who produced it", held: !!producer },
+            { key: "type", label: "Document type", held: !!docType }, { key: "inuse", label: "Only disciplines in use", held: inUseOnly },
+          ]} /></div>
           <button type="submit" className={btn("secondary", "sm")}>Apply</button>
         </form>
 

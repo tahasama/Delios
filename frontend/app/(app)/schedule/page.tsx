@@ -1,4 +1,6 @@
 import { requireScope } from "@/lib/core/scope";
+import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
+import { setGrouping } from "@/lib/settings/in-sets";
 import { departmentsOf, daysBefore } from "@/lib/actions/schedule";
 import { getActiveSet } from "@/lib/settings/config";
 import { mayUploadLists } from "@/lib/core/permissions";
@@ -327,9 +329,13 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
       ? { label: "every date", href: `/schedule${narrowParams.size ? `?${narrowParams}` : ""}`, wide: true, elsewhere: 0 }
       : null;
 
+  // Every set's values under its name (owner), and the filters this person keeps shown.
+  const inSets = await setGrouping(ctx);
+  const shownFilters = await keptFilters("schedule", ["code", "state", "happened", "discipline", "docType", "supplier", "date"]);
   return (
     <div>
       <PlanRegister
+        shownFilters={shownFilters}
         plate={
           <PlanPlate
             inForce={publishedVersion ? { since: publishedVersion.publishedAt ? fmtDate(publishedVersion.publishedAt) : null } : null}
@@ -369,8 +375,8 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         filterOptions={{
           states: STATES,
           happened: HAPPENED,
-          disciplines: disciplineRows.map((one) => ({ code: one.code, label: one.label })),
-          types: typeRows.map((one) => ({ code: one.code, label: one.label })),
+          disciplines: inSets("DISCIPLINES", disciplineRows, (one) => one.label),
+          types: inSets("DOCUMENT_TYPES", typeRows, (one) => one.label),
           suppliers: supplierRows.map((one) => ({ code: one.code, label: one.label })),
           codes: inUse.map((one) => ({ code: one.code, label: `${one.code} — ${one.name}` })),
           dateFields: DATE_FIELDS,

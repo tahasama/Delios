@@ -6,7 +6,9 @@ import Link from "next/link";
 import { saveRegisterView, deleteRegisterView } from "@/lib/documents/forms-register-views";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, GitPullRequestArrow, PackagePlus, Pin, PinOff, Search, Send, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, GitPullRequestArrow, PackagePlus, Pin, PinOff, Search, Send, X } from "lucide-react";
+import { FilterMenu } from "@/components/filter-menu";
+import { FilterOptions } from "@/components/filter-options";
 import { sendSupplierFromRegisterAction as sendFromRegister } from "@/lib/packages/forms-supplier";
 import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
@@ -54,16 +56,15 @@ type RegisterRow = {
 /** A choice of a filter; `group` names the set of its list it is in, when the list has several (owner: every set's values, said whose). */
 type Opt = { code: string; label: string; group?: string };
 
-/** The filters a person may show or hide (the "Filters" menu), in the order they stand. Kept in a cookie the server reads. */
-export const REGISTER_FILTERS = [
+/** The filters a person may show or hide (the "Filters" menu), in the order they stand. */
+const REGISTER_FILTERS = [
   { key: "state", label: "Document state" }, { key: "rev", label: "Revision state" }, { key: "status", label: "Released for" },
   { key: "verdict", label: "Verdict" }, { key: "supplier", label: "Supplier" }, { key: "po", label: "Contract / PO" },
   { key: "discipline", label: "Discipline" }, { key: "docType", label: "Type" }, { key: "date", label: "Dates" },
   { key: "criticality", label: "Criticality" }, { key: "confidentiality", label: "Confidentiality" },
   { key: "deliverable", label: "Deliverable type" }, { key: "phase", label: "Phase" }, { key: "action", label: "Owed by activity" },
 ] as const;
-export const REGISTER_FILTERS_DEFAULT = ["state", "rev", "status", "verdict", "supplier", "po", "discipline", "docType", "date"];
-export const REGISTER_FILTERS_COOKIE = "edms_register_filters";
+
 
 type Paging = {
   page: number;
@@ -167,15 +168,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   // Apply is lit only while typed words or dates wait to be applied; a dropdown applies by itself.
   const [dirty, setDirty] = useState(false);
   useEffect(() => setDirty(false), [filters.q, filters.on, filters.from, filters.to]);
-  const [shown, setShown] = useState<string[]>(shownFilters);
-  const [menu, setMenu] = useState(false);
-  const toggleFilter = (key: string) => setShown((was) => {
-    const next = was.includes(key) ? was.filter((k) => k !== key) : [...was, key];
-    try { document.cookie = `${REGISTER_FILTERS_COOKIE}=${encodeURIComponent(next.join(","))}; path=/; max-age=31536000; samesite=lax`; } catch { /* kept for this visit only */ }
-    return next;
-  });
   const held = (key: string) => key === "date" ? !!(filters.on && (filters.from || filters.to)) : !!(filters as unknown as Record<string, string>)[key];
-  const visible = (key: string) => shown.includes(key) || held(key);
+  const visible = (key: string) => shownFilters.includes(key) || held(key);
 
   // The order someone dragged their columns into, and whether they keep the
   // first column in view. Both are this browser's business, not the register's.
@@ -419,31 +413,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           {visible("deliverable") ? <Filter name="deliverable" value={filters.deliverable} empty="Deliverable type" options={filterOptions.deliverables} /> : null}
           {visible("phase") ? <Filter name="phase" value={filters.phase} empty="Phase" options={filterOptions.phases} /> : null}
           {visible("action") && filterOptions.actions.length ? <Filter name="action" value={filters.action} empty="Owed by activity" options={filterOptions.actions} /> : null}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setMenu((open) => !open)}
-              aria-expanded={menu}
-              data-caret="none"
-              className="plain group inline-flex items-center gap-1.5"
-              title="Show or hide filters"
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400 group-hover:text-brand-ink" />
-              Filters
-            </button>
-            {menu ? (
-              <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-md border border-line bg-surface p-2 shadow-[0_8px_24px_rgb(0_0_0/0.12)]" onMouseLeave={() => setMenu(false)}>
-                <p className="stencil px-1.5 pb-1.5 text-slate-500">Show these filters</p>
-                {REGISTER_FILTERS.filter((f) => f.key !== "action" || filterOptions.actions.length).map((f) => (
-                  <label key={f.key} className="flex cursor-pointer items-center gap-2 rounded-sm px-1.5 py-1 text-[12.5px] text-slate-700 hover:bg-tint-soft">
-                    <input type="checkbox" data-instant="true" checked={visible(f.key)} disabled={held(f.key)} onChange={() => toggleFilter(f.key)} />
-                    <span>{f.label}</span>
-                    {held(f.key) ? <span className="ml-auto text-[11px] text-slate-400">in use</span> : null}
-                  </label>
-                ))}
-              </div>
-            ) : null}
-          </div>
+          <FilterMenu page="register" shown={shownFilters}
+            filters={REGISTER_FILTERS.filter((f) => f.key !== "action" || filterOptions.actions.length).map((f) => ({ key: f.key, label: f.label, held: held(f.key) }))} />
           <input type="hidden" name="view" value={filters.view} />
           <noscript><button className="stencil text-brand-ink">Apply</button></noscript>
         </div>
@@ -892,14 +863,7 @@ function Filter({ name, value, empty, options, disabled }: { name: string; value
         }}
       >
         <option value="">{empty}</option>
-        {options.some((option) => option.group)
-          // A list of several sets: its values under each set's name, whose they are.
-          ? [...new Set(options.map((option) => option.group ?? ""))].map((group) => (
-              <optgroup key={group} label={group || "Other"}>
-                {options.filter((option) => (option.group ?? "") === group).map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
-              </optgroup>
-            ))
-          : options.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
+        <FilterOptions options={options} />
       </select>
     </label>
   );

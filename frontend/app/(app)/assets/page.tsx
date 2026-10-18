@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
+import { FilterMenu } from "@/components/filter-menu";
 import { projectAssets } from "@/lib/records/api";
 import { requireScope } from "@/lib/core/scope";
 import { inputCls, DataTable, Th, Td } from "@/components/ui";
@@ -21,6 +23,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
   const policy = await formPolicy(ctx, "ASSET");
   const keeper = ctx.can("CONTROL") || ctx.can("CONFIGURE");
   const sp = await searchParams;
+  const shown = await keptFilters("assets", ["area", "system"]);
   const q = (sp.q ?? "").trim();
   const all = await projectAssets(ctx, q || undefined);
   const areas = [...new Set(all.map((a) => a.area).filter((v): v is string => !!v))].sort();
@@ -49,14 +52,19 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
             <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <input name="q" defaultValue={q} placeholder="Find a tag, name, system or area" className="plain w-full !pl-7" />
           </label>
-          <select name="area" defaultValue={sp.area ?? ""} className="plain" aria-label="Area">
-            <option value="">Any area</option>
-            {areas.map((one) => <option key={one} value={one}>Area {one}</option>)}
-          </select>
-          <select name="system" defaultValue={sp.system ?? ""} className="plain" aria-label="System">
-            <option value="">Any system</option>
-            {systems.map((one) => <option key={one} value={one}>{one}</option>)}
-          </select>
+          {shown.includes("area") || sp.area ? (
+            <select name="area" defaultValue={sp.area ?? ""} className="plain" aria-label="Area">
+              <option value="">Any area</option>
+              {areas.map((one) => <option key={one} value={one}>Area {one}</option>)}
+            </select>
+          ) : null}
+          {shown.includes("system") || sp.system ? (
+            <select name="system" defaultValue={sp.system ?? ""} className="plain" aria-label="System">
+              <option value="">Any system</option>
+              {systems.map((one) => <option key={one} value={one}>{one}</option>)}
+            </select>
+          ) : null}
+          <FilterMenu page="assets" shown={shown} filters={[{ key: "area", label: "Area", held: !!sp.area }, { key: "system", label: "System", held: !!sp.system }]} />
           <button type="submit" className="ask">Apply</button>
         </form>
         {assets.length ? (

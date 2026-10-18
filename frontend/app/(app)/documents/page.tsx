@@ -9,8 +9,9 @@ import type { ActivitySummary, RegisterPage } from "@/lib/types";
 import { RegisterPlate } from "./register-plate";
 import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState } from "@/lib/core/standard";
 import { getSet } from "@/lib/settings/config";
-import { DocumentRegister, REGISTER_FILTERS_COOKIE, REGISTER_FILTERS_DEFAULT } from "./document-register";
-import { cookies } from "next/headers";
+import { DocumentRegister } from "./document-register";
+import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
+import { setGrouping } from "@/lib/settings/in-sets";
 import { activityDetail, scheduleSource } from "@/lib/actions/api";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { controlDoes } from "@/lib/settings/control-activities";
@@ -132,24 +133,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       // The questions this reader keeps, oldest first so the list stays put.
       api<{ id: string; name: string; query: string; createdAt: string }[]>(projectPath(scope, "/register/views")).catch(() => []),
     ]);
-  // Each list's sets, so a filter offers every set's values under the set's name and whom it serves (owner).
-  const listSets = new Map(((await api<{ lists: { key: string; sets: { id: string | null; name: string; isDefault: boolean; deliverableTypes: string[] }[] }[] }>(projectPath(scope, "/lists"))
-    .catch(() => ({ lists: [] }))).lists).map((l) => [l.key, l.sets]));
-  const typeName = (code: string) => deliverableTypes.find((d) => d.code === code)?.label ?? code;
-  const inSets = <T extends { code: string; setId?: string | null }>(key: string, rows: T[], label: (row: T) => string) => {
-    const sets = listSets.get(key) ?? [];
-    const defaultId = sets.find((one) => one.isDefault)?.id ?? null;
-    return rows.map((row) => {
-      const set = sets.length > 1 ? sets.find((one) => one.id === (row.setId ?? defaultId)) : null;
-      return {
-        code: row.code, label: label(row),
-        ...(set ? { group: `${set.name} · ${set.deliverableTypes.length ? `for ${set.deliverableTypes.map(typeName).join(", ")}` : set.isDefault ? "for the other types" : "for no type yet"}` } : {}),
-      };
-    });
-  };
+  // A filter on a list of several sets offers every set's values under the set's name and whom it serves (owner).
+  const inSets = await setGrouping(scope);
   // The filters this person keeps shown (the Filters menu), else the usual ones.
-  const keptFilters = (await cookies()).get(REGISTER_FILTERS_COOKIE)?.value;
-  const shownFilters = keptFilters !== undefined ? decodeURIComponent(keptFilters).split(",").filter(Boolean) : REGISTER_FILTERS_DEFAULT;
+  const shownFilters = await keptFilters("register", ["state", "rev", "status", "verdict", "supplier", "po", "discipline", "docType", "date"]);
   const actionCodes = activities.filter((a) => a.needs > 0).sort((a, b) => a.code.localeCompare(b.code)).map((a) => ({ code: a.code, name: a.name }));
   const matchCount = register.total;
   const pages = Math.max(1, register.pages);

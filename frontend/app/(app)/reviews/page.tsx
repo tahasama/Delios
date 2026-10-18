@@ -1,4 +1,6 @@
 import { isReadOnly } from "@/lib/core/auth";
+import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
+import { setGrouping } from "@/lib/settings/in-sets";
 import { requireScope } from "@/lib/core/scope";
 import { dueState } from "@/lib/reviews/workflow";
 import { getSet } from "@/lib/settings/config";
@@ -231,8 +233,12 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     };
   });
 
+  // Every set's values under its name (owner), and the filters this person keeps shown.
+  const inSets = await setGrouping(ctx);
+  const shownFilters = await keptFilters("reviews", ["status", "kind", "verdict", "due", "discipline", "docType", "supplier", "po", "deliverable", "date"]);
   return (
     <ReviewsRegister
+      shownFilters={shownFilters}
       plate={<ReviewsPlate canStart={!isReadOnly(ctx.user)} />}
       rows={rows}
       total={matching}
@@ -240,12 +246,12 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
       filterOptions={{
         statuses: VIEWS.filter((v) => v.id !== "ALL").map((v) => ({ code: v.id, label: v.label })),
         kinds: KINDS,
-        verdicts: verdicts.map((one) => ({ code: one.code, label: `${one.code} — ${one.label}` })),
+        verdicts: inSets("REVIEW_OUTCOMES", verdicts, (one) => `${one.code} — ${one.label}`),
         dues: DUES,
-        disciplines: disciplines.filter((one) => usedDisciplines.has(one.code)).map((one) => ({ code: one.code, label: one.label })),
-        types: types.filter((one) => usedTypes.has(one.code)).map((one) => ({ code: one.code, label: one.label })),
+        disciplines: inSets("DISCIPLINES", disciplines.filter((one) => usedDisciplines.has(one.code)), (one) => one.label),
+        types: inSets("DOCUMENT_TYPES", types.filter((one) => usedTypes.has(one.code)), (one) => one.label),
         suppliers: suppliers.map((one) => ({ code: one.code, label: one.label })),
-        pos: pos.map((one) => ({ code: one.code, label: one.label })),
+        pos: inSets("PURCHASE_ORDERS", pos, (one) => one.label),
         deliverables: deliverables.map((one) => ({ code: one.code, label: one.label })),
         dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })),
       }}

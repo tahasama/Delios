@@ -7,6 +7,8 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, P
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { useCardHeight } from "@/components/card-height";
 import { DateWindow } from "@/components/date-window";
+import { FilterMenu } from "@/components/filter-menu";
+import { FilterOptions } from "@/components/filter-options";
 
 /**
  * The reviews register.
@@ -56,9 +58,25 @@ export type ReviewRow = {
   receivedFrom: string | null;
 };
 
-type Opt = { code: string; label: string };
+type Opt = { code: string; label: string; group?: string };
 
-export function ReviewsRegister({ plate, rows, total, filters, filterOptions, facets, paging, sort, exportHref }: {
+/** The filters a person may show or hide here (the Filters menu, `components/filter-menu.tsx`), in the order they stand. */
+const FILTERS = [
+  { key: "status", label: "Review state" },
+  { key: "kind", label: "Kind" },
+  { key: "verdict", label: "Verdict" },
+  { key: "due", label: "Due" },
+  { key: "discipline", label: "Discipline" },
+  { key: "docType", label: "Type" },
+  { key: "supplier", label: "Supplier" },
+  { key: "po", label: "Contract / PO" },
+  { key: "deliverable", label: "Produced by" },
+  { key: "date", label: "Dates" },
+];
+
+export function ReviewsRegister({ plate, rows, total, filters, filterOptions, facets, paging, sort, exportHref, shownFilters }: {
+  /** The filters this person keeps shown (Filters menu); one holding a value always shows. None kept: all. */
+  shownFilters?: string[];
   plate: React.ReactNode;
   rows: ReviewRow[];
   total: number;
@@ -69,6 +87,9 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
   sort?: { key: string; dir: "asc" | "desc" };
   exportHref: string;
 }) {
+  // Which filters show: the person's choice (Filters menu), and always one holding a value.
+  const held = (key: string) => key === "date" ? !!(filters.on && (filters.from || filters.to)) : !!(filters as unknown as Record<string, string>)[key];
+  const show = (key: string) => !shownFilters || shownFilters.includes(key) || held(key);
   const router = useRouter();
   // Every register is the height the schedule's plan set.
   const cardHeight = useCardHeight();
@@ -179,16 +200,17 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3 md:grid-cols-5">
-          <Narrow name="status" value={filters.status} empty="Review state" options={filterOptions.statuses} />
-          <Narrow name="kind" value={filters.kind} empty="Kind" options={filterOptions.kinds} />
-          <Narrow name="verdict" value={filters.verdict} empty="Verdict" options={verdicts} />
-          <Narrow name="due" value={filters.due} empty="Due" options={filterOptions.dues} />
-          <Narrow name="discipline" value={filters.discipline} empty="Discipline" options={filterOptions.disciplines} />
-          <Narrow name="docType" value={filters.docType} empty="Type" options={filterOptions.types} />
-          <Narrow name="supplier" value={filters.supplier} empty="Supplier" options={filterOptions.suppliers} />
-          <Narrow name="po" value={filters.po} empty="Contract / PO" options={filterOptions.pos} />
-          <Narrow name="deliverable" value={filters.deliverable} empty="Produced by" options={filterOptions.deliverables} />
-          <DateWindow fields={filterOptions.dateFields} on={filters.on} from={filters.from} to={filters.to} />
+          {show("status") ? <Narrow name="status" value={filters.status} empty="Review state" options={filterOptions.statuses} /> : null}
+          {show("kind") ? <Narrow name="kind" value={filters.kind} empty="Kind" options={filterOptions.kinds} /> : null}
+          {show("verdict") ? <Narrow name="verdict" value={filters.verdict} empty="Verdict" options={verdicts} /> : null}
+          {show("due") ? <Narrow name="due" value={filters.due} empty="Due" options={filterOptions.dues} /> : null}
+          {show("discipline") ? <Narrow name="discipline" value={filters.discipline} empty="Discipline" options={filterOptions.disciplines} /> : null}
+          {show("docType") ? <Narrow name="docType" value={filters.docType} empty="Type" options={filterOptions.types} /> : null}
+          {show("supplier") ? <Narrow name="supplier" value={filters.supplier} empty="Supplier" options={filterOptions.suppliers} /> : null}
+          {show("po") ? <Narrow name="po" value={filters.po} empty="Contract / PO" options={filterOptions.pos} /> : null}
+          {show("deliverable") ? <Narrow name="deliverable" value={filters.deliverable} empty="Produced by" options={filterOptions.deliverables} /> : null}
+          {show("date") ? <DateWindow fields={filterOptions.dateFields} on={filters.on} from={filters.from} to={filters.to} /> : null}
+          <FilterMenu page="reviews" shown={shownFilters ?? FILTERS.map((f) => f.key)} filters={FILTERS.map((f) => ({ ...f, held: held(f.key) }))} />
         </div>
       </form>
     </section>
@@ -362,7 +384,7 @@ function Narrow({ name, value, empty, options }: { name: string; value: string; 
       <span className="sr-only">{empty}</span>
       <select name={name} defaultValue={value} data-on={value ? "true" : "false"} className="plain w-full">
         <option value="">{empty}</option>
-        {options.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
+        <FilterOptions options={options} />
       </select>
     </label>
   );

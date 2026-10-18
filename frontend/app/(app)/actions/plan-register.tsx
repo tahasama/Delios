@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { DateWindow } from "@/components/date-window";
+import { FilterMenu } from "@/components/filter-menu";
+import { FilterOptions } from "@/components/filter-options";
 
 /**
  * The schedule, asked about once and answered two ways.
@@ -43,11 +45,24 @@ export type PlanTableRow = {
   happenedNote: string;
 };
 
-type Opt = { code: string; label: string };
+type Opt = { code: string; label: string; group?: string };
+
+/** The filters a person may show or hide here (the Filters menu, `components/filter-menu.tsx`), in the order they stand. */
+const FILTERS = [
+  { key: "code", label: "Action" },
+  { key: "state", label: "State" },
+  { key: "happened", label: "Went ahead?" },
+  { key: "discipline", label: "Discipline" },
+  { key: "docType", label: "Type" },
+  { key: "supplier", label: "Supplier" },
+  { key: "date", label: "Dates" },
+];
 
 export function PlanRegister({
-  plate, uploads, view, plan, cardHeight, more, rows, total, filters, filterOptions, facets, paging, sort, exportHref,
+  plate, uploads, view, plan, cardHeight, more, rows, total, filters, filterOptions, facets, paging, sort, exportHref, shownFilters,
 }: {
+  /** The filters this person keeps shown (Filters menu); one holding a value always shows. None kept: all. */
+  shownFilters?: string[];
   plate: React.ReactNode;
   /** Where the dates come from, the pages behind the schedule, and uploading by hand for whoever plans. */
   uploads: React.ReactNode;
@@ -84,6 +99,9 @@ export function PlanRegister({
   sort?: { key: string; dir: "asc" | "desc" };
   exportHref: string;
 }) {
+  // Which filters show: the person's choice (Filters menu), and always one holding a value.
+  const held = (key: string) => key === "date" ? !!(filters.on && (filters.from || filters.to)) : !!(filters as unknown as Record<string, string>)[key];
+  const show = (key: string) => !shownFilters || shownFilters.includes(key) || held(key);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
@@ -262,13 +280,14 @@ export function PlanRegister({
 
         {/* Every narrowing on one line at the width this page is read at. */}
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-4 lg:grid-cols-7">
-          <Narrow name="code" value={filters.code} empty="Action" options={filterOptions.codes} />
-          <Narrow name="state" value={filters.state} empty="State" options={filterOptions.states} />
-          <Narrow name="happened" value={filters.happened} empty="Went ahead?" options={filterOptions.happened} />
-          <Narrow name="discipline" value={filters.discipline} empty="Discipline" options={filterOptions.disciplines} />
-          <Narrow name="docType" value={filters.docType} empty="Type" options={filterOptions.types} />
-          <Narrow name="supplier" value={filters.supplier} empty="Supplier" options={filterOptions.suppliers} />
-          <DateWindow fields={filterOptions.dateFields} on={filters.on} from={filters.from} to={filters.to} />
+          {show("code") ? <Narrow name="code" value={filters.code} empty="Action" options={filterOptions.codes} /> : null}
+          {show("state") ? <Narrow name="state" value={filters.state} empty="State" options={filterOptions.states} /> : null}
+          {show("happened") ? <Narrow name="happened" value={filters.happened} empty="Went ahead?" options={filterOptions.happened} /> : null}
+          {show("discipline") ? <Narrow name="discipline" value={filters.discipline} empty="Discipline" options={filterOptions.disciplines} /> : null}
+          {show("docType") ? <Narrow name="docType" value={filters.docType} empty="Type" options={filterOptions.types} /> : null}
+          {show("supplier") ? <Narrow name="supplier" value={filters.supplier} empty="Supplier" options={filterOptions.suppliers} /> : null}
+          {show("date") ? <DateWindow fields={filterOptions.dateFields} on={filters.on} from={filters.from} to={filters.to} /> : null}
+          <FilterMenu page="schedule" shown={shownFilters ?? FILTERS.map((f) => f.key)} filters={FILTERS.map((f) => ({ ...f, held: held(f.key) }))} />
         </div>
       </form>
     </section>
@@ -632,7 +651,7 @@ function Narrow({ name, value, empty, options }: { name: string; value: string; 
         }}
       >
         <option value="">{empty}</option>
-        {options.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
+        <FilterOptions options={options} />
       </select>
     </label>
   );
