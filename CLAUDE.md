@@ -464,9 +464,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`/organization/settings/identity`) and What is kept (`/organization/settings/tracking`) among them; Defaults has the
   form beside an aside (start from a project, the app's own defaults, reset). People (`/organization/people`) and
   Organizations (with those whose projects we work on, and the links refused or ended) are each one list. On
-  Organizations a name opens its card under its line, in place (`?open=<id>`, `party-card.tsx`): joined, start, finish
-  (its projects' own dates), last active, and every project it worked on with us (role, contract, from when it joined
-  until its people's last act there, the project's dates); no people count on the list (owner: pointless). **People**
+  Organizations a name opens its card under its line, in place (`?open=<id>`, `party-card.tsx`). Its dates are per
+  project (owner), never summed: one line per project it worked on with us (role, contract, joined, last active, the
+  project's start → planned end, where it stands). Joined is the earliest of being put on the project and its people
+  first coming or acting there (backend `PartiesAsync`); no people count on the list (owner: pointless). **People**
   is everyone with an account here (owner): ours, accounts we made for other organizations, and those from their own
   DELIOS (segmented choice); each line: organization, projects with function, account since, last sign-in, and "May
   sign in", a switch acting at once (`setSignInAction`, `PUT /api/admin/users/{id}`; a linked account signs in at home).

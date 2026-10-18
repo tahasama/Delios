@@ -14,7 +14,7 @@ import { adminProjects, adminUsers, partiesWithAnswers } from "@/lib/settings/ap
 import { inviteOrganizationAction, endLinkAction, setPartyActiveAction } from "@/lib/organization/forms";
 import { Switch } from "@/components/switch";
 import { IDENTIFIER_KINDS, countryName } from "@/lib/organization/countries";
-import { cn, fmtDate, timeAgo } from "@/lib/core/utils";
+import { cn, fmtDate } from "@/lib/core/utils";
 import { organizationLinks, guestAccounts } from "@/lib/organization/api";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { TheirProjectsLinks } from "../their-projects";
@@ -112,7 +112,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
       <section className="register register-sheet register-sheet-open" aria-labelledby="orgs-head">
         {band("orgs-head", "Every organization", `${parties.length} · its code, name, identifier and how it works with us change once each`)}
         <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
-          head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Projects</Th><Th>Joined</Th><Th>Last active</Th><Th className="text-right">Active</Th><Th></Th></tr>}>
+          head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Projects</Th><Th className="text-right">Active</Th><Th></Th></tr>}>
           {parties.map((p) => {
             const c = p.changed;
             const open = sp.edit === p.id;
@@ -152,15 +152,6 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                       <span className="flex flex-wrap gap-1">{worked.map((w) => <code key={w.id} className="code-chip" title={w.name}>{w.code}</code>)}</span>
                     ) : <span className="text-slate-500">none yet</span>}
                   </Td>
-                  <Td className="text-xs whitespace-nowrap">
-                    {worked.length ? fmtDate(worked.reduce((a, b) => (a.joinedAt < b.joinedAt ? a : b)).joinedAt) : <span className="text-slate-500">—</span>}
-                  </Td>
-                  <Td className="text-xs whitespace-nowrap">
-                    {(() => {
-                      const last = worked.map((w) => w.lastSeenAt).filter((d): d is string => !!d).sort().pop();
-                      return last ? <span title={fmtDate(last)}>{timeAgo(last)}</span> : <span className="text-slate-500">—</span>;
-                    })()}
-                  </Td>
                   <Td className="w-px whitespace-nowrap text-right">
                     {p.isInternal ? <span className="text-[11px] text-slate-500">us</span> : (
                       <form action={setPartyActiveAction} className="inline-flex">
@@ -179,15 +170,15 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                 {shown ? (
                   // Its card, open under its line: since when we work with it, and every project it worked on with us.
                   <tr>
-                    <td colSpan={7} className="border-b border-line bg-tint-soft p-0">
-                      <PartyCard worked={worked} linkedAt={p.linkedAt ?? null} kind={p.isInternal ? null : kindLabel(p.kind)} roleLabel={roleLabel} ours={p.isInternal} />
+                    <td colSpan={5} className="border-b border-line bg-tint-soft p-0">
+                      <PartyCard worked={worked} linkedAt={p.linkedAt ?? null} roleLabel={roleLabel} />
                     </td>
                   </tr>
                 ) : null}
                 {open ? (
                   // The line goes on as the form: grey fields, then the strip with Cancel and Save.
                   <tr>
-                    <td colSpan={7} className="border-b border-line p-0">
+                    <td colSpan={5} className="border-b border-line p-0">
                       {c?.theirs ? (
                         // Its own DELIOS: its details are its own; we see them, and switch it off for us if need be.
                         <ActionForm id={`party-form-${p.id}`} action={savePartyAction} hideSubmit
