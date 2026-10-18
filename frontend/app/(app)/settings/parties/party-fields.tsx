@@ -28,7 +28,8 @@ export function PartyKindFields({ kind, contactId, backupId, carriedBy, people, 
   /** The person of ours who works for it; empty: the control function. */
   carriedBy: string;
   /** Whether its people sign in here, and how many: "In use" is asked on an organization already there. */
-  access?: { active: boolean; signingIn: number };
+  /** Active or suspended; `onTheLine`: its switch is on the organization's line, so the form only keeps it as it is. */
+  access?: { active: boolean; signingIn: number; onTheLine?: boolean };
   /** Its own people, if any hold an account here. */
   people: { id: string; name: string; email?: string | null }[];
   /** Our people, to choose who works for it. */
@@ -84,11 +85,11 @@ export function PartyKindFields({ kind, contactId, backupId, carriedBy, people, 
         </p>
       )}
 
-      {access ? (
+      {access?.onTheLine ? <input type="hidden" name="active" value={access.active ? "on" : "off"} /> : access ? (
         <label className="flex w-fit cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700 sm:col-span-2">
           <SwitchControl name="active" defaultChecked={access.active} />
           <span>
-            In use <span className="font-normal text-slate-500">— switched off: no longer offered for new documents, transmittals or routes
+            Active <span className="font-normal text-slate-500">— switched off, it is suspended: no longer offered for new documents, transmittals or routes
             {access.signingIn ? `, and its ${access.signingIn} ${access.signingIn === 1 ? "person" : "people"} can no longer sign in` : ""}. Everything already done under it stays.</span>
           </span>
         </label>

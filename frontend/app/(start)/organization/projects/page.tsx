@@ -22,9 +22,9 @@ export const metadata = { title: "Projects" };
 
 /** Where a project stands: active, suspended (on hold) or archived, each said once. */
 const STANDS = [
-  { code: "ACTIVE", label: "Active", tone: "done", said: "Activated", means: "Its people work on it as usual." },
-  { code: "ON_HOLD", label: "Suspended", tone: "waiting", said: "Suspended", means: "Nobody opens it until it is activated again; its documents stay as they are." },
-  { code: "ARCHIVED", label: "Archived", tone: "idle", said: "Archived", means: "Put away with its documents; it leaves the picker. Nothing is deleted." },
+  { code: "ACTIVE", label: "Active", act: "Activate", tone: "done", said: "Activated", means: "Its people work on it as usual." },
+  { code: "ON_HOLD", label: "Suspended", act: "Suspend", tone: "waiting", said: "Suspended", means: "Nobody opens it until it is activated again; its documents stay as they are." },
+  { code: "ARCHIVED", label: "Archived", act: "Archive", tone: "idle", said: "Archived", means: "Put away with its documents; it leaves the picker. Nothing is deleted." },
 ] as const;
 
 /** A field as on the new-document form: grey, no box, inside the sheet's `asking` body. */
@@ -39,7 +39,7 @@ type Info = { kind?: string; startDate?: string; endDate?: string | null; scopeS
  * project" as one sheet, which starts from the organization's defaults. The organization's, never a project's Settings
  * (which keeps only the project it is in). Administrators only.
  */
-export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ edit?: string; new?: string }> }) {
+export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ edit?: string; new?: string; to?: string; p?: string }> }) {
   const scope = await requireOrgAdmin();
   const sp = await searchParams;
   const joined = await joinedProjects();
@@ -176,12 +176,13 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       <section className="register register-sheet register-sheet-open" aria-labelledby="list-head">
         {band("Every project", `${projects.length} · type, dates and scope are each project's own`)}
         <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
-          head={<tr><Th>Project</Th><Th>Type</Th><Th>Our role</Th><Th>People</Th><Th>Documents</Th><Th>Start → planned end</Th><Th>Status</Th><Th></Th></tr>}>
+          head={<tr><Th>Project</Th><Th>Type</Th><Th>Our role</Th><Th>People</Th><Th>Documents</Th><Th>Start → planned end</Th><Th>Where it stands</Th><Th></Th></tr>}>
           {projects.map((p) => {
             const here = onIt(p.id);
             const active = p.status === "ACTIVE";
             const stands = STANDS.find((one) => one.code === p.status) ?? STANDS[0];
             const isOpen = editing === p.id;
+            const changing = sp.p === p.id ? STANDS.find((one) => one.code === sp.to && one.code !== p.status) ?? null : null;
             const lineHref = (edit?: string) => `/organization/projects${edit ? `?edit=${edit}` : ""}#project-${p.id}`;
             const title = <><code className="code-chip mr-1.5">{p.code}</code><span className="font-medium">{p.name}</span></>;
             return (
@@ -210,7 +211,14 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                   <Td className="text-xs whitespace-nowrap">
                     {fmtDate(p.startDate)} <span className="text-slate-400">→</span> {p.endDate ? fmtDate(p.endDate) : <span className="text-slate-500">not set</span>}
                   </Td>
-                  <Td><ToneChip tone={stands.tone}>{stands.label}</ToneChip></Td>
+                  <Td className="w-px whitespace-nowrap">
+                    {/* Where it stands, changed right here: choosing another asks only why, under the line. */}
+                    <nav aria-label={`Where ${p.code} stands`} className="seg w-fit">
+                      {STANDS.map((one) => one.code === p.status
+                        ? <span key={one.code} aria-current="page" className="segment">{one.label}</span>
+                        : <Link key={one.code} href={`/organization/projects?p=${p.id}&to=${one.code}#project-${p.id}`} scroll={false} className="segment">{one.label}</Link>)}
+                    </nav>
+                  </Td>
                   <Td className="w-px whitespace-nowrap text-right">
                     {isOpen ? (
                       <Link href={lineHref()} scroll={false} className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Close">
@@ -223,6 +231,27 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                     )}
                   </Td>
                 </tr>
+                {changing ? (
+                  // Another state chosen on the line: only why is asked, under it, then it is done.
+                  <tr>
+                    <td colSpan={8} className="border-b border-line bg-tint-soft p-0">
+                      <ActionForm action={setProjectStatusAction} hideSubmit hidden={{ projectId: p.id, status: changing.code }}
+                        className="asking flex flex-wrap items-end gap-x-6 gap-y-3 px-5 py-4 sm:px-6">
+                        <div className="min-w-0 max-w-sm">
+                          <p className="text-[13px] font-semibold text-slate-900">{changing.act} {p.code}</p>
+                          <p className="mt-0.5 text-xs leading-5 text-slate-600">{changing.means}</p>
+                        </div>
+                        <Field label="Why" required hint="kept on the project's line and in the audit trail" className="min-w-64 flex-1">
+                          <input name="reason" required autoFocus className={field} />
+                        </Field>
+                        <div className="flex items-center gap-3">
+                          <Link href={`/organization/projects#project-${p.id}`} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                          <button type="submit" data-on="true" className="ask">{changing.act}</button>
+                        </div>
+                      </ActionForm>
+                    </td>
+                  </tr>
+                ) : null}
                 {isOpen ? (
                   // The project's line opened under it: the row itself goes on, the new-document form's way.
                   <tr>
@@ -231,33 +260,6 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                         className="asking space-y-5 px-5 py-5 sm:px-6">
                         <ProjectFields p={{ ...p, scopeStatement: p.info.scopeStatement, description: p.info.description ?? undefined }} roles={roleOptions} kinds={kinds.offered} />
                       </ActionForm>
-                      <details className="border-t border-line px-5 py-3 sm:px-6">
-                        <summary className="w-fit cursor-pointer list-none text-xs font-semibold text-slate-500 hover:text-slate-800 [&::-webkit-details-marker]:hidden">
-                          Activate, suspend or archive {p.code}
-                        </summary>
-                        <ActionForm action={setProjectStatusAction} hideSubmit hidden={{ projectId: p.id }} className="asking mt-3 space-y-3">
-                          <dl className="grid grid-cols-1 gap-2 text-xs leading-5 sm:grid-cols-3">
-                            {STANDS.map((one) => (
-                              <div key={one.code}>
-                                <dt className="font-semibold text-slate-700">{one.label}{one.code === p.status ? " (now)" : ""}</dt>
-                                <dd className="text-slate-500">{one.means}</dd>
-                              </div>
-                            ))}
-                          </dl>
-                          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-[14rem_minmax(0,1fr)]">
-                            <Field label="It becomes" required>
-                              <select name="status" required defaultValue="" className={field}>
-                                <option value="" disabled>Choose…</option>
-                                {STANDS.filter((one) => one.code !== p.status).map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
-                              </select>
-                            </Field>
-                            <Field label="Why" required hint="kept on the project's line and in the audit trail">
-                              <input name="reason" required className={field} />
-                            </Field>
-                          </div>
-                          <button type="submit" className="ask">Change it</button>
-                        </ActionForm>
-                      </details>
                       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
                         <Link href={lineHref()} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
                         <button type="submit" form={`project-form-${p.id}`} data-on="true" className="ask">Save</button>

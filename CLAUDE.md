@@ -472,14 +472,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   sign in", a switch acting at once (`setSignInAction`, `PUT /api/admin/users/{id}`; a linked account signs in at home).
   Its name opens its card in place: every project with function, department and since when (confirmed, else first put
   on it; backend `DirectoryEndpoints.SeenAsync`); the card shows no sign-ins or acts (owner: we are not monitoring
-  people), the list keeps "Last sign-in". **The organization's level controls everything** (owner): each person's pencil
-  opens their line as the form (`savePersonEverywhereAction`): name and email (a linked account's are its own
-  organization's), may sign in, administrator (ours), and on every project their function, department and whether they
-  stay on it, plus another project to put them on; a project's People & access does the same for that project only. Lines keep their order when switched (by name, never by state). No "other
-  organizations' projects" on People. An organization is suspended by its "In use" switch on its line
-  (`setPartyActiveAction`; its people's sessions stop). No eyebrow above a plate's title; the Projects plate has its two
+  people), the list keeps "Last sign-in". **The organization's level controls everything** (owner): a person's name opens
+  them under their line as one panel ready to change, never a form behind a card (`savePersonEverywhereAction`): name
+  and email (a linked account's are its own organization's), administrator (ours), and on every project their function,
+  department and whether they stay on it, plus another project to put them on; "Can sign in" is the switch on the line
+  only. A project's People & access does the same for that project only. Lines keep their order when switched (by name, never by state). No "other
+  organizations' projects" on People. An organization is suspended by its "Active" switch on its line,
+  the one place it is switched on the organization's list (`setPartyActiveAction`; its people's sessions stop); one
+  switch, one label, everywhere ("Active", also on a project's Settings → Organizations). No eyebrow above a plate's title; the Projects plate has its two
   acts and four figures (open, suspended, archived, people). A project is **Active**, **Suspended** (`ON_HOLD`: nobody
-  opens it until activated; its documents stay) or **Archived**, changed in its opened line, always with why; its
+  opens it until activated; its documents stay) or **Archived**, chosen right on its line (Where it stands, Active · Suspended · Archived), then only why is asked under the line; its
   dates read "start → planned end".
 - The organization's page (`/organization`, administrators): projects ours and joined, people, organizations
   we work with, invitations (also on Home), defaults for new projects. Its projects, people and organizations

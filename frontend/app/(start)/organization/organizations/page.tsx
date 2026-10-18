@@ -1,5 +1,4 @@
 import { Fragment } from "react";
-import { SwitchControl } from "@/components/switch";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Pencil, X } from "lucide-react";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
@@ -83,19 +82,29 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
 
   return (
     <>
-      {/* The plate: who we work with. */}
-      <section className="register register-sheet register-sheet-open">
+      {/* The plate: who we work with, in the same shape as Projects and People. */}
+      <header className="register register-sheet register-sheet-open">
         <div className="px-5 pt-5 pb-4 sm:px-6">
-          <h1 className="plate-title text-slate-950">Organizations we work with</h1>
-          <p className="plate-meta mt-2">
-            {count("COLLABORATOR")} with their own DELIOS · {count("GUEST")} with accounts from us · {count("OFFLINE")} worked for by one of ours
-          </p>
-          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-            The organization&rsquo;s list, shared by every project; each project says which of them work on it. One with its own
-            DELIOS keeps its own code, name and details: we see them, and link with it.
+          <h1 className="plate-title text-slate-950">Organizations</h1>
+          <p className="plate-meta mt-1.5 max-w-xl font-normal">
+            Shared by every project; each project says which of them work on it. One with its own DELIOS keeps its own details.
           </p>
         </div>
-      </section>
+        <dl className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
+          {[
+            { term: "Their own DELIOS", value: count("COLLABORATOR"), said: "linked; they keep their details" },
+            { term: "Accounts from us", value: count("GUEST"), said: "we made their people's accounts" },
+            { term: "Worked for by us", value: count("OFFLINE"), said: "one of ours records for them" },
+            { term: "Suspended", value: parties.filter((p) => !p.isInternal && !p.active).length, said: "their people cannot sign in" },
+          ].map((f) => (
+            <div key={f.term} className="bg-surface px-5 py-3 sm:px-6">
+              <dt className="stencil text-slate-500">{f.term}</dt>
+              <dd className="mt-1 text-[13px] font-medium tabular-nums text-slate-900">{f.value}</dd>
+              <dd className="text-[11px] text-slate-500">{f.said}</dd>
+            </div>
+          ))}
+        </dl>
+      </header>
 
       <OrganizationJoins ours={ours} control={control} own={policy.own} projects={projects} />
 
@@ -103,7 +112,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
       <section className="register register-sheet register-sheet-open" aria-labelledby="orgs-head">
         {band("orgs-head", "Every organization", `${parties.length} · its code, name, identifier and how it works with us change once each`)}
         <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
-          head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Projects</Th><Th>Joined</Th><Th>Last active</Th><Th className="text-right">In use</Th><Th></Th></tr>}>
+          head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Projects</Th><Th>Joined</Th><Th>Last active</Th><Th className="text-right">Active</Th><Th></Th></tr>}>
           {parties.map((p) => {
             const c = p.changed;
             const open = sp.edit === p.id;
@@ -157,7 +166,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                       <form action={setPartyActiveAction} className="inline-flex">
                         <input type="hidden" name="partyId" value={p.id} />
                         <input type="hidden" name="active" value={p.active ? "off" : "on"} />
-                        <Switch on={p.active} label={p.active ? `Suspend ${p.name}: its people no longer sign in` : `Put ${p.name} back in use`} />
+                        <Switch on={p.active} label={p.active ? `${p.name} is active: switch off to suspend it` : `${p.name} is suspended: switch on to make it active`} />
                       </form>
                     )}
                   </Td>
@@ -190,10 +199,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                             <dt className="text-xs font-semibold text-slate-500">Email domain</dt><dd>{c.domain ?? "—"}{c.domainConfirmed ? " (proven)" : ""}</dd>
                           </dl>
                           <p className="text-xs leading-5 text-slate-600">{p.name} has its own DELIOS: only {p.name} changes these. We see them, and link with it.</p>
-                          <label className="flex w-fit cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-700">
-                            <SwitchControl name="active" defaultChecked={p.active} />
-                            <span>In use <span className="font-normal text-slate-500">— switch off to stop working with them: their people here no longer sign in; everything done stays</span></span>
-                          </label>
+                          <input type="hidden" name="active" value={p.active ? "on" : "off"} />
                         </ActionForm>
                       ) : (
                       <ActionForm id={`party-form-${p.id}`} action={savePartyAction} hideSubmit hidden={{ id: p.id }} className="asking space-y-5 px-5 py-5 sm:px-6">
@@ -222,7 +228,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                           {p.isInternal ? <input type="hidden" name="active" value="on" /> : (
                             <PartyKindFields kind={p.kind} contactId={p.contactId ?? ""} backupId={p.backupId ?? ""} carriedBy={p.carriedByUserId ?? ""}
                               contactEmail={p.contactEmail ?? ""} people={[]} ours={ours} control={control} askContact={false}
-                              access={{ active: p.active, signingIn: signingIn(p.id) }}
+                              access={{ active: p.active, signingIn: signingIn(p.id), onTheLine: true }}
                               fixed={c?.participation ? `changed once, by ${c.participation.by}, ${fmtDate(c.participation.at)}: fixed now` : undefined} />
                           )}
                         </div>
@@ -275,7 +281,8 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                       ) : null}
                       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
                         <Link href={href({}, `party-${p.id}`)} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
-                        <button type="submit" form={`party-form-${p.id}`} data-on="true" className="ask">Save</button>
+                        {c?.theirs ? <span className="text-[11px] text-slate-500">Nothing here is ours to change; Active is on its line.</span>
+                          : <button type="submit" form={`party-form-${p.id}`} data-on="true" className="ask">Save</button>}
                       </div>
                     </td>
                   </tr>
