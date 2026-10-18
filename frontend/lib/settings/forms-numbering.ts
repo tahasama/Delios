@@ -49,16 +49,26 @@ export async function saveNumberingSchemeAction(_prev: Result | undefined, formD
     if (rules.filter((rule) => rule.startsWith("COUNTER:")).length !== 1) return { error: "A scheme has exactly one running number, so no two numbers are the same." };
   }
   const fields = reshape ? labels.map((label, index) => backendField(label, setKeys[index] ?? "", rules[index] ?? "")) : undefined;
+  // What it numbers from now on, ticked on the form: each moves to it (numbers already given keep theirs).
+  const numbers = formData.getAll("numbers").map((value) => String(value).trim()).filter(Boolean);
   try {
     const path = await base(level);
     const body = { name, notes, ...(reshape ? { delimiter, fields } : {}) };
     if (id) await api(`${path}/schemes/${id}`, { method: "PUT", body });
     else await api(`${path}/schemes`, { body });
+    if (numbers.length) {
+      // Found again by its name: on a project, the first change may have made the project's own copy under new ids.
+      const scheme = (await numberingForEditor(level)).schemes.find((one) => one.name === name);
+      if (!scheme) return { error: `${name} was saved, but could not be found to number what was ticked: choose it under What is numbered.` };
+      for (const code of numbers) {
+        await api(`${path}/routing`, { method: "PUT", body: { deliverableType: RECORD_KIND[code] ?? code, schemeId: scheme.id } });
+      }
+    }
   } catch (e) {
     return failed(e);
   }
   revalidate();
-  return { ok: `${name} saved.` };
+  return { ok: numbers.length ? `${name} saved; it numbers what was ticked from now on.` : `${name} saved.` };
 }
 
 /** Which scheme numbers one deliverable type or record kind, and whether it is numbered at all. */

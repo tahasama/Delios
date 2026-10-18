@@ -42,7 +42,7 @@ function Send({ label }: { label: string }) {
   return <button type="submit" disabled={pending} className={btn("primary", "sm")}>{pending ? "Working…" : label}</button>;
 }
 
-export function NumberingSchemeBuilder({ level, id, initialName = "", initialDelimiter = "-", initialNotes = "", initialFields, sets, fixedParts, cancelHref }: {
+export function NumberingSchemeBuilder({ level, id, initialName = "", initialDelimiter = "-", initialNotes = "", initialFields, sets, fixedParts, cancelHref, targets = [], retired }: {
   level: "organization" | "project";
   id?: string;
   initialName?: string;
@@ -53,6 +53,10 @@ export function NumberingSchemeBuilder({ level, id, initialName = "", initialDel
   fixedParts?: boolean;
   /** Where Cancel leads: the page as it was, nothing opened. */
   cancelHref: string;
+  /** Everything that can be numbered, with the scheme numbering it now (by name), to tick what this one numbers. */
+  targets?: { code: string; label: string; now: string | null }[];
+  /** A retired scheme numbers nothing: nothing is offered to it. */
+  retired?: boolean;
 }) {
   const [fields, setFields] = useState<NumberField[]>(initialFields?.length ? initialFields : [
     { label: "Project code", valueSetKey: "PROJECT_CODES", rule: "" },
@@ -127,6 +131,26 @@ export function NumberingSchemeBuilder({ level, id, initialName = "", initialDel
         </div>;
       })}</div>
     </div>
+    {targets.length && !retired ? (
+      <fieldset>
+        <legend className="mb-2 text-xs font-semibold text-slate-700">
+          What it numbers<span className="ml-2 font-normal text-slate-500">· tick to number it by this scheme from now on; numbers already given stay as they are</span>
+        </legend>
+        <div className="flex flex-wrap gap-2">
+          {targets.map((one) => {
+            const mine = !!id && one.now === initialName;
+            return (
+              <label key={one.code} title={mine ? "To number it differently, choose another scheme for it under What is numbered." : undefined}
+                className="flex cursor-pointer items-center gap-2 rounded-md bg-tint-soft px-2.5 py-1.5 text-xs text-slate-700 ring-1 ring-line has-checked:bg-emerald-50 has-checked:ring-emerald-300 has-disabled:cursor-default">
+                <input type="checkbox" name={mine ? undefined : "numbers"} value={one.code} defaultChecked={mine} disabled={mine} className="accent-emerald-700" />
+                <span className="font-semibold">{one.label}</span>
+                <span className="text-[11px] text-slate-500">{mine ? "numbered by it" : one.now ? `now ${one.now}` : "no scheme yet"}</span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+    ) : null}
     <div className="flex items-center justify-end gap-3 border-t border-line pt-3">
       <Link href={cancelHref} className="text-xs font-semibold text-slate-500 hover:text-slate-800 hover:underline">Cancel</Link>
       <Send label={id ? "Save" : "Add the scheme"} />

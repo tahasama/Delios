@@ -85,6 +85,7 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
   ];
   const rows = kinds.map((kind) => ({ ...kind, route: routing.find((r) => r.deliverableType === kind.code) ?? null }));
   const options = schemes.filter((s) => s.active);
+  const targets = rows.map((r) => ({ code: r.code, label: r.label, now: r.route?.status === "ACTIVE" ? r.route.schemeName : null }));
   const nameOf = (code: string) => kinds.find((k) => k.code === code)?.label ?? code;
   const toBuilder = (s: BoardScheme) => s.fields.map((f) => ({ label: f.label, valueSetKey: f.valueSetKey ?? "", rule: f.rule ?? "" }));
 
@@ -148,7 +149,7 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
         </div>
         {editable && adding ? (
           <div id="new-scheme" className="border-b border-line">
-            <NumberingSchemeBuilder level={level} sets={lists} cancelHref={here} />
+            <NumberingSchemeBuilder level={level} sets={lists} cancelHref={here} targets={targets} />
           </div>
         ) : null}
         <ul className="divide-y divide-line">
@@ -158,7 +159,7 @@ export function NumberingBoard({ level, editable, schemes, routing, deliverables
               return (
                 <li key={s.id} id={`scheme-${s.id}`}>
                   <NumberingSchemeBuilder level={level} id={s.id} initialName={s.name} initialDelimiter={s.delimiter} initialNotes={s.notes ?? ""}
-                    initialFields={toBuilder(s)} sets={lists} fixedParts={s.used} cancelHref={here} />
+                    initialFields={toBuilder(s)} sets={lists} fixedParts={s.used} cancelHref={here} targets={targets} retired={!s.active} />
                   <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3 sm:px-6">
                     <span className="mr-auto text-[11.5px] text-slate-500">{s.used
                       ? s.active
