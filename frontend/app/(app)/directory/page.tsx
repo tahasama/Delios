@@ -147,7 +147,7 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
             </DataTable>
             {directory.mayNameControl ? (
               <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
-                Who acts as the control function is named in the <Link href="/settings/flow#control-people" className="font-semibold text-link hover:underline">Control room</Link>.
+                Who acts as the control function is named in the <Link href="/settings/control#control-people" className="font-semibold text-link hover:underline">Control room</Link>.
               </p>
             ) : null}
           </section>

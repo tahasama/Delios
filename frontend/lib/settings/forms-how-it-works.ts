@@ -113,6 +113,9 @@ export async function setControlActivitiesAction(_prev: State | undefined, formD
     }
   }
 
+  // An act that may be left out says so with its own answer, kept whichever way the acts are carried out: who would
+  // carry it out stays as it was, for the day it is used again.
+  for (const key of Object.keys(SKIPPABLE)) if (formData.has(`skipping:${key}`)) wanted.push([SKIP_KEY(key), formData.get(`use:${key}`) === "on" ? "ON" : "OFF"]);
   // The confirmation by whoever holds Manage is its own answer, kept whichever way the acts are carried out.
   for (const key of Object.keys(CONFIRMABLE)) wanted.push([CONFIRM_KEY(key), formData.get(`confirm:${key}`) === "on" ? "ON" : "OFF"]);
   let changed: number;
@@ -197,40 +200,6 @@ export async function resetProjectToDefaultsAction(_prev: State | undefined, _fo
   revalidateHowItWorks();
   if (!changed) return { ok: "Nothing changed: the project already works as the defaults say." };
   return { ok: defaults ? "Back on the organization's defaults." : "Back on the app's own defaults: the organization has set none." };
-}
-
-/** One act, changed on its own while the project is on "it depends". */
-export async function setOneControlActivityAction(_prev: State | undefined, formData: FormData): Promise<State> {
-  const key = String(formData.get("key") ?? "");
-  const value = String(formData.get("mode") ?? "") as ControlMode | "OFF";
-  const activity = CONTROL_ACTIVITIES.find((one) => one.key === key);
-  if (!activity) return { error: "That is not one of the acts." };
-  // Left out altogether: who would carry it out stays as it was, for the day
-  // it is turned back on.
-  if (value === "OFF") {
-    if (!SKIPPABLE[key]) return { error: `${activity.title} cannot be left out.` };
-    const changed = await put(SKIP_KEY(key), "OFF", `${activity.title} — left out`);
-    revalidatePath("/settings/control");
-    revalidatePath("/settings/flow");
-    return { ok: changed ? `${activity.title}: left out.` : "Nothing changed." };
-  }
-  if (!ACT_MODES.includes(value)) return { error: "Choose who carries it out." };
-  // Choosing a side for an act that was left out brings it back in use.
-  const wasOff = (await actIsOff(await requireAdminScope(), key)) && (await put(SKIP_KEY(key), "ON", `${activity.title} — back in use`));
-  // Moving the project to "it depends" must not move any other act: each one
-  // is written down as it stands now before this one changes.
-  const now = await controlSettings(await requireAdminScope());
-  if (!now.set || now.projectMode !== "CUSTOM") {
-    for (const row of now.rows) {
-      if (row.activity.key === key) continue;
-      await put(row.activity.key, row.controlDoes ? "CONTROL" : "SELF", row.activity.title);
-    }
-  }
-  await put(PROJECT_KEY, "CUSTOM", "Who carries out the acts of document control");
-  const changed = (await put(key, value, activity.title)) || wasOff;
-  revalidatePath("/settings/control");
-  revalidatePath("/settings/flow");
-  return { ok: changed ? `${activity.title}: ${MODE_LABEL[value].toLowerCase()}.` : "Nothing changed." };
 }
 
 /**

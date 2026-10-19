@@ -12,14 +12,13 @@ const sheetHead = "flex flex-wrap items-center gap-1.5 border-b border-line bg-t
 const footer = "border-t border-line px-5 py-3 sm:px-6";
 
 /**
- * What the project has settled that is not decided on a step of the flow: who carries out the acts drawn on no step,
- * the days around an action, the organization's words for the states, and the way back to the defaults. Whoever may
- * not change it reads the answers in words; the forms only they would use (state names, reset) are left out.
+ * What the project has settled: who carries out each act, what releasing and the rest mean here, the days around an
+ * action, the organization's words for the states, and the way back to the defaults. Whoever may not change it reads
+ * the answers in words; the forms only they would use (state names, reset) are left out.
  */
-export function ProjectSettings({ source, follows, placed, names, defaults, schedule, riskFixed, admin, readOnly }: {
+export function ProjectSettings({ source, follows, names, defaults, schedule, riskFixed, admin, readOnly }: {
   source: AnswerSource;
   follows: boolean;
-  placed: { acts: Record<string, { title: string; href: string }>; policies: string[] };
   names: StateNames;
   defaults: { at: string; by: string } | null;
   schedule: { defaultLeadDays: number | null; riskWindowDays: number | null } | null;
@@ -32,7 +31,7 @@ export function ProjectSettings({ source, follows, placed, names, defaults, sche
   return (
     <div className="space-y-4">
       <div id="how-it-works" className="scroll-mt-24">
-        <HowItWorks {...source} follows={follows} placed={placed} readOnly={readOnly} />
+        <HowItWorks {...source} follows={follows} readOnly={readOnly} />
       </div>
 
       {/* The days around an action: needed before its day, at risk from. Kept with the project's schedule. */}
@@ -139,7 +138,7 @@ export function ProjectSettings({ source, follows, placed, names, defaults, sche
             className="space-y-3 px-5 py-4 sm:px-6"
           >
             <p className="text-xs leading-5 text-slate-600">
-              Every answer marked &ldquo;changed here&rdquo;, on the steps and below, goes back to {defaults ? "the organization's default" : "the app's own"}.
+              Every answer marked &ldquo;changed here&rdquo; on this page goes back to {defaults ? "the organization's default" : "the app's own"}.
               What the project is, and checks switched off on it, stay as they are. The record says who did it.
             </p>
           </ActionForm>

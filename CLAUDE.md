@@ -743,15 +743,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   what, releasing, adding people), opening on "Open the Control room". Everyone of ours reads it (`read: true`, "See
   how it works"); an administrator or the control function changes it (`mayChangeControlRoom`; read only otherwise:
   switches shown, nothing chosen). Every page below is what it is built from.
-  **One place per choice** (critique round): what a step of the flow decides is changed on that step only: who carries
-  its acts (`ActSwitch`, asked first) and its questions (`StepChoice`, "Change" opening the answers in place: what
-  may be put on a review and how fine the matrix is cut on Review; releasing, stamping with its stamps, and when an
-  action has what it needs on Released & issued / Release / Issue). Below the flow, "Who carries the acts out" keeps
-  the three-way answer and the acts drawn on no step (adding to an action, adding people, with their confirmation);
-  an act on a step is named there with "Change on its step", carried as it stands when saved. Not answered yet, the
-  project reads "it depends on the act" when its acts differ (`controlFrom`), and every act shows what really applies.
-  A step lists its lists one line each (name, how many in use, "not set up yet"), opening in Types & sets. Readers
-  get every answer in words: no greyed forms, no state names or reset.
+  **The Control room is where everything is found, never changed** (owner: "the go-to where I find everything rather
+  than going card by card"). Six flows, one segmented choice: documents we produce, we receive, a supplier owes us,
+  packages we deliver, an action on the schedule, someone joins the project. A step's card says in one line each who
+  does what (the project's answer or the fixed one) and what the project chose, each answer a link to where it is
+  changed, and "Set up in" (its lists with how many in use, numbering, routes…). Under the flows, "Everything that
+  makes <project> work": every answer today, grouped (Who, Documents, Review & release, Schedule), each opening its
+  card; a figure only its keepers may read is left out, never shown as 0. No form on the Control room.
+  **How this project works** (`/settings/control`, a Settings card, read by everyone of ours): every answer the
+  Control room used to hold as forms (who acts as the control function, who carries out each act with "Used on this
+  project" for an act that may be left out, what releasing / stamping / the matrix mean, escalation, the days around
+  an action, the states' names, back to the defaults); the acts form asks first before saving. Wherever these rules
+  say "Control room" for an answer, it is changed there.
 - **A person's activity** (owner): in People & access, a name opens `/settings/users/<id>`: who they are, then everything
   they did in the app with its day and time (signed in, opened a document, downloaded, reviewed, released, sent…), read
   from the audit trail (`GET /api/admin/users/{id}/activity`, narrowed by act and project, 50 a page). Opening a

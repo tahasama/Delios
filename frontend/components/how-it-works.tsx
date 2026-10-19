@@ -9,6 +9,8 @@ import {
   MODE_LABEL,
   CONFIRMABLE,
   CONFIRM_KEY,
+  SKIPPABLE,
+  SKIP_KEY,
   PEOPLE_KEY,
   PEOPLE_MODE_LABEL,
   PROJECT_KEY,
@@ -145,8 +147,7 @@ export function policySaid(answers: Map<string, string>, policyKey: string): str
  * Who carries out each act, and how the project works: one form for a project (Settings → Control room) and for the
  * organization's defaults for new projects (the organization's page). An answer changed from the defaults is marked.
  *
- * On a project, an act or a question drawn on a step of the flow is changed on that step only (`placed`): here it is
- * named, with where it is changed, and its answer is carried as it stands. Read only, every answer is plain words.
+ * Read only, every answer is plain words.
  */
 export function HowItWorks({
   target,
@@ -154,13 +155,10 @@ export function HowItWorks({
   follows,
   base,
   fixed = [],
-  placed,
   readOnly = false,
 }: AnswerSource & {
   /** The project has a control function. For the defaults, read as a project that has one. */
   follows: boolean;
-  /** On a project: the acts changed on a step (act → the step's title and link), and the questions changed there. */
-  placed?: { acts: Record<string, { title: string; href: string }>; policies: string[] };
   /** Whoever may not change it reads every answer in words. */
   readOnly?: boolean;
 }) {
@@ -168,9 +166,8 @@ export function HowItWorks({
   const { projectMode, set, rows } = controlFrom(answers, follows);
   const defaults = target === "defaults";
   const hidden = { target };
-  const onStep = placed?.acts ?? {};
-  const policiesHere = POLICIES.filter((one) => !placed?.policies.includes(one.key));
-  const stampsHere = !placed?.policies.includes("POLICY_PDF_STAMP");
+  const policiesHere = POLICIES;
+  const stampsHere = true;
   const escalateAfter = answers.get(ESCALATE_AFTER_KEY) ?? String(DEFAULT_ESCALATE_AFTER);
   const whoFixed = isFixedAnswer(source, "WHO_DOES_WHAT");
 
@@ -200,7 +197,7 @@ export function HowItWorks({
     <div className={sheetHead}>
       <h2 className="stencil mr-1 text-slate-500">How {defaults ? "a project" : "this project"} works</h2>
       <span className="text-[11px] text-slate-500">
-        {placed ? "what is not decided on a step" : "what it means when people act; the app recommends the first answer"}
+        what it means when people act; the app recommends the first answer
         {readOnly ? "" : ` · ${unmarked(source)}`}
       </span>
     </div>
@@ -210,7 +207,7 @@ export function HowItWorks({
   if (readOnly) {
     return (
       <div className="space-y-4">
-        <section className="register register-sheet register-sheet-open">
+        <section id="who-does-what" className="register register-sheet register-sheet-open scroll-mt-24">
           {whoHead}
           <p className="px-5 pt-3 text-[13px] font-medium text-slate-900 sm:px-6">{PROJECT_MODE_LABEL[projectMode]}</p>
           <ul className="divide-y divide-line">
@@ -219,13 +216,12 @@ export function HowItWorks({
                 <span className="font-semibold text-slate-800">{activity.title}: </span>
                 {off ? "left out on this project." : <>{carrier(activity.key, controlDoes).toLowerCase()}. {controlDoes ? activity.control : activity.self}</>}
                 {CONFIRMABLE[activity.key] ? ` ${confirmTitle(activity.key)}: ${confirm ? "yes" : "no"}.` : ""}
-                {onStep[activity.key] ? <> <a href={onStep[activity.key].href} className="font-semibold text-link hover:underline">{onStep[activity.key].title}</a></> : null}
               </li>
             ))}
           </ul>
         </section>
         {policiesHere.length || stampsHere ? (
-          <section className="register register-sheet register-sheet-open">
+          <section id="policies" className="register register-sheet register-sheet-open scroll-mt-24">
             {howHead}
             <ul className="divide-y divide-line">
               {policiesHere.map((one) => (
@@ -247,9 +243,10 @@ export function HowItWorks({
 
   return (
     <div className="space-y-4">
-      <section className="register register-sheet register-sheet-open">
+      <section id="who-does-what" className="register register-sheet register-sheet-open scroll-mt-24">
         {whoHead}
-        <ActionForm action={setControlActivitiesAction} submitLabel="Save" hidden={hidden} className="space-y-0" footerClassName={footer}>
+        <ActionForm action={setControlActivitiesAction} submitLabel="Save" hidden={hidden} className="space-y-0" footerClassName={footer}
+          confirmText={defaults ? undefined : "Who carries out each act on this project changes as chosen here. Go ahead?"}>
           <fieldset disabled={whoFixed} className="min-w-0 disabled:opacity-70">
             {whoFixed ? <p className="px-5 pt-3 text-[11px] leading-5 text-slate-500 sm:px-6">{FIXED_NOTE}</p> : null}
             <div className="space-y-2 px-5 py-4 sm:px-6">
@@ -270,21 +267,10 @@ export function HowItWorks({
             </div>
 
             {/* Each act decides only while the answer above is "it depends"; on the other answers it is kept as it
-                stands, ready for the day it is chosen again. An act drawn on a step is changed there, and carried here
-                as it stands. */}
+                stands, ready for the day it is chosen again. */}
             <ul className="divide-y divide-line border-t border-line">
               {rows.map(({ activity, controlDoes, confirm, off }) => (
                 <li key={activity.key} className="space-y-2 px-5 py-3.5 sm:px-6">
-                  {onStep[activity.key] ? (
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                      <input type="hidden" name={`mode:${activity.key}`} value={controlDoes ? "CONTROL" : "SELF"} />
-                      <p className="min-w-0 flex-1 text-xs leading-5 text-slate-600">
-                        <span className="text-sm font-semibold text-slate-800">{activity.title}</span>
-                        <span className="block">{off ? "Left out on this project." : <><span className="font-semibold text-slate-700">{carrier(activity.key, controlDoes)}:</span> {controlDoes ? activity.control : activity.self}</>}</span>
-                      </p>
-                      <a href={onStep[activity.key].href} className="text-xs font-semibold text-link hover:underline">Change on its step: {onStep[activity.key].title}</a>
-                    </div>
-                  ) : (
                     <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-slate-800">
@@ -307,7 +293,18 @@ export function HowItWorks({
                         ))}
                       </select>
                     </div>
-                  )}
+                  {/* An act whose absence leaves the record whole may be left out altogether. */}
+                  {SKIPPABLE[activity.key] ? (
+                    <label className="flex cursor-pointer items-start gap-2 rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 ring-1 ring-line">
+                      <input type="hidden" name={`skipping:${activity.key}`} value="1" />
+                      <SwitchControl name={`use:${activity.key}`} defaultChecked={!off} className="mt-0.5" />
+                      <span className="min-w-0 flex-1">
+                        <span className="font-semibold text-slate-800">Used on this {defaults ? "new project" : "project"}</span>
+                        <span className="block text-slate-600">Switched off: {SKIPPABLE[activity.key].off}</span>
+                      </span>
+                      <AnswerFrom source={source} of={SKIP_KEY(activity.key)} />
+                    </label>
+                  ) : null}
                   {/* A request may also need the say of whoever holds Manage. */}
                   {CONFIRMABLE[activity.key] ? (
                     <label className="flex cursor-pointer items-start gap-2 rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 ring-1 ring-line">
@@ -335,7 +332,7 @@ export function HowItWorks({
         </ActionForm>
       </section>
 
-      <section className="register register-sheet register-sheet-open">
+      <section id="policies" className="register register-sheet register-sheet-open scroll-mt-24">
         {howHead}
         <ActionForm action={setPolicyAction} submitLabel="Save" hidden={hidden} className="space-y-0" footerClassName={footer}>
           <ul className="divide-y divide-line">

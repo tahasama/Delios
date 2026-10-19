@@ -106,7 +106,8 @@ frontend/
 │   │   ├── notifications/
 │   │   ├── account/
 │   │   ├── guide/
-│   │   └── settings/     + distribution/, people/
+│   │   └── settings/     + distribution/, people/; flow/ (the Control room: the flows, read only, linking
+│   │                     to every card), control/ (How this project works: every answer the Control room shows)
 │   └── api/              file downloads (exports, delivery lists, templates)
 │
 ├── lib/                  the code behind the pages, by area
@@ -128,8 +129,8 @@ frontend/
 │
 ├── components/           only the pieces several areas use
 │                         (ui.tsx: buttons and fields; form, data-table, timeline, search-pick,
-│                          send-for-review, notify-panel, preflight, how-it-works: the form a project's
-                         Control room and the organization's defaults share)
+│                          send-for-review, notify-panel, preflight, how-it-works: the form How this
+                         project works and the organization's defaults share)
 ├── public/               files served as they are (sw.js, for pop-up notifications)
 ├── scripts/              demo-schedule.mjs (fills a demo), gen-theme.mjs
 └── Dockerfile            builds the screens into an image

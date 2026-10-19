@@ -119,7 +119,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                 ? "; whoever holds Manage confirms each one, and once confirmed they are put on by themselves and told by notification and email."
                 : "; no confirmation: they are on at once, and told by notification and email."}
               {admin ? " As an administrator, what you add goes straight on." : ""}
-              {" "}<Link href="/settings/flow#how-it-works" className="font-semibold text-link hover:underline">Change it in the Control room</Link>.
+              {" "}<Link href="/settings/control#how-it-works" className="font-semibold text-link hover:underline">Change it in the Control room</Link>.
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">

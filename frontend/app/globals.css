@@ -1266,6 +1266,7 @@ summary::-webkit-details-marker {
   .scene-compact .scene-title { font-size: 13px; }
   /* The branch that ends: it hangs below the line, joined by a short drop. */
   .scene-branch { position: relative; margin-top: 1rem; }
+  .scene-branch > .scene { width: 100%; }
   .scene-branch::before {
     content: "";
     position: absolute;
@@ -1276,7 +1277,7 @@ summary::-webkit-details-marker {
   }
   .scene-end:not([aria-selected="true"]) { background: color-mix(in srgb, var(--color-red-500) 5%, var(--color-surface)); }
   .scene-end .scene-number { color: var(--color-red-700); }
-  :root.dark .scene-end .scene-number { color: var(--color-red-300); }
+  :root.dark .scene-end .scene-number { color: rgb(252 165 165); }
   /* The arrow from one column to the next. */
   .scene-col-linked::after {
     content: "";
@@ -1311,40 +1312,6 @@ summary::-webkit-details-marker {
     .scene[aria-selected="true"] { transform: none; }
     .scene-panel { animation: none; }
   }
-}
-
-@layer components {
-  /* An act's two sides, switched in place in the Control room. */
-  .act-switch {
-    display: inline-flex;
-    flex-wrap: wrap;
-    max-width: 100%;
-    gap: 0.125rem;
-    padding: 0.15rem;
-    border-radius: 0.55rem;
-    background: var(--color-canvas-deep);
-  }
-  :root.dark .act-switch { background: color-mix(in srgb, var(--color-canvas-deep) 60%, var(--color-surface)); }
-  .act-side {
-    min-height: calc(var(--control-h) - 0.3rem);
-    border-radius: 0.42rem;
-    padding: 0 0.6rem;
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-    color: var(--color-slate-500);
-    transition: background-color 150ms, color 150ms;
-  }
-  .act-side:hover { color: var(--color-slate-900); }
-  .act-side { color: var(--color-slate-600); }
-  .act-side-on { background: var(--color-surface); color: var(--color-slate-900); box-shadow: 0 1px 2px rgb(15 23 42 / 0.1); }
-  .act-side-control.act-side-on { background: var(--color-tint); color: var(--color-brand-ink); }
-  .act-side-off.act-side-on { background: var(--color-surface); color: var(--color-slate-700); }
-  .act-side-asked { outline: 1.5px dashed var(--color-amber-500); outline-offset: 1px; }
-  .act-confirm { background: var(--color-tint-soft); border: 1px solid var(--color-line); }
-}
-
-@layer components {
 }
 
 /* A field missing or refused when the form was sent: outlined red until it is changed (components/form.tsx). */
