@@ -137,10 +137,10 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
                 >
                   <span className="scene-number">
                     <span>{number}</span>
-                    {end ? <span>ends here</span> : optional ? <span>sometimes</span> : null}
+                    {end ? <span>{optional ? "optional · ends here" : "ends here"}</span> : optional ? <span>optional</span> : null}
                   </span>
                   <span className="scene-title">{one.title}</span>
-                  <span className="scene-tagline">{optional && !end ? `If ${optional}` : one.tagline}</span>
+                  <span className="scene-tagline">{optional ? `Only if ${optional}` : one.tagline}</span>
                 </button>
               );
             };
@@ -158,7 +158,7 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
         {/* The key: what each mark on the console means. */}
         <p className="scene-key px-5 pb-4 sm:px-6">
           <span><span className="scene-key-light" aria-hidden />the light on top: the state it leaves the document in, as in the register</span>
-          <span><span className="scene-key-sometimes" aria-hidden />outlined: only sometimes</span>
+          <span><span className="scene-key-sometimes" aria-hidden />dashed: optional, only when it applies</span>
           <span><span className="scene-key-end" aria-hidden />below, in rose: the revision ends there, the next one starts again</span>
           <span><span className="scene-key-lit" aria-hidden />ringed: the step shown under the console</span>
         </p>

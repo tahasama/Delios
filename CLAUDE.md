@@ -737,9 +737,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   portals to the regulators, not a diagram"; no gradient; no black, grey or white): one solid brand-navy panel, the
   flows as tabs, one line "from → to", each step a station in brand blue with its state's colour as a status light
   across its top, (owner: no readouts on the stations). The lines stay (owner): an arrow on to the next station,
-  a dashed drop to a road that ends (below its station, rose, "ends here"); a step that happens only sometimes is
-  outlined ("sometimes"); the lit station is ringed in light blue. The key stays under the console (owner: "critical"):
-  the light on top, outlined, below in rose, ringed. Under it, "The days
+  a dashed drop to a road that ends (below its station, rose, "ends here"); an optional step is dashed and labelled
+  "optional", its line "Only if …" (owner): Review where some document types are not reviewed, Approved outside / Not
+  approved, Voided (off the release, ends), Going without, At risk, Escalated (beside Disciplines confirm), Confirmed /
+  Refused; what another organization sends is checked before it is registered (Documents we receive); the lit station is ringed in light blue. The key stays under the console (owner: "critical"):
+  the light on top, dashed (optional), below in rose, ringed. Under it, "The days
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top

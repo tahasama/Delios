@@ -136,16 +136,22 @@ const STAGES: Stage[] = [
   {
     key: "release", title: "Release", tagline: "In force", rail: "rail-released",
     text: "The revision comes into force, and the one before it is superseded.",
-    who: [{ title: "Releasing", by: "The decider, or the control function where it checks first" }, "VOID"],
-    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "STAMP:RELEASED", "STAMP:SUPERSEDED", "STAMP:VOID", "STAMP_COMMENTS", "STATE:RELEASED"],
+    who: [{ title: "Releasing", by: "The decider, or the control function where it checks first" }],
+    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "STAMP:RELEASED", "STAMP:SUPERSEDED", "STAMP_COMMENTS", "STATE:RELEASED"],
   },
   {
     key: "released-issued", title: "Released & issued", tagline: "In force, and sent", rail: "rail-released",
     text: "In one act it comes into force and goes to the people named by whoever decided or asked.",
-    who: ["ISSUE", "VOID"],
-    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "POLICY_READY", "STAMP:RELEASED", "STAMP:SUPERSEDED", "STAMP:VOID", "STAMP_COMMENTS", "STATE:RELEASED"],
+    who: ["ISSUE"],
+    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "POLICY_READY", "STAMP:RELEASED", "STAMP:SUPERSEDED", "STAMP_COMMENTS", "STATE:RELEASED"],
     sets: ["REASONS_FOR_ISSUE", "ISSUE_CODES"],
     extras: ["distribution", "form:TRANSMITTAL"],
+  },
+  {
+    key: "voided", title: "Voided", tagline: "Released in error", rail: "rail-void",
+    text: "A revision released in error, or never reviewed, is voided with why; what was done from it is reassessed.",
+    who: ["VOID"],
+    answers: ["STAMP:VOID", "STATE:VOID"],
   },
   {
     key: "issue", title: "Issue", tagline: "Sent out", rail: "rail-issue",
@@ -178,7 +184,7 @@ const STAGES: Stage[] = [
   },
   {
     key: "checked", title: "The control function's check", tagline: "Accepted, or back to them", rail: "rail-check",
-    text: "What the supplier sent counts only once it is checked: accepted, we hold it; returned, they correct it.",
+    text: "What another organization sent counts only once it is checked: accepted, it becomes the document's revision; returned, with why, they correct it.",
     who: ["CONTROL_PEOPLE", { title: "Checking it", by: "The control function" }],
   },
   {
@@ -237,7 +243,13 @@ const STAGES: Stage[] = [
     key: "act-confirm", title: "Disciplines confirm", tagline: "Go ahead, with or without", rail: "rail-ready",
     text: "A discipline whose documents are ready is confirmed by itself; one still short confirms by hand, saying why.",
     who: [{ title: "Confirming", by: "Each discipline concerned" }],
-    answers: ["POLICY_READY", "ESCALATE"],
+    answers: ["POLICY_READY"],
+  },
+  {
+    key: "act-escalated", title: "Escalated", tagline: "A discipline stays silent", rail: "rail-late",
+    text: "The day passed and a discipline short of its documents said nothing: after some working days its people, whoever holds Manage and the control function are told, once.",
+    who: [{ title: "Telling them", by: "The app, by itself" }],
+    answers: ["ESCALATE"],
   },
   {
     key: "act-ahead", title: "Went ahead", tagline: "On its day", rail: "rail-done",
@@ -281,16 +293,20 @@ const STAGES: Stage[] = [
  * returns a refused revision follows the project, and without a control function there is no check before release.
  */
 type FlowLane = { scene: string; optional?: string; tagline?: string; end?: boolean };
-function flowsFor({ gate, returner, together }: { gate: boolean; returner: string; together: boolean }): { key: string; title: string; from: string; to: string; columns: FlowLane[][] }[] {
+function flowsFor({ gate, returner, together, unreviewed }: { gate: boolean; returner: string; together: boolean; unreviewed: boolean }): { key: string; title: string; from: string; to: string; columns: FlowLane[][] }[] {
   // Released and issued are one act unless the project keeps them apart (POLICY_RELEASE): one step, or two.
-  const out: FlowLane[][] = together ? [[{ scene: "released-issued" }]] : [[{ scene: "release" }], [{ scene: "issue" }]];
+  // A released revision may be voided: the road that ends below the release.
+  const voided: FlowLane = { scene: "voided", end: true, optional: "it was released in error" };
+  const out: FlowLane[][] = together ? [[{ scene: "released-issued" }, voided]] : [[{ scene: "release" }, voided], [{ scene: "issue" }]];
+  // Where some document types are not reviewed, review happens only for the others.
+  const reviewed = unreviewed ? "its document type is reviewed" : undefined;
   return [
     {
       key: "produce", title: "Documents we produce", from: "We write it", to: "in force, and sent to whoever needs it",
       columns: [
         [{ scene: "register" }],
         [{ scene: "prepare" }],
-        [{ scene: "review", tagline: "Our reviewers, and others when the route names them" }],
+        [{ scene: "review", tagline: "Our reviewers, and others when the route names them", optional: reviewed }],
         [{ scene: "accepted" }, { scene: "returned", end: true, tagline: `${returner} returns it` }],
         ...(gate ? [[{ scene: "gate" }, { scene: "gate-return", end: true }]] : []),
         [{ scene: "approval", optional: "an outside approval is asked for" }, { scene: "approval-refused", end: true, optional: "an outside approval is asked for" }],
@@ -301,8 +317,9 @@ function flowsFor({ gate, returner, together }: { gate: boolean; returner: strin
       key: "receive", title: "Documents we receive", from: "Another organization sends it", to: "accepted here and passed on, or back to them",
       columns: [
         [{ scene: "received" }],
+        [{ scene: "checked" }],
         [{ scene: "theirs" }],
-        [{ scene: "review", tagline: "By us, by them, or both" }],
+        [{ scene: "review", tagline: "By us, by them, or both", optional: reviewed }],
         [{ scene: "accepted" }, { scene: "to-sender", end: true }],
         ...out,
       ],
@@ -333,7 +350,7 @@ function flowsFor({ gate, returner, together }: { gate: boolean; returner: strin
       columns: [
         [{ scene: "act-needs" }],
         [{ scene: "act-risk", optional: "a document is still missing" }],
-        [{ scene: "act-confirm" }],
+        [{ scene: "act-confirm" }, { scene: "act-escalated", optional: "a discipline short of its documents stays silent" }],
         [{ scene: "act-ahead" }, { scene: "act-postponed", end: true }],
       ],
     },
@@ -386,7 +403,7 @@ export default async function ControlRoomPage() {
     holdersOf(ctx, "CONTROL"),
     getSets().then((all) => all.map((one) => ({ key: one.key, title: one.title }))),
     // Every value of every list, to count what is in use.
-    getSets().then(async (all) => (await Promise.all(all.map(async (one) => (await getSet(one.key)).map((v) => ({ setKey: one.key, status: v.status }))))).flat()),
+    getSets().then(async (all) => (await Promise.all(all.map(async (one) => (await getSet(one.key)).map((v) => ({ setKey: one.key, status: v.status, props: v.props as Record<string, unknown> }))))).flat()),
     // What only the keepers of Settings may read comes back empty for others: unknown, never counted as none.
     routesForEditor().catch(() => null),
     projectNumbering().then((n) => n.schemes.filter((one) => one.active).length).catch(() => 0),
@@ -401,6 +418,8 @@ export default async function ControlRoomPage() {
   const stateNames_ = await stateNames(ctx);
 
   const gate = holders.length > 0;
+  // A document type published as not reviewed goes from Prepare straight to release.
+  const unreviewed = values.some((one) => one.setKey === "DOCUMENT_TYPES" && one.status === "ACTIVE" && one.props?.review === false);
   const together = (answers.get("POLICY_RELEASE") ?? "TOGETHER") === "TOGETHER";
   const actRow = new Map(settings.rows.map((row) => [row.activity.key, row]));
   const setTitle = new Map(sets.map((one) => [one.key, one.title]));
@@ -596,7 +615,7 @@ export default async function ControlRoomPage() {
 
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "The reviewer";
-  const flows: Flow[] = flowsFor({ gate, returner, together }).map((flow) => ({
+  const flows: Flow[] = flowsFor({ gate, returner, together, unreviewed }).map((flow) => ({
     ...flow,
     columns: flow.columns.map((column) => column.map((lane) => {
       const stage = byKey.get(lane.scene)!;
