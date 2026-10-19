@@ -745,12 +745,21 @@ a screen only words it. A new rule goes in the backend, never in a page.
   flows as tabs on one line (owner: never more; a short name each, `tab`, in the role's words, the full title on
   hover and at the head of the line under them), one line "title · from → to", each step a station in brand blue with its state's colour as a status light
   across its top, (owner: no readouts on the stations). The lines stay (owner): an arrow on to the next station,
-  a dashed drop to a road that ends (below its station, rose, "ends here"); an optional step is dashed and labelled
-  "optional", its line "Only if …" (owner): Review where some document types are not reviewed, Approved outside / Not
-  approved, Voided (off the release, ends), Going without, At risk, Confirmed / Refused. Never an "Escalated" step (owner): telling
+  a dashed drop to a road that ends (below its station, rose, "ends here"). **Nothing is "optional"** (owner: "a huge
+  hit to our integrity"; optional would mean it may always be skipped): a step always happens, or happens under a
+  condition, of two kinds (`When` in `scene-deck.tsx`). **Set here**: the project's configuration decides (thin solid
+  line, a switch mark; drawn "on" or "off" as it stands where it is known for the whole project, dimmed when off, else
+  "When …" with what it depends on): Review where some document types are not reviewed, Confirmed / Refused (joining),
+  the client's two ways (on DELIOS or not). **If it happens**: an event brings it on, then it is never skipped (dotted
+  amber line, a bolt): Voided, Approved outside / Not approved (when the decider asks), Going without, At risk,
+  Withdrawn, Cancelled, Legal hold, Archived. A way the project did not choose (placeholders or as they come) is not
+  drawn at all. **The cockpit** (owner: "think of the control room as a plane's cockpit"): above the flows, an
+  annunciator, one lamp per system the project runs on (control function, numbering, review routes, review outcomes,
+  release, PDF stamps, intake, organizations, schedule, joining, daily checks), green set, amber to set up, rose set at
+  a cost, hollow off by choice, and a master light counting cautions and warnings; each lamp opens its step. Never an "Escalated" step (owner): telling
   a silent discipline again is a notice, its days a setting on "Disciplines confirm"; the action stays open and overdue,
   with no explanation of its own; what another organization sends is checked before it is registered (Documents we receive); the lit station is ringed in light blue. The key stays under the console (owner: "critical"):
-  the light on top, dashed (optional), below in rose, ringed. Under it, "The days
+  the light on top, set here, if it happens, below in rose, ringed. Under it, "The days
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
@@ -776,13 +785,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   what is exchanged; we fill its placeholders there (never "attach files" that would sit apart from its numbering and
   revisions). Each organization's register holds what it accepted (the check is what lets anything in); nothing is
   copied into ours by itself. **Equivalence** (owner, built): what arrives unplanned is matched by hand to one of ours
-  ("One of ours?" on the transmittal; if it exists its content goes into it, a new submission of the revision being
+  ("One of ours?" on the transmittal, chosen from the register, never typed: owner, numbering is never manual; if it
+  exists its content goes into it, a new submission of the revision being
   prepared, else its next revision; not while in review), or made a document under our numbering; either way their
   number is kept beside ours one to one (`Documents/Equivalents.cs`, `number_equivalents`; Details "Also known as",
-  added by hand or taken back with why by the control function), the register finds it under both, and the same number
-  of theirs proposes the same document next time. **Taken as they come** (owner): a supplier's package may take documents
-  with no placeholders (`Package.TakesAsReceived`, the control function, with what they are filed under and the warning
-  ticked); the supplier sends each under its own number and revision with its status and review outcome; the check
+  recorded by itself when matched or registered, never typed; taken back with why by the control function), the
+  register finds it under both, and the same number of theirs proposes the same document next time. Recording what came
+  from outside asks their number on each file. **Taken as they come** (owner: a configuration matter, never offered
+  everywhere; one way or the other, never both): the project's choice in the Control room (`Packages/Intake.cs`,
+  `SUPPLIER_INTAKE` = PLACEHOLDERS default | AS_RECEIVED, `AS_RECEIVED_FILING`, `PUT /intake`, an administrator or the
+  control function, with what they are filed under and the warning ticked; MODE_IN_USE once either way is in use). As
+  they come: no placeholders are asked, nothing is matched or registered by hand (INTAKE_AS_RECEIVED); the other
+  organization sends each under its own number and revision with its status and review outcome; the check
   accepts all (they are in the register exactly so, `Document.AsReceived`, series `AS_RECEIVED`, their next revision
   superseding one we never took further, never one of ours: AS_RECEIVED) or returns all with why. A red warning
   (`components/as-received-warning.tsx`) says it on the package, the transmittal, the document, the register ("as

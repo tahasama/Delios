@@ -3,7 +3,7 @@ import { requireScope } from "@/lib/core/scope";
 import { isController, isAdmin, hasVerb, standsInForControl } from "@/lib/core/auth";
 import { DataTable, Th, Td, Field, inputCls, ToneChip, btn } from "@/components/ui";
 import { FileTally } from "./file-tally";
-import { setPackageRuleAction, sharePackageAction, deletePackageAction, setPackageAsReceivedAction } from "@/lib/packages/forms";
+import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@/lib/packages/forms";
 import { PackageLines, type PackageLine } from "./package-lines";
 import { ruleFilter, ruleWords } from "@/lib/packages/package-rule";
 import { RuleFields } from "../rule-fields";
@@ -11,11 +11,10 @@ import { manageItems } from "../manage-items";
 import { ActionForm } from "@/components/form";
 import { submitSupplierPackageAction, sendAsReceivedAction } from "@/lib/packages/forms-supplier";
 import { AsReceivedWarning } from "@/components/as-received-warning";
-import { getActiveSet } from "@/lib/settings/config";
 import { supplierRows, supplierFigures, packageStage, packageCounts, lineStage, WITH_SUPPLIER, type SupplierRow } from "@/lib/packages/supplier";
 import { fmtDate } from "@/lib/core/utils";
 import { plannedState } from "@/lib/actions/planned-state";
-import { ArrowLeft, Download, Filter, Inbox, PackageCheck, Pencil, Send, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Filter, PackageCheck, Pencil, Send, Share2, Trash2 } from "lucide-react";
 import { getMe } from "@/lib/account/api";
 import type { PackageView } from "@/lib/types";
 
@@ -170,9 +169,7 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
 
   // ── Our page ─────────────────────────────────────────────────────────────────
   const f = supplierFigures(rows);
-  const [deliverables, docTypes, disciplines] = staff
-    ? await Promise.all([getActiveSet("DELIVERABLE_TYPES"), getActiveSet("DOCUMENT_TYPES"), getActiveSet("DISCIPLINES")]).catch(() => [[], [], []])
-    : [[], [], []];
+
   const shared = pkg.sharedAt ? new Date(pkg.sharedAt) : null;
   const where = packageStage(pkg, rows, "ours");
   const notSent = rows.filter((r) => !asked.has(r.doc.id));
@@ -254,7 +251,7 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
               <div className="space-y-1.5">
                 <AsReceivedWarning who={supplierName} />
                 <p className="text-[11px] text-slate-500">
-                  Taking documents as they come since {fmtDate(pkg.asReceived.since)}{pkg.asReceived.by ? ` (${pkg.asReceived.by})` : ""}, filed under{" "}
+                  This project takes other organizations&rsquo; documents as they come (the Control room), filed under{" "}
                   <span className="font-mono">{pkg.asReceived.deliverableType} / {pkg.asReceived.docType} / {pkg.asReceived.discipline}</span>.
                 </p>
               </div>
@@ -294,47 +291,6 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
                 </Act>
               ) : null}
               {edit ? <Act icon={Pencil} label={typeof edit.label === "string" ? edit.label : "Edit"}>{edit.body}</Act> : null}
-              {pkg.asReceived ? (
-                <Act icon={Inbox} label="Ask by placeholder again">
-                  <ActionForm action={setPackageAsReceivedAction} submitLabel="Ask by placeholder again" size="sm" hidden={{ packageId: pkg.id, on: "false" }}>
-                    <p className="text-xs leading-5 text-slate-600">From now on {supplierName} fills the placeholders sent to them. What was taken as it came stays as it is, with its warning.</p>
-                  </ActionForm>
-                </Act>
-              ) : (
-                <Act icon={Inbox} label="Take documents as they come">
-                  <ActionForm action={setPackageAsReceivedAction} submitLabel="Take them as they come" size="sm" variant="danger" hidden={{ packageId: pkg.id, on: "true" }}>
-                    <AsReceivedWarning who={supplierName} />
-                    <p className="text-xs leading-5 text-slate-600">
-                      No placeholders: {supplierName} sends each document under its own number and revision, with its status and review outcome.
-                      Once your check accepts it, it is in the register exactly so. Use it only when placeholders cannot be agreed.
-                    </p>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <Field label="Filed under: deliverable type" required>
-                        <select name="deliverableType" required className={inputCls} defaultValue="">
-                          <option value="" disabled>Choose</option>
-                          {deliverables.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
-                        </select>
-                      </Field>
-                      <Field label="Document type" required hint="when they name none">
-                        <select name="docType" required className={inputCls} defaultValue="">
-                          <option value="" disabled>Choose</option>
-                          {docTypes.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
-                        </select>
-                      </Field>
-                      <Field label="Discipline" required>
-                        <select name="discipline" required className={inputCls} defaultValue="">
-                          <option value="" disabled>Choose</option>
-                          {disciplines.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
-                        </select>
-                      </Field>
-                    </div>
-                    <label className="flex items-start gap-2 text-xs text-slate-700">
-                      <input type="checkbox" name="understood" required className="mt-0.5" />
-                      I understand: their numbers, revisions, states and review outcomes go into our register as they are, and our numbering, revisions and states do not apply to them.
-                    </label>
-                  </ActionForm>
-                </Act>
-              )}
               {!shared && !sentAny ? (
                 <Act icon={Trash2} label="Delete the package">
                   <ActionForm action={deletePackageAction} submitLabel="Delete the package" size="sm" variant="danger" hidden={{ packageId: pkg.id }} confirmText="The package is deleted. Its documents stay in the register. Continue?">

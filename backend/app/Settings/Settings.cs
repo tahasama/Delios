@@ -75,6 +75,9 @@ public static class SettingEndpoints
                 return Problems.Forbidden("CONTROL_ONLY", "An administrator or the control function answers for the project.");
             // What the organization keeps fixed is the same on every project (owner: two levels of settings).
             if (await Liberty.RoomRefusalAsync(db, key.Trim(), r.Value, c) is { } fixedHere) return fixedHere;
+            // How documents come in has its own checks (one way or the other, its warning read): PUT /intake.
+            if (key.Trim() is Packages.Intake.Key or Packages.Intake.FilingKey)
+                return Problems.Invalid("USE_INTAKE", "How other organizations' documents come in is chosen in the Control room.");
             var result = await SetAsync(db, audit, clock, access.Project.TenantId, access.Project.Id, key, r.Value, access.UserId, access.UserName, c);
             // What makes a document count for an action changed: every action of the project is read again at once.
             if (key.Trim() is "POLICY_READY" or "POLICY_RELEASE")

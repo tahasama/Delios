@@ -68,7 +68,7 @@ const field = "plain w-full py-1.5 text-[13px]";
  * only released revisions, and a received transmittal has no subject of ours.
  */
 export function NewTransmittalForm({
-  reasons, revisions, companies, ourOrganization, parties = [], defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askingBack, mayRecordReceived, outsider = false, unsent,
+  reasons, revisions, companies, ourOrganization, parties = [], defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askingBack, mayRecordReceived, outsider = false, unsent, asReceived = false,
 }: {
   /** The organizations set up on the project, with their codes: who something was received from. */
   parties?: { id: string; code: string; name: string }[];
@@ -101,6 +101,8 @@ export function NewTransmittalForm({
   labels: Record<string, string>;
   /** The fields it added for itself. */
   ownFields: OwnField[];
+  /** The project takes other organizations' documents as they come: each file says its revision, status and outcome too. */
+  asReceived?: boolean;
 }) {
   const [step, setStep] = useState(prefill?.step === 2 ? 2 : 1);
   const [direction, setDirection] = useState(defaultDirection);
@@ -123,6 +125,8 @@ export function NewTransmittalForm({
   const [issueNow, setIssueNow] = useState(true);
   const [people, setPeople] = useState(0);
   const [files, setFiles] = useState(0);
+  // Each file that came says the number it goes by with them (and, taken as it comes, its revision, status and outcome).
+  const [fileNames, setFileNames] = useState<string[]>([]);
   const countPeople = useCallback((n: number) => setPeople(n), []);
 
   /** Whether a field is asked at all here, and whether it is insisted on. */
@@ -469,10 +473,29 @@ export function NewTransmittalForm({
                   type="file"
                   name="attachments"
                   multiple
-                  onChange={(e) => setFiles(e.target.files?.length ?? 0)}
+                  onChange={(e) => { setFiles(e.target.files?.length ?? 0); setFileNames(Array.from(e.target.files ?? []).map((one) => one.name)); }}
                   className="w-full"
                 />
               </Ask>
+              {fileNames.length ? (
+                <div className="space-y-2">
+                  {fileNames.map((name, i) => (
+                    <div key={`${name}-${i}`} className={`grid grid-cols-1 items-end gap-x-3 gap-y-2 ${asReceived ? "sm:grid-cols-[minmax(0,1fr)_12rem_6rem_10rem_10rem]" : "sm:grid-cols-[minmax(0,1fr)_14rem]"}`}>
+                      <p className="truncate pb-2 text-xs text-slate-700" title={name}>{name}</p>
+                      <Ask label="Their number" required hint="as it reads on what came">
+                        <input name={`ref_${i}`} required className={field} />
+                      </Ask>
+                      {asReceived ? (
+                        <>
+                          <Ask label="Revision" required><input name={`rev_${i}`} required className={field} /></Ask>
+                          <Ask label="Their status" hint="their words"><input name={`status_${i}`} className={field} /></Ask>
+                          <Ask label="Their review outcome" hint="if any"><input name={`outcome_${i}`} className={field} /></Ask>
+                        </>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {asks("message") ? (
                 <Ask label={says("message", "Message")} required={must("message")} hint="what they say it is for, in their words">
                   <textarea name="message" rows={3} required={must("message")} className={field} value={message} onChange={(e) => setMessage(e.target.value)} />

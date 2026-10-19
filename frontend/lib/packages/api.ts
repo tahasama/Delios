@@ -67,3 +67,9 @@ export const packageByNumber = cache(async (scope: Scope, number: string): Promi
     throw e;
   }
 });
+
+/** How the project takes other organizations' documents (the Control room): by placeholder, or as they come. */
+export type Intake = { mode: "PLACEHOLDERS" | "AS_RECEIVED"; deliverableType: string | null; docType: string | null; discipline: string | null };
+
+export const projectIntake = cache(async (scope: Scope): Promise<Intake> =>
+  api<Intake>(projectPath(scope, "/intake")).catch(() => ({ mode: "PLACEHOLDERS", deliverableType: null, docType: null, discipline: null })));

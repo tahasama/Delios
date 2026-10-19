@@ -217,7 +217,7 @@ public sealed class Document
     public string? AppVersion { get; set; }
     /// <summary>
     /// Taken as it came from a supplier's package with no placeholders: its number, revisions, states and review
-    /// outcomes are the supplier's, not ours (<see cref="Packages.Package.TakesAsReceived"/>). Shown with its warning.
+    /// outcomes are the supplier's, not ours (<see cref="Packages.Intake"/>, as they come). Shown with its warning.
     /// </summary>
     public bool AsReceived { get; set; }
     /// <summary>The organization's own fields (Settings → Forms &amp; fields), name to value, as JSON. Null when none.</summary>

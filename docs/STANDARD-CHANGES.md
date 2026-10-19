@@ -1281,14 +1281,20 @@ outside organization sends is either a placeholder of ours filled or registered 
   same number of theirs proposes the same document. Taken back only with why, and kept.
 - **What lands in a register is what its organization accepted.** Placeholders filled become the document once the
   check accepts them; unplanned items once matched or registered; nothing is copied anywhere by itself.
-- **A package taking documents as they come** (no placeholders): chosen by the control function on a supplier's
-  package, with what they are filed under (deliverable type, document type, discipline) and a warning read and ticked.
-  The supplier sends each document under its own number and revision, with its status and review outcome; once the
+- **Numbering is never manual.** Their number is asked on each file recorded as received; matching chooses one of ours
+  from the register; nobody types an equivalence.
+- **Documents taken as they come** (no placeholders): a configuration of the project, one way or the other, never both
+  (Control room; once either way is in use, the other is refused). Chosen by an administrator or the control function,
+  with what they are filed under (deliverable type, document type, discipline) and a warning read and ticked. Each
+  document is filed in its organization's package. The other organization sends each document under its own number and revision, with its status and review outcome; once the
   check accepts it, it is in the register exactly so (`Document.AsReceived`, `Revision.TheirStatus` / `TheirOutcome`,
   series `AS_RECEIVED`); returned, nothing is registered. Their next revision replaces the one before that we never
   took further; we never start one of our own on it (AS_RECEIVED). A red warning says, wherever it shows (package,
   transmittal, document, register stamp "as received", Control room): numbering, revisions, states and review
   outcomes, search and reports, archiving and keeping no longer follow one rule.
+- **No step of a process is "optional".** The Standard's flows mark some steps optional; a step either always happens
+  or happens under a stated condition: set by the project's configuration (shown on or off as it stands), or brought on
+  by an event (and then never skipped). The Control room shows where every system of the project stands at a glance.
 
 ## Still open — decided in conversation, not yet built
 

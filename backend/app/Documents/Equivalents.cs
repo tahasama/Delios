@@ -7,9 +7,6 @@ using NodaTime;
 
 namespace Delios.Host.Documents;
 
-/// <summary>Body of matching a number of another organization's to one of our documents by hand.</summary>
-public sealed record EquivalentRequest(Guid? PartyId, string? Number);
-
 /// <summary>Body of taking a matched number back: why, kept beside it.</summary>
 public sealed record TakeBackRequest(string? Reason);
 
@@ -20,7 +17,7 @@ public sealed record EquivalentView(Guid Id, Guid PartyId, string PartyCode, str
 /// <summary>
 /// Equivalence (owner): one document known under another organization's number and ours, matched one to one. Our
 /// numbering stays first in our register, theirs in theirs; neither changes the other. Recorded by itself when what
-/// they sent is matched to one of ours or registered from what came, or typed by the control function.
+/// they sent is matched to one of ours or registered from what came; never typed (owner: numbering is never manual).
 /// </summary>
 public static class Equivalents
 {
@@ -31,7 +28,6 @@ public static class Equivalents
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter<ProjectAccessFilter>();
         project.MapGet("/documents/{documentId:guid}/numbers", ListAsync);
-        project.MapPost("/documents/{documentId:guid}/numbers", TypedAsync);
         project.MapPost("/documents/{documentId:guid}/numbers/{equivalentId:guid}/take-back", TakeBackAsync);
     }
 
@@ -92,27 +88,6 @@ public static class Equivalents
             select new { e, p.Code, p.Name }).ToListAsync(cancellationToken);
         return Results.Ok(rows.Select(r => new EquivalentView(r.e.Id, r.e.PartyId, r.Code, r.Name, r.e.Number, r.e.Source,
             r.e.RecordedByName, r.e.RecordedAt.ToDateTimeOffset(), r.e.TakenBackAt?.ToDateTimeOffset(), r.e.TakenBackByName, r.e.TakenBackReason)));
-    }
-
-    private static async Task<IResult> TypedAsync(Guid documentId, EquivalentRequest request, HttpContext http, DeliosDbContext db,
-        DocumentService documents, AuditLog audit, IClock clock, CancellationToken cancellationToken)
-    {
-        var access = ProjectAccessFilter.Of(http);
-        var document = await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken))
-            .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
-        if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
-        if (!await KeepsAsync(db, access, document, cancellationToken))
-            return Problems.Forbidden("CONTROL_ONLY", "The control function matches another organization's number to ours.");
-        var party = request.PartyId is { } partyId
-            ? await db.Parties.AsNoTracking().SingleOrDefaultAsync(p => p.Id == partyId && p.Active && !p.IsInternal, cancellationToken) : null;
-        if (party is null) return Problems.Invalid("PARTY_UNKNOWN", "Say whose number it is: an organization taking part.", new { field = "partyId" });
-        if (string.IsNullOrWhiteSpace(request.Number)) return Problems.Invalid("NUMBER_REQUIRED", "Write their number.", new { field = "number" });
-        var problem = await RecordAsync(db, clock, document, party.Id, request.Number, EquivalentSources.Typed, access.UserName, cancellationToken);
-        if (problem is not null) return problem;
-        await audit.WriteAsync(new Actor(access.UserId, access.UserName), "NUMBER_MATCHED", "Document", document.Id, document.Number,
-            $"Known to {party.Name} as {request.Number!.Trim()}.", access.Project.Id, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-        return Results.NoContent();
     }
 
     private static async Task<IResult> TakeBackAsync(Guid documentId, Guid equivalentId, TakeBackRequest request, HttpContext http,

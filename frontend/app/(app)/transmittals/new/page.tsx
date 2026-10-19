@@ -8,6 +8,7 @@ import { recipientCompanies } from "@/lib/transmittals/recipients";
 import { NewTransmittalForm } from "./new-transmittal-form";
 import { api, projectPath } from "@/lib/client";
 import { backendDocument } from "@/lib/documents/api";
+import { projectIntake } from "@/lib/packages/api";
 import { addressees, backendTransmittal, ourOrganizationName } from "@/lib/transmittals/api";
 import type { RegisterPage } from "@/lib/types";
 
@@ -22,13 +23,14 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   const sp = await searchParams;
 
   const ourOrganization = await ourOrganizationName();
-  const [reasons, register, found, reviewers] = await Promise.all([
+  const [reasons, register, found, reviewers, intake] = await Promise.all([
     getActiveSet("REASONS_FOR_ISSUE"),
     // The register's newest documents, each with its released revision and the
     // one being worked on: what can be enclosed.
     api<RegisterPage>(projectPath(ctx, "/register"), { query: { per: 250 } }),
     addressees(ctx),
     holdersOf(ctx, "REVIEW"),
+    projectIntake(ctx),
   ]);
   const revisionRows = register.rows.flatMap((doc) => [
     ...(doc.releasedRevisionId ? [{ id: doc.releasedRevisionId, value: doc.releasedRevision ?? "", statusCode: doc.releasedStatus, state: "RELEASED", document: { id: doc.id, docNumber: doc.number, title: doc.title } }] : []),
@@ -158,6 +160,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         outsider={!ctx.user.isInternal}
         preselectedRevisionIds={preselected}
         unsent={unsent}
+        asReceived={intake.mode === "AS_RECEIVED"}
         parties={found.parties.map((p) => ({ id: p.id, code: p.code, name: p.name }))}
         placeholders={placeholders.length ? { to: supplier!.name, items: placeholders, mixed: owners.length > 1 } : askedIds.length && owners.length > 1 ? { to: "", items: [], mixed: true } : undefined}
         prefill={{

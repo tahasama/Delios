@@ -1,7 +1,7 @@
 import { Banner } from "@/components/ui";
 
 /**
- * What taking documents as they come does to the register (a supplier's package with no placeholders), said the same
+ * What taking documents as they come does to the register (a project with no placeholders, the Control room), said the same
  * wherever it shows: the package, the transmittal that brings them, each document taken so, the Control room.
  */
 export const AS_RECEIVED_RISKS = [
@@ -9,7 +9,7 @@ export const AS_RECEIVED_RISKS = [
   ["Revisions", "their revision values, outside our revision scheme; we cannot start a revision of our own on them."],
   ["States and review outcomes", "their words, as they gave them; nothing of ours checked them, and our review starts from nothing."],
   ["Search and reports", "the same kind of document reads under two ways of naming; filters and counts across them can mislead."],
-  ["Archiving and keeping", "kept under the deliverable type named on the package, not under rules made for them; check before archiving or disposing."],
+  ["Archiving and keeping", "kept under the deliverable type chosen in the Control room, not under rules made for them; check before archiving or disposing."],
 ] as const;
 
 export function AsReceivedWarning({ who, short = false }: { who?: string; short?: boolean }) {

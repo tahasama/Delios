@@ -120,7 +120,6 @@ export default async function DocumentDetailPage({
   // Equivalence: its numbers with other organizations, ours only; kept by the control function (or, with none, whoever exchanges).
   const numbers = user.isInternal
     ? await api<Equivalent[]>(projectPath(ctx, `/documents/${doc.id}/numbers`)).catch(() => [] as Equivalent[]) : [];
-  const numberParties = user.isInternal ? (await addressees(ctx).catch(() => ({ parties: [] as { id: string; code: string; name: string; participation: string }[] }))).parties : [];
   const mayKeepNumbers = user.isInternal && (controller || standsInForControl(user));
   // The control function adds it to a schedule action from here too: the actions with a discipline tagged that do not need it yet.
   const mayAddToAction = ctx.can("CONTROL") && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
@@ -751,8 +750,7 @@ export default async function DocumentDetailPage({
                     </div>
                   ))}
                 </dl>
-                <AlsoKnownAs documentId={doc.id} numbers={numbers} mayKeep={mayKeepNumbers}
-                  parties={numberParties} />
+                <AlsoKnownAs documentId={doc.id} numbers={numbers} mayKeep={mayKeepNumbers} />
                 {closed ? (
                   <ReadersPanel
                     documentId={doc.id}

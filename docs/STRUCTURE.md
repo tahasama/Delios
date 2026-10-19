@@ -39,7 +39,7 @@ backend/
 │   ├── Reviews/          routes, steps, advice, verdicts, release
 │   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs); matching what arrived
 │   │                     to one of ours and packages taking documents as they come (IncomingService.Taking.cs)
-│   ├── Packages/         delivery packages and supplier packages
+│   ├── Packages/         delivery packages and supplier packages; how other organizations' documents come in (Intake.cs: by placeholder or as they come)
 │   ├── Actions/          the schedule, its actions, what each needs, notices
 │   ├── Records/          assets, number ranges, readiness answers
 │   ├── Checks/           conformance checks

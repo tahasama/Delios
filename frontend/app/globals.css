@@ -1284,7 +1284,8 @@ summary::-webkit-details-marker {
   .scene-key { display: flex; flex-wrap: wrap; gap: 0.35rem 1.25rem; font-size: 12px; color: var(--deck-mute); }
   .scene-key > span { display: inline-flex; align-items: center; gap: 0.45rem; }
   .scene-key-light { width: 16px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--color-sky-400) 50%, var(--color-emerald-500) 50%); }
-  .scene-key-sometimes { width: 16px; height: 11px; border-radius: 3px; outline: 1.5px dashed rgb(147 197 253 / 0.75); outline-offset: -1.5px; }
+  .scene-key-set { width: 16px; height: 11px; border-radius: 3px; outline: 1.5px solid rgb(147 197 253 / 0.6); outline-offset: -1.5px; }
+  .scene-key-event { width: 16px; height: 11px; border-radius: 3px; outline: 1.5px dotted var(--deck-warn); outline-offset: -1.5px; }
   .scene-key-end { width: 16px; height: 11px; border-radius: 3px; background: color-mix(in srgb, #9f1239 30%, var(--color-brand-strong)); box-shadow: inset 0 2px 0 var(--color-red-600); }
   .scene-key-lit { width: 16px; height: 11px; border-radius: 3px; box-shadow: inset 0 0 0 2px var(--deck-lit); }
   .scene {
@@ -1308,16 +1309,46 @@ summary::-webkit-details-marker {
   .scene:hover { background: var(--deck-station-hover); }
   .scene:focus-visible { outline: 2px solid var(--deck-lit); outline-offset: 2px; }
   .scene[aria-selected="true"] { background: var(--deck-station-hover); box-shadow: inset 0 0 0 2px var(--deck-lit); }
-  .scene-number { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-family: var(--font-mono); font-size: 11px; color: var(--deck-faint); }
+  .scene-number { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; font-family: var(--font-mono); font-size: 11px; color: var(--deck-faint); }
   .scene-title { font-size: 14px; font-weight: 600; line-height: 1.2; }
   .scene-tagline { font-size: 12px; line-height: 1.35; color: var(--deck-mute); }
   /* A station that ends the revision, and one that works only sometimes. */
   .scene-end { --deck-station: color-mix(in srgb, #9f1239 18%, var(--color-brand-strong)); }
   .scene-end .scene-number { color: var(--deck-end); }
-  /* An optional station: dashed, so it reads as "only when it applies" at a glance. */
-  .scene-optional { box-shadow: none; outline: 1.5px dashed rgb(147 197 253 / 0.75); outline-offset: -1.5px; }
-  .scene-optional:not([aria-selected="true"]) { background: color-mix(in srgb, var(--deck-station) 55%, var(--deck)); }
-  .scene-optional[aria-selected="true"] { outline-color: var(--deck-lit); }
+  /* A condition, never "optional" (owner). Set here: a thin solid line, the project's switch decides; dimmed while
+     it is off here. If it happens: a dotted amber line, an event brings it on. */
+  .scene-set { outline: 1.5px solid rgb(147 197 253 / 0.6); outline-offset: -1.5px; }
+  .scene-off:not([aria-selected="true"]) { background: color-mix(in srgb, var(--deck-station) 40%, var(--deck)); }
+  .scene-off .scene-title, .scene-off .scene-tagline { opacity: 0.7; }
+  .scene-event { outline: 1.5px dotted var(--deck-warn); outline-offset: -1.5px; }
+  .scene-event .scene-number { color: var(--deck-warn); }
+  .scene-set[aria-selected="true"], .scene-event[aria-selected="true"] { outline-color: var(--deck-lit); }
+
+  /* The annunciator: one lamp per system, the master light first, as a cockpit's caution panel. */
+  .annunciator { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.5rem; }
+  .annunciator-grid { display: grid; flex: 1 1 32rem; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.375rem; }
+  .annunciator-master, .annunciator-light {
+    --lamp: var(--deck-lit);
+    display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 0.5rem;
+    align-items: center; height: 100%; padding: 0.4rem 0.6rem; border-radius: 8px;
+    background: color-mix(in srgb, var(--lamp) 9%, var(--deck)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lamp) 35%, transparent);
+  }
+  .annunciator-master { flex: 0 0 11rem; padding: 0.6rem 0.75rem; }
+  .annunciator-light:hover { background: color-mix(in srgb, var(--lamp) 18%, var(--deck)); }
+  .annunciator-light:focus-visible { outline: 2px solid var(--deck-lit); outline-offset: 2px; }
+  .annunciator-lamp { grid-row: span 2; width: 9px; height: 9px; border-radius: 999px; background: var(--lamp); box-shadow: 0 0 8px 1px color-mix(in srgb, var(--lamp) 70%, transparent); }
+  .annunciator-name { font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--deck-ink); }
+  .annunciator-master .annunciator-name { font-size: 13px; color: var(--lamp); }
+  .annunciator-reading { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--deck-mute); }
+  .light-go { --lamp: #6ee7b7; }
+  .light-caution { --lamp: var(--deck-warn); }
+  .light-warning { --lamp: #fb7185; }
+  .light-off { --lamp: #5b86b3; }
+  .light-off .annunciator-lamp { background: transparent; box-shadow: inset 0 0 0 1.5px var(--lamp); }
+  @media (prefers-reduced-motion: no-preference) {
+    .annunciator-master.light-warning .annunciator-lamp, .annunciator-master.light-caution .annunciator-lamp { animation: lamp 1.6s ease-in-out infinite; }
+  }
+  @keyframes lamp { 50% { opacity: 0.45; } }
 
   .scene-panel { animation: scene-in 220ms cubic-bezier(.2,.7,.2,1); }
   @keyframes scene-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { ActionForm } from "@/components/form";
 import { AsReceivedWarning } from "@/components/as-received-warning";
-import { inputCls } from "@/components/ui";
-import { cn } from "@/lib/core/utils";
+import { MatchDocument } from "./match-document";
 import { matchItemAction } from "@/lib/transmittals/forms";
 import type { TransmittalItem, TransmittalPage } from "@/lib/types";
 
@@ -69,9 +68,8 @@ export function UnplannedItems({ transmittalId, items, page, from, mayAct }: {
               {waiting && mayAct && !page.asReceived ? (
                 <ActionForm action={matchItemAction} hideSubmit hidden={{ transmittalId, itemId: item.id }} className="mt-2 space-y-0">
                   <div className="asking flex flex-wrap items-center gap-2">
-                    <label className="text-xs text-slate-600" htmlFor={`match-${item.id}`}>One of ours?</label>
-                    <input id={`match-${item.id}`} name="number" defaultValue={page.matchedBefore?.[item.id] ?? ""}
-                      placeholder="Our document's number" className={cn(inputCls, "w-64")} />
+                    <span className="text-xs text-slate-600">One of ours?</span>
+                    <MatchDocument proposed={page.matchedBefore?.[item.id] ?? null} />
                     <button className="ask">Match</button>
                     {page.matchedBefore?.[item.id] ? <span className="text-[11px] text-slate-500">matched to it before</span> : null}
                     {item.files[0] ? (

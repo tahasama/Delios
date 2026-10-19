@@ -92,6 +92,7 @@ public static class Liberty
         new("POLICY_MATRIX_DETAIL", Room, "How fine the distribution matrix is cut", "The project's team", true),
         new("RISK_WINDOW", Room, "The risk window", "The project's way of planning", true),
         new("ESCALATE_AFTER_DAYS", Room, "Days before a silent discipline is escalated", "The project's way of planning", true),
+        new("SUPPLIER_INTAKE", Room, "How other organizations' documents come in: by placeholder, or as they come", "The project's contract with its suppliers", true),
     ];
 
     /// <summary>Every switch, the organization's own lists included, as it stands.</summary>
@@ -144,6 +145,7 @@ public static class Liberty
         _ when Acts.Contains(settingKey) || settingKey.StartsWith("SKIP:") || settingKey.StartsWith("CONFIRM:") => "WHO_DOES_WHAT",
         "POLICY_RELEASE" or "POLICY_READY" or "POLICY_MATRIX" or "POLICY_MATRIX_DETAIL" or "ESCALATE_AFTER_DAYS" => settingKey,
         "POLICY_PDF_STAMP" or "STAMP_COMMENTS" => "POLICY_PDF_STAMP",
+        "SUPPLIER_INTAKE" or "AS_RECEIVED_FILING" => "SUPPLIER_INTAKE",
         _ when settingKey.StartsWith("STAMP:") => "POLICY_PDF_STAMP",
         _ => null,
     };

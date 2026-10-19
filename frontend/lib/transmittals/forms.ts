@@ -89,9 +89,12 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
       // Each file that came is something unplanned, waiting for Document
       // Control to register it under our numbering.
       const unplanned = [];
-      for (const file of attachments) {
+      for (const [i, file] of attachments.entries()) {
+        const text = (key: string) => String(formData.get(`${key}_${i}`) ?? "").trim() || null;
+        const reference = text("ref");
+        if (!reference) return { error: `Say the number ${file.name} goes by with them.` };
         const fileId = await upload(ctx, { loose: true }, file);
-        unplanned.push({ title: file.name.replace(/\.[^.]+$/, ""), fileIds: [fileId] });
+        unplanned.push({ title: file.name.replace(/\.[^.]+$/, ""), reference, revision: text("rev"), status: text("status"), outcome: text("outcome"), fileIds: [fileId] });
       }
       const t = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
         body: {
@@ -186,16 +189,16 @@ export async function matchItemAction(_prev: { error?: string; ok?: string } | u
   const ctx = await requireScope();
   const id = String(formData.get("transmittalId") ?? "");
   const itemId = String(formData.get("itemId") ?? "");
-  const number = String(formData.get("number") ?? "").trim();
-  if (!number) return { error: "Write the number of our document it is." };
+  const documentId = String(formData.get("documentId") ?? "");
+  if (!documentId) return { error: "Find the document of ours it is in the register, and choose it." };
   try {
-    await api(projectPath(ctx, `/transmittals/${id}/items/${itemId}/match`), { body: { number } });
+    await api(projectPath(ctx, `/transmittals/${id}/items/${itemId}/match`), { body: { documentId } });
   } catch (e) {
     return { error: refusal(e).message };
   } finally {
     revalidatePath(`/transmittals/${id}`);
   }
-  return { ok: `Matched to ${number}.` };
+  return { ok: "Matched." };
 }
 
 /**

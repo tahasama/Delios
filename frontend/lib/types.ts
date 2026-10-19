@@ -273,7 +273,7 @@ export type TransmittalPage = {
   /** Sent into a package taking documents as they come: the check accepts or returns what came, all at once. */
   asReceived?: boolean;
   /** Something unplanned under a number of theirs matched before to one of ours: that number of ours, by item. */
-  matchedBefore?: Record<string, string> | null;
+  matchedBefore?: Record<string, { id: string; number: string; title: string; revision: string | null }> | null;
   carried: CarriedItem[];
   files: { id: string; name: string; size: number; sha256: string; keptBy: string; keptAt: string }[];
   issueRequests: { id: string; reason: string; note: string | null }[];
@@ -349,8 +349,8 @@ export type PackageView = {
    * accepts it, the supplier's code, when it was opened, when it was delivered.
    */
   names: { to: string; owners: string; acceptors: string; supplierCode: string | null; createdAt: string; deliveredAt: string | null };
-  /** A supplier's package taking documents as they come (no placeholders): what they are filed under, since when, by whom. */
-  asReceived?: { deliverableType: string; docType: string; discipline: string; since: string | null; by: string | null } | null;
+  /** On a project taking other organizations' documents as they come (Control room): what they are filed under. */
+  asReceived?: { deliverableType: string; docType: string; discipline: string } | null;
 };
 
 /** GET /activity (ActivityEndpoints.cs): one act of the project, for Home's journal and log. */

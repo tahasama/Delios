@@ -3794,26 +3794,6 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid[]")
                         .HasColumnName("acceptor_ids");
 
-                    b.Property<Instant?>("AsReceivedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("as_received_at");
-
-                    b.Property<string>("AsReceivedByName")
-                        .HasColumnType("text")
-                        .HasColumnName("as_received_by_name");
-
-                    b.Property<string>("AsReceivedDeliverableType")
-                        .HasColumnType("text")
-                        .HasColumnName("as_received_deliverable_type");
-
-                    b.Property<string>("AsReceivedDiscipline")
-                        .HasColumnType("text")
-                        .HasColumnName("as_received_discipline");
-
-                    b.Property<string>("AsReceivedDocType")
-                        .HasColumnType("text")
-                        .HasColumnName("as_received_doc_type");
-
                     b.Property<Instant?>("AssessedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("assessed_at");
@@ -3951,10 +3931,6 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<Guid?>("SupplierPartyId")
                         .HasColumnType("uuid")
                         .HasColumnName("supplier_party_id");
-
-                    b.Property<bool>("TakesAsReceived")
-                        .HasColumnType("boolean")
-                        .HasColumnName("takes_as_received");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")

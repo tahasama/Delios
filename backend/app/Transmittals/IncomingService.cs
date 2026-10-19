@@ -50,7 +50,7 @@ public sealed record LooseUploadRequest(string? FileName, long Size, string? Con
 /// </summary>
 public sealed partial class IncomingService(
     DeliosDbContext db, DocumentService documents, TransmittalService transmittals, Numbering numbering, FileStorage storage,
-    AuditLog audit, IClock clock, IOptions<StorageOptions> storageOptions, Notifications.Notifier notifier)
+    AuditLog audit, IClock clock, IOptions<StorageOptions> storageOptions, Notifications.Notifier notifier, Packages.SupplyFiling filing)
 {
     static IncomingService() => GlobalFontSettings.FontResolver ??= new EmbeddedFonts();
 
@@ -135,8 +135,12 @@ public sealed partial class IncomingService(
             return (null, Problems.Invalid("DOCUMENT_TWICE", "Each placeholder is sent once on a transmittal."));
         // Into a package taking documents as they come: each says its own number and revision, and lands in our
         // register as it is once the check accepts it.
-        var (asReceived, packageProblem) = await AsReceivedPackageAsync(access, party!, request.PackageId, unplanned, cancellationToken);
-        if (packageProblem is not null) return (null, packageProblem);
+        var (asReceived, intakeProblem) = await AsReceivedIntakeAsync(access, party!, unplanned, cancellationToken);
+        if (intakeProblem is not null) return (null, intakeProblem);
+        // The supplier's package it was sent from, when it was: what it brings is filed there.
+        var intoPackage = request.PackageId is { } packageId && await db.Packages.AnyAsync(p => p.Id == packageId
+            && p.ProjectId == access.Project.Id && p.Kind == Packages.PackageKinds.Supply && p.SupplierPartyId == party!.Id, cancellationToken)
+            ? request.PackageId : null;
 
         var now = clock.GetCurrentInstant();
         var transmittal = new Transmittal
@@ -158,7 +162,7 @@ public sealed partial class IncomingService(
             ReceiptNote = Blank(request.Note),
             InReplyToId = answered?.Id,
             Extras = Documents.OwnFields.Write(null, request.Extras),
-            PackageId = asReceived?.Id,
+            PackageId = intoPackage,
         };
         transmittal.Recipients = forPeople.Select(m => new TransmittalRecipient
         {
@@ -290,6 +294,8 @@ public sealed partial class IncomingService(
     {
         if (!access.IsInternal || !(access.Holds(Verbs.Control) || await StandIns.ArrivalAsync(db, access, transmittalId, cancellationToken)))
             return (null, Problems.Forbidden("CONTROL_ONLY", "The control function decides what goes into the register."));
+        if ((await Packages.Intake.ReadAsync(db, access.Project.Id, cancellationToken)).Mode == Packages.Intake.AsReceived)
+            return (null, Problems.Conflict("INTAKE_AS_RECEIVED", "This project takes what others send as it comes: the check accepts it as it is."));
         if (await db.TransmittalItems.AnyAsync(i => i.Id == itemId && (i.ReturnedAt != null || i.Matched), cancellationToken))
             return (null, Problems.Conflict("ALREADY_ANSWERED", "It was matched to one of ours, or returned."));
         var transmittal = await transmittals.Visible(access).Include(t => t.Items).Include(t => t.Recipients).AsSplitQuery()

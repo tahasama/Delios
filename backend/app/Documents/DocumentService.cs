@@ -97,6 +97,11 @@ public sealed class DocumentService(
             return Fail(Problems.Invalid("VALUE_NOT_PUBLISHED", $"{originator} is not an active party.",
                 new { field = "originator", value = originator }));
         }
+        // A project taking other organizations' documents as they come registers none of theirs by hand: they send them.
+        if (originator is not null && await db.Parties.AnyAsync(p => p.Code == originator && !p.IsInternal, cancellationToken)
+            && (await Packages.Intake.ReadAsync(db, access.Project.Id, cancellationToken)).Mode == Packages.Intake.AsReceived)
+            return Fail(Problems.Conflict("INTAKE_AS_RECEIVED",
+                "This project takes other organizations' documents as they come: they send them, and the check puts them in the register."));
         if (await PurchaseOrderProblemAsync(catalog, Blank(request.ContractRef), originator, cancellationToken) is { } poProblem) return Fail(poProblem);
 
         // What this deliverable type insists on: a document from another party

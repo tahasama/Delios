@@ -366,6 +366,7 @@ public static class PlatformSetup
             Reviews.VerdictListEndpoints.MapVerdictListEndpoints(app);
             Documents.DocumentEndpoints.MapDocumentEndpoints(app);
             Documents.Equivalents.MapEquivalentEndpoints(app);
+            Packages.Intake.MapIntakeEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);
             Documents.KeepingEndpoints.MapKeepingEndpoints(app);

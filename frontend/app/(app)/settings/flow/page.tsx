@@ -12,7 +12,9 @@ import { scheduleSource } from "@/lib/actions/api";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
-import { SceneDeck, type Flow, type Scene } from "./scene-deck";
+import { SceneDeck, type Flow, type Scene, type When, type Light } from "./scene-deck";
+import { IntakeChoice } from "./intake-choice";
+import { projectIntake } from "@/lib/packages/api";
 import { Choice } from "./choice";
 import { liberty } from "@/lib/organization/liberty";
 import { setRoomAnswerAction, setScheduleDaysAction } from "@/lib/settings/forms-how-it-works";
@@ -178,8 +180,9 @@ const STAGES: Stage[] = [
   },
   {
     key: "theirs", title: "Registered or matched", tagline: "One of ours, or a new one", rail: "rail-none",
-    text: "What came unplanned is matched to one of our documents (what came becomes its content, their number kept beside ours, and the register finds it under both), or registered as a new document under our numbering, their number kept the same way.",
+    text: "What came unplanned is matched to one of our documents, chosen from the register (what came becomes its content, their number kept beside ours, and the register finds it under both), or registered as a new document under our numbering, their number kept the same way. Nobody types a number.",
     who: [{ title: "Matching it, or registering it", by: "Whoever checks what arrives" }],
+    answers: ["INTAKE"],
     sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES"],
     extras: ["numbering", "form:DOCUMENT"],
   },
@@ -187,6 +190,7 @@ const STAGES: Stage[] = [
     key: "asked", title: "Asked of the supplier", tagline: "Asked on a transmittal", rail: "rail-sent",
     text: "A placeholder from the supplier's package goes to them, due on its planned day. They hold it until they send it.",
     who: [{ title: "Asking for it", by: "The control function (with none, anyone of ours who sends documents), from the supplier's package" }],
+    answers: ["INTAKE"],
     sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS"],
     extras: ["packages", "parties", "form:TRANSMITTAL"],
   },
@@ -204,15 +208,17 @@ const STAGES: Stage[] = [
   },
   {
     key: "sent-as-is", title: "Sent as it is", tagline: "Their number, their revision", rail: "rail-received",
-    text: "A supplier's package taking documents as they come has no placeholders: the supplier sends each document under its own number and revision, with its status and review outcome.",
-    who: [{ title: "Sending it", by: "The supplier, from its side of the package" }, { title: "Choosing this way, with what it is filed under", by: "The control function, on the package" }],
-    extras: ["packages"],
+    text: "This project takes other organizations' documents as they come: nothing is asked by placeholder; they send each document under its own number and revision, with its status and review outcome, giving their number on each file.",
+    who: [{ title: "Sending it", by: "The other organization, on a transmittal" }, { title: "Choosing this way, with what it is filed under", by: "An administrator or the control function, here" }],
+    answers: ["INTAKE"],
+    extras: ["packages", "form:TRANSMITTAL"],
     warn: true,
   },
   {
     key: "as-came", title: "In the register as it came", tagline: "Not our numbering", rail: "rail-received",
-    text: "Once the check accepts it, it is in our register exactly as it came: their number, their revision, their status and review outcome, filed under the deliverable type, document type and discipline named on the package. Ready for our review; the next revision comes from them.",
+    text: "Once the check accepts it, it is in our register exactly as it came: their number, their revision, their status and review outcome, filed under the deliverable type, document type and discipline chosen here, in its organization's package. Ready for our review; the next revision comes from them. Nothing is matched or registered by hand.",
     who: [{ title: "Putting it there", by: "The app, once the check accepts it" }],
+    answers: ["INTAKE"],
     sets: ["DELIVERABLE_TYPES", "DOCUMENT_TYPES", "DISCIPLINES"],
     extras: ["packages"],
     warn: true,
@@ -380,7 +386,11 @@ const STAGES: Stage[] = [
  * The flows, from the organization's own side. A fork carries one lane on and hangs the one that ends below it; who
  * returns a refused revision follows the project, and without a control function there is no check before release.
  */
-type FlowLane = { scene: string; optional?: string; tagline?: string; end?: boolean };
+type FlowLane = { scene: string; when?: When; tagline?: string; end?: boolean };
+/** Set here: the project's configuration decides (`on` when it is known project-wide). */
+const set = (text: string, on?: boolean): When => ({ kind: "set", text, on });
+/** If it happens: an event brings it on, and then it is never skipped. */
+const event = (text: string): When => ({ kind: "event", text });
 const cap = (words: string) => words.charAt(0).toUpperCase() + words.slice(1);
 
 type FlowShape = { key: string; title: string; tab: string; from: string; to: string; columns: FlowLane[][] };
@@ -391,7 +401,7 @@ type FlowShape = { key: string; title: string; tab: string; from: string; to: st
  *  - `ours`: our verdict on what others send us is final ("final"), a recommendation another decides on
  *    ("recommends"), or a check before we pass it on to whoever approves ("passes").
  *  - `decider`: who decides after us when our verdict is not final; `approver`: who approves what we produce, when
- *    someone outside always does (else an outside approval is optional); `client`: who asks documents of us.
+ *    someone outside always does (else only when the decider asks for one); `client`: who asks documents of us.
  */
 type RoleWork = {
   order: string[];
@@ -443,9 +453,11 @@ const ROLE_WORK: Record<string, RoleWork> = {
 };
 const GENERIC_WORK: RoleWork = { order: ["produce", "receive", "supplier"], ours: "final" };
 
-function flowsFor({ gate, returner, together, unreviewed, role }: { gate: boolean; returner: string; together: boolean; unreviewed: boolean; role: string }): FlowShape[] {
+type Shape = { gate: boolean; returner: string; together: boolean; unreviewed: boolean; asCome: boolean; confirmJoin: boolean };
+
+function flowsFor({ role, ...shape }: Shape & { role: string }): FlowShape[] {
   const work = ROLE_WORK[role] ?? GENERIC_WORK;
-  const all = flowsAll({ gate, returner, together, unreviewed, work });
+  const all = flowsAll({ ...shape, work });
   const flow = (key: string) => {
     const one = all.find((f) => f.key === key)!;
     return { ...one, title: work.titles?.[key] ?? one.title, tab: work.tabs?.[key] ?? one.tab };
@@ -456,17 +468,23 @@ function flowsFor({ gate, returner, together, unreviewed, role }: { gate: boolea
   return [...lead, ...rest].map(flow);
 }
 
-function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolean; returner: string; together: boolean; unreviewed: boolean; work: RoleWork }): FlowShape[] {
+/**
+ * Nothing on a flow is optional (owner): a step either always happens, or happens under a condition, of two kinds.
+ * Set here: the project's configuration decides it (drawn on or off as it stands, where it is known for the whole
+ * project; else "depends", with what on). If it happens: an event brings it on (released in error, a legal reason),
+ * and then it is never skipped. A way the project did not choose (placeholders or as they come) is not drawn at all.
+ */
+function flowsAll({ gate, returner, together, unreviewed, asCome, confirmJoin, work }: Shape & { work: RoleWork }): FlowShape[] {
   // Released and issued are one act unless the project keeps them apart (POLICY_RELEASE): one step, or two.
   // A released revision may be voided: the road that ends below the release.
-  const voided: FlowLane = { scene: "voided", end: true, optional: "it was released in error" };
+  const voided: FlowLane = { scene: "voided", end: true, when: event("it was released in error") };
   const out: FlowLane[][] = together ? [[{ scene: "released-issued" }, voided]] : [[{ scene: "release" }, voided], [{ scene: "issue" }]];
   // Where some document types are not reviewed, review happens only for the others.
-  const reviewed = unreviewed ? "its document type is reviewed" : undefined;
+  const reviewed = unreviewed ? set("its document type is reviewed (Types & sets, on the type)") : undefined;
   // What we produce: approved outside always when our role answers to someone, else only when asked for.
   const approved: FlowLane[] = work.approver
     ? [{ scene: "approval", tagline: `${work.approver} approves it` }, { scene: "approval-refused", end: true, tagline: `${work.approver} refuses it` }]
-    : [{ scene: "approval", optional: "an outside approval is asked for" }, { scene: "approval-refused", end: true, optional: "an outside approval is asked for" }];
+    : [{ scene: "approval", when: event("the decider asks for an outside approval") }, { scene: "approval-refused", end: true, when: event("the outside approval is refused") }];
   // What others send us: our verdict is final, or another decides after us.
   const afterUs: FlowLane[][] = work.ours === "final" ? [] : [[
     { scene: "approval", tagline: `${work.decider ?? "Another"} decides` },
@@ -479,7 +497,7 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       columns: [
         [{ scene: "register" }],
         [{ scene: "prepare" }],
-        [{ scene: "review", tagline: "Our reviewers, and others when the route names them", optional: reviewed }],
+        [{ scene: "review", tagline: "Our reviewers, and others when the route names them", when: reviewed }],
         [{ scene: "accepted" }, { scene: "returned", end: true, tagline: `${returner} returns it` }],
         ...(gate ? [[{ scene: "gate" }, { scene: "gate-return", end: true }]] : []),
         approved,
@@ -491,8 +509,8 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       columns: [
         [{ scene: "received" }],
         [{ scene: gate ? "checked" : "checked-self" }],
-        [{ scene: "theirs" }],
-        [{ scene: "review", tagline: ourReview, optional: reviewed }],
+        [{ scene: asCome ? "as-came" : "theirs" }],
+        [{ scene: "review", tagline: ourReview, when: reviewed }],
         [{ scene: "accepted", tagline: work.ours === "final" ? undefined : work.ours === "recommends" ? "We recommend it" : "We pass it on" }, { scene: "to-sender", end: true }],
         ...afterUs,
         ...out,
@@ -501,10 +519,11 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
     {
       key: "supplier", tab: "Suppliers owe us", title: "Documents a supplier owes us", from: "We ask the supplier for it", to: "in force with us, or back with them for the next revision",
       columns: [
-        [{ scene: "asked" }, { scene: "sent-as-is", optional: "the package takes documents as they come" }],
+        // One way or the other (the Control room): asked by placeholder, or sent as it is and taken so.
+        [{ scene: asCome ? "sent-as-is" : "asked" }],
         [{ scene: "received", tagline: "They send it, on a transmittal" }],
         [{ scene: gate ? "checked" : "checked-self" }],
-        [{ scene: "as-came", optional: "the package takes documents as they come" }],
+        ...(asCome ? [[{ scene: "as-came" }]] : []),
         [{ scene: "review", tagline: "By us, by them, or both" }],
         [{ scene: "accepted", tagline: "We hold it" }, { scene: "handed-back", end: true }],
         ...out,
@@ -514,12 +533,12 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       key: "client", tab: `${cap(work.client ?? "our client")} asks`, title: `Documents ${work.client ?? "our client"} asks of us`, from: `${cap(work.client ?? "our client")} asks for it`, to: `accepted by ${work.client ?? "our client"}, or back with us for the next revision`,
       columns: [
         // Two ways it is asked: their placeholder, filled on their own DELIOS, or asked outside it and recorded here.
-        [{ scene: "client-placeholder", optional: "they work on DELIOS" }, { scene: "client-asked", optional: "they are not on DELIOS" }],
-        [{ scene: "register", tagline: "Here, when it was asked here", optional: "they are not on DELIOS" }],
+        [{ scene: "client-placeholder", when: set("they work from their own DELIOS (Organizations)") }, { scene: "client-asked", when: set("they are not on DELIOS (Organizations)") }],
+        [{ scene: "register", tagline: "Here, when it was asked here", when: set("they are not on DELIOS (Organizations)") }],
         [{ scene: "prepare" }],
-        [{ scene: "review", tagline: "Ours, before it goes", optional: "we review before sending" }],
+        [{ scene: "review", tagline: "Ours, before it goes", when: reviewed }],
         [{ scene: "client-sent" }],
-        [{ scene: "client-check", optional: "they work on DELIOS" }],
+        [{ scene: "client-check", when: set("they work from their own DELIOS (Organizations)") }],
         [{ scene: "accepted", tagline: `${cap(work.client ?? "our client")} accepts it` }, { scene: "returned", end: true, tagline: `${cap(work.client ?? "our client")} returns it` }],
       ],
     },
@@ -528,7 +547,7 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       columns: [
         [{ scene: "pkg-made" }],
         [{ scene: "pkg-checked" }],
-        [{ scene: "pkg-short", optional: "something is missing" }],
+        [{ scene: "pkg-short", when: event("something it needs is missing") }],
         [{ scene: "pkg-delivered" }],
         [{ scene: "pkg-accepted" }],
       ],
@@ -537,7 +556,7 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       key: "action", tab: "Actions", title: "An action on the schedule", from: "The schedule needs documents", to: "the action goes ahead, or is postponed",
       columns: [
         [{ scene: "act-needs" }],
-        [{ scene: "act-risk", optional: "a document is still missing" }],
+        [{ scene: "act-risk", when: event("a document is still missing inside the risk window") }],
         [{ scene: "act-confirm" }],
         [{ scene: "act-ahead" }, { scene: "act-postponed", end: true }],
       ],
@@ -546,7 +565,7 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       key: "join", tab: "People joining", title: "Someone joins the project", from: "Someone is needed on the project", to: "on it, and told",
       columns: [
         [{ scene: "join-asked" }],
-        [{ scene: "join-confirmed", optional: "confirmation is asked" }, { scene: "join-refused", end: true, optional: "confirmation is asked" }],
+        [{ scene: "join-confirmed", when: set("confirmation by whoever holds Manage is asked", confirmJoin) }, { scene: "join-refused", end: true, when: set("confirmation by whoever holds Manage is asked", confirmJoin) }],
         [{ scene: "join-on" }],
       ],
     },
@@ -554,9 +573,9 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       key: "keep", tab: "Keeping & ending", title: "A document kept, and ended", from: "In the register", to: "kept as long as it must be, or ended with why",
       columns: [
         // Ended at any time while kept: withdrawn once released, cancelled before.
-        [{ scene: "kept" }, { scene: "withdrawn", end: true, optional: "it was released and is no longer valid" }, { scene: "cancelled", end: true, optional: "it will never be produced" }],
-        [{ scene: "held", optional: "a legal reason calls for it" }],
-        [{ scene: "archived", optional: "the project is archived" }],
+        [{ scene: "kept" }, { scene: "withdrawn", end: true, when: event("it was released and is no longer valid") }, { scene: "cancelled", end: true, when: event("it will never be produced") }],
+        [{ scene: "held", when: event("a legal reason calls for it") }],
+        [{ scene: "archived", when: event("the project is archived") }],
       ],
     },
   ];
@@ -621,7 +640,9 @@ export default async function ControlRoomPage() {
     orgSettings().catch(() => null),
     optOutsOf(ctx.projectId).then((all) => all.length).catch(() => null),
   ]);
-  const stateNames_ = await stateNames(ctx);
+  const [stateNames_, intake] = await Promise.all([stateNames(ctx), projectIntake(ctx)]);
+  const asCome = intake.mode === "AS_RECEIVED";
+  const confirmJoin = effectiveAnswer(`CONFIRM:${PEOPLE_KEY}`, answers.get(`CONFIRM:${PEOPLE_KEY}`)) === "ON";
 
   const gate = holders.length > 0;
   // Our role on the project decides which flows come first, and in whose words.
@@ -691,6 +712,11 @@ export default async function ControlRoomPage() {
         fact("track-reading", "Opening a document, downloading a file", organization.get("TRACK_READING") === "OFF" ? "Not kept" : "Kept", where),
         fact("track-signins", "Sign-ins, on a person's activity", organization.get("TRACK_SIGN_INS") === "ON" ? "Shown" : "Kept for security, not shown", where),
       ];
+    }
+    if (key === "INTAKE") {
+      const list = (setKey: string) => values.filter((one) => one.setKey === setKey && one.status === "ACTIVE").map((one) => ({ code: one.code, label: one.label }));
+      return <IntakeChoice key={key} mode={intake.mode} filing={intake} deliverableTypes={list("DELIVERABLE_TYPES")} docTypes={list("DOCUMENT_TYPES")}
+        disciplines={list("DISCIPLINES")} readOnly={readOnly} fixed={isFixed("SUPPLIER_INTAKE")} />;
     }
     if (key === "CONTROL_PEOPLE") return fact(key, "Who acts as the control function", names.length ? names.join(", ") : "Nobody", `${HOW}#control-people`);
     if (key.startsWith("STATE:")) {
@@ -784,7 +810,7 @@ export default async function ControlRoomPage() {
         <header className="border-b border-line bg-tint-soft px-5 py-3 sm:px-6">
           <h2 className="text-[15px] font-semibold text-slate-950">{stage.title}</h2>
           <p className="mt-0.5 text-[13px] leading-5 text-slate-600">{stage.text}</p>
-          {stage.warn ? <div className="mt-2"><AsReceivedWarning /></div> : null}
+          {stage.warn || (asCome && stage.answers?.includes("INTAKE")) ? <div className="mt-2"><AsReceivedWarning /></div> : null}
         </header>
         <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
           <div className="space-y-5 px-5 py-4 sm:px-6">
@@ -839,14 +865,30 @@ export default async function ControlRoomPage() {
 
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "The reviewer";
-  const flows: Flow[] = flowsFor({ gate, returner, together, unreviewed, role }).map((flow) => ({
+  const flows: Flow[] = flowsFor({ gate, returner, together, unreviewed, asCome, confirmJoin, role }).map((flow) => ({
     ...flow,
     columns: flow.columns.map((column) => column.map((lane) => {
       const stage = byKey.get(lane.scene)!;
       const scene: Scene = { key: stage.key, title: stage.title, tagline: lane.tagline ?? stage.tagline, rail: stage.rail };
-      return { scene, optional: lane.optional, end: lane.end };
+      return { scene, when: lane.when, end: lane.end };
     })),
   }));
+
+  // The annunciator: each system the project runs on, where it stands, opening the step where it is set.
+  const stamped = effectiveAnswer("POLICY_PDF_STAMP", answers.get("POLICY_PDF_STAMP")) === "ON";
+  const lights: Light[] = [
+    { key: "control", label: "Control function", reading: names.length ? names.join(", ") : "none: the work runs itself", tone: names.length ? "go" : "off", href: `#receive/${gate ? "checked" : "checked-self"}` },
+    { key: "numbering", label: "Numbering", reading: schemes ? plural(schemes, "scheme") : "no scheme yet", tone: schemes ? "go" : "caution", href: "#produce/register" },
+    ...(templates ? [{ key: "routes", label: "Review routes", reading: templates.length ? plural(templates.length, "route") : "none yet", tone: templates.length ? "go" : "caution", href: "#produce/review" } as Light] : []),
+    { key: "outcomes", label: "Review outcomes", reading: inUse("REVIEW_OUTCOMES") ? plural(inUse("REVIEW_OUTCOMES"), "verdict") : "none yet", tone: inUse("REVIEW_OUTCOMES") ? "go" : "caution", href: "#produce/accepted" },
+    { key: "release", label: "Release", reading: together ? "released & issued at once" : "released, then issued", tone: "go", href: `#produce/${together ? "released-issued" : "release"}` },
+    { key: "stamps", label: "PDF stamps", reading: stamped ? "stamped" : "not stamped", tone: stamped ? "go" : "off", href: "#produce/accepted" },
+    { key: "intake", label: "Intake", reading: asCome ? "as they come" : "by placeholder", tone: asCome ? "warning" : "go", href: `#supplier/${asCome ? "sent-as-is" : "asked"}` },
+    ...(parties ? [{ key: "parties", label: "Organizations", reading: parties.length ? plural(parties.length, "organization") : "only us", tone: parties.length ? "go" : "caution", href: "#receive/received" } as Light] : []),
+    { key: "schedule", label: "Schedule", reading: schedule.source ? `needed ${lead} d before, at risk ${risk} d` : "none named yet", tone: schedule.source ? "go" : "caution", href: "#action/act-needs" },
+    { key: "joining", label: "Joining", reading: confirmJoin ? "confirmed by Manage" : "no confirmation", tone: confirmJoin ? "go" : "off", href: "#join/join-confirmed" },
+    ...(checksOff !== null ? [{ key: "checks", label: "Daily checks", reading: checksOff ? `${checksOff} switched off` : "all running", tone: checksOff ? "off" : "go", href: "#keep/kept" } as Light] : []),
+  ];
 
   return (
     <div className="space-y-4">
@@ -871,7 +913,7 @@ export default async function ControlRoomPage() {
         </div>
       </section>
 
-      <SceneDeck flows={flows} panels={panels} />
+      <SceneDeck flows={flows} panels={panels} lights={lights} />
     </div>
   );
 }

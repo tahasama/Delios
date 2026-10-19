@@ -174,6 +174,8 @@ public sealed partial class TransmittalService
                 .Where(d => placeholderIds.Contains(d.Id)).OrderBy(d => d.Number).ToListAsync(cancellationToken);
             if (asked.Count != placeholderIds.Count)
                 return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "A document chosen does not exist or is not yours to see."));
+            if ((await Packages.Intake.ReadAsync(db, access.Project.Id, cancellationToken)).Mode == Packages.Intake.AsReceived)
+                return Fail(Problems.Conflict("INTAKE_AS_RECEIVED", "This project takes other organizations' documents as they come: no placeholder is asked."));
             var standsIn = await StandIns.ExchangesAsync(db, access, cancellationToken);
             if (!standsIn && asked.FirstOrDefault(d => !access.Allows(Verbs.Control, d.Facts)) is { } notControl)
                 return Fail(Problems.Forbidden("CONTROL_ONLY", $"The control function asks a supplier for {notControl.Number}."));

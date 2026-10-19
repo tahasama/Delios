@@ -8,8 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Delios.Host.Transmittals;
 
-/// <summary>Body of matching something unplanned that arrived to one of our documents: our number (or one already matched to it).</summary>
-public sealed record MatchRequest(string? Number);
+/// <summary>Body of matching something unplanned that arrived to one of our documents, chosen from the register.</summary>
+public sealed record MatchRequest(Guid? DocumentId, string? Number = null);
 
 /// <summary>Body of the check on what came into a package taking documents as they come: accept all, or return all with why.</summary>
 public sealed record AsReceivedCheckRequest(bool Return = false, string? Note = null);
@@ -41,12 +41,18 @@ public sealed partial class IncomingService
             return (null, Problems.Conflict("NOT_UNPLANNED", "Only something unplanned is matched; the rest is in the register already."));
         if (item.RegisteredAt is not null || item.ReturnedAt is not null)
             return (null, Problems.Conflict("ALREADY_ANSWERED", "It is in the register already, or was returned.", new { documentId = item.DocumentId }));
+        if ((await Intake.ReadAsync(db, access.Project.Id, cancellationToken)).Mode == Intake.AsReceived)
+            return (null, Problems.Conflict("INTAKE_AS_RECEIVED", "This project takes what others send as it comes: the check accepts it as it is."));
+        // Chosen from the register (owner: numbering is never typed), or a number of theirs matched before.
         var written = request.Number?.Trim() ?? "";
-        if (written.Length == 0) return (null, Problems.Invalid("NUMBER_REQUIRED", "Write the number of our document it is.", new { field = "number" }));
+        if (request.DocumentId is null && written.Length == 0)
+            return (null, Problems.Invalid("DOCUMENT_REQUIRED", "Choose the document of ours it is, from the register.", new { field = "documentId" }));
 
         var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
         var visible = DocumentQueries.Visible(db, access, restricted);
-        var document = await visible.SingleOrDefaultAsync(d => d.Number == written, cancellationToken);
+        var document = request.DocumentId is { } chosen
+            ? await visible.SingleOrDefaultAsync(d => d.Id == chosen, cancellationToken)
+            : await visible.SingleOrDefaultAsync(d => d.Number == written, cancellationToken);
         if (document is null && await Equivalents.FindAsync(db, access.Project.Id, partyId, written, cancellationToken) is { } matched)
             document = await visible.SingleOrDefaultAsync(d => d.Id == matched, cancellationToken);
         if (document is null)
@@ -114,21 +120,15 @@ public sealed partial class IncomingService
     // ── A package taking documents as they come ───────────────────────────────
 
     /// <summary>
-    /// The package a supplier sends into without placeholders, checked when it sends: its own supply package, shared,
-    /// taking documents as they come; each item with its number and revision, not one of ours by number, and not a
-    /// revision already in our register (a returned one comes again under the same revision).
+    /// On a project taking documents as they come (<see cref="Intake"/>), what another organization sends, checked when it
+    /// sends: each item with its number and revision, not one of ours by number, and not a revision already in our
+    /// register (a returned one comes again under the same revision). Null on a project taking them by placeholder.
     /// </summary>
-    private async Task<(Package? Package, IResult? Problem)> AsReceivedPackageAsync(
-        ProjectAccess access, Party party, Guid? packageId, UnplannedItem[] items, CancellationToken cancellationToken)
+    private async Task<(IntakeView? Intake, IResult? Problem)> AsReceivedIntakeAsync(
+        ProjectAccess access, Party party, UnplannedItem[] items, CancellationToken cancellationToken)
     {
-        if (packageId is null) return (null, null);
-        var package = await db.Packages.AsNoTracking().SingleOrDefaultAsync(p => p.Id == packageId && p.ProjectId == access.Project.Id
-            && p.Kind == PackageKinds.Supply && p.SupplierPartyId == party.Id, cancellationToken);
-        if (package is null) return (null, Problems.NotFound("PACKAGE_NOT_FOUND", "No such package of yours."));
-        if (!package.TakesAsReceived)
-            return (null, Problems.Invalid("NOT_AS_RECEIVED", "This package asks for its documents by placeholder: fill those instead."));
-        if (!access.IsInternal && package.SharedAt is null) return (null, Problems.NotFound("PACKAGE_NOT_FOUND", "No such package of yours."));
-        if (items.Length == 0) return (null, Problems.Invalid("ITEMS_REQUIRED", "Send at least one document."));
+        var intake = await Intake.ReadAsync(db, access.Project.Id, cancellationToken);
+        if (intake.Mode != Intake.AsReceived) return (null, null);
         foreach (var item in items)
         {
             var number = item.Reference?.Trim() ?? "";
@@ -145,7 +145,7 @@ public sealed partial class IncomingService
                     && (r.State == RevisionStates.InReview || r.State == RevisionStates.Received), cancellationToken))
                 return (null, Problems.Conflict("REVISION_IN_REVIEW", $"{number}: the revision before is in review; send this one once it is decided."));
         }
-        return (package, null);
+        return (intake, null);
     }
 
     /// <summary>The document a number of theirs already stands for: matched before, or taken as it came under that number.</summary>
@@ -166,11 +166,13 @@ public sealed partial class IncomingService
             return (null, Problems.Forbidden("CONTROL_ONLY", "The control function checks what arrives."));
         var transmittal = await transmittals.Visible(access).Include(t => t.Items).AsSplitQuery()
             .SingleOrDefaultAsync(t => t.Id == transmittalId, cancellationToken);
-        if (transmittal?.PackageId is not { } packageId || transmittal.FromPartyId is not { } partyId)
-            return (null, Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal into a package taking documents as they come."));
-        var package = await db.Packages.Include(p => p.Members).SingleOrDefaultAsync(p => p.Id == packageId, cancellationToken);
-        if (package is null || !package.TakesAsReceived)
-            return (null, Problems.Conflict("NOT_AS_RECEIVED", "Its package no longer takes documents as they come: register each, or match it to one of ours."));
+        if (transmittal is null || transmittal.Direction != TransmittalDirections.Incoming || transmittal.FromPartyId is not { } partyId)
+            return (null, Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal from another organization."));
+        var intake = await Intake.ReadAsync(db, access.Project.Id, cancellationToken);
+        if (intake.Mode != Intake.AsReceived)
+            return (null, Problems.Conflict("NOT_AS_RECEIVED", "This project takes documents by placeholder: match each to one of ours, or make it a document."));
+        var package = transmittal.PackageId is { } packageId
+            ? await db.Packages.Include(p => p.Members).SingleOrDefaultAsync(p => p.Id == packageId, cancellationToken) : null;
         var waiting = transmittal.Items.Where(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt is null && i.ReturnedAt is null).ToList();
         if (waiting.Count == 0) return (null, Problems.Conflict("NOTHING_TO_CHECK", "Everything on it was checked already."));
         var party = await db.Parties.AsNoTracking().SingleAsync(p => p.Id == partyId, cancellationToken);
@@ -207,7 +209,7 @@ public sealed partial class IncomingService
             return (null, Problems.Conflict("FILES_NOT_READY", "Its files are not all scanned and clean."));
         foreach (var item in waiting)
         {
-            var problem = await TakeAsReceivedAsync(access, transmittal, package, party, item,
+            var problem = await TakeAsReceivedAsync(access, transmittal, intake, package, party, item,
                 files.Where(f => f.TransmittalItemId == item.Id).ToList(), catalog, cancellationToken);
             if (problem is not null) return (null, problem);
         }
@@ -216,7 +218,7 @@ public sealed partial class IncomingService
     }
 
     /// <summary>One document taken as it came: their number, their revision, their status and review outcome.</summary>
-    private async Task<IResult?> TakeAsReceivedAsync(ProjectAccess access, Transmittal transmittal, Package package, Party party,
+    private async Task<IResult?> TakeAsReceivedAsync(ProjectAccess access, Transmittal transmittal, IntakeView intake, Package? package, Party party,
         TransmittalItem item, List<StoredFile> files, Catalog catalog, CancellationToken cancellationToken)
     {
         var number = item.DocumentNumber.Trim();
@@ -229,7 +231,7 @@ public sealed partial class IncomingService
         {
             if (await db.Documents.AnyAsync(d => d.ProjectId == access.Project.Id && d.Number == number, cancellationToken))
                 return Problems.Conflict("NUMBER_TAKEN", $"{number} is already a number of another document in the register.");
-            var deliverable = package.AsReceivedDeliverableType!;
+            var deliverable = intake.DeliverableType!;
             document = new Document
             {
                 TenantId = access.Project.TenantId,
@@ -237,10 +239,10 @@ public sealed partial class IncomingService
                 Number = number,
                 Title = item.Title,
                 DeliverableType = deliverable,
-                DocType = item.DocType ?? package.AsReceivedDocType!,
-                Discipline = package.AsReceivedDiscipline!,
+                DocType = item.DocType ?? intake.DocType!,
+                Discipline = intake.Discipline!,
                 Originator = party.Code,
-                ContractRef = package.PurchaseOrder,
+                ContractRef = package?.PurchaseOrder,
                 Confidentiality = catalog.LowestOf(ValueSets.Confidentiality, deliverable) ?? catalog.DefaultOf(ValueSets.Confidentiality, deliverable),
                 RetentionClass = catalog.RetentionFor(null, deliverable),
                 AsReceived = true,
@@ -254,8 +256,17 @@ public sealed partial class IncomingService
             await audit.WriteAsync(new Actor(access.UserId, access.UserName), "REGISTER_ENTRY", "Document", document.Id, document.Number,
                 $"Taken as it came from {party.Name} on {transmittal.Number}: their number, not our numbering.", access.Project.Id, cancellationToken);
         }
-        if (!package.Members.Any(m => m.DocumentId == document.Id))
-            package.Members.Add(new PackageMember { TenantId = package.TenantId, PackageId = package.Id, DocumentId = document.Id, AddedAt = now });
+        // Filed in the package it came into, else in its supplier's (made by itself when there is none).
+        if (package is not null)
+        {
+            if (!package.Members.Any(m => m.DocumentId == document.Id))
+                package.Members.Add(new PackageMember { TenantId = package.TenantId, PackageId = package.Id, DocumentId = document.Id, AddedAt = now });
+        }
+        else if (documentId is null)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await filing.FileAsync(access.Project, document, new Actor(access.UserId, access.UserName), cancellationToken);
+        }
 
         var check = new SubmissionRecord
         {

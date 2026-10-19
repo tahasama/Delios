@@ -318,3 +318,25 @@ export async function setRoomAnswerAction(_prev: State | undefined, formData: Fo
   revalidateHowItWorks();
   return { ok: said };
 }
+
+/**
+ * How other organizations' documents come into the project (the Control room): by placeholder, or as they come, filed
+ * under a deliverable type, a document type and a discipline, the warning read. One way or the other: once one is in
+ * use the backend refuses the other (MODE_IN_USE).
+ */
+export async function setIntakeAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const mode = String(formData.get("mode") ?? "");
+  const text = (key: string) => String(formData.get(key) ?? "").trim() || null;
+  try {
+    await api(projectPath(ctx, "/intake"), {
+      method: "PUT",
+      body: { mode, deliverableType: text("deliverableType"), docType: text("docType"), discipline: text("discipline"), understood: formData.get("understood") === "on" },
+    });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath("/settings/flow");
+  revalidatePath("/packages");
+  return { ok: mode === "AS_RECEIVED" ? "Saved: other organizations' documents are taken as they come." : "Saved: other organizations' documents come by placeholder." };
+}

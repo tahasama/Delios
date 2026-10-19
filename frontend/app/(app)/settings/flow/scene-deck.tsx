@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ToggleLeft, ToggleRight, Zap } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 
 export type Scene = {
@@ -12,11 +13,31 @@ export type Scene = {
 };
 
 /**
- * A scene in its place on a flow; `optional` says when it happens at all, and
+ * Nothing on a flow is optional (owner): a step always happens, or happens under a condition. **Set here**: the
+ * project's configuration decides (`on` when it is known for the whole project, drawn in the position it stands in;
+ * else it depends, per document, on what `text` says). **If it happens**: an event brings it on, and then it is never
+ * skipped.
+ */
+export type When = { kind: "set" | "event"; text: string; on?: boolean };
+
+/**
+ * A scene in its place on a flow; `when` says under what condition it happens, and
  * `end` marks the branch where this revision stops — it goes back, and the
  * next revision starts the flow again.
  */
-export type Lane = { scene: Scene; optional?: string; end?: boolean };
+export type Lane = { scene: Scene; when?: When; end?: boolean };
+
+/**
+ * One light on the annunciator: a system the project runs on, where it stands. `go` set and working, `caution` still
+ * to set up, `warning` set a way that costs the register something, `off` switched off by choice. It opens the step
+ * where it is set (`#flow/scene`).
+ */
+export type Light = { key: string; label: string; reading: string; tone: "go" | "caution" | "warning" | "off"; href: string };
+
+const whenLabel = (when?: When) =>
+  !when ? null : when.kind === "event" ? "if it happens" : when.on === undefined ? "set here" : when.on ? "set here · on" : "set here · off";
+const whenLine = (when: When) =>
+  when.kind === "event" ? `If ${when.text}` : when.on === false ? `Off here: ${when.text}` : `When ${when.text}`;
 
 /**
  * One flow a document goes through: its columns in order, and in a column
@@ -27,10 +48,10 @@ export type Flow = { key: string; title: string; tab: string; from: string; to: 
 /**
  * The flow as a row of steps on its band: one flow at a time, one step of it lit, and under the band that step's
  * panel (who does it, how it works here, where it is set up), changed right there. A fork stacks its steps in one
- * column, the one that ends hanging below; one that does not always happen is drawn dashed. Arrow keys and the hash
+ * column, the one that ends hanging below; one under a condition says which: set here (the project decides), or if it happens (an event). Arrow keys and the hash
  * move between them: /settings/flow#receive/review.
  */
-export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<string, React.ReactNode> }) {
+export function SceneDeck({ flows, panels, lights = [] }: { flows: Flow[]; panels: Record<string, React.ReactNode>; lights?: Light[] }) {
   const [on, setOn] = useState(0);
   const [lit, setLit] = useState<string>(flows[0].columns[0][0].scene.key);
   const track = useRef<HTMLDivElement>(null);
@@ -97,6 +118,7 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
   return (
     <div className="space-y-4">
       <section ref={deck} className="scene-deck scroll-mt-24" aria-label="The flow">
+        {lights.length ? <Annunciator lights={lights} /> : null}
         <div className="scroll-quiet flex gap-1 overflow-x-auto px-5 pt-5 sm:px-6" role="group" aria-label="Which flow">
           {flows.map((one, i) => (
             <button key={one.key} type="button" onClick={() => pick(i)} aria-pressed={i === on} title={one.title} className="route-pick">
@@ -122,7 +144,8 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
         >
           {flow.columns.map((column, c) => {
             const compact = column.length > 1;
-            const station = ({ scene: one, optional, end }: Lane, n: number) => {
+            const station = ({ scene: one, when, end }: Lane, n: number) => {
+              const label = whenLabel(when);
               const number = `${String(c + 1).padStart(2, "0")}${compact ? "abc"[column.findIndex((l) => l.scene.key === one.key)] ?? "" : ""}`;
               return (
                 <button
@@ -135,14 +158,24 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
                   aria-controls="scene-panel"
                   tabIndex={one.key === lit ? 0 : -1}
                   onClick={() => go(one.key)}
-                  className={cn("scene", one.rail, optional && "scene-optional", end && "scene-end")}
+                  className={cn("scene", one.rail, when?.kind === "set" && "scene-set", when?.on === false && "scene-off", when?.kind === "event" && "scene-event", end && "scene-end")}
                 >
                   <span className="scene-number">
                     <span>{number}</span>
-                    {end ? <span>{optional ? "optional · ends here" : "ends here"}</span> : optional ? <span>optional</span> : null}
+                    {label || end ? (
+                      <span className="flex min-w-0 flex-wrap items-center justify-end gap-x-1.5 text-right">
+                        {label ? (
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                            {when?.kind === "event" ? <Zap className="h-3 w-3" aria-hidden /> : when?.on === false ? <ToggleLeft className="h-3.5 w-3.5" aria-hidden /> : <ToggleRight className="h-3.5 w-3.5" aria-hidden />}
+                            {label}
+                          </span>
+                        ) : null}
+                        {end ? <span className="whitespace-nowrap text-(--deck-end)">{label ? "· " : ""}ends here</span> : null}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="scene-title">{one.title}</span>
-                  <span className="scene-tagline">{optional ? `Only if ${optional}` : one.tagline}</span>
+                  <span className="scene-tagline">{when && (when.kind === "event" || when.on !== true) ? whenLine(when) : one.tagline}</span>
                 </button>
               );
             };
@@ -160,16 +193,55 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
         {/* The key: what each mark on the console means. */}
         <p className="scene-key px-5 pb-4 sm:px-6">
           <span><span className="scene-key-light" aria-hidden />the light on top: the state it leaves the document in, as in the register</span>
-          <span><span className="scene-key-sometimes" aria-hidden />dashed: optional, only when it applies</span>
+          <span><span className="scene-key-set" aria-hidden />set here: this project&rsquo;s configuration decides, drawn on or off as it stands (dimmed: off here)</span>
+          <span><span className="scene-key-event" aria-hidden />if it happens: an event brings it on, and then it is never skipped</span>
           <span><span className="scene-key-end" aria-hidden />below, in rose: it ends there (a revision: the next one starts again)</span>
           <span><span className="scene-key-lit" aria-hidden />ringed: the step shown under the console</span>
         </p>
       </section>
 
       <div key={`${flow.key}/${lane.scene.key}`} role="tabpanel" id="scene-panel" aria-labelledby={`scene-${lane.scene.key}`} className="scene-panel">
-        {lane.optional ? <p className="mb-2 text-xs text-slate-600">On this flow, only if {lane.optional}.</p> : null}
+        {lane.when ? (
+          <p className="mb-2 text-xs text-slate-600">
+            {lane.when.kind === "event"
+              ? <><span className="font-semibold text-slate-800">If it happens:</span> {lane.when.text}. When it does, this step is never skipped.</>
+              : <><span className="font-semibold text-slate-800">Set here:</span> {lane.when.text}{lane.when.on === undefined ? "." : lane.when.on ? ": on for this project." : ": off for this project, so this step does not happen here."} It changes below, never by itself.</>}
+          </p>
+        ) : null}
         {panels[lane.scene.key]}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The annunciator: one light per system the project runs on, as a cockpit's panel shows them at a glance. The master
+ * light counts what still needs doing (caution) and what is set at a cost (warning); each light opens its step.
+ */
+function Annunciator({ lights }: { lights: Light[] }) {
+  const cautions = lights.filter((one) => one.tone === "caution").length;
+  const warnings = lights.filter((one) => one.tone === "warning").length;
+  const master = warnings ? "warning" : cautions ? "caution" : "go";
+  return (
+    <div className="annunciator px-5 pt-5 sm:px-6" role="group" aria-label="Where each system stands">
+      <div className={cn("annunciator-master", `light-${master}`)}>
+        <span className="annunciator-lamp" aria-hidden />
+        <span className="annunciator-name">{master === "go" ? "All set" : master === "warning" ? "Warning" : "Caution"}</span>
+        <span className="annunciator-reading">
+          {master === "go" ? "every system set" : [warnings ? `${warnings} at a cost` : null, cautions ? `${cautions} to set up` : null].filter(Boolean).join(" · ")}
+        </span>
+      </div>
+      <ul className="annunciator-grid">
+        {lights.map((one) => (
+          <li key={one.key}>
+            <a href={one.href} className={cn("annunciator-light", `light-${one.tone}`)} title={`${one.label}: ${one.reading}`}>
+              <span className="annunciator-lamp" aria-hidden />
+              <span className="annunciator-name">{one.label}</span>
+              <span className="annunciator-reading">{one.reading}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

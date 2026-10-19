@@ -15,7 +15,10 @@ namespace Delios.Host.Transmittals;
 public sealed record TransmittalPage(TransmittalView Transmittal, string Status, string IssuingParty, string? CheckedBy, DateTimeOffset? CheckedAt,
     string? ReturnedReason, IReadOnlyList<CarriedItem> Carried, IReadOnlyList<ArrivedFile> Files, IReadOnlyList<CarriedRequest> IssueRequests,
     IReadOnlyDictionary<Guid, PartyHabits> Parties, bool MayCheck = false, bool AsReceived = false,
-    IReadOnlyDictionary<Guid, string>? MatchedBefore = null);
+    IReadOnlyDictionary<Guid, MatchedBefore>? MatchedBefore = null);
+
+/// <summary>One of our documents a number of theirs was matched to before: proposed for what came under it again.</summary>
+public sealed record MatchedBefore(Guid Id, string Number, string Title, string? Revision);
 
 /// <summary>
 /// A document a transmittal carried, as it stands now: its revision's state (REQUESTED for a placeholder), the newest
@@ -125,17 +128,18 @@ public sealed partial class TransmittalService
         // when it named nobody), as ControlService.ArrivalAsync allows.
         var mayCheck = incoming && (access.Holds(Verbs.Control)
             || await StandIns.ArrivalAsync(db, access, t.Id, cancellationToken));
-        // Into a package taking documents as they come: the check accepts or returns what came, all at once.
-        var asReceived = incoming && t.PackageId is { } packageId
-            && await db.Packages.AnyAsync(p => p.Id == packageId && p.TakesAsReceived, cancellationToken);
+        // On a project taking documents as they come: the check accepts or returns what came unplanned, all at once.
+        var asReceived = incoming && t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned)
+            && (await Packages.Intake.ReadAsync(db, access.Project.Id, cancellationToken)).Mode == Packages.Intake.AsReceived;
         // What came unplanned under a number of theirs matched before to one of ours: that one is proposed.
-        var matchedBefore = new Dictionary<Guid, string>();
+        var matchedBefore = new Dictionary<Guid, MatchedBefore>();
         var fromParty = incoming && access.IsInternal
             ? await db.Transmittals.Where(x => x.Id == t.Id).Select(x => x.FromPartyId).SingleOrDefaultAsync(cancellationToken) : null;
         if (fromParty is { } from)
             foreach (var loose in t.Items.Where(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt is null && i.DocumentNumber.Length > 0))
                 if (await Equivalents.FindAsync(db, access.Project.Id, from, loose.DocumentNumber, cancellationToken) is { } ours)
-                    matchedBefore[loose.Id] = await db.Documents.Where(d => d.Id == ours).Select(d => d.Number).SingleAsync(cancellationToken);
+                    matchedBefore[loose.Id] = await db.Documents.Where(d => d.Id == ours)
+                        .Select(d => new MatchedBefore(d.Id, d.Number, d.Title, d.LatestRevisionValue)).SingleAsync(cancellationToken);
 
         return new TransmittalPage(t, status, incoming ? t.From ?? t.IssuedBy : await OurNameAsync(access, cancellationToken),
             check?.By, check?.At, status == TransmittalStatuses.Rejected ? returned?.Note ?? returnedLoose?.ReturnedReason : null, carried, files, requests,
