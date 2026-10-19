@@ -19,6 +19,42 @@ export async function setMfaRequiredAction(_prev: State | undefined, formData: F
   return { ok: required ? "Everyone sets up two-step sign-in at their next sign-in." : "Two-step sign-in is each person's choice again." };
 }
 
+/**
+ * The organization's own sign-in provider (single sign-on, OpenID Connect): its name on the button, its address, the
+ * client id and secret the provider gave, the email domains it signs in, and whether it is used. The secret is asked the
+ * first time and kept encrypted; left empty later, the one kept stays. Administrators only (the backend checks).
+ */
+export async function setSsoAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  await requireScope();
+  const text = (name: string) => String(formData.get(name) ?? "").trim();
+  try {
+    await api("/api/admin/security/sso", {
+      method: "PUT",
+      body: {
+        name: text("name"), authority: text("authority"), clientId: text("clientId"), clientSecret: text("clientSecret") || null,
+        allowedDomains: text("domains").split(/[\s,;]+/).filter(Boolean), enabled: formData.get("enabled") === "on",
+      },
+    });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath("/settings/security");
+  return { ok: formData.get("enabled") === "on" ? "Saved: people may sign in with the organization's account." : "Saved, not in use: everyone signs in with a password." };
+}
+
+/** Password sign-in on, or for administrators only once everyone signs in through the organization's provider. */
+export async function setPasswordSignInAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  await requireScope();
+  const on = formData.get("passwordSignIn") === "on";
+  try {
+    await api("/api/admin/security", { method: "PUT", body: { passwordSignIn: on } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath("/settings/security");
+  return { ok: on ? "Everyone may sign in with a password." : "Only administrators sign in with a password; everyone else through the organization's account." };
+}
+
 /** Turns someone's two-step sign-in off, for a lost phone: they set it up again at their next sign-in if it is required. */
 export async function resetMfaAction(_prev: State | undefined, formData: FormData): Promise<State> {
   await requireScope();

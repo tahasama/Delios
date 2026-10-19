@@ -660,4 +660,9 @@ in the code; it lives only in your local database.
   A revision started after one accepted as it stands now always asks why.
 - **Revisions**: a line counting in small letters or with leading zeros keeps it when saved ("a", "01" in "Starts at");
   before, saving turned it to capitals and dropped the zeros.
+- **Settings, the rest of the cards**: the Control room draws "Released & issued" as one step and shows a supplier's
+  documents; the days around an action are set there. Review routes keep an outside step's reason, offer only the two
+  real kinds of step, put "offered first" first and choose organizations properly. Functions & permissions: a tick is
+  the permission on every document, and two columns the backend never kept are gone. Sign-in & security sets single
+  sign-on and password sign-in, and the sign-in page offers the organization's own account.
 

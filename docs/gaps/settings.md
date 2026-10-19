@@ -27,7 +27,11 @@ Each found wrong in the Settings review of 2026-10-16 (`.impeccable/critique/`),
 4. ~~**Functions & permissions**~~ Done: a tick is the permission on every document, what pressing it gives or takes
    (held for certain documents only shows as half, and its question says it gives it on every document); "Review
    routes" and "Read matrix", which the backend never keeps on a function, are not offered (`GRANTABLE`).
-5. **Sign-in & security**: single sign-on and "password sign-in off" exist in the backend with no screen.
+5. ~~**Sign-in & security**~~ Done: the organization's own account (single sign-on: name, provider's address, client
+   id and secret, email domains, in use) and "Everyone may sign in with a password" are set there; the sign-in page has
+   "Sign in with your organization's account" (its short name, then the provider). Two faults on the way fixed: a
+   refused sign-on sent people to a page that does not exist (now the sign-in page, in plain words), and a successful
+   one set a session the screens did not read (now taken over as theirs). Not tried against a real provider here.
 
 ## Small things seen, not done
 

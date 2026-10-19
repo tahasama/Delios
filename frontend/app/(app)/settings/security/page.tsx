@@ -3,13 +3,18 @@ import { PageHeader, ToneChip } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { api } from "@/lib/client";
 import { adminUsers } from "@/lib/settings/api-admin";
-import { setMfaRequiredAction, resetMfaAction } from "@/lib/account/forms-security";
+import { setMfaRequiredAction, resetMfaAction, setSsoAction, setPasswordSignInAction } from "@/lib/account/forms-security";
+import { SwitchField } from "@/components/switch";
+import { Field, inputCls } from "@/components/ui";
 import { NoAccess } from "../no-access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Sign-in & security" };
 
-type Security = { mfaRequired: boolean; passwordSignIn: boolean; mfaEnrolled: { enrolled: number; of: number } };
+type Security = {
+  slug: string; mfaRequired: boolean; passwordSignIn: boolean; mfaEnrolled: { enrolled: number; of: number };
+  sso: { name: string; authority: string; clientId: string; scopes: string; allowedDomains: string[]; enabled: boolean } | null;
+};
 
 /** How the organization's people sign in: two-step sign-in asked of everyone or not, and who has it on. */
 export default async function SecurityPage() {
@@ -56,6 +61,45 @@ export default async function SecurityPage() {
             />
           </li>
         </ul>
+      </section>
+
+      {/* The organization's own sign-in (single sign-on), and whether passwords still open the door. */}
+      <section className="register register-sheet register-sheet-open">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span className="stencil mr-1 text-slate-500">The organization&rsquo;s own account</span>
+          <span className="text-[11px] text-slate-500">single sign-on: people sign in with the account they use at work (OpenID Connect)</span>
+          <span className="ml-auto"><ToneChip tone={security.sso?.enabled ? "done" : "idle"}>{security.sso?.enabled ? "In use" : security.sso ? "Set up, not in use" : "Not set up"}</ToneChip></span>
+        </div>
+        <ActionForm action={setSsoAction} submitLabel="Save" className="space-y-3 px-5 py-4 sm:px-6">
+          <p className="text-xs leading-5 text-slate-600">
+            On the sign-in page, people open &ldquo;Sign in with your organization&rsquo;s account&rdquo; and type{" "}
+            <span className="font-mono font-semibold text-slate-800">{security.slug}</span>. Nobody is created by signing in: only people already
+            added here get in, by their email. Register this address with your provider as where it sends people back:{" "}
+            <span className="font-mono text-slate-800">/api/auth/sso/callback</span> on this site.
+          </p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Name on the button" hint="e.g. Microsoft, Okta, our company"><input name="name" required defaultValue={security.sso?.name ?? ""} className={inputCls} /></Field>
+            <Field label="Provider's address" hint="its issuer, https://…"><input name="authority" required type="url" defaultValue={security.sso?.authority ?? ""} className={inputCls} /></Field>
+            <Field label="Client id" hint="given by the provider"><input name="clientId" required defaultValue={security.sso?.clientId ?? ""} className={inputCls} /></Field>
+            <Field label="Client secret" hint={security.sso ? "kept; type a new one only to change it" : "given by the provider"}>
+              <input name="clientSecret" type="password" autoComplete="off" required={!security.sso} className={inputCls} />
+            </Field>
+            <Field label="Email domains" hint="who may sign in this way; empty: any"><input name="domains" defaultValue={security.sso?.allowedDomains.join(", ") ?? ""} placeholder="company.com" className={inputCls} /></Field>
+          </div>
+          <div className="w-full"><SwitchField name="enabled" defaultChecked={security.sso?.enabled ?? true}>In use: offered on the sign-in page</SwitchField></div>
+        </ActionForm>
+        <div className="space-y-2 border-t border-line px-5 py-4 sm:px-6">
+          <p className="text-sm font-semibold text-slate-800">Password sign-in</p>
+          <p className="text-xs leading-5 text-slate-600">
+            {security.passwordSignIn
+              ? "Everyone may sign in with their email and password."
+              : "Only administrators sign in with a password (to reach the organization if the provider is down); everyone else through the organization's account."}
+            {" "}It can be limited to administrators only once the organization&rsquo;s account is in use; turning that account off opens passwords to everyone again.
+          </p>
+          <ActionForm action={setPasswordSignInAction} submitLabel="Save" size="sm">
+            <div className="w-full"><SwitchField name="passwordSignIn" defaultChecked={security.passwordSignIn}>Everyone may sign in with a password</SwitchField></div>
+          </ActionForm>
+        </div>
       </section>
 
       <section className="register register-sheet register-sheet-open">

@@ -163,3 +163,19 @@ export async function confirmEmailAction(_prev: PasswordState | undefined, formD
   if (!response.ok) return { error: (await problemOf(response)).message };
   return { done: true };
 }
+
+export type SsoState = { error?: string; name?: string; slug?: string };
+
+/**
+ * Signing in through the organization's own provider (single sign-on): its short name, as its administrator gives it
+ * (Settings, Sign-in & security), says which provider. The browser is then sent to it from the sign-in page.
+ */
+export async function ssoLookupAction(_prev: SsoState | undefined, formData: FormData): Promise<SsoState> {
+  const slug = String(formData.get("organization") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Type your organization's short name: your administrator has it." };
+  const response = await apiFetch(`/api/auth/sso?tenant=${encodeURIComponent(slug)}`);
+  if (!response.ok) return { error: "That organization does not sign in through its own account here. Sign in with your email and password." };
+  const found = (await response.json()) as { name: string };
+  return { name: found.name, slug };
+}
+

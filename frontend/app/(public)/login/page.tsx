@@ -5,6 +5,7 @@ import { Suspense, useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { loginAction, resendConfirmationAction } from "@/lib/account/forms-sign-in";
 import { AuthShell } from "@/app/(public)/login/shell";
+import { SsoBox } from "@/app/(public)/login/sso-box";
 import { BotCheck } from "@/app/(public)/bot-check";
 import { inputCls, btn } from "@/components/ui";
 import { MissingSummary } from "@/components/form";
@@ -108,6 +109,7 @@ function LoginForm() {
             )}
           </form>
           {state?.unconfirmed ? <ResendLink email={state.email ?? ""} /> : null}
+          {state?.mfa || state?.recoveryCodes ? null : <SsoBox next={next} error={params.get("sso_error")} />}
           <p className="mt-6 text-center text-xs text-slate-500">
             Setting up a new organization?{" "}
             <Link href="/signup" className="font-semibold text-brand-ink hover:underline">Register one</Link>

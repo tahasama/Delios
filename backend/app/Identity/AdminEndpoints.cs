@@ -51,6 +51,8 @@ public static class AdminEndpoints
         var people = await db.Users.CountAsync(u => u.Active, cancellationToken);
         return Results.Ok(new
         {
+            // What people type on the sign-in page to sign in through the organization's provider.
+            organization.Slug,
             organization.MfaRequired,
             organization.PasswordSignIn,
             mfaEnrolled = new { enrolled, of = people },

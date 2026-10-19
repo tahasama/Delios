@@ -190,7 +190,7 @@ public static class SsoEndpoints
         IResult Fail(string reason, string detail)
         {
             logger.LogWarning("Single sign-on refused: {Reason} ({Detail})", reason, detail);
-            return Results.Redirect($"/sign-in?sso_error={reason}");
+            return Results.Redirect($"/login?sso_error={reason}");
         }
 
         State? payload;
