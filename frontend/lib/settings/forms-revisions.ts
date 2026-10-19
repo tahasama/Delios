@@ -39,8 +39,9 @@ function seriesOf(formData: FormData): RevisionSeries[] {
       kind: text(formData, `kind_${i}`) || "LETTERS",
       prefix: text(formData, `prefix_${i}`),
       start: text(formData, `start_${i}`),
-      width: Number(text(formData, `width_${i}`)) || 0,
-      lowercase: formData.get(`lowercase_${i}`) === "on",
+      // Small letters and digits are read from the start as written ("a", "01"), by the backend.
+      width: 0,
+      lowercase: false,
       excludedLetters: text(formData, `excluded_${i}`).toUpperCase().split(/[\s,]+/).filter((one) => one.length === 1),
     });
   }

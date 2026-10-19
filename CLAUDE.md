@@ -341,7 +341,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - How revisions are named is Settings → Revisions (`RevisionSchemeEndpoints`): schemes of lines, one line per
   phase, as many as wanted, plus one default line for any phase without its own (no phase published: that one
   line names every revision). A line counts in letters or numbers, with a prefix, a start (empty: A or 0) and
-  letters skipped. One scheme is the default; any deliverable type may follow another. A revision is named by
+  letters skipped. The start as written also says how values look: "a" small letters, "01" two digits (the backend
+  reads it; no separate fields). One scheme is the default; any deliverable type may follow another. A revision is named by
   the line of the phase its document is in. A scheme chosen for a type names its documents not revised yet; a
   document already started keeps counting the way it began. A line revisions carry stays, never recounted
   (backend SERIES_IN_USE).

@@ -7,6 +7,9 @@ import type { RevisionSeries } from "@/lib/settings/api-admin";
 
 type Row = Partial<RevisionSeries> & { key: number };
 
+/** The start as the person writes it, which also says how values look: "a" in small letters, "01" with two digits. */
+const written = (s: Row) => !s.start ? "" : s.kind === "NUMBERS" ? s.start.padStart(s.width ?? 0, "0") : s.lowercase ? s.start.toLowerCase() : s.start.toUpperCase();
+
 /**
  * The lines of a revision scheme: one for any phase (the default), and one for each phase that names its revisions
  * otherwise, as many as wanted. A line already carried by revisions keeps its code (sent hidden) and how it counts.
@@ -39,10 +42,11 @@ export function SeriesRows({ series, phases }: { series: RevisionSeries[]; phase
               </select>
             </Field>
             <Field label="Prefix" hint="before each value, e.g. P"><input name={`prefix_${i}`} defaultValue={s.prefix ?? ""} className={inputCls} /></Field>
-            <Field label="Starts at" hint="empty: A, or 0"><input name={`start_${i}`} defaultValue={s.start ?? ""} className={inputCls} /></Field>
+            <Field label="Starts at" hint="empty: A, or 0 · a: small letters · 01: two digits">
+              <input name={`start_${i}`} defaultValue={written(s)} className={inputCls} />
+            </Field>
             <Field label="Letters skipped" hint="read as digits or as each other">
               <input name={`excluded_${i}`} defaultValue={s.excludedLetters?.join(" ") ?? ""} className={inputCls} />
-              <input type="hidden" name={`width_${i}`} value={s.width ?? 0} />
             </Field>
             <button type="button" onClick={() => remove(s.key)} disabled={rows.length === 1 || !!s.code}
               title={s.code ? "A line stays once the scheme is saved: revisions may carry it" : "Take this line out"}

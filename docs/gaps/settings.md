@@ -14,7 +14,9 @@ The organization's space: Projects, People, Organizations, Settings; organizatio
 
 Each found wrong in the Settings review of 2026-10-16 (`.impeccable/critique/`), and only moved onto the two levels since.
 
-1. **Revisions**: lowercase revision letters are turned upper case on save; zero padding cannot be set.
+1. ~~**Revisions**: lowercase revision letters are turned upper case on save; zero padding cannot be set.~~ Done: "Starts
+   at" says both, as written ("a": small letters, "01": two digits); the backend reads them from it, and a line revisions
+   carry keeps how its values are written.
 2. **Control room**: four switches the app never reads (issuing to reviewers, issue, authorizing a revision, "ready
    when"); the flow for a supplier's documents (placeholder, check, who holds it, hand-back) is not shown; release and
    issue still drawn as two steps when they are one act; no default lead days.

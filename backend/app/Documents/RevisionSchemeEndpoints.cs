@@ -190,8 +190,13 @@ public static class RevisionSchemeEndpoints
             if (!code.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-'))
                 return (null, Problems.Invalid("SERIES_CODE_INVALID", $"{label}: its code is letters, digits, - or _."));
             var kind = (one.Kind ?? "").Trim().ToUpperInvariant();
-            // Nothing said: letters start at A, numbers at 0.
-            var start = Blank(one.Start) ?? (kind == SeriesKinds.Numbers ? "0" : "A");
+            // Nothing said: letters start at A, numbers at 0. The start as written also says how values look: "a" counts
+            // in small letters, "01" in two digits (the width and the case given are kept when the start says nothing).
+            var written = Blank(one.Start) ?? (kind == SeriesKinds.Numbers ? "0" : "A");
+            var width = kind == SeriesKinds.Numbers && written.Length > 1 && written[0] == '0' && written.All(char.IsAsciiDigit)
+                ? written.Length : one.Width;
+            var lowercase = kind == SeriesKinds.Letters && written.All(char.IsAsciiLetter) ? written.Any(char.IsAsciiLetterLower) : one.Lowercase;
+            var start = Normal(kind, written);
             var rule = new RevisionSeriesRule
             {
                 Code = code,
@@ -200,8 +205,8 @@ public static class RevisionSchemeEndpoints
                 Kind = kind,
                 Prefix = (one.Prefix ?? "").Trim(),
                 Start = start,
-                Width = Math.Clamp(one.Width, 0, 6),
-                Lowercase = one.Lowercase,
+                Width = Math.Clamp(width, 0, 6),
+                Lowercase = lowercase,
                 ExcludedLetters = [.. (one.ExcludedLetters ?? []).Select(l => l.Trim().ToUpperInvariant()).Where(l => l.Length == 1).Distinct()],
             };
             if (rule.Kind is not (SeriesKinds.Letters or SeriesKinds.Numbers))
@@ -245,9 +250,14 @@ public static class RevisionSchemeEndpoints
     /// <summary>A series in use changed in a way that recounts it: its kind, prefix or start.</summary>
     private static string? Recounted(RevisionSeriesRule was, RevisionSeriesRule now) =>
         was.Kind != now.Kind || !string.Equals(was.Prefix, now.Prefix, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(was.Start, now.Start, StringComparison.OrdinalIgnoreCase)
-            ? $"{was.Label} is carried by revisions already: how it counts, its prefix and its start stay; its name and the letters skipped may change."
+            || Normal(was.Kind, was.Start) != Normal(now.Kind, now.Start) || was.Width != now.Width || was.Lowercase != now.Lowercase
+            ? $"{was.Label} is carried by revisions already: how it counts, its prefix, its start and how its values are written (small letters, digits) stay; its name and the letters skipped may change."
             : null;
+
+    /// <summary>A start as kept: numbers without their leading zeros (the width says them), letters in capitals (the case says them).</summary>
+    private static string Normal(string kind, string start) =>
+        kind == SeriesKinds.Numbers && start.All(char.IsAsciiDigit) ? (start.TrimStart('0') is { Length: > 0 } n ? n : "0")
+        : kind == SeriesKinds.Letters ? start.ToUpperInvariant() : start;
 
     /// <summary><c>POST /api/admin/revisions/schemes</c>: a new revision scheme.</summary>
     private static async Task<IResult> CreateAsync(Guid? scope, RevisionSchemeRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
