@@ -20,6 +20,7 @@ import { stateNames, stateName, supplierStage, supplierStageName, supplierStamp 
 import { revisionGround } from "@/lib/documents/revision-ground";
 import { ownFields, readExtras, formPolicy } from "@/lib/settings/field-policy";
 import { fmtDate, timeAgo, plain } from "@/lib/core/utils";
+import { readableDetail } from "@/lib/settings/activity-words";
 import { forType } from "@/lib/settings/serving";
 import { servingOf } from "@/lib/settings/serving-api";
 import { getActiveSet, getSet, getValue } from "@/lib/settings/config";
@@ -1044,7 +1045,7 @@ export default async function DocumentDetailPage({
                         <p className="text-xs text-slate-700">
                           <span className="font-semibold">{e.actorName}</span> {prettyState(e.action)}
                           {e.entityType === "Revision" && e.entityLabel ? <span className="text-slate-500"> · {e.entityLabel.replace(doc.docNumber, "").trim()}</span> : e.entityType === "Transmittal" && e.entityLabel ? <span className="text-slate-500"> · {e.entityLabel}</span> : null}
-                          {e.field ? <span className="text-slate-400"> · {e.field}: {e.oldValue ?? "—"} → {e.newValue ?? "—"}</span> : e.newValue ? <span className="text-slate-400"> · {plain(e.newValue)}</span> : e.detail ? <span className="text-slate-400"> · {plain(e.detail)}</span> : null}
+                          {e.field ? <span className="text-slate-400"> · {e.field}: {e.oldValue ?? "—"} → {e.newValue ?? "—"}</span> : e.newValue ? <span className="text-slate-400"> · {plain(readableDetail(e.newValue)?.replaceAll("\n", " · "))}</span> : e.detail ? <span className="text-slate-400"> · {plain(readableDetail(e.detail)?.replaceAll("\n", " · "))}</span> : null}
                         </p>
                         <span className="shrink-0 text-[11px] text-slate-400">{timeAgo(e.ts)}</span>
                       </li>

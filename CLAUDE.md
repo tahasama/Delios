@@ -849,7 +849,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `lib/settings/activity-words.ts`. Who opens their activity; every title opens its page (a revision or a file its
   document, `documentId` from the backend; an action, a package, a review, a list in Settings…: `activityLink`). Only
   the side takes the kind's colour; the title stays ink. A detail kept as data reads as the fields that changed, "was →
-  now" (`readableDetail`), never as raw data. Home's Log tab is the same logbook for its project (backend `GET /log`,
+  now" (`readableDetail`), never as raw data (owner: "never display json"), wherever a detail shows (logbooks, a
+  document's History): "<what>: […] → […]" too, a list of records as added / taken out / changed, each by its name,
+  ids left out, the settings' words in plain words. Home's Log tab is the same logbook for its project (backend `GET /log`,
   the control function and administrators), the project's work only: sign-ins, opened and downloaded, and people and
   settings are left out (the administrators' trail). Its menu is on the left (`LogbookSide categoriesOnly`: the kinds,
   not every act; then Find), the days beside it, the page's right column away while the log is open.

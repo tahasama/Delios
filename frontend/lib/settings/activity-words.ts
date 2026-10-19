@@ -270,40 +270,96 @@ export function activityLink(entityType: string | null, entityId: string | null,
 }
 
 /**
- * A detail as a person reads it. Some acts keep what changed as data ("{…} → {…}"); that reads as the fields that
- * changed, each "was → now", and a single record as its fields. Anything else stays as written.
+ * A detail as a person reads it, never as data (owner: "never display json"). Some acts keep what changed as data,
+ * "{…} → {…}" or "<what>: […] → […]": that reads as what changed, each "was → now"; a list of records (a form's fields,
+ * a route's steps) reads as what was added, taken out, and changed in each, named by its label. A single record reads
+ * as its fields. Any data left inside a sentence is put in words. Anything else stays as written.
  */
 export function readableDetail(detail: string | null): string | null {
   if (!detail) return null;
-  const parse = (text: string): Record<string, unknown> | null => {
-    try {
-      const value = JSON.parse(text.trim());
-      return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-    } catch {
-      return null;
-    }
+  const parse = (text: string): { ok: true; value: unknown } | null => {
+    const t = text.trim();
+    if (t === "(default)" || t === "(none)" || t === "") return { ok: true, value: null };
+    if (!/^[[{]/.test(t)) return null;
+    try { return { ok: true, value: JSON.parse(t) }; } catch { return null; }
+  };
+  // What the settings' own words mean to a reader.
+  const NAMES: Record<string, string> = {
+    setKey: "List", control: "Kind of answer", rule: "Asked", help: "Note under the box", inRegister: "Column in the register",
+    retired: "Retired", key: "Key", label: "Name",
+  };
+  const VALUES: Record<string, string> = {
+    TEXT: "text", CHOICE: "chosen from a list", DATE: "a date", NUMBER: "a number",
+    OPTIONAL: "may be left empty", REQUIRED: "must be filled", OFF: "not asked",
   };
   const words = (key: string) => {
+    if (NAMES[key]) return NAMES[key];
     const plain = key.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ").toLowerCase();
     return plain.charAt(0).toUpperCase() + plain.slice(1);
   };
-  const show = (value: unknown) =>
+  const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+  // A record's name: what a person calls it, never its id.
+  const nameOf = (v: Record<string, unknown>) => String(v.label ?? v.name ?? v.title ?? v.code ?? v.key ?? "an entry");
+  const identity = (v: Record<string, unknown>) => String(v.key ?? v.code ?? v.id ?? v.name ?? v.label ?? JSON.stringify(v));
+  // Ids say nothing to a reader.
+  const hidden = (k: string) => k === "id" || k.endsWith("Id") || k === "tenantId";
+  const show = (value: unknown): string =>
     value === null || value === undefined || value === "" ? "none"
-      : Array.isArray(value) ? value.join(", ") || "none"
-      : typeof value === "object" ? Object.entries(value as Record<string, unknown>).map(([k, v]) => `${k} ${String(v)}`).join(", ")
-      : String(value);
-  const arrow = detail.indexOf(" → ");
+      : typeof value === "boolean" ? (value ? "yes" : "no")
+      : Array.isArray(value) ? value.map((one) => (isRecord(one) ? nameOf(one) : show(one))).join(", ") || "none"
+      : isRecord(value) ? Object.entries(value).filter(([k]) => !hidden(k)).map(([k, v]) => `${words(k).toLowerCase()} ${show(v)}`).join(", ")
+      : VALUES[String(value)] ?? String(value);
+  const fieldsChanged = (was: Record<string, unknown> | null, now: Record<string, unknown> | null, indent = "") => {
+    const keys = [...new Set([...Object.keys(was ?? {}), ...Object.keys(now ?? {})])].filter((k) => !hidden(k));
+    return keys
+      .filter((k) => JSON.stringify(was?.[k] ?? null) !== JSON.stringify(now?.[k] ?? null))
+      // A field that only appeared unset (retired: false) changed nothing a person would see.
+      .filter((k) => !(was?.[k] === undefined && (now?.[k] === false || now?.[k] === null)))
+      .map((k) => `${indent}${words(k)}: ${show(was?.[k])} → ${show(now?.[k])}`);
+  };
+  const describe = (was: unknown, now: unknown): string[] => {
+    const list = (v: unknown) => (Array.isArray(v) ? v : v === null ? [] : null);
+    const a = list(was), b = list(now);
+    if (a && b && [...a, ...b].every(isRecord)) {
+      const before = new Map(a.map((one) => [identity(one as Record<string, unknown>), one as Record<string, unknown>]));
+      const after = new Map(b.map((one) => [identity(one as Record<string, unknown>), one as Record<string, unknown>]));
+      const lines: string[] = [];
+      for (const [id, one] of after) if (!before.has(id)) lines.push(`Added ${nameOf(one)}: ${show(one)}`);
+      for (const [id, one] of before) if (!after.has(id)) lines.push(`Taken out ${nameOf(one)}`);
+      for (const [id, one] of after) {
+        const old = before.get(id);
+        if (!old) continue;
+        const changed = fieldsChanged(old, one, "· ");
+        if (changed.length) lines.push(`${nameOf(one)}:`, ...changed);
+      }
+      return lines;
+    }
+    if ((isRecord(was) || was === null) && (isRecord(now) || now === null)) return fieldsChanged(was as Record<string, unknown> | null, now as Record<string, unknown> | null);
+    return [`${show(was)} → ${show(now)}`];
+  };
+
+  // "<what>: was → now", the what kept as the heading.
+  const head = /^([^[{\n]{1,80}?):\s*(?=[[{(])/.exec(detail);
+  const label = head ? head[1].trim() : null;
+  const body = head ? detail.slice(head[0].length) : detail;
+  const arrow = body.indexOf(" → ");
   if (arrow > 0) {
-    const was = parse(detail.slice(0, arrow));
-    const now = parse(detail.slice(arrow + 3));
-    if (was || now) {
-      const keys = [...new Set([...Object.keys(was ?? {}), ...Object.keys(now ?? {})])];
-      const changed = keys.filter((k) => JSON.stringify(was?.[k]) !== JSON.stringify(now?.[k]));
-      if (!changed.length) return "Nothing changed.";
-      return changed.map((k) => `${words(k)}: ${show(was?.[k])} → ${show(now?.[k])}`).join("\n");
+    const was = parse(body.slice(0, arrow));
+    const now = parse(body.slice(arrow + 3));
+    if (was && now) {
+      const lines = describe(was.value, now.value);
+      const said = lines.length ? lines.join("\n") : "Nothing changed.";
+      return label ? `${label}\n${said}` : said;
     }
   }
-  const one = parse(detail);
-  if (one) return Object.entries(one).map(([k, v]) => `${words(k)}: ${show(v)}`).join("\n");
-  return detail;
+  const one = parse(body);
+  if (one) {
+    const v = one.value;
+    const said = isRecord(v) ? Object.entries(v).filter(([k]) => !hidden(k)).map(([k, x]) => `${words(k)}: ${show(x)}`).join("\n") : show(v);
+    return label ? `${label}\n${said}` : said;
+  }
+  // Data left inside a sentence is put in words.
+  return detail.replace(/(\{[^{}]*\}|\[[^\[\]]*\])/g, (blob) => {
+    try { return show(JSON.parse(blob)); } catch { return blob; }
+  });
 }
