@@ -751,12 +751,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   how it works"); an administrator or the control function changes it (`mayChangeControlRoom`; read only otherwise:
   switches shown, nothing chosen). Every page below is what it is built from.
   **The flows follow our role on the project** (owner; This project, "our role", CONTRACT_ROLES, named on the masthead
-  with "change"): approving roles (OWNER, PMC, EPCM, CM, INSPECTOR) see "Documents we review and approve" (we receive)
-  first, then "Documents owed to us", "Documents we issue"; supplying roles (SUPPLIER, SUBCONTRACTOR, DESIGN) see
-  "Documents we produce for our client", then **"Documents our client asks of us"** (asked of us on a transmittal, our
-  register, prepare, our review then the client's step on the route, accepted or returned by the client, released &
-  issued), then "Documents our suppliers owe us"; the others (EPC, CONTRACTOR, GENERIC…) see the flows as they are.
-  The rest follow (packages, an action, someone joins). `SIDE_OF` in `flow/page.tsx`.
+  with "change"; after researching the roles, owner: "PMC do not approve, that's in the very name"): each role orders
+  the flows, words them, and says whose word is final (`ROLE_WORK` in `flow/page.tsx`, any other role `GENERIC_WORK`).
+  Final with us: OWNER, EPC, EPCM (approves on the owner's behalf, the owner having the last word on what it reserves),
+  DESIGN (approves what contractors and suppliers send against its design; its own design is approved by the client),
+  SUPPLIER (its customer approves what it sends). Recommends: PMC (reviews and recommends, the owner decides), INSPECTOR
+  (comments; certifies its own scope only, the client decides). Passes on: CM and CONTRACTOR (check first, then the
+  designer or the client's engineer decides), SUBCONTRACTOR (the main contractor decides). Where ours is not final, the
+  flow draws who decides after our review ("<decider> decides"); where someone approves what we send, "<approver>
+  approves it" is a step, not optional. "Documents our client asks of us" is drawn for roles with a client (DESIGN,
+  CONTRACTOR, SUBCONTRACTOR, SUPPLIER), in the client's own words. The rest follow (packages, an action, someone joins).
   **The Control room simplifies the work, never adds clicks** (owner, after looking at how flow designers
   work: a step chosen on the flow opens its properties beside it). Six flows: documents we produce, we receive, a
   supplier owes us, packages we deliver, an action on the schedule, someone joins the project. The chosen step's

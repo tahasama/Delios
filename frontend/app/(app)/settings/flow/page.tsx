@@ -298,43 +298,89 @@ const STAGES: Stage[] = [
  * returns a refused revision follows the project, and without a control function there is no check before release.
  */
 type FlowLane = { scene: string; optional?: string; tagline?: string; end?: boolean };
+const cap = (words: string) => words.charAt(0).toUpperCase() + words.slice(1);
+
 type FlowShape = { key: string; title: string; from: string; to: string; columns: FlowLane[][] };
 
 /**
- * Which side of the work our role on the project puts us on (This project, "our role", CONTRACT_ROLES): those who
- * review and approve what others produce, those who produce for a client, or both at once.
+ * What our role on the project (This project, "our role", CONTRACT_ROLES) makes of the flows, as such projects run:
+ * what comes first, in whose words, who approves what we produce, and what our verdict on what others send is worth.
+ *  - `ours`: our verdict on what others send us is final ("final"), a recommendation another decides on
+ *    ("recommends"), or a check before we pass it on to whoever approves ("passes").
+ *  - `decider`: who decides after us when our verdict is not final; `approver`: who approves what we produce, when
+ *    someone outside always does (else an outside approval is optional); `client`: who asks documents of us.
  */
-type Side = "approver" | "supplier" | "both";
-const SIDE_OF: Record<string, Side> = {
-  OWNER: "approver", PMC: "approver", EPCM: "approver", CM: "approver", INSPECTOR: "approver",
-  SUPPLIER: "supplier", SUBCONTRACTOR: "supplier", DESIGN: "supplier",
+type RoleWork = {
+  order: string[];
+  titles?: Record<string, string>;
+  ours: "final" | "recommends" | "passes";
+  decider?: string;
+  approver?: string;
+  client?: string;
 };
+const ROLE_WORK: Record<string, RoleWork> = {
+  // Everything comes to the owner, who decides.
+  OWNER: { order: ["receive", "supplier", "produce"], ours: "final",
+    titles: { receive: "Documents we approve", supplier: "Documents owed to us", produce: "Documents we issue" } },
+  // A project management consultant manages for the owner: it reviews and recommends, the owner decides.
+  PMC: { order: ["receive", "produce", "supplier"], ours: "recommends", decider: "The owner",
+    titles: { receive: "Documents we review for the owner", produce: "Documents we issue", supplier: "Documents owed to the project" } },
+  // EPCM manages engineering, vendors and contractors on the owner's behalf, and approves for it.
+  EPCM: { order: ["produce", "receive", "supplier"], ours: "final", approver: "The owner",
+    titles: { produce: "Engineering we produce for the owner", receive: "Documents we approve on the owner's behalf", supplier: "Documents vendors owe the project" } },
+  // EPC approves its own engineering and its suppliers' data; the client may ask to approve.
+  EPC: { order: ["produce", "supplier", "receive"], ours: "final",
+    titles: { supplier: "Documents our suppliers owe us" } },
+  // The designer (architect, engineer of record) produces the design the client approves, and approves shop
+  // drawings and submittals for conformance with it.
+  DESIGN: { order: ["produce", "receive", "client"], ours: "final", approver: "The client", client: "the client",
+    titles: { produce: "Design we produce for the client", receive: "Shop drawings and submittals we approve" } },
+  // A construction manager checks the trades' submittals first and passes them to the designer, who approves.
+  CM: { order: ["receive", "produce", "supplier"], ours: "passes", decider: "The designer",
+    titles: { receive: "Submittals we check and pass on", produce: "Documents we issue", supplier: "Documents the trades owe us" } },
+  // A contractor produces for the client or its engineer, and checks its subcontractors' and suppliers' first.
+  CONTRACTOR: { order: ["produce", "client", "receive", "supplier"], ours: "passes", decider: "The client or its engineer", approver: "The client or its engineer", client: "the client",
+    titles: { produce: "Documents we produce for the client", receive: "Submittals we check and pass on", supplier: "Documents our suppliers owe us" } },
+  SUBCONTRACTOR: { order: ["produce", "client", "supplier", "receive"], ours: "passes", decider: "The main contractor", approver: "The main contractor", client: "the main contractor",
+    titles: { produce: "Documents we produce for the main contractor", supplier: "Documents our suppliers owe us" } },
+  SUPPLIER: { order: ["produce", "client", "supplier", "receive"], ours: "final", approver: "Our customer", client: "our customer",
+    titles: { produce: "Documents we produce for our customer", supplier: "Documents our own suppliers owe us" } },
+  // A third-party inspector certifies its own scope and comments on the rest; it never approves design.
+  INSPECTOR: { order: ["produce", "receive"], ours: "recommends", decider: "The client", approver: "The client",
+    titles: { produce: "Reports and certificates we issue", receive: "Documents we review and comment on" } },
+};
+const GENERIC_WORK: RoleWork = { order: ["produce", "receive", "supplier"], ours: "final" };
 
-function flowsFor({ gate, returner, together, unreviewed, side }: { gate: boolean; returner: string; together: boolean; unreviewed: boolean; side: Side }): FlowShape[] {
-  const all = flowsAll({ gate, returner, together, unreviewed });
-  const flow = (key: string, title?: string) => {
+function flowsFor({ gate, returner, together, unreviewed, role }: { gate: boolean; returner: string; together: boolean; unreviewed: boolean; role: string }): FlowShape[] {
+  const work = ROLE_WORK[role] ?? GENERIC_WORK;
+  const all = flowsAll({ gate, returner, together, unreviewed, work });
+  const flow = (key: string) => {
     const one = all.find((f) => f.key === key)!;
-    return title ? { ...one, title } : one;
+    return work.titles?.[key] ? { ...one, title: work.titles[key] } : one;
   };
-  // The flows that matter most for our role come first, in its words; the others stay behind them.
-  if (side === "approver") {
-    return [flow("receive", "Documents we review and approve"), flow("supplier", "Documents owed to us"), flow("produce", "Documents we issue"),
-      flow("deliver"), flow("action"), flow("join")];
-  }
-  if (side === "supplier") {
-    return [flow("produce", "Documents we produce for our client"), flow("client"), flow("supplier", "Documents our suppliers owe us"),
-      flow("receive"), flow("deliver"), flow("action"), flow("join")];
-  }
-  return [flow("produce"), flow("receive"), flow("supplier"), flow("deliver"), flow("action"), flow("join")];
+  // The flows that matter most for our role come first, in its words; the others follow.
+  const lead = work.order.filter((key) => all.some((f) => f.key === key));
+  const rest = ["produce", "receive", "supplier", "deliver", "action", "join"].filter((key) => !lead.includes(key));
+  return [...lead, ...rest].map(flow);
 }
 
-function flowsAll({ gate, returner, together, unreviewed }: { gate: boolean; returner: string; together: boolean; unreviewed: boolean }): FlowShape[] {
+function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolean; returner: string; together: boolean; unreviewed: boolean; work: RoleWork }): FlowShape[] {
   // Released and issued are one act unless the project keeps them apart (POLICY_RELEASE): one step, or two.
   // A released revision may be voided: the road that ends below the release.
   const voided: FlowLane = { scene: "voided", end: true, optional: "it was released in error" };
   const out: FlowLane[][] = together ? [[{ scene: "released-issued" }, voided]] : [[{ scene: "release" }, voided], [{ scene: "issue" }]];
   // Where some document types are not reviewed, review happens only for the others.
   const reviewed = unreviewed ? "its document type is reviewed" : undefined;
+  // What we produce: approved outside always when our role answers to someone, else only when asked for.
+  const approved: FlowLane[] = work.approver
+    ? [{ scene: "approval", tagline: `${work.approver} approves it` }, { scene: "approval-refused", end: true, tagline: `${work.approver} refuses it` }]
+    : [{ scene: "approval", optional: "an outside approval is asked for" }, { scene: "approval-refused", end: true, optional: "an outside approval is asked for" }];
+  // What others send us: our verdict is final, or another decides after us.
+  const afterUs: FlowLane[][] = work.ours === "final" ? [] : [[
+    { scene: "approval", tagline: `${work.decider ?? "Another"} decides` },
+    { scene: "approval-refused", end: true, tagline: `${work.decider ?? "Another"} refuses it` },
+  ]];
+  const ourReview = work.ours === "recommends" ? "We review it and recommend" : work.ours === "passes" ? "We check it before passing it on" : "By us, by them, or both";
   return [
     {
       key: "produce", title: "Documents we produce", from: "We write it", to: "in force, and sent to whoever needs it",
@@ -344,7 +390,7 @@ function flowsAll({ gate, returner, together, unreviewed }: { gate: boolean; ret
         [{ scene: "review", tagline: "Our reviewers, and others when the route names them", optional: reviewed }],
         [{ scene: "accepted" }, { scene: "returned", end: true, tagline: `${returner} returns it` }],
         ...(gate ? [[{ scene: "gate" }, { scene: "gate-return", end: true }]] : []),
-        [{ scene: "approval", optional: "an outside approval is asked for" }, { scene: "approval-refused", end: true, optional: "an outside approval is asked for" }],
+        approved,
         ...out,
       ],
     },
@@ -354,8 +400,9 @@ function flowsAll({ gate, returner, together, unreviewed }: { gate: boolean; ret
         [{ scene: "received" }],
         [{ scene: "checked" }],
         [{ scene: "theirs" }],
-        [{ scene: "review", tagline: "By us, by them, or both", optional: reviewed }],
-        [{ scene: "accepted" }, { scene: "to-sender", end: true }],
+        [{ scene: "review", tagline: ourReview, optional: reviewed }],
+        [{ scene: "accepted", tagline: work.ours === "final" ? undefined : work.ours === "recommends" ? "We recommend it" : "We pass it on" }, { scene: "to-sender", end: true }],
+        ...afterUs,
         ...out,
       ],
     },
@@ -371,13 +418,13 @@ function flowsAll({ gate, returner, together, unreviewed }: { gate: boolean; ret
       ],
     },
     {
-      key: "client", title: "Documents our client asks of us", from: "Our client asks for it", to: "accepted by our client, or back with us for the next revision",
+      key: "client", title: `Documents ${work.client ?? "our client"} asks of us`, from: `${cap(work.client ?? "our client")} asks for it`, to: `accepted by ${work.client ?? "our client"}, or back with us for the next revision`,
       columns: [
         [{ scene: "client-asked" }],
         [{ scene: "register" }],
         [{ scene: "prepare" }],
-        [{ scene: "review", tagline: "Ours, then our client's step on the route" }],
-        [{ scene: "accepted", tagline: "Our client accepts it" }, { scene: "returned", end: true, tagline: "Our client returns it" }],
+        [{ scene: "review", tagline: `Ours, then ${work.client ?? "our client"}'s step on the route` }],
+        [{ scene: "accepted", tagline: `${cap(work.client ?? "our client")} accepts it` }, { scene: "returned", end: true, tagline: `${cap(work.client ?? "our client")} returns it` }],
         ...out,
       ],
     },
@@ -466,7 +513,6 @@ export default async function ControlRoomPage() {
   const gate = holders.length > 0;
   // Our role on the project decides which flows come first, and in whose words.
   const role = ctx.project.role ?? "GENERIC";
-  const side: Side = SIDE_OF[role] ?? "both";
   const roleName = (await contractRoleOptions().catch(() => [])).find((one) => one.code === role)?.label ?? roleLabel(role);
   // A document type published as not reviewed goes from Prepare straight to release.
   const unreviewed = values.some((one) => one.setKey === "DOCUMENT_TYPES" && one.status === "ACTIVE" && one.props?.review === false);
@@ -665,7 +711,7 @@ export default async function ControlRoomPage() {
 
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "The reviewer";
-  const flows: Flow[] = flowsFor({ gate, returner, together, unreviewed, side }).map((flow) => ({
+  const flows: Flow[] = flowsFor({ gate, returner, together, unreviewed, role }).map((flow) => ({
     ...flow,
     columns: flow.columns.map((column) => column.map((lane) => {
       const stage = byKey.get(lane.scene)!;
