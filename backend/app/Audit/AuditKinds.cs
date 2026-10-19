@@ -100,4 +100,38 @@ public static class AuditKinds
                 found[f.Id] = f.DocumentId!.Value;
         return found;
     }
+
+    private static readonly System.Text.RegularExpressions.Regex IdPattern =
+        new(@"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// What the ids written inside these acts' details stand for (a scheme, a route, a person, an organization, a
+    /// document…), so a detail reads with names (owner: an id is never shown).
+    /// </summary>
+    public static async Task<Dictionary<Guid, string>> NamesInAsync(Platform.DeliosDbContext db, IEnumerable<AuditEvent> rows,
+        CancellationToken cancellationToken)
+    {
+        var ids = rows.Where(e => e.Detail != null).SelectMany(e => IdPattern.Matches(e.Detail!).Select(m => Guid.Parse(m.Value))).Distinct().ToList();
+        var names = new Dictionary<Guid, string>();
+        if (ids.Count == 0) return names;
+        async Task Add<T>(IQueryable<T> rowsOf, System.Linq.Expressions.Expression<Func<T, KeyValuePair<Guid, string>>> pick)
+        {
+            foreach (var one in await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(rowsOf.Select(pick), cancellationToken))
+                names.TryAdd(one.Key, one.Value);
+        }
+        await Add(db.NumberingSchemes.Where(x => ids.Contains(x.Id)), x => new KeyValuePair<Guid, string>(x.Id, x.Name));
+        await Add(db.RevisionSchemes.Where(x => ids.Contains(x.Id)), x => new KeyValuePair<Guid, string>(x.Id, x.Name));
+        await Add(db.ReviewRoutes.Where(x => ids.Contains(x.Id)), x => new KeyValuePair<Guid, string>(x.Id, x.Name));
+        await Add(db.ListSets.Where(x => ids.Contains(x.Id)), x => new KeyValuePair<Guid, string>(x.Id, x.Name));
+        await Add(db.Functions.Where(x => ids.Contains(x.Id)), x => new KeyValuePair<Guid, string>(x.Id, x.Name));
+        await Add(db.Users.Where(x => ids.Contains(x.Id)), x => new KeyValuePair<Guid, string>(x.Id, x.Name));
+        await Add(db.Parties.Where(x => ids.Contains(x.Id)), x => new KeyValuePair<Guid, string>(x.Id, x.Name));
+        await Add(db.Projects.Where(x => ids.Contains(x.Id)), x => new KeyValuePair<Guid, string>(x.Id, x.Code));
+        await Add(db.Documents.Where(x => ids.Contains(x.Id)), x => new KeyValuePair<Guid, string>(x.Id, x.Number));
+        return names;
+    }
+
+    /// <summary>A detail with every id in it put as the name it stands for; one no longer found reads "(removed)".</summary>
+    public static string? Readable(string? detail, IReadOnlyDictionary<Guid, string> names) =>
+        detail is null ? null : IdPattern.Replace(detail, m => names.TryGetValue(Guid.Parse(m.Value), out var name) ? name : "(removed)");
 }

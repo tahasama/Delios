@@ -851,7 +851,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the side takes the kind's colour; the title stays ink. A detail kept as data reads as the fields that changed, "was →
   now" (`readableDetail`), never as raw data (owner: "never display json"), wherever a detail shows (logbooks, a
   document's History): "<what>: […] → […]" too, a list of records as added / taken out / changed, each by its name,
-  ids left out, the settings' words in plain words. Home's Log tab is the same logbook for its project (backend `GET /log`,
+  one line per field under it (owner: "don't condense, no fancy transformations": a code reads as itself, only not
+  in capitals). An id is never shown: the backend puts each id in a detail as the name it stands for
+  (`AuditKinds.NamesInAsync` / `Readable`, on every audit reader), and new details are written with names. Home's Log tab is the same logbook for its project (backend `GET /log`,
   the control function and administrators), the project's work only: sign-ins, opened and downloaded, and people and
   settings are left out (the administrators' trail). Its menu is on the left (`LogbookSide categoriesOnly`: the kinds,
   not every act; then Find), the days beside it, the page's right column away while the log is open.

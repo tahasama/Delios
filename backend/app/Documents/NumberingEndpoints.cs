@@ -308,11 +308,13 @@ public static class NumberingLevels
         var type = Blank(request.DeliverableType);
         if (type is null) return Problems.Invalid("DELIVERABLE_TYPE_REQUIRED", "Say what the scheme numbers.");
         Guid? schemeId = request.SchemeId is { } named ? Mapped(http, named) : null;
+        string? schemeName = null;
         if (schemeId is { } id)
         {
             var target = await db.NumberingSchemes.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id && s.ProjectId == scope, cancellationToken);
             if (target is null) return Problems.Invalid("SCHEME_NOT_FOUND", "No such numbering scheme.");
             if (!target.Active) return Problems.Invalid("SCHEME_RETIRED", $"{target.Name} is retired: bring it back first, or choose another.");
+            schemeName = target.Name;
         }
         var routing = await db.SchemeRoutings.SingleOrDefaultAsync(r => r.ProjectId == scope && r.DeliverableType == type, cancellationToken);
         if (schemeId is null)
@@ -329,7 +331,7 @@ public static class NumberingLevels
         }
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "NUMBERING_ROUTED", "SchemeRouting", null, type,
-            schemeId is null ? "switched off" : $"scheme {schemeId}", scope, cancellationToken);
+            schemeId is null ? "switched off" : $"numbered by {schemeName}", scope, cancellationToken);
         return Results.NoContent();
     }
 }

@@ -65,8 +65,9 @@ public static class ActivityEndpoints
         }
         var rows = await query.OrderByDescending(e => e.At).ThenByDescending(e => e.Id).Take(Math.Clamp(take, 1, 200))
             .ToListAsync(cancellationToken);
+        var names = await AuditKinds.NamesInAsync(db, rows, cancellationToken);
         return Results.Ok(rows.Select(e => new ActivityRow(e.Id, e.At.ToDateTimeOffset(), e.ActorName, e.Action, e.EntityType,
-            e.EntityLabel, e.Detail)));
+            e.EntityLabel, AuditKinds.Readable(e.Detail, names))));
     }
 
     /// <summary>
@@ -109,6 +110,7 @@ public static class ActivityEndpoints
         var total = await query.CountAsync(cancellationToken);
         var rows = await query.OrderByDescending(e => e.Id).Skip((page - 1) * per).Take(per).ToListAsync(cancellationToken);
         var documents = await AuditKinds.DocumentsOfAsync(db, rows, cancellationToken);
+        var names = await AuditKinds.NamesInAsync(db, rows, cancellationToken);
         return Results.Ok(new
         {
             total,
@@ -119,7 +121,7 @@ public static class ActivityEndpoints
             rows = rows.Select(e => new
             {
                 e.Id, At = e.At.ToDateTimeOffset(), e.ActorId, e.ActorName, e.Action, Kind = AuditKinds.Of(e.Action), e.EntityType, e.EntityId,
-                e.EntityLabel, e.Detail, Project = (string?)access.Project.Code,
+                e.EntityLabel, Detail = AuditKinds.Readable(e.Detail, names), Project = (string?)access.Project.Code,
                 DocumentId = e.EntityId is { } eid && documents.TryGetValue(eid, out var did) ? did : (Guid?)null,
             }),
         });

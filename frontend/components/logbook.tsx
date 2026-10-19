@@ -172,7 +172,7 @@ export function LogbookDays({ acts, chosen, href, paging, showWho = true }: { ac
         <ul className="space-y-2">
           {those.map((e) => {
             const link = activityLink(e.entityType, e.entityId, e.entityLabel, e.documentId);
-            const detail = readableDetail(e.detail);
+            const detail = readableDetail(e.detail, e.entityLabel);
             const kind = AUDIT_KINDS.find((k) => k.key === e.kind);
             return (
               <li key={e.id} className={`slip ${AUDIT_RAIL[e.kind] ?? "rail-none"}`}>
@@ -183,7 +183,13 @@ export function LogbookDays({ acts, chosen, href, paging, showWho = true }: { ac
                   <span className="postmark">{activityWords(e.action)}</span>
                   <span className="slip-note ml-auto whitespace-nowrap">{fmtDateTime(e.at)}</span>
                 </div>
-                {detail ? <p className="slip-subject mt-1.5 whitespace-pre-line">{detail}</p> : null}
+                {detail ? (
+                  <div className="slip-subject mt-1.5">
+                    {detail.split("\n").map((line, i) => line.startsWith("· ")
+                      ? <p key={i} className="pl-4 text-[13px] text-slate-600">{line.slice(2)}</p>
+                      : <p key={i}>{line}</p>)}
+                  </div>
+                ) : null}
                 <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span className="route">
                     {showWho ? (

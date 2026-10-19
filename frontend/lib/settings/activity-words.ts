@@ -275,8 +275,10 @@ export function activityLink(entityType: string | null, entityId: string | null,
  * a route's steps) reads as what was added, taken out, and changed in each, named by its label. A single record reads
  * as its fields. Any data left inside a sentence is put in words. Anything else stays as written.
  */
-export function readableDetail(detail: string | null): string | null {
+export function readableDetail(detail: string | null, about?: string | null): string | null {
   if (!detail) return null;
+  // An id never reaches the screen (the backend names what it stands for; one left over says nothing).
+  detail = detail.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "").replace(/\s{2,}/g, " ").trim();
   const parse = (text: string): { ok: true; value: unknown } | null => {
     const t = text.trim();
     if (t === "(default)" || t === "(none)" || t === "") return { ok: true, value: null };
@@ -288,10 +290,8 @@ export function readableDetail(detail: string | null): string | null {
     setKey: "List", control: "Kind of answer", rule: "Asked", help: "Note under the box", inRegister: "Column in the register",
     retired: "Retired", key: "Key", label: "Name",
   };
-  const VALUES: Record<string, string> = {
-    TEXT: "text", CHOICE: "chosen from a list", DATE: "a date", NUMBER: "a number",
-    OPTIONAL: "may be left empty", REQUIRED: "must be filled", OFF: "not asked",
-  };
+  // A code reads as itself, only not shouted ("OPTIONAL" → "Optional").
+  const code = (v: string) => (/^[A-Z][A-Z0-9_]+$/.test(v) ? v.charAt(0) + v.slice(1).toLowerCase().replaceAll("_", " ") : v);
   const words = (key: string) => {
     if (NAMES[key]) return NAMES[key];
     const plain = key.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ").toLowerCase();
@@ -308,7 +308,7 @@ export function readableDetail(detail: string | null): string | null {
       : typeof value === "boolean" ? (value ? "yes" : "no")
       : Array.isArray(value) ? value.map((one) => (isRecord(one) ? nameOf(one) : show(one))).join(", ") || "none"
       : isRecord(value) ? Object.entries(value).filter(([k]) => !hidden(k)).map(([k, v]) => `${words(k).toLowerCase()} ${show(v)}`).join(", ")
-      : VALUES[String(value)] ?? String(value);
+      : code(String(value));
   const fieldsChanged = (was: Record<string, unknown> | null, now: Record<string, unknown> | null, indent = "") => {
     const keys = [...new Set([...Object.keys(was ?? {}), ...Object.keys(now ?? {})])].filter((k) => !hidden(k));
     return keys
@@ -324,7 +324,11 @@ export function readableDetail(detail: string | null): string | null {
       const before = new Map(a.map((one) => [identity(one as Record<string, unknown>), one as Record<string, unknown>]));
       const after = new Map(b.map((one) => [identity(one as Record<string, unknown>), one as Record<string, unknown>]));
       const lines: string[] = [];
-      for (const [id, one] of after) if (!before.has(id)) lines.push(`Added ${nameOf(one)}: ${show(one)}`);
+      // One line per field, never run together; what is empty, and what only names it, left out.
+      const fieldsOf = (one: Record<string, unknown>) => Object.entries(one)
+        .filter(([k, v]) => !hidden(k) && k !== "key" && k !== "label" && k !== "name" && v !== null && v !== undefined && v !== "" && v !== false)
+        .map(([k, v]) => `· ${words(k)}: ${show(v)}`);
+      for (const [id, one] of after) if (!before.has(id)) lines.push(`Added ${nameOf(one)}`, ...fieldsOf(one));
       for (const [id, one] of before) if (!after.has(id)) lines.push(`Taken out ${nameOf(one)}`);
       for (const [id, one] of after) {
         const old = before.get(id);
@@ -340,7 +344,8 @@ export function readableDetail(detail: string | null): string | null {
 
   // "<what>: was → now", the what kept as the heading.
   const head = /^([^[{\n]{1,80}?):\s*(?=[[{(])/.exec(detail);
-  const label = head ? head[1].trim() : null;
+  // The heading only when it says something the line above does not.
+  const label = head && head[1].trim().toLowerCase() !== (about ?? "").trim().toLowerCase() ? head[1].trim() : null;
   const body = head ? detail.slice(head[0].length) : detail;
   const arrow = body.indexOf(" → ");
   if (arrow > 0) {
