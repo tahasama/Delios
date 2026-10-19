@@ -264,7 +264,7 @@ export async function setScheduleDaysAction(_prev: State | undefined, formData: 
 /**
  * One answer of the Control room, changed where it is shown (a step's panel): who carries out an act (CONTROL /
  * SELF, or OFF for an act that may be left out), a question of how the project works, a confirmation by whoever
- * holds Manage (ON / OFF), or the working days before a silent discipline is escalated. Only this answer changes;
+ * holds Manage (ON / OFF), a stamp on the PDF (ON / OFF), or the working days before a silent discipline is escalated. Only this answer changes;
  * an answer the organization keeps fixed is refused by the backend (ROOM_FIXED) and left as it stands.
  */
 export async function setRoomAnswerAction(_prev: State | undefined, formData: FormData): Promise<State> {
@@ -296,6 +296,10 @@ export async function setRoomAnswerAction(_prev: State | undefined, formData: Fo
       if (value !== "ON" && value !== "OFF") return { error: "Choose yes or no." };
       await save(formData, [[key, value]]);
       said = value === "ON" ? "Whoever holds Manage confirms it from now on." : "No confirmation from now on.";
+    } else if (key === STAMP_COMMENTS_KEY || STAMP_KINDS.some((one) => one.key === key)) {
+      if (value !== "ON" && value !== "OFF") return { error: "Choose on or off." };
+      await save(formData, [[key, value]]);
+      said = value === "ON" ? "That stamp goes on the PDF from now on." : "That stamp is left off from now on.";
     } else if (key === ESCALATE_AFTER_KEY) {
       const days = Number(value);
       if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Escalate after 1 to 60 working days." };

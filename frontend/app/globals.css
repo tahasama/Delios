@@ -1192,132 +1192,102 @@ summary::-webkit-details-marker {
 }
 
 @layer components {
-  /* ── Control room: the flow, on its band ────────────────────────────────────
-     The band of the first Control room, drawn for each mode: slate in light,
-     night blue in dark, never white. Steps are cards topped with their state's
-     rail colour (the register's colours); the lit one is raised, washed in its
-     colour. A fork stacks its steps; the road that ends hangs below on a dashed
-     drop, in red; a step that happens only sometimes is dashed. */
+  /* ── Control room: the console ────────────────────────────────────────────
+     A control room, not a diagram: one solid navy console (the brand's), each
+     step a station on it, and each station a portal to the settings that
+     regulate it, its readouts saying how many it holds and whether any still
+     need setting up. Only the brand's blues and the states' own colours: no
+     gradient, no black, no grey, no white. */
   .scene-deck {
-    --deck-ink: #fff;
-    --deck-mute: rgb(255 255 255 / 0.8);
-    --deck-faint: rgb(255 255 255 / 0.66);
-    --deck-card: rgb(255 255 255 / 0.08);
-    --deck-card-ring: rgb(255 255 255 / 0.16);
-    --deck-line: rgb(255 255 255 / 0.4);
-    --deck-end: rgb(254 202 202);
-    position: relative;
-    overflow: hidden;
+    --deck: var(--color-brand-strong);
+    --deck-station: color-mix(in srgb, var(--color-brand) 46%, var(--color-brand-strong));
+    --deck-station-hover: color-mix(in srgb, var(--color-brand) 62%, var(--color-brand-strong));
+    --deck-ring: rgb(147 197 253 / 0.22);
+    --deck-ink: #e4effb;
+    --deck-mute: #a8c5e3;
+    --deck-faint: #86a9cc;
+    --deck-lit: #7dd3fc;
+    --deck-end: #fda4af;
+    --deck-warn: #fcd34d;
     border-radius: 14px;
     color: var(--deck-ink);
-    /* Home's band: the brand's navy, with one soft light in the corner. */
-    background: linear-gradient(115deg, var(--color-brand-strong) 0%, var(--color-brand) 58%, var(--color-brand-hover) 140%);
+    background: var(--deck);
   }
-  .scene-deck::after {
-    content: "";
-    position: absolute;
-    inset: auto -80px -170px auto;
-    width: 420px;
-    height: 420px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(122, 176, 224, 0.22), transparent 68%);
-    pointer-events: none;
-  }
-  .scene-deck > * { position: relative; z-index: 1; }
   :root.dark .scene-deck {
-    --deck-card: rgb(255 255 255 / 0.06);
-    --deck-card-ring: rgb(255 255 255 / 0.13);
-    background: linear-gradient(115deg, #0f1f33 0%, #16304d 58%, #1f4166 140%);
-    box-shadow: inset 0 0 0 1px rgb(95 143 191 / 0.16);
+    --deck: #0e2640;
+    --deck-station: #15375c;
+    --deck-station-hover: #1a4470;
+    box-shadow: inset 0 0 0 1px rgb(147 197 253 / 0.14);
   }
-  :root.dark .scene-deck::after { background: radial-gradient(circle, rgba(95, 143, 191, 0.14), transparent 68%); }
   .route-pick {
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
     min-height: var(--control-h);
     white-space: nowrap;
-    padding: 0 0.7rem;
-    border-radius: 999px;
+    padding: 0 0.75rem;
+    border-radius: 0.5rem;
     font-size: 13px;
     font-weight: 600;
     color: var(--deck-mute);
-    background: var(--deck-card);
-    box-shadow: inset 0 0 0 1px var(--deck-card-ring);
+    background: rgb(147 197 253 / 0.08);
+    box-shadow: inset 0 0 0 1px var(--deck-ring);
     transition: background-color 160ms, color 160ms;
   }
-  .route-pick:hover { color: var(--deck-ink); background: rgb(255 255 255 / 0.14); }
-  .route-pick[aria-pressed="true"] { color: var(--color-brand-strong); background: #fff; box-shadow: none; }
-  :root.dark .route-pick[aria-pressed="true"] { color: #0f1f33; background: #e8f1ff; }
-  .route-pick:focus-visible { outline: 2px solid rgb(255 255 255 / 0.8); outline-offset: 2px; }
+  .route-pick:hover { color: var(--deck-ink); background: rgb(147 197 253 / 0.16); }
+  .route-pick[aria-pressed="true"] { color: var(--color-brand-strong); background: #cfe5fb; box-shadow: none; }
+  .route-pick:focus-visible { outline: 2px solid var(--deck-lit); outline-offset: 2px; }
   .scene-route { font-size: 13px; color: var(--deck-mute); }
   .scene-route-arrow { color: var(--deck-faint); }
 
   .scene-track {
-    --band: 7rem;
-    --link: 1.1rem;
-    display: flex;
-    align-items: flex-start;
-    gap: var(--link);
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(8.75rem, 1fr);
+    align-items: start;
+    gap: 0.6rem;
     overflow-x: auto;
     scroll-snap-type: x proximity;
-    padding: 1.25rem 1.25rem 1.5rem;
+    padding: 1rem 1.25rem 1.25rem;
   }
   @media (min-width: 640px) { .scene-track { padding-inline: 1.5rem; } }
+  .scene-col { display: flex; flex-direction: column; gap: 0.45rem; scroll-snap-align: start; }
+  .scene-band { display: flex; flex-direction: column; gap: 0.45rem; }
   .scene {
     position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
     width: 100%;
-    padding: 0.8rem 0.85rem 0.75rem;
-    border-radius: 0.7rem;
+    padding: 0.7rem 0.8rem 0.65rem;
+    border-radius: 0.6rem;
     overflow: hidden;
     text-align: left;
     color: var(--deck-ink);
-    background: var(--deck-card);
-    box-shadow: inset 0 0 0 1px var(--deck-card-ring);
-    transition: transform 200ms cubic-bezier(.2,.7,.2,1), background-color 200ms, box-shadow 200ms;
+    background: var(--deck-station);
+    box-shadow: inset 0 0 0 1px var(--deck-ring);
+    transition: background-color 160ms, box-shadow 160ms;
   }
+  /* The station's status light: its state's colour, across its top. */
   .scene::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--rail); }
-  .scene:hover { background: rgb(255 255 255 / 0.12); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rail) 70%, transparent); }
-  .scene:focus-visible { outline: 2px solid rgb(255 255 255 / 0.8); outline-offset: 2px; }
-  .scene[aria-selected="true"] {
-    transform: translateY(-3px);
-    background: rgb(255 255 255 / 0.18);
-    box-shadow: inset 0 0 0 2px var(--rail), 0 12px 24px -12px rgb(0 0 0 / 0.45);
-  }
-  .scene-number { font-family: var(--font-mono); font-size: 11px; color: var(--deck-faint); }
+  .scene-deck .rail-none { --rail: var(--deck-faint); }
+  .scene:hover { background: var(--deck-station-hover); }
+  .scene:focus-visible { outline: 2px solid var(--deck-lit); outline-offset: 2px; }
+  .scene[aria-selected="true"] { background: var(--deck-station-hover); box-shadow: inset 0 0 0 2px var(--deck-lit); }
+  .scene-number { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-family: var(--font-mono); font-size: 11px; color: var(--deck-faint); }
   .scene-title { font-size: 14px; font-weight: 600; line-height: 1.2; }
   .scene-tagline { font-size: 12px; line-height: 1.35; color: var(--deck-mute); }
-  .scene-col { position: relative; flex: 1 0 8.5rem; display: flex; flex-direction: column; scroll-snap-align: start; }
-  .scene-band { position: relative; min-height: var(--band); display: flex; flex-direction: column; justify-content: center; gap: 0.5rem; }
-  .scene-band > .scene { min-height: var(--band); }
-  /* The arrow to the next step, through the middle of the band. */
-  .scene-col-linked::after {
-    content: "";
-    position: absolute;
-    top: calc(var(--band) / 2);
-    right: calc(var(--link) * -1);
-    width: var(--link);
-    height: 2px;
-    background: var(--deck-line);
-  }
-  .scene-col-linked::before {
-    content: "";
-    position: absolute;
-    z-index: 1;
-    right: calc(var(--link) * -1);
-    top: calc(var(--band) / 2 - 3px);
-    border-left: 6px solid var(--deck-line);
-    border-block: 4px solid transparent;
-  }
-  /* The road that ends: below its step, on a dashed drop, in red. */
-  .scene-branch { position: relative; margin-top: 1rem; }
-  .scene-branch::before { content: ""; position: absolute; left: 50%; top: -1rem; height: 1rem; border-left: 2px dashed var(--deck-line); }
-  .scene-end .scene-number, .scene-end .scene-title { color: var(--deck-end); }
-  /* A step that happens only sometimes. */
-  .scene-optional:not([aria-selected="true"]) { background: transparent; box-shadow: none; outline: 1.5px dashed var(--deck-line); outline-offset: -1.5px; }
+  /* Its readouts: how many settings regulate it, the lists it reads, what still needs setting up. */
+  .scene-gauges { display: flex; flex-wrap: wrap; gap: 0.25rem 0.6rem; margin-top: 0.35rem; padding-top: 0.4rem; border-top: 1px solid var(--deck-ring); font-size: 11px; color: var(--deck-mute); }
+  .scene-gauge { display: inline-flex; align-items: center; gap: 0.3rem; }
+  .scene-gauge::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: var(--deck-lit); }
+  .scene-gauge-list::before { background: var(--deck-mute); }
+  .scene-gauge-warn { color: var(--deck-warn); }
+  .scene-gauge-warn::before { background: var(--deck-warn); }
+  /* A station that ends the revision, and one that works only sometimes. */
+  .scene-end { --deck-station: color-mix(in srgb, #9f1239 18%, var(--color-brand-strong)); }
+  .scene-end .scene-number { color: var(--deck-end); }
+  .scene-optional { background: transparent; box-shadow: inset 0 0 0 1px rgb(147 197 253 / 0.35); }
 
   .scene-panel { animation: scene-in 220ms cubic-bezier(.2,.7,.2,1); }
   @keyframes scene-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -1342,7 +1312,6 @@ summary::-webkit-details-marker {
 
   @media (prefers-reduced-motion: reduce) {
     .scene, .route-pick { transition: none; }
-    .scene[aria-selected="true"] { transform: none; }
     .scene-panel { animation: none; }
   }
 }

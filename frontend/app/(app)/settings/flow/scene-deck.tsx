@@ -9,6 +9,10 @@ export type Scene = {
   tagline: string;
   /** The rail class that gives the scene its colour. */
   rail: string;
+  /** Its readouts: the settings that regulate it, the lists it reads, and how many of them still need setting up. */
+  controls: number;
+  lists: number;
+  toSet: number;
 };
 
 /**
@@ -119,34 +123,38 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
           }}
         >
           {flow.columns.map((column, c) => {
-            const main = column.filter((l) => !l.end);
-            const ends = column.filter((l) => l.end);
             const compact = column.length > 1;
-            const card = ({ scene: one, optional, end }: Lane, n: number) => {
-              const number = `${c + 1}${compact ? "ab"[column.findIndex((l) => l.scene.key === one.key)] ?? "" : ""}`;
-              return (
-                <button
-                  key={`${flow.key}/${one.key}/${n}`}
-                  type="button"
-                  role="tab"
-                  data-scene={one.key}
-                  id={`scene-${one.key}`}
-                  aria-selected={one.key === lit}
-                  aria-controls="scene-panel"
-                  tabIndex={one.key === lit ? 0 : -1}
-                  onClick={() => go(one.key)}
-                  className={cn("scene", one.rail, optional && "scene-optional", end && "scene-end")}
-                >
-                  <span className="scene-number">{number}{end ? " · ends here" : optional ? " · sometimes" : ""}</span>
-                  <span className="scene-title">{one.title}</span>
-                  <span className="scene-tagline">{optional && !end ? `If ${optional}` : one.tagline}</span>
-                </button>
-              );
-            };
             return (
-              <div key={`${flow.key}/${c}`} className={cn("scene-col", c < flow.columns.length - 1 && "scene-col-linked")}>
-                <div className="scene-band">{main.map(card)}</div>
-                {ends.map((l, i) => <div key={l.scene.key} className="scene-branch">{card(l, main.length + i)}</div>)}
+              <div key={`${flow.key}/${c}`} className="scene-col">
+                {[...column.filter((l) => !l.end), ...column.filter((l) => l.end)].map(({ scene: one, optional, end }, n) => {
+                  const number = `${String(c + 1).padStart(2, "0")}${compact ? "ab"[column.findIndex((l) => l.scene.key === one.key)] ?? "" : ""}`;
+                  return (
+                    <button
+                      key={`${flow.key}/${one.key}/${n}`}
+                      type="button"
+                      role="tab"
+                      data-scene={one.key}
+                      id={`scene-${one.key}`}
+                      aria-selected={one.key === lit}
+                      aria-controls="scene-panel"
+                      tabIndex={one.key === lit ? 0 : -1}
+                      onClick={() => go(one.key)}
+                      className={cn("scene", one.rail, optional && "scene-optional", end && "scene-end")}
+                    >
+                      <span className="scene-number">
+                        <span>{number}</span>
+                        {end ? <span>ends here</span> : optional ? <span>sometimes</span> : null}
+                      </span>
+                      <span className="scene-title">{one.title}</span>
+                      <span className="scene-tagline">{optional && !end ? `If ${optional}` : one.tagline}</span>
+                      <span className="scene-gauges">
+                        <span className="scene-gauge">{one.controls ? `${one.controls} control${one.controls === 1 ? "" : "s"}` : "fixed"}</span>
+                        {one.lists ? <span className="scene-gauge scene-gauge-list">{one.lists} to read</span> : null}
+                        {one.toSet ? <span className="scene-gauge scene-gauge-warn">{one.toSet} to set up</span> : null}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             );
           })}

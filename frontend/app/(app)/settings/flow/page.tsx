@@ -3,7 +3,8 @@ import { SETUP_PAGES, maySetup, mayChangeControlRoom } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath } from "@/lib/client";
 import { projectSettings } from "@/lib/settings/api";
-import { controlSettings, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES, SKIPPABLE, CONFIRMABLE, PEOPLE_KEY, PEOPLE_MODE_LABEL, roomItemOf } from "@/lib/settings/control-activities";
+import { controlSettings, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES, SKIPPABLE, CONFIRMABLE, PEOPLE_KEY, PEOPLE_MODE_LABEL, STAMP_KINDS, STAMP_COMMENTS_KEY, roomItemOf } from "@/lib/settings/control-activities";
+import { stateNames } from "@/lib/core/state-names";
 import { holdersOf } from "@/lib/core/permissions";
 import { scheduleSource } from "@/lib/actions/api";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
@@ -31,7 +32,8 @@ export const metadata = { title: "Control room" };
 /** Who does something on a step: an act the project decides the carrier of (its key), or one that never changes. */
 type Who = string | { title: string; by: string };
 
-type Extra = "numbering" | "revisions" | "fields" | "routes" | "distribution" | "parties" | "packages" | "schedule" | "people" | "functions";
+type Extra = "numbering" | "revisions" | "fields" | "routes" | "distribution" | "parties" | "packages" | "schedule" | "people" | "functions"
+  | "form:DOCUMENT" | "form:REVISION" | "form:REVIEW" | "form:TRANSMITTAL" | "form:PACKAGE";
 
 type Stage = {
   key: string;
@@ -61,78 +63,87 @@ const STAGES: Stage[] = [
     text: "The document gets its number and its description before anything is written in it.",
     who: [{ title: "Registering it", by: "Whoever creates it" }, "WITHDRAW"],
     sets: ["SUBPROJECTS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "PHASES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES"],
-    extras: ["numbering", "fields"],
+    extras: ["numbering", "fields", "form:DOCUMENT"],
   },
   {
     key: "prepare", title: "Prepare", tagline: "Written by its author", rail: "rail-prep",
     text: "The author writes the revision and attaches its files.",
     who: [{ title: "Writing the revision", by: "Its author" }, "AUTHORIZE_REVISION"],
     sets: ["STATUSES", "NATIVE_FORMATS", "RENDITION_FORMATS"],
-    extras: ["revisions"],
+    extras: ["revisions", "form:REVISION"],
+    answers: ["STATE:IN_PREPARATION"],
   },
   {
     key: "review", title: "Review", tagline: "Down its route", rail: "rail-review",
     text: "The route the document matches sends it to its reviewers, and each answers with a verdict or advice.",
     who: ["REVIEW_ISSUE", { title: "Answering", by: "The people on each step of the route" }, "DELEGATE"],
-    answers: ["POLICY_MATRIX", "POLICY_MATRIX_DETAIL"],
+    answers: ["POLICY_MATRIX", "POLICY_MATRIX_DETAIL", "STATE:IN_REVIEW"],
     sets: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES"],
-    extras: ["routes", "distribution"],
+    extras: ["routes", "distribution", "form:REVIEW"],
   },
   {
     key: "accepted", title: "Accepted", tagline: "The verdict lets it go on", rail: "rail-accepted",
     text: "The verdict accepts it, as it stands or with comments for the next revision.",
     who: [{ title: "Deciding", by: "The step of the route that decides" }],
     sets: ["REVIEW_OUTCOMES"],
+    extras: ["routes"],
   },
   {
     key: "returned", title: "Returned", tagline: "Back to the author", rail: "rail-rejected",
     text: "The verdict refuses it: it goes back to the author with the comments, and this revision ends.",
     who: ["RETURN_OUTCOME"],
     sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES"],
+    answers: ["STAMP:RETURNED"],
   },
   {
     key: "to-sender", title: "Returned to the sender", tagline: "For correction", rail: "rail-returned",
     text: "The verdict refuses it: it goes back to whoever sent it, for correction. Their next one starts again.",
     who: ["RETURN_OUTCOME"],
     sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES"],
-    extras: ["parties"],
+    extras: ["parties", "form:TRANSMITTAL"],
+    answers: ["STAMP:RETURNED"],
   },
   {
     key: "gate", title: "The control function's check", tagline: "Before it is published", rail: "rail-check",
     text: "Decided, it waits until the control function publishes it at the status the review settled on.",
-    who: [{ title: "Publishing it", by: "The control function" }],
+    who: ["CONTROL_PEOPLE", { title: "Publishing it", by: "The control function" }],
     sets: ["STATUSES"],
+    answers: ["STATE:NOT_RELEASED"],
   },
   {
     key: "gate-return", title: "Sent back", tagline: "Wrong for the record", rail: "rail-returned",
     text: "The control function refuses to publish it and sends it back with a reason. This revision ends.",
     who: [{ title: "Sending it back", by: "The control function" }],
     sets: ["RETURN_REASONS"],
+    answers: ["STATE:RETURNED"],
   },
   {
     key: "approval", title: "Approved outside", tagline: "An outside party approves", rail: "rail-accepted",
     text: "Somebody outside approves it before it is released, when an approval was asked for.",
     who: [{ title: "Approving", by: "The outside party named when it was asked" }],
     extras: ["parties"],
+    answers: ["STAMP:HELD", "STATE:ON_HOLD"],
   },
   {
     key: "approval-refused", title: "Not approved", tagline: "Back to the author", rail: "rail-rejected",
     text: "The outside party refuses it: it goes back to the author with a reason. This revision ends.",
     who: [{ title: "Sending it back", by: "Whoever asked for the approval" }],
+    answers: ["STAMP:HELD"],
+    extras: ["parties"],
   },
   {
     key: "release", title: "Release", tagline: "In force", rail: "rail-released",
     text: "The revision comes into force, and the one before it is superseded.",
     who: [{ title: "Releasing", by: "The decider, or the control function where it checks first" }, "VOID"],
-    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP"],
+    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "STAMP:RELEASED", "STAMP:SUPERSEDED", "STAMP:VOID", "STAMP_COMMENTS", "STATE:RELEASED"],
   },
   {
     key: "released-issued", title: "Released & issued", tagline: "In force, and sent", rail: "rail-released",
     text: "In one act it comes into force and goes to the people named by whoever decided or asked.",
     who: ["ISSUE", "VOID"],
-    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "POLICY_READY"],
+    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "POLICY_READY", "STAMP:RELEASED", "STAMP:SUPERSEDED", "STAMP:VOID", "STAMP_COMMENTS", "STATE:RELEASED"],
     sets: ["REASONS_FOR_ISSUE", "ISSUE_CODES"],
-    extras: ["distribution"],
+    extras: ["distribution", "form:TRANSMITTAL"],
   },
   {
     key: "issue", title: "Issue", tagline: "Sent out", rail: "rail-issue",
@@ -140,38 +151,39 @@ const STAGES: Stage[] = [
     who: ["ISSUE"],
     answers: ["POLICY_READY"],
     sets: ["REASONS_FOR_ISSUE", "ISSUE_CODES"],
-    extras: ["distribution"],
+    extras: ["distribution", "form:TRANSMITTAL"],
   },
   {
     key: "received", title: "Received", tagline: "Arrives on a transmittal", rail: "rail-received",
     text: "What another organization sends is recorded on the transmittal it came on.",
     who: [{ title: "Recording what arrived", by: "Whoever receives it" }],
     sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS", "REASONS_FOR_ISSUE"],
-    extras: ["parties"],
+    extras: ["parties", "form:TRANSMITTAL"],
   },
   {
     key: "theirs", title: "Registered", tagline: "Put in our register", rail: "rail-none",
     text: "It becomes a document of the register, under the sender's code and the order it answers.",
     who: [{ title: "Registering it", by: "Whoever recorded it" }],
     sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES"],
-    extras: ["numbering"],
+    extras: ["numbering", "form:DOCUMENT"],
   },
   {
     key: "asked", title: "Asked of the supplier", tagline: "Asked on a transmittal", rail: "rail-sent",
     text: "A placeholder from the supplier's package goes to them, due on its planned day. They hold it until they send it.",
     who: [{ title: "Asking for it", by: "The control function, from the supplier's package" }],
     sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS"],
-    extras: ["packages", "parties"],
+    extras: ["packages", "parties", "form:TRANSMITTAL"],
   },
   {
     key: "checked", title: "The control function's check", tagline: "Accepted, or back to them", rail: "rail-check",
     text: "What the supplier sent counts only once it is checked: accepted, we hold it; returned, they correct it.",
-    who: [{ title: "Checking it", by: "The control function" }],
+    who: ["CONTROL_PEOPLE", { title: "Checking it", by: "The control function" }],
   },
   {
     key: "handed-back", title: "Back with the supplier", tagline: "Theirs again, to update", rail: "rail-rejected",
     text: "Rejected, or released with comments: it goes back to the supplier for the next revision.",
     who: [{ title: "Taking the comments in", by: "The supplier" }],
+    sets: ["REVIEW_OUTCOMES"],
   },
 
   // ── Packages we deliver ─────────────────────────────────────────────────────
@@ -179,12 +191,12 @@ const STAGES: Stage[] = [
     key: "pkg-made", title: "Put together", tagline: "Its documents gathered", rail: "rail-prep",
     text: "The package is opened with the statuses it is needed at, and its documents are added.",
     who: [{ title: "Adding and taking out documents", by: "Those putting it together" }, { title: "Everything else on it", by: "The control function" }],
-    extras: ["packages"],
+    extras: ["packages", "form:PACKAGE"],
   },
   {
     key: "pkg-checked", title: "Checked", tagline: "Ready or not, each one", rail: "rail-check",
     text: "Each document is read against the status it is needed at; what is not ready is the shortfall.",
-    who: [{ title: "Checking it", by: "The control function" }],
+    who: ["CONTROL_PEOPLE", { title: "Checking it", by: "The control function" }],
     sets: ["STATUSES"],
   },
   {
@@ -197,6 +209,7 @@ const STAGES: Stage[] = [
     text: "One transmittal per organization carries its documents; what the package holds is then fixed.",
     who: [{ title: "Delivering it", by: "The control function" }],
     sets: ["REASONS_FOR_ISSUE"],
+    extras: ["distribution"],
   },
   {
     key: "pkg-accepted", title: "Accepted", tagline: "By whoever receives it", rail: "rail-accepted",
@@ -240,7 +253,7 @@ const STAGES: Stage[] = [
     key: "join-asked", title: "Asked or added", tagline: "Someone new, or with an account", rail: "rail-people",
     text: "Anyone of ours asks for someone new; someone with an account is added. Either way with a function and a department.",
     who: [{ title: "Asking for someone", by: "Anyone of ours on the project" }, "PROJECT_PEOPLE"],
-    extras: ["people"],
+    extras: ["people", "functions"],
   },
   {
     key: "join-confirmed", title: "Confirmed", tagline: "By whoever holds Manage", rail: "rail-check",
@@ -344,6 +357,11 @@ const EXTRA: Record<Extra, { title: string; href: string }> = {
   schedule: { title: "Schedule", href: "/schedule" },
   people: { title: "People & access", href: "/settings/users" },
   functions: { title: "Functions & permissions", href: "/settings/functions" },
+  "form:DOCUMENT": { title: "The document form", href: "/settings/fields?form=DOCUMENT" },
+  "form:REVISION": { title: "The revision form", href: "/settings/fields?form=REVISION" },
+  "form:REVIEW": { title: "The review form", href: "/settings/fields?form=REVIEW" },
+  "form:TRANSMITTAL": { title: "The transmittal form", href: "/settings/fields?form=TRANSMITTAL" },
+  "form:PACKAGE": { title: "The package form", href: "/settings/fields?form=PACKAGE" },
 };
 
 /** Where every answer of how the project works is changed. */
@@ -377,6 +395,7 @@ export default async function ControlRoomPage() {
     api<{ people: unknown[] }>(projectPath(ctx, "/people/directory")).catch(() => null),
     liberty(),
   ]);
+  const stateNames_ = await stateNames(ctx);
 
   const gate = holders.length > 0;
   const together = (answers.get("POLICY_RELEASE") ?? "TOGETHER") === "TOGETHER";
@@ -405,8 +424,34 @@ export default async function ControlRoomPage() {
   const clean = (label: string) => label.replace(/ — recommended$/, "").replace(/ \(recommended\)$/, "");
   const names = holders.map((one) => one.name);
 
+  /** A plain line of what stands, with where it is changed. */
+  const fact = (key: string, title: string, value: string, href?: string) => (
+    <li key={key} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3 first:pt-0 last:pb-0">
+      <span className="text-[13px] font-medium text-slate-900">{title}</span>
+      <span className="text-[13px] text-slate-700">
+        {value}
+        {href && opens(href) && !readOnly ? <> · <Link href={href} className="font-semibold text-link hover:underline">change</Link></> : null}
+      </span>
+    </li>
+  );
+
   /** One answer of how the project works, changed right where it is read. */
   const answer = (key: string) => {
+    if (key === "CONTROL_PEOPLE") return fact(key, "Who acts as the control function", names.length ? names.join(", ") : "Nobody", `${HOW}#control-people`);
+    if (key.startsWith("STATE:")) {
+      const code = key.slice(6) === "RELEASED" && together ? "RELEASED_ISSUED" : key.slice(6);
+      return fact(key, "This state is called", stateNames_[code as keyof typeof stateNames_] ?? code, `${HOW}#state-names`);
+    }
+    const stamp = STAMP_KINDS.find((one) => one.key === key);
+    if (stamp || key === STAMP_COMMENTS_KEY) {
+      const stamped = effectiveAnswer("POLICY_PDF_STAMP", answers.get("POLICY_PDF_STAMP")) === "ON";
+      const options = [
+        { value: "ON", label: "On", text: stamp ? `${stamp.text}.${stamped ? "" : " Only once the PDF is stamped."}` : `A stamp whose verdict carries comments lists them on a last page of the PDF.${stamped ? "" : " Only once the PDF is stamped."}` },
+        { value: "OFF", label: "Off", text: stamp ? "This stamp is left off the PDF." : "The comments stay in the app only." },
+      ];
+      return <Choice key={key} title={stamp ? `The stamp "${stamp.label}"` : "The verdict's comments on the PDF"} options={options} value={effectiveAnswer(key, answers.get(key))}
+        action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
+    }
     const act = CONTROL_ACTIVITIES.find((one) => one.key === key);
     if (act) {
       const row = actRow.get(key);
@@ -457,6 +502,8 @@ export default async function ControlRoomPage() {
     schedule: schedule.source ? "the project's schedule" : "no schedule named yet",
     people: directory ? `${directory.people.length} people` : "who is on the project",
     functions: functions ? plural(functions.length, "function") : "what each may do",
+    "form:DOCUMENT": "what it asks", "form:REVISION": "what it asks", "form:REVIEW": "what it asks",
+    "form:TRANSMITTAL": "what it asks", "form:PACKAGE": "what it asks",
   };
 
   /** A step's panel: what happens, who does it, how it works here, and where it is set up, each answer changed in place. */
@@ -473,10 +520,10 @@ export default async function ControlRoomPage() {
     const fixedWho = stage.who.filter((one): one is { title: string; by: string } => typeof one !== "string");
     const acts = stage.who.filter((one): one is string => typeof one === "string");
     const panel = (
-      <section className={cn("register register-sheet register-sheet-open relative", stage.rail)}>
-        <span className="absolute inset-y-0 left-0 w-1 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
-        <header className="border-b border-line px-5 py-3.5 sm:px-6">
-          <h2 className="text-base font-semibold text-slate-950">{stage.title}</h2>
+      <section className={cn("register register-sheet register-sheet-open relative overflow-hidden", stage.rail)}>
+        <span className="absolute inset-y-0 left-0 w-1 bg-(--rail)" aria-hidden />
+        <header className="border-b border-line bg-tint-soft px-5 py-3 sm:px-6">
+          <h2 className="text-[15px] font-semibold text-slate-950">{stage.title}</h2>
           <p className="mt-0.5 text-[13px] leading-5 text-slate-600">{stage.text}</p>
         </header>
         <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
@@ -530,13 +577,24 @@ export default async function ControlRoomPage() {
     return [stage.key, panel];
   }));
 
+  /** A station's readouts: the settings that regulate it (its acts, answers, stamps, days), what it reads, what is not set up. */
+  const readouts = (stage: Stage) => {
+    const acts = stage.who.filter((one) => typeof one === "string").length;
+    const answersOf = (stage.answers ?? []).reduce((n, key) => n + (key === "DAYS" ? 2 : 1), 0);
+    const sets = stage.sets ?? [];
+    return {
+      controls: acts + answersOf,
+      lists: sets.length + (stage.extras?.length ?? 0),
+      toSet: sets.filter((key) => !setTitle.has(key) || !inUse(key)).length,
+    };
+  };
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "The reviewer";
   const flows: Flow[] = flowsFor({ gate, returner, together }).map((flow) => ({
     ...flow,
     columns: flow.columns.map((column) => column.map((lane) => {
       const stage = byKey.get(lane.scene)!;
-      const scene: Scene = { key: stage.key, title: stage.title, tagline: lane.tagline ?? stage.tagline, rail: stage.rail };
+      const scene: Scene = { key: stage.key, title: stage.title, tagline: lane.tagline ?? stage.tagline, rail: stage.rail, ...readouts(stage) };
       return { scene, optional: lane.optional, end: lane.end };
     })),
   }));
