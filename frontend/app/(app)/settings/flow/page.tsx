@@ -14,6 +14,7 @@ import { SceneDeck, type Flow, type Scene } from "./scene-deck";
 import { Choice } from "./choice";
 import { liberty } from "@/lib/organization/liberty";
 import { setRoomAnswerAction, setScheduleDaysAction } from "@/lib/settings/forms-how-it-works";
+import { setRouteVerdictsAction } from "@/lib/reviews/forms";
 import { cn } from "@/lib/core/utils";
 import { adminFunctions, projectNumbering, partiesWithAnswers, routesForEditor } from "@/lib/settings/api-admin";
 import { getSet, getSets } from "@/lib/settings/config";
@@ -77,7 +78,7 @@ const STAGES: Stage[] = [
     key: "review", title: "Review", tagline: "Down its route", rail: "rail-review",
     text: "The route the document matches sends it to its reviewers, and each answers with a verdict or advice.",
     who: ["REVIEW_ISSUE", { title: "Answering", by: "The people on each step of the route" }, "DELEGATE"],
-    answers: ["POLICY_MATRIX", "POLICY_MATRIX_DETAIL", "STATE:IN_REVIEW"],
+    answers: ["POLICY_MATRIX", "POLICY_MATRIX_DETAIL", "STATE:IN_REVIEW", "ROUTE_VERDICTS"],
     sets: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES"],
     extras: ["routes", "distribution", "form:REVIEW"],
   },
@@ -87,13 +88,14 @@ const STAGES: Stage[] = [
     who: [{ title: "Deciding", by: "The step of the route that decides" }],
     sets: ["REVIEW_OUTCOMES"],
     extras: ["routes"],
+    answers: ["POLICY_PDF_STAMP", "STAMP_COMMENTS"],
   },
   {
     key: "returned", title: "Returned", tagline: "Back to the author", rail: "rail-rejected",
     text: "The verdict refuses it: it goes back to the author with the comments, and this revision ends.",
     who: ["RETURN_OUTCOME"],
     sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES"],
-    answers: ["STAMP:RETURNED"],
+    answers: ["STAMP:RETURNED", "POLICY_PDF_STAMP", "STAMP_COMMENTS"],
   },
   {
     key: "to-sender", title: "Returned to the sender", tagline: "For correction", rail: "rail-returned",
@@ -101,7 +103,7 @@ const STAGES: Stage[] = [
     who: ["RETURN_OUTCOME"],
     sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES"],
     extras: ["parties", "form:TRANSMITTAL"],
-    answers: ["STAMP:RETURNED"],
+    answers: ["STAMP:RETURNED", "POLICY_PDF_STAMP", "STAMP_COMMENTS"],
   },
   {
     key: "gate", title: "The control function's check", tagline: "Before it is published", rail: "rail-check",
@@ -379,7 +381,7 @@ export default async function ControlRoomPage() {
     return !card || maySetup(me, card);
   };
 
-  const [settings, holders, sets, values, templates, schemes, functions, parties, answers, schedule, directory, switches] = await Promise.all([
+  const [settings, holders, sets, values, templates, schemes, functions, parties, answers, schedule, directory, switches, verdictSets] = await Promise.all([
     controlSettings(ctx),
     holdersOf(ctx, "CONTROL"),
     getSets().then((all) => all.map((one) => ({ key: one.key, title: one.title }))),
@@ -394,6 +396,7 @@ export default async function ControlRoomPage() {
     scheduleSource(ctx),
     api<{ people: unknown[] }>(projectPath(ctx, "/people/directory")).catch(() => null),
     liberty(),
+    api<{ key: string; title: string; verdicts: { code: string; status: string }[] }[]>("/api/admin/verdict-lists").catch(() => null),
   ]);
   const stateNames_ = await stateNames(ctx);
 
@@ -437,6 +440,20 @@ export default async function ControlRoomPage() {
 
   /** One answer of how the project works, changed right where it is read. */
   const answer = (key: string) => {
+    if (key === "ROUTE_VERDICTS") {
+      if (!templates || !verdictSets) return fact(key, "Which verdicts each route decides with", "Set on each route", "/settings/workflow-templates");
+      const options = [
+        { value: "", label: "Its documents' own set", text: "The set of Review outcomes serving each document's deliverable type (Types & sets)." },
+        ...verdictSets.map((one) => {
+          const live = one.verdicts.filter((v) => v.status === "ACTIVE");
+          return { value: one.key, label: one.title, text: `${live.length} verdict${live.length === 1 ? "" : "s"}: ${live.map((v) => v.code).join(", ")}.` };
+        }),
+      ];
+      return templates.map((route) => (
+        <Choice key={`verdicts:${route.id}`} title={`The route "${route.name}" decides with`} options={options} value={route.outcomeSetKey ?? ""}
+          action={setRouteVerdictsAction} hidden={{ id: route.id }} readOnly={readOnly} />
+      ));
+    }
     if (key === "CONTROL_PEOPLE") return fact(key, "Who acts as the control function", names.length ? names.join(", ") : "Nobody", `${HOW}#control-people`);
     if (key.startsWith("STATE:")) {
       const code = key.slice(6) === "RELEASED" && together ? "RELEASED_ISSUED" : key.slice(6);
@@ -577,24 +594,13 @@ export default async function ControlRoomPage() {
     return [stage.key, panel];
   }));
 
-  /** A station's readouts: the settings that regulate it (its acts, answers, stamps, days), what it reads, what is not set up. */
-  const readouts = (stage: Stage) => {
-    const acts = stage.who.filter((one) => typeof one === "string").length;
-    const answersOf = (stage.answers ?? []).reduce((n, key) => n + (key === "DAYS" ? 2 : 1), 0);
-    const sets = stage.sets ?? [];
-    return {
-      controls: acts + answersOf,
-      lists: sets.length + (stage.extras?.length ?? 0),
-      toSet: sets.filter((key) => !setTitle.has(key) || !inUse(key)).length,
-    };
-  };
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "The reviewer";
   const flows: Flow[] = flowsFor({ gate, returner, together }).map((flow) => ({
     ...flow,
     columns: flow.columns.map((column) => column.map((lane) => {
       const stage = byKey.get(lane.scene)!;
-      const scene: Scene = { key: stage.key, title: stage.title, tagline: lane.tagline ?? stage.tagline, rail: stage.rail, ...readouts(stage) };
+      const scene: Scene = { key: stage.key, title: stage.title, tagline: lane.tagline ?? stage.tagline, rail: stage.rail };
       return { scene, optional: lane.optional, end: lane.end };
     })),
   }));

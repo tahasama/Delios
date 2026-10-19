@@ -206,3 +206,20 @@ export async function submitForReleaseAction(_prev: Result | undefined, formData
   revalidatePath("/");
   return { ok: "Sent on for release." };
 }
+
+/**
+ * Which set of Review outcomes a route decides with, changed on its own from the Control room's Review step: a set by
+ * name, or empty for the set serving each document's deliverable type. The rest of the route stays as it is.
+ */
+export async function setRouteVerdictsAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const id = text(formData, "id");
+  if (!id) return { error: "Choose a route." };
+  try {
+    await api(`${projectPath(await requireScope(), "/routes")}/${id}`, { method: "PUT", body: { verdicts: text(formData, "value") } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidateRoutes();
+  revalidatePath("/settings/flow");
+  return { ok: "Saved: the route decides with that set from now on." };
+}

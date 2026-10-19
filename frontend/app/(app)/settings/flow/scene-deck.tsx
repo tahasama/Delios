@@ -9,10 +9,6 @@ export type Scene = {
   tagline: string;
   /** The rail class that gives the scene its colour. */
   rail: string;
-  /** Its readouts: the settings that regulate it, the lists it reads, and how many of them still need setting up. */
-  controls: number;
-  lists: number;
-  toSet: number;
 };
 
 /**
@@ -124,41 +120,48 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
         >
           {flow.columns.map((column, c) => {
             const compact = column.length > 1;
+            const station = ({ scene: one, optional, end }: Lane, n: number) => {
+              const number = `${String(c + 1).padStart(2, "0")}${compact ? "ab"[column.findIndex((l) => l.scene.key === one.key)] ?? "" : ""}`;
+              return (
+                <button
+                  key={`${flow.key}/${one.key}/${n}`}
+                  type="button"
+                  role="tab"
+                  data-scene={one.key}
+                  id={`scene-${one.key}`}
+                  aria-selected={one.key === lit}
+                  aria-controls="scene-panel"
+                  tabIndex={one.key === lit ? 0 : -1}
+                  onClick={() => go(one.key)}
+                  className={cn("scene", one.rail, optional && "scene-optional", end && "scene-end")}
+                >
+                  <span className="scene-number">
+                    <span>{number}</span>
+                    {end ? <span>ends here</span> : optional ? <span>sometimes</span> : null}
+                  </span>
+                  <span className="scene-title">{one.title}</span>
+                  <span className="scene-tagline">{optional && !end ? `If ${optional}` : one.tagline}</span>
+                </button>
+              );
+            };
+            const main = column.filter((l) => !l.end);
+            const ends = column.filter((l) => l.end);
             return (
-              <div key={`${flow.key}/${c}`} className="scene-col">
-                {[...column.filter((l) => !l.end), ...column.filter((l) => l.end)].map(({ scene: one, optional, end }, n) => {
-                  const number = `${String(c + 1).padStart(2, "0")}${compact ? "ab"[column.findIndex((l) => l.scene.key === one.key)] ?? "" : ""}`;
-                  return (
-                    <button
-                      key={`${flow.key}/${one.key}/${n}`}
-                      type="button"
-                      role="tab"
-                      data-scene={one.key}
-                      id={`scene-${one.key}`}
-                      aria-selected={one.key === lit}
-                      aria-controls="scene-panel"
-                      tabIndex={one.key === lit ? 0 : -1}
-                      onClick={() => go(one.key)}
-                      className={cn("scene", one.rail, optional && "scene-optional", end && "scene-end")}
-                    >
-                      <span className="scene-number">
-                        <span>{number}</span>
-                        {end ? <span>ends here</span> : optional ? <span>sometimes</span> : null}
-                      </span>
-                      <span className="scene-title">{one.title}</span>
-                      <span className="scene-tagline">{optional && !end ? `If ${optional}` : one.tagline}</span>
-                      <span className="scene-gauges">
-                        <span className="scene-gauge">{one.controls ? `${one.controls} control${one.controls === 1 ? "" : "s"}` : "fixed"}</span>
-                        {one.lists ? <span className="scene-gauge scene-gauge-list">{one.lists} to read</span> : null}
-                        {one.toSet ? <span className="scene-gauge scene-gauge-warn">{one.toSet} to set up</span> : null}
-                      </span>
-                    </button>
-                  );
-                })}
+              <div key={`${flow.key}/${c}`} className={cn("scene-col", c < flow.columns.length - 1 && "scene-col-linked")}>
+                <div className="scene-band">{main.map(station)}</div>
+                {ends.map((l, i) => <div key={l.scene.key} className="scene-branch">{station(l, main.length + i)}</div>)}
               </div>
             );
           })}
         </div>
+
+        {/* The key: what each mark on the console means. */}
+        <p className="scene-key px-5 pb-4 sm:px-6">
+          <span><span className="scene-key-light" aria-hidden />the light on top: the state it leaves the document in, as in the register</span>
+          <span><span className="scene-key-sometimes" aria-hidden />outlined: only sometimes</span>
+          <span><span className="scene-key-end" aria-hidden />below, in rose: the revision ends there, the next one starts again</span>
+          <span><span className="scene-key-lit" aria-hidden />ringed: the step shown under the console</span>
+        </p>
       </section>
 
       <div key={`${flow.key}/${lane.scene.key}`} role="tabpanel" id="scene-panel" aria-labelledby={`scene-${lane.scene.key}`} className="scene-panel">

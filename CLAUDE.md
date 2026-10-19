@@ -736,9 +736,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   an originator), a supplier's asked from its package (a placeholder). The flow is a **console** (owner: "an actual control room, the steps are
   portals to the regulators, not a diagram"; no gradient; no black, grey or white): one solid brand-navy panel, the
   flows as tabs, one line "from → to", each step a station in brand blue with its state's colour as a status light
-  across its top, and its readouts: how many controls regulate it, what it reads, and how many still need setting up
-  (amber). No arrows or connectors: stations stand in order, a road that ends below its step (rose, "ends here"), a
-  step that happens only sometimes outlined ("sometimes"). The lit station is ringed in light blue. Under it, "The days
+  across its top, (owner: no readouts on the stations). The lines stay (owner): an arrow on to the next station,
+  a dashed drop to a road that ends (below its station, rose, "ends here"); a step that happens only sometimes is
+  outlined ("sometimes"); the lit station is ringed in light blue. The key stays under the console (owner: "critical"):
+  the light on top, outlined, below in rose, ringed. Under it, "The days
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
@@ -751,6 +752,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   supplier owes us, packages we deliver, an action on the schedule, someone joins the project. The chosen step's
   panel says what happens (one plain sentence), **Who does it** (fixed acts in words; the project's acts as one
   `Choice` each), **How it works here** (its questions, confirmations, days, the stamps it puts on the PDF, each a `Choice`;
+  after a review, Accepted / Returned carry stamping, the verdict's comments and Returned's stamp too; Review carries
+  which set of Review outcomes each route decides with, one `Choice` per route, `setRouteVerdictsAction`;
   what its state is called and who acts as the control function, with where they are changed), and **Set up in**
   (tiles: each list with how many values in use, or "not set up yet" in amber, the pages it reads and the form it asks; a tile only
   its keepers open is shown unlinked, never hidden). One method for every answer (`flow/choice.tsx`): its answers

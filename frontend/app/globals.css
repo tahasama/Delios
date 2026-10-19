@@ -1241,18 +1241,49 @@ summary::-webkit-details-marker {
   .scene-route-arrow { color: var(--deck-faint); }
 
   .scene-track {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(8.75rem, 1fr);
-    align-items: start;
-    gap: 0.6rem;
+    --band: 6.25rem;
+    --link: 1.1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--link);
     overflow-x: auto;
     scroll-snap-type: x proximity;
     padding: 1rem 1.25rem 1.25rem;
   }
   @media (min-width: 640px) { .scene-track { padding-inline: 1.5rem; } }
-  .scene-col { display: flex; flex-direction: column; gap: 0.45rem; scroll-snap-align: start; }
-  .scene-band { display: flex; flex-direction: column; gap: 0.45rem; }
+  .scene-col { position: relative; flex: 1 0 8.5rem; display: flex; flex-direction: column; scroll-snap-align: start; }
+  .scene-band { display: flex; flex-direction: column; justify-content: center; gap: 0.45rem; min-height: var(--band); }
+  .scene-band > .scene { min-height: var(--band); }
+  /* The line on to the next station, through the middle of the main row. */
+  .scene-col-linked::after {
+    content: "";
+    position: absolute;
+    top: calc(var(--band) / 2);
+    right: calc(var(--link) * -1);
+    width: var(--link);
+    height: 2px;
+    background: var(--deck-mute);
+    opacity: 0.6;
+  }
+  .scene-col-linked::before {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    right: calc(var(--link) * -1);
+    top: calc(var(--band) / 2 - 3px);
+    border-left: 6px solid color-mix(in srgb, var(--deck-mute) 60%, transparent);
+    border-block: 4px solid transparent;
+  }
+  /* The road that ends, below its station on a dashed drop. */
+  .scene-branch { position: relative; margin-top: 0.9rem; }
+  .scene-branch::before { content: ""; position: absolute; left: 50%; top: -0.9rem; height: 0.9rem; border-left: 2px dashed var(--deck-mute); opacity: 0.7; }
+  /* The key, under the console. */
+  .scene-key { display: flex; flex-wrap: wrap; gap: 0.35rem 1.25rem; font-size: 12px; color: var(--deck-mute); }
+  .scene-key > span { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .scene-key-light { width: 16px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--color-sky-400) 50%, var(--color-emerald-500) 50%); }
+  .scene-key-sometimes { width: 16px; height: 11px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgb(147 197 253 / 0.55); }
+  .scene-key-end { width: 16px; height: 11px; border-radius: 3px; background: color-mix(in srgb, #9f1239 30%, var(--color-brand-strong)); box-shadow: inset 0 2px 0 var(--color-red-600); }
+  .scene-key-lit { width: 16px; height: 11px; border-radius: 3px; box-shadow: inset 0 0 0 2px var(--deck-lit); }
   .scene {
     position: relative;
     display: flex;
@@ -1277,17 +1308,10 @@ summary::-webkit-details-marker {
   .scene-number { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-family: var(--font-mono); font-size: 11px; color: var(--deck-faint); }
   .scene-title { font-size: 14px; font-weight: 600; line-height: 1.2; }
   .scene-tagline { font-size: 12px; line-height: 1.35; color: var(--deck-mute); }
-  /* Its readouts: how many settings regulate it, the lists it reads, what still needs setting up. */
-  .scene-gauges { display: flex; flex-wrap: wrap; gap: 0.25rem 0.6rem; margin-top: 0.35rem; padding-top: 0.4rem; border-top: 1px solid var(--deck-ring); font-size: 11px; color: var(--deck-mute); }
-  .scene-gauge { display: inline-flex; align-items: center; gap: 0.3rem; }
-  .scene-gauge::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: var(--deck-lit); }
-  .scene-gauge-list::before { background: var(--deck-mute); }
-  .scene-gauge-warn { color: var(--deck-warn); }
-  .scene-gauge-warn::before { background: var(--deck-warn); }
   /* A station that ends the revision, and one that works only sometimes. */
   .scene-end { --deck-station: color-mix(in srgb, #9f1239 18%, var(--color-brand-strong)); }
   .scene-end .scene-number { color: var(--deck-end); }
-  .scene-optional { background: transparent; box-shadow: inset 0 0 0 1px rgb(147 197 253 / 0.35); }
+  .scene-optional { background: transparent; box-shadow: inset 0 0 0 1px rgb(147 197 253 / 0.55); }
 
   .scene-panel { animation: scene-in 220ms cubic-bezier(.2,.7,.2,1); }
   @keyframes scene-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
