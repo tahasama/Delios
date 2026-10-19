@@ -1199,42 +1199,45 @@ summary::-webkit-details-marker {
      colour. A fork stacks its steps; the road that ends hangs below on a dashed
      drop, in red; a step that happens only sometimes is dashed. */
   .scene-deck {
-    --deck-ink: var(--color-slate-900);
-    --deck-mute: var(--color-slate-600);
-    --deck-faint: var(--color-slate-500);
-    --deck-card: rgb(255 255 255 / 0.5);
-    --deck-card-ring: rgb(15 23 42 / 0.09);
-    --deck-line: rgb(15 23 42 / 0.22);
-    --deck-end: var(--color-red-700);
+    --deck-ink: #fff;
+    --deck-mute: rgb(255 255 255 / 0.8);
+    --deck-faint: rgb(255 255 255 / 0.66);
+    --deck-card: rgb(255 255 255 / 0.08);
+    --deck-card-ring: rgb(255 255 255 / 0.16);
+    --deck-line: rgb(255 255 255 / 0.4);
+    --deck-end: rgb(254 202 202);
     position: relative;
     overflow: hidden;
-    border-radius: 0.875rem;
+    border-radius: 14px;
     color: var(--deck-ink);
-    background:
-      radial-gradient(110% 80% at 50% -20%, rgb(148 178 214 / 0.35), transparent 60%),
-      linear-gradient(180deg, #e3e9f1 0%, #d9e1eb 100%);
-    box-shadow: inset 0 0 0 1px rgb(15 23 42 / 0.08);
+    /* Home's band: the brand's navy, with one soft light in the corner. */
+    background: linear-gradient(115deg, var(--color-brand-strong) 0%, var(--color-brand) 58%, var(--color-brand-hover) 140%);
   }
+  .scene-deck::after {
+    content: "";
+    position: absolute;
+    inset: auto -80px -170px auto;
+    width: 420px;
+    height: 420px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(122, 176, 224, 0.22), transparent 68%);
+    pointer-events: none;
+  }
+  .scene-deck > * { position: relative; z-index: 1; }
   :root.dark .scene-deck {
-    --deck-ink: #fff;
-    --deck-mute: rgb(255 255 255 / 0.78);
-    --deck-faint: rgb(255 255 255 / 0.66);
-    --deck-card: rgb(255 255 255 / 0.05);
-    --deck-card-ring: rgb(255 255 255 / 0.12);
-    --deck-line: rgb(255 255 255 / 0.3);
-    --deck-end: rgb(252 165 165);
-    background:
-      radial-gradient(110% 80% at 50% -20%, rgb(70 120 185 / 0.45), transparent 60%),
-      linear-gradient(180deg, #13223a 0%, #0f1c31 100%);
-    box-shadow: inset 0 0 0 1px rgb(140 180 230 / 0.25);
+    --deck-card: rgb(255 255 255 / 0.06);
+    --deck-card-ring: rgb(255 255 255 / 0.13);
+    background: linear-gradient(115deg, #0f1f33 0%, #16304d 58%, #1f4166 140%);
+    box-shadow: inset 0 0 0 1px rgb(95 143 191 / 0.16);
   }
+  :root.dark .scene-deck::after { background: radial-gradient(circle, rgba(95, 143, 191, 0.14), transparent 68%); }
   .route-pick {
     display: inline-flex;
+    flex-shrink: 0;
     align-items: center;
     min-height: var(--control-h);
-    flex-shrink: 0;
     white-space: nowrap;
-    padding: 0 0.85rem;
+    padding: 0 0.7rem;
     border-radius: 999px;
     font-size: 13px;
     font-weight: 600;
@@ -1243,10 +1246,10 @@ summary::-webkit-details-marker {
     box-shadow: inset 0 0 0 1px var(--deck-card-ring);
     transition: background-color 160ms, color 160ms;
   }
-  .route-pick:hover { color: var(--deck-ink); }
-  .route-pick[aria-pressed="true"] { color: #fff; background: var(--color-brand-strong, #1e3a5f); box-shadow: none; }
-  :root.dark .route-pick[aria-pressed="true"] { color: #0b1422; background: #e8f1ff; }
-  .route-pick:focus-visible { outline: 2px solid var(--color-brand-line); outline-offset: 2px; }
+  .route-pick:hover { color: var(--deck-ink); background: rgb(255 255 255 / 0.14); }
+  .route-pick[aria-pressed="true"] { color: var(--color-brand-strong); background: #fff; box-shadow: none; }
+  :root.dark .route-pick[aria-pressed="true"] { color: #0f1f33; background: #e8f1ff; }
+  .route-pick:focus-visible { outline: 2px solid rgb(255 255 255 / 0.8); outline-offset: 2px; }
   .scene-route { font-size: 13px; color: var(--deck-mute); }
   .scene-route-arrow { color: var(--deck-faint); }
 
@@ -1277,12 +1280,12 @@ summary::-webkit-details-marker {
     transition: transform 200ms cubic-bezier(.2,.7,.2,1), background-color 200ms, box-shadow 200ms;
   }
   .scene::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--rail); }
-  .scene:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rail) 60%, transparent); }
-  .scene:focus-visible { outline: 2px solid var(--color-brand-line); outline-offset: 2px; }
+  .scene:hover { background: rgb(255 255 255 / 0.12); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rail) 70%, transparent); }
+  .scene:focus-visible { outline: 2px solid rgb(255 255 255 / 0.8); outline-offset: 2px; }
   .scene[aria-selected="true"] {
     transform: translateY(-3px);
-    background: color-mix(in srgb, var(--rail) 18%, var(--deck-card));
-    box-shadow: inset 0 0 0 2px var(--rail), 0 10px 22px -14px color-mix(in srgb, var(--rail) 70%, transparent);
+    background: rgb(255 255 255 / 0.18);
+    box-shadow: inset 0 0 0 2px var(--rail), 0 12px 24px -12px rgb(0 0 0 / 0.45);
   }
   .scene-number { font-family: var(--font-mono); font-size: 11px; color: var(--deck-faint); }
   .scene-title { font-size: 14px; font-weight: 600; line-height: 1.2; }

@@ -735,8 +735,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   produces the document (owner: keep them, nothing finer): ours, another organization's (the deliverable type needs
   an originator), a supplier's asked from its package (a placeholder). The flow is drawn on its band, the first Control room's look made for
   each mode (owner: "bring back the band initial styling… colours adapt to each mode", never a white background):
-  slate in light, night blue in dark; the flows as pills, one line "from → to", the steps as cards topped with their
-  rail colour, the lit one raised and washed in it; a fork stacks, a road that ends hangs below in red, a step that
+  on Home's navy band (the same gradient and corner light as Home and Help, set deep in dark; owner); the flows as pills, one line "from → to", the steps as glass cards topped with their
+  rail colour, the lit one raised, brighter and ringed in it; a fork stacks, a road that ends hangs below in red, a step that
   happens only sometimes is dashed. Under it, "The days
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).

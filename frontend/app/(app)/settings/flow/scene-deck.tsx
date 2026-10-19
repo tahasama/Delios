@@ -97,7 +97,7 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
   return (
     <div className="space-y-4">
       <section ref={deck} className="scene-deck scroll-mt-24" aria-label="The flow">
-        <div className="scroll-quiet flex gap-1.5 overflow-x-auto px-5 pt-5 sm:flex-wrap sm:px-6" role="group" aria-label="Which flow">
+        <div className="scroll-quiet flex gap-1 overflow-x-auto px-5 pt-5 sm:flex-wrap sm:px-6" role="group" aria-label="Which flow">
           {flows.map((one, i) => (
             <button key={one.key} type="button" onClick={() => pick(i)} aria-pressed={i === on} className="route-pick">
               {one.title}
