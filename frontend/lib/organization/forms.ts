@@ -424,3 +424,21 @@ export async function resetFormAction(_prev: Result | undefined, formData: FormD
   revalidatePath("/settings/fields");
   return { ok: "It uses the organization's form again." };
 }
+
+/**
+ * Puts a project's kept copy back on it (owner: a reset keeps what the project held, in case it is wanted again): from
+ * the organization's card, with why; the project's control function is told.
+ */
+export async function putBackCopyAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const id = text(formData, "copyId");
+  const reason = text(formData, "reason");
+  if (!reason) return { error: "Say why it goes back on the project.", fields: ["reason"] };
+  try {
+    await api(`/api/admin/kept-copies/${id}/put-back`, { body: { reason } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization/settings", "layout");
+  revalidatePath("/settings", "layout");
+  return { ok: "It is the project's own again, as it was." };
+}

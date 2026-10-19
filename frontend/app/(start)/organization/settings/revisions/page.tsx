@@ -1,10 +1,11 @@
+import { keptCopies } from "@/lib/settings/api-admin";
 import Link from "next/link";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { getActiveSet } from "@/lib/settings/config";
 import { adminNumbering, revisionCopies } from "@/lib/settings/api-admin";
 import { liberty } from "@/lib/organization/liberty";
 import { RevisionBoard } from "@/app/(app)/settings/revisions/board";
-import { ProjectCopies } from "../copies";
+import { ProjectCopies, KeptCopies } from "../copies";
 import { ProjectSwitches } from "../switches";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export default async function OrganizationRevisionsPage() {
           lead={`How every project's revisions are named. Changed here, it changes for every project reading it; ${copies.length ? `${copies.length} project${copies.length === 1 ? " has" : "s have"} its own.` : "every project reads it."}`} />
         <ProjectSwitches items={switches.filter((one) => one.area === "Revisions")} />
         <ProjectCopies what="revisions" copies={copies} />
+        <KeptCopies copies={await keptCopies("REVISIONS")} />
       </>
   );
 }

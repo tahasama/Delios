@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Delios.Host.Audit;
 using Delios.Host.Identity;
 using Delios.Host.Notifications;
@@ -123,6 +124,27 @@ public static class RevisionSchemeEndpoints
         return map;
     }
 
+    /// <summary>A revision routing as a kept copy holds it.</summary>
+    public sealed record KeptRouting(Guid Id, string DeliverableType, Guid SchemeId);
+    /// <summary>A project's own revision naming, kept when it went back to the organization's.</summary>
+    public sealed record RevisionsCopy(List<RevisionScheme> Schemes, List<KeptRouting> Routings, string Mark);
+
+    /// <summary>Puts a kept revision naming back on the project, as it was.</summary>
+    public static async Task<IResult?> PutBackAsync(DeliosDbContext db, IClock clock, Project project, string payload, string by,
+        CancellationToken cancellationToken)
+    {
+        if (await db.Set<Setting>().AnyAsync(s => s.ProjectId == project.Id && s.Key == OwnKey, cancellationToken))
+            return KeptCopies.OwnAgain(project.Code, "revision naming");
+        var copy = JsonSerializer.Deserialize<RevisionsCopy>(payload, KeptCopies.Json)!;
+        foreach (var scheme in copy.Schemes) { scheme.TenantId = project.TenantId; scheme.ProjectId = project.Id; db.RevisionSchemes.Add(scheme); }
+        await db.SaveChangesAsync(cancellationToken);
+        foreach (var r in copy.Routings)
+            db.RevisionSchemeRoutings.Add(new RevisionSchemeRouting { Id = r.Id, TenantId = project.TenantId, ProjectId = project.Id, DeliverableType = r.DeliverableType, SchemeId = r.SchemeId });
+        KeptCopies.Restore(db, clock, project.TenantId, project.Id, [new KeptSetting(OwnKey, copy.Mark)], by);
+        await db.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
     /// <summary><c>GET /api/admin/revisions/projects</c>: the projects naming revisions by their own copy, since when and by whom.</summary>
     private static async Task<IResult> OwnCopiesAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {
@@ -146,12 +168,17 @@ public static class RevisionSchemeEndpoints
         if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
         var mark = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == projectId && s.Key == OwnKey, cancellationToken);
         if (mark is null) return Problems.Invalid("NOT_OWN", $"{project.Code} already names revisions by the organization's.");
-        db.RevisionSchemeRoutings.RemoveRange(await db.RevisionSchemeRoutings.Where(r => r.ProjectId == projectId).ToListAsync(cancellationToken));
+        var actor = await ActorAsync(http, db, cancellationToken);
+        var routings = await db.RevisionSchemeRoutings.Where(r => r.ProjectId == projectId).ToListAsync(cancellationToken);
+        var schemes = await db.RevisionSchemes.Where(s => s.ProjectId == projectId).ToListAsync(cancellationToken);
+        // What it held is kept whole, to be put back from the organization's card if wanted (owner).
+        KeptCopies.Keep(db, http.RequestServices.GetRequiredService<IClock>(), project.TenantId, project.Id, "REVISIONS", "revision naming",
+            new RevisionsCopy(schemes, routings.Select(r => new KeptRouting(r.Id, r.DeliverableType, r.SchemeId)).ToList(), mark.Value), actor.Name, reason);
+        db.RevisionSchemeRoutings.RemoveRange(routings);
         await db.SaveChangesAsync(cancellationToken);
-        db.RevisionSchemes.RemoveRange(await db.RevisionSchemes.Where(s => s.ProjectId == projectId).ToListAsync(cancellationToken));
+        db.RevisionSchemes.RemoveRange(schemes);
         db.Remove(mark);
         await db.SaveChangesAsync(cancellationToken);
-        var actor = await ActorAsync(http, db, cancellationToken);
         await audit.WriteAsync(actor, "SETTING_RESET", "Project", project.Id, $"{project.Code}: revision naming", reason, project.Id, cancellationToken);
         await notifier.NotifyAsync(project.TenantId, project.Id, await Actions.NoticeLog.HoldersAsync(db, project.Id, Verbs.Control, cancellationToken),
             NotificationKinds.General, $"{project.Code} names revisions by the organization's again",

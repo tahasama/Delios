@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Delios.Host.Audit;
 using Delios.Host.Identity;
 using Delios.Host.Notifications;
@@ -157,6 +158,26 @@ public static class NumberingLevels
         return Results.Ok(rows.Select(r => new { r.Id, r.Code, r.Name, Since = r.UpdatedAt.ToDateTimeOffset(), By = r.UpdatedByName }));
     }
 
+    /// <summary>A scheme routing as a kept copy holds it.</summary>
+    public sealed record KeptRouting(Guid Id, string DeliverableType, Guid SchemeId, bool Active);
+    /// <summary>A project's own numbering, kept when it went back to the organization's.</summary>
+    public sealed record NumberingCopy(List<NumberingScheme> Schemes, List<KeptRouting> Routings, string Mark);
+
+    /// <summary>Puts a kept numbering back on the project, as it was: the same schemes (numbers they gave still theirs) and routing.</summary>
+    public static async Task<IResult?> PutBackAsync(DeliosDbContext db, IClock clock, Project project, string payload, string by,
+        CancellationToken cancellationToken)
+    {
+        if (await ScopeAsync(db, project.Id, cancellationToken) is not null) return KeptCopies.OwnAgain(project.Code, "numbering");
+        var copy = JsonSerializer.Deserialize<NumberingCopy>(payload, KeptCopies.Json)!;
+        foreach (var scheme in copy.Schemes) { scheme.TenantId = project.TenantId; scheme.ProjectId = project.Id; db.NumberingSchemes.Add(scheme); }
+        await db.SaveChangesAsync(cancellationToken);
+        foreach (var r in copy.Routings)
+            db.SchemeRoutings.Add(new SchemeRouting { Id = r.Id, TenantId = project.TenantId, ProjectId = project.Id, DeliverableType = r.DeliverableType, SchemeId = r.SchemeId, Active = r.Active });
+        KeptCopies.Restore(db, clock, project.TenantId, project.Id, [new KeptSetting(OwnKey, copy.Mark)], by);
+        await db.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
     /// <summary>Body of putting a project back on the organization's: why, always.</summary>
     public sealed record ResetRequest(string? Reason);
 
@@ -174,12 +195,18 @@ public static class NumberingLevels
         if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
         var mark = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == projectId && s.Key == OwnKey, cancellationToken);
         if (mark is null) return Problems.Invalid("NOT_OWN", $"{project.Code} already numbers by the organization's.");
-        db.SchemeRoutings.RemoveRange(await db.SchemeRoutings.Where(r => r.ProjectId == projectId).ToListAsync(cancellationToken));
+        var actor = await ActorAsync(http, db, cancellationToken);
+        var routings = await db.SchemeRoutings.Where(r => r.ProjectId == projectId).ToListAsync(cancellationToken);
+        var schemes = await db.NumberingSchemes.Where(s => s.ProjectId == projectId).ToListAsync(cancellationToken);
+        // What it held is kept whole, to be put back from the organization's card if wanted (owner).
+        KeptCopies.Keep(db, http.RequestServices.GetRequiredService<IClock>(), project.TenantId, project.Id, "NUMBERING", "numbering",
+            new NumberingCopy(schemes, routings.Select(r => new KeptRouting(r.Id, r.DeliverableType, r.SchemeId, r.Active)).ToList(), mark.Value),
+            actor.Name, reason);
+        db.SchemeRoutings.RemoveRange(routings);
         await db.SaveChangesAsync(cancellationToken);
-        db.NumberingSchemes.RemoveRange(await db.NumberingSchemes.Where(s => s.ProjectId == projectId).ToListAsync(cancellationToken));
+        db.NumberingSchemes.RemoveRange(schemes);
         db.Remove(mark);
         await db.SaveChangesAsync(cancellationToken);
-        var actor = await ActorAsync(http, db, cancellationToken);
         await audit.WriteAsync(actor, "SETTING_RESET", "Project", project.Id, $"{project.Code}: numbering", reason, project.Id, cancellationToken);
         await notifier.NotifyAsync(project.TenantId, project.Id, await Actions.NoticeLog.HoldersAsync(db, project.Id, Verbs.Control, cancellationToken),
             NotificationKinds.General, $"{project.Code} numbers by the organization's again",

@@ -189,6 +189,21 @@ public static class CatalogAdminEndpoints
         return await act(access.Project.Id);
     }
 
+    /// <summary>A project's own review routes, kept when it went back to the organization's.</summary>
+    public sealed record RoutesCopy(List<ReviewRoute> Routes, string Mark);
+
+    /// <summary>Puts kept review routes back on the project, as they were.</summary>
+    public static async Task<IResult?> PutBackRoutesAsync(DeliosDbContext db, IClock clock, Project project, string payload, string by,
+        CancellationToken cancellationToken)
+    {
+        if (await RouteScopeAsync(db, project.Id, cancellationToken) is not null) return KeptCopies.OwnAgain(project.Code, "review routes");
+        var copy = JsonSerializer.Deserialize<RoutesCopy>(payload, KeptCopies.Json)!;
+        foreach (var route in copy.Routes) { route.TenantId = project.TenantId; route.ProjectId = project.Id; db.ReviewRoutes.Add(route); }
+        KeptCopies.Restore(db, clock, project.TenantId, project.Id, [new KeptSetting(RoutesOwnKey, copy.Mark)], by);
+        await db.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
     /// <summary><c>GET /api/admin/routes/projects</c>: the projects offering their own copy of the review routes.</summary>
     private static async Task<IResult> RouteCopiesAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {
@@ -212,10 +227,14 @@ public static class CatalogAdminEndpoints
         if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
         var mark = await db.Set<Settings.Setting>().SingleOrDefaultAsync(s => s.ProjectId == projectId && s.Key == RoutesOwnKey, cancellationToken);
         if (mark is null) return Problems.Invalid("NOT_OWN", $"{project.Code} already offers the organization's review routes.");
-        db.ReviewRoutes.RemoveRange(await db.ReviewRoutes.Where(r => r.ProjectId == projectId).ToListAsync(cancellationToken));
+        var actor = await ActorAsync(http, db, cancellationToken);
+        var routes = await db.ReviewRoutes.Where(r => r.ProjectId == projectId).ToListAsync(cancellationToken);
+        // What it held is kept whole, to be put back from the organization's card if wanted (owner).
+        KeptCopies.Keep(db, http.RequestServices.GetRequiredService<IClock>(), project.TenantId, project.Id, "ROUTES", "review routes",
+            new RoutesCopy(routes, mark.Value), actor.Name, reason);
+        db.ReviewRoutes.RemoveRange(routes);
         db.Remove(mark);
         await db.SaveChangesAsync(cancellationToken);
-        var actor = await ActorAsync(http, db, cancellationToken);
         await audit.WriteAsync(actor, "SETTING_RESET", "Project", project.Id, $"{project.Code}: review routes", reason, project.Id, cancellationToken);
         await notifier.NotifyAsync(project.TenantId, project.Id, await Actions.NoticeLog.HoldersAsync(db, project.Id, Verbs.Control, cancellationToken),
             Notifications.NotificationKinds.General, $"{project.Code} offers the organization's review routes again",

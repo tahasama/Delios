@@ -1,9 +1,10 @@
+import { keptCopies } from "@/lib/settings/api-admin";
 import Link from "next/link";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { routeCopies } from "@/lib/settings/api-admin";
 import { liberty } from "@/lib/organization/liberty";
 import { RoutesBoard } from "@/app/(app)/settings/workflow-templates/routes-board";
-import { ProjectCopies } from "../copies";
+import { ProjectCopies, KeptCopies } from "../copies";
 import { ProjectSwitches } from "../switches";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export default async function OrganizationRoutesPage() {
         <RoutesBoard level="organization" editable
           lead={`The organization's routes: every project offers them until it changes its own. ${copies.length ? `${copies.length} project${copies.length === 1 ? " has" : "s have"} its own.` : "No project has its own yet."}`} />
         <ProjectCopies what="routes" copies={copies} />
+        <KeptCopies copies={await keptCopies("ROUTES")} />
       </>
   );
 }

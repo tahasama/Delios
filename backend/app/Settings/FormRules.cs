@@ -320,6 +320,18 @@ public static class FormRules
         else { mark.Value = value; mark.UpdatedAt = clock.GetCurrentInstant(); mark.UpdatedByName = by; }
     }
 
+    /// <summary>Puts a kept form back on the project, as it was: what it asked, its words, its own fields.</summary>
+    public static async Task<IResult?> PutBackAsync(DeliosDbContext db, IClock clock, Project project, string form, string payload, string by,
+        CancellationToken cancellationToken)
+    {
+        var owned = await OwnedAsync(db, project.Id, cancellationToken);
+        if (owned.Contains(form)) return KeptCopies.OwnAgain(project.Code, $"{Noun(form)} form");
+        KeptCopies.Restore(db, clock, project.TenantId, project.Id, JsonSerializer.Deserialize<List<KeptSetting>>(payload, KeptCopies.Json)!, by);
+        await MarkAsync(db, project.TenantId, project.Id, owned.Append(form), by, clock, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
     /// <summary>Body of putting one of a project's forms back to the organization's: which form, and why.</summary>
     public sealed record FormResetRequest(string? Form, string? Reason);
 
@@ -338,10 +350,14 @@ public static class FormRules
         if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
         var owned = await OwnedAsync(db, projectId, cancellationToken);
         if (form is null || !owned.Contains(form)) return Problems.Invalid("NOT_OWN", $"{project.Code} already uses the organization's form.");
-        db.Set<Setting>().RemoveRange(await db.Set<Setting>()
-            .Where(s => s.ProjectId == projectId && (s.Key.StartsWith(RuleKey + form + ":") || s.Key.StartsWith(LabelKey + form + ":") || s.Key == OwnKey + form))
-            .ToListAsync(cancellationToken));
         var me = await db.Users.AsNoTracking().Where(u => u.Id == http.User.UserId()).Select(u => u.Name).SingleAsync(cancellationToken);
+        var rows = await db.Set<Setting>()
+            .Where(s => s.ProjectId == projectId && (s.Key.StartsWith(RuleKey + form + ":") || s.Key.StartsWith(LabelKey + form + ":") || s.Key == OwnKey + form))
+            .ToListAsync(cancellationToken);
+        // What it held is kept whole, to be put back from the organization's card if wanted (owner).
+        KeptCopies.Keep(db, clock, project.TenantId, project.Id, "FORM:" + form, $"{Noun(form)} form",
+            rows.Select(r => new KeptSetting(r.Key, r.Value)).ToList(), me, reason);
+        db.Set<Setting>().RemoveRange(rows);
         await MarkAsync(db, project.TenantId, projectId, owned.Where(f => f != form), me, clock, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         var noun = $"{Noun(form)} form";

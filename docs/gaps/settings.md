@@ -37,7 +37,7 @@ Each found wrong in the Settings review of 2026-10-16 (`.impeccable/critique/`),
 
 - ~~Numbering, "What is numbered": the example showed the old scheme until Save~~ (done: it follows the scheme picked).
 - ~~The organization's band on a phone cuts the organization's name~~ (done: its two ways out keep only their icons there).
-- Functions step 2 (a project's own rights): only if a project needs it.
-- A Control room answer made fixed later: the project keeps what it held. Whether the organization's answer should
-  then reach it is not decided.
+- Functions step 2 (a project's own rights): wanted (owner), being built.
+- ~~A Control room answer made fixed later~~ (decided, owner: what a project changed is never overridden by the
+  organization; only a reset from the organization's card touches it, and a reset keeps a copy that can be put back).
 - Demo data: schemes seeded with documents are not marked as having given numbers (real use marks them).

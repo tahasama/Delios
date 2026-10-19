@@ -450,3 +450,13 @@ export const listCopies = cache(async () =>
 /** The projects keeping their own copy of forms (the organization's Forms & fields card), and which. */
 export const formCopies = cache(async () =>
   api<{ id: string; code: string; name: string; forms: string[] }[]>("/api/admin/forms/projects").catch(() => []));
+
+/** A project's own copy kept when it was put back to the organization's (backend `KeptCopies`). */
+export type KeptCopy = {
+  id: string; projectId: string; projectCode: string; projectName: string; kind: string; title: string;
+  keptAt: string; keptByName: string; reason: string; putBackAt: string | null; putBackByName: string | null; putBackReason: string | null;
+};
+
+/** The kept copies of one card ("NUMBERING", "REVISIONS", "ROUTES"; "LIST:" or "FORM:" for every list or form). */
+export const keptCopies = cache(async (kind: string) =>
+  api<KeptCopy[]>("/api/admin/kept-copies", { query: { kind } }).catch(() => [] as KeptCopy[]));

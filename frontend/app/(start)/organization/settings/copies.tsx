@@ -1,7 +1,8 @@
 import { ActionForm } from "@/components/form";
 import { inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
-import { resetProjectAction } from "@/lib/organization/forms";
+import { putBackCopyAction, resetProjectAction } from "@/lib/organization/forms";
+import type { KeptCopy } from "@/lib/settings/api-admin";
 
 type Copy = { id: string; code: string; name: string; since: string; by: string };
 
@@ -45,6 +46,48 @@ export function ProjectCopies({ what, copies }: { what: keyof typeof WORDS; copi
       ) : (
         <p className="px-5 py-3 text-xs text-slate-500 sm:px-6">None: every project uses the organization&rsquo;s.</p>
       )}
+    </section>
+  );
+}
+
+/**
+ * What a reset kept (owner: "if they decide to reset, we keep a copy of the project's config in case we want to
+ * revert"): each project's own copy as it was when put back to the organization's, when, by whom and why, and "Put it
+ * back on <project>", with why. One put back says so, and stays listed.
+ */
+export function KeptCopies({ copies }: { copies: KeptCopy[] }) {
+  if (!copies.length) return null;
+  return (
+    <section className="register register-sheet register-sheet-open">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+        <span className="stencil mr-1 text-slate-500">Kept when put back</span>
+        <span className="text-[11px] text-slate-500">each project&rsquo;s own copy as it was when it went back to the organization&rsquo;s</span>
+      </div>
+      <ul className="divide-y divide-line">
+        {copies.map((one) => (
+          <li key={one.id} className="grid grid-cols-1 items-start gap-x-6 gap-y-2 px-5 py-3 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] sm:px-6">
+            <div>
+              <p className="text-[13px] font-semibold text-slate-800"><span className="font-mono">{one.projectCode}</span> · {one.title}</p>
+              <p className="text-[11.5px] text-slate-500">kept {fmtDate(one.keptAt)}, by {one.keptByName}: {one.reason}</p>
+            </div>
+            {one.putBackAt ? (
+              <p className="text-[11.5px] text-slate-600">Put back on {one.projectCode} {fmtDate(one.putBackAt)}, by {one.putBackByName}: {one.putBackReason}</p>
+            ) : (
+              <details>
+                <summary className="cursor-pointer text-[11.5px] font-semibold text-slate-500 hover:text-slate-800">Put it back on {one.projectCode}</summary>
+                <ActionForm action={putBackCopyAction} submitLabel={`Put it back on ${one.projectCode}`} size="sm" hidden={{ copyId: one.id }}
+                  confirmText={`${one.projectCode} gets its own ${one.title} again, exactly as it was on ${fmtDate(one.keptAt)}. Go ahead?`}
+                  className="mt-2 flex flex-wrap items-end gap-2 space-y-0">
+                  <label className="min-w-64 flex-1">
+                    <span className="sr-only">Why</span>
+                    <input name="reason" required maxLength={300} placeholder="Why, told to its control function" className={inputCls} />
+                  </label>
+                </ActionForm>
+              </details>
+            )}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

@@ -50,7 +50,7 @@ backend/
 │   │                     unique across DELIOS: codes, names, identifiers, contract numbers; changed once;
 │   │                     look-alikes, claims, merges), RegistryEndpoints (on DELIOS, our identity and domain,
 │   │                     claims, merges; command merge-organizations)
-│   ├── Settings/         the organization's and the project's settings and lists; FormRules (Forms & fields: what each form asks, checked on save); Liberty (what projects may change: Fixed or Free per setting)
+│   ├── Settings/         the organization's and the project's settings and lists; KeptCopies (a project's own copy kept when reset, put back from the organization's card); FormRules (Forms & fields: what each form asks, checked on save); Liberty (what projects may change: Fixed or Free per setting)
 │   ├── Notifications/    notifications, email, pop-ups
 │   ├── Audit/            the audit trail
 │   ├── Extraction/       reading text out of files

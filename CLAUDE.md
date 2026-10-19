@@ -50,7 +50,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   its switch on the page itself (`ProjectSwitches`; backend `Settings/Liberty.cs`, `LIBERTY:<key>`; the separate
   page `/organization/liberty` only redirects), and lists the projects with their own copy (`ProjectCopies`): there,
   and only there, one may be put back to the organization's, for a mess, always with why, logged (SETTING_RESET), the
-  project's control function told. No reset inside a project, ever. **Fixed** (every project uses
+  project's control function told. No reset inside a project, ever. **What a project changed is never overridden by the
+  organization** (owner): a switch made Fixed later leaves it as it is; only that reset touches it. **A reset keeps a
+  copy** (owner): what the project held is kept whole (`Settings/KeptCopies.cs`, `kept_copies`), listed on the card under
+  "Kept when put back" (when, by whom, why), and may be put back on the project, with why, its control function told
+  (`POST /api/admin/kept-copies/{id}/put-back`, SETTING_PUT_BACK; refused while it has its own copy again, OWN_AGAIN). **Fixed** (every project uses
   the organization's; only an administrator changes it, for all) or **Free** (a project may take its own copy; the
   organization's later changes never touch it). Two degrees only, never a third. Made stricter later, what a project
   already changed stays, read as changed before the rule. Where each starts, and why, is in `Liberty.Items`, chosen

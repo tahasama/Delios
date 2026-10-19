@@ -113,16 +113,21 @@ public static class ProjectLists
         var project = await db.Projects.SingleOrDefaultAsync(p => p.Id == projectId, cancellationToken);
         if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
         if (list is null || !project.OwnListKeys.Contains(list)) return Problems.Invalid("NOT_OWN", $"{project.Code} already uses the organization's list.");
-        db.ValueEntries.RemoveRange(await db.ValueEntries.IgnoreQueryFilters()
-            .Where(v => v.TenantId == level.TenantId && v.ProjectId == projectId && v.SetKey == list).ToListAsync(cancellationToken));
+        var title = ListRules.TitleOf(list, (await ListRules.MetaAsync(db, null, cancellationToken)).GetValueOrDefault(list) ?? ListRules.ListMeta.Read(null));
+        var values = await db.ValueEntries.IgnoreQueryFilters()
+            .Where(v => v.TenantId == level.TenantId && v.ProjectId == projectId && v.SetKey == list).ToListAsync(cancellationToken);
+        var sets = await db.ListSets.IgnoreQueryFilters()
+            .Where(v => v.TenantId == level.TenantId && v.ProjectId == projectId && v.ListKey == list).ToListAsync(cancellationToken);
+        var meta = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == projectId && s.Key == SetPrefix + list, cancellationToken);
+        // What it held is kept whole, to be put back from the organization's card if wanted (owner).
+        KeptCopies.Keep(db, http.RequestServices.GetRequiredService<IClock>(), project.TenantId, project.Id, "LIST:" + list, title,
+            new ListCopy(values, sets, meta?.Value), level.UserName, reason);
+        db.ValueEntries.RemoveRange(values);
         await db.SaveChangesAsync(cancellationToken);
-        db.ListSets.RemoveRange(await db.ListSets.IgnoreQueryFilters()
-            .Where(v => v.TenantId == level.TenantId && v.ProjectId == projectId && v.ListKey == list).ToListAsync(cancellationToken));
-        if (await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == projectId && s.Key == SetPrefix + list, cancellationToken) is { } meta)
-            db.Remove(meta);
+        db.ListSets.RemoveRange(sets);
+        if (meta is not null) db.Remove(meta);
         project.OwnListKeys = [.. project.OwnListKeys.Where(k => k != list)];
         await db.SaveChangesAsync(cancellationToken);
-        var title = ListRules.TitleOf(list, (await ListRules.MetaAsync(db, null, cancellationToken)).GetValueOrDefault(list) ?? ListRules.ListMeta.Read(null));
         await audit.WriteAsync(new Actor(level.UserId, level.UserName), "SETTING_RESET", "Project", project.Id, $"{project.Code}: {title}", reason,
             project.Id, cancellationToken);
         await notifier.NotifyAsync(project.TenantId, project.Id, await Actions.NoticeLog.HoldersAsync(db, project.Id, Verbs.Control, cancellationToken),
@@ -130,6 +135,24 @@ public static class ProjectLists
             $"{level.UserName} put {project.Code}'s {title} back to the organization's: {reason}. What its documents carry stays as it is.",
             $"/settings/config?set={list}", cancellationToken);
         return Results.NoContent();
+    }
+
+    /// <summary>A project's own copy of one list, kept when it went back to the organization's.</summary>
+    public sealed record ListCopy(List<ValueEntry> Values, List<ValueSet> Sets, string? Meta);
+
+    /// <summary>Puts a kept list back on the project, as it was: its sets and values, the same codes.</summary>
+    public static async Task<IResult?> PutBackAsync(DeliosDbContext db, IClock clock, Project project, string list, string payload, string by,
+        CancellationToken cancellationToken)
+    {
+        if (project.OwnListKeys.Contains(list)) return KeptCopies.OwnAgain(project.Code, "copy of this list");
+        var copy = JsonSerializer.Deserialize<ListCopy>(payload, KeptCopies.Json)!;
+        foreach (var set in copy.Sets) { set.TenantId = project.TenantId; set.ProjectId = project.Id; db.ListSets.Add(set); }
+        await db.SaveChangesAsync(cancellationToken);
+        foreach (var value in copy.Values) { value.TenantId = project.TenantId; value.ProjectId = project.Id; db.ValueEntries.Add(value); }
+        if (copy.Meta is not null) KeptCopies.Restore(db, clock, project.TenantId, project.Id, [new KeptSetting(SetPrefix + list, copy.Meta)], by);
+        project.OwnListKeys = [.. project.OwnListKeys, list];
+        await db.SaveChangesAsync(cancellationToken);
+        return null;
     }
 
     private const string LevelItem = "lists.level";

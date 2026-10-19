@@ -1229,7 +1229,10 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
 - **What stays the same across projects by default is what other things depend on**: numbering, revision naming,
   what verdicts, statuses and reasons mean, classification and keeping, functions and their rights; what is the
   project's own work (its sub-projects, orders, routes, forms, who does what) is free.
-- **Making a setting fixed later undoes nothing** a project already changed.
+- **Making a setting fixed later undoes nothing** a project already changed: what a project changed is never
+  overridden by the organization.
+- **Only a reset, from the organization's settings, puts a project back on the organization's**, for a mess, with why,
+  its control function told; **what the project held is kept**, and may be put back on it, with why.
 - **Lists are decided one by one**: each list has its own switch, and a project copies only the list it changes,
   where the organization leaves it free; a list the organization keeps fixed is the same on every project. Lists that
   describe projects themselves (their type, our role) are always the organization's.

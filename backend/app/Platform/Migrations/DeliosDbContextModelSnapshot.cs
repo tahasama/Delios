@@ -5323,6 +5323,79 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("search_watermarks", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Settings.KeptCopy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("KeptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("kept_at");
+
+                    b.Property<string>("KeptByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("kept_by_name");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Instant?>("PutBackAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("put_back_at");
+
+                    b.Property<string>("PutBackByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("put_back_by_name");
+
+                    b.Property<string>("PutBackReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("put_back_reason");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id")
+                        .HasName("pk_kept_copies");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_kept_copies_tenant_id");
+
+                    b.HasIndex("ProjectId", "Kind")
+                        .HasDatabaseName("ix_kept_copies_project_id_kind");
+
+                    b.ToTable("kept_copies", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Settings.Setting", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7450,6 +7523,16 @@ namespace Delios.Host.Platform.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_search_watermarks_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Delios.Host.Settings.KeptCopy", b =>
+                {
+                    b.HasOne("Delios.Host.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_kept_copies_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Delios.Host.Settings.Setting", b =>

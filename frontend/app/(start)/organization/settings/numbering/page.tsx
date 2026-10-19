@@ -1,3 +1,4 @@
+import { keptCopies } from "@/lib/settings/api-admin";
 import Link from "next/link";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { organizationSets, getActiveSet, SET_KEY } from "@/lib/settings/config";
@@ -5,7 +6,7 @@ import { orgSettings } from "@/lib/settings/api";
 import { numberingForEditor, numberingCopies, NUMBERING_SETS } from "@/lib/settings/api-admin";
 import { liberty } from "@/lib/organization/liberty";
 import { NumberingBoard } from "@/app/(app)/settings/numbering/board";
-import { ProjectCopies } from "../copies";
+import { ProjectCopies, KeptCopies } from "../copies";
 import { ProjectSwitches } from "../switches";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,7 @@ export default async function OrganizationNumberingPage({ searchParams }: { sear
           deliverables={deliverables.map((d) => ({ code: d.code, label: d.label }))} sets={sets.map((s) => ({ key: s.key, title: s.title }))}
           editId={params.edit} adding={params.new === "1"} here="/organization/settings/numbering" />
         <ProjectCopies what="numbering" copies={copies} />
+        <KeptCopies copies={await keptCopies("NUMBERING")} />
       </>
   );
 }

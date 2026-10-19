@@ -367,6 +367,7 @@ public static class PlatformSetup
             Documents.DocumentEndpoints.MapDocumentEndpoints(app);
             Documents.Equivalents.MapEquivalentEndpoints(app);
             Packages.Intake.MapIntakeEndpoints(app);
+            Settings.KeptCopies.MapKeptCopyEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);
             Documents.KeepingEndpoints.MapKeepingEndpoints(app);

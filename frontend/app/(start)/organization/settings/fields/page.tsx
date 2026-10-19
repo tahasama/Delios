@@ -1,3 +1,5 @@
+import { keptCopies } from "@/lib/settings/api-admin";
+import { KeptCopies } from "../copies";
 import { ActionForm } from "@/components/form";
 import { inputCls } from "@/components/ui";
 import { liberty } from "@/lib/organization/liberty";
@@ -58,6 +60,7 @@ export default async function OrganizationFieldsPage({ searchParams }: { searchP
           </ul>
         ) : <p className="px-5 py-3 text-xs text-slate-500 sm:px-6">None: every project uses the organization&rsquo;s forms.</p>}
       </section>
-    </>
+      <KeptCopies copies={await keptCopies("FORM:")} />
+      </>
   );
 }

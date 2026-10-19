@@ -201,6 +201,7 @@ const WORDS: Record<string, string> = {
   SETTING_CHANGED: "Changed a setting",
   LIBERTY_CHANGED: "Changed what projects may change",
   SETTING_RESET: "Put a project back to the organization's",
+  SETTING_PUT_BACK: "Put a project's own copy back",
   VALUE_CHANGED: "Changed a list value",
   VALUE_DELETED: "Deleted a list value never used",
   LIST_CREATED: "Made a list",
