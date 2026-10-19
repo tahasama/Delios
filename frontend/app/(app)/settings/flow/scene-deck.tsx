@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 
 export type Scene = {
@@ -10,10 +9,6 @@ export type Scene = {
   tagline: string;
   /** The rail class that gives the scene its colour. */
   rail: string;
-  /** How the acts of this step are carried: one mark per act. */
-  carriers: ("control" | "work" | "fixed" | "off")[];
-  states: string[];
-  sets: number;
 };
 
 /**
@@ -30,10 +25,10 @@ export type Lane = { scene: Scene; optional?: string; end?: boolean };
 export type Flow = { key: string; title: string; from: string; to: string; columns: Lane[][] };
 
 /**
- * The flow as a strip of scenes: one flow at a time, one scene of it lit, the
- * details of the lit one underneath. Scenes that run side by side are stacked
- * in one column; one that does not always happen is drawn dashed. Arrow keys
- * and the hash move between them: /settings/flow#receive/outside.
+ * The flow as a row of steps: one flow at a time, one step of it lit, what it
+ * decides underneath. A fork stacks its steps in one column, the one that ends
+ * hanging below; one that does not always happen is drawn dashed. Arrow keys
+ * and the hash move between them: /settings/flow#receive/review.
  */
 export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<string, React.ReactNode> }) {
   const [on, setOn] = useState(0);
@@ -100,33 +95,25 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
 
   return (
     <div className="space-y-4">
-      <section ref={deck} className="scene-deck scroll-mt-24" aria-label="The flow">
-        <div className="scene-film" aria-hidden />
-        <div className="flex flex-wrap gap-1.5 px-5 pt-5 sm:px-7" role="group" aria-label="Flows">
-          {flows.map((one, i) => (
-            <button key={one.key} type="button" onClick={() => pick(i)} aria-pressed={i === on} className="route-pick">
-              {one.title}
-            </button>
-          ))}
-        </div>
-        <p className="scene-route px-5 pt-2.5 sm:px-7">
-          <span>{flow.from}</span>
-          <span className="scene-route-arrow" aria-hidden>→</span>
-          <span>{flow.to}</span>
-        </p>
-        <div className="flex items-center justify-between gap-3 px-5 pt-3 sm:px-7">
-          <p className="scene-kicker">{flow.title} · {flow.columns.length} steps</p>
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={() => step(-1)} disabled={at === 0} className="scene-nav" aria-label="Previous scene"><ChevronLeft className="h-4 w-4" /></button>
-            <button type="button" onClick={() => step(1)} disabled={at === order.length - 1} className="scene-nav" aria-label="Next scene"><ChevronRight className="h-4 w-4" /></button>
+      <section ref={deck} className="register register-sheet register-sheet-open scroll-mt-24" aria-label="The flow">
+        <div className="space-y-2 px-5 pt-4 pb-3 sm:px-6">
+          <div className="seg w-fit max-w-full flex-wrap sm:flex-nowrap" role="group" aria-label="Which documents">
+            {flows.map((one, i) => (
+              <button key={one.key} type="button" onClick={() => pick(i)} aria-pressed={i === on} className="segment">
+                {one.title}
+              </button>
+            ))}
           </div>
+          <p className="text-xs text-slate-600">
+            {flow.from} <span aria-hidden className="text-slate-400">→</span> {flow.to}
+          </p>
         </div>
 
         <div
           ref={track}
           role="tablist"
-          aria-label="Scenes"
-          className="scene-track scroll-quiet"
+          aria-label="Steps"
+          className="scene-track scroll-quiet pt-3"
           onKeyDown={(event) => {
             if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); step(1, true); }
             if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); step(-1, true); }
@@ -139,8 +126,7 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
             // that carries on stays on the line and the one that ends hangs below.
             const compact = column.length > 1;
             const card = ({ scene: one, optional, end }: Lane, lane: number) => {
-              const index = order.findIndex((l) => l.scene.key === one.key);
-              const number = `${String(c + 1).padStart(2, "0")}${compact ? "ab"[column.findIndex((l) => l.scene.key === one.key)] ?? "" : ""}`;
+              const number = `${c + 1}${compact ? "ab"[column.findIndex((l) => l.scene.key === one.key)] ?? "" : ""}`;
               return (
                 <button
                   key={`${flow.key}/${one.key}/${lane}`}
@@ -152,28 +138,17 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
                   aria-controls={`panel-${one.key}`}
                   tabIndex={one.key === lit ? 0 : -1}
                   onClick={() => go(one.key)}
-                  className={cn("scene", one.rail, index < at && "scene-past", optional && "scene-optional", compact && "scene-compact", end && "scene-end")}
+                  className={cn("scene", one.rail, optional && "scene-optional", compact && "scene-compact", end && "scene-end")}
                 >
-                  <span className="scene-number">{number}{end ? " · ends" : optional ? " · optional" : ""}</span>
+                  <span className="scene-number">{number}{end ? " · ends here" : optional ? " · if asked" : ""}</span>
                   <span className="scene-title">{one.title}</span>
-                  <span className="scene-tagline">{optional && !end && !compact ? `If ${optional}` : one.tagline}</span>
-                  {compact ? null : (
-                    <span className="scene-foot">
-                      <span className="flex items-center gap-1" title="Who carries out its acts">
-                        {one.carriers.length
-                          ? one.carriers.map((mark, n) => <span key={n} className={cn("scene-dot", `scene-dot-${mark}`)} />)
-                          : <span className="scene-dot scene-dot-none" />}
-                      </span>
-                      <span>{one.sets ? `${one.sets} list${one.sets === 1 ? "" : "s"}` : "no lists"}</span>
-                    </span>
-                  )}
+                  {compact ? null : <span className="scene-tagline">{optional ? `If ${optional}` : one.tagline}</span>}
                 </button>
               );
             };
             return (
               <div key={`${flow.key}/${c}`} className={cn("scene-col", c < flow.columns.length - 1 && "scene-col-linked")}>
                 <div className={cn("scene-band", main.length > 1 && "scene-fork")}>
-                  {main.length > 1 ? <span className="scene-fork-label">side by side</span> : null}
                   {main.map(card)}
                 </div>
                 {ends.map((lane, i) => (
@@ -183,17 +158,6 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
             );
           })}
         </div>
-
-        <div className="scene-progress" aria-hidden>
-          <span style={{ width: `${((at + 1) / order.length) * 100}%` }} />
-        </div>
-        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 pb-4 text-[11px] sm:px-7">
-          <span className="scene-legend"><span className="scene-dot scene-dot-control" /> The control function</span>
-          <span className="scene-legend"><span className="scene-dot scene-dot-work" /> the people doing the work</span>
-          <span className="scene-legend"><span className="scene-dot scene-dot-fixed" /> fixed</span>
-          <span className="scene-legend"><span className="scene-dot scene-dot-off" /> skipped</span>
-          <span className="scene-legend"><span className="scene-legend-dashed" /> only when it applies</span>
-        </p>
       </section>
 
       <div

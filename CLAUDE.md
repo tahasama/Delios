@@ -731,7 +731,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `workByDefault`): projects go on as before until they choose.
 - The Control room's flow draws released and issued as one step, "Released & issued", unless the project keeps them
   apart (POLICY_RELEASE = SEPARATE: Release, then Issue), and has three flows: documents we produce, we receive, and a
-  supplier owes us (asked, received, the control function's check, review, kept or back with them). Under it, "The days
+  supplier owes us (asked, received, the control function's check, review, kept or back with them). The three are by who
+  produces the document (owner: keep them, nothing finer): ours, another organization's (the deliverable type needs
+  an originator), a supplier's asked from its package (a placeholder). The flow is drawn in the app's own look, light
+  and dark alike (owner: no dark "film strip"): the three as one segmented choice, one line "from → to", the steps as
+  cards on the sheet topped with their rail colour, the lit one in the tint; no dots, legend, counts or progress bar. Under it, "The days
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top

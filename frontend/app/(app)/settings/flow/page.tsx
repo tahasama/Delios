@@ -91,7 +91,7 @@ const STAGES: Stage[] = [
   },
   {
     key: "theirs",
-    tagline: "Made one of ours",
+    tagline: "Put in our register",
     title: "Registered",
     text: "A file that arrived becomes a document in the register, under the sender's code and the order it answers.",
     rail: "rail-none",
@@ -295,7 +295,7 @@ const STAGES: Stage[] = [
   },
   {
     key: "asked",
-    tagline: "Asked of them, theirs to send",
+    tagline: "Asked on a transmittal",
     title: "Asked of the supplier",
     text: "A placeholder from the supplier's package goes to them on a transmittal, issued for update, due on its planned day. From then the supplier holds it: only they change it until they send it.",
     rail: "rail-sent",
@@ -381,7 +381,7 @@ function flowsFor({ gate, returner, together }: { gate: boolean; returner: strin
         [{ scene: "prepare" }],
         // One step. Ours always review it; another organization's reviewers are
         // on the same step, alongside ours, when the route names them.
-        [{ scene: "review", tagline: "Ours always · outside ones too, when named" }],
+        [{ scene: "review", tagline: "Our reviewers, and others when the route names them" }],
         [{ scene: "accepted" }, { scene: "returned", end: true, tagline: `Rejected — ${returner} returns it` }],
         ...(gate ? [[{ scene: "gate", tagline: "Passes, and is published" }, { scene: "gate-return", end: true }]] : []),
         [
@@ -401,7 +401,7 @@ function flowsFor({ gate, returner, together }: { gate: boolean; returner: strin
         [{ scene: "theirs" }],
         // One step, by us, by another organization, or both: the route the
         // document matches decides who is on it.
-        [{ scene: "review", tagline: "Ours, theirs, or both" }],
+        [{ scene: "review", tagline: "By us, by them, or both" }],
         [{ scene: "accepted" }, { scene: "to-sender", end: true, tagline: `For correction — ${returner} returns it` }],
         ...out,
       ],
@@ -415,8 +415,8 @@ function flowsFor({ gate, returner, together }: { gate: boolean; returner: strin
         [{ scene: "asked" }],
         [{ scene: "received", tagline: "They send it, on a transmittal" }],
         [{ scene: "checked" }],
-        [{ scene: "review", tagline: "Ours, theirs, or both" }],
-        [{ scene: "accepted", tagline: "Accepted: we hold it" }, { scene: "handed-back", end: true }],
+        [{ scene: "review", tagline: "By us, by them, or both" }],
+        [{ scene: "accepted", tagline: "We hold it" }, { scene: "handed-back", end: true }],
         ...out,
       ],
     },
@@ -597,21 +597,7 @@ export default async function ControlRoomPage() {
     return [stage.key, panel];
   }));
 
-  const sceneOf = (stage: Stage): Scene => {
-    const fixedCount = (stage.key === (gate ? "gate" : "release") ? 1 : 0) + stage.fixed.length;
-    return {
-      key: stage.key,
-      title: stage.title,
-      tagline: stage.tagline,
-      rail: stage.rail,
-      carriers: [
-        ...[...stage.acts, ...stage.branches.flatMap((b) => (b.act ? [b.act] : []))].map((key) => (actRow.get(key)?.off ? "off" : actRow.get(key)?.controlDoes ? "control" : "work") as Scene["carriers"][number]),
-        ...Array.from({ length: fixedCount + stage.branches.filter((b) => !b.act).length }, () => "fixed" as const),
-      ],
-      states: stage.states,
-      sets: stage.sets.length,
-    };
-  };
+  const sceneOf = (stage: Stage): Scene => ({ key: stage.key, title: stage.title, tagline: stage.tagline, rail: stage.rail });
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "the reviewer";
   const shape = flowsFor({ gate, returner, together });
