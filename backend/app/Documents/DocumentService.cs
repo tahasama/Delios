@@ -484,6 +484,20 @@ public sealed class DocumentService(
     }
 
     /// <summary>
+    /// Whether a released revision asked for the next one: released at a status for update, or by a verdict whose comments
+    /// go into the next revision (read from what the verdict means, never its code).
+    /// </summary>
+    private async Task<bool> AskedForAsync(Revision released, CancellationToken cancellationToken)
+    {
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        if (SupplierHold.ForUpdate(catalog, released.StatusCode)) return true;
+        var verdict = await db.Reviews.AsNoTracking().Where(r => r.RevisionId == released.Id && r.DecidedAt != null && r.Verdict != null)
+            .OrderByDescending(r => r.DecidedAt).Select(r => new { r.VerdictSet, r.Verdict }).FirstOrDefaultAsync(cancellationToken);
+        return verdict is not null
+            && catalog.Prop(verdict.VerdictSet, verdict.Verdict!, "resubmit") is { ValueKind: System.Text.Json.JsonValueKind.True };
+    }
+
+    /// <summary>
     /// Starts the document's next revision from files already uploaded: works out its value from the revision scheme,
     /// attaches the files and queues them for scanning. Refused while an earlier revision is still in motion,
     /// and for a record that already has its one revision.
@@ -504,6 +518,20 @@ public sealed class DocumentService(
             return (null, Problems.Conflict("REVISION_IN_MOTION",
                 $"Revision {latest.Value} is still {latest.State.ToLowerInvariant().Replace('_', ' ')}; finish it first.",
                 new { revision = latest.Value, state = latest.State }));
+        }
+
+        // A revision nobody asked for (AUTHORIZE_REVISION): the last one was released as it stands, with no comments to
+        // take in and not for update, and the document is not with its supplier. It is started with why, by whoever works
+        // on the document, or only by the control function where the project says so. One a verdict asked for needs nobody's leave.
+        if (incoming is null && existing.LastOrDefault() is { State: RevisionStates.Released } done && document.WithSupplier != true
+            && !await AskedForAsync(done, cancellationToken))
+        {
+            if (await Settings.ProjectAnswers.ControlDoesAsync(db, access.Project.Id, "AUTHORIZE_REVISION", cancellationToken) && !access.Holds(Verbs.Control))
+                return (null, Problems.Forbidden("CONTROL_STARTS",
+                    $"Revision {done.Value} was accepted as it stands: on this project the control function starts a new one. Ask them, with why."));
+            if (string.IsNullOrWhiteSpace(request.ChangeDescription))
+                return (null, Problems.Invalid("REASON_REQUIRED",
+                    $"Revision {done.Value} was accepted as it stands: say what changes, and why a new revision is started.", new { field = "changeDescription" }));
         }
 
         // What the project's revision form insists on (Settings, Forms & fields), when one of ours starts it by hand.

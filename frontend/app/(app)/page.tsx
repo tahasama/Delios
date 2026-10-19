@@ -227,10 +227,17 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         tag: "asked back", tone: "amber", at: at(w.since), cta: "Answer",
       })),
     ],
-    route: revisionsOf(["TO_ROUTE"]).map<Row>((w) => ({
-      href: `/documents/${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
-      tag: "accepted", tone: "emerald", at: at(w.since), cta: "Send for review",
-    })),
+    route: [
+      ...revisionsOf(["TO_ROUTE"]).map<Row>((w) => ({
+        href: `/documents/${w.documentId}`, code: w.documentNumber, rev: w.revision, title: w.title,
+        tag: "accepted", tone: "emerald", at: at(w.since), cta: "Send for review",
+      })),
+      // Sent for review, waiting for the control function to send it to its reviewers (the project's choice).
+      ...work.gate.filter((w) => w.kind === "SEND_TO_REVIEWERS").map<Row>((w) => ({
+        href: `/reviews/${w.reviewId}`, code: w.documentNumber, rev: w.revisionValue, title: w.title,
+        tag: "sent for review", tone: "sky", at: at(w.since), cta: "Send to reviewers",
+      })),
+    ],
     // The schedule: confirming a discipline's documents, a postponement, and the schedule's upkeep.
     requirements: scheduleWork.map<Row>((w) => w.kind === "CONFIRM_DOCUMENTS"
       ? { href: `/actions/${w.code}#confirm`, code: w.code ?? "", title: `${w.name} · ${w.department}: ${w.count} document${w.count === 1 ? "" : "s"} missing`, tag: w.day && new Date(w.day).getTime() < Date.now() ? "day passed" : "confirm", tone: w.day && new Date(w.day).getTime() < Date.now() ? "amber" : "sky", at: at(w.since), cta: "Confirm" }
@@ -278,7 +285,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       asks: "Your documents came back with the reviewers' comments.",
       then: "Each one is finished: the next revision starts fresh.", call: "Read the comments" },
     { id: "route", tab: "To send out", title: "Send for review", icon: <Share2 />, accent: "cyan",
-      asks: "Accepted by us, and still not sent out for review.",
+      asks: "Accepted by us and not sent for review yet, or sent for review and waiting for you to send it to its reviewers.",
       then: "The reviewers cannot start, and the clock is running.", call: "Send them out" },
     { id: "owed", tab: "To upload", title: "To send us", icon: <Upload />, accent: "ocean",
       asks: "Documents your package still owes, and we await.",

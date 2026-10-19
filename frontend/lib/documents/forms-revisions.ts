@@ -87,10 +87,17 @@ export async function withdrawRevisionAction(_prev: Result | undefined, formData
   return {};
 }
 
-/** The review goes to its reviewers as soon as it starts; there is no separate issuing. */
+/** The control function sends a review waiting for it to its reviewers (where the project has it do so). */
 export async function issueToReviewAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const ctx = await requireScope();
   const cycleId = text(formData, "cycleId");
+  try {
+    await api(projectPath(ctx, `/reviews/${cycleId}/issue`), { method: "POST" });
+  } catch (e) {
+    return failed(e);
+  }
   revalidatePath(`/reviews/${cycleId}`);
+  revalidatePath("/");
   return {};
 }
 

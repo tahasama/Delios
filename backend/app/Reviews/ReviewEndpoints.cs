@@ -41,7 +41,9 @@ public sealed record ReviewView(Guid Id, string Number, Guid DocumentId, Guid Re
     string? ApprovalWithdrawnBy = null, string? ApprovalWithdrawnReason = null, string VerdictSet = ReviewSets.Verdicts,
     Guid? StartedById = null, IReadOnlyList<SendBack>? SendBacks = null, string? Verdicts = null,
     /// <summary>The verdicts the deciding step may give: those of the review's set, in order.</summary>
-    IReadOnlyList<string>? VerdictCodes = null);
+    IReadOnlyList<string>? VerdictCodes = null,
+    /// <summary>Sent for review, waiting for the control function to send it to its reviewers (REVIEW_ISSUE).</summary>
+    bool AwaitsIssue = false);
 
 /// <summary>
 /// The HTTP endpoints for reviews: listing routes, starting a review, commenting, answering, releasing, returning, rewinding and dispatching steps.
@@ -77,6 +79,7 @@ public static class ReviewEndpoints
         project.MapPost("/reviews/{reviewId:guid}/return", ReturnAsync);
         project.MapPost("/reviews/{reviewId:guid}/rewind", RewindAsync);
         project.MapPost("/reviews/{reviewId:guid}/dispatch", DispatchAsync);
+        project.MapPost("/reviews/{reviewId:guid}/issue", IssueAsync);
         project.MapPost("/reviews/{reviewId:guid}/evidence", EvidenceAsync);
         project.MapPost("/revisions/{revisionId:guid}/arrival", ArrivalAsync);
         project.MapGet("/work", WorkAsync);
@@ -215,6 +218,10 @@ public static class ReviewEndpoints
         CancellationToken cancellationToken) =>
         Result(await reviews.DispatchAsync(ProjectAccessFilter.Of(http), reviewId, request, cancellationToken));
 
+    /// <summary>POST <c>/reviews/{reviewId}/issue</c>: the control function sends a review waiting for it to its reviewers.</summary>
+    private static async Task<IResult> IssueAsync(Guid reviewId, HttpContext http, ReviewService reviews, CancellationToken cancellationToken) =>
+        Result(await reviews.IssueToReviewersAsync(ProjectAccessFilter.Of(http), reviewId, cancellationToken));
+
     /// <summary>POST <c>/reviews/{reviewId}/evidence</c>: starts an upload of a file that proves another organization's answer; returns the upload ticket.</summary>
     private static async Task<IResult> EvidenceAsync(
         Guid reviewId, UploadRequest request, HttpContext http, ReviewService reviews, CancellationToken cancellationToken)
@@ -256,7 +263,8 @@ public static class ReviewEndpoints
             s.ForeignAnswer, s.RecordedByName, s.EvidenceFileId, s.WarnedAt?.ToDateTimeOffset())).ToList(),
         r.Comments.Where(c => c.Status != CommentStatuses.Withdrawn).OrderBy(c => c.CreatedAt).Select(View).ToList(),
         r.ApprovalWithdrawnAt?.ToDateTimeOffset(), r.ApprovalWithdrawnByName, r.ApprovalWithdrawnReason, r.VerdictSet, r.StartedById,
-        r.SendBacks is null ? [] : System.Text.Json.JsonSerializer.Deserialize<List<SendBack>>(r.SendBacks) ?? [], r.Verdicts);
+        r.SendBacks is null ? [] : System.Text.Json.JsonSerializer.Deserialize<List<SendBack>>(r.SendBacks) ?? [], r.Verdicts,
+        AwaitsIssue: ReviewService.AwaitsIssue(r));
 
     /// <summary>Converts a review comment entity into the <see cref="CommentView"/> sent to clients.</summary>
     private static CommentView View(ReviewComment c) => new(

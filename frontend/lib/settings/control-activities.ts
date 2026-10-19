@@ -42,6 +42,7 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
     text: "A revision is ready to be looked at, and the reviewers have to be told it is with them.",
     control: "Whoever sent it for review waits; the control function issues it to the reviewers.",
     self: "Whoever sent it for review issues it to the reviewers themselves.",
+    workByDefault: true,
   },
   {
     key: "RETURN_OUTCOME",
@@ -56,6 +57,7 @@ export const CONTROL_ACTIVITIES: ControlActivity[] = [
     text: "A released revision leaving the project — to a contractor, a supplier, the client.",
     control: "Whoever wants it sent asks, and the control function raises and sends the transmittal.",
     self: "Whoever wants it sent raises the transmittal and sends it themselves.",
+    workByDefault: true,
   },
   {
     key: "DELEGATE",

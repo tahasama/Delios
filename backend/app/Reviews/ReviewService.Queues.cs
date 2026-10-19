@@ -74,6 +74,18 @@ public sealed partial class ReviewService
             gate = decided.Select(x => new WorkItem(x.Id, x.Number, x.DocumentId, x.DocumentNumber, x.Title, x.Value,
                 x.Verdict is null || Proceeds(catalog, x.VerdictSet, x.Verdict) ? "READY_TO_RELEASE" : "SEND_BACK", null, null,
                 x.DecidedAt!.Value.ToDateTimeOffset(), true, x.Verdict, x.GrantedStatus)).ToList();
+            // Sent for review and waiting for the control function to send them to their reviewers.
+            var waiting = await (
+                from r in db.Reviews
+                join d in db.Documents on r.DocumentId equals d.Id
+                join v in db.Revisions on r.RevisionId equals v.Id
+                where r.ProjectId == access.Project.Id && r.State == ReviewStates.InProgress
+                    && r.Steps.All(s => s.State == StepStates.Waiting && s.OpenedAt == null)
+                orderby r.StartedAt
+                select new { r.Id, r.Number, DocumentId = d.Id, DocumentNumber = d.Number, d.Title, v.Value, r.StartedAt })
+                .ToListAsync(cancellationToken);
+            gate.AddRange(waiting.Select(x => new WorkItem(x.Id, x.Number, x.DocumentId, x.DocumentNumber, x.Title, x.Value,
+                "SEND_TO_REVIEWERS", null, null, x.StartedAt.ToDateTimeOffset())));
         }
         return new
         {

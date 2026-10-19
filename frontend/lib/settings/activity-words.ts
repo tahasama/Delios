@@ -27,6 +27,7 @@ const WORDS: Record<string, string> = {
   ACCESS_REFUSED: "Was refused access",
   // Reviews and decisions
   REVIEW_STARTED: "Sent for review",
+  REVIEW_ISSUED: "Sent to its reviewers",
   STEP_DISPATCHED: "Sent a review step to an outside party",
   ADVICE: "Gave advice on a review",
   VERDICT: "Gave a verdict",

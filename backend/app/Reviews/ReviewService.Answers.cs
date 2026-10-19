@@ -203,6 +203,12 @@ public sealed partial class ReviewService
             await CompleteStepAsync(access, review, step, catalog, cancellationToken);
         }
         await db.SaveChangesAsync(cancellationToken);
+        // Decided, the revision may count for the actions needing it where the project reads the status it carries.
+        if (review.DecidedAt is not null)
+        {
+            await Actions.Readiness.RestateDocumentsAsync(db, clock, [review.DocumentId], cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+        }
         return (review, null);
     }
 

@@ -51,13 +51,14 @@ public static class Readiness
         var activities = await db.Activities.Include(a => a.Requirements)
             .Where(a => activityIds.Contains(a.Id)).ToListAsync(cancellationToken);
         var documentIds = activities.SelectMany(a => a.Requirements).Select(r => r.DocumentId).Distinct().ToList();
-        var current = await db.Revisions.AsNoTracking()
-            .Where(r => documentIds.Contains(r.DocumentId) && r.State == RevisionStates.Released)
-            .Select(r => new { r.DocumentId, r.StatusCode, r.ReleasedAt }).ToListAsync(cancellationToken);
-        var released = current.ToDictionary(r => r.DocumentId);
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var now = clock.GetCurrentInstant();
         var projectIds = activities.Select(a => a.ProjectId).Distinct().ToList();
+        // What makes a document count, as each project chose (POLICY_READY): released and issued at the status the action
+        // needs (ISSUED, the app's), or a decided revision carrying that status, however it got there (STATUS).
+        var there = new Dictionary<Guid, Dictionary<Guid, (string? Status, Instant At)>>();
+        foreach (var projectId in projectIds)
+            there[projectId] = await ThereAsync(db, projectId, documentIds, cancellationToken);
         var windows = await db.ScheduleSources.AsNoTracking().Where(s => projectIds.Contains(s.ProjectId))
             .ToDictionaryAsync(s => s.ProjectId, s => s.RiskWindowDays, cancellationToken);
 
@@ -66,12 +67,10 @@ public static class Readiness
             foreach (var need in activity.Requirements)
             {
                 need.NeededBy = NeededBy(activity, need);
-                var there = released.TryGetValue(need.DocumentId, out var revision)
-                    && Serves(catalog, need, revision.StatusCode);
-                if (there)
+                if (there[activity.ProjectId].TryGetValue(need.DocumentId, out var revision) && Serves(catalog, need, revision.Status))
                 {
                     need.State = RequirementStates.Met;
-                    need.MetAt ??= revision!.ReleasedAt ?? now;
+                    need.MetAt ??= revision.At;
                 }
                 else
                 {
@@ -108,6 +107,53 @@ public static class Readiness
                 if (document.PlannedDate != earliest[document.Id]) document.PlannedDate = earliest[document.Id];
         }
     }
+
+    /// <summary>
+    /// For each document, the revision that counts for the schedule on this project, with its status and since when. The
+    /// app's reading (POLICY_READY = ISSUED): the released revision, once it reached its people: at once where releasing
+    /// sends it (POLICY_RELEASE = TOGETHER), else when a transmittal first carried it out. STATUS: the newest revision a
+    /// review decided (released or not, never returned or void), with the status it carries.
+    /// </summary>
+    private static async Task<Dictionary<Guid, (string? Status, Instant At)>> ThereAsync(DeliosDbContext db, Guid projectId, List<Guid> documentIds,
+        CancellationToken cancellationToken)
+    {
+        var ready = await Settings.ProjectAnswers.PolicyOrDefaultAsync(db, projectId, "POLICY_READY", "ISSUED", cancellationToken);
+        var mine = db.Revisions.AsNoTracking().Where(r => r.ProjectId == projectId && documentIds.Contains(r.DocumentId));
+        if (ready == "STATUS")
+        {
+            var decided = await (from r in mine
+                                 where r.State != RevisionStates.Returned && r.State != RevisionStates.Void && r.State != RevisionStates.Superseded
+                                 let at = db.Reviews.Where(v => v.RevisionId == r.Id && v.DecidedAt != null).Max(v => v.DecidedAt)
+                                 where r.State == RevisionStates.Released || at != null
+                                 select new { r.DocumentId, r.StatusCode, r.CreatedAt, At = r.ReleasedAt ?? at }).ToListAsync(cancellationToken);
+            return decided.GroupBy(r => r.DocumentId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.CreatedAt).Select(r => ((string?)r.StatusCode, r.At!.Value)).First());
+        }
+        var released = await mine.Where(r => r.State == RevisionStates.Released)
+            .Select(r => new { r.Id, r.DocumentId, r.StatusCode, r.ReleasedAt }).ToListAsync(cancellationToken);
+        var together = await Settings.ProjectAnswers.PolicyOrDefaultAsync(db, projectId, "POLICY_RELEASE", "TOGETHER", cancellationToken) != "SEPARATE";
+        if (together) return released.ToDictionary(r => r.DocumentId, r => ((string?)r.StatusCode, r.ReleasedAt!.Value));
+        var ids = released.Select(r => r.Id).ToList();
+        var sent = await (from i in db.TransmittalItems
+                          join t in db.Transmittals on i.TransmittalId equals t.Id
+                          where i.RevisionId != null && ids.Contains(i.RevisionId.Value) && t.ReviewStepId == null
+                              && t.Direction == TransmittalDirections.Outgoing
+                          group t by i.RevisionId!.Value into g
+                          select new { RevisionId = g.Key, At = g.Min(t => t.IssuedAt) }).ToDictionaryAsync(x => x.RevisionId, x => x.At, cancellationToken);
+        return released.Where(r => sent.ContainsKey(r.Id)).ToDictionary(r => r.DocumentId, r => ((string?)r.StatusCode, sent[r.Id]));
+    }
+
+    /// <summary>Restates every activity needing one of these documents (after a transmittal sent them, or a review decided one). The caller saves.</summary>
+    public static async Task RestateDocumentsAsync(DeliosDbContext db, IClock clock, IReadOnlyCollection<Guid> documentIds, CancellationToken cancellationToken)
+    {
+        if (documentIds.Count == 0) return;
+        var ids = await db.Requirements.Where(r => documentIds.Contains(r.DocumentId)).Select(r => r.ActivityId).Distinct().ToListAsync(cancellationToken);
+        await RestateAsync(db, clock, ids, cancellationToken);
+    }
+
+    /// <summary>Restates every activity of a project (after what makes a document count changed). The caller saves.</summary>
+    public static async Task RestateProjectAsync(DeliosDbContext db, IClock clock, Guid projectId, CancellationToken cancellationToken) =>
+        await RestateAsync(db, clock, await db.Activities.Where(a => a.ProjectId == projectId).Select(a => a.Id).ToListAsync(cancellationToken), cancellationToken);
 
     /// <summary>Every activity (active or removed) that needs this document: the ones its release may change.</summary>
     public static Task<List<Guid>> NeedingAsync(DeliosDbContext db, Guid documentId, CancellationToken cancellationToken) =>

@@ -117,9 +117,9 @@ async function readCycle(scope: Scope, review: ReviewView) {
     outcomeAt: outcome ? (step.deciding && review.decidedAt ? new Date(review.decidedAt) : by.at) : null,
     status: step.state === "OPEN" ? "OPEN" : "CLOSED", grantsStatuses: JSON.stringify(step.grantsStatuses) as string | null,
     dueAt: dueDay(step.dueDate),
-    // A review goes to its reviewers the moment it starts; there is no separate issuing.
+    // A review goes to its reviewers when it starts, unless the project has the control function send it on (awaitsIssue).
     openedById: review.startedById ?? "", openedByName: review.startedBy, submittedAt: new Date(review.startedAt), receivedAt: new Date(review.startedAt),
-    issuedToReviewAt: new Date(review.startedAt) as Date | null, returnedFromReviewAt: review.decidedAt ? new Date(review.decidedAt) : null,
+    issuedToReviewAt: review.awaitsIssue ? null : new Date(review.startedAt) as Date | null, returnedFromReviewAt: review.decidedAt ? new Date(review.decidedAt) : null,
     returnedToOriginatorAt: review.state === "RETURNED" && review.closedAt ? new Date(review.closedAt) : null,
     withdrawn: review.state === "WITHDRAWN" ? { note: review.returnNote, at: review.closedAt ? new Date(review.closedAt) : null } : null,
     comments: commentsOf(review, step.number),

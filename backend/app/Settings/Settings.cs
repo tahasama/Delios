@@ -75,7 +75,14 @@ public static class SettingEndpoints
                 return Problems.Forbidden("CONTROL_ONLY", "An administrator or the control function answers for the project.");
             // What the organization keeps fixed is the same on every project (owner: two levels of settings).
             if (await Liberty.RoomRefusalAsync(db, key.Trim(), r.Value, c) is { } fixedHere) return fixedHere;
-            return await SetAsync(db, audit, clock, access.Project.TenantId, access.Project.Id, key, r.Value, access.UserId, access.UserName, c);
+            var result = await SetAsync(db, audit, clock, access.Project.TenantId, access.Project.Id, key, r.Value, access.UserId, access.UserName, c);
+            // What makes a document count for an action changed: every action of the project is read again at once.
+            if (key.Trim() is "POLICY_READY" or "POLICY_RELEASE")
+            {
+                await Actions.Readiness.RestateProjectAsync(db, clock, access.Project.Id, c);
+                await db.SaveChangesAsync(c);
+            }
+            return result;
         });
     }
 
@@ -151,6 +158,11 @@ public static class Tracking
 /// </summary>
 public static class ProjectAnswers
 {
+    /// <summary>Acts left to the people doing the work unless the project says otherwise (the screens' <c>workByDefault</c>).</summary>
+    /// Sending a review to its reviewers and sending documents out were read by nothing before they worked: left to the
+    /// people doing the work, existing projects go on as they did until they choose otherwise.
+    public static readonly string[] WorkByDefault = ["AUTHORIZE_REVISION", "REVIEW_ISSUE", "ISSUE"];
+
     private static Task<Dictionary<string, string>> AllAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken) =>
         db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == projectId).ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
 
@@ -165,6 +177,8 @@ public static class ProjectAnswers
         if (all == "CONTROL") return true;
         if (all == "SELF") return false;
         if (all == "CUSTOM" && answers.GetValueOrDefault(act) is { } own && own is "CONTROL" or "SELF") return own == "CONTROL";
+        // Left to the people doing the work unless the project says otherwise, as the screens read it.
+        if (WorkByDefault.Contains(act)) return false;
         return await db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
             && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
@@ -192,6 +206,14 @@ public static class ProjectAnswers
     /// <summary>Every answer the project gave, by key.</summary>
     public static Task<Dictionary<string, string>> AnswersAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken) =>
         AllAsync(db, projectId, cancellationToken);
+
+    /// <summary>The project's answer to a policy, else the organization's, else <paramref name="fallback"/> (the app's).</summary>
+    public static async Task<string> PolicyOrDefaultAsync(DeliosDbContext db, Guid projectId, string key, string fallback, CancellationToken cancellationToken)
+    {
+        var rows = await db.Set<Setting>().AsNoTracking().Where(s => s.Key == key && (s.ProjectId == projectId || s.ProjectId == null))
+            .Select(s => new { s.ProjectId, s.Value }).ToListAsync(cancellationToken);
+        return rows.FirstOrDefault(r => r.ProjectId == projectId)?.Value ?? rows.FirstOrDefault(r => r.ProjectId == null)?.Value ?? fallback;
+    }
 
     /// <summary>The project's chosen option for a policy, or null when it has not chosen.</summary>
     public static async Task<string?> PolicyAsync(DeliosDbContext db, Guid projectId, string key, CancellationToken cancellationToken) =>

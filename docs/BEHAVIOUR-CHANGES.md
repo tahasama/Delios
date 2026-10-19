@@ -653,3 +653,11 @@ in the code; it lives only in your local database.
   an administrator, and offered on every project. A project changes its own where free (the default): its first change
   makes its own copy, and the organization's later changes do not reach it.
 
+- **The Control room's switches now do what they say.** Four were read by nothing: "Sending a review to its reviewers",
+  "Sending a document out", "Starting a revision nobody asked for" and "When an action has what it needs". Each now
+  changes who may act (the backend refuses otherwise) or when a document counts for an action. The first three are left
+  to the people doing the work until a project chooses otherwise, so nothing changes on a project that never answered.
+  A revision started after one accepted as it stands now always asks why.
+- **Revisions**: a line counting in small letters or with leading zeros keeps it when saved ("a", "01" in "Starts at");
+  before, saving turned it to capitals and dropped the zeros.
+

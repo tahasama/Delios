@@ -13,7 +13,7 @@ export type WorkItem = {
   documentNumber: string;
   title: string;
   revisionValue: string;
-  kind: "ANSWER_STEP" | "DISPATCH_STEP" | "RECORD_ANSWER" | "READY_TO_RELEASE" | "SEND_BACK";
+  kind: "ANSWER_STEP" | "DISPATCH_STEP" | "RECORD_ANSWER" | "READY_TO_RELEASE" | "SEND_BACK" | "SEND_TO_REVIEWERS";
   stepTitle: string | null;
   dueDate: string | null;
   since: string;
@@ -189,6 +189,8 @@ export type ReviewView = {
   verdicts?: string | null; verdictCodes?: string[] | null;
   /** Who started the review: they may notify its people by hand. */
   startedById?: string | null;
+  /** Sent for review, waiting for the control function to send it to its reviewers (the project's choice). */
+  awaitsIssue?: boolean;
 };
 /** GET /transmittals/log (TransmittalLog.cs). */
 export type TransmittalLog = { total: number; page: number; pages: number; per: number; sizes: number[]; rows: TransmittalLogRow[] };

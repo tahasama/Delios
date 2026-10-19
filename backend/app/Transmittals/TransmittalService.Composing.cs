@@ -64,6 +64,12 @@ public sealed partial class TransmittalService
                 $"Issued {p.Reason}: {string.Join(", ", sent.Select(t => t.Number))}.", access.Project.Id, cancellationToken);
         }
         await db.SaveChangesAsync(cancellationToken);
+        // Sent out, a released revision may now count for the actions needing it (where released and issued are apart).
+        if (p.Items.Count > 0)
+        {
+            await Actions.Readiness.RestateDocumentsAsync(db, clock, [.. p.Items.Select(i => i.Document.Id).Distinct()], cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+        }
         return (sent, null);
     }
 
@@ -86,6 +92,12 @@ public sealed partial class TransmittalService
         var subjectGiven = request.Subject?.Trim() is { Length: > 0 };
         var messageGiven = request.Message?.Trim() is { Length: > 0 };
         if (revisionIds.Count > 500) return Fail(Problems.Invalid("ITEMS_REQUIRED", "Choose at most 500 released revisions."));
+        // Sending our documents out (ISSUE): where the control function carries it out, whoever wants a revision sent asks
+        // for it (on the document, "Ask for rev X to be sent"), and the control function raises and sends the transmittal.
+        if (revisionIds.Count > 0 && access.IsInternal && !access.Holds(Verbs.Control)
+            && await Settings.ProjectAnswers.ControlDoesAsync(db, access.Project.Id, "ISSUE", cancellationToken))
+            return Fail(Problems.Forbidden("CONTROL_SENDS",
+                "On this project the control function sends documents out: ask for each to be sent from its page (\"Ask for rev … to be sent\"), with who and why."));
         if (revisionIds.Count == 0 && placeholderIds.Count == 0 && !(subjectGiven && messageGiven))
             return Fail(Problems.Invalid("ITEMS_REQUIRED", "Enclose at least one released revision, or write a subject and a message: a letter says something."));
         var catalog = await Catalog.LoadAsync(db, cancellationToken);

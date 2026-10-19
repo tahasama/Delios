@@ -715,6 +715,19 @@ a screen only words it. A new rule goes in the backend, never in a page.
   to tell criticality and whether an outside stamp / wet signature is needed or the app's approval is enough, legally.
   That needs research before deciding (`docs/gaps/families.md`). Meanwhile document types are grouped by deliverable
   type. The families' stamp rule is not applied by the app, so nothing states it.
+- **Every Control room switch is read by the backend** (owner: "make them work", not removed). Sending a review to its
+  reviewers (`REVIEW_ISSUE`): with the control function, a review sent for review waits, no step open
+  (`ReviewService.AwaitsIssue`), until they send it on (`POST /reviews/{id}/issue`, REVIEW_ISSUED); they are told, it is
+  on their Home ("Send for review", "Send to reviewers"), whoever sent it is told when it goes. Sending a document out
+  (`ISSUE`): with the control function, a transmittal carrying our revisions is theirs to send (backend CONTROL_SENDS);
+  others ask for it to be sent from the document. Starting a revision nobody asked for (`AUTHORIZE_REVISION`): after a
+  revision released as it stands (no comments to take in, not for update, not with its supplier), a new one needs "what
+  changes, and why" (REASON_REQUIRED) and, with the control function, is theirs to start (CONTROL_STARTS). When an action
+  has what it needs (`POLICY_READY`): ISSUED (the app's) counts a document released and issued (where release and issue
+  are apart, once a transmittal carried it out); STATUS counts the newest revision a review decided, with the status it
+  carries (`Readiness.ThereAsync`); readiness is read again on a send, a decision, and when either policy changes. These
+  three acts are left to the people doing the work unless the project says otherwise (`ProjectAnswers.WorkByDefault`,
+  `workByDefault`): projects go on as before until they choose.
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
   of the hub (`CONTROL_ROOM`): how the project works, and what makes it work that way (the control function, who does
   what, releasing, adding people), opening on "Open the Control room". Everyone of ours reads it (`read: true`, "See

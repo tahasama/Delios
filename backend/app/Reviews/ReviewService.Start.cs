@@ -179,7 +179,11 @@ public sealed partial class ReviewService
         review.CopyUserIds = copies.Count == 0 ? [] : [.. await db.Memberships.AsNoTracking()
             .Where(m => m.ProjectId == access.Project.Id && m.Active && copies.Contains(m.UserId)).Select(m => m.UserId).Distinct().ToListAsync(cancellationToken)];
         db.Reviews.Add(review);
-        await OpenStepAsync(access, review, 0, cancellationToken);
+        // Sending a review to its reviewers (REVIEW_ISSUE): where the control function carries it out, the review waits for
+        // them to send it on (IssueToReviewersAsync); otherwise it goes to its first step's people at once.
+        var held = !access.Holds(Verbs.Control)
+            && await Settings.ProjectAnswers.ControlDoesAsync(db, access.Project.Id, "REVIEW_ISSUE", cancellationToken);
+        if (!held) await OpenStepAsync(access, review, 0, cancellationToken);
 
         revision.State = RevisionStates.InReview;
         // Under review, a revision with no purpose yet is issued for review: each step confirms it or changes it.
@@ -190,7 +194,12 @@ public sealed partial class ReviewService
         await audit.WriteAsync(Actor(access), "REVIEW_STARTED", "Review", review.Id, review.Number,
             $"{document.Number} rev {revision.Value} sent for review on route {route.Name}"
             + (chosenBySender.Count > 0 ? $", the sender choosing the people on {string.Join(", ", chosenBySender)}." : ".")
-            + (review.CopyUserIds.Length > 0 ? $" {review.CopyUserIds.Length} copied in." : ""), access.Project.Id, cancellationToken);
+            + (review.CopyUserIds.Length > 0 ? $" {review.CopyUserIds.Length} copied in." : "")
+            + (held ? " Waiting for the control function to send it to its reviewers." : ""), access.Project.Id, cancellationToken);
+        if (held)
+            await TellAsync(review, await notifier.ControlHoldersAsync(access.Project.Id, cancellationToken), Notifications.NotificationKinds.ReviewStep,
+                $"{TransmittalService.Label(document, revision)} sent for review: send it to its reviewers",
+                $"Review {review.Number}, sent by {access.UserName} on route {route.Name}. It waits for you to send it to its first step.", cancellationToken);
         if (review.CopyUserIds.Length > 0)
             await TellAsync(review, review.CopyUserIds, Notifications.NotificationKinds.General,
                 $"{TransmittalService.Label(document, revision)} sent for review: you are copied in",
