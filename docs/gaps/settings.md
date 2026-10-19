@@ -35,8 +35,8 @@ Each found wrong in the Settings review of 2026-10-16 (`.impeccable/critique/`),
 
 ## Small things seen, not done
 
-- Numbering, "What is numbered": after another scheme is picked, the example beside it shows the old one until Save.
-- The organization's band on a phone cuts the organization's name ("Dem…").
+- ~~Numbering, "What is numbered": the example showed the old scheme until Save~~ (done: it follows the scheme picked).
+- ~~The organization's band on a phone cuts the organization's name~~ (done: its two ways out keep only their icons there).
 - Functions step 2 (a project's own rights): only if a project needs it.
 - A Control room answer made fixed later: the project keeps what it held. Whether the organization's answer should
   then reach it is not decided.

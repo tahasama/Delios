@@ -13,8 +13,10 @@ export type ChoiceOption = { value: string; label: string; hint?: string };
  * worked the same way with the keyboard: Enter, Space or the arrows open it, the arrows move, Enter chooses, Escape
  * closes. For a choice whose options need saying; a plain list of words stays a select.
  */
-export function Choice({ name, options, defaultValue = "", placeholder = "Choose…", label, className }: {
+export function Choice({ name, options, defaultValue = "", placeholder = "Choose…", label, className, onChange }: {
   name: string;
+  /** Told of each choice, for what beside it follows the choice before it is saved. */
+  onChange?: (value: string) => void;
   options: ChoiceOption[];
   defaultValue?: string;
   placeholder?: string;
@@ -42,7 +44,7 @@ export function Choice({ name, options, defaultValue = "", placeholder = "Choose
   }
   function pick(index: number) {
     const one = options[index];
-    if (one) setValue(one.value);
+    if (one) { setValue(one.value); onChange?.(one.value); }
     setOpen(false);
   }
   function key(event: React.KeyboardEvent) {
