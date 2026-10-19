@@ -12,6 +12,8 @@ type MeRule = {
 /** A project the person is on, with their function, department and the function's rules. */
 type MeProject = {
   id: string; code: string; name: string; timeZone: string; contractRole: string; kind?: string; status: string; department: string | null;
+  /** Nobody acts as the control function on it: the people doing the work stand in. */
+  noControl?: boolean;
   function: { id: string; code: string; name: string; clearance?: string | null }; verbs: string[]; rules: MeRule[];
 };
 

@@ -36,7 +36,8 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   const pkg = await packageByNumber(ctx, identifier);
   if (!pkg) notFound();
   if (pkg.kind === "SUPPLY") return <SupplierPackage pkg={pkg} />;
-  const staff = isController(user) || isAdmin(user);
+  // With no control function, those putting it together do everything on it (backend StandIns).
+  const staff = isController(user) || isAdmin(user) || (!!user.noControl && user.isInternal && pkg.ownerIds.includes(user.id));
   const [statuses, reasons, people, parties] = await Promise.all([
     getActiveSet("STATUSES"),
     getActiveSet("REASONS_FOR_ISSUE"),

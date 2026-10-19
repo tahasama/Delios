@@ -117,8 +117,7 @@ public sealed partial class TransmittalService
         // Who checks what arrived: the control function; with none on the project, whoever it was for (anyone of ours
         // when it named nobody), as ControlService.ArrivalAsync allows.
         var mayCheck = incoming && (access.Holds(Verbs.Control)
-            || (access.IsInternal && (await notifier.ControlHoldersAsync(access.Project.Id, cancellationToken)).Count == 0
-                && (!t.Recipients.Any(r => r.UserId is not null) || t.Recipients.Any(r => r.UserId == access.UserId))));
+            || await StandIns.ArrivalAsync(db, access, t.Id, cancellationToken));
 
         return new TransmittalPage(t, status, incoming ? t.From ?? t.IssuedBy : await OurNameAsync(access, cancellationToken),
             check?.By, check?.At, status == TransmittalStatuses.Rejected ? returned?.Note : null, carried, files, requests, parties, mayCheck);

@@ -26,7 +26,8 @@ public sealed partial class KeepingService
         var document = await db.Documents.SingleOrDefaultAsync(d => d.Id == documentId && d.ProjectId == access.Project.Id, cancellationToken);
         if (document is null || await VisibleAsync(access, documentId, cancellationToken) is null)
             return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
-        if (!access.IsInternal || (!access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http)))
+        if (!access.IsInternal || (!access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http)
+                && !await StandIns.ExchangesAsync(db, access, cancellationToken)))
             return Problems.Forbidden("CONTROL_ONLY", "The control function sends a document to its supplier.");
         var supplier = await SupplierOfAsync(document, cancellationToken);
         if (supplier is null || document.WithSupplier is null)
@@ -58,7 +59,8 @@ public sealed partial class KeepingService
         var fromSupplier = !access.IsInternal;
         if (fromSupplier && !await SupplierMayAsync(access, document))
             return Problems.Forbidden("NOT_ALLOWED", $"Whoever of {supplier.Name} may upload asks for it back.");
-        if (!fromSupplier && !access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http))
+        if (!fromSupplier && !access.Allows(Verbs.Control, document.Facts) && !await Keepers.ConfiguresAsync(http)
+            && !await StandIns.ExchangesAsync(db, access, cancellationToken))
             return Problems.Forbidden("CONTROL_ONLY", "The control function asks a supplier to hand a document back.");
         // Asked of the side that holds it: the supplier asks us when we hold it, we ask them when they do.
         if (document.WithSupplier == fromSupplier)
@@ -107,7 +109,8 @@ public sealed partial class KeepingService
         if (supplier is null) return Problems.Conflict("NOT_EXCHANGED", "Only a document exchanged with a supplier is asked back.");
         // The holder answers: we, when the supplier asked; the supplier, when we asked.
         var mayAnswer = ask.FromSupplier
-            ? access.IsInternal && (access.Allows(Verbs.Control, document.Facts) || await Keepers.ConfiguresAsync(http))
+            ? access.IsInternal && (access.Allows(Verbs.Control, document.Facts) || await Keepers.ConfiguresAsync(http)
+                || await StandIns.ExchangesAsync(db, access, cancellationToken))
             : !access.IsInternal && await SupplierMayAsync(access, document);
         if (!mayAnswer)
             return Problems.Forbidden("NOT_THE_HOLDER", ask.FromSupplier ? "The control function answers this." : $"{supplier.Name} answers this.");

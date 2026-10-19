@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
-import { isController, isAdmin, hasVerb } from "@/lib/core/auth";
+import { isController, isAdmin, hasVerb, standsInForControl } from "@/lib/core/auth";
 import { DataTable, Th, Td, Field, inputCls, ToneChip, btn } from "@/components/ui";
 import { FileTally } from "./file-tally";
 import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@/lib/packages/forms";
@@ -63,7 +63,7 @@ function Act({ icon: Icon, label, href, primary, children }: { icon: typeof Send
 export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
   const ctx = await requireScope();
   const { user } = ctx;
-  const staff = isController(user) || isAdmin(user);
+  const staff = isController(user) || isAdmin(user) || standsInForControl(user);
   const isSupplier = !user.isInternal && !!user.partyCode && user.partyCode === pkg.names.supplierCode;
   const rows = await supplierRows(ctx, pkg, true);
   const org = (await getMe())?.tenant.name ?? "us";

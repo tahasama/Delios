@@ -123,7 +123,7 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
           {flow.columns.map((column, c) => {
             const compact = column.length > 1;
             const station = ({ scene: one, optional, end }: Lane, n: number) => {
-              const number = `${String(c + 1).padStart(2, "0")}${compact ? "ab"[column.findIndex((l) => l.scene.key === one.key)] ?? "" : ""}`;
+              const number = `${String(c + 1).padStart(2, "0")}${compact ? "abc"[column.findIndex((l) => l.scene.key === one.key)] ?? "" : ""}`;
               return (
                 <button
                   key={`${flow.key}/${one.key}/${n}`}
@@ -161,7 +161,7 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
         <p className="scene-key px-5 pb-4 sm:px-6">
           <span><span className="scene-key-light" aria-hidden />the light on top: the state it leaves the document in, as in the register</span>
           <span><span className="scene-key-sometimes" aria-hidden />dashed: optional, only when it applies</span>
-          <span><span className="scene-key-end" aria-hidden />below, in rose: the revision ends there, the next one starts again</span>
+          <span><span className="scene-key-end" aria-hidden />below, in rose: it ends there (a revision: the next one starts again)</span>
           <span><span className="scene-key-lit" aria-hidden />ringed: the step shown under the console</span>
         </p>
       </section>

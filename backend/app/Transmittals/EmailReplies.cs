@@ -288,7 +288,8 @@ public sealed class EmailReplies(
     public async Task<(Guid? TransmittalId, IResult? Problem)> RecordAsync(ProjectAccess access, IncomingService incoming, Guid replyId,
         CancellationToken cancellationToken)
     {
-        if (!access.Holds(Verbs.Control)) return (null, Problems.Forbidden("CONTROL_ONLY", "The control function records what arrived."));
+        if (!access.Holds(Verbs.Control) && !await StandIns.ExchangesAsync(db, access, cancellationToken))
+            return (null, Problems.Forbidden("CONTROL_ONLY", "The control function records what arrived."));
         var reply = await db.Set<EmailReply>().SingleOrDefaultAsync(r => r.Id == replyId && r.ProjectId == access.Project.Id, cancellationToken);
         if (reply is null) return (null, Problems.NotFound("REPLY_NOT_FOUND", "No such reply."));
         if (reply.State != EmailReplyStates.Waiting) return (null, Problems.Conflict("REPLY_HANDLED", "This reply was already answered."));
@@ -318,7 +319,8 @@ public sealed class EmailReplies(
     /// <summary>The control function sets a reply aside, with why: not about this transmittal, a mistake, a duplicate. It is kept.</summary>
     public async Task<IResult?> SetAsideAsync(ProjectAccess access, Guid replyId, SetAsideRequest request, CancellationToken cancellationToken)
     {
-        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function answers what arrived.");
+        if (!access.Holds(Verbs.Control) && !await StandIns.ExchangesAsync(db, access, cancellationToken))
+            return Problems.Forbidden("CONTROL_ONLY", "The control function answers what arrived.");
         var why = request.Reason?.Trim() ?? "";
         if (why.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why it is set aside.");
         var reply = await db.Set<EmailReply>().SingleOrDefaultAsync(r => r.Id == replyId && r.ProjectId == access.Project.Id, cancellationToken);

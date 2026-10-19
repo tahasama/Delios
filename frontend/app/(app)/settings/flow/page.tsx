@@ -2,7 +2,9 @@ import Link from "next/link";
 import { SETUP_PAGES, maySetup, mayChangeControlRoom } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath } from "@/lib/client";
-import { projectSettings } from "@/lib/settings/api";
+import { projectSettings, orgSettings } from "@/lib/settings/api";
+import { optOutsOf } from "@/lib/conformance/api";
+import { isAdmin } from "@/lib/core/auth";
 import { controlSettings, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES, SKIPPABLE, CONFIRMABLE, PEOPLE_KEY, PEOPLE_MODE_LABEL, STAMP_KINDS, STAMP_COMMENTS_KEY, roomItemOf } from "@/lib/settings/control-activities";
 import { stateNames } from "@/lib/core/state-names";
 import { holdersOf } from "@/lib/core/permissions";
@@ -36,7 +38,8 @@ export const metadata = { title: "Control room" };
 type Who = string | { title: string; by: string };
 
 type Extra = "numbering" | "revisions" | "fields" | "routes" | "distribution" | "parties" | "packages" | "schedule" | "people" | "functions"
-  | "form:DOCUMENT" | "form:REVISION" | "form:REVIEW" | "form:TRANSMITTAL" | "form:PACKAGE";
+  | "assets" | "checks" | "project"
+  | "form:DOCUMENT" | "form:REVISION" | "form:REVIEW" | "form:TRANSMITTAL" | "form:PACKAGE" | "form:ASSET" | "form:PARTY" | "form:PROJECT";
 
 type Stage = {
   key: string;
@@ -47,7 +50,7 @@ type Stage = {
   text: string;
   rail: string;
   who: Who[];
-  /** What the project chose that this step reads: a question's key, or DAYS, ESCALATE, CONFIRM:<act>. */
+  /** What the project chose that this step reads: a question's key, or DAYS, ESCALATE, CONFIRM:<act>, TRACKING. */
   answers?: string[];
   /** The lists it reads. */
   sets?: string[];
@@ -65,8 +68,8 @@ const STAGES: Stage[] = [
     key: "register", title: "Register", tagline: "Numbered and described", rail: "rail-none",
     text: "The document gets its number and its description before anything is written in it.",
     who: [{ title: "Registering it", by: "Whoever creates it" }, "WITHDRAW"],
-    sets: ["SUBPROJECTS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "PHASES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES"],
-    extras: ["numbering", "fields", "form:DOCUMENT"],
+    sets: ["SUBPROJECTS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "PHASES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES", "GENERIC_TITLE_WORDS"],
+    extras: ["numbering", "fields", "form:DOCUMENT", "assets", "form:ASSET"],
   },
   {
     key: "prepare", title: "Prepare", tagline: "Written by its author", rail: "rail-prep",
@@ -168,7 +171,7 @@ const STAGES: Stage[] = [
     text: "What another organization sends is recorded on the transmittal it came on.",
     who: [{ title: "Recording what arrived", by: "Whoever receives it" }],
     sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS", "REASONS_FOR_ISSUE"],
-    extras: ["parties", "form:TRANSMITTAL"],
+    extras: ["parties", "form:TRANSMITTAL", "form:PARTY"],
   },
   {
     key: "theirs", title: "Registered", tagline: "Put in our register", rail: "rail-none",
@@ -180,7 +183,7 @@ const STAGES: Stage[] = [
   {
     key: "asked", title: "Asked of the supplier", tagline: "Asked on a transmittal", rail: "rail-sent",
     text: "A placeholder from the supplier's package goes to them, due on its planned day. They hold it until they send it.",
-    who: [{ title: "Asking for it", by: "The control function, from the supplier's package" }],
+    who: [{ title: "Asking for it", by: "The control function (with none, anyone of ours who sends documents), from the supplier's package" }],
     sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS"],
     extras: ["packages", "parties", "form:TRANSMITTAL"],
   },
@@ -188,11 +191,13 @@ const STAGES: Stage[] = [
     key: "checked", title: "The control function's check", tagline: "Accepted, or back to them", rail: "rail-check",
     text: "What another organization sent counts only once it is checked: accepted, it becomes the document's revision; returned, with why, they correct it.",
     who: ["CONTROL_PEOPLE", { title: "Checking it", by: "The control function" }],
+    sets: ["CONTROL_OUTCOMES"],
   },
   {
     key: "checked-self", title: "Checked by whoever it was for", tagline: "Accepted, or back to them", rail: "rail-check",
     text: "With no control function on the project, whoever the transmittal was for checks it (anyone of ours when it named nobody): accepted, it becomes the document's revision; returned, with why, they correct it.",
     who: [{ title: "Checking it", by: "Whoever the transmittal was for" }],
+    sets: ["CONTROL_OUTCOMES"],
   },
   {
     key: "handed-back", title: "Back with the supplier", tagline: "Theirs again, to update", rail: "rail-rejected",
@@ -203,35 +208,87 @@ const STAGES: Stage[] = [
 
   // ── Documents our client asks of us ─────────────────────────────────────────
   {
-    key: "client-asked", title: "Asked of us", tagline: "By our client, on a transmittal", rail: "rail-received",
-    text: "Our client asks for a document on a transmittal, with the day it is due; it is answered by the document, sent on a transmittal following theirs.",
+    key: "client-placeholder", title: "Their placeholder", tagline: "Filled on their project", rail: "rail-sent",
+    text: "A client on DELIOS keeps the document on its own project and asks it of us there, from our package: we switch into their project, see only what they asked, and attach our file beside it.",
+    who: [{ title: "Filling it in", by: "Whoever of ours they put on their project" }],
+    extras: ["parties"],
+  },
+  {
+    key: "client-asked", title: "Asked of us", tagline: "Recorded here, on a transmittal", rail: "rail-received",
+    text: "A client not on DELIOS asks by email or letter: we record it as a transmittal received, with the day it is due, and answer with the document on a transmittal following theirs.",
     who: [{ title: "Recording what they ask", by: "Whoever receives it" }],
     sets: ["REASONS_FOR_ISSUE"],
     extras: ["parties", "form:TRANSMITTAL"],
+  },
+  {
+    key: "client-sent", title: "Sent to them", tagline: "From their project, or a transmittal", rail: "rail-issue",
+    text: "Filled on their project, it goes with \"Send to them\" there; asked here, it is released and issued to them on a transmittal following theirs.",
+    who: [{ title: "Sending it from their project", by: "Whoever of ours filled it" }, "ISSUE"],
+    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "STAMP:RELEASED"],
+    sets: ["REASONS_FOR_ISSUE"],
+    extras: ["form:TRANSMITTAL"],
+  },
+  {
+    key: "client-check", title: "Their check", tagline: "Before it counts with them", rail: "rail-check",
+    text: "On their DELIOS, their control function checks what we sent before it counts: accepted, it goes to their review; returned, with why, we correct it and send it again under the same revision.",
+    who: [{ title: "Checking it", by: "Their control function" }],
+  },
+
+  // ── Keeping and ending a document ───────────────────────────────────────────
+  {
+    key: "kept", title: "Kept", tagline: "As long as it must be", rail: "rail-released",
+    text: "Every revision and its files are kept, read only by those its confidentiality allows, for as long as its retention class says; what is kept for the long term is kept in a preservation format.",
+    who: [{ title: "Keeping it", by: "The app, by itself" }, { title: "Checking the register every day", by: "The app, by itself" }],
+    answers: ["TRACKING"],
+    sets: ["RETENTION_CLASSES", "CONFIDENTIALITY", "PRESERVATION_FORMATS"],
+    extras: ["checks", "functions"],
+  },
+  {
+    key: "held", title: "On legal hold", tagline: "Kept against disposal", rail: "rail-held",
+    text: "Held for a legal reason, with why: it cannot be ended and no revision voided until the hold is lifted, with why. New revisions and reviews go on.",
+    who: [{ title: "Holding it, and lifting the hold", by: "The control function, or an administrator" }],
+    answers: ["STAMP:HELD"],
+  },
+  {
+    key: "cancelled", title: "Cancelled", tagline: "Never to be produced", rail: "rail-withdrawn",
+    text: "A document that will never be produced is cancelled with why, only while nothing of it was ever released. Reinstated, with why, it counts again.",
+    who: [{ title: "Cancelling or reinstating it", by: "The control function, or whoever registered it" }],
+  },
+  {
+    key: "withdrawn", title: "Withdrawn", tagline: "No longer valid", rail: "rail-withdrawn",
+    text: "A released document no longer valid is withdrawn with why: everyone sent a revision of it is told to stop using it. Reinstated, with why, they are told it counts again.",
+    who: [{ title: "Withdrawing or reinstating it", by: "The control function, or whoever registered it" }],
+    extras: ["distribution"],
+  },
+  {
+    key: "archived", title: "Archived", tagline: "With its project", rail: "rail-archived",
+    text: "Documents are never archived one by one: they are archived with their project, read only, and come back when it is reopened.",
+    who: [{ title: "Archiving or reopening the project, with why", by: "An administrator, on the organization's Projects" }],
+    extras: ["project", "form:PROJECT"],
   },
 
   // ── Packages we deliver ─────────────────────────────────────────────────────
   {
     key: "pkg-made", title: "Put together", tagline: "Its documents gathered", rail: "rail-prep",
     text: "The package is opened with the statuses it is needed at, and its documents are added.",
-    who: [{ title: "Adding and taking out documents", by: "Those putting it together" }, { title: "Everything else on it", by: "The control function" }],
+    who: [{ title: "Adding and taking out documents", by: "Those putting it together" }, { title: "Everything else on it", by: "The control function (with none, those putting it together)" }],
     extras: ["packages", "form:PACKAGE"],
   },
   {
     key: "pkg-checked", title: "Checked", tagline: "Ready or not, each one", rail: "rail-check",
     text: "Each document is read against the status it is needed at; what is not ready is the shortfall.",
-    who: ["CONTROL_PEOPLE", { title: "Checking it", by: "The control function" }],
+    who: ["CONTROL_PEOPLE", { title: "Checking it", by: "The control function (with none, those putting it together)" }],
     sets: ["STATUSES"],
   },
   {
     key: "pkg-short", title: "Going without", tagline: "What is missing is asked", rail: "rail-shortfall",
     text: "Whoever accepts the package is asked whether it may go without what is missing; agreeing delivers it at once.",
-    who: [{ title: "Asking", by: "The control function, on a transmittal" }, { title: "Agreeing", by: "Whoever accepts the package" }],
+    who: [{ title: "Asking", by: "The control function (with none, those putting it together), on a transmittal" }, { title: "Agreeing", by: "Whoever accepts the package" }],
   },
   {
     key: "pkg-delivered", title: "Delivered", tagline: "Sent, then fixed", rail: "rail-delivered",
     text: "One transmittal per organization carries its documents; what the package holds is then fixed.",
-    who: [{ title: "Delivering it", by: "The control function" }],
+    who: [{ title: "Delivering it", by: "The control function (with none, those putting it together)" }],
     sets: ["REASONS_FOR_ISSUE"],
     extras: ["distribution"],
   },
@@ -265,11 +322,13 @@ const STAGES: Stage[] = [
     key: "act-ahead", title: "Went ahead", tagline: "On its day", rail: "rail-done",
     text: "The day passes: the action went ahead with its documents, or without some, written down with why.",
     who: ["ACTION_NOTE"],
+    sets: ["ACTIVITY_DECISIONS"],
   },
   {
     key: "act-postponed", title: "Postponed", tagline: "Will not go ahead", rail: "rail-withdrawn",
     text: "Recorded with who decided and why; whoever plans confirms it, and a new schedule revision follows.",
     who: [{ title: "Recording it", by: "Anyone concerned" }, { title: "Confirming it", by: "Whoever plans" }],
+    sets: ["ACTIVITY_DECISIONS"],
   },
 
   // ── Someone joins the project ───────────────────────────────────────────────
@@ -294,6 +353,7 @@ const STAGES: Stage[] = [
     key: "join-on", title: "On the project", tagline: "Told, and in", rail: "rail-done",
     text: "They are put on by themselves and told by notification and email; a new account gets its link to choose a password.",
     who: [{ title: "Telling them", by: "The app, by itself" }],
+    answers: ["TRACKING"],
     extras: ["people", "functions"],
   },
 ];
@@ -374,7 +434,7 @@ function flowsFor({ gate, returner, together, unreviewed, role }: { gate: boolea
   };
   // The flows that matter most for our role come first, in its words; the others follow.
   const lead = work.order.filter((key) => all.some((f) => f.key === key));
-  const rest = ["produce", "receive", "supplier", "deliver", "action", "join"].filter((key) => !lead.includes(key));
+  const rest = ["produce", "receive", "supplier", "deliver", "action", "join", "keep"].filter((key) => !lead.includes(key));
   return [...lead, ...rest].map(flow);
 }
 
@@ -434,12 +494,14 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
     {
       key: "client", tab: `${cap(work.client ?? "our client")} asks`, title: `Documents ${work.client ?? "our client"} asks of us`, from: `${cap(work.client ?? "our client")} asks for it`, to: `accepted by ${work.client ?? "our client"}, or back with us for the next revision`,
       columns: [
-        [{ scene: "client-asked" }],
-        [{ scene: "register" }],
+        // Two ways it is asked: their placeholder, filled on their own DELIOS, or asked outside it and recorded here.
+        [{ scene: "client-placeholder", optional: "they work on DELIOS" }, { scene: "client-asked", optional: "they are not on DELIOS" }],
+        [{ scene: "register", tagline: "Here, when it was asked here", optional: "they are not on DELIOS" }],
         [{ scene: "prepare" }],
-        [{ scene: "review", tagline: `Ours, then ${work.client ?? "our client"}'s step on the route` }],
+        [{ scene: "review", tagline: "Ours, before it goes", optional: "we review before sending" }],
+        [{ scene: "client-sent" }],
+        [{ scene: "client-check", optional: "they work on DELIOS" }],
         [{ scene: "accepted", tagline: `${cap(work.client ?? "our client")} accepts it` }, { scene: "returned", end: true, tagline: `${cap(work.client ?? "our client")} returns it` }],
-        ...out,
       ],
     },
     {
@@ -469,6 +531,15 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
         [{ scene: "join-on" }],
       ],
     },
+    {
+      key: "keep", tab: "Keeping & ending", title: "A document kept, and ended", from: "In the register", to: "kept as long as it must be, or ended with why",
+      columns: [
+        // Ended at any time while kept: withdrawn once released, cancelled before.
+        [{ scene: "kept" }, { scene: "withdrawn", end: true, optional: "it was released and is no longer valid" }, { scene: "cancelled", end: true, optional: "it will never be produced" }],
+        [{ scene: "held", optional: "a legal reason calls for it" }],
+        [{ scene: "archived", optional: "the project is archived" }],
+      ],
+    },
   ];
 }
 
@@ -483,11 +554,17 @@ const EXTRA: Record<Extra, { title: string; href: string }> = {
   schedule: { title: "Schedule", href: "/schedule" },
   people: { title: "People & access", href: "/settings/users" },
   functions: { title: "Functions & permissions", href: "/settings/functions" },
+  assets: { title: "Assets & tags", href: "/assets" },
+  checks: { title: "The checks switched off", href: "/conformance/checks?result=OFF" },
+  project: { title: "This project", href: "/settings/projects" },
   "form:DOCUMENT": { title: "The document form", href: "/settings/fields?form=DOCUMENT" },
   "form:REVISION": { title: "The revision form", href: "/settings/fields?form=REVISION" },
   "form:REVIEW": { title: "The review form", href: "/settings/fields?form=REVIEW" },
   "form:TRANSMITTAL": { title: "The transmittal form", href: "/settings/fields?form=TRANSMITTAL" },
   "form:PACKAGE": { title: "The package form", href: "/settings/fields?form=PACKAGE" },
+  "form:ASSET": { title: "The tag form", href: "/settings/fields?form=ASSET" },
+  "form:PARTY": { title: "The organization form", href: "/settings/fields?form=PARTY" },
+  "form:PROJECT": { title: "The project form", href: "/settings/fields?form=PROJECT" },
 };
 
 /** Where every answer of how the project works is changed. */
@@ -505,7 +582,7 @@ export default async function ControlRoomPage() {
     return !card || maySetup(me, card);
   };
 
-  const [settings, holders, sets, values, templates, schemes, functions, parties, answers, schedule, directory, switches, verdictSets] = await Promise.all([
+  const [settings, holders, sets, values, templates, schemes, functions, parties, answers, schedule, directory, switches, verdictSets, organization, checksOff] = await Promise.all([
     controlSettings(ctx),
     holdersOf(ctx, "CONTROL"),
     getSets().then((all) => all.map((one) => ({ key: one.key, title: one.title }))),
@@ -521,6 +598,9 @@ export default async function ControlRoomPage() {
     api<{ people: unknown[] }>(projectPath(ctx, "/people/directory")).catch(() => null),
     liberty(),
     api<{ key: string; title: string; verdicts: { code: string; status: string }[] }[]>("/api/admin/verdict-lists").catch(() => null),
+    // What is kept about people's activity is the organization's (What is kept), read here only.
+    orgSettings().catch(() => null),
+    optOutsOf(ctx.projectId).then((all) => all.length).catch(() => null),
   ]);
   const stateNames_ = await stateNames(ctx);
 
@@ -582,6 +662,16 @@ export default async function ControlRoomPage() {
         <Choice key={`verdicts:${route.id}`} title={`The route "${route.name}" decides with`} options={options} value={route.outcomeSetKey ?? ""}
           action={setRouteVerdictsAction} hidden={{ id: route.id }} readOnly={readOnly} />
       ));
+    }
+    if (key === "TRACKING") {
+      // The organization's choice for every project; changed on its Settings by an administrator.
+      const where = isAdmin(me) ? "/organization/settings/tracking" : undefined;
+      if (!organization) return fact(key, "What is kept about people's activity", "The organization's choice");
+      return [
+        fact("track-acts", "What people do to documents", "Always kept"),
+        fact("track-reading", "Opening a document, downloading a file", organization.get("TRACK_READING") === "OFF" ? "Not kept" : "Kept", where),
+        fact("track-signins", "Sign-ins, on a person's activity", organization.get("TRACK_SIGN_INS") === "ON" ? "Shown" : "Kept for security, not shown", where),
+      ];
     }
     if (key === "CONTROL_PEOPLE") return fact(key, "Who acts as the control function", names.length ? names.join(", ") : "Nobody", `${HOW}#control-people`);
     if (key.startsWith("STATE:")) {
@@ -649,7 +739,11 @@ export default async function ControlRoomPage() {
     people: directory ? `${directory.people.length} people` : "who is on the project",
     functions: functions ? plural(functions.length, "function") : "what each may do",
     "form:DOCUMENT": "what it asks", "form:REVISION": "what it asks", "form:REVIEW": "what it asks",
-    "form:TRANSMITTAL": "what it asks", "form:PACKAGE": "what it asks",
+    "form:TRANSMITTAL": "what it asks", "form:PACKAGE": "what it asks", "form:ASSET": "what it asks",
+    "form:PARTY": "the organization's", "form:PROJECT": "the organization's",
+    assets: "what each tag describes",
+    checks: checksOff === null ? "what is checked every day" : checksOff ? `${checksOff} switched off, with why` : "none switched off",
+    project: "what it is, our role, its dates",
   };
 
   /** A step's panel: what happens, who does it, how it works here, and where it is set up, each answer changed in place. */

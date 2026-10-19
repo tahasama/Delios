@@ -711,7 +711,7 @@ public sealed class PackageService(
     {
         if (!access.Holds(Verbs.Read)) return [];
         // Supplier documents registered before packages were made by themselves join their package now.
-        if (access.IsInternal && access.Holds(Verbs.Control))
+        if (access.IsInternal && (access.Holds(Verbs.Control) || await StandIns.NoControlAsync(db, access.Project.Id, cancellationToken)))
             await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken);
         var rows = await Visible(access)
             .OrderByDescending(p => p.CreatedAt).Take(500)
@@ -866,12 +866,18 @@ public sealed class PackageService(
         var package = await LoadAsync(access, id, cancellationToken);
         if (package is null) return (null, NotFound());
         // Those putting it together add and take out its documents; everything else is the control function's (and above).
-        if (!access.IsInternal || !(access.Holds(Verbs.Control) || (members && package.OwnerIds.Contains(access.UserId))))
+        // With no control function, those putting a delivery together do everything on it, and a supplier's package is
+        // looked after by whoever of ours may send or register documents.
+        var noControl = access.IsInternal && !access.Holds(Verbs.Control) && await StandIns.NoControlAsync(db, access.Project.Id, cancellationToken);
+        var standsIn = noControl && (package.Kind == PackageKinds.Supply
+            ? access.Holds(Verbs.Transmit) || access.Holds(Verbs.Create)
+            : package.OwnerIds.Contains(access.UserId));
+        if (!access.IsInternal || !(access.Holds(Verbs.Control) || standsIn || (members && package.OwnerIds.Contains(access.UserId))))
             return (null, members
                 ? Problems.Forbidden("OWNER_ONLY", "Those putting it together, or the control function, add and take out its documents.")
                 : Problems.Forbidden("CONTROL_ONLY", "The control function looks after a package; those putting it together add and take out its documents."));
         // A supplier's package is the control function's alone.
-        if (package.Kind == PackageKinds.Supply && !access.Holds(Verbs.Control))
+        if (package.Kind == PackageKinds.Supply && !access.Holds(Verbs.Control) && !standsIn)
             return (null, Problems.Forbidden("CONTROL_ONLY", "The control function looks after a supplier's package."));
         if (package.State != PackageStates.Open) return (null, Closed(package));
         return (package, null);

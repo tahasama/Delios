@@ -551,7 +551,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   function, holds CONTROL on the whole project, as if their function carried it (`ProjectAccess.WithControl`, every
   CONTROL holder lookup, `/api/me`). Those whose function carries CONTROL count too. An administrator or whoever acts
   as it names them; each is told. Nobody may be named: the project then has no control function, and the people
-  doing the work carry its acts out themselves (as when the Control room says so).
+  doing the work carry its acts out themselves (as when the Control room says so). **Stand-ins** (owner, one rule,
+  backend `Identity/StandIns.cs`, `/api/me` `noControl`, `standsInForControl`): what arrived (its check, registering
+  what came unplanned, keeping files with it) is whoever the transmittal was for (anyone of ours when it named nobody);
+  what we exchange with other organizations (a supplier's package, asking for its documents, handing them back and
+  forth, replies by email) is anyone of ours who may send or register; a delivery package is those putting it
+  together. Ending a document is already its registrar's too; legal hold an administrator's.
 - People & access, in the reference style: masthead (on the project · waiting · refused, and how joining works here),
   "Someone joins <project>" ("Add someone", "Ask for someone to join"), "Waiting to be confirmed" (with Remind), and
   Everyone (organization and project chips; each person's Change: function, department, name and email unless
@@ -763,10 +768,20 @@ a screen only words it. A new rule goes in the backend, never in a page.
   designer or the client's engineer decides), SUBCONTRACTOR (the main contractor decides). Where ours is not final, the
   flow draws who decides after our review ("<decider> decides"); where someone approves what we send, "<approver>
   approves it" is a step, not optional. "Documents our client asks of us" is drawn for roles with a client (DESIGN,
-  CONTRACTOR, SUBCONTRACTOR, SUPPLIER), in the client's own words. The rest follow (packages, an action, someone joins).
+  CONTRACTOR, SUBCONTRACTOR, SUPPLIER), in the client's own words. The rest follow (packages, an action, someone joins, keeping & ending). "<Client> asks"
+  draws both ways it is asked (owner): their placeholder, filled on their own DELIOS (switched into their project;
+  their check before it counts), or asked outside it and recorded here (registered, released and issued to them on a
+  transmittal following theirs).
+  **Covers everything** (owner: "does it finally cover EVERYTHING?"): every list the app reads is a tile on the step
+  that reads it (control outcomes on the check, activity decisions on an action, generic title words on registering,
+  preservation formats on keeping); "Keeping & ending" draws kept (retention, confidentiality, what is kept about
+  people's activity read only, the checks switched off), legal hold, withdrawn / cancelled (ending under Kept),
+  archived with the project; assets & tags and every form are linked. Left out on purpose: the organization's own
+  (sign-in & security, the audit trail, the switches, defaults for new projects), each person's (pop-ups), families (on hold).
   **The Control room simplifies the work, never adds clicks** (owner, after looking at how flow designers
-  work: a step chosen on the flow opens its properties beside it). Six flows: documents we produce, we receive, a
-  supplier owes us, packages we deliver, an action on the schedule, someone joins the project. The chosen step's
+  work: a step chosen on the flow opens its properties beside it). Its flows: documents we produce, we receive, a
+  supplier owes us, our client asks of us (roles with a client), packages we deliver, an action on the schedule,
+  someone joins the project, keeping & ending. The chosen step's
   panel says what happens (one plain sentence), **Who does it** (fixed acts in words; the project's acts as one
   `Choice` each), **How it works here** (its questions, confirmations, days, the stamps it puts on the PDF, each a `Choice`;
   after a review, Accepted / Returned carry stamping, the verdict's comments and Returned's stamp too; Review carries

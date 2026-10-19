@@ -78,18 +78,6 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
     }
 
     /// <summary>
-    /// Where the project has no control function, the people doing the work check what arrives: whoever the transmittal it
-    /// came on was for, else, when it named nobody of ours, anyone of ours on the project.
-    /// </summary>
-    private async Task<bool> ChecksWithoutControlAsync(ProjectAccess access, Guid revisionId, CancellationToken cancellationToken)
-    {
-        if (!access.IsInternal || (await notifier.ControlHoldersAsync(access.Project.Id, cancellationToken)).Count > 0) return false;
-        var came = db.TransmittalRecipients.Where(t => t.UserId != null
-            && db.TransmittalItems.Any(i => i.RevisionId == revisionId && i.TransmittalId == t.TransmittalId));
-        return !await came.AnyAsync(cancellationToken) || await came.AnyAsync(t => t.UserId == access.UserId, cancellationToken);
-    }
-
-    /// <summary>
     /// The check on arrival: a revision another organization sent in is accepted
     /// before anybody reviews it, or returned to them to correct and send again
     /// under the same revision.
@@ -102,7 +90,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
         var document = revision is null ? null : await DocumentQueries.Visible(db, access, restricted)
             .SingleOrDefaultAsync(d => d.Id == revision.DocumentId, cancellationToken);
         if (revision is null || document is null) return (null, Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
-        if (!access.Allows(Verbs.Control, document.Facts) && !await ChecksWithoutControlAsync(access, revision.Id, cancellationToken))
+        if (!access.Allows(Verbs.Control, document.Facts) && !await StandIns.ArrivedRevisionAsync(db, access, revision.Id, cancellationToken))
             return (null, Problems.Forbidden("CONTROL_ONLY", "Accepting what arrives is the control function's act."));
         if (revision.State != RevisionStates.Received)
         {
@@ -184,7 +172,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
         var control = access.Holds(Verbs.Control);
         var party = access.IsInternal ? null : access.PartyCode;
         // No control function: what arrives waits on whoever it was for (anyone of ours when it named nobody).
-        var standIn = !control && access.IsInternal && (await notifier.ControlHoldersAsync(projectId, cancellationToken)).Count == 0;
+        var standIn = !control && access.IsInternal && await StandIns.NoControlAsync(db, projectId, cancellationToken);
         // The verdicts that release a revision with comments for the next one ("accepted with comments"), by meaning.
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var verdictSets = await db.Reviews.Where(v => v.ProjectId == projectId).Select(v => v.VerdictSet).Distinct().ToListAsync(cancellationToken);

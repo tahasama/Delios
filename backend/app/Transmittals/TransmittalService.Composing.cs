@@ -174,7 +174,8 @@ public sealed partial class TransmittalService
                 .Where(d => placeholderIds.Contains(d.Id)).OrderBy(d => d.Number).ToListAsync(cancellationToken);
             if (asked.Count != placeholderIds.Count)
                 return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "A document chosen does not exist or is not yours to see."));
-            if (asked.FirstOrDefault(d => !access.Allows(Verbs.Control, d.Facts)) is { } notControl)
+            var standsIn = await StandIns.ExchangesAsync(db, access, cancellationToken);
+            if (!standsIn && asked.FirstOrDefault(d => !access.Allows(Verbs.Control, d.Facts)) is { } notControl)
                 return Fail(Problems.Forbidden("CONTROL_ONLY", $"The control function asks a supplier for {notControl.Number}."));
             var owners = asked.Select(d => d.Originator).Distinct().ToList();
             var owner = owners.Count == 1 && owners[0] is { } code

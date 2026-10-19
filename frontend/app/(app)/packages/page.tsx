@@ -7,7 +7,7 @@ import { formPolicy } from "@/lib/settings/field-policy";
 import { createPackageAction } from "@/lib/packages/forms";
 import { createSupplierPackageAction } from "@/lib/packages/forms-supplier";
 import { supplierRows, packageCounts, packageStage } from "@/lib/packages/supplier";
-import { isController, isAdmin } from "@/lib/core/auth";
+import { isController, isAdmin, standsInForControl } from "@/lib/core/auth";
 import { getActiveSet } from "@/lib/settings/config";
 import { fmtDate } from "@/lib/core/utils";
 import { Download } from "lucide-react";
@@ -24,7 +24,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   const ctx = await requireScope();
   const packagePolicy = await formPolicy(ctx, "PACKAGE");
   const { user } = ctx;
-  const staff = isController(user) || isAdmin(user);
+  const staff = isController(user) || isAdmin(user) || standsInForControl(user);
   // A supplier only ever sees its own package.
   const supplierOnly = !user.isInternal;
   const sp = await searchParams;

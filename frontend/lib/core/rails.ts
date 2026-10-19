@@ -11,6 +11,9 @@ export const RAILS = [
     { rail: "rail-released", name: "Released" },
     { rail: "rail-superseded", name: "Superseded by a newer revision" },
     { rail: "rail-void", name: "Void" },
+    { rail: "rail-held", name: "On legal hold" },
+    { rail: "rail-withdrawn", name: "Cancelled or withdrawn" },
+    { rail: "rail-archived", name: "Archived with its project" },
   ] },
   { area: "Reviews", items: [
     { rail: "rail-review", name: "Open, in time" },

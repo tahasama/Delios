@@ -118,7 +118,7 @@ export const getScope = cache(async (): Promise<Scope | null> => {
   const role = actor.role as Role;
   const held = [...new Set(actor.rules.filter((r) => r.projectRole === null || r.projectRole === chosen.contractRole).flatMap((r) => r.verbs))];
   return {
-    user: { ...user, role, verbs: held, functionName: actor.functionName, department: chosen.department ?? null },
+    user: { ...user, role, verbs: held, functionName: actor.functionName, department: chosen.department ?? null, noControl: !!chosen.noControl },
     orgId: me.tenant.slug,
     projectId: chosen.id,
     project: summary(chosen),

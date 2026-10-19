@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
-import { isController, isAdmin } from "@/lib/core/auth";
+import { isController, isAdmin, standsInForControl } from "@/lib/core/auth";
 import { Card, Chip, Banner } from "@/components/ui";
 import { TONE } from "@/lib/core/tones";
 import { ActionForm } from "@/components/form";
@@ -235,7 +235,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                           <Link href={`/documents/${registered.documentId}`} className="text-[11px] text-slate-500 hover:text-link">
                             in the register as <span className="font-mono font-semibold">{registered.number}</span> rev {registered.revision}
                           </Link>
-                        ) : controller ? (
+                        ) : (controller || page.mayCheck) ? (
                           <Link href={`/documents/new?received=1&fromFile=${file.id}`} className="text-[11px] font-semibold text-link hover:underline">Make it a document &rarr;</Link>
                         ) : null}
                       </li>
@@ -245,7 +245,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
               ) : (
                 <p className="px-5 py-3 text-xs text-slate-400 sm:px-6">Nothing kept with it yet.</p>
               )}
-              {controller ? (
+              {(controller || page.mayCheck) ? (
                 <ActionForm action={attachTransmittalFilesAction} hideSubmit hidden={{ transmittalId: t.id }} className="space-y-0">
                   <div className="asking flex flex-wrap items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
                     <label className="min-w-0 flex-1">
@@ -432,7 +432,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
           ) : null}
 
           {/* Replies by email from an organization not on DELIOS: the control function records or sets each aside. */}
-          {controller ? <EmailReplies replies={await emailReplies(ctx, t.id)} transmittalId={t.id} /> : null}
+          {(controller || standsInForControl(user)) ? <EmailReplies replies={await emailReplies(ctx, t.id)} transmittalId={t.id} /> : null}
 
           {/* What came back. Each answer is correspondence in its own right, so
               this says what they are and where they are, and does not try to
@@ -538,7 +538,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
             </section>
           ) : null}
 
-          {incoming && status === "ACCEPTED" && controller && readyToRoute.length ? (
+          {incoming && status === "ACCEPTED" && (controller || page.mayCheck) && readyToRoute.length ? (
             <section className="register register-sheet register-sheet-open">
               <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
                 <span className="stencil mr-1 text-slate-400">Send for review</span>

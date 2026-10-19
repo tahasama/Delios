@@ -380,9 +380,13 @@ public static class IdentityEndpoints
                 m.ActsAsControl,
             })
             .ToListAsync(cancellationToken);
+        // A project with nobody acting as the control function: the people doing the work stand in (StandIns).
+        var noControl = new HashSet<Guid>();
+        foreach (var one in projects) if (await StandIns.NoControlAsync(db, one.Id, cancellationToken)) noControl.Add(one.Id);
         // Named on a project to act as the control function: CONTROL on every document of it, as the backend reads it.
         var shown = projects.Select(p => new
         {
+            NoControl = noControl.Contains(p.Id),
             p.Id, p.Code, p.Name, p.TimeZone, p.ContractRole, p.Kind, p.Status, p.Department, p.Function,
             Verbs = p.ActsAsControl && !p.Verbs.Contains(Verbs.Control) ? [.. p.Verbs, Verbs.Control] : p.Verbs,
             Rules = p.ActsAsControl

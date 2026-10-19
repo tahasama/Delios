@@ -280,6 +280,8 @@ summary::-webkit-details-marker {
   .rail-rejected { --rail: var(--color-red-600); }
   .rail-returned { --rail: var(--color-orange-500); }
   .rail-withdrawn { --rail: var(--color-stone-400); }
+  .rail-held { --rail: var(--color-slate-600); }
+  .rail-archived { --rail: var(--color-stone-600); }
   .rail-overdue { --rail: var(--color-red-400); }
   .rail-risk { --rail: var(--color-amber-500); }
   .rail-late { --rail: var(--color-fuchsia-400); }

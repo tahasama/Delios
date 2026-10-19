@@ -59,6 +59,8 @@ export type SessionUser = {
   functionName?: string | null;
   /** The department this person answers for on the current project. */
   department?: string | null;
+  /** The current project has no control function: the people doing the work carry its acts out (backend StandIns). */
+  noControl?: boolean;
 };
 
 const ORG_VERBS = ["PLAN", "ROUTES", "MATRIX"];
@@ -95,6 +97,15 @@ export async function requireUser(): Promise<SessionUser> {
 }
 
 /** The control function: Control, or Configure. */
+/**
+ * Whether this person stands in for the control function on the current project, for what we exchange with other
+ * organizations (a supplier's package, asking for its documents): one of ours who may send or register, on a project
+ * with no control function. The backend asks the same (StandIns.ExchangesAsync).
+ */
+export function standsInForControl(user: SessionUser | null | undefined): boolean {
+  return !!user?.noControl && user.isInternal && (hasVerb(user, "TRANSMIT") || hasVerb(user, "CREATE"));
+}
+
 export function isController(user: SessionUser | null): boolean {
   // Configuring a project is not working in it. An administrator sets the app
   // up and leaves; whether anybody stands between the work and the record is

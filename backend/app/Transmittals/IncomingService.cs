@@ -277,7 +277,7 @@ public sealed class IncomingService(
     public async Task<(Transmittal? Transmittal, IResult? Problem)> RegisterAsync(
         ProjectAccess access, Guid transmittalId, Guid itemId, RegisterDocumentRequest request, CancellationToken cancellationToken)
     {
-        if (!access.IsInternal || !access.Holds(Verbs.Control))
+        if (!access.IsInternal || !(access.Holds(Verbs.Control) || await StandIns.ArrivalAsync(db, access, transmittalId, cancellationToken)))
             return (null, Problems.Forbidden("CONTROL_ONLY", "The control function decides what goes into the register."));
         var transmittal = await transmittals.Visible(access).Include(t => t.Items).Include(t => t.Recipients).AsSplitQuery()
             .SingleOrDefaultAsync(t => t.Id == transmittalId, cancellationToken);
@@ -422,7 +422,8 @@ public sealed class IncomingService(
     public async Task<(Transmittal? Transmittal, IResult? Problem)> AttachAsync(
         ProjectAccess access, Guid transmittalId, AttachFilesRequest request, CancellationToken cancellationToken)
     {
-        if (!access.Holds(Verbs.Control)) return (null, Problems.Forbidden("CONTROL_ONLY", "The control function keeps what arrived."));
+        if (!access.Holds(Verbs.Control) && !await StandIns.ArrivalAsync(db, access, transmittalId, cancellationToken))
+            return (null, Problems.Forbidden("CONTROL_ONLY", "The control function keeps what arrived."));
         var transmittal = await db.Transmittals.Include(t => t.Items).Include(t => t.Recipients).AsSplitQuery()
             .SingleOrDefaultAsync(t => t.Id == transmittalId && t.ProjectId == access.Project.Id, cancellationToken);
         if (transmittal is null) return (null, Problems.NotFound("TRANSMITTAL_NOT_FOUND", "No such transmittal."));

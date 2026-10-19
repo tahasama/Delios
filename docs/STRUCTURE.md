@@ -44,7 +44,7 @@ backend/
 │   ├── Checks/           conformance checks
 │   ├── Reports/          reports
 │   ├── Search/           full-text search
-│   ├── Identity/         people, sign-in, functions, organizations, who may do what
+│   ├── Identity/         people, sign-in, functions, organizations, who may do what (StandIns.cs: who acts where there is no control function)
 │   ├── Organizations/    organizations working together: links, linked accounts, switching; Registry (what is
 │   │                     unique across DELIOS: codes, names, identifiers, contract numbers; changed once;
 │   │                     look-alikes, claims, merges), RegistryEndpoints (on DELIOS, our identity and domain,
