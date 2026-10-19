@@ -131,14 +131,16 @@ public sealed partial class IncomingService
         if (intake.Mode != Intake.AsReceived) return (null, null);
         foreach (var item in items)
         {
+            // Nothing is asked of what is sent (owner): a file attached from outside has no number; whoever checks
+            // returns what came without what it needs. Only what was given is checked here.
             var number = item.Reference?.Trim() ?? "";
             var value = item.Revision?.Trim() ?? "";
-            if (number.Length == 0) return (null, Problems.Invalid("NUMBER_REQUIRED", "Each document goes with its number.", new { field = "reference" }));
-            if (value.Length == 0) return (null, Problems.Invalid("REVISION_REQUIRED", $"{number}: say which revision it is.", new { field = "revision" }));
+            if (number.Length == 0) continue;
             if (number.Length > 200 || value.Length > 32) return (null, Problems.Invalid("TOO_LONG", $"{number}: its number or revision is too long."));
             var documentId = await AsReceivedDocumentAsync(access.Project.Id, party, number, cancellationToken);
             if (documentId is null && await db.Documents.AnyAsync(d => d.ProjectId == access.Project.Id && d.Number == number, cancellationToken))
                 return (null, Problems.Conflict("NUMBER_TAKEN", $"{number} is already a number of another document in the register: send it under its own number."));
+            if (value.Length == 0) continue;
             if (documentId is { } id && await db.Revisions.AnyAsync(r => r.DocumentId == id && r.Value == value && r.State != RevisionStates.Correcting, cancellationToken))
                 return (null, Problems.Conflict("REVISION_EXISTS", $"{number} rev {value} is in the register already: send the next revision."));
             if (documentId is { } busyId && await db.Revisions.AnyAsync(r => r.DocumentId == busyId && r.Value != value
@@ -207,6 +209,10 @@ public sealed partial class IncomingService
             .ToListAsync(cancellationToken);
         if (files.Any(f => f.Status != FileStatuses.Clean))
             return (null, Problems.Conflict("FILES_NOT_READY", "Its files are not all scanned and clean."));
+        // What came without their number or revision cannot go into the register as it came: it is returned, saying so.
+        if (waiting.FirstOrDefault(i => string.IsNullOrWhiteSpace(i.DocumentNumber) || string.IsNullOrWhiteSpace(i.RevisionValue)) is { } bare)
+            return (null, Problems.Conflict("CAME_WITHOUT_NUMBER",
+                $"{bare.Title} came without its number or revision: return it, saying what is missing."));
         foreach (var item in waiting)
         {
             var problem = await TakeAsReceivedAsync(access, transmittal, intake, package, party, item,

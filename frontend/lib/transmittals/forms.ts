@@ -89,12 +89,9 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
       // Each file that came is something unplanned, waiting for Document
       // Control to register it under our numbering.
       const unplanned = [];
-      for (const [i, file] of attachments.entries()) {
-        const text = (key: string) => String(formData.get(`${key}_${i}`) ?? "").trim() || null;
-        const reference = text("ref");
-        if (!reference) return { error: `Say the number ${file.name} goes by with them.` };
+      for (const file of attachments) {
         const fileId = await upload(ctx, { loose: true }, file);
-        unplanned.push({ title: file.name.replace(/\.[^.]+$/, ""), reference, revision: text("rev"), status: text("status"), outcome: text("outcome"), fileIds: [fileId] });
+        unplanned.push({ title: file.name.replace(/\.[^.]+$/, ""), fileIds: [fileId] });
       }
       const t = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
         body: {

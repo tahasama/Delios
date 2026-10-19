@@ -39,7 +39,7 @@ function Ask({ label, hint, required, children, className }: { label: string; hi
  * it is comes with the file.
  */
 export function NewDocumentForm({
-  received, start, fromFile, numberingSets, deliverableTypes, docTypes: docTypesAll, disciplines: disciplinesAll, currentProject,
+  received, start, fromFile, fromItem, numberingSets, deliverableTypes, docTypes: docTypesAll, disciplines: disciplinesAll, currentProject,
   subprojects: subprojectsAll, phases: phasesAll, suppliers, pos: posAll, poOwners, usualCriticality, criticalities: criticalitiesAll,
   confidentialities: confidentialitiesAll, retentionClasses: retentionClassesAll, defaultConfidentiality, fields, ownFields, labels, serving,
 }: {
@@ -50,6 +50,13 @@ export function NewDocumentForm({
   start?: { docType: string; title: string };
   /** A file that came with a received transmittal, used instead of an upload. */
   fromFile?: { id: string; name: string; transmittal: string | null };
+  /**
+   * What came unplanned on a received transmittal, made a document of ours ("None of ours? Make it a document"): what is
+   * known of it filled in (who it comes from, its deliverable type, type, title, order); the files that came are its
+   * first revision, and their number stays beside ours.
+   */
+  fromItem?: { transmittalId: string; itemId: string; transmittal: string; files: string[]; theirNumber: string | null;
+    producer: string; originator: string; contractRef: string | null; docType: string; title: string };
   numberingSets: Record<string, string[]>;
   /** The project being worked in. A document is registered here, so it is not a choice. */
   currentProject: { code: string; name: string };
@@ -67,7 +74,7 @@ export function NewDocumentForm({
   labels: Record<string, string>;
 }) {
   const [step, setStep] = useState(1);
-  const [producer, setProducer] = useState(received ? "VND" : start ? "ENG" : "");
+  const [producer, setProducer] = useState(fromItem?.producer ?? (received ? "VND" : start ? "ENG" : ""));
   // Each list offers the set serving the chosen deliverable type (Types & sets); the backend refuses any other.
   const docTypes = forType(serving, "DOCUMENT_TYPES", producer, docTypesAll);
   const disciplines = forType(serving, "DISCIPLINES", producer, disciplinesAll);
@@ -77,13 +84,13 @@ export function NewDocumentForm({
   const criticalities = forType(serving, "CRITICALITY", producer, criticalitiesAll);
   const confidentialities = forType(serving, "CONFIDENTIALITY", producer, confidentialitiesAll);
   const retentionClasses = forType(serving, "RETENTION_CLASSES", producer, retentionClassesAll);
-  const [receivedFile, setHasFile] = useState(!!fromFile);
+  const [receivedFile, setHasFile] = useState(!!fromFile || !!fromItem);
   const [pdf, setPdf] = useState(false);
   const [native, setNative] = useState(false);
   const hasFile = receivedFile || pdf || native;
-  const [docType, setDocType] = useState(start?.docType ?? "");
+  const [docType, setDocType] = useState(fromItem?.docType ?? start?.docType ?? "");
   const [discipline, setDiscipline] = useState("");
-  const [title, setTitle] = useState(start?.title ?? "");
+  const [title, setTitle] = useState(fromItem?.title ?? start?.title ?? "");
   const [criticality, setCriticality] = useState("");
   const [confidentiality, setConfidentiality] = useState(defaultConfidentiality ?? "");
   // The register refuses a title that only repeats the type, so the form says so first.
@@ -100,7 +107,7 @@ export function NewDocumentForm({
   // From another organization: the deliverable type says it insists on who it comes from (Settings, on the type).
   const producerRequires = deliverableTypes.find((o) => o.code === producer)?.required ?? [];
   const external = producerRequires.includes("originator");
-  const [originator, setOriginator] = useState("");
+  const [originator, setOriginator] = useState(fromItem?.originator ?? "");
   // Who may see it starts at the lowest level for a document another organization shares with us, unless chosen.
   const [ownLevel, setOwnLevel] = useState(false);
   const shownLevel = ownLevel || !external ? confidentiality : confidentialities[0]?.code ?? confidentiality;
@@ -165,7 +172,14 @@ export function NewDocumentForm({
         </nav>
       )}
 
-      <ActionForm action={createDocumentAction} submitLabel="Create" hideSubmit className="space-y-4">
+      <ActionForm action={createDocumentAction} submitLabel="Create" hideSubmit className="space-y-4"
+        hidden={fromItem ? { fromTransmittal: fromItem.transmittalId, fromItem: fromItem.itemId } : undefined}>
+        {fromItem ? (
+          <p className="rounded-md bg-tint-soft px-4 py-3 text-xs leading-5 text-slate-700 ring-1 ring-line">
+            <span className="font-semibold text-slate-900">Came on {fromItem.transmittal}{fromItem.theirNumber ? `, as their ${fromItem.theirNumber}` : ""}.</span>{" "}
+            What is known of it is filled in. It gets our number; {fromItem.files.length ? `${fromItem.files.length === 1 ? "the file that came" : `the ${fromItem.files.length} files that came`} (${fromItem.files.join(", ")}) ${fromItem.files.length === 1 ? "becomes" : "become"} its first revision` : "what came becomes its first revision"}{fromItem.theirNumber ? ", and their number stays beside ours" : ""}.
+          </p>
+        ) : null}
         {/* ── 1 · What it is ──────────────────────────────────────────────── */}
         <section className={cn("register register-sheet register-sheet-open", !received && step !== 1 && "hidden")}>
           {band(1, received ? "what arrived, who sent it, and whose work it is" : "whether it is revised, who produces it, and whose work it is")}
@@ -206,7 +220,7 @@ export function NewDocumentForm({
                 single
                 name="docType"
                 browse
-                initial={start ? [start.docType] : undefined}
+                initial={fromItem?.docType ? [fromItem.docType] : start ? [start.docType] : undefined}
                 items={typesForProducer.map((o) => ({ id: o.code, name: o.label, detail: o.code }))}
                 label="Type"
                 required
@@ -275,7 +289,7 @@ export function NewDocumentForm({
                 {criticalities.map((o) => <option key={o.code} value={o.code}>{o.label}{o.code === recommended?.code ? " (recommended)" : ""}</option>)}
               </select>
             </Ask>
-            {received || !asks("file") ? <div aria-hidden className="hidden xl:block" /> : (
+            {received || fromItem || !asks("file") ? <div aria-hidden className="hidden xl:block" /> : (
               <Ask label="PDF" required={must("file")} hint={must("file") ? "this project registers nothing without its file — the PDF or the native file" : "optional — what people will read; needed before it is sent"}>
                 <input type="file" name="renditionFile" accept=".pdf" className="w-full" onChange={(e) => setPdf(!!e.target.files?.length)} />
               </Ask>
@@ -333,7 +347,7 @@ export function NewDocumentForm({
                 </select>
               </Ask>
             ) : <div aria-hidden className="hidden xl:block" />}
-            {received || !asks("file") ? <div aria-hidden className="hidden xl:block" /> : (
+            {received || fromItem || !asks("file") ? <div aria-hidden className="hidden xl:block" /> : (
               <Ask label="Native file" hint="optional — the editable original (.docx, .dwg, .xlsx…)">
                 <input type="file" name="nativeFile" className="w-full" onChange={(e) => setNative(!!e.target.files?.length)} />
               </Ask>
@@ -349,7 +363,7 @@ export function NewDocumentForm({
                 </Ask>
                 {asks("contractRef") || needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef") ? (
                   <Ask label={labels["contractRef"]} required={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))}>
-                    <select name="contractRef" required={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))} className={field} defaultValue="">
+                    <select name="contractRef" required={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))} className={field} defaultValue={fromItem?.contractRef ?? ""}>
                       <option value="" disabled={must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef"))}>{must("contractRef", needs("PURCHASE_ORDERS") || producerRequires.includes("contractRef")) ? "Choose…" : "—"}</option>
                       {/* Only the chosen organization's orders (or one tied to nobody); the backend refuses another's. */}
                       {pos.filter((o) => !poOwners[o.code] || !originator || poOwners[o.code] === originator).map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}

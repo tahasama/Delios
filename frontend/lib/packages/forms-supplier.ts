@@ -101,7 +101,8 @@ export async function sendAsReceivedAction(_prev: { error?: string; ok?: string 
   if (!supplierMayUpload(user)) return { error: "Your access here is read-only. Ask the control function for the right to upload." };
   const text = (key: string) => String(formData.get(key) ?? "").trim();
   const number = text("reference"), title = text("title"), revision = text("revision");
-  const missing = [!number && "your number", !title && "its title", !revision && "its revision"].filter(Boolean);
+  // Only the file is needed to send: what it says of itself is theirs to give; whoever checks it returns what lacks it.
+  const missing = [!title && "its title"].filter(Boolean);
   const files = formData.getAll("files").filter((one): one is File => one instanceof File && one.size > 0);
   if (!files.length) missing.push("its file");
   if (missing.length) return { error: `Missing: ${missing.join(", ")}.` };
@@ -109,13 +110,13 @@ export async function sendAsReceivedAction(_prev: { error?: string; ok?: string 
     const fileIds = await Promise.all(files.map((file) => upload(ctx, { loose: true }, file)));
     const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
       body: {
-        reason: pkg.reason, subject: `${pkg.number}: ${number} rev ${revision}`, packageId: pkg.id,
-        unplanned: [{ title, reference: number, revision, status: text("status") || null, outcome: text("outcome") || null, fileIds }],
+        reason: pkg.reason, subject: `${pkg.number}: ${[number, revision && `rev ${revision}`].filter(Boolean).join(" ") || title}`, packageId: pkg.id,
+        unplanned: [{ title, reference: number || null, revision: revision || null, status: text("status") || null, outcome: text("outcome") || null, fileIds }],
       },
       idempotencyKey: randomUUID(),
     });
     revalidatePath(`/packages/${pkg.number}`);
-    return { ok: `${number} rev ${revision} sent on ${sent.number}. It is checked, then in the register as you sent it.` };
+    return { ok: `Sent on ${sent.number}. It is checked, then in the register as you sent it.` };
   } catch (e) {
     return { error: refusal(e).message };
   }

@@ -73,7 +73,7 @@ export function UnplannedItems({ transmittalId, items, page, from, mayAct }: {
                     <button className="ask">Match</button>
                     {page.matchedBefore?.[item.id] ? <span className="text-[11px] text-slate-500">matched to it before</span> : null}
                     {item.files[0] ? (
-                      <Link href={`/documents/new?received=1&fromFile=${item.files[0].id}`} className="ml-auto text-[11px] font-semibold text-link hover:underline">
+                      <Link href={`/documents/new?item=${transmittalId}:${item.id}`} className="ml-auto text-[11px] font-semibold text-link hover:underline">
                         None of ours? Make it a document &rarr;
                       </Link>
                     ) : null}

@@ -1,4 +1,5 @@
-import { packagesOf } from "@/lib/packages/api";
+import { packagesOf, packageView } from "@/lib/packages/api";
+import { backendTransmittal } from "@/lib/transmittals/api";
 import { fieldRules, fieldLabels, ownFields } from "@/lib/settings/field-policy";
 import { getActiveSet } from "@/lib/settings/config";
 import { servingOf } from "@/lib/settings/serving-api";
@@ -12,7 +13,7 @@ import { api } from "@/lib/client";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Create document" };
 
-export default async function NewDocumentPage({ searchParams }: { searchParams: Promise<{ received?: string; fromFile?: string; docType?: string; title?: string }> }) {
+export default async function NewDocumentPage({ searchParams }: { searchParams: Promise<{ received?: string; fromFile?: string; docType?: string; title?: string; item?: string }> }) {
   const ctx = await requireScope();
   const { user, project } = ctx;
   const sp = await searchParams;
@@ -88,13 +89,29 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     // The retention period a criticality level brings, when none is chosen.
     retention: typeof r.props?.retention === "string" ? r.props.retention : null,
   }));
+  // What came unplanned on a received transmittal, made a document of ours: what is known of it, filled in.
+  const fromItem = await (async () => {
+    const [transmittalId, itemId] = (sp.item ?? "").split(":");
+    if (!transmittalId || !itemId) return undefined;
+    const t = await backendTransmittal(ctx, transmittalId);
+    const item = t?.items.find((one) => one.id === itemId);
+    if (!t || !item) return undefined;
+    const party = suppliers.find((one) => one.label === t.from || one.code === t.from);
+    const pkg = t.packageId ? await packageView(ctx, t.packageId).catch(() => null) : null;
+    // The deliverable type of a document from another organization: one that requires its originator.
+    const producer = deliverableTypes.find((one) => Array.isArray(one.props.required) && (one.props.required as unknown[]).includes("originator"))?.code ?? "";
+    return {
+      transmittalId, itemId, transmittal: t.number, files: item.files.map((f) => f.name), theirNumber: item.documentNumber || null,
+      producer, originator: party?.code ?? "", contractRef: pkg?.purchaseOrder ?? null, docType: item.docType ?? "", title: item.title,
+    };
+  })();
   const byName = (rows: { code: string; label: string; props?: Record<string, unknown>; setId?: string | null }[]) => toOpt(rows).sort((x, y) => x.label.localeCompare(y.label));
 
   return (
     <div>
       <PageHeader
-        title={received ? "Receive a document" : "Create a document"}
-        subtitle={received ? "Register what arrived and send it for approval in one go." : "The number is assigned when you finish."}
+        title={received ? "Receive a document" : fromItem ? "Make it a document" : "Create a document"}
+        subtitle={received ? "Register what arrived and send it for approval in one go." : fromItem ? `What came on ${fromItem.transmittal}, under our numbering.` : "The number is assigned when you finish."}
       />
       <NewDocumentForm
         fields={fields}
@@ -103,6 +120,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
         received={received}
         start={!received && sp.docType ? { docType: sp.docType, title: (sp.title ?? "").slice(0, 200) } : undefined}
         fromFile={fromFile}
+        fromItem={fromItem}
         numberingSets={numberingSets}
         deliverableTypes={toOpt(deliverableTypes)}
         docTypes={byName(docTypes)}

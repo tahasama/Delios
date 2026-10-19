@@ -12,7 +12,7 @@ import { scheduleSource } from "@/lib/actions/api";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
-import { SceneDeck, type Flow, type Scene, type When, type Light } from "./scene-deck";
+import { SceneDeck, type Flow, type Scene, type When } from "./scene-deck";
 import { IntakeChoice } from "./intake-choice";
 import { projectIntake } from "@/lib/packages/api";
 import { Choice } from "./choice";
@@ -208,7 +208,7 @@ const STAGES: Stage[] = [
   },
   {
     key: "sent-as-is", title: "Sent as it is", tagline: "Their number, their revision", rail: "rail-received",
-    text: "This project takes other organizations' documents as they come: nothing is asked by placeholder; they send each document under its own number and revision, with its status and review outcome, giving their number on each file.",
+    text: "This project is an exception: it takes other organizations' documents as they come. Nothing is asked by placeholder; they send each document with its own number and revision, its status and review outcome.",
     who: [{ title: "Sending it", by: "The other organization, on a transmittal" }, { title: "Choosing this way, with what it is filed under", by: "An administrator or the control function, here" }],
     answers: ["INTAKE"],
     extras: ["packages", "form:TRANSMITTAL"],
@@ -840,8 +840,8 @@ export default async function ControlRoomPage() {
                 {tiles.map((one) => (
                   <li key={one.href}>
                     {opens(one.href) ? (
-                      <Link href={one.href} className="group flex h-full flex-col rounded-md bg-tint-soft px-3 py-2 ring-1 ring-line hover:ring-brand-line">
-                        <span className="text-[13px] font-medium text-link group-hover:underline">{one.title}</span>
+                      <Link href={one.href} className="flex h-full flex-col rounded-md bg-tint-soft px-3 py-2 ring-1 ring-line transition-shadow duration-300 ease-out hover:ring-brand-line">
+                        <span className="text-[13px] font-medium text-link">{one.title}</span>
                         <span className={cn("text-xs", one.warn ? "text-amber-800" : "text-slate-600")}>{one.figure}</span>
                       </Link>
                     ) : (
@@ -874,22 +874,6 @@ export default async function ControlRoomPage() {
     })),
   }));
 
-  // The annunciator: each system the project runs on, where it stands, opening the step where it is set.
-  const stamped = effectiveAnswer("POLICY_PDF_STAMP", answers.get("POLICY_PDF_STAMP")) === "ON";
-  const lights: Light[] = [
-    { key: "control", label: "Control function", reading: names.length ? names.join(", ") : "none: the work runs itself", tone: names.length ? "go" : "off", href: `#receive/${gate ? "checked" : "checked-self"}` },
-    { key: "numbering", label: "Numbering", reading: schemes ? plural(schemes, "scheme") : "no scheme yet", tone: schemes ? "go" : "caution", href: "#produce/register" },
-    ...(templates ? [{ key: "routes", label: "Review routes", reading: templates.length ? plural(templates.length, "route") : "none yet", tone: templates.length ? "go" : "caution", href: "#produce/review" } as Light] : []),
-    { key: "outcomes", label: "Review outcomes", reading: inUse("REVIEW_OUTCOMES") ? plural(inUse("REVIEW_OUTCOMES"), "verdict") : "none yet", tone: inUse("REVIEW_OUTCOMES") ? "go" : "caution", href: "#produce/accepted" },
-    { key: "release", label: "Release", reading: together ? "released & issued at once" : "released, then issued", tone: "go", href: `#produce/${together ? "released-issued" : "release"}` },
-    { key: "stamps", label: "PDF stamps", reading: stamped ? "stamped" : "not stamped", tone: stamped ? "go" : "off", href: "#produce/accepted" },
-    { key: "intake", label: "Intake", reading: asCome ? "as they come" : "by placeholder", tone: asCome ? "warning" : "go", href: `#supplier/${asCome ? "sent-as-is" : "asked"}` },
-    ...(parties ? [{ key: "parties", label: "Organizations", reading: parties.length ? plural(parties.length, "organization") : "only us", tone: parties.length ? "go" : "caution", href: "#receive/received" } as Light] : []),
-    { key: "schedule", label: "Schedule", reading: schedule.source ? `needed ${lead} d before, at risk ${risk} d` : "none named yet", tone: schedule.source ? "go" : "caution", href: "#action/act-needs" },
-    { key: "joining", label: "Joining", reading: confirmJoin ? "confirmed by Manage" : "no confirmation", tone: confirmJoin ? "go" : "off", href: "#join/join-confirmed" },
-    ...(checksOff !== null ? [{ key: "checks", label: "Daily checks", reading: checksOff ? `${checksOff} switched off` : "all running", tone: checksOff ? "off" : "go", href: "#keep/kept" } as Light] : []),
-  ];
-
   return (
     <div className="space-y-4">
       <section className="register register-sheet register-sheet-open">
@@ -913,7 +897,7 @@ export default async function ControlRoomPage() {
         </div>
       </section>
 
-      <SceneDeck flows={flows} panels={panels} lights={lights} />
+      <SceneDeck flows={flows} panels={panels} />
     </div>
   );
 }

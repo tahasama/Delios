@@ -27,13 +27,6 @@ export type When = { kind: "set" | "event"; text: string; on?: boolean };
  */
 export type Lane = { scene: Scene; when?: When; end?: boolean };
 
-/**
- * One light on the annunciator: a system the project runs on, where it stands. `go` set and working, `caution` still
- * to set up, `warning` set a way that costs the register something, `off` switched off by choice. It opens the step
- * where it is set (`#flow/scene`).
- */
-export type Light = { key: string; label: string; reading: string; tone: "go" | "caution" | "warning" | "off"; href: string };
-
 const whenLabel = (when?: When) =>
   !when ? null : when.kind === "event" ? "if it happens" : when.on === undefined ? "set here" : when.on ? "set here · on" : "set here · off";
 const whenLine = (when: When) =>
@@ -51,7 +44,7 @@ export type Flow = { key: string; title: string; tab: string; from: string; to: 
  * column, the one that ends hanging below; one under a condition says which: set here (the project decides), or if it happens (an event). Arrow keys and the hash
  * move between them: /settings/flow#receive/review.
  */
-export function SceneDeck({ flows, panels, lights = [] }: { flows: Flow[]; panels: Record<string, React.ReactNode>; lights?: Light[] }) {
+export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<string, React.ReactNode> }) {
   const [on, setOn] = useState(0);
   const [lit, setLit] = useState<string>(flows[0].columns[0][0].scene.key);
   const track = useRef<HTMLDivElement>(null);
@@ -118,13 +111,14 @@ export function SceneDeck({ flows, panels, lights = [] }: { flows: Flow[]; panel
   return (
     <div className="space-y-4">
       <section ref={deck} className="scene-deck scroll-mt-24" aria-label="The flow">
-        {lights.length ? <Annunciator lights={lights} /> : null}
-        <div className="scroll-quiet flex gap-1 overflow-x-auto px-5 pt-5 sm:px-6" role="group" aria-label="Which flow">
-          {flows.map((one, i) => (
-            <button key={one.key} type="button" onClick={() => pick(i)} aria-pressed={i === on} title={one.title} className="route-pick">
-              {one.tab}
-            </button>
-          ))}
+        <div className="scroll-quiet overflow-x-auto px-5 pt-5 sm:px-6">
+          <div className="route-picks" role="group" aria-label="Which flow">
+            {flows.map((one, i) => (
+              <button key={one.key} type="button" onClick={() => pick(i)} aria-pressed={i === on} title={one.title} className="route-pick">
+                {one.tab}
+              </button>
+            ))}
+          </div>
         </div>
         <p className="scene-route px-5 pt-3 sm:px-6">
           <span className="scene-route-title">{flow.title}</span>
@@ -192,11 +186,11 @@ export function SceneDeck({ flows, panels, lights = [] }: { flows: Flow[]; panel
 
         {/* The key: what each mark on the console means. */}
         <p className="scene-key px-5 pb-4 sm:px-6">
-          <span><span className="scene-key-light" aria-hidden />the light on top: the state it leaves the document in, as in the register</span>
-          <span><span className="scene-key-set" aria-hidden />set here: this project&rsquo;s configuration decides, drawn on or off as it stands (dimmed: off here)</span>
-          <span><span className="scene-key-event" aria-hidden />if it happens: an event brings it on, and then it is never skipped</span>
-          <span><span className="scene-key-end" aria-hidden />below, in rose: it ends there (a revision: the next one starts again)</span>
-          <span><span className="scene-key-lit" aria-hidden />ringed: the step shown under the console</span>
+          <span><span className="scene-key-light" aria-hidden />its state</span>
+          <span><span className="scene-key-set" aria-hidden />set here (dimmed: off)</span>
+          <span><span className="scene-key-event" aria-hidden />if it happens</span>
+          <span><span className="scene-key-end" aria-hidden />ends here</span>
+          <span><span className="scene-key-lit" aria-hidden />shown below</span>
         </p>
       </section>
 
@@ -214,34 +208,3 @@ export function SceneDeck({ flows, panels, lights = [] }: { flows: Flow[]; panel
   );
 }
 
-/**
- * The annunciator: one light per system the project runs on, as a cockpit's panel shows them at a glance. The master
- * light counts what still needs doing (caution) and what is set at a cost (warning); each light opens its step.
- */
-function Annunciator({ lights }: { lights: Light[] }) {
-  const cautions = lights.filter((one) => one.tone === "caution").length;
-  const warnings = lights.filter((one) => one.tone === "warning").length;
-  const master = warnings ? "warning" : cautions ? "caution" : "go";
-  return (
-    <div className="annunciator px-5 pt-5 sm:px-6" role="group" aria-label="Where each system stands">
-      <div className={cn("annunciator-master", `light-${master}`)}>
-        <span className="annunciator-lamp" aria-hidden />
-        <span className="annunciator-name">{master === "go" ? "All set" : master === "warning" ? "Warning" : "Caution"}</span>
-        <span className="annunciator-reading">
-          {master === "go" ? "every system set" : [warnings ? `${warnings} at a cost` : null, cautions ? `${cautions} to set up` : null].filter(Boolean).join(" · ")}
-        </span>
-      </div>
-      <ul className="annunciator-grid">
-        {lights.map((one) => (
-          <li key={one.key}>
-            <a href={one.href} className={cn("annunciator-light", `light-${one.tone}`)} title={`${one.label}: ${one.reading}`}>
-              <span className="annunciator-lamp" aria-hidden />
-              <span className="annunciator-name">{one.label}</span>
-              <span className="annunciator-reading">{one.reading}</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}

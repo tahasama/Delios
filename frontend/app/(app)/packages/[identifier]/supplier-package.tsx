@@ -153,9 +153,9 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
             </div>
             <ActionForm action={sendAsReceivedAction} submitLabel={`Send to ${org}`} size="sm" hidden={{ packageId: pkg.id }} className="px-5 py-4 sm:px-6">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Field label="Your number" required><input name="reference" required className={inputCls} /></Field>
+                <Field label="Your number"><input name="reference" className={inputCls} /></Field>
                 <Field label="Title" required><input name="title" required className={inputCls} /></Field>
-                <Field label="Revision" required hint="as you name it"><input name="revision" required className={inputCls} /></Field>
+                <Field label="Revision" hint="as you name it"><input name="revision" className={inputCls} /></Field>
                 <Field label="Status" hint="your words, e.g. issued for approval"><input name="status" className={inputCls} /></Field>
                 <Field label="Review outcome" hint="what your own review said, if any"><input name="outcome" className={inputCls} /></Field>
                 <Field label="Files" required hint="the PDF and its native file"><input type="file" name="files" multiple required className="w-full" /></Field>

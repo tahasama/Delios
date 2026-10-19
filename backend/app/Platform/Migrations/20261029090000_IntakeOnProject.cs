@@ -11,28 +11,8 @@ namespace Delios.Host.Platform.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // A supplier's package switched to take documents as they come puts its project on that way (owner: one way
-            // per project), with what it filed them under.
-            migrationBuilder.Sql("""
-                DO $$
-                DECLARE t record;
-                BEGIN
-                    FOR t IN SELECT id FROM tenants LOOP
-                        PERFORM set_config('app.tenant_id', t.id::text, true);
-                        INSERT INTO settings (id, tenant_id, project_id, key, value, updated_at, updated_by_name)
-                        SELECT DISTINCT ON (p.project_id) gen_random_uuid(), p.tenant_id, p.project_id, 'SUPPLIER_INTAKE', 'AS_RECEIVED', now(), coalesce(p.as_received_by_name, 'migration')
-                        FROM packages p WHERE p.tenant_id = t.id AND p.takes_as_received
-                        ON CONFLICT DO NOTHING;
-                        INSERT INTO settings (id, tenant_id, project_id, key, value, updated_at, updated_by_name)
-                        SELECT DISTINCT ON (p.project_id) gen_random_uuid(), p.tenant_id, p.project_id, 'AS_RECEIVED_FILING',
-                            p.as_received_deliverable_type || '|' || p.as_received_doc_type || '|' || p.as_received_discipline, now(), coalesce(p.as_received_by_name, 'migration')
-                        FROM packages p WHERE p.tenant_id = t.id AND p.takes_as_received
-                        ON CONFLICT DO NOTHING;
-                    END LOOP;
-                    PERFORM set_config('app.tenant_id', '', true);
-                END $$;
-                """);
-
+            // Taking documents as they come is a project's exception, chosen by hand (owner): no project is put on it
+            // from what a package said before.
             migrationBuilder.DropColumn(
                 name: "as_received_at",
                 table: "packages");

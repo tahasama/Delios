@@ -753,13 +753,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the client's two ways (on DELIOS or not). **If it happens**: an event brings it on, then it is never skipped (dotted
   amber line, a bolt): Voided, Approved outside / Not approved (when the decider asks), Going without, At risk,
   Withdrawn, Cancelled, Legal hold, Archived. A way the project did not choose (placeholders or as they come) is not
-  drawn at all. **The cockpit** (owner: "think of the control room as a plane's cockpit"): above the flows, an
-  annunciator, one lamp per system the project runs on (control function, numbering, review routes, review outcomes,
-  release, PDF stamps, intake, organizations, schedule, joining, daily checks), green set, amber to set up, rose set at
-  a cost, hollow off by choice, and a master light counting cautions and warnings; each lamp opens its step. Never an "Escalated" step (owner): telling
+  drawn at all. No panel of lights above the flows (owner: "serves absolutely nothing", removed). The flows' tabs are
+  one recessed strip, the open one raised in light; the key is five short words (its state, set here, if it happens,
+  ends here, shown below); a "Set up in" tile has no underline, its border fades in on hover. Never an "Escalated" step (owner): telling
   a silent discipline again is a notice, its days a setting on "Disciplines confirm"; the action stays open and overdue,
   with no explanation of its own; what another organization sends is checked before it is registered (Documents we receive); the lit station is ringed in light blue. The key stays under the console (owner: "critical"):
-  the light on top, set here, if it happens, below in rose, ringed. Under it, "The days
+  its state, set here, if it happens, ends here, shown below. Under it, "The days
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
@@ -790,13 +789,20 @@ a screen only words it. A new rule goes in the backend, never in a page.
   prepared, else its next revision; not while in review), or made a document under our numbering; either way their
   number is kept beside ours one to one (`Documents/Equivalents.cs`, `number_equivalents`; Details "Also known as",
   recorded by itself when matched or registered, never typed; taken back with why by the control function), the
-  register finds it under both, and the same number of theirs proposes the same document next time. Recording what came
-  from outside asks their number on each file. **Taken as they come** (owner: a configuration matter, never offered
-  everywhere; one way or the other, never both): the project's choice in the Control room (`Packages/Intake.cs`,
-  `SUPPLIER_INTAKE` = PLACEHOLDERS default | AS_RECEIVED, `AS_RECEIVED_FILING`, `PUT /intake`, an administrator or the
-  control function, with what they are filed under and the warning ticked; MODE_IN_USE once either way is in use). As
-  they come: no placeholders are asked, nothing is matched or registered by hand (INTAKE_AS_RECEIVED); the other
-  organization sends each under its own number and revision with its status and review outcome; the check
+  register finds it under both, and the same number of theirs proposes the same document next time. "None of ours? Make
+  it a document" opens the new-document form filled with what is known (`/documents/new?item=<transmittal>:<item>`: who
+  it comes from, the deliverable type requiring an originator, its type, title, the package's order); saved, it registers
+  that item (`POST /transmittals/{t}/items/{i}/register`), its files the first revision. **Nothing is asked of what is
+  sent** (owner): a file attached from outside has no number, and the system cannot tell a controlled document from a
+  loose attachment, so no number, revision or other metadata is asked when it is recorded or sent; whoever checks
+  refuses a transmittal lacking what it needs, by hand. **Taken as they come** is a project's **exception**, never the
+  default and never drawn as its equal (owner): by placeholder is the way; the Control room offers "Make this project an
+  exception" (`Packages/Intake.cs`, `SUPPLIER_INTAKE` = AS_RECEIVED, `AS_RECEIVED_FILING`, `PUT /intake`, an administrator
+  or the control function, with what they are filed under and the warning ticked; one way or the other, MODE_IN_USE once
+  either is in use). Nothing puts a project on it by itself (migration IntakeExceptionOnly took back what a package had
+  said). As they come: no placeholders are asked, nothing is matched or registered by hand (INTAKE_AS_RECEIVED); the
+  other organization sends each with its own number and revision where it gives them (one that came without cannot be
+  accepted as it came: CAME_WITHOUT_NUMBER, returned with why); the check
   accepts all (they are in the register exactly so, `Document.AsReceived`, series `AS_RECEIVED`, their next revision
   superseding one we never took further, never one of ours: AS_RECEIVED) or returns all with why. A red warning
   (`components/as-received-warning.tsx`) says it on the package, the transmittal, the document, the register ("as

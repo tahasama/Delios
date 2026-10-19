@@ -10,6 +10,7 @@ import { ownFields, takeExtras } from "@/lib/settings/field-policy";
 import { api, refusalForForm, projectPath, refusal } from "@/lib/client";
 import { backendDocument } from "@/lib/documents/api";
 import { upload, filesOf } from "@/lib/documents/api-uploads";
+import type { TransmittalView } from "@/lib/types";
 
 // G.1 — Creating a new document. "No controlled information shall be produced
 // without a register entry" (§3.9). Number is system-generated (§3.7).
@@ -68,17 +69,32 @@ export async function createDocumentAction(_prev: { error?: string; fields?: str
   // What the project's form insists on is checked by the backend, once (FIELDS_REQUIRED outlines what is missing).
   const answered = takeExtras(await ownFields(ctx, "DOCUMENT"), (name) => String(formData.get(name) ?? ""));
   // The backend allocates the number and checks every value again.
-  let doc: { id: string; number: string };
-  try {
-    doc = await api<{ id: string; number: string }>(projectPath(ctx, "/documents"), {
-      body: {
+  const body = {
         title, deliverableType, docType, discipline, originator, subproject: subProject, phase, contractRef, criticality,
         confidentiality, retentionClass: chosenRetention, receivedDate, plannedDate: String(formData.get("plannedDate") ?? "") || null, kind,
         previousNumber: String(formData.get("previousId") ?? "").trim() || null,
         legacyScheme: String(formData.get("legacyScheme") ?? "").trim() || null,
         appVersion: String(formData.get("appVersion") ?? "").trim() || null,
         extras: Object.keys(answered.extras).length ? answered.extras : null,
-      },
+  };
+  // What came unplanned on a received transmittal, made a document: that item is registered, its files its first revision.
+  const fromTransmittal = String(formData.get("fromTransmittal") ?? "");
+  const fromItem = String(formData.get("fromItem") ?? "");
+  if (fromTransmittal && fromItem) {
+    let made: string | null = null;
+    try {
+      const t = await api<TransmittalView>(projectPath(ctx, `/transmittals/${fromTransmittal}/items/${fromItem}/register`), { body });
+      made = t.items.find((one) => one.id === fromItem)?.documentId ?? null;
+    } catch (e) {
+      return refusalForForm(e);
+    }
+    revalidatePath(`/transmittals/${fromTransmittal}`);
+    redirect(made ? `/documents/${made}?created=1` : `/transmittals/${fromTransmittal}#unplanned`);
+  }
+  let doc: { id: string; number: string };
+  try {
+    doc = await api<{ id: string; number: string }>(projectPath(ctx, "/documents"), {
+      body,
       idempotencyKey: String(formData.get("formKey") ?? "") || undefined,
     });
   } catch (e) {
