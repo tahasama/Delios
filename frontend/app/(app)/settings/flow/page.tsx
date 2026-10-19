@@ -2,13 +2,19 @@ import Link from "next/link";
 import { Lock } from "lucide-react";
 import { SETUP_PAGES, maySetup, mayChangeControlRoom } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
-import { PageHeader, Chip, StateChip } from "@/components/ui";
+import { Chip, StateChip } from "@/components/ui";
 import { ProjectSettings } from "./project-settings";
 import { ActionForm } from "@/components/form";
 import { SearchPick } from "@/components/search-pick";
 import { api, projectPath } from "@/lib/client";
 import { setControlPeopleAction } from "@/lib/settings/forms-people";
-import { orgSettings } from "@/lib/settings/api";
+import { orgSettings, projectSettings } from "@/lib/settings/api";
+import { projectDefaults } from "@/lib/organization/defaults";
+import { liberty } from "@/lib/organization/liberty";
+import { scheduleSource } from "@/lib/actions/api";
+import { POLICIES } from "@/lib/settings/control-activities";
+import { StepChoice } from "./step-choice";
+import type { AnswerSource } from "@/components/how-it-works";
 import { isAdmin } from "@/lib/core/auth";
 import { controlSettings, policies, PROJECT_MODE_LABEL, CONTROL_ACTIVITIES, SKIPPABLE } from "@/lib/settings/control-activities";
 import { holdersOf } from "@/lib/core/permissions";
@@ -29,9 +35,10 @@ export const metadata = { title: "Control room" };
  * The whole flow on one page: each step a document goes through, who carries
  * it out on this project, what the project has chosen, and the lists it draws from.
  *
- * Who carries an act out is switched right here (ActSwitch); the project's
- * answers and state names are changed lower on this page ("change" and
- * "rename" jump there); lists, routes and numbering link to their own pages.
+ * Everything a step decides is changed on that step: who carries an act out
+ * (ActSwitch), and the questions it answers (StepChoice, opened in place). What
+ * no step decides is lower on the page; lists, routes and numbering link to
+ * their own pages.
  */
 
 /** A step that is not a choice, and why. */
@@ -105,7 +112,7 @@ const STAGES: Stage[] = [
     states: [],
     acts: [],
     policies: [],
-    sets: ["PROJECT_CODES", "SUBPROJECTS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "DELIVERABLE_TYPE_FIELDS", "PHASES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES"],
+    sets: ["SUBPROJECTS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES", "DELIVERABLE_TYPE_FIELDS", "PHASES", "CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES"],
     fixed: [{ title: "The number", text: "Built by the scheme its deliverable type uses, and never reused." }],
     branches: [{ title: "Taking a document out of use", text: "Withdrawn: no longer worked from.", act: "WITHDRAW" }],
     extras: ["numbering"],
@@ -134,7 +141,7 @@ const STAGES: Stage[] = [
     rail: "rail-review",
     states: ["IN_REVIEW"],
     acts: ["REVIEW_ISSUE"],
-    policies: ["POLICY_PDF_STAMP", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL"],
+    policies: ["POLICY_MATRIX", "POLICY_MATRIX_DETAIL"],
     sets: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES"],
     fixed: [
       { title: "Outside reviewers on the route", text: "An organization with accounts here answers for itself, alongside ours. One that is not on the system is carried by its liaison — or the control function — who sends the pack out and records what comes back." },
@@ -151,7 +158,7 @@ const STAGES: Stage[] = [
     rail: "rail-accepted",
     states: [],
     acts: [],
-    policies: ["POLICY_PDF_STAMP", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL"],
+    policies: [],
     sets: ["REVIEW_OUTCOMES"],
     fixed: [{ title: "What the verdict does", text: "Each verdict is published with what it does: final, final with comments to fix next time, or back to the author. Only the first two go on." }],
     branches: [],
@@ -165,7 +172,7 @@ const STAGES: Stage[] = [
     rail: "rail-rejected",
     states: [],
     acts: ["RETURN_OUTCOME"],
-    policies: ["POLICY_PDF_STAMP", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL"],
+    policies: [],
     sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES"],
     fixed: [{ title: "The next revision", text: "Asked for by the verdict: it may be started at once, and carries the verdict as its reason." }],
     branches: [],
@@ -179,7 +186,7 @@ const STAGES: Stage[] = [
     rail: "rail-returned",
     states: [],
     acts: ["RETURN_OUTCOME"],
-    policies: ["POLICY_PDF_STAMP", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL"],
+    policies: [],
     sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES"],
     fixed: [
       { title: "Who it goes back to", text: "The sender, as the document's originator — on a reply to the transmittal it came on. The control function chooses who else is copied in." },
@@ -226,7 +233,7 @@ const STAGES: Stage[] = [
     rail: "rail-accepted",
     states: ["NOT_RELEASED", "ON_HOLD"],
     acts: [],
-    policies: ["POLICY_PDF_STAMP", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL"],
+    policies: [],
     sets: ["REVIEW_OUTCOMES"],
     fixed: [
       { title: "Asked for when it is sent", text: "Whoever asks for it to be sent says that an outside approval is needed, and from whom; the revision stays not released while their step is open." },
@@ -258,7 +265,7 @@ const STAGES: Stage[] = [
     rail: "rail-released",
     states: ["RELEASED", "SUPERSEDED"],
     acts: [],
-    policies: ["POLICY_RELEASE"],
+    policies: ["POLICY_RELEASE", "POLICY_PDF_STAMP"],
     sets: [],
     fixed: [],
     branches: [
@@ -274,7 +281,7 @@ const STAGES: Stage[] = [
     rail: "rail-released",
     states: ["RELEASED", "SUPERSEDED"],
     acts: ["ISSUE"],
-    policies: ["POLICY_RELEASE", "POLICY_READY"],
+    policies: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "POLICY_READY"],
     sets: ["REASONS_FOR_ISSUE", "ISSUE_CODES"],
     fixed: [
       { title: "Who receives it", text: "Named by the decider, or by whoever asked for it to be sent; the release shows them, each removable, and others may be added." },
@@ -432,14 +439,14 @@ export default async function ControlRoomPage() {
   // Everyone of ours reads how the project works; an administrator or the control function changes it.
   const changesIt = mayChangeControlRoom(me);
 
-  const [settings, chosen, holders, sets, values, templates, schemes, rules, names, parties] = await Promise.all([
+  const [settings, chosen, holders, sets, values, templates, schemes, rules, names, parties, answers, defaults, switches, schedule] = await Promise.all([
     controlSettings(ctx),
     policies(ctx),
     holdersOf(ctx, "CONTROL"),
     getSets().then((all) => all.map((one) => ({ key: one.key, title: one.title, description: one.description }))),
-    // Every value of every list, with its meaning as the JSON it was published with.
+    // Every value of every list, to count what is in use.
     getSets().then(async (all) => (await Promise.all(all.map(async (one) => (await getSet(one.key)).map((v) => ({
-      setKey: one.key, code: v.code, label: v.label, status: v.status, props: Object.keys(v.props).length ? JSON.stringify(v.props) : null,
+      setKey: one.key, code: v.code, status: v.status, props: Object.keys(v.props).length ? JSON.stringify(v.props) : null,
     }))))).flat()),
     routesForEditor().catch(() => []),
     projectNumbering().then((n) => n.schemes.filter((one) => one.active).length).catch(() => 0),
@@ -447,6 +454,10 @@ export default async function ControlRoomPage() {
     orEmpty(adminFunctions).then((all) => all.reduce((n, f) => n + f.rules.filter((r) => r.verbs.includes("RECEIVE")).length, 0)),
     stateNames(ctx),
     partiesWithAnswers().then((all) => all.filter((one) => one.active).map((one) => ({ kind: one.kind }))).catch(() => []),
+    projectSettings(ctx.projectId).catch(() => new Map<string, string>()),
+    projectDefaults().catch(() => null),
+    liberty(),
+    scheduleSource(ctx),
   ]);
 
   const orgAnswers = await orgSettings().catch(() => new Map<string, string>());
@@ -461,8 +472,14 @@ export default async function ControlRoomPage() {
   const gate = holders.length > 0;
   const together = chosen.find((one) => one.policy.key === "POLICY_RELEASE")?.value === "TOGETHER";
   const actRow = new Map(settings.rows.map((row) => [row.activity.key, row]));
-  const policyRow = new Map(chosen.map((one) => [one.policy.key, one]));
   const setByKey = new Map(sets.map((one) => [one.key, one]));
+  // Where every answer comes from: what the organization keeps the same on every project is read only here (ROOM_FIXED).
+  const source: AnswerSource = {
+    target: "project",
+    answers,
+    base: defaults?.values ?? null,
+    fixed: switches.filter((one) => one.area === "Control room" && !one.free).map((one) => one.key),
+  };
 
   // Routes may answer from a set of their own; the review step lists every set
   // a live route uses, not only the default one.
@@ -504,10 +521,6 @@ export default async function ControlRoomPage() {
     ? { title: "The control function's gate", text: `A finished route waits as Not released until the control function publishes it — ${holders.length} ${holders.length === 1 ? "person holds" : "people hold"} the control function.` }
     : { title: "No gate", text: "Nobody holds the control function, so a finished route is released at once." };
 
-  const usedBy = new Map<string, string[]>();
-  for (const stage of stages) for (const key of stage.sets) usedBy.set(key, [...(usedBy.get(key) ?? []), stage.title]);
-  const unplaced = sets.filter((one) => !usedBy.has(one.key));
-
   const panels = Object.fromEntries(stages.map((stage) => {
     // The check before release is The control function's gate where there is one,
     // and the release itself says so where there is none.
@@ -519,47 +532,33 @@ export default async function ControlRoomPage() {
           <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
           <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <h2 className="text-sm font-semibold text-slate-900">{stage.title}</h2>
-            <span className="text-[11px] text-slate-500">{stage.text}</span>
+            <span className="text-xs text-slate-600">{stage.text}</span>
             {states.length ? (
               <span className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
                 {states.map((state) => <StateChip key={state} label={stateLabel(state)} color={stateColor(state)} />)}
-                <Link href="#state-names" className="text-[11px] font-semibold text-link hover:underline">rename</Link>
+                {changesIt ? <Link href="#state-names" className="text-[11px] font-semibold text-link hover:underline">rename</Link> : null}
               </span>
             ) : null}
           </header>
 
-          <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:divide-x lg:divide-y-0">
-            {/* Who carries it out, and what the organization chose. */}
+          <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
+            {/* What the step decides: who carries it out, and the questions it answers. */}
             <div className="space-y-3 px-5 py-3.5 sm:px-6">
-              <p className="stencil text-slate-500">Who does it</p>
+              <h3 className="stencil text-slate-500">Who does it</h3>
               {stage.acts.length || fixed.length ? (
                 <ul className="space-y-2.5">
                   {stage.acts.map((key) => <ActLine key={key} act={key} row={actRow.get(key)} readOnly={!changesIt} />)}
                   {fixed.map((one) => <FixedLine key={one.title} {...one} />)}
                 </ul>
               ) : (
-                <p className="text-xs text-slate-500">Whoever is doing the work — nothing here to switch.</p>
+                <p className="text-xs text-slate-600">Whoever is doing the work — nothing here to switch.</p>
               )}
 
-              {stage.policies.map((key) => {
-                const row = policyRow.get(key);
-                if (!row) return null;
-                const option = row.policy.options.find((one) => one.value === row.value);
-                return (
-                  <div key={key} className="border-t border-line pt-2.5">
-                    <p className="text-[11px] text-slate-500">{row.policy.title}</p>
-                    <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[13px] font-medium text-slate-900">
-                      {option?.label.replace(/ — recommended$/, "")}
-                      <span className="text-[11px] font-normal text-slate-500">{row.set ? "chosen" : "default"}</span>
-                      <Link href="#how-it-works" className="text-[11px] font-semibold text-link hover:underline">change</Link>
-                    </p>
-                  </div>
-                );
-              })}
+              {stage.policies.map((key) => <StepChoice key={key} source={source} policyKey={key} readOnly={!changesIt} />)}
 
               {stage.branches.length ? (
                 <div className="border-t border-line pt-2.5">
-                  <p className="stencil mb-1.5 text-slate-500">Off this step</p>
+                  <h3 className="stencil mb-1.5 text-slate-500">Off this step</h3>
                   <ul className="space-y-2.5">
                     {stage.branches.map((branch) => branch.act
                       ? <ActLine key={branch.title} act={branch.act} row={actRow.get(branch.act)} readOnly={!changesIt} />
@@ -569,22 +568,22 @@ export default async function ControlRoomPage() {
               ) : null}
             </div>
 
-            {/* The sets it draws from, and their values. */}
+            {/* What it reads: the lists, and where else it is set up. Each opens where it is kept. */}
             <div className="space-y-3 px-5 py-3.5 sm:px-6">
-              <p className="stencil text-slate-500">Sets it uses</p>
+              <h3 className="stencil text-slate-500">Lists it uses</h3>
               {stage.sets.length ? (
-                <ul className="space-y-3">
+                <ul className="space-y-1">
                   {stage.sets.map((key) => (
                     <SetLine key={key} setKey={key} set={setByKey.get(key)} values={values.filter((one) => one.setKey === key)} />
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-slate-500">None — this step reads what the earlier ones set.</p>
+                <p className="text-xs text-slate-600">None — this step reads what the earlier ones set.</p>
               )}
               {stage.extras.length ? (
                 <ul className="space-y-1 border-t border-line pt-2.5">
                   {stage.extras.map((key) => (
-                    <li key={key} className="flex items-baseline gap-2 text-[13px]">
+                    <li key={key} className="flex flex-wrap items-baseline justify-between gap-x-2 text-[13px]">
                       <Link href={EXTRA[key].href} className="font-medium text-link hover:underline">{EXTRA[key].title}</Link>
                       <span className="text-[11px] text-slate-500">{extraCount[key]}</span>
                     </li>
@@ -615,74 +614,92 @@ export default async function ControlRoomPage() {
   };
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "the reviewer";
-  const flows: Flow[] = flowsFor({ gate, returner, together }).map((flow) => ({
+  const shape = flowsFor({ gate, returner, together });
+  const flows: Flow[] = shape.map((flow) => ({
     ...flow,
     columns: flow.columns.map((column) => column.map((lane) => ({ scene: { ...sceneOf(byKey.get(lane.scene)!), ...(lane.tagline ? { tagline: lane.tagline } : {}) }, optional: lane.optional, end: lane.end }))),
   }));
 
+  // What a step of the flow decides is changed on that step only: below, each act is named with the step it is on.
+  const placedActs: Record<string, { title: string; href: string }> = {};
+  for (const flow of shape) {
+    for (const lane of flow.columns.flat()) {
+      const stage = byKey.get(lane.scene)!;
+      for (const act of [...stage.acts, ...stage.branches.flatMap((b) => (b.act ? [b.act] : []))]) {
+        placedActs[act] ??= { title: stage.title, href: `#${flow.key}/${stage.key}` };
+      }
+    }
+  }
+  const shown = new Set(shape.flatMap((flow) => flow.columns.flat().map((lane) => lane.scene)));
+  const placedPolicies = POLICIES.map((one) => one.key).filter((key) => stages.some((stage) => shown.has(stage.key) && stage.policies.includes(key)));
+
+  const whoDoesWhat = PROJECT_MODE_LABEL[settings.projectMode];
+  const onThisPage: [string, string][] = [
+    ["#the-flow", "The flow"],
+    ["#control-people", "Who acts as the control function"],
+    ["#how-it-works", "Who carries the other acts out"],
+    ["#action-days", "The days around an action"],
+    ...(changesIt ? [["#state-names", "What the states are called"], ["#defaults", "Back to the defaults"]] as [string, string][] : []),
+  ];
+
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Control room"
-        subtitle={`How ${ctx.project.code} works, and what makes it work that way: every step a document goes through, who carries each act out, what releasing means here, what the states are called. The deck shows the flow; the panels under it decide it, and each list or rule opens where it is kept.${changesIt ? "" : " You read it; an administrator or the control function changes it."}`}
-      />
-
-      {/* Where the project stands, before the steps. */}
+      {/* The masthead: where the project stands, before the steps. */}
       <section className="register register-sheet register-sheet-open">
-        <div className="grid grid-cols-1 divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <div className="px-5 pt-6 pb-4 sm:px-6">
+          <h1 className="plate-title text-slate-950">Control room</h1>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+            How {ctx.project.code} works: every step a document goes through, who carries each act out, and what the project chose.
+            {changesIt ? " Choose a step to see what it decides, and change it there." : " You read it; an administrator or the control function changes it."}
+          </p>
+        </div>
+        <div className="grid grid-cols-1 divide-y divide-line border-t border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           <div className="px-5 py-3 sm:px-6">
-            <p className="stencil text-slate-500">Control function</p>
+            <h2 className="stencil text-slate-500">Control function</h2>
             <p className="mt-1 text-[13px] font-medium text-slate-900">{gate ? `${holders.length} ${holders.length === 1 ? "person" : "people"}` : "Nobody"}</p>
-            <p className="text-[11px] text-slate-500">{gate ? "The control function stands between the work and the register." : "No control function: the people doing the work run the register."}</p>
-            <a href="#control-people" className="text-[11px] font-semibold text-link hover:underline">Who acts as it</a>
+            <p className="text-xs leading-5 text-slate-600">{gate ? "Stands between the work and the register." : "The people doing the work run the register."}</p>
+            <a href="#control-people" className="text-xs font-semibold text-link hover:underline">Who acts as it</a>
           </div>
           <div className="px-5 py-3 sm:px-6">
-            <p className="stencil text-slate-500">Who does what</p>
-            <p className="mt-1 text-[13px] font-medium text-slate-900">
-              {/* Not answered yet, some acts stay with the people doing the work whatever the project has (workByDefault). */}
-              {!settings.set && settings.rows.some((row) => !row.controlDoes) && settings.rows.some((row) => row.controlDoes)
-                ? `The control function, except ${settings.rows.filter((row) => !row.controlDoes).length} left to the people doing the work`
-                : PROJECT_MODE_LABEL[settings.projectMode]}
-            </p>
-            <p className="text-[11px] text-slate-500">{settings.set ? "Set by an administrator." : "Not set yet — read from the project."}</p>
+            <h2 className="stencil text-slate-500">Who does what</h2>
+            <p className="mt-1 text-[13px] font-medium text-slate-900">{whoDoesWhat}</p>
+            <p className="text-xs leading-5 text-slate-600">{settings.set ? "Answered for this project." : "Not answered yet: read from the project."}</p>
           </div>
           <div className="px-5 py-3 sm:px-6">
-            <p className="stencil text-slate-500">Releasing</p>
-            <p className="mt-1 text-[13px] font-medium text-slate-900">{together ? `${names.RELEASED_ISSUED} — releasing sends it` : `${names.RELEASED} — releasing means go ahead`}</p>
-            <p className="text-[11px] text-slate-500">{policyRow.get("POLICY_RELEASE")?.set ? "Chosen by an administrator." : "The default."}</p>
+            <h2 className="stencil text-slate-500">Releasing</h2>
+            <p className="mt-1 text-[13px] font-medium text-slate-900">{together ? names.RELEASED_ISSUED : names.RELEASED}</p>
+            <p className="text-xs leading-5 text-slate-600">{together ? "Releasing sends it." : "Releasing means go ahead."} {answers.has("POLICY_RELEASE") ? "Chosen here." : "The default."}</p>
           </div>
         </div>
+        <nav aria-label="On this page" className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-5 py-2.5 text-xs sm:px-6">
+          <span className="text-slate-500">On this page:</span>
+          {onThisPage.map(([href, label]) => <a key={href} href={href} className="font-semibold text-link hover:underline">{label}</a>)}
+        </nav>
       </section>
 
-      <SceneDeck flows={flows} panels={panels} />
-
-      {unplaced.length ? (
-        <section className="register register-sheet register-sheet-open">
-          <div className="border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-            <span className="stencil text-slate-500">Other sets</span>
-            <span className="ml-2 text-[11px] text-slate-500">published, and not tied to one step</span>
-          </div>
-          <ul className="space-y-3 px-5 py-3.5 sm:px-6">
-            {unplaced.map((one) => (
-              <SetLine key={one.key} setKey={one.key} set={one} values={values.filter((value) => value.setKey === one.key)} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <div id="the-flow" className="scroll-mt-24">
+        <SceneDeck flows={flows} panels={panels} />
+      </div>
 
       {/* Who acts as the control function: named here, whatever their function. */}
       {directory ? (
         <section className="register register-sheet register-sheet-open scroll-mt-24" id="control-people" aria-labelledby="control-people-head">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-            <span id="control-people-head" className="stencil mr-1 text-slate-500">Who acts as the control function</span>
+            <h2 id="control-people-head" className="stencil mr-1 text-slate-500">Who acts as the control function</h2>
             <span className="text-[11px] text-slate-500">whatever their function: they keep the register, check what arrives, add people…</span>
           </div>
           <div className="space-y-3 px-5 py-4 sm:px-6">
             {byFunction.length ? (
-              <p className="text-xs leading-5 text-slate-600">
-                By their function: {byFunction.map((p) => `${p.name} (${p.function})`).join(", ")}. Changed in{" "}
-                <Link href="/settings/functions" className="font-semibold text-link hover:underline">Functions</Link>.
-              </p>
+              <div className="space-y-1.5">
+                <p className="text-xs text-slate-600">
+                  By their function (changed in <Link href="/settings/functions" className="font-semibold text-link hover:underline">Functions</Link>):
+                </p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {byFunction.map((p) => (
+                    <li key={p.id}><Chip className="bg-tint-soft text-slate-700 ring-line">{p.name}<span className="ml-1 font-normal text-slate-500">{p.function}</span></Chip></li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
             {directory.mayNameControl ? (
               <ActionForm action={setControlPeopleAction} submitLabel="Save" size="sm">
@@ -695,17 +712,29 @@ export default async function ControlRoomPage() {
               </ActionForm>
             ) : (
               <p className="text-xs leading-5 text-slate-600">
-                {ourPeople.filter((p) => p.actsAsControl).map((p) => p.name).join(", ") || "Nobody named"}. An administrator, or whoever acts as the control function, names them.
+                Named on {ctx.project.code}: {ourPeople.filter((p) => p.actsAsControl).map((p) => p.name).join(", ") || "nobody"}. An administrator, or whoever acts as the control function, names them.
               </p>
             )}
           </div>
         </section>
       ) : null}
 
+      <ProjectSettings
+        source={source}
+        follows={gate}
+        placed={{ acts: placedActs, policies: placedPolicies }}
+        names={names}
+        defaults={defaults}
+        schedule={schedule.source ? { defaultLeadDays: schedule.source.defaultLeadDays ?? null, riskWindowDays: schedule.source.riskWindowDays ?? null } : null}
+        riskFixed={switches.some((one) => one.key === "RISK_WINDOW" && !one.free)}
+        admin={isAdmin(me)}
+        readOnly={!changesIt}
+      />
+
       {/* What is kept about people's activity: the organization's choice, shown here, changed on its page. */}
       <section className="register register-sheet register-sheet-open" aria-labelledby="tracking-head">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-          <span id="tracking-head" className="stencil mr-1 text-slate-500">What is kept about people&rsquo;s activity</span>
+          <h2 id="tracking-head" className="stencil mr-1 text-slate-500">What is kept about people&rsquo;s activity</h2>
           <span className="text-[11px] text-slate-500">the organization&rsquo;s choice, for every project</span>
         </div>
         <ul className="divide-y divide-line">
@@ -717,8 +746,6 @@ export default async function ControlRoomPage() {
           {isAdmin(me) ? <>Changed on the <Link href="/organization#tracking" className="font-semibold text-link hover:underline">organization&rsquo;s page</Link>.</> : "An administrator changes it, on the organization's page."}
         </p>
       </section>
-
-      <ProjectSettings readOnly={!changesIt} />
     </div>
   );
 }
@@ -753,33 +780,22 @@ function FixedLine({ title, text }: Fixed) {
   );
 }
 
-/** A set, what it is for, and its values — the switched-off ones struck through. */
+/** A list the step reads: its name (opening it in Types & sets), and how many of its values are in use. */
 function SetLine({ setKey, set, values }: {
   setKey: string;
   set?: { title: string; description: string | null };
-  values: { code: string; label: string; status: string }[];
+  values: { status: string }[];
 }) {
-  const on = values.filter((one) => one.status === "ACTIVE");
-  const off = values.filter((one) => one.status !== "ACTIVE");
-  const shown = [...on, ...off].slice(0, 14);
-  const more = on.length + off.length - shown.length;
+  const on = values.filter((one) => one.status === "ACTIVE").length;
+  const off = values.length - on;
+  // A list not set up yet still reads by its name, never its key.
+  const name = set?.title ?? setKey.charAt(0) + setKey.slice(1).toLowerCase().replace(/_/g, " ");
   return (
-    <li>
-      <p className="flex flex-wrap items-baseline gap-x-2">
-        <Link href={`/settings/config?set=${setKey}`} className="text-[13px] font-medium text-link hover:underline">{set?.title ?? setKey}</Link>
-        <span className="text-[11px] text-slate-500">
-          {set ? `${on.length} on${off.length ? ` · ${off.length} off` : ""}` : "not published yet"}
-        </span>
-      </p>
-      {set?.description ? <p className="text-xs leading-5 text-slate-600">{set.description}</p> : null}
-      {shown.length ? (
-        <p className="mt-1 flex flex-wrap gap-1">
-          {shown.map((one) => (
-            <code key={one.code} title={one.status === "ACTIVE" ? one.label : `${one.label} — retired`} className={cn("code-chip", one.status !== "ACTIVE" && "opacity-50 line-through")}>{one.code}{one.status === "ACTIVE" ? null : <span className="sr-only"> (retired)</span>}</code>
-          ))}
-          {more > 0 ? <Link href={`/settings/config?set=${setKey}`} className="self-center text-[11px] text-slate-500 hover:text-link">+{more} more</Link> : null}
-        </p>
-      ) : null}
+    <li className="flex flex-wrap items-baseline justify-between gap-x-2 text-[13px]">
+      <Link href={`/settings/config?set=${setKey}`} title={set?.description ?? undefined} className="font-medium text-link hover:underline">{name}</Link>
+      <span className={cn("text-[11px]", set && on ? "text-slate-500" : "text-amber-800")}>
+        {!set ? "not set up yet" : on ? `${on} in use${off ? ` · ${off} retired` : ""}` : "none in use"}
+      </span>
     </li>
   );
 }

@@ -39,6 +39,7 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
   const [on, setOn] = useState(0);
   const [lit, setLit] = useState<string>(flows[0].columns[0][0].scene.key);
   const track = useRef<HTMLDivElement>(null);
+  const deck = useRef<HTMLElement>(null);
   const flow = flows[on];
   // Reading order: column by column, top to bottom within one.
   const order = flow.columns.flat();
@@ -91,14 +92,15 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
       requestAnimationFrame(() => centre(found.scene.key, false));
     };
     follow();
-    // A link on this page to another flow or scene changes only the hash.
-    window.addEventListener("hashchange", follow);
-    return () => window.removeEventListener("hashchange", follow);
+    // A link on this page to another flow or scene changes only the hash, and brings the flow into view.
+    const followed = () => { follow(); if (/^#[a-z-]+\/[a-z-]+$/.test(window.location.hash)) deck.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    window.addEventListener("hashchange", followed);
+    return () => window.removeEventListener("hashchange", followed);
   }, [flows]);
 
   return (
     <div className="space-y-4">
-      <section className="scene-deck" aria-label="The flow">
+      <section ref={deck} className="scene-deck scroll-mt-24" aria-label="The flow">
         <div className="scene-film" aria-hidden />
         <div className="flex flex-wrap gap-1.5 px-5 pt-5 sm:px-7" role="group" aria-label="Flows">
           {flows.map((one, i) => (
@@ -162,7 +164,7 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
                           ? one.carriers.map((mark, n) => <span key={n} className={cn("scene-dot", `scene-dot-${mark}`)} />)
                           : <span className="scene-dot scene-dot-none" />}
                       </span>
-                      <span>{one.sets ? `${one.sets} set${one.sets === 1 ? "" : "s"}` : "no sets"}</span>
+                      <span>{one.sets ? `${one.sets} list${one.sets === 1 ? "" : "s"}` : "no lists"}</span>
                     </span>
                   )}
                 </button>

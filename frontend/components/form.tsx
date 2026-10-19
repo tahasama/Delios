@@ -52,6 +52,7 @@ export function ActionForm({
   hidden,
   hideSubmit,
   id,
+  footerClassName,
 }: {
   action: (prev: State | undefined, formData: FormData) => Promise<State>;
   children?: React.ReactNode;
@@ -70,6 +71,8 @@ export function ActionForm({
   hideSubmit?: boolean;
   /** Lets fields elsewhere on the page belong to this form, through their `form` attribute. */
   id?: string;
+  /** Where the answer and the button sit, when the fields above them carry their own padding (a sheet's rows). */
+  footerClassName?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const [missing, setMissing] = useState<MissingField[]>([]);
@@ -113,36 +116,38 @@ export function ActionForm({
         : null}
       {children}
 
-      <MissingSummary missing={missing} />
+      <Footer className={footerClassName}>
+        <MissingSummary missing={missing} />
 
-      {state?.error ? (
-        <div role="alert" className="rounded-lg bg-red-50 px-3 py-2">
-          <p className="text-xs text-red-700">{state.error}</p>
-          {state.issues?.length ? (
-            <ul className="scroll-thin mt-1.5 max-h-40 space-y-0.5 overflow-y-auto">
-              {state.issues.map((issue, i) => (
-                <li key={i} className="text-[11px] text-red-600">
-                  {issue.line > 0 ? <span className="font-mono font-medium">line {issue.line}: </span> : null}
-                  {issue.message}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
+        {state?.error ? (
+          <div role="alert" className="rounded-lg bg-red-50 px-3 py-2">
+            <p className="text-xs text-red-700">{state.error}</p>
+            {state.issues?.length ? (
+              <ul className="scroll-thin mt-1.5 max-h-40 space-y-0.5 overflow-y-auto">
+                {state.issues.map((issue, i) => (
+                  <li key={i} className="text-[11px] text-red-600">
+                    {issue.line > 0 ? <span className="font-mono font-medium">line {issue.line}: </span> : null}
+                    {issue.message}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
 
-      {state?.ok ? (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-          {state.ok}
-          {state.link ? <> <a href={state.link.href} className="font-semibold underline">{state.link.label}</a></> : null}
-        </p>
-      ) : null}
+        {state?.ok ? (
+          <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            {state.ok}
+            {state.link ? <> <a href={state.link.href} className="font-semibold underline">{state.link.label}</a></> : null}
+          </p>
+        ) : null}
 
-      {hideSubmit ? null : (
-        <button type="submit" disabled={pending} className={cn(btn(variant, size))}>
-          {pending ? "Working…" : submitLabel}
-        </button>
-      )}
+        {hideSubmit ? null : (
+          <button type="submit" disabled={pending} className={cn(btn(variant, size))}>
+            {pending ? "Working…" : submitLabel}
+          </button>
+        )}
+      </Footer>
     </form>
   );
 }
@@ -157,4 +162,9 @@ export function ConfirmButton({ confirm, children, ...rest }: { confirm: string;
       {children}
     </button>
   );
+}
+
+/** The answer and the button of a form: as they are, or in a strip of their own. */
+function Footer({ className, children }: { className?: string; children: React.ReactNode }) {
+  return className ? <div className={cn("space-y-3", className)}>{children}</div> : <>{children}</>;
 }

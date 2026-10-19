@@ -220,7 +220,7 @@ export async function setOneControlActivityAction(_prev: State | undefined, form
   // Moving the project to "it depends" must not move any other act: each one
   // is written down as it stands now before this one changes.
   const now = await controlSettings(await requireAdminScope());
-  if (now.projectMode !== "CUSTOM") {
+  if (!now.set || now.projectMode !== "CUSTOM") {
     for (const row of now.rows) {
       if (row.activity.key === key) continue;
       await put(row.activity.key, row.controlDoes ? "CONTROL" : "SELF", row.activity.title);

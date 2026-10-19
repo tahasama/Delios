@@ -499,9 +499,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Defaults for new projects (`/organization/defaults`, `PROJECT_DEFAULTS`): edited directly with the same form
   as a project's Control room (`components/how-it-works.tsx`), or taken from one project; they keep only what
   differs from the app's own; "Reset to the app's defaults". Copied when a project opens, never changing one
-  already open; a joined project follows its owner. A project marks each answer "as the defaults" / "the
-  app's" / "changed here" and has "Reset to the organization's defaults" (what the project is, and checks
-  ticked off, stay).
+  already open; a joined project follows its owner. A project marks only an answer "changed here" (or
+  "the organization's" where fixed); an unmarked answer is the defaults', said once at the head of each sheet (the
+  same answer marked on every line was noise). It has "Reset to the organization's defaults" (what the project is, and
+  checks ticked off, stay).
 - Not on DELIOS, with "Their email for transmittals" (`Party.ContactEmail`): our transmittals to them go by
   email with their files (`EmailReplies`), each with a reply address of its own (`replies+<key>@…`,
   `ReplyAddress`, kept outside organization fencing). A reply from that address only is taken in: it waits on
@@ -738,6 +739,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   what, releasing, adding people), opening on "Open the Control room". Everyone of ours reads it (`read: true`, "See
   how it works"); an administrator or the control function changes it (`mayChangeControlRoom`; read only otherwise:
   switches shown, nothing chosen). Every page below is what it is built from.
+  **One place per choice** (critique round): what a step of the flow decides is changed on that step only: who carries
+  its acts (`ActSwitch`, asked first) and its questions (`StepChoice`, "Change" opening the answers in place: what
+  may be put on a review and how fine the matrix is cut on Review; releasing, stamping with its stamps, and when an
+  action has what it needs on Released & issued / Release / Issue). Below the flow, "Who carries the acts out" keeps
+  the three-way answer and the acts drawn on no step (adding to an action, adding people, with their confirmation);
+  an act on a step is named there with "Change on its step", carried as it stands when saved. Not answered yet, the
+  project reads "it depends on the act" when its acts differ (`controlFrom`), and every act shows what really applies.
+  A step lists its lists one line each (name, how many in use, "not set up yet"), opening in Types & sets. Readers
+  get every answer in words: no greyed forms, no state names or reset.
 - **A person's activity** (owner): in People & access, a name opens `/settings/users/<id>`: who they are, then everything
   they did in the app with its day and time (signed in, opened a document, downloaded, reviewed, released, sent…), read
   from the audit trail (`GET /api/admin/users/{id}/activity`, narrowed by act and project, 50 a page). Opening a

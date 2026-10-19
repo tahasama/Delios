@@ -30,7 +30,7 @@ export const STATE_NAMES = [
 ] as const;
 
 type StateNameCode = (typeof STATE_NAMES)[number]["code"];
-type StateNames = Record<StateNameCode, string>;
+export type StateNames = Record<StateNameCode, string>;
 
 const DEFAULT_STATE_NAMES = Object.fromEntries(STATE_NAMES.map((one) => [one.code, one.default])) as StateNames;
 

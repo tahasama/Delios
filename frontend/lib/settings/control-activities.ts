@@ -406,12 +406,8 @@ export async function controlSettings(t: Tenant): Promise<ControlReading> {
 export function controlFrom(byKey: Map<string, string>, follows: boolean): ControlReading {
   const all = byKey.get(PROJECT_KEY);
   const set = all === "CONTROL" || all === "SELF" || all === "CUSTOM";
-  const projectMode: ProjectMode = set ? (all as ProjectMode) : follows ? "CONTROL" : "SELF";
-  return {
-    follows,
-    projectMode,
-    set,
-    rows: CONTROL_ACTIVITIES.map((activity) => {
+  const asSet: ProjectMode = set ? (all as ProjectMode) : follows ? "CONTROL" : "SELF";
+  const rows = CONTROL_ACTIVITIES.map((activity) => {
       const own = (byKey.get(activity.key) ?? "FOLLOW") as ControlMode;
       const mine = own === "CONTROL" ? true : own === "SELF" ? false : activity.workByDefault ? false : follows;
       return {
@@ -419,12 +415,15 @@ export function controlFrom(byKey: Map<string, string>, follows: boolean): Contr
         mode: own,
         // Until the project answers for everything, each act reads its own
         // default — which for most is the project's control function.
-        controlDoes: !set ? mine : projectMode === "CONTROL" ? true : projectMode === "SELF" ? false : mine,
+        controlDoes: !set ? mine : asSet === "CONTROL" ? true : asSet === "SELF" ? false : mine,
         off: !!SKIPPABLE[activity.key] && byKey.get(SKIP_KEY(activity.key)) === "OFF",
         confirm: !!CONFIRMABLE[activity.key] && effectiveAnswer(CONFIRM_KEY(activity.key), byKey.get(CONFIRM_KEY(activity.key))) === "ON",
       };
-    }),
-  };
+    });
+  // Not answered yet, some acts stay with the people doing the work whatever the project has (workByDefault): the
+  // project then reads as "it depends on the act", which is what it does.
+  const mixed = rows.some((row) => row.controlDoes) && rows.some((row) => !row.controlDoes);
+  return { follows, projectMode: !set && mixed ? "CUSTOM" : asSet, set, rows };
 }
 
 /**
