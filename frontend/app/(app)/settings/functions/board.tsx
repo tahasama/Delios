@@ -11,7 +11,7 @@ import {
   deletePermissionRuleAction,
   toggleFunctionVerb,
 } from "@/lib/settings/forms-functions";
-import { VERBS, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/core/permissions";
+import { VERBS, GRANTABLE, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/core/permissions";
 import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 import { Check, Minus } from "lucide-react";
 import { functionsForMatrix } from "@/lib/settings/api-admin";
@@ -63,8 +63,11 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
   // rules. A rule narrowed to one discipline still shows here, with its
   // selector listed underneath, so nothing is hidden by the summary.
   const grid = functions.map((f) => {
+    // A tick is the permission on every document (the rule naming no documents): what pressing it gives or takes.
+    // Held for certain documents only is shown apart (half), and pressing it gives it on every document.
+    const everywhere = (r: (typeof f.rules)[number]) => !(r.deliverableType || r.docType || r.discipline || r.criticality || r.confidentiality || r.projectRole);
     const held = new Set<Verb>();
-    for (const rule of f.rules) for (const verb of parseVerbs(rule.verbs)) held.add(verb);
+    for (const rule of f.rules.filter(everywhere)) for (const verb of parseVerbs(rule.verbs)) held.add(verb);
     return { fn: f, held };
   });
 
@@ -118,7 +121,7 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
             <tr>
               <Th className="sticky left-0 z-4 min-w-55 align-bottom">Function</Th>
               <Th className="align-bottom">Department</Th>
-              {VERBS.map((v) => (
+              {GRANTABLE.map((v) => (
                 <Th key={v} label={VERB_LABEL[v]} className="px-2 text-center align-bottom normal-case tracking-normal">
                   <span title={VERB_BLURB[v]} className="mx-auto block whitespace-nowrap text-[11px] font-semibold text-slate-600 [text-orientation:mixed] [writing-mode:vertical-rl] rotate-180">{VERB_LABEL[v]}</span>
                 </Th>
@@ -136,9 +139,9 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
                   {narrowed.length ? <p className="text-[11px] text-slate-500">only for {narrowed.join("; ")}</p> : null}
                 </Td>
                 <Td className="whitespace-nowrap py-2 text-xs text-slate-500">{fn.department ? deptLabel.get(fn.department) ?? fn.department : <span className="text-slate-300">—</span>}</Td>
-                    {VERBS.map((v) => {
+                    {GRANTABLE.map((v) => {
                       const on = held.has(v);
-                      const narrowed = fn.rules.some((r) => (r.deliverableType || r.docType || r.discipline || r.criticality || r.confidentiality) && r.verbs.includes(`"${v}"`));
+                      const narrowed = fn.rules.some((r) => (r.deliverableType || r.docType || r.discipline || r.criticality || r.confidentiality || r.projectRole) && r.verbs.includes(`"${v}"`));
                       return (
                         <Td key={v} className="px-2 py-1 text-center">
                           {admin ? (
@@ -146,10 +149,10 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
                               <input type="hidden" name="functionId" value={fn.id} />
                               <input type="hidden" name="verb" value={v} />
                               <ConfirmButton
-                                confirm={`${on ? "Take" : "Give"} ${VERB_LABEL[v]} ${on ? "from" : "to"} everyone who holds ${fn.name}${fn._count.memberships ? ` (${fn._count.memberships} ${fn._count.memberships === 1 ? "person" : "people"})` : ""}?`}
+                                confirm={`${on ? "Take" : "Give"} ${VERB_LABEL[v]} ${on ? "from" : "to"} everyone who holds ${fn.name}${fn._count.memberships ? ` (${fn._count.memberships} ${fn._count.memberships === 1 ? "person" : "people"})` : ""}${on ? "" : narrowed ? ", on every document (today only on certain documents)" : ""}?`}
                                 aria-pressed={on}
-                                title={`${on ? "Remove" : "Grant"} ${VERB_LABEL[v]} for ${fn.name}${narrowed ? " — it is also granted for certain documents only, which is changed below" : ""}`}
-                                aria-label={`${on ? "Remove" : "Grant"} ${VERB_LABEL[v]} for ${fn.name}`}
+                                title={`${on ? "Remove" : "Grant"} ${VERB_LABEL[v]} for ${fn.name} on every document${narrowed ? "; it is also granted for certain documents only, changed below" : ""}`}
+                                aria-label={`${on ? "Remove" : "Grant"} ${VERB_LABEL[v]} for ${fn.name} on every document`}
                                 className={`mx-auto grid h-6 w-6 place-items-center rounded-md border transition ${on ? "border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : narrowed ? "border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100" : "border-transparent text-slate-200 hover:border-line-strong hover:text-slate-500"}`}
                               >
                                 {on ? <Check className="h-3.5 w-3.5" /> : narrowed ? <span className="text-[11px] font-bold">◐</span> : <Minus className="h-3 w-3" />}
@@ -200,7 +203,7 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
                         <ActionForm action={savePermissionRuleAction} submitLabel="Add rule" size="sm" hidden={{ functionId: fn.id }}>
                           <Field label="May" required>
                             <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                              {VERBS.map((v) => (
+                              {GRANTABLE.map((v) => (
                                 <label key={v} className="flex items-center gap-2 text-xs text-slate-700" title={VERB_BLURB[v]}>
                                   <input type="checkbox" name="verbs" value={v} /> {VERB_LABEL[v]}
                                 </label>
@@ -275,7 +278,7 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
               </div>
               <Field label="May">
                 <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                  {VERBS.map((v) => (
+                  {GRANTABLE.map((v) => (
                     <label key={v} className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" name="verbs" value={v} defaultChecked={v === "READ"} /> {VERB_LABEL[v]}</label>
                   ))}
                 </div>

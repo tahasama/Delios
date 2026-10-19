@@ -5,14 +5,14 @@ import { requireAccessScope } from "@/lib/core/scope";
 import { api, refusal } from "@/lib/client";
 import { adminFunctions, rulesBody, type AdminFunction, type AdminRule } from "@/lib/settings/api-admin";
 import { getActiveSet } from "@/lib/settings/config";
-import { VERBS, type Verb } from "@/lib/core/permissions";
+import { VERBS, GRANTABLE, type Verb } from "@/lib/core/permissions";
 import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 
 const CODE = /^[A-Z0-9][A-Z0-9_-]{1,31}$/;
 
 function readVerbs(formData: FormData): Verb[] {
   const picked = formData.getAll("verbs").map(String);
-  return VERBS.filter((v) => picked.includes(v));
+  return GRANTABLE.filter((v) => picked.includes(v));
 }
 
 /**
@@ -158,7 +158,7 @@ async function toggleFunctionVerbAction(_prev: Result | undefined, formData: For
   const verb = String(formData.get("verb") ?? "");
   const fn = await findFunction(functionId);
   if (!fn) return { error: "That function no longer exists." };
-  if (!VERBS.includes(verb as Verb)) return { error: "Unknown permission." };
+  if (!GRANTABLE.includes(verb as Verb)) return { error: "Unknown permission." };
   const guard = adminFunctionGuard(ctx, fn);
   if (guard) return { error: guard };
   if (!ctx.can("CONFIGURE") && verb === "CONFIGURE") {

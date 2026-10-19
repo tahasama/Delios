@@ -51,6 +51,12 @@ export const VERBS = [
 ] as const;
 export type Verb = (typeof VERBS)[number];
 
+/**
+ * The permissions a function may be given: the backend's own (`Verbs.All`). "Review routes" and "Read matrix" are read
+ * on screens only, implied by Configure; the backend never kept them on a function, so they are not offered.
+ */
+export const GRANTABLE: Verb[] = VERBS.filter((v) => v !== "ROUTES" && v !== "MATRIX");
+
 export const VERB_LABEL: Record<Verb, string> = {
   READ: "Read",
   CREATE: "Create",

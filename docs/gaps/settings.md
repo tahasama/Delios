@@ -24,8 +24,9 @@ Each found wrong in the Settings review of 2026-10-16 (`.impeccable/critique/`),
    required by the backend: STEP_REASON_REQUIRED); only the two ways the backend runs a step are offered (all of them,
    or whoever gets to it first); "Offer this route first" puts it first among routes as specific; "From which
    organization" lists the organizations taking part, by their code, as a document's originator is.
-4. **Functions & permissions**: a tick can give a permission while saying it takes it away; two columns ("Review
-   routes", "Read matrix") are refused by the backend, silently.
+4. ~~**Functions & permissions**~~ Done: a tick is the permission on every document, what pressing it gives or takes
+   (held for certain documents only shows as half, and its question says it gives it on every document); "Review
+   routes" and "Read matrix", which the backend never keeps on a function, are not offered (`GRANTABLE`).
 5. **Sign-in & security**: single sign-on and "password sign-in off" exist in the backend with no screen.
 
 ## Small things seen, not done
