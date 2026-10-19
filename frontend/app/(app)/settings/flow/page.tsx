@@ -19,6 +19,8 @@ import { cn } from "@/lib/core/utils";
 import { adminFunctions, projectNumbering, partiesWithAnswers, routesForEditor } from "@/lib/settings/api-admin";
 import { getSet, getSets } from "@/lib/settings/config";
 import { NoAccess } from "../no-access";
+import { contractRoleOptions } from "@/lib/settings/contract-roles";
+import { roleLabel } from "@/lib/settings/profiles/roles";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Control room" };
@@ -194,6 +196,15 @@ const STAGES: Stage[] = [
     sets: ["REVIEW_OUTCOMES"],
   },
 
+  // ── Documents our client asks of us ─────────────────────────────────────────
+  {
+    key: "client-asked", title: "Asked of us", tagline: "By our client, on a transmittal", rail: "rail-received",
+    text: "Our client asks for a document on a transmittal, with the day it is due; it is answered by the document, sent on a transmittal following theirs.",
+    who: [{ title: "Recording what they ask", by: "Whoever receives it" }],
+    sets: ["REASONS_FOR_ISSUE"],
+    extras: ["parties", "form:TRANSMITTAL"],
+  },
+
   // ── Packages we deliver ─────────────────────────────────────────────────────
   {
     key: "pkg-made", title: "Put together", tagline: "Its documents gathered", rail: "rail-prep",
@@ -243,13 +254,7 @@ const STAGES: Stage[] = [
     key: "act-confirm", title: "Disciplines confirm", tagline: "Go ahead, with or without", rail: "rail-ready",
     text: "A discipline whose documents are ready is confirmed by itself; one still short confirms by hand, saying why.",
     who: [{ title: "Confirming", by: "Each discipline concerned" }],
-    answers: ["POLICY_READY"],
-  },
-  {
-    key: "act-escalated", title: "Escalated", tagline: "A discipline stays silent", rail: "rail-late",
-    text: "The day passed and a discipline short of its documents said nothing: after some working days its people, whoever holds Manage and the control function are told, once.",
-    who: [{ title: "Telling them", by: "The app, by itself" }],
-    answers: ["ESCALATE"],
+    answers: ["POLICY_READY", "ESCALATE"],
   },
   {
     key: "act-ahead", title: "Went ahead", tagline: "On its day", rail: "rail-done",
@@ -293,7 +298,37 @@ const STAGES: Stage[] = [
  * returns a refused revision follows the project, and without a control function there is no check before release.
  */
 type FlowLane = { scene: string; optional?: string; tagline?: string; end?: boolean };
-function flowsFor({ gate, returner, together, unreviewed }: { gate: boolean; returner: string; together: boolean; unreviewed: boolean }): { key: string; title: string; from: string; to: string; columns: FlowLane[][] }[] {
+type FlowShape = { key: string; title: string; from: string; to: string; columns: FlowLane[][] };
+
+/**
+ * Which side of the work our role on the project puts us on (This project, "our role", CONTRACT_ROLES): those who
+ * review and approve what others produce, those who produce for a client, or both at once.
+ */
+type Side = "approver" | "supplier" | "both";
+const SIDE_OF: Record<string, Side> = {
+  OWNER: "approver", PMC: "approver", EPCM: "approver", CM: "approver", INSPECTOR: "approver",
+  SUPPLIER: "supplier", SUBCONTRACTOR: "supplier", DESIGN: "supplier",
+};
+
+function flowsFor({ gate, returner, together, unreviewed, side }: { gate: boolean; returner: string; together: boolean; unreviewed: boolean; side: Side }): FlowShape[] {
+  const all = flowsAll({ gate, returner, together, unreviewed });
+  const flow = (key: string, title?: string) => {
+    const one = all.find((f) => f.key === key)!;
+    return title ? { ...one, title } : one;
+  };
+  // The flows that matter most for our role come first, in its words; the others stay behind them.
+  if (side === "approver") {
+    return [flow("receive", "Documents we review and approve"), flow("supplier", "Documents owed to us"), flow("produce", "Documents we issue"),
+      flow("deliver"), flow("action"), flow("join")];
+  }
+  if (side === "supplier") {
+    return [flow("produce", "Documents we produce for our client"), flow("client"), flow("supplier", "Documents our suppliers owe us"),
+      flow("receive"), flow("deliver"), flow("action"), flow("join")];
+  }
+  return [flow("produce"), flow("receive"), flow("supplier"), flow("deliver"), flow("action"), flow("join")];
+}
+
+function flowsAll({ gate, returner, together, unreviewed }: { gate: boolean; returner: string; together: boolean; unreviewed: boolean }): FlowShape[] {
   // Released and issued are one act unless the project keeps them apart (POLICY_RELEASE): one step, or two.
   // A released revision may be voided: the road that ends below the release.
   const voided: FlowLane = { scene: "voided", end: true, optional: "it was released in error" };
@@ -336,6 +371,17 @@ function flowsFor({ gate, returner, together, unreviewed }: { gate: boolean; ret
       ],
     },
     {
+      key: "client", title: "Documents our client asks of us", from: "Our client asks for it", to: "accepted by our client, or back with us for the next revision",
+      columns: [
+        [{ scene: "client-asked" }],
+        [{ scene: "register" }],
+        [{ scene: "prepare" }],
+        [{ scene: "review", tagline: "Ours, then our client's step on the route" }],
+        [{ scene: "accepted", tagline: "Our client accepts it" }, { scene: "returned", end: true, tagline: "Our client returns it" }],
+        ...out,
+      ],
+    },
+    {
       key: "deliver", title: "Packages we deliver", from: "We gather what someone needs", to: "delivered, and accepted by them",
       columns: [
         [{ scene: "pkg-made" }],
@@ -350,7 +396,7 @@ function flowsFor({ gate, returner, together, unreviewed }: { gate: boolean; ret
       columns: [
         [{ scene: "act-needs" }],
         [{ scene: "act-risk", optional: "a document is still missing" }],
-        [{ scene: "act-confirm" }, { scene: "act-escalated", optional: "a discipline short of its documents stays silent" }],
+        [{ scene: "act-confirm" }],
         [{ scene: "act-ahead" }, { scene: "act-postponed", end: true }],
       ],
     },
@@ -403,7 +449,7 @@ export default async function ControlRoomPage() {
     holdersOf(ctx, "CONTROL"),
     getSets().then((all) => all.map((one) => ({ key: one.key, title: one.title }))),
     // Every value of every list, to count what is in use.
-    getSets().then(async (all) => (await Promise.all(all.map(async (one) => (await getSet(one.key)).map((v) => ({ setKey: one.key, status: v.status, props: v.props as Record<string, unknown> }))))).flat()),
+    getSets().then(async (all) => (await Promise.all(all.map(async (one) => (await getSet(one.key)).map((v) => ({ setKey: one.key, code: v.code, label: v.label, status: v.status, props: v.props as Record<string, unknown> }))))).flat()),
     // What only the keepers of Settings may read comes back empty for others: unknown, never counted as none.
     routesForEditor().catch(() => null),
     projectNumbering().then((n) => n.schemes.filter((one) => one.active).length).catch(() => 0),
@@ -418,6 +464,10 @@ export default async function ControlRoomPage() {
   const stateNames_ = await stateNames(ctx);
 
   const gate = holders.length > 0;
+  // Our role on the project decides which flows come first, and in whose words.
+  const role = ctx.project.role ?? "GENERIC";
+  const side: Side = SIDE_OF[role] ?? "both";
+  const roleName = (await contractRoleOptions().catch(() => [])).find((one) => one.code === role)?.label ?? roleLabel(role);
   // A document type published as not reviewed goes from Prepare straight to release.
   const unreviewed = values.some((one) => one.setKey === "DOCUMENT_TYPES" && one.status === "ACTIVE" && one.props?.review === false);
   const together = (answers.get("POLICY_RELEASE") ?? "TOGETHER") === "TOGETHER";
@@ -518,7 +568,7 @@ export default async function ControlRoomPage() {
       ];
     }
     if (key === "ESCALATE") {
-      return <Choice key={key} title="A silent discipline is escalated after" value={escalate} unit="working days" min={1} max={60}
+      return <Choice key={key} title="A discipline still silent after the day is told again, with whoever holds Manage and the control function, after" value={escalate} unit="working days" min={1} max={60}
         action={setRoomAnswerAction} hidden={{ key: ESCALATE_AFTER_KEY }} readOnly={readOnly} fixed={isFixed(ESCALATE_AFTER_KEY)} />;
     }
     const policy = POLICIES.find((one) => one.key === key);
@@ -615,7 +665,7 @@ export default async function ControlRoomPage() {
 
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "The reviewer";
-  const flows: Flow[] = flowsFor({ gate, returner, together, unreviewed }).map((flow) => ({
+  const flows: Flow[] = flowsFor({ gate, returner, together, unreviewed, side }).map((flow) => ({
     ...flow,
     columns: flow.columns.map((column) => column.map((lane) => {
       const stage = byKey.get(lane.scene)!;
@@ -633,6 +683,10 @@ export default async function ControlRoomPage() {
             <p className="plate-meta mt-2">
               The control function: {names.length ? names.join(", ") : "nobody (the people doing the work run the register)"}
               {opens(HOW) ? <> · <Link href={`${HOW}#control-people`} className="text-link hover:underline">{readOnly ? "see" : "change"}</Link></> : null}
+            </p>
+            <p className="plate-meta mt-1">
+              Drawn for our role on {ctx.project.code}: {roleName}
+              {opens("/settings/projects") && !readOnly ? <> · <Link href="/settings/projects" className="text-link hover:underline">change</Link></> : null}
             </p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
               How {ctx.project.code} works, step by step. Choose a flow, then a step: who does it and how it works here are

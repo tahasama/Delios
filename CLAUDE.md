@@ -739,8 +739,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   across its top, (owner: no readouts on the stations). The lines stay (owner): an arrow on to the next station,
   a dashed drop to a road that ends (below its station, rose, "ends here"); an optional step is dashed and labelled
   "optional", its line "Only if …" (owner): Review where some document types are not reviewed, Approved outside / Not
-  approved, Voided (off the release, ends), Going without, At risk, Escalated (beside Disciplines confirm), Confirmed /
-  Refused; what another organization sends is checked before it is registered (Documents we receive); the lit station is ringed in light blue. The key stays under the console (owner: "critical"):
+  approved, Voided (off the release, ends), Going without, At risk, Confirmed / Refused. Never an "Escalated" step (owner): telling
+  a silent discipline again is a notice, its days a setting on "Disciplines confirm"; the action stays open and overdue,
+  with no explanation of its own; what another organization sends is checked before it is registered (Documents we receive); the lit station is ringed in light blue. The key stays under the console (owner: "critical"):
   the light on top, dashed (optional), below in rose, ringed. Under it, "The days
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
@@ -749,6 +750,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   what, releasing, adding people), opening on "Open the Control room". Everyone of ours reads it (`read: true`, "See
   how it works"); an administrator or the control function changes it (`mayChangeControlRoom`; read only otherwise:
   switches shown, nothing chosen). Every page below is what it is built from.
+  **The flows follow our role on the project** (owner; This project, "our role", CONTRACT_ROLES, named on the masthead
+  with "change"): approving roles (OWNER, PMC, EPCM, CM, INSPECTOR) see "Documents we review and approve" (we receive)
+  first, then "Documents owed to us", "Documents we issue"; supplying roles (SUPPLIER, SUBCONTRACTOR, DESIGN) see
+  "Documents we produce for our client", then **"Documents our client asks of us"** (asked of us on a transmittal, our
+  register, prepare, our review then the client's step on the route, accepted or returned by the client, released &
+  issued), then "Documents our suppliers owe us"; the others (EPC, CONTRACTOR, GENERIC…) see the flows as they are.
+  The rest follow (packages, an action, someone joins). `SIDE_OF` in `flow/page.tsx`.
   **The Control room simplifies the work, never adds clicks** (owner, after looking at how flow designers
   work: a step chosen on the flow opens its properties beside it). Six flows: documents we produce, we receive, a
   supplier owes us, packages we deliver, an action on the schedule, someone joins the project. The chosen step's
