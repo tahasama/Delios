@@ -17,9 +17,9 @@ Each found wrong in the Settings review of 2026-10-16 (`.impeccable/critique/`),
 1. ~~**Revisions**: lowercase revision letters are turned upper case on save; zero padding cannot be set.~~ Done: "Starts
    at" says both, as written ("a": small letters, "01": two digits); the backend reads them from it, and a line revisions
    carry keeps how its values are written.
-2. **Control room**: ~~four switches the app never reads~~ (done: they work, see CLAUDE.md, Control room acts); the
-   flow for a supplier's documents (placeholder, check, who holds it, hand-back) is not shown; release and issue still
-   drawn as two steps when they are one act; no default lead days.
+2. ~~**Control room**~~ Done: the four switches work; the flow draws "Released & issued" as one step (two where the
+   project keeps them apart) and has a third flow, "Documents a supplier owes us"; the days around an action (needed
+   before, at risk from) are set there.
 3. **Review routes**: a step answered by another organization loses its "reason for issue" on save; two step types
    that do not exist are offered; "Offer this route first" does the opposite; "From which organization" never matches.
 4. **Functions & permissions**: a tick can give a permission while saying it takes it away; two columns ("Review

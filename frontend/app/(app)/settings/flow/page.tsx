@@ -267,6 +267,71 @@ const STAGES: Stage[] = [
     extras: [],
   },
   {
+    key: "released-issued",
+    tagline: "In force, and sent",
+    title: "Released & issued",
+    text: "One act: the revision comes into force, the one before it is superseded, and it goes at once to the people and organizations named by whoever decided or asked. Nothing is released to nobody.",
+    rail: "rail-released",
+    states: ["RELEASED", "SUPERSEDED"],
+    acts: ["ISSUE"],
+    policies: ["POLICY_RELEASE", "POLICY_READY"],
+    sets: ["REASONS_FOR_ISSUE", "ISSUE_CODES"],
+    fixed: [
+      { title: "Who receives it", text: "Named by the decider, or by whoever asked for it to be sent; the release shows them, each removable, and others may be added." },
+      { title: "To an organization not on the system", text: "One of our people sends it on and marks it sent, with the proof; until then it reads as not yet sent." },
+    ],
+    branches: [
+      { title: "Voiding a revision", text: "Released in error, or never reviewed — and what was done from it is reassessed.", act: "VOID" },
+      { title: "An action going ahead without its documents", text: "The day passes and something it needed is missing; the note says who decided and who owns the delay.", act: "ACTION_NOTE" },
+    ],
+    extras: ["distribution", "parties"],
+  },
+  {
+    key: "asked",
+    tagline: "Asked of them, theirs to send",
+    title: "Asked of the supplier",
+    text: "A placeholder from the supplier's package goes to them on a transmittal, issued for update, due on its planned day. From then the supplier holds it: only they change it until they send it.",
+    rail: "rail-sent",
+    states: [],
+    acts: [],
+    policies: [],
+    sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS"],
+    fixed: [
+      { title: "Asked once", text: "Each placeholder is asked once, from the package or the register; after that it is handed back and forth." },
+      { title: "Who holds it", text: "One side at a time: the supplier while it is with them, us once they send it; only the holder changes it." },
+    ],
+    branches: [],
+    extras: ["parties"],
+  },
+  {
+    key: "checked",
+    tagline: "Accepted, or back to them",
+    title: "The control function's check",
+    text: "What the supplier sent is checked before it counts: accepted, it becomes the document's revision and we hold it; returned, with why, they hold it again to correct it.",
+    rail: "rail-check",
+    states: [],
+    acts: [],
+    policies: [],
+    sets: [],
+    fixed: [{ title: "Nothing counts before the check", text: "Until it is accepted, the files belong to the transmittal they came on; the document keeps what it had." }],
+    branches: [],
+    extras: [],
+  },
+  {
+    key: "handed-back",
+    tagline: "Theirs again, to update",
+    title: "Back with the supplier",
+    text: "A review that rejects it, or releases it with comments to take in, hands it back to the supplier for the next revision; their people are told and it is on their Home. Either side may also ask the holder to hand it back for an update, with why.",
+    rail: "rail-rejected",
+    states: ["RETURNED"],
+    acts: [],
+    policies: [],
+    sets: [],
+    fixed: [{ title: "Read from what the verdict means", text: "Accepted or for information: we keep it. Accepted with comments or rejected: it goes back to them. Never read from a verdict's code." }],
+    branches: [],
+    extras: [],
+  },
+  {
     key: "issue",
     tagline: "Sent out",
     title: "Issue",
@@ -295,7 +360,9 @@ const STAGES: Stage[] = [
  * release either; the verdict releases it.
  */
 type FlowLane = { scene: string; optional?: string; tagline?: string; end?: boolean };
-function flowsFor({ gate, returner }: { gate: boolean; returner: string }): { key: string; title: string; from: string; to: string; columns: FlowLane[][] }[] {
+function flowsFor({ gate, returner, together }: { gate: boolean; returner: string; together: boolean }): { key: string; title: string; from: string; to: string; columns: FlowLane[][] }[] {
+  // Released and issued are one act unless the project keeps them apart (POLICY_RELEASE): one step, or two.
+  const out: FlowLane[][] = together ? [[{ scene: "released-issued" }]] : [[{ scene: "release" }], [{ scene: "issue" }]];
   return [
     {
       key: "produce",
@@ -314,8 +381,7 @@ function flowsFor({ gate, returner }: { gate: boolean; returner: string }): { ke
           { scene: "approval", optional: "an outside approval is asked for" },
           { scene: "approval-refused", end: true, optional: "an outside approval is asked for", tagline: `Not approved — ${returner} returns it` },
         ],
-        [{ scene: "release" }],
-        [{ scene: "issue" }],
+        ...out,
       ],
     },
     {
@@ -330,8 +396,21 @@ function flowsFor({ gate, returner }: { gate: boolean; returner: string }): { ke
         // document matches decides who is on it.
         [{ scene: "review", tagline: "Ours, theirs, or both" }],
         [{ scene: "accepted" }, { scene: "to-sender", end: true, tagline: `For correction — ${returner} returns it` }],
-        [{ scene: "release" }],
-        [{ scene: "issue" }],
+        ...out,
+      ],
+    },
+    {
+      key: "supplier",
+      title: "Documents a supplier owes us",
+      from: "We ask the supplier for it",
+      to: "In force with us — or back with them for the next revision",
+      columns: [
+        [{ scene: "asked" }],
+        [{ scene: "received", tagline: "They send it, on a transmittal" }],
+        [{ scene: "checked" }],
+        [{ scene: "review", tagline: "Ours, theirs, or both" }],
+        [{ scene: "accepted", tagline: "Accepted: we hold it" }, { scene: "handed-back", end: true }],
+        ...out,
       ],
     },
   ];
@@ -536,7 +615,7 @@ export default async function ControlRoomPage() {
   };
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "the reviewer";
-  const flows: Flow[] = flowsFor({ gate, returner }).map((flow) => ({
+  const flows: Flow[] = flowsFor({ gate, returner, together }).map((flow) => ({
     ...flow,
     columns: flow.columns.map((column) => column.map((lane) => ({ scene: { ...sceneOf(byKey.get(lane.scene)!), ...(lane.tagline ? { tagline: lane.tagline } : {}) }, optional: lane.optional, end: lane.end }))),
   }));
@@ -559,7 +638,12 @@ export default async function ControlRoomPage() {
           </div>
           <div className="px-5 py-3 sm:px-6">
             <p className="stencil text-slate-500">Who does what</p>
-            <p className="mt-1 text-[13px] font-medium text-slate-900">{PROJECT_MODE_LABEL[settings.projectMode]}</p>
+            <p className="mt-1 text-[13px] font-medium text-slate-900">
+              {/* Not answered yet, some acts stay with the people doing the work whatever the project has (workByDefault). */}
+              {!settings.set && settings.rows.some((row) => !row.controlDoes) && settings.rows.some((row) => row.controlDoes)
+                ? `The control function, except ${settings.rows.filter((row) => !row.controlDoes).length} left to the people doing the work`
+                : PROJECT_MODE_LABEL[settings.projectMode]}
+            </p>
             <p className="text-[11px] text-slate-500">{settings.set ? "Set by an administrator." : "Not set yet — read from the project."}</p>
           </div>
           <div className="px-5 py-3 sm:px-6">

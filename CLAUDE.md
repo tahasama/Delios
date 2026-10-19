@@ -728,6 +728,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   carries (`Readiness.ThereAsync`); readiness is read again on a send, a decision, and when either policy changes. These
   three acts are left to the people doing the work unless the project says otherwise (`ProjectAnswers.WorkByDefault`,
   `workByDefault`): projects go on as before until they choose.
+- The Control room's flow draws released and issued as one step, "Released & issued", unless the project keeps them
+  apart (POLICY_RELEASE = SEPARATE: Release, then Issue), and has three flows: documents we produce, we receive, and a
+  supplier owes us (asked, received, the control function's check, review, kept or back with them). Under it, "The days
+  around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
+  named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
   of the hub (`CONTROL_ROOM`): how the project works, and what makes it work that way (the control function, who does
   what, releasing, adding people), opening on "Open the Control room". Everyone of ours reads it (`read: true`, "See

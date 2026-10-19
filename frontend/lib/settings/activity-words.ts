@@ -101,6 +101,7 @@ const WORDS: Record<string, string> = {
   SCHEDULE_READ: "Read the schedule",
   SCHEDULE_NOT_READ: "Schedule could not be read",
   SCHEDULE_SOURCE_SET: "Chose the project's schedule",
+  SCHEDULE_DAYS_SET: "Set the days around an action",
   DEPARTMENTS_READ: "Read the disciplines per action",
   DEPARTMENTS_NOT_READ: "Disciplines per action could not be read",
   DEPARTMENTS_NOTIFIED: "Told the disciplines",

@@ -6,7 +6,7 @@ import { isAdmin } from "@/lib/core/auth";
 import { randomUUID } from "crypto";
 import { STATE_NAMES, STATE_NAME_MAX } from "@/lib/core/state-names";
 import { orgSettings, projectSettings, setOrgSetting, setProjectSetting } from "@/lib/settings/api";
-import { refusal } from "@/lib/client";
+import { api, projectPath, refusal } from "@/lib/client";
 import { ESCALATE_AFTER_KEY } from "@/lib/actions/escalation";
 import {
   CONTROL_ACTIVITIES,
@@ -268,5 +268,26 @@ export async function setStateNamesAction(_prev: State | undefined, formData: Fo
   revalidatePath("/", "layout");
   if (!changed.length) return { ok: "Nothing changed." };
   return { ok: `Renamed: ${changed.join("; ")}.` };
+}
+
+/**
+ * The days around an action (Control room): how long before an action's day its documents are needed, unless the
+ * requirements list says otherwise, and from how long before it the action is at risk. The backend checks the risk
+ * window is the project's to change, and reads every action again.
+ */
+export async function setScheduleDaysAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const lead = Number(formData.get("leadDays"));
+  const risk = Number(formData.get("riskDays"));
+  if (!Number.isInteger(lead) || !Number.isInteger(risk) || lead < 0 || risk < 0 || lead > 365 || risk > 365)
+    return { error: "Write whole days, from 0 to 365." };
+  try {
+    await api(projectPath(ctx, "/schedule/days"), { method: "PUT", body: { defaultLeadDays: lead, riskWindowDays: risk } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath("/settings/flow");
+  revalidatePath("/schedule");
+  return { ok: `Saved: needed ${lead} days before an action, at risk from ${risk} days before.` };
 }
 

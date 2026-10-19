@@ -6,7 +6,10 @@ import { ActionForm } from "@/components/form";
 import { HowItWorks, DefaultsLink } from "@/components/how-it-works";
 import { holders, projectSettings } from "@/lib/settings/api";
 import { NOT_SWITCHABLE } from "@/lib/settings/control-activities";
-import { setStateNamesAction, resetProjectToDefaultsAction } from "@/lib/settings/forms-how-it-works";
+import { setStateNamesAction, resetProjectToDefaultsAction, setScheduleDaysAction } from "@/lib/settings/forms-how-it-works";
+import { scheduleSource } from "@/lib/actions/api";
+import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
+import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { STATE_NAMES, STATE_NAME_MAX, stateNames } from "@/lib/core/state-names";
 import { projectDefaults } from "@/lib/organization/defaults";
 import { fmtDate } from "@/lib/core/utils";
@@ -24,13 +27,15 @@ import { fmtDate } from "@/lib/core/utils";
  */
 export async function ProjectSettings({ readOnly = false }: { readOnly?: boolean }) {
   const ctx = await requireScope();
-  const [answers, controllers, names, defaults, switches] = await Promise.all([
+  const [answers, controllers, names, defaults, switches, schedule] = await Promise.all([
     projectSettings(ctx.projectId).catch(() => new Map<string, string>()),
     holders(ctx.projectId, "CONTROL").catch(() => []),
     stateNames(ctx),
     projectDefaults().catch(() => null),
     liberty(),
+    scheduleSource(ctx),
   ]);
+  const riskFixed = switches.some((one) => one.key === "RISK_WINDOW" && !one.free);
   // What the organization keeps the same on every project: shown, never chosen here (backend ROOM_FIXED).
   const fixed = switches.filter((one) => one.area === "Control room" && !one.free).map((one) => one.key);
   const admin = isAdmin(ctx.user);
@@ -42,6 +47,47 @@ export async function ProjectSettings({ readOnly = false }: { readOnly?: boolean
         <HowItWorks target="project" answers={answers} follows={controllers.length > 0} base={defaults?.values ?? null}
           fixed={fixed} />
       </div>
+
+      {/* The days around an action: needed before its day, at risk from. Kept with the project's schedule. */}
+      <section className="register register-sheet register-sheet-open">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span className="stencil mr-1 text-slate-500">The days around an action</span>
+          <span className="text-[11px] text-slate-500">
+            {schedule.source ? "for every action of the project's schedule" : "once the project's schedule is named (Schedule)"}
+          </span>
+        </div>
+        {schedule.source ? (
+          <ActionForm action={setScheduleDaysAction} submitLabel="Save" className="space-y-3 px-5 py-4 sm:px-6">
+            <p className="text-xs leading-5 text-slate-600">
+              A document an action needs is due this many days before the action&rsquo;s day, unless the requirements list gives its own;
+              the action is at risk from this many days before it while a document is still missing, unless the document has its own window.
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:max-w-xl">
+              <label className="text-xs text-slate-700">
+                <span className="mb-1.5 block h-4 font-medium leading-4">Needed before the action&rsquo;s day</span>
+                <span className="flex items-center gap-2">
+                  <input type="number" name="leadDays" min={0} max={365} defaultValue={schedule.source.defaultLeadDays ?? DEFAULT_LEAD_DAYS} className={`${inputCls} w-24`} />
+                  days
+                </span>
+              </label>
+              <label className="text-xs text-slate-700">
+                <span className="mb-1.5 block h-4 font-medium leading-4">At risk from</span>
+                <span className="flex items-center gap-2">
+                  <input type="number" name="riskDays" min={0} max={365} defaultValue={schedule.source.riskWindowDays ?? DEFAULT_RISK_DAYS}
+                    readOnly={riskFixed} className={`${inputCls} w-24`} />
+                  days before
+                </span>
+              </label>
+            </div>
+            {riskFixed ? <p className="text-[11px] leading-5 text-slate-500">The organization keeps the risk window the same on every project: an administrator changes it in the organization&rsquo;s Settings.</p> : null}
+          </ActionForm>
+        ) : (
+          <p className="px-5 py-4 text-xs leading-5 text-slate-600 sm:px-6">
+            Each document is needed {DEFAULT_LEAD_DAYS} days before its action, and the action is at risk from {DEFAULT_RISK_DAYS} days before, until the
+            project&rsquo;s schedule is named; then they can be changed here.
+          </p>
+        )}
+      </section>
 
       <section className="register register-sheet register-sheet-open">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
