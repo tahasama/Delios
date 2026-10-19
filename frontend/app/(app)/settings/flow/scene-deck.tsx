@@ -22,7 +22,7 @@ export type Lane = { scene: Scene; optional?: string; end?: boolean };
  * One flow a document goes through: its columns in order, and in a column
  * with more than one lane, scenes that run side by side.
  */
-export type Flow = { key: string; title: string; from: string; to: string; columns: Lane[][] };
+export type Flow = { key: string; title: string; tab: string; from: string; to: string; columns: Lane[][] };
 
 /**
  * The flow as a row of steps on its band: one flow at a time, one step of it lit, and under the band that step's
@@ -97,14 +97,16 @@ export function SceneDeck({ flows, panels }: { flows: Flow[]; panels: Record<str
   return (
     <div className="space-y-4">
       <section ref={deck} className="scene-deck scroll-mt-24" aria-label="The flow">
-        <div className="scroll-quiet flex gap-1 overflow-x-auto px-5 pt-5 sm:flex-wrap sm:px-6" role="group" aria-label="Which flow">
+        <div className="scroll-quiet flex gap-1 overflow-x-auto px-5 pt-5 sm:px-6" role="group" aria-label="Which flow">
           {flows.map((one, i) => (
-            <button key={one.key} type="button" onClick={() => pick(i)} aria-pressed={i === on} className="route-pick">
-              {one.title}
+            <button key={one.key} type="button" onClick={() => pick(i)} aria-pressed={i === on} title={one.title} className="route-pick">
+              {one.tab}
             </button>
           ))}
         </div>
         <p className="scene-route px-5 pt-3 sm:px-6">
+          <span className="scene-route-title">{flow.title}</span>
+          <span aria-hidden className="scene-route-arrow"> · </span>
           {flow.from} <span aria-hidden className="scene-route-arrow">→</span> {flow.to}
         </p>
 

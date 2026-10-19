@@ -420,7 +420,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   its files belong to the transmittal it came on (each line carries that
   submission's own files, checked there): the document keeps what it had (a
   placeholder: nothing; handed back for an update: the submission accepted
-  before). `RevisionReading` (backend, `AwaitingCheck`).
+  before). `RevisionReading` (backend, `AwaitingCheck`). With no control function on the project, whoever the
+  transmittal it came on was for checks it (anyone of ours when it named nobody; `ControlService.ArrivalAsync`,
+  `TransmittalPage.MayCheck`), and it waits on their Home; the Control room draws "Checked by whoever it was for".
 - "Files that came with it" shows on a received transmittal only when files
   came with it.
 - A placeholder sent to its supplier is issued for update: reason IFU ("For update",
@@ -735,7 +737,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   produces the document (owner: keep them, nothing finer): ours, another organization's (the deliverable type needs
   an originator), a supplier's asked from its package (a placeholder). The flow is a **console** (owner: "an actual control room, the steps are
   portals to the regulators, not a diagram"; no gradient; no black, grey or white): one solid brand-navy panel, the
-  flows as tabs, one line "from → to", each step a station in brand blue with its state's colour as a status light
+  flows as tabs on one line (owner: never more; a short name each, `tab`, in the role's words, the full title on
+  hover and at the head of the line under them), one line "title · from → to", each step a station in brand blue with its state's colour as a status light
   across its top, (owner: no readouts on the stations). The lines stay (owner): an arrow on to the next station,
   a dashed drop to a road that ends (below its station, rose, "ends here"); an optional step is dashed and labelled
   "optional", its line "Only if …" (owner): Review where some document types are not reviewed, Approved outside / Not

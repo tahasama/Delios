@@ -256,6 +256,8 @@ export type TransmittalPage = {
   transmittal: TransmittalView;
   status: "DRAFT" | "ISSUED" | "REJECTED" | "ACCEPTED";
   issuingParty: string; checkedBy: string | null; checkedAt: string | null; returnedReason: string | null;
+  /** May this person accept or return what arrived (the control function; with none, whoever it was for). */
+  mayCheck?: boolean;
   carried: CarriedItem[];
   files: { id: string; name: string; size: number; sha256: string; keptBy: string; keptAt: string }[];
   issueRequests: { id: string; reason: string; note: string | null }[];

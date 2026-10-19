@@ -190,6 +190,11 @@ const STAGES: Stage[] = [
     who: ["CONTROL_PEOPLE", { title: "Checking it", by: "The control function" }],
   },
   {
+    key: "checked-self", title: "Checked by whoever it was for", tagline: "Accepted, or back to them", rail: "rail-check",
+    text: "With no control function on the project, whoever the transmittal was for checks it (anyone of ours when it named nobody): accepted, it becomes the document's revision; returned, with why, they correct it.",
+    who: [{ title: "Checking it", by: "Whoever the transmittal was for" }],
+  },
+  {
     key: "handed-back", title: "Back with the supplier", tagline: "Theirs again, to update", rail: "rail-rejected",
     text: "Rejected, or released with comments: it goes back to the supplier for the next revision.",
     who: [{ title: "Taking the comments in", by: "The supplier" }],
@@ -300,7 +305,7 @@ const STAGES: Stage[] = [
 type FlowLane = { scene: string; optional?: string; tagline?: string; end?: boolean };
 const cap = (words: string) => words.charAt(0).toUpperCase() + words.slice(1);
 
-type FlowShape = { key: string; title: string; from: string; to: string; columns: FlowLane[][] };
+type FlowShape = { key: string; title: string; tab: string; from: string; to: string; columns: FlowLane[][] };
 
 /**
  * What our role on the project (This project, "our role", CONTRACT_ROLES) makes of the flows, as such projects run:
@@ -313,6 +318,8 @@ type FlowShape = { key: string; title: string; from: string; to: string; columns
 type RoleWork = {
   order: string[];
   titles?: Record<string, string>;
+  /** The short names on the tabs, where the role words them otherwise. */
+  tabs?: Record<string, string>;
   ours: "final" | "recommends" | "passes";
   decider?: string;
   approver?: string;
@@ -321,33 +328,40 @@ type RoleWork = {
 const ROLE_WORK: Record<string, RoleWork> = {
   // Everything comes to the owner, who decides.
   OWNER: { order: ["receive", "supplier", "produce"], ours: "final",
-    titles: { receive: "Documents we approve", supplier: "Documents owed to us", produce: "Documents we issue" } },
+    titles: { receive: "Documents we approve", supplier: "Documents owed to us", produce: "Documents we issue" },
+    tabs: { receive: "We approve", supplier: "Owed to us", produce: "We issue" } },
   // A project management consultant manages for the owner: it reviews and recommends, the owner decides.
   PMC: { order: ["receive", "produce", "supplier"], ours: "recommends", decider: "The owner",
-    titles: { receive: "Documents we review for the owner", produce: "Documents we issue", supplier: "Documents owed to the project" } },
+    titles: { receive: "Documents we review for the owner", produce: "Documents we issue", supplier: "Documents owed to the project" },
+    tabs: { receive: "We review", produce: "We issue", supplier: "Owed to the project" } },
   // EPCM manages engineering, vendors and contractors on the owner's behalf, and approves for it.
   EPCM: { order: ["produce", "receive", "supplier"], ours: "final", approver: "The owner",
-    titles: { produce: "Engineering we produce for the owner", receive: "Documents we approve on the owner's behalf", supplier: "Documents vendors owe the project" } },
+    titles: { produce: "Engineering we produce for the owner", receive: "Documents we approve on the owner's behalf", supplier: "Documents vendors owe the project" },
+    tabs: { produce: "We engineer", receive: "We approve", supplier: "Vendors owe" } },
   // EPC approves its own engineering and its suppliers' data; the client may ask to approve.
   EPC: { order: ["produce", "supplier", "receive"], ours: "final",
     titles: { supplier: "Documents our suppliers owe us" } },
   // The designer (architect, engineer of record) produces the design the client approves, and approves shop
   // drawings and submittals for conformance with it.
   DESIGN: { order: ["produce", "receive", "client"], ours: "final", approver: "The client", client: "the client",
-    titles: { produce: "Design we produce for the client", receive: "Shop drawings and submittals we approve" } },
+    titles: { produce: "Design we produce for the client", receive: "Shop drawings and submittals we approve" },
+    tabs: { produce: "We design", receive: "We approve" } },
   // A construction manager checks the trades' submittals first and passes them to the designer, who approves.
   CM: { order: ["receive", "produce", "supplier"], ours: "passes", decider: "The designer",
-    titles: { receive: "Submittals we check and pass on", produce: "Documents we issue", supplier: "Documents the trades owe us" } },
+    titles: { receive: "Submittals we check and pass on", produce: "Documents we issue", supplier: "Documents the trades owe us" },
+    tabs: { receive: "We check", produce: "We issue", supplier: "Trades owe us" } },
   // A contractor produces for the client or its engineer, and checks its subcontractors' and suppliers' first.
   CONTRACTOR: { order: ["produce", "client", "receive", "supplier"], ours: "passes", decider: "The client or its engineer", approver: "The client or its engineer", client: "the client",
-    titles: { produce: "Documents we produce for the client", receive: "Submittals we check and pass on", supplier: "Documents our suppliers owe us" } },
+    titles: { produce: "Documents we produce for the client", receive: "Submittals we check and pass on", supplier: "Documents our suppliers owe us" },
+    tabs: { receive: "We check" } },
   SUBCONTRACTOR: { order: ["produce", "client", "supplier", "receive"], ours: "passes", decider: "The main contractor", approver: "The main contractor", client: "the main contractor",
     titles: { produce: "Documents we produce for the main contractor", supplier: "Documents our suppliers owe us" } },
   SUPPLIER: { order: ["produce", "client", "supplier", "receive"], ours: "final", approver: "Our customer", client: "our customer",
     titles: { produce: "Documents we produce for our customer", supplier: "Documents our own suppliers owe us" } },
   // A third-party inspector certifies its own scope and comments on the rest; it never approves design.
   INSPECTOR: { order: ["produce", "receive"], ours: "recommends", decider: "The client", approver: "The client",
-    titles: { produce: "Reports and certificates we issue", receive: "Documents we review and comment on" } },
+    titles: { produce: "Reports and certificates we issue", receive: "Documents we review and comment on" },
+    tabs: { produce: "We certify", receive: "We comment" } },
 };
 const GENERIC_WORK: RoleWork = { order: ["produce", "receive", "supplier"], ours: "final" };
 
@@ -356,7 +370,7 @@ function flowsFor({ gate, returner, together, unreviewed, role }: { gate: boolea
   const all = flowsAll({ gate, returner, together, unreviewed, work });
   const flow = (key: string) => {
     const one = all.find((f) => f.key === key)!;
-    return work.titles?.[key] ? { ...one, title: work.titles[key] } : one;
+    return { ...one, title: work.titles?.[key] ?? one.title, tab: work.tabs?.[key] ?? one.tab };
   };
   // The flows that matter most for our role come first, in its words; the others follow.
   const lead = work.order.filter((key) => all.some((f) => f.key === key));
@@ -383,7 +397,7 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
   const ourReview = work.ours === "recommends" ? "We review it and recommend" : work.ours === "passes" ? "We check it before passing it on" : "By us, by them, or both";
   return [
     {
-      key: "produce", title: "Documents we produce", from: "We write it", to: "in force, and sent to whoever needs it",
+      key: "produce", tab: "We produce", title: "Documents we produce", from: "We write it", to: "in force, and sent to whoever needs it",
       columns: [
         [{ scene: "register" }],
         [{ scene: "prepare" }],
@@ -395,10 +409,10 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       ],
     },
     {
-      key: "receive", title: "Documents we receive", from: "Another organization sends it", to: "accepted here and passed on, or back to them",
+      key: "receive", tab: "We receive", title: "Documents we receive", from: "Another organization sends it", to: "accepted here and passed on, or back to them",
       columns: [
         [{ scene: "received" }],
-        [{ scene: "checked" }],
+        [{ scene: gate ? "checked" : "checked-self" }],
         [{ scene: "theirs" }],
         [{ scene: "review", tagline: ourReview, optional: reviewed }],
         [{ scene: "accepted", tagline: work.ours === "final" ? undefined : work.ours === "recommends" ? "We recommend it" : "We pass it on" }, { scene: "to-sender", end: true }],
@@ -407,18 +421,18 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       ],
     },
     {
-      key: "supplier", title: "Documents a supplier owes us", from: "We ask the supplier for it", to: "in force with us, or back with them for the next revision",
+      key: "supplier", tab: "Suppliers owe us", title: "Documents a supplier owes us", from: "We ask the supplier for it", to: "in force with us, or back with them for the next revision",
       columns: [
         [{ scene: "asked" }],
         [{ scene: "received", tagline: "They send it, on a transmittal" }],
-        [{ scene: "checked" }],
+        [{ scene: gate ? "checked" : "checked-self" }],
         [{ scene: "review", tagline: "By us, by them, or both" }],
         [{ scene: "accepted", tagline: "We hold it" }, { scene: "handed-back", end: true }],
         ...out,
       ],
     },
     {
-      key: "client", title: `Documents ${work.client ?? "our client"} asks of us`, from: `${cap(work.client ?? "our client")} asks for it`, to: `accepted by ${work.client ?? "our client"}, or back with us for the next revision`,
+      key: "client", tab: `${cap(work.client ?? "our client")} asks`, title: `Documents ${work.client ?? "our client"} asks of us`, from: `${cap(work.client ?? "our client")} asks for it`, to: `accepted by ${work.client ?? "our client"}, or back with us for the next revision`,
       columns: [
         [{ scene: "client-asked" }],
         [{ scene: "register" }],
@@ -429,7 +443,7 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       ],
     },
     {
-      key: "deliver", title: "Packages we deliver", from: "We gather what someone needs", to: "delivered, and accepted by them",
+      key: "deliver", tab: "Packages", title: "Packages we deliver", from: "We gather what someone needs", to: "delivered, and accepted by them",
       columns: [
         [{ scene: "pkg-made" }],
         [{ scene: "pkg-checked" }],
@@ -439,7 +453,7 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       ],
     },
     {
-      key: "action", title: "An action on the schedule", from: "The schedule needs documents", to: "the action goes ahead, or is postponed",
+      key: "action", tab: "Actions", title: "An action on the schedule", from: "The schedule needs documents", to: "the action goes ahead, or is postponed",
       columns: [
         [{ scene: "act-needs" }],
         [{ scene: "act-risk", optional: "a document is still missing" }],
@@ -448,7 +462,7 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
       ],
     },
     {
-      key: "join", title: "Someone joins the project", from: "Someone is needed on the project", to: "on it, and told",
+      key: "join", tab: "People joining", title: "Someone joins the project", from: "Someone is needed on the project", to: "on it, and told",
       columns: [
         [{ scene: "join-asked" }],
         [{ scene: "join-confirmed", optional: "confirmation is asked" }, { scene: "join-refused", end: true, optional: "confirmation is asked" }],

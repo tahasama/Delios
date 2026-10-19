@@ -500,7 +500,9 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                   {status === "ACCEPTED" || status === "REJECTED"
                     ? <>{status === "ACCEPTED" ? "accepted" : "rejected"} by {page.checkedBy}, {fmtDate(page.checkedAt)}</>
                     : t.direction === "INCOMING"
-                      ? "The control function accepts it, or rejects it with a reason the sender reads"
+                      ? page.mayCheck && !controller
+                        ? "With no control function on this project, whoever it was for accepts it, or rejects it with a reason the sender reads"
+                        : "The control function accepts it, or rejects it with a reason the sender reads"
                       : "their document control checks what we send"}
                 </span>
               </div>
@@ -512,7 +514,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
               ) : null}
 
               {incoming && status === "ISSUED" ? (
-                controller ? (
+                (controller || page.mayCheck) ? (
                   <div className="px-5 py-3.5 sm:px-6">
                     <PreflightPanel result={await preflight("ACCEPT_TRANSMITTAL", { transmittalId: t.id })} className="mb-3" />
                     <ActionForm action={acceptTransmittalAction} hideSubmit hidden={{ transmittalId: t.id }} className="space-y-0">
