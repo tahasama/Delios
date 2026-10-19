@@ -267,6 +267,16 @@ public static class CatalogAdminEndpoints
                 return Problems.Invalid("FUNCTION_UNKNOWN", $"{step.Title}: {function} is not a function in use.");
             if (step.PartyCode is { } party && !await db.Parties.AnyAsync(p => p.Code == party && p.Active, cancellationToken))
                 return Problems.Invalid("PARTY_UNKNOWN", $"{step.Title}: {party} is not an organization taking part.");
+            // A step another organization answers goes to them on a transmittal: it says why (a published reason for issue).
+            if (step.PartyCode is not null)
+            {
+                step.Reason = Blank(step.Reason);
+                if (step.Reason is null)
+                    return Problems.Invalid("STEP_REASON_REQUIRED", $"{step.Title}: say why it goes to {step.PartyCode}, the reason for issue on the transmittal.");
+                if (!(await Catalog.LoadAsync(db, cancellationToken)).IsActive(Transmittals.TransmittalSets.Reasons, step.Reason))
+                    return Problems.Invalid("VALUE_NOT_PUBLISHED", $"{step.Title}: {step.Reason} is not a published reason for issue.");
+            }
+            else step.Reason = null;
         }
         return null;
     }

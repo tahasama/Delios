@@ -10,7 +10,9 @@ export type WorkflowBuilderStep = {
   act: "REVIEW" | "APPROVAL";
   /** An outside party answers this step instead of our own people. */
   partyId?: string;
-  mode: "ANY_OF" | "ALL_CONSOLIDATOR" | "SERIAL" | "ALL";
+  /** For an outside party's step: the reason for issue on the transmittal that carries it to them. */
+  reason?: string;
+  mode: "ANY_OF" | "ALL";
   participantIds: string[];
   functionIds?: string[];
   title?: string;
@@ -31,11 +33,10 @@ type ClassOptions = { documentTypes: ClassOption[]; disciplines: ClassOption[]; 
 type StatusChoice = { code: string; label: string };
 
 /** How the people on one step work, in the words a project uses. */
+// The two ways the backend runs a step (StepModes): everyone answers, or the first answer closes it.
 const HOW: { value: WorkflowBuilderStep["mode"]; label: string; hint: string }[] = [
   { value: "ALL", label: "All of them, in any order", hint: "each gives a verdict; the step closes when everyone has" },
   { value: "ANY_OF", label: "Whoever gets to it first", hint: "the first verdict closes the step" },
-  { value: "SERIAL", label: "One after another", hint: "each sees the one before; the last one's verdict counts" },
-  { value: "ALL_CONSOLIDATOR", label: "All of them, last one sums up", hint: "everyone gives input; the last person records the verdict" },
 ];
 
 /**
@@ -43,7 +44,9 @@ const HOW: { value: WorkflowBuilderStep["mode"]; label: string; hint: string }[]
  * one deciding. Two names in a box means they work in parallel. Add a box
  * between any two, or at the end, and give it whoever should be on it.
  */
-export function WorkflowTemplateBuilder({ level = "project", id, name = "", description = "", classes = "*", outcomeSetKey = "", isDefault = false, initialSteps, users, functions = [], outsideParties = [], outcomeSets, classOptions, statuses }: {
+export function WorkflowTemplateBuilder({ level = "project", id, name = "", description = "", classes = "*", outcomeSetKey = "", isDefault = false, initialSteps, users, functions = [], outsideParties = [], outcomeSets, classOptions, statuses, reasons = [] }: {
+  /** The reasons for issue: an outside party's step says why it goes to them. */
+  reasons?: { code: string; label: string }[];
   /** Where the route is kept: the organization's routes, or the project's (its own copy where routes are free). */
   level?: "organization" | "project";
   id?: string;
@@ -240,7 +243,15 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
                     ? "They answer here, in their own account."
                     : "We send it to them and write down their answer. Who carries that, and whether it needs proof, is set on the organization, in Organizations."}
                 </p>
-                <button type="button" onClick={() => update(open, { partyId: undefined })} className="mt-2 text-[11px] font-semibold text-link hover:underline">
+                <div className="mt-3 max-w-xs">
+                  <Field label="Why it goes to them" hint="the reason for issue on the transmittal">
+                    <select value={steps[open].reason ?? ""} onChange={(e) => update(open, { reason: e.target.value || undefined })} className={inputCls}>
+                      <option value="">Choose…</option>
+                      {reasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                <button type="button" onClick={() => update(open, { partyId: undefined, reason: undefined })} className="mt-2 text-[11px] font-semibold text-link hover:underline">
                   Choose our own people instead
                 </button>
               </div>

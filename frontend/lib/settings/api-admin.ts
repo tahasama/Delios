@@ -298,7 +298,7 @@ export async function partiesWithAnswers(projectId?: string) {
 // function (by code) or by one party (by code), the first answer or all.
 
 export type EditorRouteStep = {
-  act: "REVIEW" | "APPROVAL"; partyId?: string; mode: "ANY_OF" | "ALL_CONSOLIDATOR" | "SERIAL" | "ALL"; participantIds: string[];
+  act: "REVIEW" | "APPROVAL"; partyId?: string; reason?: string; mode: "ANY_OF" | "ALL"; participantIds: string[];
   functionIds?: string[]; title?: string; days?: number; grantsStatuses?: string[];
 };
 
@@ -323,6 +323,7 @@ export async function routesForEditor(level: "organization" | "project" = "proje
     steps: JSON.stringify(r.steps.map((s, i): EditorRouteStep => ({
       act: i === r.steps.length - 1 ? "APPROVAL" : "REVIEW",
       partyId: s.partyCode ? parties.find((p) => p.code === s.partyCode)?.id : undefined,
+      reason: s.reason ?? undefined,
       mode: s.mode === "ALL" ? "ALL" : "ANY_OF",
       participantIds: s.userIds ?? [],
       functionIds: s.functionCode ? [s.functionCode] : [],
@@ -349,6 +350,8 @@ export async function backendRoute(classes: string, steps: EditorRouteStep[]): P
       functionCode: s.partyId ? null : (s.functionIds ?? [])[0] ?? null,
       userIds: s.partyId ? [] : s.participantIds,
       partyCode: s.partyId ? parties.find((p) => p.id === s.partyId)?.code ?? null : null,
+      // Why it goes to an outside organization: kept on the step, carried on the transmittal that takes it to them.
+      reason: s.partyId ? s.reason ?? null : null,
       mode: s.mode === "ANY_OF" ? "ANY" : "ALL",
       days: s.days ?? null,
       grantsStatuses: s.grantsStatuses ?? [],

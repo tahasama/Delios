@@ -23,14 +23,17 @@ export async function RoutesBoard({ level, editable, lead }: { level: "organizat
     adminUsers().then((all) => all.filter((u) => u.active).map((u) => ({
       id: u.id, name: u.name, role: "", party: u.partyId ? { name: u.partyName ?? "", isInternal: u.internal } : null,
     }))),
-    Promise.all(["DOCUMENT_TYPES", "DISCIPLINES", "CRITICALITY", "DELIVERABLE_TYPES", "SUPPLIER_CODES"].map(async (setKey) =>
+    Promise.all(["DOCUMENT_TYPES", "DISCIPLINES", "CRITICALITY", "DELIVERABLE_TYPES"].map(async (setKey) =>
       (await getActiveSet(setKey)).map((v) => ({ ...v, setKey })))).then((all) => all.flat()),
     // A step names a function by its code.
     adminFunctions().then((all) => all.filter((f) => f.active).map((f) => ({ id: f.code, name: f.name }))),
     // Parties that can hold a step of a route: a client, a control office, a
     // supplier. How each of them answers is set in Parties & people.
-    adminParties().then((all) => all.filter((p) => !p.isInternal && p.active).map((p) => ({ id: p.id, name: p.name, participation: p.participation }))),
+    adminParties().then((all) => all.filter((p) => !p.isInternal && p.active)),
   ]);
+  const organizations = outsideParties.map((p) => ({ code: p.code, name: p.name }));
+  const parties = outsideParties.map((p) => ({ id: p.id, name: p.name, participation: p.participation }));
+  const reasonChoices = (await getActiveSet("REASONS_FOR_ISSUE")).map((value) => ({ code: value.code, label: value.label }));
   // A route answers from a set of the review outcomes (Types & sets), each verdict with its meaning; none named, from the
   // set serving each document's deliverable type.
   const outcomeSets = await api<{ key: string; title: string; verdicts: { code: string; label: string; status: string; meaning: string | null }[] }[]>("/api/admin/verdict-lists").catch(() => []);
@@ -46,7 +49,8 @@ export async function RoutesBoard({ level, editable, lead }: { level: "organizat
     // Who produces it, and which outside organization it came from: a supplier
     // drawing and one of ours are the same type and take different routes.
     deliverableTypes: classValues.filter((value) => value.setKey === "DELIVERABLE_TYPES").map(({ code, label }) => ({ code, label })),
-    originators: classValues.filter((value) => value.setKey === "SUPPLIER_CODES").map(({ code, label }) => ({ code, label })),
+    // A document's originator is the organization it came from, by its code: the organizations taking part, never a list.
+    originators: organizations.map(({ code, name }) => ({ code, label: name })),
   };
   const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
   const setViews = new Map(outcomeSets.map((s) => [s.key, {
@@ -114,7 +118,7 @@ export async function RoutesBoard({ level, editable, lead }: { level: "organizat
                           </p>
                           <p className="mt-1 text-[13px] font-semibold text-slate-900">{s.title || (decides ? "Decision" : `Review ${i + 1}`)}</p>
                           <p className="mt-1 text-[11px] leading-4 text-slate-600">{who.length ? who.join(", ") : <span className="text-amber-700">by discipline when sent</span>}</p>
-                          {who.length > 1 ? <p className="mt-1 text-[11px] text-slate-500">{s.mode === "ANY_OF" ? "whoever gets there first" : s.mode === "SERIAL" ? "one after another" : s.mode === "ALL" ? "all, any order" : "all, last one sums up"}</p> : null}
+                          {who.length > 1 ? <p className="mt-1 text-[11px] text-slate-500">{s.mode === "ANY_OF" ? "whoever gets there first" : "all, any order"}</p> : null}
                         </div>
                         {i < steps.length - 1 ? <ArrowRight className="h-4 w-4 shrink-0 self-center text-slate-300" aria-hidden /> : null}
                       </div>
@@ -126,7 +130,7 @@ export async function RoutesBoard({ level, editable, lead }: { level: "organizat
                   <details className="mt-3 rounded-md border border-line">
                     <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-600">Edit</summary>
                     <div className="border-t border-line p-3">
-                      <WorkflowTemplateBuilder level={level} outsideParties={outsideParties} functions={functions} id={t.id} name={t.name} description={t.description ?? ""} classes={t.classes} outcomeSetKey={t.outcomeSetKey ?? ""} isDefault={t.isDefault} initialSteps={steps} users={users} outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} classOptions={classOptions} statuses={statusChoices} />
+                      <WorkflowTemplateBuilder level={level} outsideParties={parties} reasons={reasonChoices} functions={functions} id={t.id} name={t.name} description={t.description ?? ""} classes={t.classes} outcomeSetKey={t.outcomeSetKey ?? ""} isDefault={t.isDefault} initialSteps={steps} users={users} outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} classOptions={classOptions} statuses={statusChoices} />
                     </div>
                   </details>
                 ) : null}
@@ -139,7 +143,7 @@ export async function RoutesBoard({ level, editable, lead }: { level: "organizat
       {admin ? (
         <details className="rounded-md border border-line bg-surface px-5 py-3">
           <summary className="cursor-pointer text-sm font-semibold text-brand-ink">+ New review route</summary>
-          <div className="mt-3"><WorkflowTemplateBuilder level={level} outsideParties={outsideParties} functions={functions} users={users} outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} classOptions={classOptions} statuses={statusChoices} /></div>
+          <div className="mt-3"><WorkflowTemplateBuilder level={level} outsideParties={parties} reasons={reasonChoices} functions={functions} users={users} outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} classOptions={classOptions} statuses={statusChoices} /></div>
         </details>
       ) : null}
     </div>

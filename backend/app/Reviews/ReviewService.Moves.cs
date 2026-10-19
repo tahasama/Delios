@@ -53,7 +53,8 @@ public sealed partial class ReviewService
         if (party is not null && !step.ByProxy)
         {
             var (document, revision) = await SubjectAsync(review, cancellationToken);
-            var transmittal = await transmittals.RaiseAsync(new TransmittalService.Raise(project, Actor(access), step.Reason!,
+            // A route saved before a party's step said why keeps working: it goes for review.
+            var transmittal = await transmittals.RaiseAsync(new TransmittalService.Raise(project, Actor(access), step.Reason ?? "REVIEW",
                 $"{TransmittalService.Label(document, revision)}: {step.Title}", null, party, party.Name, [(document, revision)],
                 holders.Select(h => new TransmittalService.Addressee(h.Id, party.Id, h.Name, party.Name)).ToList(),
                 ReviewStepId: step.Id, ResponseDue: step.DueDate), cancellationToken);

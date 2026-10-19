@@ -803,6 +803,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   a project changes them where free (`/api/projects/{id}/routes`, the control function), its first change making its own
   copy (`ROUTES_OWN`, `ReviewRoute.ProjectId`); Send for review offers the project's routes. Reset only from the
   organization's card (reviews already sent keep their steps).
+- A route's step is answered by all its people (any order) or by whoever gets to it first (`StepModes` ALL / ANY): no
+  other kind is offered. A step another organization answers says why it goes to them (a published reason for issue,
+  backend STEP_REASON_REQUIRED), carried on the transmittal that takes it. "Offer this route first" puts it first among
+  routes equally specific. "From which organization" chooses among the organizations taking part (a document's
+  originator is an organization's code).
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
 - **Two levels of settings** (owner): the organization's (`/organization`, its portal) and the project's (Settings).
   Every project, opening one, archiving and reopening are the organization's: **Projects** (`/organization/projects`,

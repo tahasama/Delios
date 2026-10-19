@@ -29,14 +29,15 @@ public sealed partial class ReviewService
         return routes
             .Select(r => (Route: r, Score: Score(r, document)))
             .Where(x => x.Score >= 0)
-            .OrderByDescending(x => x.Score).ThenBy(x => x.Route.IsDefault).ThenBy(x => x.Route.Name)
+            // Among routes as specific as each other, the one offered first comes first (false sorts before true).
+            .OrderByDescending(x => x.Score).ThenByDescending(x => x.Route.IsDefault).ThenBy(x => x.Route.Name)
             .Select(x => x.Route).ToList();
     }
 
     /// <summary>-1 when the route does not serve the document; otherwise how many fields its best pattern pins.</summary>
     internal static int Score(ReviewRoute route, Document d)
     {
-        if (route.Patterns.Count == 0) return route.IsDefault ? 0 : 0;
+        if (route.Patterns.Count == 0) return 0;
         var best = -1;
         foreach (var p in route.Patterns)
         {
