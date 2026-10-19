@@ -68,7 +68,7 @@ public static class NoticeLog
     public static Task<List<Guid>> HoldersAsync(DeliosDbContext db, Guid projectId, string verb, CancellationToken cancellationToken) =>
         db.Memberships.AsNoTracking()
             .Where(m => m.ProjectId == projectId && m.Active && m.Function!.Active
-                && ((verb == Identity.Verbs.Control && m.ActsAsControl) || m.Function.Rules.Any(r => r.Verbs.Contains(verb))))
+                && ((verb == Identity.Verbs.Control && m.ActsAsControl) || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(verb))))
             .Select(m => m.UserId).Distinct().ToListAsync(cancellationToken);
 
     /// <summary>The departments of an activity still short of a document: a need with no department counts against every one.</summary>
@@ -148,7 +148,7 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({"action-notices:" + projectId}))", cancellationToken);
         var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == projectId, cancellationToken);
-        db.UseListsOf(project.Id, project.OwnListKeys);
+        db.UseListsOf(project.Id, project.OwnListKeys, project.OwnFunctions);
         var today = WorkingCalendar.Today(clock, project.TimeZone);
 
         var ids = await db.Activities.Where(a => a.ProjectId == projectId && a.State == ActivityStates.Active && a.Start != null

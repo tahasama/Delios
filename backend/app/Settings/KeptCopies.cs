@@ -142,6 +142,7 @@ public static class KeptCopies
         {
             "NUMBERING" => await NumberingLevels.PutBackAsync(db, clock, project, copy.Payload, by, cancellationToken),
             "REVISIONS" => await RevisionSchemeEndpoints.PutBackAsync(db, clock, project, copy.Payload, by, cancellationToken),
+            "FUNCTIONS" => await Identity.ProjectFunctions.PutBackAsync(db, project, copy.Payload, cancellationToken),
             "ROUTES" => await CatalogAdminEndpoints.PutBackRoutesAsync(db, clock, project, copy.Payload, by, cancellationToken),
             var k when k.StartsWith("LIST:") => await ProjectLists.PutBackAsync(db, clock, project, k[5..], copy.Payload, by, cancellationToken),
             var k when k.StartsWith("FORM:") => await FormRules.PutBackAsync(db, clock, project, k[5..], copy.Payload, by, cancellationToken),

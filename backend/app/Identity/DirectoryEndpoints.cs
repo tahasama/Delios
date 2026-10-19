@@ -598,7 +598,7 @@ public static class DirectoryEndpoints
         var me = http.User.UserId();
         var admin = await Keepers.ConfiguresAsync(http);
         var holds = async (string verb) => await db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.UserId == me && m.Active
-            && m.Function!.Active && ((verb == Verbs.Control && m.ActsAsControl) || m.Function.Rules.Any(r => r.Verbs.Contains(verb))), cancellationToken);
+            && m.Function!.Active && ((verb == Verbs.Control && m.ActsAsControl) || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(verb))), cancellationToken);
         var withControl = await Settings.ProjectAnswers.ControlDoesAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken);
         if (!admin && !(await holds(Verbs.Control) || (!withControl && await holds(Verbs.Manage))))
             return Problems.Forbidden("PEOPLE_NOT_YOURS", $"On {project.Code} the control function keeps who is on the project.");
@@ -694,6 +694,8 @@ public static class DirectoryEndpoints
     /// <summary><c>GET /api/admin/functions</c>: every function with its matrix rows and how many places on projects hold it.</summary>
     private static async Task<IResult> FunctionsAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {
+        // The organization's rights, whatever project the request comes from (a project's own are on its own page).
+        db.UseOrganizationRules();
         var functions = await db.Functions.AsNoTracking().Include(f => f.Rules).OrderBy(f => f.Name).ToListAsync(cancellationToken);
         var held = await db.Memberships.AsNoTracking().Where(m => m.Active).GroupBy(m => m.FunctionId)
             .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
@@ -730,6 +732,7 @@ public static class DirectoryEndpoints
     private static async Task<IResult> UpdateFunctionAsync(
         Guid functionId, UpdateFunctionRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
+        db.UseOrganizationRules();
         var function = await db.Functions.Include(f => f.Rules).SingleOrDefaultAsync(f => f.Id == functionId, cancellationToken);
         if (function is null) return Problems.NotFound("FUNCTION_NOT_FOUND", "No such function.");
         var changes = new List<string>();
@@ -1113,7 +1116,7 @@ public static class Keepers
         var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
         var me = http.User.UserId();
         return await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
-            && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Configure)), http.RequestAborted);
+            && db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Configure)), http.RequestAborted);
     }
 
     /// <summary>An endpoint filter that lets through only those who administer the organization.</summary>
@@ -1128,7 +1131,7 @@ public static class Keepers
         var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
         var me = http.User.UserId();
         var keeps = await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
-            && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control) || r.Verbs.Contains(Verbs.Manage))), http.RequestAborted);
+            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control) || r.Verbs.Contains(Verbs.Manage))), http.RequestAborted);
         return keeps
             ? await next(context)
             : Problems.Forbidden("ADMIN_OR_CONTROL", "An administrator, the control function or whoever holds Manage keeps the project's people.");
@@ -1141,7 +1144,7 @@ public static class Keepers
         var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
         var me = http.User.UserId();
         var control = await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
-            && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))), http.RequestAborted);
+            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control))), http.RequestAborted);
         return control
             ? await next(context)
             : Problems.Forbidden("ADMIN_OR_CONTROL", "An administrator, or the control function, keeps the organization's people and functions.");

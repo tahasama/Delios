@@ -101,7 +101,7 @@ public sealed partial class ReviewService
     /// <summary>How many people hold a function with the CONTROL verb on the project.</summary>
     private Task<int> ControlHoldersAsync(Guid projectId, CancellationToken cancellationToken) =>
         db.Memberships.CountAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
-            && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
+            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control)))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
 
     /// <summary>Whether the caller has the CONTROL verb on the review's document.</summary>

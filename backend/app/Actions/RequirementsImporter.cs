@@ -400,7 +400,7 @@ public sealed class RequirementsImporter(
     private async Task<ProjectAccess?> RegistrarAsync(Project project, CancellationToken cancellationToken)
     {
         var membership = await db.Memberships.AsNoTracking().Include(m => m.Function!).ThenInclude(f => f.Rules)
-            .Where(m => m.ProjectId == project.Id && m.Active && m.Function!.Active && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))))
+            .Where(m => m.ProjectId == project.Id && m.Active && m.Function!.Active && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control))))
             .OrderBy(m => m.UserId).FirstOrDefaultAsync(cancellationToken);
         if (membership is null) return null;
         var name = await db.Users.AsNoTracking().Where(u => u.Id == membership.UserId).Select(u => u.Name).SingleAsync(cancellationToken);

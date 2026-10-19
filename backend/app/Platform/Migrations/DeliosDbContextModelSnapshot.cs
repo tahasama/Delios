@@ -2582,6 +2582,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("note");
 
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
                     b.Property<string>("ProjectRole")
                         .HasColumnType("text")
                         .HasColumnName("project_role");
@@ -2663,6 +2667,10 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<Guid?>("OpenedById")
                         .HasColumnType("uuid")
                         .HasColumnName("opened_by_id");
+
+                    b.Property<bool>("OwnFunctions")
+                        .HasColumnType("boolean")
+                        .HasColumnName("own_functions");
 
                     b.PrimitiveCollection<string[]>("OwnListKeys")
                         .IsRequired()

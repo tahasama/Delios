@@ -215,6 +215,11 @@ public sealed class Project
     /// free): it reads its copy of those, never the organization's again, and the organization's of every other list.
     /// </summary>
     public string[] OwnListKeys { get; set; } = [];
+    /// <summary>
+    /// The project keeps its own copy of what each function may do (owner: functions changed on the project), its
+    /// rules marked with its id; where false it reads the organization's (rules with no project).
+    /// </summary>
+    public bool OwnFunctions { get; set; }
 }
 
 /// <summary>A job as the organization names it: Lead Electrical Engineer, the control function.</summary>
@@ -244,6 +249,8 @@ public sealed class PermissionRule
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
     public Guid FunctionId { get; set; }
+    /// <summary>Empty: the organization's rule; set: one project's own copy (<see cref="Project.OwnFunctions"/>).</summary>
+    public Guid? ProjectId { get; set; }
     public string? DeliverableType { get; set; }
     public string? DocType { get; set; }
     public string? Discipline { get; set; }

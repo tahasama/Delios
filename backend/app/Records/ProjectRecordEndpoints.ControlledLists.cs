@@ -60,7 +60,7 @@ public static partial class ProjectRecordEndpoints
         if (await Keepers.ConfiguresAsync(h)) return true;
         var me = h.User.UserId();
         return await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && (projectId == null || m.ProjectId == projectId)
-            && m.Function!.Active && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))), h.RequestAborted);
+            && m.Function!.Active && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control))), h.RequestAborted);
     }
 
     private static async Task<IResult> UploadAsync(HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, Guid? projectId,

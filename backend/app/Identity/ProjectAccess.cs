@@ -93,7 +93,9 @@ public sealed class ProjectAccessLoader(DeliosDbContext db)
             .SingleAsync(cancellationToken);
         var project = membership.Project!;
         // Its lists from here on: its own copy once it has one, else the organization's.
-        db.UseListsOf(project.Id, project.OwnListKeys);
+        db.UseListsOf(project.Id, project.OwnListKeys, project.OwnFunctions);
+        // What the function may do here, read now the project is set: its own copy where it keeps one.
+        var rules = await db.PermissionRules.AsNoTracking().Where(r => r.FunctionId == membership.FunctionId).ToListAsync(cancellationToken);
         var above = membership.Function!.Clearance is null ? []
             : Clearance.Above(await Clearance.RanksAsync(db, cancellationToken), membership.Function.Clearance);
         return new ProjectAccess
@@ -102,7 +104,7 @@ public sealed class ProjectAccessLoader(DeliosDbContext db)
             UserId = userId,
             UserName = principal.Identity?.Name ?? "",
             Function = membership.Function!,
-            Rules = ProjectAccess.WithControl(membership.Function!.Rules
+            Rules = ProjectAccess.WithControl(rules
                 .Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole)
                 .ToList(), membership.ActsAsControl),
             IsInternal = party is null || party.IsInternal,

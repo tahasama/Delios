@@ -73,7 +73,7 @@ public sealed partial class ReviewService
         var stepIds = steps.Select(s => s.Id).ToList();
         var answered = await db.ReviewParticipants.AsNoTracking().Where(p => stepIds.Contains(p.StepId)).Select(p => p.UserId).ToListAsync(cancellationToken);
         var controllers = await db.Memberships.AsNoTracking()
-            .Where(m => m.ProjectId == review.ProjectId && m.Active && m.Function!.Active && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control))))
+            .Where(m => m.ProjectId == review.ProjectId && m.Active && m.Function!.Active && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control))))
             .Select(m => m.UserId).ToListAsync(cancellationToken);
         var party = revision.AuthoredByParty ?? document.Originator;
         var outside = party is not null && await db.Parties.AnyAsync(p => p.Code == party && !p.IsInternal, cancellationToken)

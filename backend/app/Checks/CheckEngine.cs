@@ -69,7 +69,7 @@ public sealed class CheckEngine(
     private async Task RunAsync(CheckRun run, CancellationToken cancellationToken)
     {
         var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == run.ProjectId, cancellationToken);
-        db.UseListsOf(project.Id, project.OwnListKeys);
+        db.UseListsOf(project.Id, project.OwnListKeys, project.OwnFunctions);
         var entries = await db.ValueEntries.AsNoTracking().ToListAsync(cancellationToken);
         var context = new CheckContext
         {

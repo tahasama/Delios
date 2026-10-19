@@ -213,7 +213,10 @@ export async function numberingForEditor(level: "organization" | "project" = "pr
 
 /** Functions with their rows, in the screen's shapes: verbs as a JSON list, a holders count. */
 export async function functionsForMatrix() {
-  const functions = await adminFunctions();
+  return matrixOf(await adminFunctions());
+}
+
+function matrixOf(functions: AdminFunction[]) {
   return [...functions]
     .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name))
     .map((f) => ({
@@ -460,3 +463,13 @@ export type KeptCopy = {
 /** The kept copies of one card ("NUMBERING", "REVISIONS", "ROUTES"; "LIST:" or "FORM:" for every list or form). */
 export const keptCopies = cache(async (kind: string) =>
   api<KeptCopy[]>("/api/admin/kept-copies", { query: { kind } }).catch(() => [] as KeptCopy[]));
+
+/** What each function may do on a project (its own copy where it keeps one), as the matrix reads it, with who may change it. */
+export async function projectFunctionsForMatrix(scope: { projectId: string }) {
+  const view = await api<{ own: boolean; free: boolean; mayChange: boolean; functions: AdminFunction[] }>(projectPath(scope, "/functions"));
+  return { ...view, functions: matrixOf(view.functions) };
+}
+
+/** The projects keeping their own rights. */
+export const functionCopies = cache(async () =>
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/functions/projects").catch(() => []));

@@ -103,17 +103,28 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     /// Reads the lists as this project sees them from now on in the request: its own copy of the lists it keeps, the
     /// organization's of the others. Set by <c>ProjectAccessFilter</c> and by the <c>X-Delios-Project</c> header.
     /// </summary>
-    public void UseListsOf(Guid projectId, string[] ownKeys)
+    public void UseListsOf(Guid projectId, string[] ownKeys, bool ownRules = false)
     {
         ListsProject = projectId;
         ListsOwnKeys = ownKeys;
+        RulesProject = ownRules ? projectId : null;
     }
+
+    /// <summary>
+    /// The project whose own copy of what functions may do is read in this request; none: the organization's rules.
+    /// Set with the lists (<see cref="UseListsOf"/>), from the project in hand.
+    /// </summary>
+    public Guid? RulesProject { get; private set; }
+
+    /// <summary>Reads what functions may do as the organization's (its Settings), whatever project the request is in.</summary>
+    public void UseOrganizationRules() => RulesProject = null;
 
     /// <summary>Reads every list as the organization's (the organization's Settings).</summary>
     public void UseOrganizationLists()
     {
         ListsProject = null;
         ListsOwnKeys = [];
+        RulesProject = null;
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -121,6 +132,8 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DeliosDbContext).Assembly);
         // A list is read as the project in hand sees it: its own copy of the lists it keeps, the organization's of the others.
         modelBuilder.Entity<ValueEntry>().HasQueryFilter(v => ListsOwnKeys.Contains(v.SetKey) ? v.ProjectId == ListsProject : v.ProjectId == null);
+        // What a function may do is read the same way: the project's own copy where it keeps one, else the organization's.
+        modelBuilder.Entity<PermissionRule>().HasQueryFilter(r => r.ProjectId == RulesProject);
         modelBuilder.Entity<ValueSet>().HasQueryFilter(v => ListsOwnKeys.Contains(v.ListKey) ? v.ProjectId == ListsProject : v.ProjectId == null);
 
         // Every Guid id is made in code (Guid.CreateVersion7), never by the database.

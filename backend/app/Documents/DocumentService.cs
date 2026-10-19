@@ -865,7 +865,7 @@ public sealed class DocumentService(
     /// </summary>
     private async Task<bool> NeedsAcceptanceAsync(ProjectAccess access, Incoming? incoming, CancellationToken cancellationToken) =>
         (!access.IsInternal || incoming?.OnBehalfOf is not null) && await db.Memberships.AnyAsync(m => m.ProjectId == access.Project.Id && m.Active && m.Function!.Active
-            && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
+            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control)))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
 
     /// <summary>

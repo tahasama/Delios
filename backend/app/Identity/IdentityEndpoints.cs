@@ -362,11 +362,12 @@ public static class IdentityEndpoints
                 m.Project.Status,
                 m.Department,
                 Function = new { m.Function!.Id, m.Function.Code, m.Function.Name, m.Function.Clearance },
-                Verbs = m.Function.Rules
+                // Each project's own copy of what the function may do where it keeps one, else the organization's.
+                Verbs = db.PermissionRules.IgnoreQueryFilters().Where(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project.OwnFunctions ? (Guid?)m.ProjectId : null))
                     .Where(r => r.ProjectRole == null || r.ProjectRole == m.Project.ContractRole)
                     .SelectMany(r => r.Verbs).Distinct().ToList(),
                 // The function's rows of the permission matrix, so the screens ask the same question the backend does.
-                Rules = m.Function.Rules.Select(r => new
+                Rules = db.PermissionRules.IgnoreQueryFilters().Where(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project.OwnFunctions ? (Guid?)m.ProjectId : null)).Select(r => new
                 {
                     r.DeliverableType,
                     r.DocType,

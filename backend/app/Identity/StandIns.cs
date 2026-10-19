@@ -13,7 +13,7 @@ public static class StandIns
     /// <summary>Whether the project has nobody acting as the control function.</summary>
     public static async Task<bool> NoControlAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken) =>
         !await db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
-            && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
+            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control)))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
 
     /// <summary>

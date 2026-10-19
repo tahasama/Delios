@@ -141,7 +141,7 @@ public static class CheckCatalog
         new("SET-09", Phases.Setup, "Nobody on the project receives documents",
             "At least one function on the project holds Receive in the distribution matrix; otherwise a release proposes nobody", Severities.Major, "OG", async ctx =>
                 await ctx.Db.Memberships.AnyAsync(m => m.ProjectId == ctx.Project.Id && m.Active && m.Function!.Active
-                    && m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Receive)), ctx.CancellationToken)
+                    && ctx.Db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Receive)), ctx.CancellationToken)
                     ? Pass : Fail([Setting("MATRIX", "Distribution", "The matrix proposes nobody when a document is issued.")])),
         new("DOC-01", Phases.Running, "A title that became generic",
             "Titles made only of words added to the organization's generic list after the document was registered (new titles of that kind are refused)", Severities.Minor, "OR", ctx =>

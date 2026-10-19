@@ -82,7 +82,7 @@ public static class Liberty
 
         new(Forms, "Forms & fields", "Forms & fields", "A client may ask fields of its own; a field a number part reads follows the numbering", true),
         new(Routes, "Review routes", "Review routes", "Each project has its own reviewers and steps", true),
-        new(Functions, "Functions & permissions", "Functions & permissions", "The organization's jobs, and what each may do", false),
+        new(Functions, "Functions & permissions", "Functions & permissions", "The organization's jobs; where free, a project changes what each may do there", false),
 
         new("WHO_DOES_WHAT", Room, "Who carries each act out, and what is confirmed", "The project's contract and team", true),
         new("POLICY_RELEASE", Room, "What releasing a revision means", "The project's contract", true),
@@ -113,9 +113,7 @@ public static class Liberty
         return items.Select(item =>
         {
             var row = rows.FirstOrDefault(r => r.Key == Prefix + item.Key);
-            var locked = item.Key.StartsWith("LIST:") && numbered.Contains(item.Key[5..]) ? "A number part reads it: it follows the numbering"
-                // A project's own version of what a function may do is not built: what each may do is the same everywhere.
-                : item.Key == Functions ? "Not yet: what each function may do is the same on every project" : null;
+            var locked = item.Key.StartsWith("LIST:") && numbered.Contains(item.Key[5..]) ? "A number part reads it: it follows the numbering" : null;
             var free = locked is null && (row?.Value is { } value ? value == Free : item.FreeByDefault);
             return new LibertyView(item.Key, item.Area, item.Title, item.Why, free, item.FreeByDefault,
                 row?.UpdatedAt.ToDateTimeOffset(), row?.UpdatedByName, locked);
@@ -127,7 +125,6 @@ public static class Liberty
     /// </summary>
     public static async Task<bool> IsFreeAsync(DeliosDbContext db, string key, CancellationToken cancellationToken)
     {
-        if (key == Functions) return false;
         if (key.StartsWith("LIST:") && (await NumberedListsAsync(db, cancellationToken)).Contains(key[5..]))
             return await IsFreeAsync(db, Numbering, cancellationToken);
         var value = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && s.Key == Prefix + key)

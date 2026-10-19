@@ -14,7 +14,7 @@ import {
 import { VERBS, GRANTABLE, VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/core/permissions";
 import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 import { Check, Minus } from "lucide-react";
-import { functionsForMatrix } from "@/lib/settings/api-admin";
+import { functionsForMatrix, projectFunctionsForMatrix } from "@/lib/settings/api-admin";
 import { NoAccess } from "../no-access";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 
@@ -31,32 +31,40 @@ function parseVerbs(json: string): Verb[] {
 }
 
 /**
- * Functions & permissions, the same card in both Settings (owner): the functions and what each may do are the
- * organization's, the same on every project, created and changed in the organization's Settings by an administrator.
- * A project's Settings show them read only, with who holds each there; who holds which function on a project is changed
- * in its People & access.
+ * Functions & permissions, the same card in both Settings (owner): the functions themselves (name, code, clearance, in
+ * use) are the organization's, created and changed in the organization's Settings by an administrator. What each may do
+ * is the organization's too, unless the organization leaves it free: then a project's control function changes it for
+ * that project, its first change taking the project's own copy (owner: "we should be able to change functions on a
+ * project level"). Configure stays the organization's. Who holds which function on a project is changed in People & access.
  */
 export async function FunctionsBoard({ level }: { level: "project" | "organization" }) {
+  let scope: { projectId: string } | null = null;
   if (level === "organization") await requireOrgAdmin();
   else {
-    const { user: me } = await requireScope();
-    if (!maySetup(me, SETUP_PAGES.find((p) => p.href === "/settings/functions")!)) {
+    const ctx = await requireScope();
+    if (!maySetup(ctx.user, SETUP_PAGES.find((p) => p.href === "/settings/functions")!)) {
       return <NoAccess title="Functions & permissions" who="control" />;
     }
+    scope = ctx;
   }
   // The control function maintains the matrix, but not the authority that could
   // give itself more: an administrator's own function stays with administrators.
 
+  const project = scope ? await projectFunctionsForMatrix(scope) : null;
   const [functions, disciplines, docTypes, deliverableTypes, criticalities, confidentialities] = await Promise.all([
-    functionsForMatrix(),
+    project ? Promise.resolve(project.functions) : functionsForMatrix(),
     getActiveSet("DISCIPLINES"),
     getActiveSet("DOCUMENT_TYPES"),
     getActiveSet("DELIVERABLE_TYPES"),
     getActiveSet("CRITICALITY"),
     getActiveSet("CONFIDENTIALITY"),
   ]);
-  // Changed in the organization's Settings only: a project's page reads them.
+  // The functions themselves are changed in the organization's Settings only; what each may do, there, or on a project
+  // where the organization leaves it free, by its control function.
   const admin = level === "organization";
+  const rights = admin || (!!project?.free && !!project?.mayChange);
+  /** A permission a project never changes: Configure is the organization's. */
+  const fixedHere = (v: Verb) => !admin && v === "CONFIGURE";
   const deptLabel = new Map(disciplines.map((d) => [d.code, d.label]));
 
   // The grid answers "what can this function do anywhere?" — the union of its
@@ -109,11 +117,15 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
       <PageHeader
         title="Functions & permissions"
         subtitle={admin
-          ? "Functions are the jobs people hold — Construction manager, HVAC technician, Project manager. What each may do comes from its rules here and in the distribution matrix; one function can create, review and approve. They are the same on every project."
-          : "The organization's functions, the same on every project: an administrator changes them in the organization's Settings. Who holds which function here is changed in People & access."}
+          ? "Functions are the jobs people hold — Construction manager, HVAC technician, Project manager. What each may do comes from its rules here and in the distribution matrix; one function can create, review and approve. Every project reads them, unless it changed what each may do for itself where that is left free."
+          : project?.own
+            ? "The organization's functions; what each may do is this project's own, changed here, which the organization's later changes never touch. Configure stays the organization's. Who holds which function here is changed in People & access."
+            : project?.free
+              ? `The organization's functions, and what each may do as the organization has it.${rights ? " Change one here and the project takes its own copy, which the organization's later changes never touch." : " The control function changes it for this project."} Who holds which function here is changed in People & access.`
+              : "The organization's functions and what each may do, the same on every project: an administrator changes them in the organization's Settings. Who holds which function here is changed in People & access."}
       />
 
-      <Card title="Who may do what" description={admin ? "Tick a box to grant a permission for every document, untick it to take it away. A half-filled box means the permission is granted for certain documents only — narrow it below." : undefined}>
+      <Card title="Who may do what" description={rights ? "Tick a box to grant a permission for every document, untick it to take it away. A half-filled box means the permission is granted for certain documents only — narrow it below." : undefined}>
         <DataTable
           id="functions-grid"
           className="shadow-none"
@@ -144,8 +156,9 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
                       const narrowed = fn.rules.some((r) => (r.deliverableType || r.docType || r.discipline || r.criticality || r.confidentiality || r.projectRole) && r.verbs.includes(`"${v}"`));
                       return (
                         <Td key={v} className="px-2 py-1 text-center">
-                          {admin ? (
+                          {rights && !fixedHere(v) ? (
                             <form action={toggleFunctionVerb}>
+                              <input type="hidden" name="level" value={level} />
                               <input type="hidden" name="functionId" value={fn.id} />
                               <input type="hidden" name="verb" value={v} />
                               <ConfirmButton
@@ -169,8 +182,8 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
         </DataTable>
       </Card>
 
-      {admin ? (
-      <Card title="Change a function" description="Open one to edit its rules or retire it. Rules only add permissions; nothing takes them away.">
+      {rights ? (
+      <Card title="Change a function" description={admin ? "Open one to edit its rules or retire it. Rules only add permissions; nothing takes them away." : "Open one to change what it may do on this project. Rules only add permissions; nothing takes them away."}>
         <ul className="divide-y divide-line">
           {functions.map((fn) => (
             <li key={fn.id}>
@@ -191,7 +204,9 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
                             {parseVerbs(rule.verbs).map((v) => <Chip key={v} className="bg-emerald-50/40 text-emerald-800 ring-emerald-300">{VERB_LABEL[v]}</Chip>)}
                           </span>
                         </span>
-                        <ActionForm action={deletePermissionRuleAction} submitLabel="Remove" variant="danger" size="sm" hidden={{ ruleId: rule.id }} className="shrink-0 space-y-0" />
+                        {fixedHere("CONFIGURE") && parseVerbs(rule.verbs).includes("CONFIGURE") ? null : (
+                          <ActionForm action={deletePermissionRuleAction} submitLabel="Remove" variant="danger" size="sm" hidden={{ ruleId: rule.id, level }} className="shrink-0 space-y-0" />
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -200,10 +215,10 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
                     <details>
                       <summary className="cursor-pointer text-xs font-semibold text-link">+ Add a rule</summary>
                       <div className="mt-3 max-w-2xl">
-                        <ActionForm action={savePermissionRuleAction} submitLabel="Add rule" size="sm" hidden={{ functionId: fn.id }}>
+                        <ActionForm action={savePermissionRuleAction} submitLabel="Add rule" size="sm" hidden={{ functionId: fn.id, level }}>
                           <Field label="May" required>
                             <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                              {GRANTABLE.map((v) => (
+                              {GRANTABLE.filter((v) => !fixedHere(v)).map((v) => (
                                 <label key={v} className="flex items-center gap-2 text-xs text-slate-700" title={VERB_BLURB[v]}>
                                   <input type="checkbox" name="verbs" value={v} /> {VERB_LABEL[v]}
                                 </label>
@@ -233,6 +248,7 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
                     </details>
                   ) : null}
 
+                  {admin ? (
                   <ActionForm action={updateFunctionAction} submitLabel="Save" size="sm" hidden={{ functionId: fn.id, name: fn.name }} className="flex flex-wrap items-center gap-3 space-y-0">
                     <label className="flex items-center gap-2 text-xs text-slate-600">
                       Department
@@ -250,12 +266,14 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
                     </label>
                     <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600"><SwitchControl name="active" defaultChecked={fn.active} /> in use</label>
                   </ActionForm>
+                  ) : null}
                 </div>
               </details>
             </li>
           ))}
         </ul>
 
+        {admin ? (
         <details className="mt-3 border-t border-line pt-3">
           <summary className="cursor-pointer text-xs font-semibold text-link">+ New function</summary>
           <div className="mt-3 max-w-2xl">
@@ -286,6 +304,7 @@ export async function FunctionsBoard({ level }: { level: "project" | "organizati
             </ActionForm>
           </div>
         </details>
+        ) : null}
       </Card>
       ) : null}
     </div>

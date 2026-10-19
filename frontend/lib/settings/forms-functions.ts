@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAccessScope } from "@/lib/core/scope";
-import { api, refusal } from "@/lib/client";
+import { requireAccessScope, requireScope } from "@/lib/core/scope";
+import { api, projectPath, refusal } from "@/lib/client";
 import { adminFunctions, rulesBody, type AdminFunction, type AdminRule } from "@/lib/settings/api-admin";
 import { getActiveSet } from "@/lib/settings/config";
 import { VERBS, GRANTABLE, type Verb } from "@/lib/core/permissions";
@@ -28,12 +28,28 @@ function adminFunctionGuard(ctx: { can: (verb: "CONFIGURE") => boolean }, fn: Ad
 
 type Result = { error?: string; ok?: string };
 
-async function findFunction(id: string) {
-  return (await adminFunctions()).find((one) => one.id === id) ?? null;
+/** Which level a form changes: the organization's functions, or the project's own copy of what each may do. */
+const onProject = (formData: FormData) => String(formData.get("level") ?? "") === "project";
+
+/** The functions as the level reads them: the organization's, or as the project in hand sees them. */
+async function functionsOf(project: boolean): Promise<AdminFunction[]> {
+  if (!project) return adminFunctions();
+  const ctx = await requireScope();
+  return (await api<{ functions: AdminFunction[] }>(projectPath(ctx, "/functions"))).functions;
 }
 
-async function saveRules(fn: AdminFunction, rules: AdminRule[]): Promise<Result | null> {
+async function findFunction(id: string, project = false) {
+  return (await functionsOf(project)).find((one) => one.id === id) ?? null;
+}
+
+async function saveRules(fn: AdminFunction, rules: AdminRule[], project = false): Promise<Result | null> {
   try {
+    if (project) {
+      // The project's own copy (made on its first change, where the organization leaves functions free).
+      const ctx = await requireScope();
+      await api(projectPath(ctx, `/functions/${fn.id}/rules`), { method: "PUT", body: { rules: rulesBody(rules) } });
+      return null;
+    }
     await api(`/api/admin/functions/${fn.id}`, { method: "PUT", body: { rules: rulesBody(rules) } });
     return null;
   } catch (e) {
@@ -97,11 +113,13 @@ export async function savePermissionRuleAction(_prev: Result | undefined, formDa
   const ruleId = String(formData.get("ruleId") ?? "").trim();
   const functionId = String(formData.get("functionId") ?? "").trim();
   const blank = (key: string) => String(formData.get(key) ?? "").trim() || null;
-  const fn = await findFunction(functionId);
+  const project = onProject(formData);
+  const fn = await findFunction(functionId, project);
   if (!fn) return { error: "Choose a function." };
-  const guard = adminFunctionGuard(ctx, fn);
+  const guard = project ? null : adminFunctionGuard(ctx, fn);
   if (guard) return { error: guard };
   const verbs = readVerbs(formData);
+  if (project && verbs.includes("CONFIGURE")) return { error: "Configure is the organization's: it is given on the organization's page, never on a project." };
   if (!ctx.can("CONFIGURE") && verbs.includes("CONFIGURE")) {
     return { error: "Only an administrator grants Configure — it is the permission that grants every other." };
   }
@@ -125,7 +143,7 @@ export async function savePermissionRuleAction(_prev: Result | undefined, formDa
   }
   if (ruleId && !fn.rules.some((r) => r.id === ruleId)) return { error: "That rule no longer exists." };
   const rules = ruleId ? fn.rules.map((r) => (r.id === ruleId ? rule : r)) : [...fn.rules, rule];
-  const failed = await saveRules(fn, rules);
+  const failed = await saveRules(fn, rules, project);
   if (failed) return failed;
   revalidatePath("/settings/functions");
   revalidatePath("/organization/settings/functions");
@@ -135,11 +153,12 @@ export async function savePermissionRuleAction(_prev: Result | undefined, formDa
 export async function deletePermissionRuleAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireAccessScope();
   const ruleId = String(formData.get("ruleId") ?? "");
-  const fn = (await adminFunctions()).find((one) => one.rules.some((r) => r.id === ruleId));
+  const project = onProject(formData);
+  const fn = (await functionsOf(project)).find((one) => one.rules.some((r) => r.id === ruleId));
   if (!fn) return { error: "That rule no longer exists." };
-  const guard = adminFunctionGuard(ctx, fn);
+  const guard = project ? null : adminFunctionGuard(ctx, fn);
   if (guard) return { error: guard };
-  const failed = await saveRules(fn, fn.rules.filter((r) => r.id !== ruleId));
+  const failed = await saveRules(fn, fn.rules.filter((r) => r.id !== ruleId), project);
   if (failed) return failed;
   revalidatePath("/settings/functions");
   revalidatePath("/organization/settings/functions");
@@ -156,11 +175,13 @@ async function toggleFunctionVerbAction(_prev: Result | undefined, formData: For
   const ctx = await requireAccessScope();
   const functionId = String(formData.get("functionId") ?? "");
   const verb = String(formData.get("verb") ?? "");
-  const fn = await findFunction(functionId);
+  const project = onProject(formData);
+  const fn = await findFunction(functionId, project);
   if (!fn) return { error: "That function no longer exists." };
   if (!GRANTABLE.includes(verb as Verb)) return { error: "Unknown permission." };
-  const guard = adminFunctionGuard(ctx, fn);
+  const guard = project ? null : adminFunctionGuard(ctx, fn);
   if (guard) return { error: guard };
+  if (project && verb === "CONFIGURE") return { error: "Configure is the organization's: it is given on the organization's page, never on a project." };
   if (!ctx.can("CONFIGURE") && verb === "CONFIGURE") {
     return { error: "Only an administrator grants Configure — it is the permission that grants every other." };
   }
@@ -173,7 +194,7 @@ async function toggleFunctionVerbAction(_prev: Result | undefined, formData: For
   const rules = next.length
     ? [...others, { id: open?.id ?? "", verbs: next, deliverableType: null, docType: null, discipline: null, criticality: null, confidentiality: null, projectRole: null }]
     : others;
-  const failed = await saveRules(fn, rules);
+  const failed = await saveRules(fn, rules, project);
   if (failed) return failed;
   revalidatePath("/settings/functions");
   revalidatePath("/organization/settings/functions");

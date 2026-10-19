@@ -99,13 +99,13 @@ public sealed partial class TransmittalService
         }
         ours = party.CustodianFunction is { } code
             ? ours.Where(x => x.m.Function!.Code == code)
-            : ours.Where(x => (x.m.ActsAsControl || x.m.Function!.Rules.Any(r => r.Verbs.Contains(Verbs.Control))));
+            : ours.Where(x => (x.m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == x.m.FunctionId && r.ProjectId == (x.m.Project!.OwnFunctions ? (Guid?)x.m.ProjectId : null) && r.Verbs.Contains(Verbs.Control))));
         return await ours.OrderBy(x => x.u.Name).Select(x => x.u).ToListAsync(cancellationToken);
     }
 
     /// <summary>Whether anyone active on the project holds CONTROL (the control function).</summary>
     private Task<bool> AnyControlHolderAsync(Guid projectId, CancellationToken cancellationToken) =>
         db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
-            && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
+            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control)))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
 }

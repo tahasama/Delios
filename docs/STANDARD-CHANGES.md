@@ -1231,6 +1231,8 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
   project's own work (its sub-projects, orders, routes, forms, who does what) is free.
 - **Making a setting fixed later undoes nothing** a project already changed: what a project changed is never
   overridden by the organization.
+- **What each function may do may be the project's own** where the organization leaves it free (the functions
+  themselves stay the organization's, and so does the right to configure).
 - **Only a reset, from the organization's settings, puts a project back on the organization's**, for a mess, with why,
   its control function told; **what the project held is kept**, and may be put back on it, with why.
 - **Lists are decided one by one**: each list has its own switch, and a project copies only the list it changes,

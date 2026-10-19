@@ -716,10 +716,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   how it works with us change once each (above). An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
 - Layered settings: built as the two levels above (the switches). Being moved onto them card by card: the switches
-  and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (done, per list), Forms & fields (done, per form), Functions & permissions (step 1 done: the organization's only, created and changed
-  on its Settings card `/organization/settings/functions` by an administrator, backend Configurers; a project's page reads
-  them, with who holds each there; its switch held Fixed, "Not yet", `Liberty.IsFreeAsync` false; a project's own
-  version of what a function may do is step 2, built only when a project needs it),
+  and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (done, per list), Forms & fields (done, per form), Functions & permissions (done, owner: "we should be able to change functions on a
+  project level": the functions themselves, name, code, clearance, in use, are the organization's, created and changed on
+  its Settings card `/organization/settings/functions` by an administrator; what each may do is the organization's unless
+  its switch `FUNCTIONS` (Fixed by default) leaves it Free, then the project's control function changes it on the
+  project's page, its first change copying every function's rights onto the project (`Project.OwnFunctions`,
+  `PermissionRule.ProjectId`; `Identity/ProjectFunctions.cs`, `PUT /api/projects/{id}/functions/{fid}/rules`); Configure
+  stays the organization's (CONFIGURE_ORGANIZATIONS). Rights are read per project: the query filter on rules follows the
+  project in hand (`DeliosDbContext.RulesProject`, set with its lists), and every check across projects reads each
+  project's own copy explicitly. The organization's card lists the projects with their own and resets one, its copy kept),
   the Control room (done: an answer whose switch is Fixed is read only on a project, "the organization's", backend
   ROOM_FIXED via `Liberty.RoomItemOf` / `RoomRefusalAsync`, accepted only when it equals the organization's default;
   the risk window likewise; a project keeps the answers it already held). Until a page is moved, it says plainly what is the organization's and what is the project's.

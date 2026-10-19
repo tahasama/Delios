@@ -183,7 +183,7 @@ public static class ProjectAnswers
         // Left to the people doing the work unless the project says otherwise, as the screens read it.
         if (WorkByDefault.Contains(act)) return false;
         return await db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
-            && (m.ActsAsControl || m.Function.Rules.Any(r => r.Verbs.Contains(Verbs.Control)))
+            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control)))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);
     }
 

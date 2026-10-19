@@ -194,7 +194,7 @@ public static class ProjectLists
         var project = await db.Projects.SingleAsync(p => p.Id == projectId, cancellationToken);
         if (project.OwnListKeys.Contains(listKey))
         {
-            db.UseListsOf(project.Id, project.OwnListKeys);
+            db.UseListsOf(project.Id, project.OwnListKeys, project.OwnFunctions);
             return false;
         }
         var sets = await db.ListSets.IgnoreQueryFilters().AsNoTracking()
@@ -215,7 +215,7 @@ public static class ProjectLists
         }));
         project.OwnListKeys = [.. project.OwnListKeys, listKey];
         await db.SaveChangesAsync(cancellationToken);
-        db.UseListsOf(project.Id, project.OwnListKeys);
+        db.UseListsOf(project.Id, project.OwnListKeys, project.OwnFunctions);
         return true;
     }
 
