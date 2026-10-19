@@ -1,12 +1,13 @@
 # Organizations working together: known gaps
 
-## Equivalence of numbers (later, owner)
+## Equivalence of numbers (built: matching by hand)
 
 When we work in another organization's project, its creator's numbering is the one used: that is what is
 exchanged, easy and consistent. In our own DELIOS, our numbering comes first; in theirs, theirs.
 
-Later, an equivalence: one document known under their number and under ours, each kept, matched one to one.
-It makes no trouble to the numbering on either side.
+An equivalence: one document known under their number and under ours, each kept, matched one to one. Built as matching
+by hand (owner): what arrives is one of ours (its content goes into it) or made a new one; their number is kept beside
+ours (`Documents/Equivalents.cs`). Still to come: matching across two organizations' own DELIOS by itself.
 
 What is not done, and why:
 - Nothing is copied into our register by itself when we send something on their project. Each register holds what

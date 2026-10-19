@@ -21,6 +21,7 @@ import { cn } from "@/lib/core/utils";
 import { adminFunctions, projectNumbering, partiesWithAnswers, routesForEditor } from "@/lib/settings/api-admin";
 import { getSet, getSets } from "@/lib/settings/config";
 import { NoAccess } from "../no-access";
+import { AsReceivedWarning } from "@/components/as-received-warning";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { roleLabel } from "@/lib/settings/profiles/roles";
 
@@ -56,6 +57,8 @@ type Stage = {
   sets?: string[];
   /** Where else it is set up. */
   extras?: Extra[];
+  /** Its panel opens on the red warning of documents taken as they come. */
+  warn?: boolean;
 };
 
 /**
@@ -174,9 +177,9 @@ const STAGES: Stage[] = [
     extras: ["parties", "form:TRANSMITTAL", "form:PARTY"],
   },
   {
-    key: "theirs", title: "Registered", tagline: "Put in our register", rail: "rail-none",
-    text: "It becomes a document of the register, under the sender's code and the order it answers.",
-    who: [{ title: "Registering it", by: "Whoever recorded it" }],
+    key: "theirs", title: "Registered or matched", tagline: "One of ours, or a new one", rail: "rail-none",
+    text: "What came unplanned is matched to one of our documents (what came becomes its content, their number kept beside ours, and the register finds it under both), or registered as a new document under our numbering, their number kept the same way.",
+    who: [{ title: "Matching it, or registering it", by: "Whoever checks what arrives" }],
     sets: ["SUPPLIER_CODES", "PURCHASE_ORDERS", "DISCIPLINES", "DOCUMENT_TYPES", "DELIVERABLE_TYPES"],
     extras: ["numbering", "form:DOCUMENT"],
   },
@@ -198,6 +201,21 @@ const STAGES: Stage[] = [
     text: "With no control function on the project, whoever the transmittal was for checks it (anyone of ours when it named nobody): accepted, it becomes the document's revision; returned, with why, they correct it.",
     who: [{ title: "Checking it", by: "Whoever the transmittal was for" }],
     sets: ["CONTROL_OUTCOMES"],
+  },
+  {
+    key: "sent-as-is", title: "Sent as it is", tagline: "Their number, their revision", rail: "rail-received",
+    text: "A supplier's package taking documents as they come has no placeholders: the supplier sends each document under its own number and revision, with its status and review outcome.",
+    who: [{ title: "Sending it", by: "The supplier, from its side of the package" }, { title: "Choosing this way, with what it is filed under", by: "The control function, on the package" }],
+    extras: ["packages"],
+    warn: true,
+  },
+  {
+    key: "as-came", title: "In the register as it came", tagline: "Not our numbering", rail: "rail-received",
+    text: "Once the check accepts it, it is in our register exactly as it came: their number, their revision, their status and review outcome, filed under the deliverable type, document type and discipline named on the package. Ready for our review; the next revision comes from them.",
+    who: [{ title: "Putting it there", by: "The app, once the check accepts it" }],
+    sets: ["DELIVERABLE_TYPES", "DOCUMENT_TYPES", "DISCIPLINES"],
+    extras: ["packages"],
+    warn: true,
   },
   {
     key: "handed-back", title: "Back with the supplier", tagline: "Theirs again, to update", rail: "rail-rejected",
@@ -483,9 +501,10 @@ function flowsAll({ gate, returner, together, unreviewed, work }: { gate: boolea
     {
       key: "supplier", tab: "Suppliers owe us", title: "Documents a supplier owes us", from: "We ask the supplier for it", to: "in force with us, or back with them for the next revision",
       columns: [
-        [{ scene: "asked" }],
+        [{ scene: "asked" }, { scene: "sent-as-is", optional: "the package takes documents as they come" }],
         [{ scene: "received", tagline: "They send it, on a transmittal" }],
         [{ scene: gate ? "checked" : "checked-self" }],
+        [{ scene: "as-came", optional: "the package takes documents as they come" }],
         [{ scene: "review", tagline: "By us, by them, or both" }],
         [{ scene: "accepted", tagline: "We hold it" }, { scene: "handed-back", end: true }],
         ...out,
@@ -765,6 +784,7 @@ export default async function ControlRoomPage() {
         <header className="border-b border-line bg-tint-soft px-5 py-3 sm:px-6">
           <h2 className="text-[15px] font-semibold text-slate-950">{stage.title}</h2>
           <p className="mt-0.5 text-[13px] leading-5 text-slate-600">{stage.text}</p>
+          {stage.warn ? <div className="mt-2"><AsReceivedWarning /></div> : null}
         </header>
         <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
           <div className="space-y-5 px-5 py-4 sm:px-6">

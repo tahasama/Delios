@@ -89,6 +89,39 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
 }
 
 /**
+ * Into a package taking documents as they come: the supplier sends one document as it is, under its own number,
+ * revision, status and review outcome, with its files. It lands in our register as it came once our check accepts it.
+ */
+export async function sendAsReceivedAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const { user } = ctx;
+  const packageId = String(formData.get("packageId") ?? "");
+  const pkg = await packageView(ctx, packageId);
+  if (!pkg?.asReceived) return { error: "This package asks for its documents by placeholder." };
+  if (!supplierMayUpload(user)) return { error: "Your access here is read-only. Ask the control function for the right to upload." };
+  const text = (key: string) => String(formData.get(key) ?? "").trim();
+  const number = text("reference"), title = text("title"), revision = text("revision");
+  const missing = [!number && "your number", !title && "its title", !revision && "its revision"].filter(Boolean);
+  const files = formData.getAll("files").filter((one): one is File => one instanceof File && one.size > 0);
+  if (!files.length) missing.push("its file");
+  if (missing.length) return { error: `Missing: ${missing.join(", ")}.` };
+  try {
+    const fileIds = await Promise.all(files.map((file) => upload(ctx, { loose: true }, file)));
+    const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
+      body: {
+        reason: pkg.reason, subject: `${pkg.number}: ${number} rev ${revision}`, packageId: pkg.id,
+        unplanned: [{ title, reference: number, revision, status: text("status") || null, outcome: text("outcome") || null, fileIds }],
+      },
+      idempotencyKey: randomUUID(),
+    });
+    revalidatePath(`/packages/${pkg.number}`);
+    return { ok: `${number} rev ${revision} sent on ${sent.number}. It is checked, then in the register as you sent it.` };
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+}
+
+/**
  * A supplier attaches its file to one of its placeholders, from the document
  * itself. The backend keeps no file a supplier has not sent: attaching sends it,
  * on its own incoming transmittal.

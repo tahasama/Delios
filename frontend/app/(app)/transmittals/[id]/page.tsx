@@ -10,6 +10,7 @@ import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import {
   issueTransmittalAction,
   acceptTransmittalAction,
+  checkAsReceivedAction,
   attachTransmittalFilesAction,
   chaseTransmittalAction,
   markRecipientSentAction,
@@ -25,6 +26,7 @@ import { ArrowLeft } from "lucide-react";
 import { getActiveSet } from "@/lib/settings/config";
 import { carriersOf as carriersOfTransmittal, transmittalPage, emailReplies } from "@/lib/transmittals/api";
 import { EmailReplies } from "./email-replies";
+import { UnplannedItems } from "./unplanned";
 import { activityDetail } from "@/lib/actions/api";
 
 export const dynamic = "force-dynamic";
@@ -211,6 +213,11 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
               the email, what they attached. Kept as the record of what arrived;
               one becomes a document only when somebody makes it one — and then
               it is found in the register by its own content. */}
+          {incoming ? (
+            <UnplannedItems transmittalId={t.id} items={t.items.filter((one) => one.kind === "UNPLANNED")} page={page}
+              from={page.issuingParty} mayAct={controller || !!page.mayCheck} />
+          ) : null}
+
           {/* Only when files came with it: a transmittal sent through the system carries its documents, nothing loose. */}
           {incoming && page.files.length ? (
             <section id="files" className="register register-sheet register-sheet-open">
@@ -517,7 +524,7 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                 (controller || page.mayCheck) ? (
                   <div className="px-5 py-3.5 sm:px-6">
                     <PreflightPanel result={await preflight("ACCEPT_TRANSMITTAL", { transmittalId: t.id })} className="mb-3" />
-                    <ActionForm action={acceptTransmittalAction} hideSubmit hidden={{ transmittalId: t.id }} className="space-y-0">
+                    <ActionForm action={page.asReceived ? checkAsReceivedAction : acceptTransmittalAction} hideSubmit hidden={{ transmittalId: t.id }} className="space-y-0">
                       <div className="asking grid grid-cols-1 items-center gap-x-3 gap-y-2.5 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                         <label className="min-w-0">
                           <span className="sr-only">A note, or why it is rejected</span>
@@ -529,7 +536,11 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                         <button name="decision" value="accept" data-on="true" className="ask">Accept</button>
                       </div>
                     </ActionForm>
-                    <p className="mt-2 text-[11px] text-slate-400">Accepting starts any response period. Rejecting returns it to the sender with your reason.</p>
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      {page.asReceived
+                        ? "Accepting puts each in the register as it came: their number, revision, status and review outcome. Rejecting returns it all to the sender with your reason."
+                        : "Accepting starts any response period. Rejecting returns it to the sender with your reason."}
+                    </p>
                   </div>
                 ) : (
                   <p className="px-5 py-2.5 text-xs text-slate-500 sm:px-6">The control function checks what arrives.</p>

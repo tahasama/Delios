@@ -193,6 +193,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       // Asked of its supplier on a transmittal (the supplier's own states begin at "Sent").
       requested: !!doc.supplier,
       // Its stamp, in the reader's words: ours ("sent to supplier", "received"…) or the supplier's ("to be transmitted"…).
+      asReceived: !!doc.asReceived,
       supplierStamp: doc.supplier && (SUPPLIER_STAGES as readonly string[]).includes(doc.supplier)
         ? supplierStamp(doc.supplier as SupplierStage, user.isInternal ? "ours" : "theirs", doc.withSupplier) : null,
       docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,

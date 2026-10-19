@@ -14,7 +14,8 @@ namespace Delios.Host.Transmittals;
 /// </summary>
 public sealed record TransmittalPage(TransmittalView Transmittal, string Status, string IssuingParty, string? CheckedBy, DateTimeOffset? CheckedAt,
     string? ReturnedReason, IReadOnlyList<CarriedItem> Carried, IReadOnlyList<ArrivedFile> Files, IReadOnlyList<CarriedRequest> IssueRequests,
-    IReadOnlyDictionary<Guid, PartyHabits> Parties, bool MayCheck = false);
+    IReadOnlyDictionary<Guid, PartyHabits> Parties, bool MayCheck = false, bool AsReceived = false,
+    IReadOnlyDictionary<Guid, string>? MatchedBefore = null);
 
 /// <summary>
 /// A document a transmittal carried, as it stands now: its revision's state (REQUESTED for a placeholder), the newest
@@ -69,6 +70,10 @@ public sealed partial class TransmittalService
                              select new { DocumentId = i.DocumentId!.Value, o.Id }).Distinct().ToListAsync(cancellationToken))
             .GroupBy(x => x.DocumentId).ToDictionary(g => g.Key, g => g.Count());
 
+        // Something unplanned matched or registered reads under our number (the item keeps theirs, as it came).
+        var looseIds = t.Items.Where(i => i.Kind == TransmittalItemKinds.Unplanned && i.DocumentId is not null).Select(i => i.DocumentId!.Value).ToList();
+        var ourNumbers = looseIds.Count == 0 ? new Dictionary<Guid, string>()
+            : await db.Documents.AsNoTracking().Where(d => looseIds.Contains(d.Id) && visible.Contains(d.Id)).ToDictionaryAsync(d => d.Id, d => d.Number, cancellationToken);
         // Only what is in the register is carried; something unplanned waits on the transmittal, as files that came with it.
         var carried = t.Items.Where(i => i.DocumentId is not null).Select(item =>
         {
@@ -77,7 +82,7 @@ public sealed partial class TransmittalService
             var review = item.RevisionId is { } rid
                 ? reviews[rid].Where(r => incoming ? r.StartedAt >= issuedAt : t.ReviewStepId is not null).MaxBy(r => r.StartedAt)
                 : null;
-            return new CarriedItem(item.Id, item.Kind, documentId, item.RevisionId, item.DocumentNumber, item.Title, item.Revision, item.Status,
+            return new CarriedItem(item.Id, item.Kind, documentId, item.RevisionId, ourNumbers.GetValueOrDefault(documentId, item.DocumentNumber), item.Title, item.Revision, item.Status,
                 item.Kind == TransmittalItemKinds.Placeholder ? "REQUESTED" : revision?.State ?? RevisionStates.Released,
                 newest.GetValueOrDefault(documentId),
                 actions[documentId].DistinctBy(a => a.Code).Select(a => new CarriedAction(a.Code, a.Name)).ToList(),
@@ -94,11 +99,13 @@ public sealed partial class TransmittalService
                 item.Kind == TransmittalItemKinds.Attachment && item.RegisteredAt is { } kept ? kept : t.IssuedAt))).ToList();
 
         var arrivals = carried.Select(i => i.Arrival).OfType<ArrivalView>().ToList();
-        var unregistered = t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt is null);
+        var unregistered = t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt is null && i.ReturnedAt is null);
+        // Something unplanned returned by the check (taken as it comes) reads as returned, with why.
+        var returnedLoose = t.Items.FirstOrDefault(i => i.Kind == TransmittalItemKinds.Unplanned && i.ReturnedAt is not null);
         var returned = arrivals.FirstOrDefault(a => a.State == Arrivals.Returned);
         var status = t.State == TransmittalStatuses.Draft ? TransmittalStatuses.Draft
             : !incoming || unregistered || arrivals.Any(a => a.State == Arrivals.ToCheck) ? TransmittalStatuses.Issued
-            : returned is not null ? TransmittalStatuses.Rejected : TransmittalStatuses.Accepted;
+            : returned is not null || returnedLoose is not null ? TransmittalStatuses.Rejected : TransmittalStatuses.Accepted;
         // Who checked it: whoever last accepted, returned or registered what came.
         var check = status is TransmittalStatuses.Accepted or TransmittalStatuses.Rejected
             ? arrivals.Where(a => a.At is not null).Select(a => (By: a.By, At: a.At!.Value))
@@ -118,9 +125,21 @@ public sealed partial class TransmittalService
         // when it named nobody), as ControlService.ArrivalAsync allows.
         var mayCheck = incoming && (access.Holds(Verbs.Control)
             || await StandIns.ArrivalAsync(db, access, t.Id, cancellationToken));
+        // Into a package taking documents as they come: the check accepts or returns what came, all at once.
+        var asReceived = incoming && t.PackageId is { } packageId
+            && await db.Packages.AnyAsync(p => p.Id == packageId && p.TakesAsReceived, cancellationToken);
+        // What came unplanned under a number of theirs matched before to one of ours: that one is proposed.
+        var matchedBefore = new Dictionary<Guid, string>();
+        var fromParty = incoming && access.IsInternal
+            ? await db.Transmittals.Where(x => x.Id == t.Id).Select(x => x.FromPartyId).SingleOrDefaultAsync(cancellationToken) : null;
+        if (fromParty is { } from)
+            foreach (var loose in t.Items.Where(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt is null && i.DocumentNumber.Length > 0))
+                if (await Equivalents.FindAsync(db, access.Project.Id, from, loose.DocumentNumber, cancellationToken) is { } ours)
+                    matchedBefore[loose.Id] = await db.Documents.Where(d => d.Id == ours).Select(d => d.Number).SingleAsync(cancellationToken);
 
         return new TransmittalPage(t, status, incoming ? t.From ?? t.IssuedBy : await OurNameAsync(access, cancellationToken),
-            check?.By, check?.At, status == TransmittalStatuses.Rejected ? returned?.Note : null, carried, files, requests, parties, mayCheck);
+            check?.By, check?.At, status == TransmittalStatuses.Rejected ? returned?.Note ?? returnedLoose?.ReturnedReason : null, carried, files, requests,
+            parties, mayCheck, asReceived, matchedBefore);
     }
 
     /// <summary>Our organization's name as the reader knows it: their own party when it is ours, else the organization's.</summary>

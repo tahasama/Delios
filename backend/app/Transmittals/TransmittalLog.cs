@@ -141,7 +141,7 @@ public static class TransmittalLogEndpoints
         if (!string.IsNullOrWhiteSpace(f.Party))
             query = query.Where(t => db.Parties.Any(p => (p.Id == t.ToPartyId || p.Id == t.FromPartyId) && p.Code == f.Party));
         if (f.Direction is TransmittalDirections.Outgoing or TransmittalDirections.Incoming) query = query.Where(t => t.Direction == f.Direction);
-        var unregistered = query.Where(t => t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt == null));
+        var unregistered = query.Where(t => t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt == null && i.ReturnedAt == null));
         var toSend = query.Where(t => t.Recipients.Any(r => r.UserId == null && r.DispatchedAt == null));
         query = f.Status switch
         {

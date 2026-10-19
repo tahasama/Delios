@@ -775,7 +775,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   **Working in someone else's project** (owner): it is one project, with its creator's data and numbering, which is
   what is exchanged; we fill its placeholders there (never "attach files" that would sit apart from its numbering and
   revisions). Each organization's register holds what it accepted (the check is what lets anything in); nothing is
-  copied into ours by itself. Matching their number to ours ("equivalence") comes later: `docs/gaps/organizations.md`.
+  copied into ours by itself. **Equivalence** (owner, built): what arrives unplanned is matched by hand to one of ours
+  ("One of ours?" on the transmittal; if it exists its content goes into it, a new submission of the revision being
+  prepared, else its next revision; not while in review), or made a document under our numbering; either way their
+  number is kept beside ours one to one (`Documents/Equivalents.cs`, `number_equivalents`; Details "Also known as",
+  added by hand or taken back with why by the control function), the register finds it under both, and the same number
+  of theirs proposes the same document next time. **Taken as they come** (owner): a supplier's package may take documents
+  with no placeholders (`Package.TakesAsReceived`, the control function, with what they are filed under and the warning
+  ticked); the supplier sends each under its own number and revision with its status and review outcome; the check
+  accepts all (they are in the register exactly so, `Document.AsReceived`, series `AS_RECEIVED`, their next revision
+  superseding one we never took further, never one of ours: AS_RECEIVED) or returns all with why. A red warning
+  (`components/as-received-warning.tsx`) says it on the package, the transmittal, the document, the register ("as
+  received" stamp) and the Control room: numbering, revisions, states and outcomes, search and reports, archiving.
   **Covers everything** (owner: "does it finally cover EVERYTHING?"): every list the app reads is a tile on the step
   that reads it (control outcomes on the check, activity decisions on an action, generic title words on registering,
   preservation formats on keeping); "Keeping & ending" draws kept (retention, confidentiality, what is kept about

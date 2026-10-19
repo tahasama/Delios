@@ -90,6 +90,8 @@ export type RegisterRow = {
   withSupplier?: boolean | null;
   /** The phase it is in now (PHASES). */
   phase?: string | null;
+  /** Taken as it came, under its supplier's number and revisions. */
+  asReceived?: boolean;
 };
 
 /** An ask to hand a supplier's document back for an update (RETURN_FOR_UPDATE), with its answer. */
@@ -115,6 +117,8 @@ export type DocumentView = {
   withSupplier?: boolean | null;
   /** The phase it is in now (PHASES): its next revision is named by that phase's line. */
   phase?: string | null;
+  /** Taken as it came from a supplier's package with no placeholders: its number, revisions and states are theirs. */
+  asReceived?: boolean;
 };
 
 /** Something a person decided and wrote down: when, who, and why, in their words. */
@@ -142,6 +146,8 @@ export type RevisionView = {
   reading?: { awaitingCheck: boolean; keptSubmission: number; decided: boolean; granted: string | null; issuedAt: string | null } | null;
   /** The phase the document was in when this revision was started. */
   phase?: string | null;
+  /** Taken as it came: the status and review outcome its sender gave it, in their words. */
+  theirStatus?: string | null; theirOutcome?: string | null;
 };
 /** GET /documents/{id}/routes (ReviewEndpoints RouteView). */
 export type RouteView = { id: string; name: string; description: string | null; isDefault: boolean; verdictSet?: string; verdicts?: string | null; verdictCodes?: string[] | null; verdictsMismatch?: boolean; steps: { title: string; functionCode: string | null; partyCode: string | null; mode: string; reason: string | null; userIds?: string[] }[] };
@@ -246,6 +252,12 @@ export type TransmittalItem = {
   documentId: string | null; revisionId: string | null; documentNumber: string; title: string; revision: string; status: string | null;
   dueDate: string | null; submission: number | null; docType: string | null; registeredAt: string | null; registeredBy: string | null;
   files: { id: string; name: string; size: number; sha256: string; status: string; kind: string | null }[];
+  /** Unplanned: matched by hand to one of our documents rather than registered anew. */
+  matched?: boolean;
+  /** Sent as it comes (a package with no placeholders): the status and review outcome the sender gave it. */
+  theirStatus?: string | null; theirOutcome?: string | null;
+  /** Sent as it comes and returned by the check, with why. */
+  returnedAt?: string | null; returnedBy?: string | null; returnedReason?: string | null;
 };
 
 /**
@@ -258,6 +270,10 @@ export type TransmittalPage = {
   issuingParty: string; checkedBy: string | null; checkedAt: string | null; returnedReason: string | null;
   /** May this person accept or return what arrived (the control function; with none, whoever it was for). */
   mayCheck?: boolean;
+  /** Sent into a package taking documents as they come: the check accepts or returns what came, all at once. */
+  asReceived?: boolean;
+  /** Something unplanned under a number of theirs matched before to one of ours: that number of ours, by item. */
+  matchedBefore?: Record<string, string> | null;
   carried: CarriedItem[];
   files: { id: string; name: string; size: number; sha256: string; keptBy: string; keptAt: string }[];
   issueRequests: { id: string; reason: string; note: string | null }[];
@@ -333,6 +349,8 @@ export type PackageView = {
    * accepts it, the supplier's code, when it was opened, when it was delivered.
    */
   names: { to: string; owners: string; acceptors: string; supplierCode: string | null; createdAt: string; deliveredAt: string | null };
+  /** A supplier's package taking documents as they come (no placeholders): what they are filed under, since when, by whom. */
+  asReceived?: { deliverableType: string; docType: string; discipline: string; since: string | null; by: string | null } | null;
 };
 
 /** GET /activity (ActivityEndpoints.cs): one act of the project, for Home's journal and log. */

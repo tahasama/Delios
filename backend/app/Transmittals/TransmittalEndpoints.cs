@@ -48,7 +48,8 @@ public sealed record TransmittalSummary(Guid Id, string Number, string Reason, s
 /// </summary>
 public sealed record TransmittalItemView(Guid Id, string Kind, Guid? DocumentId, Guid? RevisionId, string DocumentNumber, string Title,
     string Revision, string? Status, DateOnly? DueDate, int? Submission, string? DocType, DateTimeOffset? RegisteredAt,
-    string? RegisteredBy, IReadOnlyList<ItemFileView> Files);
+    string? RegisteredBy, IReadOnlyList<ItemFileView> Files, bool Matched = false, string? TheirStatus = null, string? TheirOutcome = null,
+    DateTimeOffset? ReturnedAt = null, string? ReturnedBy = null, string? ReturnedReason = null);
 
 /// <summary>A file a transmittal item carried.</summary>
 public sealed record ItemFileView(Guid Id, string Name, long Size, string Sha256, string Status, string? Kind = null);
@@ -163,6 +164,18 @@ public static class TransmittalEndpoints
                 return problem ?? Results.Ok(View(found!, await t.ItemFilesAsync(found!, c)));
             });
         project.MapPost("/transmittals/{transmittalId:guid}/items/{itemId:guid}/register", RegisterItemAsync);
+        project.MapPost("/transmittals/{transmittalId:guid}/items/{itemId:guid}/match", async (Guid transmittalId, Guid itemId, MatchRequest request,
+            HttpContext http, IncomingService incoming, TransmittalService transmittals, CancellationToken c) =>
+        {
+            var (t, problem) = await incoming.MatchAsync(ProjectAccessFilter.Of(http), transmittalId, itemId, request, c);
+            return problem ?? Results.Ok(View(t!, await transmittals.ItemFilesAsync(t!, c)));
+        });
+        project.MapPost("/transmittals/{transmittalId:guid}/as-received", async (Guid transmittalId, AsReceivedCheckRequest request,
+            HttpContext http, IncomingService incoming, TransmittalService transmittals, CancellationToken c) =>
+        {
+            var (t, problem) = await incoming.CheckAsReceivedAsync(ProjectAccessFilter.Of(http), transmittalId, request, c);
+            return problem ?? Results.Ok(View(t!, await transmittals.ItemFilesAsync(t!, c)));
+        });
         project.MapGet("/transmittals/{transmittalId:guid}/receipt", ReceiptAsync);
     }
 
@@ -373,7 +386,8 @@ public static class TransmittalEndpoints
         t.Items.OrderBy(i => i.DocumentNumber).ThenBy(i => i.Title).Select(i => new TransmittalItemView(i.Id, i.Kind, i.DocumentId,
             i.RevisionId, i.DocumentNumber, i.Title, i.RevisionValue, i.StatusCode, i.DueDate?.ToDateOnly(), i.Submission, i.DocType,
             i.RegisteredAt?.ToDateTimeOffset(), i.RegisteredByName,
-            TransmittalService.FilesOf(i, files ?? []).Select(f => new ItemFileView(f.Id, f.Name, f.Size, f.Sha256, f.Status, f.Kind)).ToList()))
+            TransmittalService.FilesOf(i, files ?? []).Select(f => new ItemFileView(f.Id, f.Name, f.Size, f.Sha256, f.Status, f.Kind)).ToList(),
+            i.Matched, i.TheirStatus, i.TheirOutcome, i.ReturnedAt?.ToDateTimeOffset(), i.ReturnedByName, i.ReturnedReason))
             .ToList(),
         // A person was told when it was issued unless told later; one opened before openings were counted opened it once.
         t.Recipients.OrderBy(r => r.Name).Select(r => new RecipientView(r.Id, r.Name, r.Organization, r.UserId is not null,

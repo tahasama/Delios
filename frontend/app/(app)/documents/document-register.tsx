@@ -39,6 +39,8 @@ type RegisterRow = {
   requested?: boolean;
   /** A supplier's document: where it stands, as a stamp in the reader's words. */
   supplierStamp?: string | null;
+  /** Taken as it came, under its supplier's number and revisions: stamped in red. */
+  asReceived?: boolean;
   docTypeLabel: string; disciplineLabel: string; deliverableLabel: string;
   /** What the newest revision serves, and the activities that list this document. */
   phase: string | null; phaseLabel: string | null;
@@ -604,6 +606,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
                 {row.docState === "CANCELLED" ? <span className="stamp text-slate-500">cancelled</span> : null}
                 {row.docState === "WITHDRAWN" ? <span className="stamp text-red-700">withdrawn</span> : null}
                 {row.docState === "ARCHIVED" ? <span className="stamp text-slate-500">archived</span> : null}
+                {row.asReceived ? <span className="stamp text-red-700" title="Its number, revisions and states are its sender's, not ours">as received</span> : null}
                 {row.supplierStamp ? <span className="stamp text-sky-700">{row.supplierStamp}</span> : row.placeholder ? <span className="stamp text-slate-500">{row.originator ? "not sent to supplier" : "number reserved"}</span> : null}
                 {row.onHold ? <span title={row.onHold} className="stamp text-red-700">not for use</span> : null}
               </span>

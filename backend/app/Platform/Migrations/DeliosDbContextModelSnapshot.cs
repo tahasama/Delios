@@ -901,6 +901,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("app_version");
 
+                    b.Property<bool>("AsReceived")
+                        .HasColumnType("boolean")
+                        .HasColumnName("as_received");
+
                     b.Property<string>("Confidentiality")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
@@ -1376,6 +1380,83 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("number_counters", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Documents.NumberEquivalent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("number");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("party_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Instant>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<string>("RecordedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("recorded_by_name");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
+
+                    b.Property<Instant?>("TakenBackAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("taken_back_at");
+
+                    b.Property<string>("TakenBackByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("taken_back_by_name");
+
+                    b.Property<string>("TakenBackReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("taken_back_reason");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_number_equivalents");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_number_equivalents_tenant_id");
+
+                    b.HasIndex("DocumentId", "PartyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_number_equivalents_document_id_party_id")
+                        .HasFilter("taken_back_at IS NULL");
+
+                    b.HasIndex("ProjectId", "PartyId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_number_equivalents_project_id_party_id_number")
+                        .HasFilter("taken_back_at IS NULL");
+
+                    b.ToTable("number_equivalents", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Documents.NumberingScheme", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1608,6 +1689,14 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<string>("TheirOutcome")
+                        .HasColumnType("text")
+                        .HasColumnName("their_outcome");
+
+                    b.Property<string>("TheirStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("their_status");
 
                     b.Property<string>("UnvoidReason")
                         .HasColumnType("text")
@@ -3705,6 +3794,26 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid[]")
                         .HasColumnName("acceptor_ids");
 
+                    b.Property<Instant?>("AsReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("as_received_at");
+
+                    b.Property<string>("AsReceivedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("as_received_by_name");
+
+                    b.Property<string>("AsReceivedDeliverableType")
+                        .HasColumnType("text")
+                        .HasColumnName("as_received_deliverable_type");
+
+                    b.Property<string>("AsReceivedDiscipline")
+                        .HasColumnType("text")
+                        .HasColumnName("as_received_discipline");
+
+                    b.Property<string>("AsReceivedDocType")
+                        .HasColumnType("text")
+                        .HasColumnName("as_received_doc_type");
+
                     b.Property<Instant?>("AssessedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("assessed_at");
@@ -3842,6 +3951,10 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<Guid?>("SupplierPartyId")
                         .HasColumnType("uuid")
                         .HasColumnName("supplier_party_id");
+
+                    b.Property<bool>("TakesAsReceived")
+                        .HasColumnType("boolean")
+                        .HasColumnName("takes_as_received");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -5839,6 +5952,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("kind");
 
+                    b.Property<bool>("Matched")
+                        .HasColumnType("boolean")
+                        .HasColumnName("matched");
+
                     b.Property<Instant?>("RegisteredAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("registered_at");
@@ -5847,6 +5964,18 @@ namespace Delios.Host.Platform.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("registered_by_name");
+
+                    b.Property<Instant?>("ReturnedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("returned_at");
+
+                    b.Property<string>("ReturnedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("returned_by_name");
+
+                    b.Property<string>("ReturnedReason")
+                        .HasColumnType("text")
+                        .HasColumnName("returned_reason");
 
                     b.Property<Guid?>("RevisionId")
                         .HasColumnType("uuid")
@@ -5870,6 +5999,14 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<string>("TheirOutcome")
+                        .HasColumnType("text")
+                        .HasColumnName("their_outcome");
+
+                    b.Property<string>("TheirStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("their_status");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -6401,6 +6538,23 @@ namespace Delios.Host.Platform.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_number_counters_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Delios.Host.Documents.NumberEquivalent", b =>
+                {
+                    b.HasOne("Delios.Host.Documents.Document", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_number_equivalents_documents_document_id");
+
+                    b.HasOne("Delios.Host.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_number_equivalents_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Delios.Host.Documents.NumberingScheme", b =>

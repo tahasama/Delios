@@ -205,6 +205,15 @@ public sealed class TransmittalItem
     /// <summary>Unplanned: when the control function put it in our register, and by whom. DocumentId is then set.</summary>
     public Instant? RegisteredAt { get; set; }
     public string? RegisteredByName { get; set; }
+    /// <summary>Unplanned: matched by hand to one of our documents (its content became that document's), not registered anew.</summary>
+    public bool Matched { get; set; }
+    /// <summary>Sent as it comes (a package with no placeholders): the status and review outcome the sender gave it.</summary>
+    public string? TheirStatus { get; set; }
+    public string? TheirOutcome { get; set; }
+    /// <summary>Unplanned, sent as it comes: returned by the check, with why; never registered.</summary>
+    public Instant? ReturnedAt { get; set; }
+    public string? ReturnedByName { get; set; }
+    public string? ReturnedReason { get; set; }
 }
 
 /// <summary>

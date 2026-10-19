@@ -29,7 +29,13 @@ public sealed record PackageView(Guid Id, string Number, string Title, string? D
     IReadOnlyList<PackageTransmittal> Transmittals, string Kind, Guid? SupplierPartyId, string? Supplier, string? PurchaseOrder,
     IReadOnlyList<string>? Reasons = null, System.Text.Json.JsonElement? Extras = null, string? AcceptNote = null,
     DateTimeOffset? SharedAt = null, string? SharedBy = null, bool AutoCreated = false, IReadOnlyList<string>? SupplierPeople = null,
-    PackageNames? Names = null);
+    PackageNames? Names = null, AsReceivedView? AsReceived = null);
+
+/// <summary>A supplier's package taking documents as they come: filed under what, since when, by whom.</summary>
+public sealed record AsReceivedView(string DeliverableType, string DocType, string Discipline, DateTimeOffset? Since, string? By);
+
+/// <summary>Body of making a supplier's package take documents as they come (or not), with what they are filed under.</summary>
+public sealed record AsReceivedRequest(bool On, string? DeliverableType = null, string? DocType = null, string? Discipline = null, bool Understood = false);
 
 /// <summary>
 /// A package's people and dates in words: who it goes to (its supplier, or its recipients), who puts it together
@@ -79,6 +85,8 @@ public static class PackageEndpoints
             Act(h, s, (a) => s.AcceptAsync(a, packageId, r, c)));
         project.MapPost("/{packageId:guid}/share", (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.ShareAsync(a, packageId, c)));
+        project.MapPut("/{packageId:guid}/as-received", (Guid packageId, AsReceivedRequest r, HttpContext h, PackageService s, CancellationToken c) =>
+            Act(h, s, (a) => s.AsReceivedAsync(a, packageId, r, c)));
         project.MapPost("/{packageId:guid}/request", (Guid packageId, SupplyRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.RequestAsync(a, packageId, r, c)));
         project.MapPut("/{packageId:guid}", (Guid packageId, RenameRequest r, HttpContext h, PackageService s, CancellationToken c) =>
@@ -157,7 +165,8 @@ public static class PackageEndpoints
         var readiness = await packages.ReadinessAsync(p, cancellationToken);
         var transmittals = await packages.TransmittalsAsync(p, cancellationToken);
         // Its supplier sees what was asked of it on a transmittal, and nothing else.
-        if (outside) readiness = readiness.Where(r => r.Member.RequestedAt is not null).ToList();
+        // Theirs to see: what was asked of them, and in a package taking documents as they come, what they sent.
+        if (outside) readiness = readiness.Where(r => r.Member.RequestedAt is not null || p.TakesAsReceived).ToList();
         return new PackageView(p.Id, p.Number, p.Title, p.Description, p.Reason, p.RequiredStatuses, p.CompletionDate?.ToDateOnly(),
             p.Rule, p.Excluded, p.RecipientPartyIds, p.OwnerIds, p.AcceptorIds, p.State, p.AssessedAt?.ToDateTimeOffset(), p.Shortfall,
             p.ShortfallIssuedAt?.ToDateTimeOffset(), p.ShortfallAcceptedAt?.ToDateTimeOffset(), p.ShortfallAcceptedByName,
@@ -171,6 +180,8 @@ public static class PackageEndpoints
             p.Extras is null ? null : System.Text.Json.JsonDocument.Parse(p.Extras).RootElement.Clone(), p.AcceptNote,
             p.SharedAt?.ToDateTimeOffset(), p.SharedByName, p.AutoCreated,
             outside ? null : (await packages.SupplierPeopleAsync(p, cancellationToken)).Select(x => x.Name).ToList(),
-            await packages.NamesAsync(p, transmittals, cancellationToken));
+            await packages.NamesAsync(p, transmittals, cancellationToken),
+            p.TakesAsReceived ? new AsReceivedView(p.AsReceivedDeliverableType!, p.AsReceivedDocType!, p.AsReceivedDiscipline!,
+                p.AsReceivedAt?.ToDateTimeOffset(), p.AsReceivedByName) : null);
     }
 }

@@ -77,7 +77,8 @@ public static class DocumentEndpoints
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var pattern = "%" + q.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
-                query = query.Where(d => EF.Functions.ILike(d.Number, pattern) || EF.Functions.ILike(d.Title, pattern));
+                query = query.Where(d => EF.Functions.ILike(d.Number, pattern) || EF.Functions.ILike(d.Title, pattern)
+                    || source.NumberEquivalents.Any(e => e.DocumentId == d.Id && e.TakenBackAt == null && EF.Functions.ILike(e.Number, pattern)));
             }
             if (discipline is not null) query = query.Where(d => d.Discipline == discipline);
             if (docType is not null) query = query.Where(d => d.DocType == docType);
@@ -318,7 +319,7 @@ public static class DocumentEndpoints
         d.ConfirmedByName, d.CorrectsId, d.LegalHoldAt?.ToDateTimeOffset(), d.LegalHoldByName,
         Written.Of(d.LegalHoldLiftedAt, d.LegalHoldLiftedByName, d.LegalHoldLiftReason), Written.Of(d.EndedAt, d.EndedByName, d.EndReason),
         Written.Of(d.ReinstatedAt, d.ReinstatedByName, d.ReinstateReason),
-        d.WithSupplier, d.Phase);
+        d.WithSupplier, d.Phase, d.AsReceived);
 
     /// <summary>Turns a revision entity, with its submissions and files, into the shape the API returns.</summary>
     private static RevisionView View(Revision r) => new(
@@ -332,5 +333,5 @@ public static class DocumentEndpoints
         r.AuthoredById, r.AuthoredByParty, r.ReleasedByName, r.ReturnedAt?.ToDateTimeOffset(), r.HeldAt?.ToDateTimeOffset(), r.HeldReason,
         r.HeldByName, r.VoidedAt?.ToDateTimeOffset(), r.VoidReason, r.VoidAuthority, r.VoidReassessment,
         Written.Of(r.UnvoidedAt, r.UnvoidedByName, r.UnvoidReason), Written.Of(r.ResentAt, r.ResentByName, r.ResentNote ?? ""),
-        RevisionReading.Of(r), r.Phase);
+        RevisionReading.Of(r), r.Phase, r.TheirStatus, r.TheirOutcome);
 }

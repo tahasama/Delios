@@ -29,6 +29,18 @@ public sealed class Package
     public string? SharedByName { get; set; }
     /// <summary>Made by itself when the first document for its supplier (and purchase order) was registered.</summary>
     public bool AutoCreated { get; set; }
+    /// <summary>
+    /// A supply package with no placeholders: what the supplier sends is taken as it comes, and once the check accepts
+    /// it, it is in our register under the supplier's number, revision, status and review outcome, filed under the
+    /// deliverable type, document type and discipline named here. Chosen by the control function, with its warning:
+    /// the register no longer follows one numbering, revisions or states. Who and when are kept.
+    /// </summary>
+    public bool TakesAsReceived { get; set; }
+    public string? AsReceivedDeliverableType { get; set; }
+    public string? AsReceivedDocType { get; set; }
+    public string? AsReceivedDiscipline { get; set; }
+    public Instant? AsReceivedAt { get; set; }
+    public string? AsReceivedByName { get; set; }
     public required string Title { get; set; }
     public string? Description { get; set; }
     /// <summary>Further reasons for issue, after the one its transmittals go for; named on them.</summary>

@@ -3,17 +3,19 @@ import { requireScope } from "@/lib/core/scope";
 import { isController, isAdmin, hasVerb, standsInForControl } from "@/lib/core/auth";
 import { DataTable, Th, Td, Field, inputCls, ToneChip, btn } from "@/components/ui";
 import { FileTally } from "./file-tally";
-import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@/lib/packages/forms";
+import { setPackageRuleAction, sharePackageAction, deletePackageAction, setPackageAsReceivedAction } from "@/lib/packages/forms";
 import { PackageLines, type PackageLine } from "./package-lines";
 import { ruleFilter, ruleWords } from "@/lib/packages/package-rule";
 import { RuleFields } from "../rule-fields";
 import { manageItems } from "../manage-items";
 import { ActionForm } from "@/components/form";
-import { submitSupplierPackageAction } from "@/lib/packages/forms-supplier";
+import { submitSupplierPackageAction, sendAsReceivedAction } from "@/lib/packages/forms-supplier";
+import { AsReceivedWarning } from "@/components/as-received-warning";
+import { getActiveSet } from "@/lib/settings/config";
 import { supplierRows, supplierFigures, packageStage, packageCounts, lineStage, WITH_SUPPLIER, type SupplierRow } from "@/lib/packages/supplier";
 import { fmtDate } from "@/lib/core/utils";
 import { plannedState } from "@/lib/actions/planned-state";
-import { ArrowLeft, Download, Filter, PackageCheck, Pencil, Send, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Filter, Inbox, PackageCheck, Pencil, Send, Share2, Trash2 } from "lucide-react";
 import { getMe } from "@/lib/account/api";
 import type { PackageView } from "@/lib/types";
 
@@ -74,7 +76,8 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
 
   // ── The supplier's page ──────────────────────────────────────────────────────
   if (isSupplier) {
-    const mine = rows.filter((r) => asked.has(r.doc.id));
+    // Taking documents as they come: everything they sent is theirs to see; else only what was asked of them.
+    const mine = pkg.asReceived ? rows : rows.filter((r) => asked.has(r.doc.id));
     const mayUpload = hasVerb(user, "CREATE") || hasVerb(user, "REVISE");
     const holds = mine.filter((r) => WITH_SUPPLIER.includes(r.state));
     const where = packageStage(pkg, rows, "theirs");
@@ -143,12 +146,33 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
             </ActionForm>
           ) : table}
         </section>
+        {pkg.asReceived && mayUpload ? (
+          <section className="register register-sheet register-sheet-open">
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+              <span className="stencil mr-1 text-slate-500">Send a document as it is</span>
+              <span className="text-[11px] text-slate-500">under your own number and revision: {org} checks it, then it is in their register as you sent it</span>
+            </div>
+            <ActionForm action={sendAsReceivedAction} submitLabel={`Send to ${org}`} size="sm" hidden={{ packageId: pkg.id }} className="px-5 py-4 sm:px-6">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Field label="Your number" required><input name="reference" required className={inputCls} /></Field>
+                <Field label="Title" required><input name="title" required className={inputCls} /></Field>
+                <Field label="Revision" required hint="as you name it"><input name="revision" required className={inputCls} /></Field>
+                <Field label="Status" hint="your words, e.g. issued for approval"><input name="status" className={inputCls} /></Field>
+                <Field label="Review outcome" hint="what your own review said, if any"><input name="outcome" className={inputCls} /></Field>
+                <Field label="Files" required hint="the PDF and its native file"><input type="file" name="files" multiple required className="w-full" /></Field>
+              </div>
+            </ActionForm>
+          </section>
+        ) : null}
       </div>
     );
   }
 
   // ── Our page ─────────────────────────────────────────────────────────────────
   const f = supplierFigures(rows);
+  const [deliverables, docTypes, disciplines] = staff
+    ? await Promise.all([getActiveSet("DELIVERABLE_TYPES"), getActiveSet("DOCUMENT_TYPES"), getActiveSet("DISCIPLINES")]).catch(() => [[], [], []])
+    : [[], [], []];
   const shared = pkg.sharedAt ? new Date(pkg.sharedAt) : null;
   const where = packageStage(pkg, rows, "ours");
   const notSent = rows.filter((r) => !asked.has(r.doc.id));
@@ -226,6 +250,15 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
             </span>
           </div>
           <div className="space-y-3 px-5 py-4 sm:px-6">
+            {pkg.asReceived ? (
+              <div className="space-y-1.5">
+                <AsReceivedWarning who={supplierName} />
+                <p className="text-[11px] text-slate-500">
+                  Taking documents as they come since {fmtDate(pkg.asReceived.since)}{pkg.asReceived.by ? ` (${pkg.asReceived.by})` : ""}, filed under{" "}
+                  <span className="font-mono">{pkg.asReceived.deliverableType} / {pkg.asReceived.docType} / {pkg.asReceived.discipline}</span>.
+                </p>
+              </div>
+            ) : null}
             {/* Who of the supplier sees it: its people on this project. Nobody there, nobody sees it, shared or not. */}
             {pkg.supplierPeople && !pkg.supplierPeople.length ? (
               <p className="rounded-md bg-red-50 px-3 py-2.5 text-xs leading-5 text-red-900 ring-1 ring-red-200">
@@ -261,6 +294,47 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
                 </Act>
               ) : null}
               {edit ? <Act icon={Pencil} label={typeof edit.label === "string" ? edit.label : "Edit"}>{edit.body}</Act> : null}
+              {pkg.asReceived ? (
+                <Act icon={Inbox} label="Ask by placeholder again">
+                  <ActionForm action={setPackageAsReceivedAction} submitLabel="Ask by placeholder again" size="sm" hidden={{ packageId: pkg.id, on: "false" }}>
+                    <p className="text-xs leading-5 text-slate-600">From now on {supplierName} fills the placeholders sent to them. What was taken as it came stays as it is, with its warning.</p>
+                  </ActionForm>
+                </Act>
+              ) : (
+                <Act icon={Inbox} label="Take documents as they come">
+                  <ActionForm action={setPackageAsReceivedAction} submitLabel="Take them as they come" size="sm" variant="danger" hidden={{ packageId: pkg.id, on: "true" }}>
+                    <AsReceivedWarning who={supplierName} />
+                    <p className="text-xs leading-5 text-slate-600">
+                      No placeholders: {supplierName} sends each document under its own number and revision, with its status and review outcome.
+                      Once your check accepts it, it is in the register exactly so. Use it only when placeholders cannot be agreed.
+                    </p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <Field label="Filed under: deliverable type" required>
+                        <select name="deliverableType" required className={inputCls} defaultValue="">
+                          <option value="" disabled>Choose</option>
+                          {deliverables.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Document type" required hint="when they name none">
+                        <select name="docType" required className={inputCls} defaultValue="">
+                          <option value="" disabled>Choose</option>
+                          {docTypes.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Discipline" required>
+                        <select name="discipline" required className={inputCls} defaultValue="">
+                          <option value="" disabled>Choose</option>
+                          {disciplines.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
+                        </select>
+                      </Field>
+                    </div>
+                    <label className="flex items-start gap-2 text-xs text-slate-700">
+                      <input type="checkbox" name="understood" required className="mt-0.5" />
+                      I understand: their numbers, revisions, states and review outcomes go into our register as they are, and our numbering, revisions and states do not apply to them.
+                    </label>
+                  </ActionForm>
+                </Act>
+              )}
               {!shared && !sentAny ? (
                 <Act icon={Trash2} label="Delete the package">
                   <ActionForm action={deletePackageAction} submitLabel="Delete the package" size="sm" variant="danger" hidden={{ packageId: pkg.id }} confirmText="The package is deleted. Its documents stay in the register. Continue?">

@@ -71,6 +71,8 @@ export type PageDocument = {
   holdLifted: Written | null; ended: Written | null; reinstated: Written | null;
   /** Exchanged with a supplier: true while they hold it (only they change it), false while we do; null otherwise. */
   withSupplier: boolean | null;
+  /** Taken as it came from a supplier's package with no placeholders. */
+  asReceived: boolean;
   legacyScheme: string | null; createdDate: Date; receivedDate: Date | null; plannedDate: Date | null; appVersion: string | null;
   createdById: string; createdByName: string; createdAt: Date; updatedAt: Date;
   revisions: PageRevision[];
@@ -202,6 +204,7 @@ export const documentPage = cache(async (scope: Scope, id: string): Promise<Page
     legalHoldReason: doc.legalHoldReason ?? null, legalHoldAt: date(doc.legalHoldAt ?? null), legalHoldBy: doc.legalHoldBy ?? null,
     holdLifted: doc.holdLifted ?? null, ended: doc.ended ?? null, reinstated: doc.reinstated ?? null,
     withSupplier: doc.withSupplier ?? null,
+    asReceived: !!doc.asReceived,
     isPlaceholder: doc.isPlaceholder, previousId: doc.previousNumber, legacyScheme: doc.legacyScheme, createdDate: new Date(doc.createdAt), receivedDate: date(doc.receivedDate),
     plannedDate: date(doc.plannedDate), appVersion: doc.appVersion, createdById: doc.createdById, createdByName: doc.createdByName,
     createdAt: new Date(doc.createdAt), updatedAt: new Date(doc.updatedAt),

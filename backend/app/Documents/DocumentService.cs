@@ -513,6 +513,9 @@ public sealed class DocumentService(
             .OrderBy(r => r.CreatedAt).ToListAsync(cancellationToken);
         if (document!.Kind == DocumentKinds.Record && existing.Count > 0)
             return (null, Problems.Conflict("RECORD_IS_FIXED", "A record is fixed evidence: it has one revision and is never revised."));
+        // Taken as it came: its revisions are its sender's, the next one comes from them, as it is, into their package.
+        if (document.AsReceived)
+            return (null, Problems.Conflict("AS_RECEIVED", "Its revisions are its sender's: the next one comes from them, into their package."));
         if (existing.LastOrDefault() is { } latest && RevisionStates.InMotion(latest.State))
         {
             return (null, Problems.Conflict("REVISION_IN_MOTION",
@@ -715,7 +718,7 @@ public sealed class DocumentService(
     /// </summary>
     public async Task<(Revision? Revision, IResult? Problem)> AdoptAsync(
         ProjectAccess access, Document document, List<StoredFile> files, string? party, string? status, Instant sentAt, string sentBy,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? how = null)
     {
         var scheme = await RevisionSchemeForAsync(document.ProjectId, document.DeliverableType, null, cancellationToken);
         if (scheme is null)
@@ -724,8 +727,13 @@ public sealed class DocumentService(
                 "No revision scheme applies to this deliverable type. An administrator sets one up.",
                 new { deliverableType = document.DeliverableType }));
         }
-        var line = RevisionValues.LineFor(scheme, document.Phase).Code;
-        var value = ((NextValue.Value)RevisionValues.Next(scheme, [], line)).Text;
+        // A document with revisions already (one of ours that what arrived was matched to) goes on counting the way it began.
+        var existing = await db.Revisions.AsNoTracking().Where(r => r.DocumentId == document.Id).OrderBy(r => r.CreatedAt)
+            .Select(r => new { r.Series, r.Value }).ToListAsync(cancellationToken);
+        var line = existing.Count > 0 ? null : RevisionValues.LineFor(scheme, document.Phase).Code;
+        if (RevisionValues.Next(scheme, existing.Select(r => (r.Series, r.Value)).ToList(), line) is not NextValue.Value { Text: var value })
+            return (null, Problems.Conflict("NO_NEXT_REVISION", $"{document.Number} has no next revision value in its scheme."));
+        line ??= existing[^1].Series;
         var revision = new Revision
         {
             TenantId = document.TenantId,
@@ -734,8 +742,8 @@ public sealed class DocumentService(
             Value = value,
             Series = line,
             Phase = document.Phase,
-            ReasonForRevision = "First issue",
-            ChangeDescription = "Received unplanned on a transmittal",
+            ReasonForRevision = existing.Count == 0 ? "First issue" : "Received from another organization",
+            ChangeDescription = how ?? "Received unplanned on a transmittal",
             AuthoredById = access.UserId,
             AuthoredByName = sentBy,
             AuthoredByParty = party,

@@ -215,6 +215,11 @@ public sealed class Document
     public string? LegacyScheme { get; set; }
     /// <summary>The application (and version) its native file is made with.</summary>
     public string? AppVersion { get; set; }
+    /// <summary>
+    /// Taken as it came from a supplier's package with no placeholders: its number, revisions, states and review
+    /// outcomes are the supplier's, not ours (<see cref="Packages.Package.TakesAsReceived"/>). Shown with its warning.
+    /// </summary>
+    public bool AsReceived { get; set; }
     /// <summary>The organization's own fields (Settings → Forms &amp; fields), name to value, as JSON. Null when none.</summary>
     public string? Extras { get; set; }
     /// <summary>Kept whatever its retention says: nothing about it may be disposed of while it holds.</summary>
@@ -309,6 +314,9 @@ public sealed class Revision
     public Instant CreatedAt { get; set; }
     /// <summary>What the released revision is for (IFC, IFA…), from the organization's status list.</summary>
     public string? StatusCode { get; set; }
+    /// <summary>Taken as it came: the status and review outcome the sender gave it, in their words, never ours.</summary>
+    public string? TheirStatus { get; set; }
+    public string? TheirOutcome { get; set; }
     public Instant? ReleasedAt { get; set; }
     public string? ReleasedByName { get; set; }
     public Instant? SupersededAt { get; set; }
@@ -577,6 +585,35 @@ public sealed class HandBackRequest
     public string? AnsweredByName { get; set; }
     public bool? Accepted { get; set; }
     public string? Answer { get; set; }
+}
+
+/// <summary>
+/// One document known under another organization's number as well as ours: matched by hand when what they sent is
+/// one of ours (or registered from what they sent), kept one to one. Neither number changes the other; the register
+/// finds the document under both. Taken back only with why, and kept.
+/// </summary>
+public sealed class NumberEquivalent
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid TenantId { get; set; }
+    public Guid ProjectId { get; set; }
+    public Guid DocumentId { get; set; }
+    /// <summary>The organization whose number it is.</summary>
+    public Guid PartyId { get; set; }
+    public required string Number { get; set; }
+    /// <summary>MATCHED (what they sent, matched to ours), REGISTERED (registered from what they sent), TYPED.</summary>
+    public required string Source { get; set; }
+    public required string RecordedByName { get; set; }
+    public Instant RecordedAt { get; set; }
+    public Instant? TakenBackAt { get; set; }
+    public string? TakenBackByName { get; set; }
+    public string? TakenBackReason { get; set; }
+}
+
+/// <summary>How a <see cref="NumberEquivalent"/> came to be.</summary>
+public static class EquivalentSources
+{
+    public const string Matched = "MATCHED", Registered = "REGISTERED", Typed = "TYPED";
 }
 
 /// <summary>The kinds of <see cref="HandBackRequest"/>.</summary>

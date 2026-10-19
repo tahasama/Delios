@@ -321,6 +321,66 @@ public sealed class PackageService(
         return (package, null);
     }
 
+    /// <summary>
+    /// The control function makes a supplier's package take documents as they come, with no placeholders (or stops it):
+    /// what the supplier sends is checked, then in our register under its own number, revision, status and review
+    /// outcome, filed under the deliverable type, document type and discipline named here. The register no longer
+    /// follows one numbering, revisions or states: it is said wherever such a document shows. Logged; the supplier told.
+    /// </summary>
+    public async Task<(Package? Package, IResult? Problem)> AsReceivedAsync(ProjectAccess access, Guid id, AsReceivedRequest request,
+        CancellationToken cancellationToken)
+    {
+        var (package, problem) = await ComposableAsync(access, id, cancellationToken);
+        if (problem is not null) return Fail(problem);
+        if (package!.Kind != PackageKinds.Supply)
+            return Fail(Problems.Conflict("NOT_A_SUPPLY_PACKAGE", "Only a supplier's package takes its documents as they come."));
+        if (request.On)
+        {
+            var catalog = await Catalog.LoadAsync(db, cancellationToken);
+            var deliverable = request.DeliverableType?.Trim() ?? "";
+            var type = request.DocType?.Trim() ?? "";
+            var discipline = request.Discipline?.Trim() ?? "";
+            var missing = new List<string>();
+            if (!catalog.IsActive(ValueSets.DeliverableTypes, deliverable)) missing.Add("deliverableType");
+            if (!catalog.IsActive(ValueSets.DocumentTypes, type)) missing.Add("docType");
+            if (!catalog.IsActive(ValueSets.Disciplines, discipline)) missing.Add("discipline");
+            if (missing.Count > 0)
+                return Fail(Problems.Invalid("FIELDS_REQUIRED", "Say what they are filed under: a deliverable type, a document type and a discipline, from the lists.",
+                    new { fields = missing }));
+            if (!request.Understood)
+                return Fail(Problems.Invalid("WARNING_NOT_READ", "Read what it does to the register, and tick that you understand.", new { field = "understood" }));
+            package.TakesAsReceived = true;
+            package.AsReceivedDeliverableType = deliverable;
+            package.AsReceivedDocType = type;
+            package.AsReceivedDiscipline = discipline;
+            package.AsReceivedAt = clock.GetCurrentInstant();
+            package.AsReceivedByName = access.UserName;
+        }
+        else
+        {
+            if (!package.TakesAsReceived) return (package, null);
+            package.TakesAsReceived = false;
+            package.AsReceivedAt = clock.GetCurrentInstant();
+            package.AsReceivedByName = access.UserName;
+        }
+        await audit.WriteAsync(Actor(access), request.On ? "PACKAGE_AS_RECEIVED" : "PACKAGE_BY_PLACEHOLDER", "Package", package.Id, package.Number,
+            request.On
+                ? $"Takes its documents as they come, with no placeholders: their numbers, revisions, states and review outcomes go into the register as they are, filed under {package.AsReceivedDeliverableType} / {package.AsReceivedDocType} / {package.AsReceivedDiscipline}."
+                : "Back to asking its documents by placeholder. Documents already taken as they came stay as they are.",
+            package.ProjectId, cancellationToken);
+        if (package.SharedAt is not null)
+        {
+            var people = (await SupplierPeopleAsync(package, cancellationToken)).Select(p => p.Id).ToList();
+            if (people.Count > 0)
+                await notifier.NotifyAsync(access.Project.TenantId, package.ProjectId, people, Notifications.NotificationKinds.General,
+                    request.On ? $"{package.Number}: send your documents as they are" : $"{package.Number}: documents are asked by placeholder again",
+                    request.On ? "Send each document under your own number and revision, from the package." : "Fill the placeholders sent to you.",
+                    $"/packages/{package.Number}", cancellationToken);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return (package, null);
+    }
+
     // ── Name, and deleting an empty one ───────────────────────────────────────
 
     /// <summary>

@@ -62,7 +62,9 @@ public sealed record RegisterRow(
     DateTimeOffset? RevisionStartedAt, DateTimeOffset? FileAddedAt, int Packages, IReadOnlyList<RegisterActivity> Activities,
     string? Supplier = null, bool? WithSupplier = null, string? Phase = null,
     /// <summary>The answers kept with it to the project's own fields and lists of its own.</summary>
-    IReadOnlyDictionary<string, string>? Extras = null);
+    IReadOnlyDictionary<string, string>? Extras = null,
+    /// <summary>Taken as it came, under the supplier's number, revision and states (a package with no placeholders).</summary>
+    bool AsReceived = false);
 
 public sealed record RegisterActivity(string Code, string Name);
 
@@ -270,7 +272,9 @@ public static class RegisterEndpoints
                 foreach (var word in words)
                 {
                     var pattern = $"%{Escape(word)}%";
-                    all = all.And(d => EF.Functions.ILike(d.Number, pattern) || EF.Functions.ILike(d.Title, pattern));
+                    // Found under another organization's number matched to it, too (equivalence).
+                    all = all.And(d => EF.Functions.ILike(d.Number, pattern) || EF.Functions.ILike(d.Title, pattern)
+                        || db.NumberEquivalents.Any(e => e.DocumentId == d.Id && e.TakenBackAt == null && EF.Functions.ILike(e.Number, pattern)));
                 }
                 predicate = predicate.Or(all);
             }
@@ -444,7 +448,7 @@ public static class RegisterEndpoints
                 d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), latest?.CreatedAt.ToDateTimeOffset(),
                 files.TryGetValue(id, out var added) ? added.ToDateTimeOffset() : null, packages.GetValueOrDefault(id),
                 activities.GetValueOrDefault(id) ?? [], SupplierStage(asked.Contains(id), latest?.State, latest?.ResentAt, latest?.ReturnedAt), d.WithSupplier, d.Phase,
-                d.Extras is null ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(d.Extras));
+                d.Extras is null ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(d.Extras), d.AsReceived);
         }).ToList();
     }
 

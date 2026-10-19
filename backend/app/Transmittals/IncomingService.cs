@@ -17,8 +17,12 @@ namespace Delios.Host.Transmittals;
 /// <summary>A placeholder filled: its document, the files uploaded for it, and the status the sender proposes.</summary>
 public sealed record PlannedItem(Guid DocumentId, Guid[]? FileIds, string? Status);
 
-/// <summary>Something not planned (an RFI, an NCR, minutes…): what it is, its type, the sender's reference, its files.</summary>
-public sealed record UnplannedItem(string? Title, string? DocType, string? Reference, Guid[]? FileIds);
+/// <summary>
+/// Something not planned (an RFI, an NCR, minutes…): what it is, its type, the sender's reference, its files. Sent into
+/// a package taking documents as they come, also its revision, status and review outcome, in the sender's words.
+/// </summary>
+public sealed record UnplannedItem(string? Title, string? DocType, string? Reference, Guid[]? FileIds,
+    string? Revision = null, string? Status = null, string? Outcome = null);
 
 /// <summary>
 /// Body of an incoming transmittal. <c>Planned</c> fills placeholders; <c>Unplanned</c> sends files that wait for
@@ -30,7 +34,7 @@ public sealed record IncomingRequest(
     string? Reason, string? Subject = null, string? Message = null, string? TheirReference = null,
     PlannedItem[]? Planned = null, UnplannedItem[]? Unplanned = null, Guid[]? RevisionIds = null,
     Guid? FromPartyId = null, Guid? ProofFileId = null, string? Note = null, Guid[]? UserIds = null, DateOnly? ReceivedOn = null,
-    Guid? InReplyToId = null, Dictionary<string, string?>? Extras = null);
+    Guid? InReplyToId = null, Dictionary<string, string?>? Extras = null, Guid? PackageId = null);
 
 /// <summary>Body of keeping files with something received after it was recorded.</summary>
 public sealed record AttachFilesRequest(Guid[]? FileIds, string? Note = null);
@@ -44,7 +48,7 @@ public sealed record LooseUploadRequest(string? FileName, long Size, string? Con
 /// filled update our register straight away (the control function then checks them on arrival); anything unplanned waits
 /// on the transmittal until the control function registers it under our numbering.
 /// </summary>
-public sealed class IncomingService(
+public sealed partial class IncomingService(
     DeliosDbContext db, DocumentService documents, TransmittalService transmittals, Numbering numbering, FileStorage storage,
     AuditLog audit, IClock clock, IOptions<StorageOptions> storageOptions, Notifications.Notifier notifier)
 {
@@ -129,6 +133,10 @@ public sealed class IncomingService(
         if (forPeople.Count != forIds.Count) return (null, Problems.Invalid("RECIPIENT_UNKNOWN", "Someone it is for is not one of ours on this project."));
         if (planned.Select(p => p.DocumentId).Distinct().Count() != planned.Length)
             return (null, Problems.Invalid("DOCUMENT_TWICE", "Each placeholder is sent once on a transmittal."));
+        // Into a package taking documents as they come: each says its own number and revision, and lands in our
+        // register as it is once the check accepts it.
+        var (asReceived, packageProblem) = await AsReceivedPackageAsync(access, party!, request.PackageId, unplanned, cancellationToken);
+        if (packageProblem is not null) return (null, packageProblem);
 
         var now = clock.GetCurrentInstant();
         var transmittal = new Transmittal
@@ -150,6 +158,7 @@ public sealed class IncomingService(
             ReceiptNote = Blank(request.Note),
             InReplyToId = answered?.Id,
             Extras = Documents.OwnFields.Write(null, request.Extras),
+            PackageId = asReceived?.Id,
         };
         transmittal.Recipients = forPeople.Select(m => new TransmittalRecipient
         {
@@ -224,8 +233,10 @@ public sealed class IncomingService(
                 Kind = TransmittalItemKinds.Unplanned,
                 DocumentNumber = Blank(other.Reference) ?? "",
                 Title = title,
-                RevisionValue = "",
+                RevisionValue = asReceived is null ? "" : Blank(other.Revision) ?? "",
                 DocType = type,
+                TheirStatus = asReceived is null ? null : CutOrNull(Blank(other.Status), 200),
+                TheirOutcome = asReceived is null ? null : CutOrNull(Blank(other.Outcome), 200),
             };
             var (files, problem) = await LooseFilesAsync(access, other.FileIds, proof: false, cancellationToken);
             if (problem is not null) return (null, problem);
@@ -279,6 +290,8 @@ public sealed class IncomingService(
     {
         if (!access.IsInternal || !(access.Holds(Verbs.Control) || await StandIns.ArrivalAsync(db, access, transmittalId, cancellationToken)))
             return (null, Problems.Forbidden("CONTROL_ONLY", "The control function decides what goes into the register."));
+        if (await db.TransmittalItems.AnyAsync(i => i.Id == itemId && (i.ReturnedAt != null || i.Matched), cancellationToken))
+            return (null, Problems.Conflict("ALREADY_ANSWERED", "It was matched to one of ours, or returned."));
         var transmittal = await transmittals.Visible(access).Include(t => t.Items).Include(t => t.Recipients).AsSplitQuery()
             .SingleOrDefaultAsync(t => t.Id == transmittalId, cancellationToken);
         var item = transmittal?.Items.SingleOrDefault(i => i.Id == itemId);
@@ -308,6 +321,10 @@ public sealed class IncomingService(
         item.RevisionValue = revision.Value;
         item.RegisteredAt = clock.GetCurrentInstant();
         item.RegisteredByName = access.UserName;
+        // Their number is kept beside ours: the register finds it under both.
+        var kept = await Equivalents.RecordAsync(db, clock, document, party.Id, item.DocumentNumber, EquivalentSources.Registered,
+            access.UserName, cancellationToken);
+        if (kept is not null) return (null, kept);
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "UNPLANNED_REGISTERED", "Transmittal", transmittal.Id,
             transmittal.Number, $"{Label(item)} registered as {document.Number}.", access.Project.Id, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -517,5 +534,6 @@ public sealed class IncomingService(
         : $"{i.DocumentNumber} rev {i.RevisionValue}";
 
     private static string Cut(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
+    private static string? CutOrNull(string? s, int max) => s is null ? null : Cut(s, max);
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

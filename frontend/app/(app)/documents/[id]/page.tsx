@@ -11,7 +11,7 @@ import { requireScope } from "@/lib/core/scope";
 import { preflight } from "@/lib/conformance/rules/preflight";
 import { PreflightPanel } from "@/components/preflight";
 import Link from "next/link";
-import { isController, isAdmin, mayContributeToDocument } from "@/lib/core/auth";
+import { isController, isAdmin, mayContributeToDocument, standsInForControl } from "@/lib/core/auth";
 import { ToneChip, StateChip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
@@ -48,6 +48,9 @@ import { activityList, scheduleSource } from "@/lib/actions/api";
 import { addDocumentToActionAction } from "@/lib/actions/forms-links";
 import { sendToSupplierAction, askBackAction, answerAskAction } from "@/lib/packages/forms-supplier";
 import { addressees } from "@/lib/transmittals/api";
+import { AlsoKnownAs, type Equivalent } from "./numbers";
+import { AsReceivedWarning } from "@/components/as-received-warning";
+import { api, projectPath } from "@/lib/client";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +117,11 @@ export default async function DocumentDetailPage({
   const asks = supplierName ? await handBacks(ctx, doc.id) : [];
   const openAsk = asks.find((one) => !one.answeredAt) ?? null;
   const controller = isController(user) || isAdmin(user);
+  // Equivalence: its numbers with other organizations, ours only; kept by the control function (or, with none, whoever exchanges).
+  const numbers = user.isInternal
+    ? await api<Equivalent[]>(projectPath(ctx, `/documents/${doc.id}/numbers`)).catch(() => [] as Equivalent[]) : [];
+  const numberParties = user.isInternal ? (await addressees(ctx).catch(() => ({ parties: [] as { id: string; code: string; name: string; participation: string }[] }))).parties : [];
+  const mayKeepNumbers = user.isInternal && (controller || standsInForControl(user));
   // The control function adds it to a schedule action from here too: the actions with a discipline tagged that do not need it yet.
   const mayAddToAction = ctx.can("CONTROL") && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
   const actionChoices = mayAddToAction
@@ -634,6 +642,7 @@ export default async function DocumentDetailPage({
 
   return (
     <div className="space-y-4">
+      {doc.asReceived ? <AsReceivedWarning who={supplierName ?? doc.originator ?? undefined} short /> : null}
       {doc.legalHold ? (
         <Banner tone="warn" title={`On legal hold${doc.legalHoldAt ? ` since ${fmtDate(doc.legalHoldAt)}` : ""}${doc.legalHoldBy ? ` — ${doc.legalHoldBy}` : ""}`}>
           {doc.legalHoldReason ?? "No reason was recorded."} While held it cannot be retired and no revision voided. New revisions and reviews go on.
@@ -665,6 +674,7 @@ export default async function DocumentDetailPage({
               {doc.state === "ARCHIVED" ? <span className="stamp font-sans text-slate-500">archived</span> : null}
               {doc.revisions[0]?.state === "VOID" ? <span className="stamp font-sans text-red-700">rev {doc.revisions[0].value} void</span> : null}
               {doc.legalHold ? <span className="stamp font-sans text-amber-800">legal hold</span> : null}
+              {doc.asReceived ? <span className="stamp font-sans text-red-700">as received</span> : null}
             </p>
             <h1 className="plate-name mt-1 min-w-0">{doc.title}</h1>
             <p className="plate-meta mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -741,6 +751,8 @@ export default async function DocumentDetailPage({
                     </div>
                   ))}
                 </dl>
+                <AlsoKnownAs documentId={doc.id} numbers={numbers} mayKeep={mayKeepNumbers}
+                  parties={numberParties} />
                 {closed ? (
                   <ReadersPanel
                     documentId={doc.id}

@@ -115,7 +115,7 @@ public sealed partial class TransmittalService
             var unplanned = await (
                 from i in db.TransmittalItems
                 join t in db.Transmittals on i.TransmittalId equals t.Id
-                where t.ProjectId == projectId && i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt == null
+                where t.ProjectId == projectId && i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt == null && i.ReturnedAt == null
                 orderby t.IssuedAt
                 select new { t.Id, i.DocumentNumber, i.Title, t.Number, t.FromName, t.IssuedAt }).ToListAsync(cancellationToken);
             work.AddRange(unplanned.Select(x => new IssueWork("REGISTER_UNPLANNED", null, x.Id, null,

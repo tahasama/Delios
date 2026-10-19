@@ -31,13 +31,14 @@ delios/
 backend/
 ├── app/                  the program (API and worker)
 │   ├── Program.cs        start-up: what runs, in which order
-│   ├── Documents/        documents, revisions, files, the register; the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
+│   ├── Documents/        documents, revisions, files, the register; their numbers with other organizations (Equivalents.cs); the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
 │   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (the sets of Review outcomes, read by routes)
 │   │                     ProjectLists: the project's lists (own copy on first change, where each value is used, who changes them)
 │   │                     ListRules: groups, the app's lists, which set of a list serves a deliverable type; Catalog.IsOfferedFor checks it
 │   │                     SheetGuard: every spreadsheet checked before it is read (type, size unpacked, macros, viruses)
 │   ├── Reviews/          routes, steps, advice, verdicts, release
-│   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs)
+│   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs); matching what arrived
+│   │                     to one of ours and packages taking documents as they come (IncomingService.Taking.cs)
 │   ├── Packages/         delivery packages and supplier packages
 │   ├── Actions/          the schedule, its actions, what each needs, notices
 │   ├── Records/          assets, number ranges, readiness answers

@@ -301,6 +301,25 @@ internal sealed class IdempotencyRecordConfiguration : IEntityTypeConfiguration<
     }
 }
 
+/// <summary>Tells EF Core how to store <see cref="NumberEquivalent"/>: a document's number with another organization.</summary>
+internal sealed class NumberEquivalentConfiguration : IEntityTypeConfiguration<NumberEquivalent>
+{
+    /// <summary>Sets up the table: foreign keys, indexes and column lengths. One live number per organization and document.</summary>
+    public void Configure(EntityTypeBuilder<NumberEquivalent> b)
+    {
+        b.ToTable("number_equivalents");
+        b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<Document>().WithMany().HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.ProjectId, x.PartyId, x.Number }).IsUnique().HasFilter("taken_back_at IS NULL");
+        b.HasIndex(x => new { x.DocumentId, x.PartyId }).IsUnique().HasFilter("taken_back_at IS NULL");
+        b.Property(x => x.Number).HasMaxLength(200);
+        b.Property(x => x.Source).HasMaxLength(20);
+        b.Property(x => x.RecordedByName).HasMaxLength(200);
+        b.Property(x => x.TakenBackByName).HasMaxLength(200);
+        b.Property(x => x.TakenBackReason).HasMaxLength(2000);
+    }
+}
+
 /// <summary>Tells EF Core how to store <see cref="HandBackRequest"/>: asks to hand a supplier's document back, kept per document.</summary>
 internal sealed class HandBackRequestConfiguration : IEntityTypeConfiguration<HandBackRequest>
 {

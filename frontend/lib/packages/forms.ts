@@ -206,6 +206,22 @@ export async function sharePackageAction(_prev: { error?: string } | undefined, 
 }
 
 /**
+ * A supplier's package takes documents as they come, with no placeholders (or goes back to placeholders): what they
+ * send lands in the register as it is once checked. Filed under the three values chosen; the warning must be read.
+ */
+export async function setPackageAsReceivedAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const on = formData.get("on") === "true";
+  const { error } = await onPackage(String(formData.get("packageId") ?? ""), "/as-received", {
+    on,
+    deliverableType: String(formData.get("deliverableType") ?? "") || null,
+    docType: String(formData.get("docType") ?? "") || null,
+    discipline: String(formData.get("discipline") ?? "") || null,
+    understood: formData.get("understood") === "on",
+  }, "PUT");
+  return error ? { error } : {};
+}
+
+/**
  * Delete a package that holds nothing and never went anywhere. Its documents
  * stay in the register; only the package goes. The number is not given out again.
  */

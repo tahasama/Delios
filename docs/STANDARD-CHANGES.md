@@ -1268,6 +1268,28 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
 - **Functions and what they may do are the organization's**, the same on every project, for now: a project's own
   version is built only when a project needs it.
 
+## 68 · One document, two numbers; and documents taken as they come
+
+**What the Standard assumes:** every document in the register carries our number, from our numbering, and what an
+outside organization sends is either a placeholder of ours filled or registered anew under our numbering.
+
+**What we built (owner):**
+- **Equivalence.** What arrives unplanned is matched by hand to one of our documents: if it is one of ours, what came
+  becomes its content (a new submission of the revision being prepared, else its next revision); if it is none of ours,
+  it is made a document under our numbering. Either way their number is kept beside ours, one to one
+  (`number_equivalents`, `Documents/Equivalents.cs`), the register finds it under both, and the next arrival under the
+  same number of theirs proposes the same document. Taken back only with why, and kept.
+- **What lands in a register is what its organization accepted.** Placeholders filled become the document once the
+  check accepts them; unplanned items once matched or registered; nothing is copied anywhere by itself.
+- **A package taking documents as they come** (no placeholders): chosen by the control function on a supplier's
+  package, with what they are filed under (deliverable type, document type, discipline) and a warning read and ticked.
+  The supplier sends each document under its own number and revision, with its status and review outcome; once the
+  check accepts it, it is in the register exactly so (`Document.AsReceived`, `Revision.TheirStatus` / `TheirOutcome`,
+  series `AS_RECEIVED`); returned, nothing is registered. Their next revision replaces the one before that we never
+  took further; we never start one of our own on it (AS_RECEIVED). A red warning says, wherever it shows (package,
+  transmittal, document, register stamp "as received", Control room): numbering, revisions, states and review
+  outcomes, search and reports, archiving and keeping no longer follow one rule.
+
 ## Still open — decided in conversation, not yet built
 
 - **Every transmittal and every notification also goes by email**, showing what

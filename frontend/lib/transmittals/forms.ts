@@ -157,7 +157,7 @@ export async function acceptTransmittalAction(_prev: { error?: string } | undefi
   const waiting = page.carried.filter((one) => one.arrival?.state === "TO_CHECK");
   if (!waiting.length) {
     return page.files.length && page.status === "ISSUED"
-      ? { error: "What is left on it came unplanned: make each file a document to register it." }
+      ? { error: "What is left on it came unplanned: match each to one of ours, or make it a document." }
       : { error: "Only a transmittal waiting to be checked can be accepted or rejected." };
   }
   // Returned to the sender to correct under the same revision, as the organization words it.
@@ -170,6 +170,46 @@ export async function acceptTransmittalAction(_prev: { error?: string } | undefi
     for (const item of waiting) {
       await api(projectPath(ctx, `/revisions/${item.revisionId}/arrival`), { body: { outcome, note: notes || null, return: reject && !outcome } });
     }
+  } catch (e) {
+    return { error: refusal(e).message };
+  } finally {
+    revalidatePath(`/transmittals/${id}`);
+  }
+  return {};
+}
+
+/**
+ * Equivalence: something unplanned that arrived is one of our documents. What came becomes that document's (a new
+ * submission of the revision being prepared, else its next revision); their number is kept beside ours.
+ */
+export async function matchItemAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const id = String(formData.get("transmittalId") ?? "");
+  const itemId = String(formData.get("itemId") ?? "");
+  const number = String(formData.get("number") ?? "").trim();
+  if (!number) return { error: "Write the number of our document it is." };
+  try {
+    await api(projectPath(ctx, `/transmittals/${id}/items/${itemId}/match`), { body: { number } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  } finally {
+    revalidatePath(`/transmittals/${id}`);
+  }
+  return { ok: `Matched to ${number}.` };
+}
+
+/**
+ * What came into a package taking documents as they come: accepted, each is in the register as it came (their number,
+ * revision, status, review outcome); returned, nothing is registered and they are told why.
+ */
+export async function checkAsReceivedAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requireScope();
+  const id = String(formData.get("transmittalId") ?? "");
+  const reject = formData.get("decision") === "reject";
+  const notes = String(formData.get("notes") ?? "").trim();
+  if (reject && !notes) return { error: "Say what is wrong — the sender reads this." };
+  try {
+    await api(projectPath(ctx, `/transmittals/${id}/as-received`), { body: { return: reject, note: notes || null } });
   } catch (e) {
     return { error: refusal(e).message };
   } finally {
