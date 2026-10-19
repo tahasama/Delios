@@ -1,20 +1,16 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
-import { StateChip } from "@/components/ui";
 import { api, projectPath } from "@/lib/client";
 import { projectSettings } from "@/lib/settings/api";
-import { controlSettings, PROJECT_MODE_LABEL, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES } from "@/lib/settings/control-activities";
+import { controlSettings, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES } from "@/lib/settings/control-activities";
 import { policySaid } from "@/components/how-it-works";
 import { holdersOf } from "@/lib/core/permissions";
-import { REV_STATE_COLOR, type RevState } from "@/lib/core/standard";
-import { stateNames, stateName, STATE_NAMES } from "@/lib/core/state-names";
 import { scheduleSource } from "@/lib/actions/api";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
-import { SceneDeck, type Flow, type Scene } from "./scene-deck";
+import { SceneDeck, type Flow, type Scene, type StepRow } from "./scene-deck";
 import { cn } from "@/lib/core/utils";
 import { adminFunctions, projectNumbering, partiesWithAnswers, routesForEditor } from "@/lib/settings/api-admin";
 import { getSet, getSets } from "@/lib/settings/config";
@@ -30,9 +26,6 @@ export const metadata = { title: "Control room" };
  * changed on its own card (How this project works, Numbering, Review routes…).
  */
 
-/** A revision state, or the hold, which is read as one. */
-type Shown = RevState | "ON_HOLD";
-
 /** Who does something on a step: an act the project decides the carrier of (its key), or one that never changes. */
 type Who = string | { title: string; by: string };
 
@@ -46,8 +39,6 @@ type Stage = {
   /** One sentence: what happens at this step. */
   text: string;
   rail: string;
-  /** The states a revision is in, or leaves in, at this step. */
-  states?: Shown[];
   who: Who[];
   /** What the project chose that this step reads: a question's key, or DAYS, ESCALATE, CONFIRM:<act>. */
   answers?: string[];
@@ -71,14 +62,14 @@ const STAGES: Stage[] = [
     extras: ["numbering", "fields"],
   },
   {
-    key: "prepare", title: "Prepare", tagline: "Written by its author", rail: "rail-prep", states: ["IN_PREPARATION"],
+    key: "prepare", title: "Prepare", tagline: "Written by its author", rail: "rail-prep",
     text: "The author writes the revision and attaches its files.",
     who: [{ title: "Writing the revision", by: "Its author" }, "AUTHORIZE_REVISION"],
     sets: ["STATUSES", "NATIVE_FORMATS", "RENDITION_FORMATS"],
     extras: ["revisions"],
   },
   {
-    key: "review", title: "Review", tagline: "Down its route", rail: "rail-review", states: ["IN_REVIEW"],
+    key: "review", title: "Review", tagline: "Down its route", rail: "rail-review",
     text: "The route the document matches sends it to its reviewers, and each answers with a verdict or advice.",
     who: ["REVIEW_ISSUE", { title: "Answering", by: "The people on each step of the route" }, "DELEGATE"],
     answers: ["POLICY_MATRIX", "POLICY_MATRIX_DETAIL"],
@@ -105,36 +96,36 @@ const STAGES: Stage[] = [
     extras: ["parties"],
   },
   {
-    key: "gate", title: "The control function's check", tagline: "Before it is published", rail: "rail-check", states: ["NOT_RELEASED"],
+    key: "gate", title: "The control function's check", tagline: "Before it is published", rail: "rail-check",
     text: "Decided, it waits until the control function publishes it at the status the review settled on.",
     who: [{ title: "Publishing it", by: "The control function" }],
     sets: ["STATUSES"],
   },
   {
-    key: "gate-return", title: "Sent back", tagline: "Wrong for the record", rail: "rail-returned", states: ["RETURNED"],
+    key: "gate-return", title: "Sent back", tagline: "Wrong for the record", rail: "rail-returned",
     text: "The control function refuses to publish it and sends it back with a reason. This revision ends.",
     who: [{ title: "Sending it back", by: "The control function" }],
     sets: ["RETURN_REASONS"],
   },
   {
-    key: "approval", title: "Approved outside", tagline: "An outside party approves", rail: "rail-accepted", states: ["NOT_RELEASED", "ON_HOLD"],
+    key: "approval", title: "Approved outside", tagline: "An outside party approves", rail: "rail-accepted",
     text: "Somebody outside approves it before it is released, when an approval was asked for.",
     who: [{ title: "Approving", by: "The outside party named when it was asked" }],
     extras: ["parties"],
   },
   {
-    key: "approval-refused", title: "Not approved", tagline: "Back to the author", rail: "rail-rejected", states: ["ON_HOLD"],
+    key: "approval-refused", title: "Not approved", tagline: "Back to the author", rail: "rail-rejected",
     text: "The outside party refuses it: it goes back to the author with a reason. This revision ends.",
     who: [{ title: "Sending it back", by: "Whoever asked for the approval" }],
   },
   {
-    key: "release", title: "Release", tagline: "In force", rail: "rail-released", states: ["RELEASED", "SUPERSEDED"],
+    key: "release", title: "Release", tagline: "In force", rail: "rail-released",
     text: "The revision comes into force, and the one before it is superseded.",
     who: [{ title: "Releasing", by: "The decider, or the control function where it checks first" }, "VOID"],
     answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP"],
   },
   {
-    key: "released-issued", title: "Released & issued", tagline: "In force, and sent", rail: "rail-released", states: ["RELEASED", "SUPERSEDED"],
+    key: "released-issued", title: "Released & issued", tagline: "In force, and sent", rail: "rail-released",
     text: "In one act it comes into force and goes to the people named by whoever decided or asked.",
     who: ["ISSUE", "VOID", "ACTION_NOTE"],
     answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "POLICY_READY"],
@@ -176,7 +167,7 @@ const STAGES: Stage[] = [
     who: [{ title: "Checking it", by: "The control function" }],
   },
   {
-    key: "handed-back", title: "Back with the supplier", tagline: "Theirs again, to update", rail: "rail-rejected", states: ["RETURNED"],
+    key: "handed-back", title: "Back with the supplier", tagline: "Theirs again, to update", rail: "rail-rejected",
     text: "Rejected, or released with comments: it goes back to the supplier for the next revision.",
     who: [{ title: "Taking the comments in", by: "The supplier" }],
   },
@@ -368,7 +359,7 @@ export default async function ControlRoomPage() {
     return !card || maySetup(me, card);
   };
 
-  const [settings, holders, sets, values, templates, schemes, functions, names, parties, answers, schedule, directory] = await Promise.all([
+  const [settings, holders, sets, values, templates, schemes, functions, parties, answers, schedule, directory] = await Promise.all([
     controlSettings(ctx),
     holdersOf(ctx, "CONTROL"),
     getSets().then((all) => all.map((one) => ({ key: one.key, title: one.title }))),
@@ -378,7 +369,6 @@ export default async function ControlRoomPage() {
     routesForEditor().catch(() => null),
     projectNumbering().then((n) => n.schemes.filter((one) => one.active).length).catch(() => 0),
     adminFunctions().catch(() => null),
-    stateNames(ctx),
     partiesWithAnswers().then((all) => all.filter((one) => one.active)).catch(() => null),
     projectSettings(ctx.projectId).catch(() => new Map<string, string>()),
     scheduleSource(ctx),
@@ -434,66 +424,27 @@ export default async function ControlRoomPage() {
     functions: functions ? plural(functions.length, "function") : "",
   };
 
-  const stateLabel = (state: Shown) =>
-    state === "ON_HOLD" ? names.ON_HOLD : state === "RELEASED" ? (together ? names.RELEASED_ISSUED : names.RELEASED) : stateName(names, state);
-  const stateColor = (state: Shown) => (state === "ON_HOLD" ? "bg-red-50/40 text-red-800 ring-red-300" : REV_STATE_COLOR[state]);
 
-  const panels = Object.fromEntries(stages.map((stage) => {
-    const states = (stage.states ?? []).filter((state) => gate || (state !== "NOT_RELEASED" && state !== "RETURNED"));
-    const rows = [
-      ...stage.who.map((one) => (typeof one === "string" ? said(one) : { title: one.title, answer: one.by, href: null as string | null })),
-      ...(stage.answers ?? []).map(said),
-    ];
-    const links = [
+  // Each step as its row of the flow's table: who does what there (an answer linking to where it is changed), and
+  // where it is set up.
+  const rows: Record<string, StepRow> = Object.fromEntries(stages.map((stage) => [stage.key, {
+    who: [
+      ...stage.who.map((one) => {
+        const line = typeof one === "string" ? said(one) : { title: one.title, answer: one.by, href: null as string | null };
+        return { ...line, href: line.href && opens(line.href) ? line.href : null };
+      }),
+      ...(stage.answers ?? []).map(said).map((line) => ({ ...line, href: opens(line.href) ? line.href : null })),
+    ],
+    links: [
       ...(stage.sets ?? []).map((key) => ({
         title: setTitle.get(key) ?? key.charAt(0) + key.slice(1).toLowerCase().replace(/_/g, " "),
-        figure: setTitle.has(key) ? `${inUse(key)} in use` : "not set up yet",
+        figure: setTitle.has(key) ? String(inUse(key)) : "not set up yet",
         href: `/settings/config?set=${key}`,
         warn: !setTitle.has(key) || !inUse(key),
       })),
       ...(stage.extras ?? []).map((key) => ({ title: EXTRA[key].title, figure: extraCount[key], href: EXTRA[key].href, warn: false })),
-    ];
-    const panel = (
-      <section key={stage.key} className={cn("register register-sheet register-sheet-open relative", stage.rail)}>
-        <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
-        <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 border-b border-line px-5 py-3 sm:px-6">
-          <h2 className="text-sm font-semibold text-slate-900">{stage.title}</h2>
-          <span className="text-xs text-slate-600">{stage.text}</span>
-          {states.length ? (
-            <span className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
-              {states.map((state) => <StateChip key={state} label={stateLabel(state)} color={stateColor(state)} />)}
-            </span>
-          ) : null}
-        </header>
-        <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
-          <dl className="divide-y divide-line">
-            {rows.map((row) => (
-              <div key={row.title} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-5 py-2.5 text-[13px] sm:px-6">
-                <dt className="text-slate-600">{row.title}</dt>
-                <dd className="font-medium text-slate-900">
-                  {row.href && opens(row.href) ? <Link href={row.href} className="hover:text-link hover:underline">{row.answer}</Link> : row.answer}
-                </dd>
-              </div>
-            ))}
-          </dl>
-          {links.length ? (
-            <ul className="space-y-1 px-5 py-3 sm:px-6">
-              <li className="stencil pb-1 text-slate-500">Set up in</li>
-              {links.map((one) => (
-                <li key={one.href} className="flex flex-wrap items-baseline justify-between gap-x-2 text-[13px]">
-                  {opens(one.href) ? <Link href={one.href} className="font-medium text-link hover:underline">{one.title}</Link> : <span className="font-medium text-slate-800">{one.title}</span>}
-                  <span className={cn("text-xs", one.warn ? "text-amber-800" : "text-slate-500")}>{one.figure}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="px-5 py-3 text-xs text-slate-500 sm:px-6">Nothing to set up: this step reads what the others set.</p>
-          )}
-        </div>
-      </section>
-    );
-    return [stage.key, panel];
-  }));
+    ].filter((one) => opens(one.href)),
+  }]));
 
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "The reviewer";
@@ -505,52 +456,6 @@ export default async function ControlRoomPage() {
       return { scene, optional: lane.optional, end: lane.end };
     })),
   }));
-
-  // Everything that makes the project work, with its answer today and where it is kept.
-  const renamed = STATE_NAMES.filter((one) => names[one.code] !== one.default).length;
-  const outcomes = inUse("REVIEW_OUTCOMES");
-  const index: { group: string; rows: { title: string; answer: string | null; href: string }[] }[] = [
-    {
-      group: "Who",
-      rows: [
-        { title: "The control function", answer: gate ? `${holders.length} ${holders.length === 1 ? "person" : "people"}` : "Nobody", href: `${HOW}#control-people` },
-        { title: "Who carries out each act", answer: PROJECT_MODE_LABEL[settings.projectMode].replace(/ — set them one by one$/, ""), href: `${HOW}#who-does-what` },
-        { title: "People on the project", answer: directory ? `${directory.people.length}` : null, href: "/settings/users" },
-        { title: "Organizations", answer: parties ? `${parties.length}` : null, href: "/settings/parties" },
-        { title: "Functions", answer: functions ? `${functions.length}` : null, href: "/settings/functions" },
-      ],
-    },
-    {
-      group: "Documents",
-      rows: [
-        { title: "Lists", answer: `${sets.length}`, href: "/settings/config" },
-        { title: "What each form asks", answer: "Forms & fields", href: "/settings/fields" },
-        { title: "Numbering", answer: plural(schemes, "scheme"), href: "/settings/numbering" },
-        { title: "How revisions are named", answer: "Revisions", href: "/settings/revisions" },
-        { title: "What the states are called", answer: renamed ? `${renamed} renamed` : "The app's names", href: `${HOW}#state-names` },
-      ],
-    },
-    {
-      group: "Review & release",
-      rows: [
-        { title: "Review routes", answer: templates ? `${templates.length}` : null, href: "/settings/workflow-templates" },
-        { title: "Review outcomes", answer: plural(outcomes, "verdict"), href: "/settings/config?set=REVIEW_OUTCOMES" },
-        { title: "Who may be put on a review", answer: policySaid(answers, "POLICY_MATRIX"), href: `${HOW}#policies` },
-        { title: "Who receives what", answer: receives === null ? null : receives ? plural(receives, "rule") : "None yet", href: "/distribution" },
-        { title: "Releasing", answer: together ? "Releasing sends it" : "Releasing means go ahead", href: `${HOW}#policies` },
-        { title: "Stamping the PDF", answer: effectiveAnswer("POLICY_PDF_STAMP", answers.get("POLICY_PDF_STAMP")) === "ON" ? "Stamped" : "Not stamped", href: `${HOW}#policies` },
-      ],
-    },
-    {
-      group: "Schedule",
-      rows: [
-        { title: "An action has what it needs", answer: effectiveAnswer("POLICY_READY", answers.get("POLICY_READY")) === "STATUS" ? "At its status" : "Released and issued", href: `${HOW}#policies` },
-        { title: "Documents needed", answer: `${lead} days before`, href: `${HOW}#action-days` },
-        { title: "At risk from", answer: `${risk} days before`, href: `${HOW}#action-days` },
-        { title: "A silent discipline escalated", answer: `after ${escalate} working days`, href: `${HOW}#policies` },
-      ],
-    },
-  ];
 
   return (
     <div className="space-y-4">
@@ -567,39 +472,8 @@ export default async function ControlRoomPage() {
         </div>
       </section>
 
-      <SceneDeck flows={flows} panels={panels} />
+      <SceneDeck flows={flows} rows={rows} />
 
-      <section className="register register-sheet register-sheet-open" aria-labelledby="everything-head">
-        <div className="border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-          <h2 id="everything-head" className="stencil text-slate-500">Everything that makes {ctx.project.code} work</h2>
-        </div>
-        <div className="grid grid-cols-1 gap-x-8 px-5 py-2 sm:px-6 md:grid-cols-2 xl:grid-cols-4">
-          {index.map((block) => (
-            <div key={block.group} className="py-2">
-              <h3 className="stencil mb-1 text-slate-500">{block.group}</h3>
-              <ul className="divide-y divide-line">
-                {block.rows.filter((row) => row.answer !== null).map((row) => (
-                  <li key={row.title}>
-                    {opens(row.href) ? (
-                      <Link href={row.href} className="group flex items-baseline justify-between gap-3 py-2 text-[13px]">
-                        <span className="text-slate-600 group-hover:text-link">{row.title}</span>
-                        <span className="flex items-center gap-1 text-right font-medium text-slate-900">
-                          {row.answer}<ArrowUpRight className="h-3 w-3 shrink-0 text-slate-400 group-hover:text-link" aria-hidden />
-                        </span>
-                      </Link>
-                    ) : (
-                      <p className="flex items-baseline justify-between gap-3 py-2 text-[13px]">
-                        <span className="text-slate-600">{row.title}</span>
-                        <span className="text-right font-medium text-slate-900">{row.answer}</span>
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

@@ -1192,125 +1192,92 @@ summary::-webkit-details-marker {
 }
 
 @layer components {
-  /* ── Control room: the flow ─────────────────────────────────────────────────
-     Drawn in the app's own look, light and dark alike: the steps are cards on
-     the sheet, each topped with its state's rail colour (the colours the
-     register uses), the lit one raised in the brand's tint. Nothing is dimmed:
-     every step reads at full strength. */
+  /* ── Control room: the flow, as a line of stops ──────────────────────────────
+     Like a metro map: each step a stop in its state's rail colour on one line,
+     its name under it; a road that ends hangs below its stop on a dashed drop;
+     a step that happens only sometimes is a hollow stop. The lit stop is ringed
+     and its name sits on a tint of its colour. Drawn on the page's tint, never
+     on white, the same in light and dark. */
   .scene-track {
+    --dot: 18px;
+    --dot-top: 0.6rem;
     display: flex;
-    --band: 6.75rem;
-    --link: 1.25rem;
-    align-items: flex-start;
-    gap: var(--link);
     overflow-x: auto;
     scroll-snap-type: x proximity;
-    padding: 0.5rem 1.25rem 1.25rem;
+    padding: 1rem 0.75rem 1.25rem;
   }
-  @media (min-width: 640px) { .scene-track { padding-inline: 1.5rem; } }
-
-  .scene {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    min-height: 0;
-    overflow: hidden;
-    padding: 0.8rem 0.85rem 0.75rem;
-    border-radius: 0.6rem;
-    text-align: left;
-    color: var(--color-slate-900);
-    background: var(--color-surface);
-    box-shadow: inset 0 0 0 1px var(--color-line), 0 1px 2px rgb(15 23 42 / 0.04);
-    transition: box-shadow 180ms, background-color 180ms, transform 180ms;
-  }
-  .scene::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 3px;
-    background: var(--rail);
-  }
-  .scene:hover { box-shadow: inset 0 0 0 1px var(--color-line-strong), 0 2px 6px -2px rgb(15 23 42 / 0.12); }
-  .scene:focus-visible { outline: 2px solid var(--color-brand-line); outline-offset: 2px; }
-  .scene[aria-selected="true"] {
-    background: var(--color-tint-soft);
-    box-shadow: inset 0 0 0 2px var(--color-brand-line), 0 6px 16px -10px rgb(15 23 42 / 0.35);
-    transform: translateY(-2px);
-  }
-  .scene-number { font-family: var(--font-mono); font-size: 11px; color: var(--color-slate-500); }
-  .scene-title { font-size: 14px; font-weight: 600; line-height: 1.2; letter-spacing: -0.005em; }
-  .scene-tagline { font-size: 12px; line-height: 1.35; color: var(--color-slate-600); }
-
-  /* A column of the flow: one step, or several side by side, stacked. */
   .scene-col {
     position: relative;
-    flex: 1 1 0;
-    min-width: 8.5rem;
+    flex: 1 0 8.75rem;
     display: flex;
     flex-direction: column;
     scroll-snap-align: start;
   }
-  /* The main line: every column's band is the same height, so the line runs
-     straight through the middle of all of them. */
-  .scene-band {
+  /* The line to the next stop, through the middle of the dots. */
+  .scene-col-linked::after {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    top: calc(var(--dot-top) + var(--dot) / 2 - 1.5px);
+    left: 50%;
+    width: 100%;
+    height: 3px;
+    border-radius: 3px;
+    background: var(--color-line-strong);
+  }
+  .scene-band { display: flex; flex-direction: column; gap: 0.5rem; }
+  .scene {
     position: relative;
-    height: var(--band);
+    z-index: 1;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: 0.4rem;
+    align-items: center;
+    gap: 0.15rem;
+    margin-inline: 0.3rem;
+    padding: var(--dot-top) 0.5rem 0.6rem;
+    border-radius: 0.75rem;
+    text-align: center;
+    transition: background-color 160ms;
   }
-  .scene-band > .scene:not(.scene-compact) { height: 100%; }
-  .scene-compact { padding: 0.6rem 0.75rem 0.55rem; }
-  .scene-compact .scene-title { font-size: 13px; }
-  /* The branch that ends: it hangs below the line, joined by a short drop. */
-  .scene-branch { position: relative; margin-top: 1rem; }
-  .scene-branch > .scene { width: 100%; }
+  .scene::before {
+    content: "";
+    width: var(--dot);
+    height: var(--dot);
+    margin-bottom: 0.45rem;
+    border-radius: 999px;
+    background: var(--rail);
+    box-shadow: 0 0 0 4px var(--color-tint-soft);
+    transition: box-shadow 160ms, transform 160ms;
+  }
+  .scene:hover { background: color-mix(in srgb, var(--rail) 8%, transparent); }
+  .scene:focus-visible { outline: 2px solid var(--color-brand-line); outline-offset: 2px; }
+  .scene[aria-pressed="true"] { background: color-mix(in srgb, var(--rail) 16%, transparent); }
+  .scene[aria-pressed="true"]::before {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 4px var(--color-tint-soft), 0 0 0 7px color-mix(in srgb, var(--rail) 55%, transparent);
+  }
+  .scene-number { font-family: var(--font-mono); font-size: 11px; color: var(--color-slate-500); }
+  .scene-title { font-size: 13px; font-weight: 600; line-height: 1.25; color: var(--color-slate-900); }
+  .scene-tagline { font-size: 12px; line-height: 1.35; color: var(--color-slate-600); }
+  /* A step that happens only sometimes: a hollow stop. */
+  .scene-optional::before { background: var(--color-tint-soft); box-shadow: inset 0 0 0 3px var(--rail), 0 0 0 4px var(--color-tint-soft); }
+  .scene-optional[aria-pressed="true"]::before { box-shadow: inset 0 0 0 3px var(--rail), 0 0 0 4px var(--color-tint-soft), 0 0 0 7px color-mix(in srgb, var(--rail) 55%, transparent); }
+  /* The road that ends: below its stop, on a dashed drop. */
+  .scene-branch { position: relative; margin-top: 0.4rem; }
   .scene-branch::before {
     content: "";
     position: absolute;
     left: 50%;
-    top: -1rem;
-    height: 1rem;
-    border-left: 1px dashed var(--color-line-strong);
+    top: -0.4rem;
+    height: calc(0.4rem + var(--dot-top) + 2px);
+    border-left: 2px dashed var(--color-line-strong);
   }
-  .scene-end:not([aria-selected="true"]) { background: color-mix(in srgb, var(--color-red-500) 5%, var(--color-surface)); }
-  .scene-end .scene-number { color: var(--color-red-700); }
-  :root.dark .scene-end .scene-number { color: rgb(252 165 165); }
-  /* The arrow from one column to the next. */
-  .scene-col-linked::after {
-    content: "";
-    position: absolute;
-    top: calc(var(--band) / 2);
-    right: calc(var(--link) * -1);
-    width: var(--link);
-    height: 1px;
-    background: var(--color-line-strong);
-  }
-  .scene-col-linked::before {
-    content: "";
-    position: absolute;
-    z-index: 1;
-    right: calc(var(--link) * -1 + 1px);
-    top: calc(var(--band) / 2 - 3.5px);
-    border-left: 6px solid var(--color-line-strong);
-    border-block: 4px solid transparent;
-  }
-  /* Steps side by side: the line splits before them and joins after. */
-  .scene-fork { padding-inline: 0.5rem; background:
-      linear-gradient(var(--color-line-strong), var(--color-line-strong)) left 0 top 25% / 1px 50% no-repeat,
-      linear-gradient(var(--color-line-strong), var(--color-line-strong)) right 0 top 25% / 1px 50% no-repeat; }
-  /* A step that happens only on some documents. */
-  .scene-optional:not([aria-selected="true"]) { background: transparent; box-shadow: none; outline: 1px dashed var(--color-line-strong); outline-offset: -1px; }
-
-  .scene-panel { animation: scene-in 240ms cubic-bezier(.2,.7,.2,1); }
-  @keyframes scene-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .scene-end .scene-number, .scene-end .scene-title { color: var(--color-red-700); }
+  :root.dark .scene-end .scene-number, :root.dark .scene-end .scene-title { color: rgb(252 165 165); }
 
   @media (prefers-reduced-motion: reduce) {
-    .scene { transition: none; }
-    .scene[aria-selected="true"] { transform: none; }
-    .scene-panel { animation: none; }
+    .scene, .scene::before { transition: none; }
+    .scene[aria-pressed="true"]::before { transform: none; }
   }
 }
 

@@ -733,9 +733,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   apart (POLICY_RELEASE = SEPARATE: Release, then Issue), and has three flows: documents we produce, we receive, and a
   supplier owes us (asked, received, the control function's check, review, kept or back with them). The three are by who
   produces the document (owner: keep them, nothing finer): ours, another organization's (the deliverable type needs
-  an originator), a supplier's asked from its package (a placeholder). The flow is drawn in the app's own look, light
-  and dark alike (owner: no dark "film strip"): the three as one segmented choice, one line "from → to", the steps as
-  cards on the sheet topped with their rail colour, the lit one in the tint; no dots, legend, counts or progress bar. Under it, "The days
+  an originator), a supplier's asked from its package (a placeholder). The flow is a line of stops (owner: no dark "film strip", no white
+  boxes, never a white background): on the page's tint, each step a dot in its state's rail colour on one line, its
+  name under it; a road that ends hangs below on a dashed drop, in red; a step that happens only sometimes is a hollow
+  dot; the lit one ringed on a tint of its colour. The flows are one segmented choice with one line "from → to". Under it, "The days
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
@@ -745,11 +746,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   switches shown, nothing chosen). Every page below is what it is built from.
   **The Control room is where everything is found, never changed** (owner: "the go-to where I find everything rather
   than going card by card"). Six flows, one segmented choice: documents we produce, we receive, a supplier owes us,
-  packages we deliver, an action on the schedule, someone joins the project. A step's card says in one line each who
-  does what (the project's answer or the fixed one) and what the project chose, each answer a link to where it is
-  changed, and "Set up in" (its lists with how many in use, numbering, routes…). Under the flows, "Everything that
-  makes <project> work": every answer today, grouped (Who, Documents, Review & release, Schedule), each opening its
-  card; a figure only its keepers may read is left out, never shown as 0. No form on the Control room.
+  packages we deliver, an action on the schedule, someone joins the project. Under the line, **one table per flow** (owner's choice
+  over a card per step and a separate list): every step a row (step, who does it, set up in), roads that end indented
+  under theirs, the lit step's row tinted; each answer a link to where it is changed, each list with how many in use.
+  A link only its keepers may open is left out. No form on the Control room.
   **How this project works** (`/settings/control`, a Settings card, read by everyone of ours): every answer the
   Control room used to hold as forms (who acts as the control function, who carries out each act with "Used on this
   project" for an act that may be left out, what releasing / stamping / the matrix mean, escalation, the days around
