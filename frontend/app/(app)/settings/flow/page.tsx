@@ -1,16 +1,18 @@
 import Link from "next/link";
-import { SETUP_PAGES, maySetup } from "../setup-pages";
+import { SETUP_PAGES, maySetup, mayChangeControlRoom } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath } from "@/lib/client";
 import { projectSettings } from "@/lib/settings/api";
-import { controlSettings, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES } from "@/lib/settings/control-activities";
-import { policySaid } from "@/components/how-it-works";
+import { controlSettings, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES, SKIPPABLE, CONFIRMABLE, PEOPLE_KEY, PEOPLE_MODE_LABEL, roomItemOf } from "@/lib/settings/control-activities";
 import { holdersOf } from "@/lib/core/permissions";
 import { scheduleSource } from "@/lib/actions/api";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
-import { SceneDeck, type Flow, type Scene, type StepRow } from "./scene-deck";
+import { SceneDeck, type Flow, type Scene } from "./scene-deck";
+import { Choice } from "./choice";
+import { liberty } from "@/lib/organization/liberty";
+import { setRoomAnswerAction, setScheduleDaysAction } from "@/lib/settings/forms-how-it-works";
 import { cn } from "@/lib/core/utils";
 import { adminFunctions, projectNumbering, partiesWithAnswers, routesForEditor } from "@/lib/settings/api-admin";
 import { getSet, getSets } from "@/lib/settings/config";
@@ -20,10 +22,10 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Control room" };
 
 /**
- * The Control room: where everything about how the project works is found, not changed. The flows a document, a
- * package, an action and a person go through, each step saying who does it and what it reads, with a link to where
- * each is kept; then everything that makes the project work, with its answer today and its link. Every answer is
- * changed on its own card (How this project works, Numbering, Review routes…).
+ * The Control room: how the project works, step by step, and where it is changed. The flows a document, a package,
+ * an action and a person go through on a band; the chosen step's panel under it says what happens, who does it and
+ * how it works here (each answer changed right there, asked first), and opens the lists and pages it reads. Every
+ * answer is also on one page, How this project works.
  */
 
 /** Who does something on a step: an act the project decides the carrier of (its key), or one that never changes. */
@@ -127,7 +129,7 @@ const STAGES: Stage[] = [
   {
     key: "released-issued", title: "Released & issued", tagline: "In force, and sent", rail: "rail-released",
     text: "In one act it comes into force and goes to the people named by whoever decided or asked.",
-    who: ["ISSUE", "VOID", "ACTION_NOTE"],
+    who: ["ISSUE", "VOID"],
     answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "POLICY_READY"],
     sets: ["REASONS_FOR_ISSUE", "ISSUE_CODES"],
     extras: ["distribution"],
@@ -135,7 +137,7 @@ const STAGES: Stage[] = [
   {
     key: "issue", title: "Issue", tagline: "Sent out", rail: "rail-issue",
     text: "The released revision is sent out on a transmittal.",
-    who: ["ISSUE", "ACTION_NOTE"],
+    who: ["ISSUE"],
     answers: ["POLICY_READY"],
     sets: ["REASONS_FOR_ISSUE", "ISSUE_CODES"],
     extras: ["distribution"],
@@ -359,7 +361,7 @@ export default async function ControlRoomPage() {
     return !card || maySetup(me, card);
   };
 
-  const [settings, holders, sets, values, templates, schemes, functions, parties, answers, schedule, directory] = await Promise.all([
+  const [settings, holders, sets, values, templates, schemes, functions, parties, answers, schedule, directory, switches] = await Promise.all([
     controlSettings(ctx),
     holdersOf(ctx, "CONTROL"),
     getSets().then((all) => all.map((one) => ({ key: one.key, title: one.title }))),
@@ -373,6 +375,7 @@ export default async function ControlRoomPage() {
     projectSettings(ctx.projectId).catch(() => new Map<string, string>()),
     scheduleSource(ctx),
     api<{ people: unknown[] }>(projectPath(ctx, "/people/directory")).catch(() => null),
+    liberty(),
   ]);
 
   const gate = holders.length > 0;
@@ -395,56 +398,137 @@ export default async function ControlRoomPage() {
   }
   const stages = STAGES.map((stage) => (stage.key === "review" ? { ...stage, sets: [...new Set([...(stage.sets ?? []), ...routeSets])] } : stage));
 
-  /** One line of what the project chose: what it is, the answer today, where it is changed. */
-  const said = (key: string): { title: string; answer: string; href: string } => {
+  const readOnly = !mayChangeControlRoom(me);
+  const fixedItems = new Set(switches.filter((one) => one.area === "Control room" && !one.free).map((one) => one.key));
+  const isFixed = (key: string) => fixedItems.has(roomItemOf(key) ?? key);
+  const riskFixed = switches.some((one) => one.key === "RISK_WINDOW" && !one.free);
+  const clean = (label: string) => label.replace(/ — recommended$/, "").replace(/ \(recommended\)$/, "");
+  const names = holders.map((one) => one.name);
+
+  /** One answer of how the project works, changed right where it is read. */
+  const answer = (key: string) => {
     const act = CONTROL_ACTIVITIES.find((one) => one.key === key);
     if (act) {
       const row = actRow.get(key);
-      return { title: act.title, answer: row?.off ? "Left out" : row?.controlDoes ? "The control function" : "The people doing the work", href: `${HOW}#who-does-what` };
+      const people = key === PEOPLE_KEY;
+      const options = [
+        { value: "CONTROL", label: people ? PEOPLE_MODE_LABEL.CONTROL : "The control function", text: act.control },
+        { value: "SELF", label: people ? PEOPLE_MODE_LABEL.SELF : "The people doing the work", text: act.self },
+        ...(SKIPPABLE[key] ? [{ value: "OFF", label: "Left out", text: SKIPPABLE[key].off }] : []),
+      ];
+      const value = row?.off ? "OFF" : row?.controlDoes ? "CONTROL" : "SELF";
+      return <Choice key={key} title={act.title} options={options} value={value} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
     }
     if (key.startsWith("CONFIRM:")) {
-      return { title: "Confirmed by whoever holds Manage", answer: effectiveAnswer(key, answers.get(key)) === "ON" ? "Yes" : "No", href: `${HOW}#who-does-what` };
+      const of = key.slice(8);
+      const options = [
+        { value: "ON", label: "Yes", text: CONFIRMABLE[of] ?? "" },
+        { value: "OFF", label: "No", text: of === PEOPLE_KEY ? "Nobody confirms: they are on the project at once." : "Nobody confirms: the control function applies it." },
+      ];
+      return <Choice key={key} title="Confirmed by whoever holds Manage" options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
     }
-    if (key === "DAYS") return { title: "Documents needed / at risk from", answer: `${lead} days / ${risk} days before`, href: `${HOW}#action-days` };
-    if (key === "ESCALATE") return { title: "A silent discipline is escalated", answer: `after ${escalate} working days`, href: `${HOW}#policies` };
+    if (key === "DAYS") {
+      const noSchedule = !schedule.source;
+      return [
+        <Choice key="lead" title="A document is needed before the action's day" value={String(lead)} unit="days" min={0} max={365} field="leadDays"
+          action={setScheduleDaysAction} hidden={{ riskDays: String(risk) }} readOnly={readOnly || noSchedule} />,
+        <Choice key="risk" title="The action is at risk from" value={String(risk)} unit="days before" min={0} max={365} field="riskDays"
+          action={setScheduleDaysAction} hidden={{ leadDays: String(lead) }} readOnly={readOnly || noSchedule} fixed={riskFixed} />,
+      ];
+    }
+    if (key === "ESCALATE") {
+      return <Choice key={key} title="A silent discipline is escalated after" value={escalate} unit="working days" min={1} max={60}
+        action={setRoomAnswerAction} hidden={{ key: ESCALATE_AFTER_KEY }} readOnly={readOnly} fixed={isFixed(ESCALATE_AFTER_KEY)} />;
+    }
     const policy = POLICIES.find((one) => one.key === key);
-    return { title: policy?.title ?? key, answer: policySaid(answers, key), href: `${HOW}#policies` };
+    if (!policy) return null;
+    const options = policy.options.map((one) => ({ value: one.value, label: clean(one.label), text: one.text }));
+    return <Choice key={key} title={policy.title} options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
   };
 
   const extraCount: Record<Extra, string> = {
     numbering: plural(schemes, "scheme"),
-    revisions: "",
-    fields: "",
-    routes: templates ? plural(templates.length, "route") : "",
-    distribution: receives === null ? "" : receives ? plural(receives, "rule") : "none yet",
-    parties: parties ? plural(parties.length, "organization") : "",
-    packages: "",
-    schedule: schedule.source ? "" : "no schedule named yet",
-    people: directory ? `${directory.people.length} people` : "",
-    functions: functions ? plural(functions.length, "function") : "",
+    revisions: "how revisions are named",
+    fields: "what each form asks",
+    routes: templates ? plural(templates.length, "route") : "the project's routes",
+    distribution: receives === null ? "who receives what" : receives ? plural(receives, "rule") : "none yet",
+    parties: parties ? plural(parties.length, "organization") : "who takes part",
+    packages: "the project's packages",
+    schedule: schedule.source ? "the project's schedule" : "no schedule named yet",
+    people: directory ? `${directory.people.length} people` : "who is on the project",
+    functions: functions ? plural(functions.length, "function") : "what each may do",
   };
 
-
-  // Each step as its row of the flow's table: who does what there (an answer linking to where it is changed), and
-  // where it is set up.
-  const rows: Record<string, StepRow> = Object.fromEntries(stages.map((stage) => [stage.key, {
-    who: [
-      ...stage.who.map((one) => {
-        const line = typeof one === "string" ? said(one) : { title: one.title, answer: one.by, href: null as string | null };
-        return { ...line, href: line.href && opens(line.href) ? line.href : null };
-      }),
-      ...(stage.answers ?? []).map(said).map((line) => ({ ...line, href: opens(line.href) ? line.href : null })),
-    ],
-    links: [
+  /** A step's panel: what happens, who does it, how it works here, and where it is set up, each answer changed in place. */
+  const panels = Object.fromEntries(stages.map((stage) => {
+    const tiles = [
       ...(stage.sets ?? []).map((key) => ({
         title: setTitle.get(key) ?? key.charAt(0) + key.slice(1).toLowerCase().replace(/_/g, " "),
-        figure: setTitle.has(key) ? String(inUse(key)) : "not set up yet",
+        figure: setTitle.has(key) ? `${plural(inUse(key), "value")} in use` : "not set up yet",
         href: `/settings/config?set=${key}`,
         warn: !setTitle.has(key) || !inUse(key),
       })),
       ...(stage.extras ?? []).map((key) => ({ title: EXTRA[key].title, figure: extraCount[key], href: EXTRA[key].href, warn: false })),
-    ].filter((one) => opens(one.href)),
-  }]));
+    ];
+    const fixedWho = stage.who.filter((one): one is { title: string; by: string } => typeof one !== "string");
+    const acts = stage.who.filter((one): one is string => typeof one === "string");
+    const panel = (
+      <section className={cn("register register-sheet register-sheet-open relative", stage.rail)}>
+        <span className="absolute inset-y-0 left-0 w-1 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
+        <header className="border-b border-line px-5 py-3.5 sm:px-6">
+          <h2 className="text-base font-semibold text-slate-950">{stage.title}</h2>
+          <p className="mt-0.5 text-[13px] leading-5 text-slate-600">{stage.text}</p>
+        </header>
+        <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:divide-x lg:divide-y-0">
+          <div className="space-y-5 px-5 py-4 sm:px-6">
+            <div>
+              <h3 className="stencil mb-2 text-slate-500">Who does it</h3>
+              <ul className="divide-y divide-line">
+                {fixedWho.map((one) => (
+                  <li key={one.title} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3 first:pt-0 last:pb-0">
+                    <span className="text-[13px] font-medium text-slate-900">{one.title}</span>
+                    <span className="text-[13px] text-slate-700">{one.by}</span>
+                  </li>
+                ))}
+                {acts.map(answer)}
+              </ul>
+            </div>
+            {stage.answers?.length ? (
+              <div>
+                <h3 className="stencil mb-2 text-slate-500">How it works here</h3>
+                <ul className="divide-y divide-line">{stage.answers.flatMap((key) => answer(key))}</ul>
+              </div>
+            ) : null}
+          </div>
+          <div className="px-5 py-4 sm:px-6">
+            <h3 className="stencil mb-2 text-slate-500">Set up in</h3>
+            {tiles.length ? (
+              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {tiles.map((one) => (
+                  <li key={one.href}>
+                    {opens(one.href) ? (
+                      <Link href={one.href} className="group flex h-full flex-col rounded-md bg-tint-soft px-3 py-2 ring-1 ring-line hover:ring-brand-line">
+                        <span className="text-[13px] font-medium text-link group-hover:underline">{one.title}</span>
+                        <span className={cn("text-xs", one.warn ? "text-amber-800" : "text-slate-600")}>{one.figure}</span>
+                      </Link>
+                    ) : (
+                      <div className="flex h-full flex-col rounded-md bg-tint-soft px-3 py-2 ring-1 ring-line">
+                        <span className="text-[13px] font-medium text-slate-800">{one.title}</span>
+                        <span className={cn("text-xs", one.warn ? "text-amber-800" : "text-slate-600")}>{one.figure}</span>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-slate-600">Nothing of its own: it works from what the steps before it set.</p>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+    return [stage.key, panel];
+  }));
 
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const returner = actRow.get("RETURN_OUTCOME")?.controlDoes ? "The control function" : "The reviewer";
@@ -463,17 +547,20 @@ export default async function ControlRoomPage() {
         <div className="flex flex-col gap-3 px-5 pt-6 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             <h1 className="plate-title text-slate-950">Control room</h1>
+            <p className="plate-meta mt-2">
+              The control function: {names.length ? names.join(", ") : "nobody (the people doing the work run the register)"}
+              {opens(HOW) ? <> · <Link href={`${HOW}#control-people`} className="text-link hover:underline">{readOnly ? "see" : "change"}</Link></> : null}
+            </p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-              How {ctx.project.code} works, all in one place. Choose a flow and a step to see who does it and where it is set up; every
-              answer opens where it is changed.
+              How {ctx.project.code} works, step by step. Choose a flow, then a step: who does it and how it works here are
+              changed right there{readOnly ? " by an administrator or the control function" : ""}; the lists and pages it reads open from it.
             </p>
           </div>
-          {opens(HOW) ? <Link href={HOW} className="ask shrink-0 self-start">How this project works</Link> : null}
+          {opens(HOW) ? <Link href={HOW} className="ask shrink-0 self-start">Every answer on one page</Link> : null}
         </div>
       </section>
 
-      <SceneDeck flows={flows} rows={rows} />
-
+      <SceneDeck flows={flows} panels={panels} />
     </div>
   );
 }

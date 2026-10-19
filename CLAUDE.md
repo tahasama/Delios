@@ -733,10 +733,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   apart (POLICY_RELEASE = SEPARATE: Release, then Issue), and has three flows: documents we produce, we receive, and a
   supplier owes us (asked, received, the control function's check, review, kept or back with them). The three are by who
   produces the document (owner: keep them, nothing finer): ours, another organization's (the deliverable type needs
-  an originator), a supplier's asked from its package (a placeholder). The flow is a line of stops (owner: no dark "film strip", no white
-  boxes, never a white background): on the page's tint, each step a dot in its state's rail colour on one line, its
-  name under it; a road that ends hangs below on a dashed drop, in red; a step that happens only sometimes is a hollow
-  dot; the lit one ringed on a tint of its colour. The flows are one segmented choice with one line "from → to". Under it, "The days
+  an originator), a supplier's asked from its package (a placeholder). The flow is drawn on its band, the first Control room's look made for
+  each mode (owner: "bring back the band initial styling… colours adapt to each mode", never a white background):
+  slate in light, night blue in dark; the flows as pills, one line "from → to", the steps as cards topped with their
+  rail colour, the lit one raised and washed in it; a fork stacks, a road that ends hangs below in red, a step that
+  happens only sometimes is dashed. Under it, "The days
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
@@ -744,17 +745,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
   what, releasing, adding people), opening on "Open the Control room". Everyone of ours reads it (`read: true`, "See
   how it works"); an administrator or the control function changes it (`mayChangeControlRoom`; read only otherwise:
   switches shown, nothing chosen). Every page below is what it is built from.
-  **The Control room is where everything is found, never changed** (owner: "the go-to where I find everything rather
-  than going card by card"). Six flows, one segmented choice: documents we produce, we receive, a supplier owes us,
-  packages we deliver, an action on the schedule, someone joins the project. Under the line, **one table per flow** (owner's choice
-  over a card per step and a separate list): every step a row (step, who does it, set up in), roads that end indented
-  under theirs, the lit step's row tinted; each answer a link to where it is changed, each list with how many in use.
-  A link only its keepers may open is left out. No form on the Control room.
-  **How this project works** (`/settings/control`, a Settings card, read by everyone of ours): every answer the
-  Control room used to hold as forms (who acts as the control function, who carries out each act with "Used on this
-  project" for an act that may be left out, what releasing / stamping / the matrix mean, escalation, the days around
-  an action, the states' names, back to the defaults); the acts form asks first before saving. Wherever these rules
-  say "Control room" for an answer, it is changed there.
+  **The Control room simplifies the work, never adds clicks** (owner, after looking at how flow designers
+  work: a step chosen on the flow opens its properties beside it). Six flows: documents we produce, we receive, a
+  supplier owes us, packages we deliver, an action on the schedule, someone joins the project. The chosen step's
+  panel says what happens (one plain sentence), **Who does it** (fixed acts in words; the project's acts as one
+  `Choice` each), **How it works here** (its questions, confirmations, days, each a `Choice`), and **Set up in**
+  (tiles: each list with how many values in use, or "not set up yet" in amber, and the pages it reads; a tile only
+  its keepers open is shown unlinked, never hidden). One method for every answer (`flow/choice.tsx`): its answers
+  side by side, what the one in force means under it, another chosen asks "From now on… Instead of…" before saving
+  (`setRoomAnswerAction`, `setScheduleDaysAction`); read only for whoever may not change it, locked where the
+  organization keeps it. The masthead names who acts as the control function. **How this project works**
+  (`/settings/control`) keeps every answer on one page too (stamps, state names, back to the defaults).
 - **A person's activity** (owner): in People & access, a name opens `/settings/users/<id>`: who they are, then everything
   they did in the app with its day and time (signed in, opened a document, downloaded, reviewed, released, sent…), read
   from the audit trail (`GET /api/admin/users/{id}/activity`, narrowed by act and project, 50 a page). Opening a

@@ -260,3 +260,57 @@ export async function setScheduleDaysAction(_prev: State | undefined, formData: 
   return { ok: `Saved: needed ${lead} days before an action, at risk from ${risk} days before.` };
 }
 
+
+/**
+ * One answer of the Control room, changed where it is shown (a step's panel): who carries out an act (CONTROL /
+ * SELF, or OFF for an act that may be left out), a question of how the project works, a confirmation by whoever
+ * holds Manage (ON / OFF), or the working days before a silent discipline is escalated. Only this answer changes;
+ * an answer the organization keeps fixed is refused by the backend (ROOM_FIXED) and left as it stands.
+ */
+export async function setRoomAnswerAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const key = String(formData.get("key") ?? "");
+  const value = String(formData.get("value") ?? "").trim();
+  const activity = CONTROL_ACTIVITIES.find((one) => one.key === key);
+  let said: string;
+  try {
+    if (activity) {
+      if (value === "OFF") {
+        if (!SKIPPABLE[key]) return { error: `${activity.title} cannot be left out.` };
+        await put(SKIP_KEY(key), "OFF", `${activity.title} — left out`);
+        said = `${activity.title}: left out.`;
+      } else {
+        if (!ACT_MODES.includes(value as ControlMode)) return { error: "Choose who carries it out." };
+        // Choosing a side for an act that was left out brings it back in use.
+        if (await actIsOff(await requireAdminScope(), key)) await put(SKIP_KEY(key), "ON", `${activity.title} — back in use`);
+        // Moving the project to "it depends" must not move any other act: each one is written down as it stands
+        // now before this one changes.
+        const now = await controlSettings(await requireAdminScope());
+        if (!now.set || now.projectMode !== "CUSTOM") {
+          for (const row of now.rows) if (row.activity.key !== key) await put(row.activity.key, row.controlDoes ? "CONTROL" : "SELF", row.activity.title);
+        }
+        await put(PROJECT_KEY, "CUSTOM", "Who carries out the acts of document control");
+        await put(key, value, activity.title);
+        said = `${activity.title}: ${MODE_LABEL[value as ControlMode].toLowerCase()}.`;
+      }
+    } else if (key.startsWith("CONFIRM:") && CONFIRMABLE[key.slice(8)]) {
+      if (value !== "ON" && value !== "OFF") return { error: "Choose yes or no." };
+      await save(formData, [[key, value]]);
+      said = value === "ON" ? "Whoever holds Manage confirms it from now on." : "No confirmation from now on.";
+    } else if (key === ESCALATE_AFTER_KEY) {
+      const days = Number(value);
+      if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Escalate after 1 to 60 working days." };
+      await save(formData, [[key, String(days)]]);
+      said = `A silent discipline is escalated after ${days} working days.`;
+    } else {
+      const policy = POLICIES.find((one) => one.key === key);
+      const option = policy?.options.find((one) => one.value === value);
+      if (!policy || !option) return { error: "That is not one of the answers." };
+      await save(formData, [[key, value]]);
+      said = `${policy.title}: ${option.label.replace(/ — recommended$/, "").replace(/ \(recommended\)$/, "").toLowerCase()}.`;
+    }
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidateHowItWorks();
+  return { ok: said };
+}
