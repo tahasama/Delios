@@ -209,7 +209,7 @@ const STAGES: Stage[] = [
   // ── Documents our client asks of us ─────────────────────────────────────────
   {
     key: "client-placeholder", title: "Their placeholder", tagline: "Filled on their project", rail: "rail-sent",
-    text: "A client on DELIOS keeps the document on its own project and asks it of us there, from our package: we switch into their project, see only what they asked, and attach our file beside it.",
+    text: "A client on DELIOS keeps the document on its own project and asks it of us there, from our package: we switch into their project, see only what they asked, and fill in their placeholder: its revision, under their number, in their register.",
     who: [{ title: "Filling it in", by: "Whoever of ours they put on their project" }],
     extras: ["parties"],
   },

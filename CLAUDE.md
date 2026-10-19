@@ -772,6 +772,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   draws both ways it is asked (owner): their placeholder, filled on their own DELIOS (switched into their project;
   their check before it counts), or asked outside it and recorded here (registered, released and issued to them on a
   transmittal following theirs).
+  **Working in someone else's project** (owner): it is one project, with its creator's data and numbering, which is
+  what is exchanged; we fill its placeholders there (never "attach files" that would sit apart from its numbering and
+  revisions). Each organization's register holds what it accepted (the check is what lets anything in); nothing is
+  copied into ours by itself. Matching their number to ours ("equivalence") comes later: `docs/gaps/organizations.md`.
   **Covers everything** (owner: "does it finally cover EVERYTHING?"): every list the app reads is a tile on the step
   that reads it (control outcomes on the check, activity decisions on an action, generic title words on registering,
   preservation formats on keeping); "Keeping & ending" draws kept (retention, confidentiality, what is kept about
