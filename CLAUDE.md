@@ -31,6 +31,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
 ## How to work with the owner
 
 - Short, plain replies. No jargon. PowerShell commands one per block.
+- Never say "escalation" or "escalate" (owner), on screens or in replies: it is a **notification** ("notified again").
 - To update the owner's copy: `git pull`, then `docker compose --profile app up -d --build`. The app's own services
   (API, worker, screens, migrations) carry the profile `app` in `compose.yaml`; without it only the dependencies start
   (database, storage, queue…), for running the API by hand. `COMPOSE_PROFILES=app` in `.env` makes it the default.
@@ -242,7 +243,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the key on Help, "What the colours say". Every list of documents takes them, the package lists too (a supplier's
   line by its stage, a delivery line by ready / released short of its status / nothing released); a card (Next step)
   takes none.
-- Stamps on the PDF are the project's choice (How this project works): `POLICY_PDF_STAMP` (stamped or not), each
+- Stamps on the PDF are the project's choice (the Control room): `POLICY_PDF_STAMP` (stamped or not), each
   stamp `STAMP:<kind>` (RELEASED, RETURNED, SUPERSEDED, VOID, HELD; on unless turned off) and `STAMP_COMMENTS` (off
   unless chosen: a verdict's comments listed on a last page). Read once in the worker (`Stamping.StampChoices`). A
   rejected revision is stamped RETURNED. The PDF opened from a document is its marked copy (`openCopy`,
@@ -835,8 +836,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   its keepers open is shown unlinked, never hidden). One method for every answer (`flow/choice.tsx`): its answers
   side by side, what the one in force means under it, another chosen asks "From now on… Instead of…" before saving
   (`setRoomAnswerAction`, `setScheduleDaysAction`); read only for whoever may not change it, locked where the
-  organization keeps it. The masthead names who acts as the control function. **How this project works**
-  (`/settings/control`) keeps every answer on one page too (stamps, state names, back to the defaults).
+  organization keeps it. The masthead names who acts as the control function. **No second page of answers** (owner:
+  "How this project works" is gone, `/settings/control` only redirects to the Control room): every answer is changed in
+  the Control room and read as written sentences in the plan (the masthead's "Read it all as the plan"). Under the
+  console sit what holds for the whole project (`flow/project-wide.tsx`): "Who acts as the control function"
+  (`#control-people`, named there) and "Back to the defaults". What the states are called is the organization's card
+  (`/organization/settings/states`, administrators), read on a project.
 - **A person's activity** (owner): in People & access, a name opens `/settings/users/<id>`: who they are, then everything
   they did in the app with its day and time (signed in, opened a document, downloaded, reviewed, released, sent…), read
   from the audit trail (`GET /api/admin/users/{id}/activity`, narrowed by act and project, 50 a page). Opening a
@@ -1137,7 +1142,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Automatic notices (worker job, once each): at risk → each discipline still
   short and not confirmed; day passed → the same. Confirmed disciplines and
   postponed actions are not notified. A discipline still silent some working days
-  after the day (Settings → How this project works, `ESCALATE_AFTER_DAYS`, 3 by
+  after the day (the Control room, Disciplines confirm, `ESCALATE_AFTER_DAYS`, 3 by
   default) is escalated once: its people, Manage holders and Document Control
   are all notified. Nothing marks the action "escalated"; the notice is the record.
 - Postponed: written with who decided and why; everyone concerned and whoever

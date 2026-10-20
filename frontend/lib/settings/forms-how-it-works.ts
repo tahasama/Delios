@@ -89,7 +89,7 @@ async function save(formData: FormData, wanted: [key: string, value: string | nu
 }
 
 function revalidateHowItWorks() {
-  revalidatePath("/settings/control");
+  revalidatePath("/settings/flow");
   revalidatePath("/settings/flow");
   revalidatePath("/organization");
   revalidatePath("/organization/defaults");
@@ -156,9 +156,9 @@ export async function setPolicyAction(_prev: State | undefined, formData: FormDa
   const escalate = String(formData.get(ESCALATE_AFTER_KEY) ?? "").trim();
   if (escalate) {
     const days = Number(escalate);
-    if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Escalate after 1 to 60 working days." };
+    if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Notify again after 1 to 60 working days." };
     wanted.push([ESCALATE_AFTER_KEY, String(days)]);
-    said.push(`escalate after ${days} working days`);
+    said.push(`notified again after ${days} working days`);
   }
   let changed: number;
   try {
@@ -302,9 +302,9 @@ export async function setRoomAnswerAction(_prev: State | undefined, formData: Fo
       said = value === "ON" ? "That stamp goes on the PDF from now on." : "That stamp is left off from now on.";
     } else if (key === ESCALATE_AFTER_KEY) {
       const days = Number(value);
-      if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Escalate after 1 to 60 working days." };
+      if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Notify again after 1 to 60 working days." };
       await save(formData, [[key, String(days)]]);
-      said = `A silent discipline is escalated after ${days} working days.`;
+      said = `A silent discipline is notified again after ${days} working days.`;
     } else {
       const policy = POLICIES.find((one) => one.key === key);
       const option = policy?.options.find((one) => one.value === value);

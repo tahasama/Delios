@@ -350,7 +350,7 @@ Answering one counts as acknowledging it. When nobody is there to send it to, th
 
 **A discipline that does not answer is escalated.** When an action's day has passed with a discipline's documents
 missing and nobody of that discipline confirmed, everyone of that discipline, management (Manage) and Document
-Control are notified once, 3 working days after the day. The number is changed in Settings → How this project works.
+Control are notified once, 3 working days after the day. The number is changed in the Control room, on "Disciplines confirm".
 The action is not marked; the notice is in the notice log.
 
 **Sessions end after 7 days.** A session still renews while in use, but never beyond 7 days from signing in;
@@ -604,7 +604,7 @@ the installation sets its keys.
   flags are refused, each said plainly. Before, the Schedule lists were only checked for size and name, and the
   screens' imports not at all. CSV downloads keep cells starting with = + - @ as text.
 - **Tips look like tips** (dashed frame, yellow bulb, "TIP").
-- **Stamps follow the project's choice** (How this project works → "Stamping the PDF" and "Which stamps"): stamped
+- **Stamps follow the project's choice** (the Control room, on Accepted and Returned): stamped
   or not; each stamp (released, returned by the review, superseded, void, on hold) on or off; and, if wanted, the
   comments of a verdict that carries them listed on a last page. Before, the setting was not read and every stamp
   was made.

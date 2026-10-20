@@ -60,7 +60,7 @@ export default async function DefaultRulesPage({ searchParams }: { searchParams:
         <section className="register register-sheet register-sheet-open">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <span className="stencil mr-1 text-slate-500">Settled on this project</span>
-            <span className="text-[11px] text-slate-500">where there is a real choice, the answer used here (Settings → How this project works)</span>
+            <span className="text-[11px] text-slate-500">where there is a real choice, the answer used here (Settings → Control room)</span>
           </div>
           <ul className="divide-y divide-line">
             {settled.map((s) => (

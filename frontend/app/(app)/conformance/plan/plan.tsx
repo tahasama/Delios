@@ -594,7 +594,7 @@ export async function DocumentManagementPlan() {
           { what: "Each document gets its planned day", who: "By itself", detail: `The earliest day an action needs it; sending for review is due on that day, released & issued on the action's day (${leadDays} days ahead by default).`, rail: "rail-ahead" },
           { what: "An action is at risk", when: `${riskWindow} days before its day, or the document's own risk window`, detail: "Each discipline still short is told.", rail: "rail-risk" },
           { what: "Each discipline confirms", who: "Its people", detail: `All its documents ${readyMeans}: confirmed by itself. Otherwise it confirms by hand, always saying why it goes ahead without them.`, rail: "rail-ready" },
-          { what: "A silent discipline is escalated", when: `${escalateAfter} working days after the day`, detail: "Its people, whoever holds Manage and the control function are told, once.", rail: "rail-overdue" },
+          { what: "A silent discipline is notified again", when: `${escalateAfter} working days after the day`, detail: "Its people, whoever holds Manage and the control function are told, once.", rail: "rail-overdue" },
         ]} />
         <Say className="text-[12px] text-slate-500">An action that will not go ahead is recorded as postponed, with who decided and why; whoever plans confirms it with what changes.</Say>
         <Ensured rules={ensured("Schedule")} />

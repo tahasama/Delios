@@ -101,13 +101,6 @@ export const SETUP_PAGES: SetupPage[] = [
     read: true,
   },
   {
-    href: "/settings/control",
-    title: "How this project works",
-    text: "Every answer in one place: who acts as the control function, who carries out each act, what releasing means, stamps, the days around an action, the states' names.",
-    group: "How work flows",
-    read: true,
-  },
-  {
     href: "/settings/workflow-templates",
     title: "Review routes",
     text: "Who reviews, and in which order: side by side, one after another, or gathered by a lead.",

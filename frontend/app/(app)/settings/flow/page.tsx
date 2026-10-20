@@ -23,6 +23,8 @@ import { cn } from "@/lib/core/utils";
 import { adminFunctions, projectNumbering, partiesWithAnswers, routesForEditor } from "@/lib/settings/api-admin";
 import { getSet, getSets } from "@/lib/settings/config";
 import { NoAccess } from "../no-access";
+import { ControlPeople, BackToDefaults } from "./project-wide";
+import { projectDefaults } from "@/lib/organization/defaults";
 import { AsReceivedWarning } from "@/components/as-received-warning";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { roleLabel } from "@/lib/settings/profiles/roles";
@@ -34,7 +36,7 @@ export const metadata = { title: "Control room" };
  * The Control room: how the project works, step by step, and where it is changed. The flows a document, a package,
  * an action and a person go through on a band; the chosen step's panel under it says what happens, who does it and
  * how it works here (each answer changed right there, asked first), and opens the lists and pages it reads. Every
- * answer is also on one page, How this project works.
+ * answer is also read as written sentences in the plan (Assurance).
  */
 
 /** Who does something on a step: an act the project decides the carrier of (its key), or one that never changes. */
@@ -606,7 +608,8 @@ const EXTRA: Record<Extra, { title: string; href: string }> = {
 };
 
 /** Where every answer of how the project works is changed. */
-const HOW = "/settings/control";
+/** Where the project's acts and answers are read as written sentences, for everyone of ours. */
+const PLAN = "/conformance/plan";
 
 export default async function ControlRoomPage() {
   const ctx = await requireScope();
@@ -633,14 +636,18 @@ export default async function ControlRoomPage() {
     partiesWithAnswers().then((all) => all.filter((one) => one.active)).catch(() => null),
     projectSettings(ctx.projectId).catch(() => new Map<string, string>()),
     scheduleSource(ctx),
-    api<{ people: unknown[] }>(projectPath(ctx, "/people/directory")).catch(() => null),
+    api<{
+      people: { id: string; name: string; partyId: string | null; function: string; control: boolean; actsAsControl: boolean }[];
+      organizations: { id: string; kind: string }[];
+      mayNameControl: boolean;
+    }>(projectPath(ctx, "/people/directory")).catch(() => null),
     liberty(),
     api<{ key: string; title: string; verdicts: { code: string; status: string }[] }[]>("/api/admin/verdict-lists").catch(() => null),
     // What is kept about people's activity is the organization's (What is kept), read here only.
     orgSettings().catch(() => null),
     optOutsOf(ctx.projectId).then((all) => all.length).catch(() => null),
   ]);
-  const [stateNames_, intake] = await Promise.all([stateNames(ctx), projectIntake(ctx)]);
+  const [stateNames_, intake, defaults] = await Promise.all([stateNames(ctx), projectIntake(ctx), projectDefaults().catch(() => null)]);
   const asCome = intake.mode === "AS_RECEIVED";
   const confirmJoin = effectiveAnswer(`CONFIRM:${PEOPLE_KEY}`, answers.get(`CONFIRM:${PEOPLE_KEY}`)) === "ON";
 
@@ -718,10 +725,10 @@ export default async function ControlRoomPage() {
       return <IntakeChoice key={key} mode={intake.mode} filing={intake} deliverableTypes={list("DELIVERABLE_TYPES")} docTypes={list("DOCUMENT_TYPES")}
         disciplines={list("DISCIPLINES")} readOnly={readOnly} fixed={isFixed("SUPPLIER_INTAKE")} />;
     }
-    if (key === "CONTROL_PEOPLE") return fact(key, "Who acts as the control function", names.length ? names.join(", ") : "Nobody", `${HOW}#control-people`);
+    if (key === "CONTROL_PEOPLE") return fact(key, "Who acts as the control function", names.length ? names.join(", ") : "Nobody", "#control-people");
     if (key.startsWith("STATE:")) {
       const code = key.slice(6) === "RELEASED" && together ? "RELEASED_ISSUED" : key.slice(6);
-      return fact(key, "This state is called", stateNames_[code as keyof typeof stateNames_] ?? code, `${HOW}#state-names`);
+      return fact(key, "This state is called", stateNames_[code as keyof typeof stateNames_] ?? code, isAdmin(me) ? "/organization/settings/states" : undefined);
     }
     const stamp = STAMP_KINDS.find((one) => one.key === key);
     if (stamp || key === STAMP_COMMENTS_KEY) {
@@ -882,7 +889,7 @@ export default async function ControlRoomPage() {
             <h1 className="plate-title text-slate-950">Control room</h1>
             <p className="plate-meta mt-2">
               The control function: {names.length ? names.join(", ") : "nobody (the people doing the work run the register)"}
-              {opens(HOW) ? <> · <Link href={`${HOW}#control-people`} className="text-link hover:underline">{readOnly ? "see" : "change"}</Link></> : null}
+              {" "}· <a href="#control-people" className="text-link hover:underline">{readOnly ? "see" : "change"}</a>
             </p>
             <p className="plate-meta mt-1">
               Drawn for our role on {ctx.project.code}: {roleName}
@@ -893,11 +900,18 @@ export default async function ControlRoomPage() {
               changed right there{readOnly ? " by an administrator or the control function" : ""}; the lists and pages it reads open from it.
             </p>
           </div>
-          {opens(HOW) ? <Link href={HOW} className="ask shrink-0 self-start">Every answer on one page</Link> : null}
+          <Link href={PLAN} className="ask shrink-0 self-start">Read it all as the plan</Link>
         </div>
       </section>
 
       <SceneDeck flows={flows} panels={panels} />
+
+      {/* What holds for the whole project rather than one step. */}
+      {directory ? (
+        <ControlPeople project={ctx.project.code} mayName={directory.mayNameControl}
+          people={directory.people.filter((p) => p.partyId === null || directory.organizations.some((o) => o.kind === "OURS" && o.id === p.partyId))} />
+      ) : null}
+      {readOnly ? null : <BackToDefaults defaults={defaults} admin={isAdmin(me)} />}
     </div>
   );
 }
