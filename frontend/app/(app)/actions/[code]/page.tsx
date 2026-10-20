@@ -32,10 +32,12 @@ export const dynamic = "force-dynamic";
  * One scheduled activity and everything it needs. Departments are tagged by
  * whoever plans; the documents come from the approved requirements list.
  */
-export default async function ActionDetailPage({ params, searchParams }: { params: Promise<{ code: string }>; searchParams: Promise<{ dept?: string }> }) {
+export default async function ActionDetailPage({ params, searchParams }: { params: Promise<{ code: string }>; searchParams: Promise<{ dept?: string; decide?: string; as?: string }> }) {
   const ctx = await requireScope();
   const { code } = await params;
-  const { dept } = await searchParams;
+  const { dept, decide, as: chosen } = await searchParams;
+  // Opened from a request transmittal (`Asks`): the decision it names is open, its choice made.
+  const refusing = (key: string) => decide === key && chosen === "refuse";
   const [action, version] = await Promise.all([planActionByCode(ctx, code), planVersion(ctx)]);
   if (!action) notFound();
 
@@ -271,7 +273,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
           </div>
           <ul className="divide-y divide-line">
             {mine.map((one) => (
-              <li key={one.id} className="space-y-3 px-5 py-3.5 sm:px-6">
+              <li key={one.id} id={`decide-${one.id}`} className="scroll-mt-24 space-y-3 px-5 py-3.5 target:bg-tint-soft sm:px-6">
                 <div className="space-y-1 text-xs leading-5">
                   <p className="font-semibold text-slate-800">
                     {one.from} asks for {one.kind === "DISCIPLINE" ? "a missing discipline" : "a document"} to be added
@@ -284,11 +286,11 @@ export default async function ActionDetailPage({ params, searchParams }: { param
                 </div>
                 <div className="flex flex-wrap items-start gap-3">
                   <ActionForm action={confirmActionRequestAction} submitLabel="Confirm" size="sm" hidden={{ transmittalId: one.id, code: action.code }} className="space-y-0" />
-                  <details className="min-w-0 flex-1 text-xs">
+                  <details className="min-w-0 flex-1 text-xs" open={refusing(one.id)}>
                     <summary className="cursor-pointer font-semibold text-link">Refuse</summary>
                     <ActionForm action={refuseActionRequestAction} submitLabel="Refuse" variant="secondary" size="sm" hidden={{ transmittalId: one.id, code: action.code }} className="mt-2 space-y-3">
                       <Field label="Why" required hint={`${one.from} and the control function are told`}>
-                        <textarea name="note" required rows={2} className={inputCls} />
+                        <textarea name="note" required rows={2} autoFocus={refusing(one.id)} className={inputCls} />
                       </Field>
                     </ActionForm>
                   </details>
@@ -495,6 +497,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
 
           {control ? (
             <LinksCard
+              decide={decide}
+              chosen={chosen}
               actionId={action.id}
               code={action.code}
               departments={depts}
@@ -513,6 +517,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
             actionId={action.id}
             mayNote={mayNote}
             mayPlan={(ctx.user.verbs ?? []).includes("PLAN")}
+            decide={decide}
+            chosen={chosen}
             mayControl={control}
             answer={wentAhead}
             missing={missingCount}

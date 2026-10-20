@@ -182,7 +182,8 @@ export default async function PackageDetailPage({ params, searchParams }: { para
 
       {overdue ? <Banner tone="danger" title="Past its date">It was due on {fmtDate(pkg.completionDate)}.</Banner> : null}
 
-      <section className="register register-sheet register-sheet-open">
+      {/* Its next step: where a request transmittal's decision lands (`#decide-shortfall`, Asks). */}
+      <section id="decide-shortfall" className="register register-sheet register-sheet-open scroll-mt-24">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">{pkg.acceptedAt ? "Accepted" : pkg.closedAt ? "Delivered — to accept" : "Next step"}</span>
         </div>

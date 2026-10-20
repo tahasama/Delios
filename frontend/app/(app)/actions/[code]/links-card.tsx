@@ -25,7 +25,10 @@ export function proposalText(proposal: ActivityProposal | null, kind: Ask["kind"
  * requests about them. The control function only. Documents are chosen in the
  * register, opened for this action: ticked is needed, unticked is not.
  */
-export function LinksCard({ actionId, code, departments, disciplines, documents, asks, count, confirmers }: {
+export function LinksCard({ actionId, code, departments, disciplines, documents, asks, count, confirmers, decide, chosen }: {
+  /** Opened from a request transmittal: the request to decide, and the choice made. */
+  decide?: string;
+  chosen?: string;
   actionId: string;
   code: string;
   /** The disciplines tagged now. */
@@ -56,7 +59,7 @@ export function LinksCard({ actionId, code, departments, disciplines, documents,
       {asks.length ? (
         <ul id="asked" className="scroll-mt-24 divide-y divide-line border-b border-line">
           {asks.map((ask) => (
-            <li key={ask.id} className="space-y-3 px-5 py-3.5 sm:px-6">
+            <li key={ask.id} id={`decide-${ask.id}`} className="scroll-mt-24 space-y-3 px-5 py-3.5 target:bg-tint-soft sm:px-6">
               <div className="space-y-1 text-xs leading-5">
                 <p className="font-semibold text-slate-800">
                   {ask.from} asks for {ask.kind === "DISCIPLINE" ? "a change to the disciplines (one to add or to take off)" : "a document to be added"}
@@ -100,11 +103,11 @@ export function LinksCard({ actionId, code, departments, disciplines, documents,
                   {ask.confirm ? confirmerField : null}
                 </ActionForm>
               ) : <p className="text-xs text-amber-800">Tag the disciplines first, below.</p>}
-              {ask.checkedAt ? null : <details className="text-xs">
+              {ask.checkedAt ? null : <details className="text-xs" open={decide === ask.id && chosen === "refuse"}>
                 <summary className="cursor-pointer font-semibold text-link">Nothing to add</summary>
                 <ActionForm action={answerActionRequestAction} submitLabel="Answer" hidden={{ transmittalId: ask.id, code }} className="mt-2 space-y-3">
                   <Field label="Why" required hint={`${ask.from} is told`}>
-                    <textarea name="note" required rows={2} className={inputCls} />
+                    <textarea name="note" required rows={2} autoFocus={decide === ask.id && chosen === "refuse"} className={inputCls} />
                   </Field>
                 </ActionForm>
               </details>}

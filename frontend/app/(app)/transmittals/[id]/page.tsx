@@ -27,7 +27,6 @@ import { getActiveSet } from "@/lib/settings/config";
 import { carriersOf as carriersOfTransmittal, transmittalPage, emailReplies } from "@/lib/transmittals/api";
 import { EmailReplies } from "./email-replies";
 import { UnplannedItems } from "./unplanned";
-import { activityDetail } from "@/lib/actions/api";
 
 export const dynamic = "force-dynamic";
 
@@ -58,9 +57,6 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
   const reviews = page.carried.flatMap((one) => (one.review ? [one.review] : []));
 
   const controller = isController(user) || isAdmin(user);
-  // A request to add a document to a schedule action: answered on the action's page.
-  const ask = t.activity;
-  const askedOf = ask ? (await activityDetail(ctx, ask.id))?.activity ?? null : null;
   const mine = t.recipients.find((recipient) => recipient.userId === user.id) ?? null;
   const readyToRoute = page.carried.filter((one) => one.revisionState === "IN_PREPARATION" && one.revisionId).map((one) => one.revisionId!);
   // Whether the reason it was sent for asks for a review at all (§11.11). Where
@@ -185,22 +181,22 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
         </section>
       ) : null}
       {sp.issueError ? <Banner tone="warn" title="Created, but not sent">{sp.issueError} Issue it above once that is settled.</Banner> : null}
-      {ask && askedOf ? (
-        <Banner tone={ask.answeredAt ? "info" : "warn"} title={`Asks for ${ask.kind === "DISCIPLINE" ? "a missing discipline" : "a document"} to be added to ${askedOf.code}`}>
-          {ask.answeredAt
-            ? <>Answered by {ask.answeredBy}, {fmtDate(ask.answeredAt)}: {ask.answer} </>
-            : ask.checkedAt
-              ? <>{askedOf.name}. Checked by {ask.checkedBy}, {fmtDate(ask.checkedAt)}; with {ask.confirmerName} to confirm. </>
-              : <>{askedOf.name}. Not answered yet{ask.confirm ? "; the control function checks it, then whoever holds Manage confirms it" : ""}. </>}
-          {(() => {
-            const yours = !ask.answeredAt && !!ask.checkedAt && ask.confirmerId === ctx.user.id;
-            const toCheck = !ask.answeredAt && !ask.checkedAt && ctx.can("CONTROL");
-            return (
-              <Link href={`/actions/${askedOf.code}${yours ? "#your-confirmation" : toCheck ? "#asked" : ""}`} className="font-semibold text-link hover:underline">
-                {yours ? "Confirm or refuse it on the action" : toCheck ? (ask.confirm ? "Check it on the action" : "Answer it on the action") : "Open the action"}
-              </Link>
-            );
-          })()}
+      {/* What it asks, decided where it belongs (owner: the decision needs its context): the person asked gets the
+          decisions, each opening that form there, already chosen; everyone else reads where it stands (backend Asks). */}
+      {page.ask ? (
+        <Banner tone={page.ask.answeredAt ? "info" : "warn"} title={`Asks: ${page.ask.what}`}>
+          {page.ask.answeredAt
+            ? <>Answered by {page.ask.answeredBy ?? "someone"}, {fmtDate(page.ask.answeredAt)}{page.ask.answer ? `: ${page.ask.answer}` : ""}
+                {page.ask.replyId ? <> &middot; <Link href={`/transmittals/${page.ask.replyId}`} className="font-semibold text-link hover:underline">{page.ask.replyNumber}</Link></> : null}. </>
+            : page.ask.choices.length ? <>It is yours to decide, on {page.ask.place}: </>
+            : <>Waiting for {page.ask.waitingFor ?? "an answer"}. </>}
+          {page.ask.choices.length ? (
+            <span className="mt-2 flex flex-wrap items-center gap-2">
+              {page.ask.choices.map((one, i) => (
+                <Link key={one.href} href={one.href} data-on={i === 0 ? "true" : undefined} className="ask">{one.label}</Link>
+              ))}
+            </span>
+          ) : <Link href={page.ask.where} className="font-semibold text-link hover:underline">Open {page.ask.place}</Link>}
         </Banner>
       ) : null}
       {status === "REJECTED" ? (

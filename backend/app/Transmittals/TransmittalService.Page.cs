@@ -15,7 +15,7 @@ namespace Delios.Host.Transmittals;
 public sealed record TransmittalPage(TransmittalView Transmittal, string Status, string IssuingParty, string? CheckedBy, DateTimeOffset? CheckedAt,
     string? ReturnedReason, IReadOnlyList<CarriedItem> Carried, IReadOnlyList<ArrivedFile> Files, IReadOnlyList<CarriedRequest> IssueRequests,
     IReadOnlyDictionary<Guid, PartyHabits> Parties, bool MayCheck = false, bool AsReceived = false,
-    IReadOnlyDictionary<Guid, MatchedBefore>? MatchedBefore = null);
+    IReadOnlyDictionary<Guid, MatchedBefore>? MatchedBefore = null, TransmittalAsk? Ask = null);
 
 /// <summary>One of our documents a number of theirs was matched to before: proposed for what came under it again.</summary>
 public sealed record MatchedBefore(Guid Id, string Number, string Title, string? Revision);
@@ -143,7 +143,7 @@ public sealed partial class TransmittalService
 
         return new TransmittalPage(t, status, incoming ? t.From ?? t.IssuedBy : await OurNameAsync(access, cancellationToken),
             check?.By, check?.At, status == TransmittalStatuses.Rejected ? returned?.Note ?? returnedLoose?.ReturnedReason : null, carried, files, requests,
-            parties, mayCheck, asReceived, matchedBefore);
+            parties, mayCheck, asReceived, matchedBefore, await Asks.OfAsync(db, access, t.Id, cancellationToken));
     }
 
     /// <summary>Our organization's name as the reader knows it: their own party when it is ours, else the organization's.</summary>

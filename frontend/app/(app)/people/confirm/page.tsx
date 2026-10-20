@@ -18,8 +18,10 @@ type Pending = {
  * Whoever was named confirms, or anyone holding Manage when nobody was; the
  * others are listed with who they wait for.
  */
-export default async function PeopleToConfirmPage() {
+export default async function PeopleToConfirmPage({ searchParams }: { searchParams: Promise<{ decide?: string; as?: string }> }) {
   const ctx = await requireScope();
+  // Opened from the request transmittal (`Asks`): the person it names, its choice made.
+  const { decide, as: chosen } = await searchParams;
   const rows = await api<Pending[]>(projectPath(ctx, "/people/pending")).catch(() => [] as Pending[]);
 
   return (
@@ -35,7 +37,7 @@ export default async function PeopleToConfirmPage() {
         <section className="register register-sheet register-sheet-open">
           <ul className="divide-y divide-line">
             {rows.map((one) => (
-              <li key={one.membershipId} className="space-y-3 px-5 py-3.5 sm:px-6">
+              <li key={one.membershipId} id={`decide-${one.membershipId}`} className="scroll-mt-24 space-y-3 px-5 py-3.5 target:bg-tint-soft sm:px-6">
                 <p className="text-xs leading-5 text-slate-700">
                   <span className="text-sm font-semibold text-slate-900">{one.name}</span>
                   {one.organization ? <span className="ml-1.5 text-slate-500">· {one.organization}</span> : null}
@@ -44,11 +46,11 @@ export default async function PeopleToConfirmPage() {
                 {one.mine ? (
                   <div className="flex flex-wrap items-start gap-3">
                     <ActionForm action={confirmPersonAction} submitLabel="Confirm" size="sm" hidden={{ membershipId: one.membershipId }} className="space-y-0" />
-                    <details className="min-w-0 flex-1 text-xs">
+                    <details className="min-w-0 flex-1 text-xs" open={decide === one.membershipId && chosen === "refuse"}>
                       <summary className="cursor-pointer font-semibold text-link">Refuse</summary>
                       <ActionForm action={refusePersonAction} submitLabel="Refuse" variant="secondary" size="sm" hidden={{ membershipId: one.membershipId }} className="mt-2 space-y-3">
                         <Field label="Why" required hint={`${one.proposedBy ?? "Whoever added them"} is told`}>
-                          <textarea name="note" required rows={2} className={inputCls} />
+                          <textarea name="note" required rows={2} autoFocus={decide === one.membershipId && chosen === "refuse"} className={inputCls} />
                         </Field>
                       </ActionForm>
                     </details>

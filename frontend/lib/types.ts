@@ -283,6 +283,13 @@ export type TransmittalPage = {
   issueRequests: { id: string; reason: string; note: string | null }[];
   /** How each organization it went to takes things outside the system, by its id. */
   parties: Record<string, { externalSystem: string | null; evidenceRequired: boolean }>;
+  /** What it asks, decided elsewhere (backend `Asks`): where, who it waits for, the answer, and the decisions open to this reader. */
+  ask?: {
+    kind: "ACTION_DOCUMENT" | "ACTION_DISCIPLINE" | "POSTPONEMENT" | "JOIN" | "SHORTFALL";
+    what: string; where: string; place: string; waitingFor: string | null;
+    answeredAt: string | null; answeredBy: string | null; answer: string | null; replyId: string | null; replyNumber: string | null;
+    choices: { label: string; href: string }[];
+  } | null;
 };
 
 export type CarriedItem = {

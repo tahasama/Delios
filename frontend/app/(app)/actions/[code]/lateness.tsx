@@ -26,7 +26,10 @@ const ANSWER: Record<WentAhead, { word: string; tone: string }> = {
  * with what changes, and the control function can take it back. Nothing is erased:
  * a postponement taken back stays, marked.
  */
-export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, answer, missing, total, day, postponeCodes, people }: {
+export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, answer, missing, total, day, postponeCodes, people, decide, chosen }: {
+  /** Opened from the request transmittal: the postponement to decide, and the choice made. */
+  decide?: string;
+  chosen?: string;
   notes: Note[];
   actionId: string;
   /** Who writes a postponement down: the control function, or whoever the project lets. */
@@ -71,7 +74,7 @@ export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, ans
           {notes.map((note) => {
             const postponement = postponeCodes.includes(note.decision);
             return (
-              <li key={note.id} className={`space-y-1 px-5 py-3 text-xs leading-5 sm:px-6 ${note.reversedAt ? "text-slate-500" : ""}`}>
+              <li key={note.id} id={`decide-${note.id}`} className={`scroll-mt-24 space-y-1 px-5 py-3 text-xs leading-5 target:bg-tint-soft sm:px-6 ${note.reversedAt ? "text-slate-500" : ""}`}>
                 <p className={`font-semibold ${note.reversedAt ? "text-slate-500 line-through" : postponement ? "text-slate-800" : "text-amber-800"}`}>
                   {postponement ? "Postponed" : "Missing documents"}
                   {note.plannedStart ? <span className="font-normal text-slate-500 no-underline"> &middot; the day stood at {fmtDate(note.plannedStart)}</span> : null}
@@ -94,13 +97,13 @@ export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, ans
                 {postponement && note === active && !note.confirmedAt && mayPlan ? (
                   <ActionForm action={confirmPostponementAction} submitLabel="Confirm the postponement" hidden={{ actionId, decisionId: note.id }} className="space-y-3 pt-2">
                     <Field label="What changes" required hint="the new day, or what the next schedule revision will carry">
-                      <textarea name="note" required rows={3} className={inputCls} />
+                      <textarea name="note" required rows={3} autoFocus={decide === note.id && chosen === "confirm"} className={inputCls} />
                     </Field>
                   </ActionForm>
                 ) : null}
                 {/* The control function can take it back: a planner who would not confirm, a mistake. */}
                 {note === active && mayControl ? (
-                  <details className="pt-1">
+                  <details className="pt-1" open={decide === note.id && chosen === "refuse"}>
                     <summary className="cursor-pointer text-xs font-semibold text-link">Take it back</summary>
                     <ActionForm action={reverseDecisionAction} submitLabel="Take it back" hidden={{ actionId, decisionId: note.id }} className="mt-2 space-y-3">
                       <Field label="Why" required hint="kept with the postponement, and everyone concerned is told">
