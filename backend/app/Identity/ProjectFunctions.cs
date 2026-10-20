@@ -66,7 +66,8 @@ public static class ProjectFunctions
     /// <summary>
     /// <c>PUT /api/projects/{id}/functions/{functionId}/rules</c>: what one function may do on this project, its rows
     /// replaced as a whole. Only where Functions &amp; permissions is free, by whoever changes the project's settings; the
-    /// project's copy is made first. Configure stays the organization's: a project never grants it.
+    /// project's copy is made first. Configure stays the organization's: a project neither grants nor takes it, every
+    /// other permission of every function is the project's to change.
     /// </summary>
     private static async Task<IResult> RulesAsync(Guid functionId, UpdateFunctionRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
         IClock clock, CancellationToken cancellationToken)
@@ -76,9 +77,9 @@ public static class ProjectFunctions
             return Problems.Forbidden("FUNCTIONS_FIXED", "What each function may do is the organization's, the same on every project: an administrator changes it on the organization's page.");
         if (!await ProjectLists.MayChangeAsync(db, access, cancellationToken))
             return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes what each function may do here (on a project with none, whoever opened it).");
-        var rules = request.Rules ?? [];
-        if (rules.Any(r => (r.Verbs ?? []).Contains(Verbs.Configure)))
-            return Problems.Forbidden("CONFIGURE_ORGANIZATIONS", "Configure is the organization's: it is given on the organization's page, never on a project.");
+        // Configure is the administrators' permission, the organization's alone (owner): a project neither gives nor takes it.
+        // What comes for it is left out; what the function holds of it stays as it is, below.
+        var rules = (request.Rules ?? []).Select(r => r with { Verbs = (r.Verbs ?? []).Where(v => v != Verbs.Configure).ToArray() }).ToArray();
         foreach (var rule in rules)
         {
             var unknown = (rule.Verbs ?? []).Where(v => !Verbs.All.Contains(v)).ToList();
@@ -86,16 +87,18 @@ public static class ProjectFunctions
         }
         var function = await db.Functions.AsNoTracking().SingleOrDefaultAsync(f => f.Id == functionId, cancellationToken);
         if (function is null) return Problems.NotFound("FUNCTION_NOT_FOUND", "No such function.");
-        // The administrators' function (one that configures) is the organization's to change (owner): a project could
-        // otherwise take Configure away from it, or give its holders more. Read from the rights in force, before any copy.
         var project = await db.Projects.SingleAsync(p => p.Id == access.Project.Id, cancellationToken);
-        var inForce = project.OwnFunctions ? project.Id : (Guid?)null;
-        if (await db.PermissionRules.IgnoreQueryFilters().AnyAsync(r => r.TenantId == project.TenantId && r.ProjectId == inForce
-                && r.FunctionId == functionId && r.Verbs.Contains(Verbs.Configure), cancellationToken))
-            return Problems.Forbidden("CONFIGURE_ORGANIZATIONS", $"{function.Name} configures the organization: what it may do is changed in the organization's Settings, never on a project.");
         await EnsureOwnAsync(db, project, cancellationToken);
         var mine = await db.PermissionRules.IgnoreQueryFilters().Where(r => r.ProjectId == project.Id && r.FunctionId == functionId).ToListAsync(cancellationToken);
+        // Configure where the function held it, on the same documents, kept whatever else changes.
+        var kept = mine.Where(r => r.Verbs.Contains(Verbs.Configure)).Select(r => new PermissionRule
+        {
+            TenantId = project.TenantId, ProjectId = project.Id, FunctionId = functionId, Verbs = [Verbs.Configure],
+            DeliverableType = r.DeliverableType, DocType = r.DocType, Discipline = r.Discipline, Criticality = r.Criticality,
+            Confidentiality = r.Confidentiality, ProjectRole = r.ProjectRole, Family = r.Family, Note = r.Note,
+        }).ToList();
         db.PermissionRules.RemoveRange(mine);
+        db.PermissionRules.AddRange(kept);
         foreach (var rule in rules.Where(r => (r.Verbs ?? []).Length > 0))
             db.PermissionRules.Add(new PermissionRule
             {

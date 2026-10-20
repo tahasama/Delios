@@ -69,8 +69,6 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
   const rights = admin || (!!project?.free && !!project?.mayChange);
   /** A permission a project never changes: Configure is the organization's. */
   const fixedHere = (v: Verb) => !admin && v === "CONFIGURE";
-  /** The administrators' function (one that configures) is the organization's: read only on a project (owner). */
-  const lockedHere = (fn: { rules: { verbs: string }[] }) => !admin && fn.rules.some((r) => parseVerbs(r.verbs).includes("CONFIGURE"));
   const clearanceOf = (code: string | null) => (code ? confidentialities.find((c) => c.code === code)?.label ?? code : null);
   const withClearance = functions.some((f) => f.clearance);
 
@@ -108,9 +106,9 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
   const plateLine = admin
     ? "The jobs people hold, and what each may do. Every project reads them, unless it changed what each may do for itself where that is left free."
     : project?.own
-      ? "The organization's functions; what each may do here is this project's own copy, which the organization's later changes never touch. The administrators' function, and Configure, stay the organization's."
+      ? "The organization's functions; what each may do here is this project's own copy, which the organization's later changes never touch. Configure, the administrators' permission, stays the organization's."
       : project?.free
-        ? `The organization's functions, and what each may do as the organization has it.${rights ? " Change one here and the project takes its own copy, which the organization's later changes never touch; the administrators' function stays the organization's." : " The control function changes it for this project."}`
+        ? `The organization's functions, and what each may do as the organization has it.${rights ? " Change one here and the project takes its own copy, which the organization's later changes never touch; Configure, the administrators' permission, stays the organization's." : " The control function changes it for this project."}`
         : "The organization's functions and what each may do, the same on every project: an administrator changes them in the organization's Settings.";
   const columns = 2 + GRANTABLE.length + (withClearance ? 1 : 0);
 
@@ -191,7 +189,6 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
         >
               {grid.map(({ fn, held, partly }) => {
                 const isOpen = open === fn.id;
-                const locked = lockedHere(fn);
                 const narrowCount = fn.rules.filter(narrow).length;
                 return [
                   <tr key={fn.id} id={`fn-${fn.id}`} className={`scroll-mt-20 ${isOpen ? "bg-tint-soft" : ""} ${fn.active ? "" : "text-slate-400"}`}>
@@ -202,7 +199,6 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
                         {fn.name}
                       </Link>
                       {fn.active ? null : <span className="ml-1.5 text-[11px] text-slate-500">· not in use</span>}
-                      {locked && rights ? <span className="ml-1.5 text-[11px] text-slate-500">· the organization&rsquo;s</span> : null}
                       {narrowCount ? <p className="ml-4.5 text-[11px] text-slate-500">and {narrowCount === 1 ? "1 rule" : `${narrowCount} rules`} for certain documents</p> : null}
                     </Td>
                     {GRANTABLE.map((v) => {
@@ -211,7 +207,7 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
                       const mark = on ? <Check className="h-3.5 w-3.5" aria-hidden /> : half ? <Contrast className="h-3.5 w-3.5" aria-hidden /> : <Minus className="h-3 w-3" aria-hidden />;
                       return (
                         <Td key={v} className="px-1.5 py-1 text-center">
-                          {rights && !fixedHere(v) && !locked && fn.active ? (
+                          {rights && !fixedHere(v) && fn.active ? (
                             <form action={toggleFunctionVerb}>
                               <input type="hidden" name="level" value={level} />
                               <input type="hidden" name="functionId" value={fn.id} />
@@ -241,12 +237,11 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
                     <tr key={`${fn.id}-open`} className="bg-tint-soft">
                       <td colSpan={columns} className="px-5 pt-1 pb-5 sm:px-6">
                         <div className="space-y-4 rounded-md bg-surface p-4 ring-1 ring-line">
-                          <FunctionRules fn={fn} rules={fn.rules} level={level} rights={rights && fn.active && !locked} fixedHere={fixedHere} scopeOf={scopeOf} selectors={selectors} />
+                          <FunctionRules fn={fn} rules={fn.rules} level={level} rights={rights && fn.active} fixedHere={fixedHere} scopeOf={scopeOf} selectors={selectors} />
                           {admin ? (
                             <FunctionItself fn={fn} confidentialities={confidentialities} />
                           ) : (
                             <p className="border-t border-line pt-3 text-[11px] text-slate-500">
-                              {locked ? <>{fn.name} configures the organization: what it may do is changed in the organization&rsquo;s Settings, never on a project. </> : null}
                               Its name and clearance ({clearanceOf(fn.clearance) ? `up to ${clearanceOf(fn.clearance)}` : "no limit"}) are the organization&rsquo;s, changed in the organization&rsquo;s Settings.
                             </p>
                           )}
@@ -311,7 +306,7 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
         <span className="text-[11px] text-slate-500">on top of its ticks: a rule only adds, nothing takes away what another gives</span>
       </p>
       {narrowed.length === 0 ? (
-        <p className="text-xs text-slate-500">Nothing: {fn.name} may do only what its ticks say, on every document.</p>
+        <p className="text-xs text-slate-500">None yet.</p>
       ) : (
         <ul className="divide-y divide-line rounded-md ring-1 ring-line">
           {narrowed.map((rule) => {
@@ -325,7 +320,7 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
                   </p>
                   <p className="flex flex-wrap gap-1">{verbs.map((v) => <Chip key={v} title={VERB_BLURB[v]}>{VERB_LABEL[v]}</Chip>)}</p>
                 </div>
-                {rights && !verbs.some(fixedHere) ? (
+                {rights ? (
                   <ActionForm action={deletePermissionRuleAction} hideSubmit hidden={{ ruleId: rule.id, level }} className="shrink-0 space-y-1"
                     confirmText={`Remove this rule from ${fn.name}? ${verbs.map((v) => VERB_LABEL[v]).join(", ")} for ${scope.map((s) => s.value).join(", ")} is then no longer given by it.`}>
                     <button type="submit" title="Remove this rule" aria-label={`Remove this rule from ${fn.name}`}

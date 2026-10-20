@@ -1271,8 +1271,8 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
   and cannot change it; where free, the project chooses. A project keeps the answers it already held when an answer is
   made fixed later.
 - **Functions are the organization's; what each may do is each project's by default** (owner): a project's control
-  function changes it there, its first change taking its own copy. The organization may make it Fixed. The function
-  that configures the organization (its administrators') is never changed on a project.
+  function changes it there, for every function, its first change taking its own copy. The organization may make it
+  Fixed. Configure, the administrators' permission, is never given or taken on a project.
 
 ## 68 · One document, two numbers; and documents taken as they come
 
@@ -1366,8 +1366,8 @@ from the function's name, every rule it holds for certain documents only, each n
 What each permission allows is always written under the grid, never left to a hover. A function's name may be
 corrected; its code never changes. A function has no department of its own (the field shown before was never kept).
 
-A project changes what each function may do by default; the organization may fix it for all. The administrators'
-function (the one that configures the organization) is changed only in the organization's Settings.
+A project changes what each function may do by default; the organization may fix it for all. Configure, the
+administrators' permission, is given and taken only in the organization's Settings.
 
 ## 72 · Clearance, the one confidentiality rule
 

@@ -973,8 +973,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   The opened function shows only what the grid cannot (owner, "redundancy"): its rules for certain documents only and
   "Add a rule", which asks which documents (on every document is a tick, never a second copy); in the organization's
   Settings also the function itself.
-  **The administrators' function stays the organization's** (owner): a function holding Configure is read only on a
-  project, whatever the switch (backend CONFIGURE_ORGANIZATIONS, checked on the rights in force before any copy).
+  **On a project every function is changed, Configure excepted** (owner: "project level should be able to edit that by
+  default, except the admin function"): Configure, the administrators' permission, is neither given nor taken on a
+  project; the backend leaves it out of what comes and keeps it where the function held it (`ProjectFunctions.RulesAsync`).
+  The switch starts Free (migration FunctionsFreeByDefault took away a Fixed kept from before).
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
 - **Two levels of settings** (owner): the organization's (`/organization`, its portal) and the project's (Settings).
   Every project, opening one, archiving and reopening are the organization's: **Projects** (`/organization/projects`,

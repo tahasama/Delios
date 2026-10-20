@@ -196,13 +196,14 @@ async function toggleFunctionVerbAction(_prev: Result | undefined, formData: For
     return { error: "Only an administrator grants Configure — it is the permission that grants every other." };
   }
   const isOpen = (r: AdminRule) => !r.deliverableType && !r.docType && !r.discipline && !r.criticality && !r.confidentiality && !r.projectRole;
-  const open = fn.rules.find(isOpen);
-  const held = open?.verbs ?? [];
+  // Every rule on every document read as one (a project keeps Configure in a rule of its own), written back as one.
+  const open = fn.rules.filter(isOpen);
+  const held = [...new Set(open.flatMap((r) => r.verbs))];
   const has = held.includes(verb);
   const next = has ? held.filter((v) => v !== verb) : [...held, verb];
-  const others = fn.rules.filter((r) => r !== open);
+  const others = fn.rules.filter((r) => !isOpen(r));
   const rules = next.length
-    ? [...others, { id: open?.id ?? "", verbs: next, deliverableType: null, docType: null, discipline: null, criticality: null, confidentiality: null, projectRole: null }]
+    ? [...others, { id: open[0]?.id ?? "", verbs: next, deliverableType: null, docType: null, discipline: null, criticality: null, confidentiality: null, projectRole: null }]
     : others;
   const failed = await saveRules(fn, rules, project);
   if (failed) return failed;
