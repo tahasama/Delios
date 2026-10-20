@@ -28,7 +28,7 @@ export const ORG_CARDS: OrgCard[] = [
   { project: "states", title: "What the states are called", text: "The organization's words for each state of a revision, on every project.", slug: "states", group: "How work flows" },
   { project: "/settings/workflow-templates", title: "Review routes", text: "Who reviews, and in which order.", slug: "routes", area: "Review routes" },
   { project: "/settings/functions", title: "Functions & permissions", text: "The organization's jobs, and what each may do.", slug: "functions", area: "Functions & permissions" },
-  { project: "/settings/security", title: "Sign-in & security", text: "The sign-in rules for everyone in the organization.", elsewhere: "/settings/security" },
+  { project: "/settings/security", title: "Sign-in & security", text: "The sign-in rules for everyone in the organization.", slug: "security" },
   { project: "tracking", title: "What is kept about people's activity", text: "Whether who opened and downloaded is kept, and whether sign-ins show on a person's activity.", slug: "tracking", group: "Change & evidence" },
   { project: "/settings/audit", title: "Audit trail", text: "Every recorded act, across our projects.", elsewhere: "/settings/audit" },
 ];

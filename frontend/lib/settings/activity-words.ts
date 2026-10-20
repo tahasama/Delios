@@ -259,7 +259,7 @@ export function activityLink(entityType: string | null, entityId: string | null,
     case "NumberRange": return "/settings/numbering";
     case "RevisionScheme":
     case "RevisionSchemeRouting": return "/settings/revisions";
-    case "IdentityProvider": return "/settings/security";
+    case "IdentityProvider": return "/organization/settings/security";
     case "CheckRun":
     case "Defect":
     case "Exception": return "/conformance/checks";

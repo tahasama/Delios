@@ -1004,10 +1004,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   often as needed, each name kept its own. "How they work with us" changes once. The **contract** is between two
   organizations: the one signing it (the project's) is known by the project's code, the other by its contract number
   (`ProjectParty.ContractNumber`, Organizations, "On <project>"), unique on DELIOS, changed once.
-- **Sign-in & security** (administrators): two-step sign-in asked of everyone or not; the organization's own account
+- **Sign-in & security** (administrators) is the organization's, on its Settings (`/organization/settings/security`; owner,
+  after the critique; `/settings/security` only redirects there): two-step sign-in asked of everyone or not; the organization's own account
   (single sign-on, OpenID Connect: name on the button, provider's address, client id and secret kept encrypted, email
   domains, in use); "Everyone may sign in with a password", which may be limited to administrators only once that
-  account is in use (backend SSO_NOT_CONFIGURED otherwise; turning the account off opens passwords again). The sign-in
+  account is in use (backend SSO_NOT_CONFIGURED otherwise; turning the account off opens passwords again): until then the
+  switch is not offered, the line says why; a new account's "In use" starts off. The sign-in
   page folds "Sign in with your organization's account": its short name (shown to the administrator), then the
   provider. Nobody is created by signing in. A refused sign-on comes back to the sign-in page in plain words
   (`sso_error`); a successful one's session (the backend's cookie) is taken over by the screens (`proxy.ts`).

@@ -15,7 +15,7 @@ export async function setMfaRequiredAction(_prev: State | undefined, formData: F
   } catch (e) {
     return { error: refusal(e).message };
   }
-  revalidatePath("/settings/security");
+  revalidatePath("/organization/settings/security");
   return { ok: required ? "Everyone sets up two-step sign-in at their next sign-in." : "Two-step sign-in is each person's choice again." };
 }
 
@@ -38,7 +38,7 @@ export async function setSsoAction(_prev: State | undefined, formData: FormData)
   } catch (e) {
     return { error: refusal(e).message };
   }
-  revalidatePath("/settings/security");
+  revalidatePath("/organization/settings/security");
   return { ok: formData.get("enabled") === "on" ? "Saved: people may sign in with the organization's account." : "Saved, not in use: everyone signs in with a password." };
 }
 
@@ -51,7 +51,7 @@ export async function setPasswordSignInAction(_prev: State | undefined, formData
   } catch (e) {
     return { error: refusal(e).message };
   }
-  revalidatePath("/settings/security");
+  revalidatePath("/organization/settings/security");
   return { ok: on ? "Everyone may sign in with a password." : "Only administrators sign in with a password; everyone else through the organization's account." };
 }
 
@@ -64,7 +64,7 @@ export async function resetMfaAction(_prev: State | undefined, formData: FormDat
   } catch (e) {
     return { error: refusal(e).message };
   }
-  revalidatePath("/settings/security");
+  revalidatePath("/organization/settings/security");
   return { ok: "Two-step sign-in is off for them. They can set it up again." };
 }
 
