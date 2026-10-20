@@ -49,10 +49,10 @@ const ORDER_KEY = "transmittals:columns";
 const FREEZE_KEY = "transmittals:frozen";
 
 const RAIL: Record<string, string> = {
-  DRAFT: "rail-draft", ISSUED: "rail-sent", ACCEPTED: "rail-accepted", REJECTED: "rail-returned", CLOSED: "rail-received",
+  DRAFT: "rail-draft", ISSUED: "rail-sent", ACCEPTED: "rail-checked", REJECTED: "rail-returned", CLOSED: "rail-received",
 };
 const STATUS_INK: Record<string, string> = {
-  DRAFT: "text-slate-500", ISSUED: "text-sky-700", ACCEPTED: "text-emerald-700", REJECTED: "text-red-700",
+  DRAFT: "text-slate-500", ISSUED: "text-sky-700", ACCEPTED: "text-fuchsia-700", REJECTED: "text-red-700",
 };
 
 type Column = {

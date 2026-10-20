@@ -9,7 +9,7 @@ import { setPackageMembersAction } from "@/lib/packages/forms";
 
 export type PackageLine = {
   id: string; number: string; title: string; rev: string | null;
-  stage: { word: string; tone: keyof typeof TONE; holder: string; rail: string };
+  stage: { word: string; tone: keyof typeof TONE; holder: string; rail: string; pill: string };
   reason: string | null;
   /** Sent to the supplier on a transmittal: it stays in the package for good. */
   sent: string | null;
@@ -94,7 +94,7 @@ export function PackageLines({ packageId, packageNumber, supplier, shared, lines
                     <span className="block max-w-80 truncate text-xs text-slate-500">{one.title}</span>
                   </Td>
                   <Td className="text-xs">
-                    <ToneChip inRegister tone={one.stage.tone}>{one.stage.word}</ToneChip>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${one.stage.pill}`}>{one.stage.word}</span>
                     {one.stage.holder ? <span className="mt-1 block text-[11px] text-slate-500">{one.stage.holder}</span> : null}
                     {one.reason ? <p className="mt-1 max-w-72 text-[11px] text-slate-600">&ldquo;{one.reason}&rdquo;</p> : null}
                   </Td>

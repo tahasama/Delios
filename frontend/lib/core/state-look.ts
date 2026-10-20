@@ -19,7 +19,8 @@ export const STATE_LOOK: Record<string, StateLook> = {
   // A supplier's document, in its own stages.
   SENT: { ink: "text-blue-700", rail: "rail-sent", pill: "bg-blue-50 text-blue-800 ring-blue-200" },
   RECEIVED: { ink: "text-cyan-700", rail: "rail-check", pill: "bg-cyan-50 text-cyan-800 ring-cyan-200" },
-  ACCEPTED: { ink: "text-green-700", rail: "rail-accepted", pill: "bg-green-50 text-green-800 ring-green-200" },
+  // Let in by the check: only the first step of a long way, so never a green that reads as approved or released (owner).
+  ACCEPTED: { ink: "text-fuchsia-700", rail: "rail-checked", pill: "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200" },
   RETURNED_CHECK: { ink: "text-orange-700", rail: "rail-returned", pill: "bg-orange-50 text-orange-800 ring-orange-200" },
   RETURNED_REVIEW: { ink: "text-rose-700", rail: "rail-rejected", pill: "bg-rose-50 text-rose-800 ring-rose-200" },
 };

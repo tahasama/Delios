@@ -277,6 +277,8 @@ summary::-webkit-details-marker {
   .rail-review { --rail: var(--color-sky-400); }
   .rail-released { --rail: var(--color-emerald-500); }
   .rail-accepted { --rail: var(--color-green-500); }
+  /* Let in by the check on arrival: far from accepted by a review and from released (owner: not to be read as approved). */
+  .rail-checked { --rail: var(--color-fuchsia-600); }
   .rail-superseded { --rail: var(--color-violet-400); }
   .rail-void { --rail: var(--color-red-500); }
   .rail-rejected { --rail: var(--color-red-600); }

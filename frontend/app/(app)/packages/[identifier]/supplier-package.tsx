@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { isController, isAdmin, hasVerb, standsInForControl } from "@/lib/core/auth";
-import { DataTable, Th, Td, Field, inputCls, ToneChip, btn } from "@/components/ui";
+import { DataTable, Th, Td, Field, inputCls, ToneChip, Chip, btn } from "@/components/ui";
 import { FileTally } from "./file-tally";
 import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@/lib/packages/forms";
 import { PackageLines, type PackageLine } from "./package-lines";
@@ -92,7 +92,7 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
                 <span className="block max-w-80 truncate text-xs text-slate-500">{r.doc.title}</span>
               </Td>
               <Td className="text-xs">
-                <ToneChip tone={stage.tone}>{stage.word}</ToneChip>
+                <Chip className={stage.pill}>{stage.word}</Chip>
                 <span className="mt-1 block text-[11px] text-slate-500">{stage.holder}</span>
                 {r.reason ? <p className="mt-1 max-w-72 text-[11px] text-slate-600">&ldquo;{r.reason}&rdquo;</p> : null}
               </Td>

@@ -243,8 +243,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (new document, step 2: project · criticality · PDF / sub-project · what the criticality means / who may see it ·
   retention period · native file). A search picker's line starts where every field's does (magnifier inside).
 - The side colours (rails, Home's edges, the history's marks): one colour per state, never one colour for things
-  that mean different things; close states take close colours (released emerald / accepted green, done / ready,
-  superseded violet). The states and their classes are listed once in `lib/core/rails.ts` (CSS `.rail-*`), which is
+  that mean different things; close states take close colours (released emerald / a review's accepted green, done /
+  ready, superseded violet). **Accepted by the check is never green** (owner: it is only the first step of a long
+  review; near released it would read as approved): fuchsia (`rail-checked`, `STATE_LOOK.ACCEPTED`), in the register, the
+  transmittals, a package's lines and the key alike. The states and their classes are listed once in `lib/core/rails.ts` (CSS `.rail-*`), which is
   the key on Help, "What the colours say". Every list of documents takes them, the package lists too (a supplier's
   line by its stage, a delivery line by ready / released short of its status / nothing released); a card (Next step)
   takes none.

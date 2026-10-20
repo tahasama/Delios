@@ -1,6 +1,7 @@
 import { documentPage, documentContext } from "@/lib/documents/api";
 import type { PackageView } from "@/lib/types";
 import { supplierStage, supplierStamp, type SupplierStage } from "@/lib/core/state-names";
+import { stateLook } from "@/lib/core/state-look";
 
 /**
  * Where each document a supplier owes us stands, in the two stages Document
@@ -162,7 +163,7 @@ const LINE_TONE: Record<SupplierStage, "done" | "waiting" | "refused" | "moving"
 
 /** The side colour of each stage (the key is `lib/core/rails.ts`, "Supplier documents"). */
 const LINE_RAIL: Record<SupplierStage, string> = {
-  SENT: "rail-sent", RECEIVED: "rail-check", ACCEPTED: "rail-accepted", RETURNED_CHECK: "rail-returned",
+  SENT: "rail-sent", RECEIVED: "rail-check", ACCEPTED: "rail-checked", RETURNED_CHECK: "rail-returned",
   IN_REVIEW: "rail-review", RELEASED: "rail-released", RETURNED_REVIEW: "rail-rejected",
 };
 
@@ -171,14 +172,16 @@ const LINE_RAIL: Record<SupplierStage, string> = {
  * supplier / to be transmitted, received / transmitted, accepted, returned / to correct, in review, released,
  * returned / to revise. A line not sent to the supplier yet reads so (only we see it). Who holds it is said beside it.
  */
-export function lineStage(row: SupplierRow, asked: boolean, side: "ours" | "theirs"): { word: string; tone: "done" | "waiting" | "refused" | "moving" | "idle"; holder: string; rail: string } {
-  if (!asked) return { word: "not sent to supplier", tone: "idle", holder: "", rail: "rail-none" };
+export function lineStage(row: SupplierRow, asked: boolean, side: "ours" | "theirs"): { word: string; tone: "done" | "waiting" | "refused" | "moving" | "idle"; holder: string; rail: string; pill: string } {
+  if (!asked) return { word: "not sent to supplier", tone: "idle", holder: "", rail: "rail-none", pill: stateLook("NONE").pill };
   const stage = STAGE_OF[row.state];
   const theirs = WITH_SUPPLIER.includes(row.state);
   return {
     word: supplierStamp(stage, side),
     tone: LINE_TONE[stage],
     rail: LINE_RAIL[stage],
+    // Each stage its own colour, as in the register (`lib/core/state-look.ts`): accepted never reads as released.
+    pill: stateLook(stage).pill,
     holder: side === "ours" ? (theirs ? "with the supplier" : "with us") : (theirs ? "with you" : "with us"),
   };
 }
