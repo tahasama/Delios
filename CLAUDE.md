@@ -537,6 +537,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   SUPPLIER, INSPECTOR (docs/ORGANIZATIONS.md). New ones only with the owner's approval.
 
 ### Settings
+- **Settings are read by everyone of ours** (owner: "access without the editing liberty"): the Control room, Types &
+  sets, Numbering, Revisions, Review routes, Forms & fields and Functions & permissions open read only for whoever may
+  not change them (`SETUP_PAGES` `read: true`), each saying who changes it; editing stays with whoever the backend
+  allows. People & access, Organizations, This project, the Audit trail and the organization's Settings stay closed
+  (people's details, contacts, activity); the Project directory says who takes part. Another organization's people open none.
 - Every setting is the project's: the hub says "How <project> works… What you change here changes this project
   only" (owner's answer). Nobody is left lost: the menu's Settings link shows exactly when a Settings page opens for
   the person (`SETUP_PAGES` + `maySetup`, layout `canSettings`); a page they may not open says plainly who changes it
@@ -1145,12 +1150,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   organization can play on any project): the app's segmented tabs (`.seg`, `?role=`), ours marked "us", one another
   organization plays here marked by a dot (its key shown only then), each with what it does, where approval sits, what
   it sends, what comes to it, what its verdict is worth (`lib/settings/role-word.ts` `ROLE_WORD`, read by the Control
-  room's flows too) and who plays it here; **how it is set up**, for everyone, each line folding on this project's own
-  facts: how to read a document number (its schemes read on one of its numbers), why a form offers only some values,
-  which route a document takes (each route, what it takes, its steps, advises or decides, days), who takes part (the
-  directory's organizations, role, how they work with us, who answers), what you may do here (your function, department,
-  permissions, clearance), who to ask (the control function and whoever holds Manage, by name); "Where it is changed"
-  only for whoever changes it; then Do the work, and See the whole flow for the control function. No banner, no
+  room's flows too) and who plays it here; **reading a number** (one fold, the project's schemes read on one of its own
+  numbers, opening Numbering); then Do the work (the Project directory among them: who takes part, who to ask), See the
+  whole flow for the control function, and **How it is set up**: the Settings pages the person opens, read only for
+  whoever may not change them. Help repeats nothing a Settings page shows (owner: "we need no more redundancies"): what
+  values a form offers, the routes, what you may do are read on their pages. No banner, no
   figures, no grid of cards; never a link to a page that does not exist. A project's role does not start a matrix of
   its own (the matrix written per role in `profiles/roles.ts` is applied nowhere): Help never says it does.
 
