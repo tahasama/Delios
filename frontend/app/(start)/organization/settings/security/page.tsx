@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { ToneChip } from "@/components/ui";
@@ -21,7 +22,8 @@ type Security = {
  * sign-in asked of everyone or not, its own account (single sign-on), whether passwords still open the door, and who
  * has two-step on.
  */
-export default async function SecurityPage() {
+export default async function SecurityPage({ searchParams }: { searchParams: Promise<{ sso?: string }> }) {
+  const { sso: opening } = await searchParams;
   await requireOrgAdmin();
   const security = await api<Security>("/api/admin/security");
   const people = (await adminUsers().catch(() => [])).filter((u) => u.active).sort((a, b) => a.name.localeCompare(b.name));
@@ -36,11 +38,9 @@ export default async function SecurityPage() {
   const origin = `${head.get("x-forwarded-proto") ?? "http"}://${head.get("x-forwarded-host") ?? head.get("host") ?? ""}`;
   // autoComplete off on every field: a browser would otherwise put the administrator's own email and password here.
   const ssoForm = (
-    <ActionForm action={setSsoAction} submitLabel="Save" className="space-y-3 px-5 py-4 sm:px-6">
+    <ActionForm action={setSsoAction} submitLabel="Save" className="space-y-3 border-t border-line px-5 py-4 sm:px-6">
       <p className="text-xs leading-5 text-slate-600">
-        On the sign-in page, people open &ldquo;Sign in with your organization&rsquo;s account&rdquo; and type{" "}
-        <span className="font-mono font-semibold text-slate-800">{security.slug}</span>. Nobody is created by signing in: only people already
-        added here get in, by their email. Give your provider this address as where it sends people back:{" "}
+        For step 1, your IT team gives the provider this address, where it sends people back after they sign in:{" "}
         <span className="font-mono text-slate-800 select-all">{origin}/api/auth/sso/callback</span>
       </p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -101,21 +101,15 @@ export default async function SecurityPage() {
       <section className="register register-sheet register-sheet-open">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">The organization&rsquo;s own account</span>
-          <span className="text-[11px] text-slate-500">single sign-on: people sign in with the account they use at work (OpenID Connect)</span>
+          <span className="text-[11px] text-slate-500">only if your people already sign in to work with Microsoft, Google, Okta or the like</span>
           <span className="ml-auto"><ToneChip tone={security.sso?.enabled ? "done" : "idle"}>{security.sso?.enabled ? "In use" : security.sso ? "Set up, not in use" : "Not set up"}</ToneChip></span>
         </div>
-        {security.sso ? ssoForm : (
-          <div className="space-y-3 px-5 py-4 sm:px-6">
-            <p className="max-w-3xl text-xs leading-5 text-slate-600">
-              Only for an organization whose people already have a work account with Microsoft, Google, Okta or the like: they
-              then sign in here with it, with no DELIOS password. Nothing to do otherwise; everyone signs in with their email
-              and password. Setting it up takes the details your IT team gets from that provider.
-            </p>
-            <details className="group">
-              <summary className="ask inline-flex list-none items-center">Set it up</summary>
-              <div className="-mx-5 mt-3 border-t border-line sm:-mx-6">{ssoForm}</div>
-            </details>
-          </div>
+        <SsoSteps saved={!!security.sso} inUse={ssoInUse} slug={security.slug} />
+        {security.sso || opening === "1" ? ssoForm : (
+          <p className="border-t border-line px-5 py-3 text-xs text-slate-500 sm:px-6">
+            Not needed otherwise: everyone signs in with their email and password.{" "}
+            <Link href="/organization/settings/security?sso=1" scroll={false} className="font-semibold text-link hover:underline">Set it up</Link>
+          </p>
         )}
         <div className="space-y-2 border-t border-line px-5 py-4 sm:px-6">
           <p className="text-sm font-semibold text-slate-800">Password sign-in</p>
@@ -166,5 +160,38 @@ export default async function SecurityPage() {
         </p>
       </section>
     </div>
+  );
+}
+
+/**
+ * How the organization's own account works, step by step, each step lit as it stands (owner: "explain the work with a
+ * progress diagram"): done, the next one to do, or still to come.
+ */
+function SsoSteps({ saved, inUse, slug }: { saved: boolean; inUse: boolean; slug: string }) {
+  const steps = [
+    { title: "Register DELIOS with your provider", text: "Your IT team does it at Microsoft, Google, Okta…; it gives back a client id and a secret.", done: saved },
+    { title: "Type its details here", text: "The name on the button, the provider's address, the client id and the secret.", done: saved },
+    { title: "Switch it on", text: "\u201CIn use\u201D: from then on it is offered on the sign-in page.", done: inUse },
+    { title: "People sign in with it", text: `They choose \u201CSign in with your organization\u2019s account\u201D, type ${slug}, sign in at the provider and come back here. Only people already added here get in, by their email.`, done: inUse },
+  ];
+  const next = steps.findIndex((step) => !step.done);
+  return (
+    <ol className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
+      {steps.map((step, i) => {
+        const state = step.done ? "done" : i === next ? "next" : "later";
+        return (
+          <li key={step.title} className={`rounded-md px-3 py-2.5 ring-1 ${state === "done" ? "bg-emerald-50 ring-emerald-200" : state === "next" ? "bg-amber-50 ring-amber-200" : "bg-tint-soft ring-line"}`}>
+            <p className="flex items-center gap-2 text-xs font-semibold text-slate-800">
+              <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] ${state === "done" ? "bg-emerald-600 text-white" : state === "next" ? "bg-amber-500 text-white" : "bg-slate-200 text-slate-600"}`}>{i + 1}</span>
+              {step.title}
+            </p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-600">{step.text}</p>
+            <p className={`mt-1.5 text-[11px] font-semibold ${state === "done" ? "text-emerald-800" : state === "next" ? "text-amber-900" : "text-slate-500"}`}>
+              {state === "done" ? "Done" : state === "next" ? "Next" : "To come"}
+            </p>
+          </li>
+        );
+      })}
+    </ol>
   );
 }

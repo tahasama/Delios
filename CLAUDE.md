@@ -1006,9 +1006,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`ProjectParty.ContractNumber`, Organizations, "On <project>"), unique on DELIOS, changed once.
 - **Sign-in & security** (administrators) is the organization's, on its Settings (`/organization/settings/security`; owner,
   after the critique; `/settings/security` only redirects there, and a project's Settings carry no such card):
-  two-step sign-in asked of everyone or not; the organization's own account folded behind "Set it up" until set up,
-  said plainly as only for an organization whose people have a work account elsewhere (its form never filled by the
-  browser: autoComplete off; the full address the provider sends people back to, this site's own); the organization's own account
+  two-step sign-in asked of everyone or not; the organization's own account (owner: "explain the work with a progress
+  diagram") drawn as its four steps, each lit done / next / to come (register DELIOS with the provider, type its details
+  here, switch it on, people sign in with it; `SsoSteps`), said plainly as only for an organization whose people have a
+  work account elsewhere; its form only once set up or asked for ("Set it up", `?sso=1`), never filled by the browser
+  (autoComplete off), the address the provider sends people back to given in it, for step 1; the organization's own account
   (single sign-on, OpenID Connect: name on the button, provider's address, client id and secret kept encrypted, email
   domains, in use); "Everyone may sign in with a password", which may be limited to administrators only once that
   account is in use (backend SSO_NOT_CONFIGURED otherwise; turning the account off opens passwords again): until then the
