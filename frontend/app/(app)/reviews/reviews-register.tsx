@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Search, X, Bell } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
-import { TONE } from "@/lib/core/tones";
 import { useCardHeight } from "@/components/card-height";
 import { DateWindow } from "@/components/date-window";
 import { FilterMenu } from "@/components/filter-menu";
@@ -456,7 +455,7 @@ const COLUMNS: Column[] = [
     cell: (row) =>
       row.withdrawn ? (
         <span className="text-slate-600">
-          <Chip className={TONE.idle}>withdrawn</Chip>
+          <Chip className="bg-slate-100 text-slate-700 ring-slate-300">withdrawn</Chip>
           <span className="mt-0.5 block max-w-64 truncate text-[11px] text-slate-500" title={row.withdrawn}>{row.withdrawn}</span>
         </span>
       ) : row.verdict || row.verdictLabel ? (
@@ -465,7 +464,7 @@ const COLUMNS: Column[] = [
           {row.verdictLabel && row.verdictLabel !== row.verdict ? <span className={row.verdict ? "ml-1.5" : ""}>{row.verdictLabel}</span> : null}
           {row.decidedBy ? <span className="block text-[11px] text-slate-400">{row.decidedBy}</span> : null}
         </span>
-      ) : row.open ? <Chip className={TONE.waiting}>waiting</Chip> : <span className="text-slate-300">—</span>,
+      ) : row.open ? <span className="text-amber-700">waiting</span> : <span className="text-slate-300">—</span>,
   },
   {
     key: "reviewers", label: "Reviewers",

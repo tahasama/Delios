@@ -13,9 +13,7 @@ import { FilterOptions } from "@/components/filter-options";
 import { sendSupplierFromRegisterAction as sendFromRegister } from "@/lib/packages/forms-supplier";
 import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
-import { Th, Td, Info, Chip } from "@/components/ui";
-import { TONE } from "@/lib/core/tones";
-import { DOC_STATE_COLOR, REV_STATE_COLOR, type DocState, type RevState } from "@/lib/core/standard";
+import { Th, Td, Info } from "@/components/ui";
 import { useCardHeight } from "@/components/card-height";
 import { ActionForm } from "@/components/form";
 import { setActionDocumentsAction } from "@/lib/actions/forms-links";
@@ -97,6 +95,11 @@ const GUIDE: Record<string, string> = {
 };
 /** A list's page in Types & sets, for a reader who opens it (`codes["@lists"]`, set for our people only). */
 const listHref = (codes: Record<string, string>, key: string) => (codes["@lists"] ? GUIDE[key] : undefined);
+/** A revision state reads in its colour, as text (owner: no pills inside registers). */
+const REV_INK: Record<string, string> = {
+  IN_PREPARATION: "text-amber-700", IN_REVIEW: "text-sky-700", RELEASED: "text-emerald-700",
+  SUPERSEDED: "text-violet-700", VOID: "text-red-700",
+};
 
 /** The rail colour per revision state: the row's state, read before any word. */
 const RAIL: Record<string, string> = {
@@ -729,7 +732,7 @@ const COLUMNS: Column[] = [
     label: "Document state",
     note: "Where the document itself stands: planned, active, superseded, withdrawn. It is about the document, not any one revision.",
     cellClass: "whitespace-nowrap",
-    cell: (row, codes) => <CodeRef code={row.docStateLabel} note={codes[`DOC_STATE|${row.docState}`]} href={GUIDE.DOC_STATE} chip={DOC_STATE_COLOR[row.docState as DocState] ?? TONE.idle} />,
+    cell: (row, codes) => <CodeRef code={row.docStateLabel} note={codes[`DOC_STATE|${row.docState}`]} href={GUIDE.DOC_STATE} className="meta font-sans!" />,
   },
   {
     key: "rev", sort: "rev",
@@ -744,7 +747,7 @@ const COLUMNS: Column[] = [
     cellClass: "whitespace-nowrap",
     cell: (row, codes) => (
       <>
-        <CodeRef code={row.revStateLabel} note={codes[`REV_STATE|${row.revState ?? ""}`]} href={row.revState ? GUIDE.REV_STATE : undefined} chip={REV_STATE_COLOR[row.revState as RevState] ?? TONE.idle} />
+        <CodeRef code={row.revStateLabel} note={codes[`REV_STATE|${row.revState ?? ""}`]} href={row.revState ? GUIDE.REV_STATE : undefined} className={`meta font-sans! ${REV_INK[row.revState ?? ""] ?? ""}`} />
         {/* Released, and nobody asked for it to be sent. It is in use; nobody
             has been told, including anyone whose approval it may still need. */}
       </>
@@ -898,9 +901,8 @@ function day(value: string) { return value ? new Intl.DateTimeFormat("en-GB", { 
  * and the whole list is one click away in the guide — so the register stays a
  * register, and nobody has to memorise IFC, C2 or AB to read it.
  */
-function CodeRef({ code, note, href, className, chip }: { code: string; note?: string; href?: string; className?: string; chip?: string }) {
-  // A state reads as its pill, in the app's tones (owner: "keep the way the pills were colored, everywhere").
-  const body = chip ? <Chip className={chip}>{code}</Chip> : <span className={`code-ref ${className ?? ""}`}>{code}</span>;
+function CodeRef({ code, note, href, className }: { code: string; note?: string; href?: string; className?: string }) {
+  const body = <span className={`code-ref ${className ?? ""}`}>{code}</span>;
   // A code with a note but nowhere to go still says, under the cursor, that
   // hovering it will tell you something.
   if (!href) return <span title={note} className={note ? "cursor-help" : undefined}>{body}</span>;

@@ -644,9 +644,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   filter at once, a keyboard one on leaving). Never a bare `<select>` again. The search fields' lists (`SearchPick`,
   `JumpPick`, the recipient picker, "One of ours?") take the same look, and every one lists on a click and narrows as
   one types (Functions' long lists and "One of ours?" included).
-- **States read as pills** (owner, "keep the way the pills were colored, everywhere"): `Chip` in the app's tones
-  (`TONE`): the register's document and revision states (`DOC_STATE_COLOR`, `REV_STATE_COLOR`), transmittals' status,
-  reviews' waiting / withdrawn, packages' stage (`ToneChip` is a `Chip`).
+- **Never pills inside a register** (owner: "we are very satisfied with the current styling"): a register's state
+  reads as coloured text (the revision state in its colour, `REV_INK`; transmittals' status, `STATUS_INK`), as it was.
+  Outside registers a state is its pill in the app's tones (`Chip`, `TONE`: the document page, Help's states).
 - **On/off is a switch** (owner, everywhere): `components/switch.tsx` (`role="switch"`): `Switch` acts at once,
   `SwitchControl` / `SwitchField` are a form's field (can sign in, in use, pop-ups, stamps, confirmation needed, only
   moves forward, shown in the register…). Never a "Switch off" button or an on/off chip beside a button; a choice among

@@ -9,8 +9,7 @@ import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
 import { FilterMenu } from "@/components/filter-menu";
 import { FilterOptions } from "@/components/filter-options";
-import { Th, Td, Info, Chip } from "@/components/ui";
-import { TONE } from "@/lib/core/tones";
+import { Th, Td, Info } from "@/components/ui";
 import { useCardHeight } from "@/components/card-height";
 
 /**
@@ -52,9 +51,8 @@ const FREEZE_KEY = "transmittals:frozen";
 const RAIL: Record<string, string> = {
   DRAFT: "rail-draft", ISSUED: "rail-sent", ACCEPTED: "rail-accepted", REJECTED: "rail-returned", CLOSED: "rail-received",
 };
-/** Each status as its pill, in the app's tones. */
-const STATUS_TONE: Record<string, string> = {
-  DRAFT: TONE.idle, ISSUED: TONE.moving, ACCEPTED: TONE.done, REJECTED: TONE.refused,
+const STATUS_INK: Record<string, string> = {
+  DRAFT: "text-slate-500", ISSUED: "text-sky-700", ACCEPTED: "text-emerald-700", REJECTED: "text-red-700",
 };
 
 type Column = {
@@ -424,7 +422,7 @@ const COLUMNS: Column[] = [
     key: "status", sort: "status", label: "Status",
     note: "Draft means nothing has been sent. Issued means the recipients were told. On what arrives: to check, then accepted or rejected, then closed.",
     cellClass: "whitespace-nowrap",
-    cell: (row) => <Chip className={STATUS_TONE[row.status] ?? TONE.idle}>{row.statusLabel}</Chip>,
+    cell: (row) => <span className={`meta font-sans! ${STATUS_INK[row.status] ?? ""}`}>{row.statusLabel}</span>,
   },
   {
     key: "seen", label: "Seen by",

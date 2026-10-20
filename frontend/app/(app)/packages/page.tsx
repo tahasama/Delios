@@ -1,7 +1,7 @@
 import { Select } from "@/components/select";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
-import { Field, inputCls, Info, ToneChip, Chip, DataTable, Th, Td } from "@/components/ui";
+import { Field, inputCls, Info, ToneChip, DataTable, Th, Td } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/settings/field-policy";
@@ -109,7 +109,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                       <Td className="w-10"><input type="radio" name="number" value={pkg.number} form="package-export" required aria-label={`Tick ${pkg.number} to export it`} /></Td>
                       <Td><Link href={`/packages/${pkg.number}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.names.to}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.number}</span></Td>
                       <Td className={`text-xs`}>
-                        <Chip className={where.tone}>{where.word}</Chip>
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
                       </Td>
                       {supplierOnly ? null : <Td className="text-xs tabular-nums">{f.notSent ? `${f.notSent} of ${f.total}` : <span className="text-slate-400">none</span>}</Td>}
                       <Td className="text-xs tabular-nums">{f.withThem} of {f.total}</Td>
