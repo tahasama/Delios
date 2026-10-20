@@ -1357,3 +1357,10 @@ on record; the most severe verdict stands and the last decider's status is what 
 answered by an organization, a function, named people, or whoever the distribution matrix gives for each document's
 discipline, alone or together, each narrowing the others. A route's days are a default (five in all, deciders given
 more), never a limit.
+
+## 71 · What each function may do, said in one place
+
+A function's permissions are read and changed in one place: the grid (a permission on every document) and, opened
+from the function's name, every rule it holds for certain documents only, each named by its field ("Discipline Civil").
+What each permission allows is always written under the grid, never left to a hover. A function's name may be
+corrected; its code never changes. A function has no department of its own (the field shown before was never kept).

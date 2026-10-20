@@ -964,6 +964,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (above). "Offer this route first" puts it first among
   routes equally specific. "From which organization" chooses among the organizations taking part (a document's
   originator is an organization's code).
+- **Functions & permissions, one place per function** (owner, after the critique): the grid's ticks give a permission
+  on every document (half mark: held for certain documents only); a function's name opens it under its line
+  (`?open=<id>`): every rule it holds, every document first, each narrowed one with its fields named, a bin to remove
+  (asked first), "Add a rule"; in the organization's Settings also the function itself (name, code read only, clearance,
+  in use). "New function" is the plate's act (`?new=1`), opening the added one. "What each permission allows" is always
+  written under the grid (`VERB_BLURB`). No department on a function (never kept by the backend; the field is gone).
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
 - **Two levels of settings** (owner): the organization's (`/organization`, its portal) and the project's (Settings).
   Every project, opening one, archiving and reopening are the organization's: **Projects** (`/organization/projects`,

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireAccessScope, requireScope } from "@/lib/core/scope";
 import { api, projectPath, refusal } from "@/lib/client";
 import { adminFunctions, rulesBody, type AdminFunction, type AdminRule } from "@/lib/settings/api-admin";
@@ -65,18 +66,23 @@ export async function createFunctionAction(_prev: Result | undefined, formData: 
   const verbs = readVerbs(formData);
   if (!name) return { error: "Give the function the name people actually use for it." };
   if (!CODE.test(code)) return { error: "The code is short and uppercase, e.g. ELEC_TECH." };
+  let id: string;
   try {
     const created = await api<{ id: string }>("/api/admin/functions", { body: { code, name } });
     const clearance = String(formData.get("clearance") ?? "").trim();
     if (verbs.length || clearance) {
       await api(`/api/admin/functions/${created.id}`, { method: "PUT", body: { ...(verbs.length ? { rules: [{ verbs }] } : {}), ...(clearance ? { clearance } : {}) } });
     }
+    id = created.id;
   } catch (e) {
     return { error: refusal(e).message };
   }
   revalidatePath("/settings/functions");
   revalidatePath("/organization/settings/functions");
-  return { ok: `${name} published.` };
+  // Added, it opens under its line in the grid, to give it what it may do for certain documents.
+  const back = String(formData.get("back") ?? "");
+  if (back === "/organization/settings/functions") redirect(`${back}?open=${id}#fn-${id}`);
+  return { ok: `${name} added.` };
 }
 
 export async function updateFunctionAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
