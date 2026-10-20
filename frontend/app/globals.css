@@ -297,6 +297,7 @@ summary::-webkit-details-marker {
   .rail-schedule { --rail: var(--color-teal-500); }
   .rail-people { --rail: var(--color-purple-500); }
   .rail-reading { --rail: var(--color-lime-500); }
+  .rail-downloaded { --rail: var(--color-lime-700); }
   .rail-signin { --rail: var(--color-pink-400); }
 
   /* Denser rows than the rest of the app: this table is read for hours. */

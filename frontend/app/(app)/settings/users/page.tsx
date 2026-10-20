@@ -3,7 +3,7 @@ import { SwitchControl } from "@/components/switch";
 import Link from "next/link";
 import { Fragment } from "react";
 import { cn } from "@/lib/core/utils";
-import { Bell, Pencil, X } from "lucide-react";
+import { Bell, History, Pencil, Search, UserPlus, X } from "lucide-react";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
 import { DataTable, Th, Td, Field, inputCls, ToneChip } from "@/components/ui";
@@ -39,7 +39,7 @@ type Pending = {
  * themselves and told; the control function may remind whoever confirms. The list: everyone, narrowed by organization
  * and project, each with their place here.
  */
-export default async function PeoplePage({ searchParams }: { searchParams: Promise<{ org?: string; project?: string; edit?: string }> }) {
+export default async function PeoplePage({ searchParams }: { searchParams: Promise<{ org?: string; project?: string; edit?: string; q?: string }> }) {
   const ctx = await requireScope();
   const { user: me, projectId, project } = ctx;
   const sp = await searchParams;
@@ -87,8 +87,14 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
     }));
   const shownOrg = sp.org ? parties.find((party) => party.id === sp.org) ?? null : null;
   const projectFilter = sp.project && projects.some((item) => item.id === sp.project) ? sp.project : "";
+  // Found by name or email (owner: fine for 9 people, needed for 90).
+  const words = (sp.q ?? "").trim().toLowerCase();
   const shown = users.filter((person) =>
-    (!shownOrg || person.partyId === shownOrg.id) && (!projectFilter || person.seats.some((seat) => seat.projectId === projectFilter)));
+    (!shownOrg || person.partyId === shownOrg.id) && (!projectFilter || person.seats.some((seat) => seat.projectId === projectFilter))
+    && (!words || `${person.name} ${person.email}`.toLowerCase().includes(words)));
+  // "Other projects" only when someone shown is on another project: a column of dashes takes room for nothing.
+  const showElsewhere = shown.some((person) => person.seats.some((seat) => seat.projectId !== projectId));
+  const columns = showElsewhere ? 6 : 5;
   const refused = users.filter((u) => u.held?.refusedAt).length;
 
   // Reminding whoever confirms: one notice history per person waiting.
@@ -97,6 +103,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   // A person's activity (everything they did, with its day) is read by an administrator or the control function.
   const mayReadActivity = admin || ctx.can("CONTROL");
   const chip = (q: Record<string, string | undefined>) => {
+    if (sp.q && !("q" in q)) q = { ...q, q: sp.q };
     const next = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => !!e[1]));
     return `/settings/users${next.size ? `?${next}` : ""}`;
   };
@@ -216,9 +223,20 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
               ))}
             </>
           ) : null}
+          {/* Find a person: Enter applies; the organization and project chosen stay. */}
+          <form className="asking ml-auto flex min-w-56 items-center gap-2">
+            {shownOrg ? <input type="hidden" name="org" value={shownOrg.id} /> : null}
+            {projectFilter ? <input type="hidden" name="project" value={projectFilter} /> : null}
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">Find a person</span>
+              <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input name="q" defaultValue={sp.q ?? ""} placeholder="Find a name or email" className="plain w-full !pl-7" />
+            </label>
+            {sp.q ? <Link href={chip({ org: shownOrg?.id, project: projectFilter || undefined, q: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Clear</Link> : null}
+          </form>
         </div>
         <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
-          head={<tr><Th>Person</Th><Th>Organization</Th><Th>On {project.code}</Th><Th>Department</Th><Th>Other projects</Th><Th></Th></tr>}>
+          head={<tr><Th>Person</Th><Th>Organization</Th><Th>On {project.code}</Th><Th>Department</Th>{showElsewhere ? <Th>Other projects</Th> : null}<Th></Th></tr>}>
           {shown.map((u) => {
             const here = u.seats.find((m) => m.projectId === projectId);
             const elsewhere = u.seats.filter((m) => m.projectId !== projectId);
@@ -245,8 +263,14 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                       : <span className="text-slate-500">not on it</span>}
                   </Td>
                   <Td className="text-xs">{here?.department ? deptLabel(here.department) : "—"}</Td>
-                  <Td className="text-xs">{elsewhere.length ? elsewhere.map((m) => `${m.projectCode} · ${m.functionName}`).join(", ") : "—"}</Td>
+                  {showElsewhere ? <Td className="text-xs">{elsewhere.length ? elsewhere.map((m) => `${m.projectCode} · ${m.functionName}`).join(", ") : "—"}</Td> : null}
                   <Td className="w-px whitespace-nowrap text-right">
+                    {/* What they did in the app: the person's activity, for an administrator or the control function. */}
+                    {mayReadActivity ? (
+                      <Link href={`/settings/users/${u.id}`} className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title={`What ${u.name} did in the app`}>
+                        <History aria-label={`What ${u.name} did in the app`} className="h-4 w-4" />
+                      </Link>
+                    ) : null}
                     {here ? (
                       open ? (
                         <Link href={lineHref()} scroll={false} className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Close">
@@ -258,7 +282,9 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                         </Link>
                       )
                     ) : u.held?.pendingSince ? null : u.active ? (
-                      <Link href="#join" className="text-xs font-semibold text-link hover:underline">Ask for them to join</Link>
+                      <Link href="#join" className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title={`Ask for ${u.name} to join`}>
+                        <UserPlus aria-label={`Ask for ${u.name} to join`} className="h-4 w-4" />
+                      </Link>
                     ) : null}
                   </Td>
                 </tr>
@@ -266,7 +292,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                   // The person's line opened under it: the row itself goes on, the new-document form's way (grey
                   // fields side by side, then the strip with Cancel and Save), never a box inside the table.
                   <tr>
-                    <td colSpan={6} className="border-b border-line p-0">
+                    <td colSpan={columns} className="border-b border-line p-0">
                       <ActionForm id={`person-form-${u.id}`} action={savePersonAction} hideSubmit hidden={{ userId: u.id, partyId: u.partyId ?? "" }}
                         className="asking space-y-5 px-5 py-5 sm:px-6">
                         {u.linked ? (
@@ -316,6 +342,11 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                       ) : null}
                       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
                         <Link href={lineHref()} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+                        {mayReadActivity ? (
+                          <Link href={`/settings/users/${u.id}`} className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-link hover:underline">
+                            <History aria-hidden className="h-3.5 w-3.5" /> See what {u.name} did
+                          </Link>
+                        ) : null}
                         <button type="submit" form={`person-form-${u.id}`} data-on="true" className="ask">Save</button>
                       </div>
                     </td>

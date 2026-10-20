@@ -3,7 +3,7 @@ namespace Delios.Host.Audit;
 /// <summary>
 /// The kinds of act in the audit trail, worked out once from each act's code (the screens read the kind, never the
 /// code): reviews, releases, returns and ends, transmittals, packages, the schedule, the register, people and
-/// settings, reading, sign-ins. Each kind has its own side colour on the screens (lib/core/rails.ts, "Audit trail").
+/// settings, opened, downloaded, sign-ins. Each kind has its own side colour on the screens (lib/core/rails.ts, "Audit trail").
 /// Every code the app writes is named here; a new one falls to the register until it is placed.
 /// </summary>
 public static class AuditKinds
@@ -19,13 +19,16 @@ public static class AuditKinds
         ("SCHEDULE", "Schedule"),
         ("REGISTER", "The register"),
         ("PEOPLE", "People and settings"),
-        ("READING", "Opened or downloaded"),
+        ("READING", "Opened"),
+        ("DOWNLOADED", "Downloaded"),
         ("SIGN_IN", "Sign-ins and security"),
     ];
 
     private static readonly Dictionary<string, string[]> Codes = new()
     {
-        ["READING"] = ["DOCUMENT_VIEWED", "DOWNLOAD", "ACTIVITY_READ", "TRANSMITTAL_OPENED"],
+        ["READING"] = ["DOCUMENT_VIEWED", "ACTIVITY_READ", "TRANSMITTAL_OPENED"],
+        // Opening is not downloading (owner): a download is a kind of its own.
+        ["DOWNLOADED"] = ["DOWNLOAD"],
         ["SIGN_IN"] = ["SIGN_IN", "SIGN_IN_MFA", "SIGN_IN_SSO", "SIGN_IN_FAILED", "LOGIN", "ACCOUNT_LOCKED", "MFA_ENABLED", "MFA_DISABLED",
             "MFA_FAILED", "MFA_RESET", "PASSWORD_RESET", "PASSWORD_RESET_ASKED", "SSO_CONFIGURED", "SECURITY_POLICY_CHANGED", "SWITCHED_IN",
             "ACCESS_REFUSED"],

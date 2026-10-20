@@ -89,7 +89,7 @@ public static class ActivityEndpoints
         // administrators' trail (Settings, Audit trail; a person's activity), never on Home.
         var outside = await db.AuditEvents.AsNoTracking().Where(e => e.ProjectId == access.Project.Id).Select(e => e.Action).Distinct()
             .ToListAsync(cancellationToken);
-        var hidden = outside.Where(code => AuditKinds.Of(code) is "PEOPLE" or "READING" or "SIGN_IN").ToArray();
+        var hidden = outside.Where(code => AuditKinds.Of(code) is "PEOPLE" or "READING" or "DOWNLOADED" or "SIGN_IN").ToArray();
         var query = db.AuditEvents.AsNoTracking().Where(e => e.ProjectId == access.Project.Id && !hidden.Contains(e.Action));
         var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(access.Project.TimeZone) ?? DateTimeZone.Utc;
         if (from is { } f) { var start = LocalDate.FromDateOnly(f).AtStartOfDayInZone(zone).ToInstant(); query = query.Where(e => e.At >= start); }

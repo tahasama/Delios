@@ -574,7 +574,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   together. Ending a document is already its registrar's too; legal hold an administrator's.
 - People & access, in the reference style: masthead (on the project · waiting · refused, and how joining works here),
   "Someone joins <project>" ("Add someone", "Ask for someone to join"), "Waiting to be confirmed" (with Remind), and
-  Everyone (organization and project chips; each person's Change: function, department, name and email unless
+  Everyone (organization and project chips, a field to find a name or email; "Other projects" only when someone shown
+  is on another; acts as icons: activity, change, ask for them to join; each person's Change: function, department, name and email unless
   linked, "Can sign in" on every project, "Take off <project>", asked first). A linked account (works here from its
   own DELIOS) changes only its function and department here. The organization's own extra fields on a person (Forms
   & fields) are no longer asked when adding (they were checked on the screen only).
@@ -852,7 +853,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   console sit what holds for the whole project (`flow/project-wide.tsx`): "Who acts as the control function"
   (`#control-people`, named there) and "Back to the defaults". What the states are called is the organization's card
   (`/organization/settings/states`, administrators), read on a project.
-- **A person's activity** (owner): in People & access, a name opens `/settings/users/<id>`: who they are, then everything
+- **A person's activity** (owner): in People & access, a name opens `/settings/users/<id>`, and so do the clock icon on
+  each line and "See what <name> did" in the opened line (owner: "I didn't know this page existed"): who they are, then everything
   they did in the app with its day and time (signed in, opened a document, downloaded, reviewed, released, sent…), read
   from the audit trail (`GET /api/admin/users/{id}/activity`, narrowed by act and project, 50 a page). Opening a
   document is recorded (`DOCUMENT_VIEWED`, once per person and document every half hour). An administrator or the
@@ -861,7 +863,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   that purpose, and the organization sets how long it is kept; some countries also ask staff representatives first.
   What is kept is the organization's choice (organization page, "What is kept about people's activity",
   `Settings.Tracking`; shown read-only in the Control room): acts on documents always; reading (opened a document,
-  downloaded a file, `TRACK_READING`) kept unless switched off; sign-ins always kept for security, shown on a person's
+  downloaded a file, `TRACK_READING`) kept unless switched off, read as two kinds, Opened and Downloaded (owner: opened
+  is not downloaded; `AuditKinds` READING / DOWNLOADED); sign-ins always kept for security, shown on a person's
   activity only when switched on (`TRACK_SIGN_INS` = ON).
 - **Audit trail** (Settings, administrators) keeps its logbook look (owner: the agreement was on content, not styling):
   the day as a rule, each act a slip, the kinds beside it. Shared with a person's activity (`components/logbook.tsx`).
