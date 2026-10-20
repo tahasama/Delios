@@ -1270,8 +1270,9 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
   risk window, escalation) follow the same two levels: where the organization keeps an answer fixed, a project reads it
   and cannot change it; where free, the project chooses. A project keeps the answers it already held when an answer is
   made fixed later.
-- **Functions and what they may do are the organization's**, the same on every project, for now: a project's own
-  version is built only when a project needs it.
+- **Functions are the organization's; what each may do is each project's by default** (owner): a project's control
+  function changes it there, its first change taking its own copy. The organization may make it Fixed. The function
+  that configures the organization (its administrators') is never changed on a project.
 
 ## 68 · One document, two numbers; and documents taken as they come
 
@@ -1364,3 +1365,6 @@ A function's permissions are read and changed in one place: the grid (a permissi
 from the function's name, every rule it holds for certain documents only, each named by its field ("Discipline Civil").
 What each permission allows is always written under the grid, never left to a hover. A function's name may be
 corrected; its code never changes. A function has no department of its own (the field shown before was never kept).
+
+A project changes what each function may do by default; the organization may fix it for all. The administrators'
+function (the one that configures the organization) is changed only in the organization's Settings.

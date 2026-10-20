@@ -86,12 +86,15 @@ public static class ProjectFunctions
         }
         var function = await db.Functions.AsNoTracking().SingleOrDefaultAsync(f => f.Id == functionId, cancellationToken);
         if (function is null) return Problems.NotFound("FUNCTION_NOT_FOUND", "No such function.");
-        // A function that configures is the organization's to change: a project could otherwise take Configure away from it.
+        // The administrators' function (one that configures) is the organization's to change (owner): a project could
+        // otherwise take Configure away from it, or give its holders more. Read from the rights in force, before any copy.
         var project = await db.Projects.SingleAsync(p => p.Id == access.Project.Id, cancellationToken);
+        var inForce = project.OwnFunctions ? project.Id : (Guid?)null;
+        if (await db.PermissionRules.IgnoreQueryFilters().AnyAsync(r => r.TenantId == project.TenantId && r.ProjectId == inForce
+                && r.FunctionId == functionId && r.Verbs.Contains(Verbs.Configure), cancellationToken))
+            return Problems.Forbidden("CONFIGURE_ORGANIZATIONS", $"{function.Name} configures the organization: what it may do is changed in the organization's Settings, never on a project.");
         await EnsureOwnAsync(db, project, cancellationToken);
         var mine = await db.PermissionRules.IgnoreQueryFilters().Where(r => r.ProjectId == project.Id && r.FunctionId == functionId).ToListAsync(cancellationToken);
-        if (mine.Any(r => r.Verbs.Contains(Verbs.Configure)))
-            return Problems.Forbidden("CONFIGURE_ORGANIZATIONS", $"{function.Name} configures the organization: what it may do is changed on the organization's page.");
         db.PermissionRules.RemoveRange(mine);
         foreach (var rule in rules.Where(r => (r.Verbs ?? []).Length > 0))
             db.PermissionRules.Add(new PermissionRule

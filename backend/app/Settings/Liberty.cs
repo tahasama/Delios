@@ -82,7 +82,7 @@ public static class Liberty
 
         new(Forms, "Forms & fields", "Forms & fields", "A client may ask fields of its own; a field a number part reads follows the numbering", true),
         new(Routes, "Review routes", "Review routes", "Each project has its own reviewers and steps", true),
-        new(Functions, "Functions & permissions", "Functions & permissions", "The organization's jobs; where free, a project changes what each may do there", false),
+        new(Functions, "Functions & permissions", "Functions & permissions", "Each project's team shares out the work its own way; the administrators' function stays the organization's", true),
 
         new("WHO_DOES_WHAT", Room, "Who carries each act out, and what is confirmed", "The project's contract and team", true),
         new("POLICY_RELEASE", Room, "What releasing a revision means", "The project's contract", true),

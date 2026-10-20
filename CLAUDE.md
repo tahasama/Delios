@@ -725,7 +725,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (done, per list), Forms & fields (done, per form), Functions & permissions (done, owner: "we should be able to change functions on a
   project level": the functions themselves, name, code, clearance, in use, are the organization's, created and changed on
   its Settings card `/organization/settings/functions` by an administrator; what each may do is the organization's unless
-  its switch `FUNCTIONS` (Fixed by default) leaves it Free, then the project's control function changes it on the
+  its switch `FUNCTIONS` (owner: Free by default) leaves it Free, then the project's control function changes it on the
   project's page, its first change copying every function's rights onto the project (`Project.OwnFunctions`,
   `PermissionRule.ProjectId`; `Identity/ProjectFunctions.cs`, `PUT /api/projects/{id}/functions/{fid}/rules`); Configure
   stays the organization's (CONFIGURE_ORGANIZATIONS). Rights are read per project: the query filter on rules follows the
@@ -970,6 +970,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (asked first), "Add a rule"; in the organization's Settings also the function itself (name, code read only, clearance,
   in use). "New function" is the plate's act (`?new=1`), opening the added one. "What each permission allows" is always
   written under the grid (`VERB_BLURB`). No department on a function (never kept by the backend; the field is gone).
+  **The administrators' function stays the organization's** (owner): a function holding Configure is read only on a
+  project, whatever the switch (backend CONFIGURE_ORGANIZATIONS, checked on the rights in force before any copy).
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
 - **Two levels of settings** (owner): the organization's (`/organization`, its portal) and the project's (Settings).
   Every project, opening one, archiving and reopening are the organization's: **Projects** (`/organization/projects`,
