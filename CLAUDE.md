@@ -971,9 +971,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   in use). "New function" is the plate's act (`?new=1`), opening the added one. "What each permission allows" is always
   written under the grid (`VERB_BLURB`). No department on a function (never kept by the backend; the field is gone).
   The opened function shows only what the grid cannot (owner, "redundancy"; then "useless… i'd rather see the form
-  directly"): its rules for certain documents only, if any, and the form to add one, open at once (it asks which
-  documents: on every document is a tick, never a second copy); in the organization's Settings also the function
-  itself. Nothing else: no "none yet", no line on what is the organization's. A name opens only when there is something
+  directly"): its rules for certain documents only, if any, and the form to add one, open at once; in the
+  organization's Settings also the function itself. The form never repeats the grid's ticks (owner: "pills of what
+  that function already capable of doing with a close button"): what it holds on every document shows as pills, a
+  cross leaves one out, and "Only on these documents" moves those left from every document to the documents chosen
+  (`narrow`, asked first; `VerbPills`). A permission is given in the grid only. Nothing else: no "none yet", no line on what is the organization's. A name opens only when there is something
   there (whoever may not change it, on a function with no such rule, reads a plain name).
   **On a project every function is changed, Configure excepted** (owner: "project level should be able to edit that by
   default, except the admin function"): Configure, the administrators' permission, is neither given nor taken on a

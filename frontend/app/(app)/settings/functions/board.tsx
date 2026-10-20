@@ -17,6 +17,7 @@ import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 import { Check, ChevronDown, ChevronRight, Contrast, Minus, Plus, Trash2 } from "lucide-react";
 import { functionsForMatrix, projectFunctionsForMatrix } from "@/lib/settings/api-admin";
 import { NoAccess } from "../no-access";
+import { VerbPills } from "./verb-pills";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 
 /** A list longer than this is shared on the page rather than repeated in each form. */
@@ -190,7 +191,7 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
               {grid.map(({ fn, held, partly }) => {
                 const narrowCount = fn.rules.filter(narrow).length;
                 // Opened only when there is something to see or do: the function itself, a rule to add, or its rules.
-                const opens = admin || (rights && fn.active) || narrowCount > 0;
+                const opens = admin || narrowCount > 0 || (rights && fn.active && [...held].some((v) => !fixedHere(v)));
                 const isOpen = opens && open === fn.id;
                 return [
                   <tr key={fn.id} id={`fn-${fn.id}`} className={`scroll-mt-20 ${isOpen ? "bg-tint-soft" : ""} ${fn.active ? "" : "text-slate-400"}`}>
@@ -299,11 +300,13 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
 }) {
   // On every document is the ticks on its line, said once there; here only what the grid cannot show.
   const narrowed = rules.filter((rule) => scopeOf(rule).length > 0);
+  // What it holds on every document: the grid gives it, this form narrows it to certain documents.
+  const everywhere = VERBS.filter((v) => !fixedHere(v) && rules.some((r) => scopeOf(r).length === 0 && parseVerbs(r.verbs).includes(v)));
   return (
     <div className="space-y-3">
       <p className="flex flex-wrap items-baseline gap-2">
-        <span className="stencil text-slate-500">More on certain documents only</span>
-        <span className="text-[11px] text-slate-500">on top of its ticks, e.g. Approve on one discipline&rsquo;s documents</span>
+        <span className="stencil text-slate-500">Only on certain documents</span>
+        <span className="text-[11px] text-slate-500">what it holds, narrowed to the documents chosen, e.g. Approve on one discipline&rsquo;s documents</span>
       </p>
       {narrowed.length === 0 ? null : (
         <ul className="divide-y divide-line rounded-md ring-1 ring-line">
@@ -331,11 +334,12 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
         </ul>
       )}
 
-      {rights ? (
-        <ActionForm action={savePermissionRuleAction} submitLabel="Add the rule" size="sm" resetOnSuccess hidden={{ functionId: fn.id, level }} className="space-y-4">
-            <VerbTicks verbs={GRANTABLE.filter((v) => !fixedHere(v))} label="May" />
+      {rights && everywhere.length ? (
+        <ActionForm action={savePermissionRuleAction} submitLabel="Only on these documents" size="sm" resetOnSuccess hidden={{ functionId: fn.id, level, narrow: "1" }} className="space-y-4"
+          confirmText={`${fn.name} will hold what is left in the pills on the documents chosen only, no longer on every document. Go ahead?`}>
+            <VerbPills verbs={everywhere.map((v) => ({ code: v, label: VERB_LABEL[v], blurb: VERB_BLURB[v] }))} />
             <div className="space-y-1.5">
-              <p className="stencil text-slate-500">On these documents <span className="font-normal normal-case tracking-normal text-slate-400">· at least one; on every document is a tick on its line</span></p>
+              <p className="stencil text-slate-500">On these documents <span className="font-normal normal-case tracking-normal text-slate-400">· at least one</span></p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {selectors.map((sel) => (
                   <Field key={sel.name} label={sel.label} hint={sel.values.length > LONG ? "type part of the code or name" : undefined}>

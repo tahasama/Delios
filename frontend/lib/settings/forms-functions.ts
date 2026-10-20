@@ -129,14 +129,14 @@ export async function savePermissionRuleAction(_prev: Result | undefined, formDa
   if (!ctx.can("CONFIGURE") && verbs.includes("CONFIGURE")) {
     return { error: "Only an administrator grants Configure — it is the permission that grants every other." };
   }
-  if (!verbs.length) return { error: "A rule with no verbs grants nothing — delete it instead." };
+  if (!verbs.length) return { error: "Keep at least one permission to narrow." };
   const rule: AdminRule = {
     id: ruleId, verbs, deliverableType: blank("deliverableType"), docType: blank("docType"), discipline: blank("discipline"),
     criticality: blank("criticality"), confidentiality: blank("confidentiality"), projectRole: blank("projectRole"),
   };
   // On every document is a tick in the grid (owner): a rule here says which documents, or it would be a second copy of it.
   if (!ruleId && !rule.deliverableType && !rule.docType && !rule.discipline && !rule.criticality && !rule.confidentiality && !rule.projectRole) {
-    return { error: "Choose which documents. To give it on every document, tick it on the function's line." };
+    return { error: "Choose which documents." };
   }
   if (rule.projectRole && !CONTRACT_ROLES.some((r) => r.code === rule.projectRole)) {
     return { error: `“${rule.projectRole}” is not a contract role — leave it blank for every project.` };
@@ -152,7 +152,13 @@ export async function savePermissionRuleAction(_prev: Result | undefined, formDa
     }
   }
   if (ruleId && !fn.rules.some((r) => r.id === ruleId)) return { error: "That rule no longer exists." };
-  const rules = ruleId ? fn.rules.map((r) => (r.id === ruleId ? rule : r)) : [...fn.rules, rule];
+  // Narrowing (owner): what it held on every document is held on the documents chosen only; the rest stays as it was.
+  const narrowing = formData.get("narrow") === "1";
+  const isOpen = (r: AdminRule) => !r.deliverableType && !r.docType && !r.discipline && !r.criticality && !r.confidentiality && !r.projectRole;
+  const base = narrowing
+    ? fn.rules.map((r) => (isOpen(r) ? { ...r, verbs: r.verbs.filter((v) => !verbs.includes(v as Verb)) } : r)).filter((r) => r.verbs.length > 0)
+    : fn.rules;
+  const rules = ruleId ? base.map((r) => (r.id === ruleId ? rule : r)) : [...base, rule];
   const failed = await saveRules(fn, rules, project);
   if (failed) return failed;
   revalidatePath("/settings/functions");
