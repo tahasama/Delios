@@ -11,7 +11,8 @@ export const metadata = { title: "Review routes" };
  * organization left routes free (the default), the control function changes them here, its first change giving the
  * project its own copy. Otherwise they are read here, and changed in the organization's Settings.
  */
-export default async function WorkflowTemplatesPage() {
+export default async function WorkflowTemplatesPage({ searchParams }: { searchParams: Promise<{ edit?: string; new?: string }> }) {
+  const params = await searchParams;
   const ctx = await requireScope();
   const routes = await projectRoutes();
   const project = ctx.project.code;
@@ -25,5 +26,5 @@ export default async function WorkflowTemplatesPage() {
           {routes.mayChangeOrganization
             ? <>An administrator changes them in the organization&rsquo;s Settings: <Link href="/organization/settings/routes" className="font-semibold text-link hover:underline">Review routes</Link>.</>
             : "An administrator changes them, for every project."}</>;
-  return <RoutesBoard level="project" editable={routes.mayChange} lead={lead} />;
+  return <RoutesBoard level="project" editable={routes.mayChange} lead={lead} editing={params.edit} adding={params.new === "1"} />;
 }

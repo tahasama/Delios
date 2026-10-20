@@ -42,6 +42,8 @@ public sealed record ReviewView(Guid Id, string Number, Guid DocumentId, Guid Re
     Guid? StartedById = null, IReadOnlyList<SendBack>? SendBacks = null, string? Verdicts = null,
     /// <summary>The verdicts the deciding step may give: those of the review's set, in order.</summary>
     IReadOnlyList<string>? VerdictCodes = null,
+    /// <summary>The advice the advising steps may give: that of the review's set, in order.</summary>
+    IReadOnlyList<string>? AdviceCodes = null,
     /// <summary>Sent for review, waiting for the control function to send it to its reviewers (REVIEW_ISSUE).</summary>
     bool AwaitsIssue = false);
 
@@ -143,6 +145,7 @@ public static class ReviewEndpoints
         return Results.Ok(view with
         {
             VerdictCodes = catalog.ActiveIn(review.VerdictSet, review.Verdicts),
+            AdviceCodes = catalog.ActiveIn(ReviewSets.Advice, review.Advice),
             Steps = view.Steps.Select(step =>
             {
                 var s = review.Steps.Single(one => one.Index == step.Number - 1);

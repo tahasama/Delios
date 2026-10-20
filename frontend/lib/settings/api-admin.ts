@@ -99,6 +99,8 @@ type AdminRoute = {
   id: string; name: string; description: string | null; isDefault: boolean; active: boolean; verdictSet?: string | null;
   /** The set of the review outcomes it decides from (none: the one serving each document), and the deliverable types it serves that set does not. */
   verdicts?: string | null; verdictsMismatch?: string[];
+  /** The set of the review advice its advising steps answer from (none: the one serving each document), and the types it serves that set does not. */
+  advice?: string | null; adviceMismatch?: string[];
   patterns: { deliverableType: string | null; docType: string | null; discipline: string | null; criticality: string | null; originator: string | null }[];
   steps: RouteStepView[];
 };
@@ -319,7 +321,8 @@ export const routeCopies = cache(async () =>
 export async function routesForEditor(level: "organization" | "project" = "project") {
   const [routes, parties] = await Promise.all([level === "organization" ? adminRoutes() : projectRoutes().then((p) => p.routes), adminParties()]);
   return routes.filter((r) => r.active).map((r) => ({
-    id: r.id, name: r.name, description: r.description, isDefault: r.isDefault, outcomeSetKey: r.verdicts ?? "", verdictsMismatch: r.verdictsMismatch ?? [], createdAt: new Date(0),
+    id: r.id, name: r.name, description: r.description, isDefault: r.isDefault, outcomeSetKey: r.verdicts ?? "", verdictsMismatch: r.verdictsMismatch ?? [],
+    adviceSetKey: r.advice ?? "", adviceMismatch: r.adviceMismatch ?? [], createdAt: new Date(0),
     classes: r.patterns.length
       ? JSON.stringify(r.patterns.map((p) => Object.fromEntries(Object.entries(p).filter(([, v]) => v))))
       : "*",

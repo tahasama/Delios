@@ -29,6 +29,11 @@ public sealed class ReviewRoute
     /// Null: the set serving the document's deliverable type.
     /// </summary>
     public string? Verdicts { get; set; }
+    /// <summary>
+    /// The set of the review advice its advising steps answer from, by its name. Null: the set serving the document's
+    /// deliverable type.
+    /// </summary>
+    public string? Advice { get; set; }
     /// <summary>Documents it serves. Empty serves every document. A null field in a pattern means any value.</summary>
     public List<RoutePattern> Patterns { get; set; } = [];
     public List<RouteStep> Steps { get; set; } = [];
@@ -97,6 +102,8 @@ public sealed class Review
     public string VerdictSet { get; set; } = ReviewSets.Verdicts;
     /// <summary>The set of the review outcomes its verdicts are offered from, by name, fixed when it starts. Null: any.</summary>
     public string? Verdicts { get; set; }
+    /// <summary>The set of the review advice its advisers answer from, by name, fixed when it starts. Null: any.</summary>
+    public string? Advice { get; set; }
     public Guid StartedById { get; set; }
     public required string StartedByName { get; set; }
     /// <summary>Copied in when it was sent (cc): told of it and of what comes of it, never asked to answer.</summary>

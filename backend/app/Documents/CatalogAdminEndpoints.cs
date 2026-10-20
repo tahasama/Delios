@@ -28,7 +28,9 @@ public sealed record RouteRequest(
     string? Name = null, string? Description = null, bool? IsDefault = null, bool? Active = null, RoutePattern[]? Patterns = null,
     RouteStep[]? Steps = null, string? VerdictSet = null,
     /// <summary>The set of the review outcomes it decides from, by name; empty: the set serving the document's deliverable type.</summary>
-    string? Verdicts = null);
+    string? Verdicts = null,
+    /// <summary>The set of the review advice its advising steps answer from, by name; empty: the set serving the document's deliverable type.</summary>
+    string? Advice = null);
 
 /// <summary>
 /// What an administrator publishes for the organization: the value lists, how numbers are built and which scheme
@@ -171,7 +173,7 @@ public static class CatalogAdminEndpoints
                 var copy = new ReviewRoute
                 {
                     TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Name = route.Name, Description = route.Description,
-                    IsDefault = route.IsDefault, Active = route.Active, Verdicts = route.Verdicts,
+                    IsDefault = route.IsDefault, Active = route.Active, Verdicts = route.Verdicts, Advice = route.Advice,
                     Patterns = route.Patterns.Select(x => new RoutePattern { DeliverableType = x.DeliverableType, DocType = x.DocType, Discipline = x.Discipline, Criticality = x.Criticality, Originator = x.Originator }).ToList(),
                     Steps = System.Text.Json.JsonSerializer.Deserialize<List<RouteStep>>(System.Text.Json.JsonSerializer.Serialize(route.Steps)) ?? [],
                 };
@@ -259,6 +261,9 @@ public static class CatalogAdminEndpoints
             r.Id, r.Name, r.Description, r.IsDefault, r.Active, r.Patterns, r.Steps, VerdictSet = ReviewSets.Verdicts, r.Verdicts,
             VerdictsMismatch = r.Verdicts is null ? [] : r.Patterns.Select(p => p.DeliverableType).OfType<string>().Distinct()
                 .Where(t => catalog.ServingSetName(ReviewSets.Verdicts, t) != r.Verdicts).ToArray(),
+            r.Advice,
+            AdviceMismatch = r.Advice is null ? [] : r.Patterns.Select(p => p.DeliverableType).OfType<string>().Distinct()
+                .Where(t => catalog.ServingSetName(ReviewSets.Advice, t) != r.Advice).ToArray(),
         }).ToArray();
     }
 
@@ -316,6 +321,19 @@ public static class CatalogAdminEndpoints
         return (name, null);
     }
 
+    /// <summary>A route's own set of the review advice, by name: there, with advice in it. Empty: none.</summary>
+    private static async Task<(string? Set, IResult? Problem)> CheckAdviceAsync(DeliosDbContext db, string? requested, CancellationToken cancellationToken)
+    {
+        var name = Blank(requested);
+        if (name is null) return (null, null);
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        if (catalog.SetNamed(ReviewSets.Advice, name) is null)
+            return (null, Problems.Invalid("ADVICE_SET_UNKNOWN", $"The review advice has no set called {name}."));
+        if (catalog.ActiveIn(ReviewSets.Advice, name).Count == 0)
+            return (null, Problems.Invalid("ADVICE_SET_EMPTY", $"{name} has no advice yet: add it in Types & sets, Review advice."));
+        return (name, null);
+    }
+
     /// <summary><c>POST /api/admin/routes</c>: a new review route.</summary>
     private static async Task<IResult> CreateRouteAsync(Guid? scope,
         RouteRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
@@ -328,9 +346,12 @@ public static class CatalogAdminEndpoints
         if (await CheckStepsAsync(db, steps, cancellationToken) is { } problem) return problem;
         var (verdicts, setProblem) = await CheckVerdictsAsync(db, request.Verdicts, cancellationToken);
         if (setProblem is not null) return setProblem;
+        var (advice, adviceProblem) = await CheckAdviceAsync(db, request.Advice, cancellationToken);
+        if (adviceProblem is not null) return adviceProblem;
         var route = new ReviewRoute
         {
             Verdicts = verdicts,
+            Advice = advice,
             TenantId = http.User.TenantId(),
             ProjectId = scope,
             Name = name,
@@ -379,6 +400,16 @@ public static class CatalogAdminEndpoints
             {
                 route.Verdicts = verdicts;
                 changes.Add(verdicts is null ? "decides from the verdicts serving each document" : $"decides from the verdicts {verdicts}");
+            }
+        }
+        if (request.Advice is not null)
+        {
+            var (advice, adviceProblem) = await CheckAdviceAsync(db, request.Advice, cancellationToken);
+            if (adviceProblem is not null) return adviceProblem;
+            if (advice != route.Advice)
+            {
+                route.Advice = advice;
+                changes.Add(advice is null ? "advises from the advice serving each document" : $"advises from the advice {advice}");
             }
         }
         if (request.Patterns is { } patterns) { route.Patterns = patterns.ToList(); changes.Add($"serves {patterns.Length} pattern(s)"); }

@@ -916,6 +916,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   a project changes them where free (`/api/projects/{id}/routes`, the control function), its first change making its own
   copy (`ROUTES_OWN`, `ReviewRoute.ProjectId`); Send for review offers the project's routes. Reset only from the
   organization's card (reviews already sent keep their steps).
+- A route names, like its verdicts, the **set of Review advice** its advising steps answer from (owner; `ReviewRoute.Advice`,
+  by name; none: the set serving the document's deliverable type), kept on each review (`Review.Advice`, `AdviceCodes`):
+  advisers are offered only its advice (backend refuses another, VALUE_NOT_PUBLISHED); renamed, routes follow; a set a
+  route names is not deleted (SET_IN_USE). Review routes page (owner, "the overall styling"): the plate with "New review
+  route" (`?new=1`), one sheet per route (advice, verdicts, what it takes in words, never a bare code; each step with who
+  really answers it, an organization by its name, its working days and what the decision may release at), the pencil
+  opening the route as its own form (`?edit=<id>`, Cancel / Save on one strip), each step's working days typed in its own
+  box. A step names people of ours only.
 - A route's step is answered by all its people (any order) or by whoever gets to it first (`StepModes` ALL / ANY): no
   other kind is offered. A step another organization answers says why it goes to them (a published reason for issue,
   backend STEP_REASON_REQUIRED), carried on the transmittal that takes it. "Offer this route first" puts it first among

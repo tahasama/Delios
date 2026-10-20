@@ -55,6 +55,10 @@ supplier; accepted or for information → us).
 | `evidence` | `NONE` · `OPTIONAL` · `REQUIRED` — a returned stamped copy |
 | `days` | Working days allowed, for the at-risk and overdue marks |
 
+The route itself names two sets (built): the **advice** its advising steps answer from (`ReviewRoute.Advice`) and the
+**verdicts** its deciding step answers from (`ReviewRoute.Verdicts`), each by its name in Types & sets; none named, the
+set serving the document's deliverable type. The review keeps both when it starts.
+
 A template already matches on deliverable type, document type, discipline and
 criticality. **Add originator to the match**, so "supplier document we produced"
 and "supplier document we did not" can route differently — the only difference

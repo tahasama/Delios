@@ -162,8 +162,9 @@ public sealed partial class ReviewService
     private static bool Proceeds(Catalog catalog, string set, string verdict) => ReviewSets.Proceeds(catalog, set, verdict);
 
     /// <summary>The published advice code for an advice kind (none, some, blocking); the kind in capitals when none is published.</summary>
-    private static string AdviceCode(Catalog catalog, string kind) =>
-        catalog.CodeWhere(ReviewSets.Advice, "comments", kind) ?? kind.ToUpperInvariant();
+    private static string AdviceCode(Catalog catalog, string kind, string? set = null) =>
+        catalog.ActiveIn(ReviewSets.Advice, set).FirstOrDefault(code => AdviceKind(catalog, code) == kind)
+            ?? catalog.CodeWhere(ReviewSets.Advice, "comments", kind) ?? kind.ToUpperInvariant();
 
     /// <summary>The advice kind (none, some, blocking) behind a published advice code; the code in lower case when it has none.</summary>
     private static string AdviceKind(Catalog catalog, string code) =>

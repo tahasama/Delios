@@ -4663,6 +4663,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Advice")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("advice");
+
                     b.Property<Instant?>("ApprovalWithdrawnAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("approval_withdrawn_at");
@@ -5109,6 +5114,11 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<bool>("Active")
                         .HasColumnType("boolean")
                         .HasColumnName("active");
+
+                    b.Property<string>("Advice")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("advice");
 
                     b.Property<string>("Description")
                         .HasColumnType("text")

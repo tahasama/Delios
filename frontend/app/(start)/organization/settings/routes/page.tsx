@@ -15,7 +15,8 @@ export const metadata = { title: "Review routes" };
  * administrator. Its switch says whether projects may change them (free by default); the projects that did are listed,
  * and one may be put back for a mess.
  */
-export default async function OrganizationRoutesPage() {
+export default async function OrganizationRoutesPage({ searchParams }: { searchParams: Promise<{ edit?: string; new?: string }> }) {
+  const params = await searchParams;
   const scope = await requireOrgAdmin();
   const [switches, copies] = await Promise.all([liberty(), routeCopies()]);
   return (
@@ -24,7 +25,7 @@ export default async function OrganizationRoutesPage() {
           <Link href="/organization/settings" className="hover:underline">{scope.organization.name} · Settings</Link>
         </p>
         <ProjectSwitches items={switches.filter((one) => one.area === "Review routes")} />
-        <RoutesBoard level="organization" editable
+        <RoutesBoard level="organization" editable editing={params.edit} adding={params.new === "1"}
           lead={`The organization's routes: every project offers them until it changes its own. ${copies.length ? `${copies.length} project${copies.length === 1 ? " has" : "s have"} its own.` : "No project has its own yet."}`} />
         <ProjectCopies what="routes" copies={copies} />
         <KeptCopies copies={await keptCopies("ROUTES")} />

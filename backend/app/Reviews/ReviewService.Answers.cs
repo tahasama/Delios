@@ -86,8 +86,8 @@ public sealed partial class ReviewService
                 && (c.AuthorId == access.UserId || c.AuthorId == seat.UserId)).ToList();
             var kind = mine.Any(c => c.Blocking) ? Advice_Blocking : mine.Count > 0 ? Advice_Some : Advice_None;
             kindWritten = kind;
-            answer = string.IsNullOrWhiteSpace(request.Verdict) ? AdviceCode(catalog, kind) : request.Verdict;
-            if (!catalog.IsActive(ReviewSets.Advice, answer) && answer != AdviceCode(catalog, kind))
+            answer = string.IsNullOrWhiteSpace(request.Verdict) ? AdviceCode(catalog, kind, review.Advice) : request.Verdict;
+            if ((!catalog.IsActive(ReviewSets.Advice, answer) || !catalog.InSet(ReviewSets.Advice, answer, review.Advice)) && answer != AdviceCode(catalog, kind, review.Advice))
             {
                 return (null, Problems.Invalid("VALUE_NOT_PUBLISHED", $"{answer} is not published advice.",
                     new { field = "verdict", value = answer }));
@@ -96,8 +96,8 @@ public sealed partial class ReviewService
             if (Array.IndexOf(severity, AdviceKind(catalog, answer)) < Array.IndexOf(severity, kind))
             {
                 return (null, Problems.Invalid("ADVICE_BELOW_COMMENTS",
-                    $"Your comments say {AdviceCode(catalog, kind)}; your advice cannot say less than they do.",
-                    new { field = "verdict", floor = AdviceCode(catalog, kind) }));
+                    $"Your comments say {AdviceCode(catalog, kind, review.Advice)}; your advice cannot say less than they do.",
+                    new { field = "verdict", floor = AdviceCode(catalog, kind, review.Advice) }));
             }
             // What the revision is issued for, as this adviser sees it: kept, or changed.
             // It is carried to the next step, which confirms it or changes it again.
@@ -241,7 +241,7 @@ public sealed partial class ReviewService
         {
             var severity = new[] { Advice_None, Advice_Some, Advice_Blocking };
             step.Answer = answered.Select(p => p.Answer!)
-                .MaxBy(code => Array.IndexOf(severity, AdviceKind(catalog, code))) ?? AdviceCode(catalog, Advice_None);
+                .MaxBy(code => Array.IndexOf(severity, AdviceKind(catalog, code))) ?? AdviceCode(catalog, Advice_None, review.Advice);
         }
 
         // Reservations this step was named to settle close themselves, unless it objected.

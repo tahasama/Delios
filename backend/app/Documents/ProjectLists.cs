@@ -868,6 +868,16 @@ public static class ProjectLists
                 foreach (var review in await db.Reviews.Where(r => readers.Contains(r.ProjectId) && r.Verdicts == was && r.State == ReviewStates.InProgress)
                     .ToListAsync(cancellationToken)) review.Verdicts = name;
             }
+            // Likewise a route and the reviews still open naming a set of advice.
+            if (set == ReviewSets.Advice)
+            {
+                var was = one.Name;
+                foreach (var route in await db.ReviewRoutes.Where(r => r.Advice == was).ToListAsync(cancellationToken)) route.Advice = name;
+                List<Guid> readers = level.ProjectId is { } here ? [here]
+                    : await db.Projects.Where(p => !p.OwnListKeys.Contains(set)).Select(p => p.Id).ToListAsync(cancellationToken);
+                foreach (var review in await db.Reviews.Where(r => readers.Contains(r.ProjectId) && r.Advice == was && r.State == ReviewStates.InProgress)
+                    .ToListAsync(cancellationToken)) review.Advice = name;
+            }
             one.Name = name;
         }
         // The default set is theirs like any other (owner): renamed, switched off, deleted; switched off, the deliverable
@@ -913,6 +923,8 @@ public static class ProjectLists
             return Problems.Conflict("SET_IN_USE", $"{inUse.Code} of this set is used ({string.Join(", ", used[inUse.Code])}): switch the set off instead.");
         if (set == ReviewSets.Verdicts && await db.ReviewRoutes.Where(r => r.Verdicts == one.Name).Select(r => r.Name).ToListAsync(cancellationToken) is { Count: > 0 } routes)
             return Problems.Conflict("SET_IN_USE", $"The review routes {string.Join(", ", routes)} decide from {one.Name}: choose them another set first, or switch it off.");
+        if (set == ReviewSets.Advice && await db.ReviewRoutes.Where(r => r.Advice == one.Name).Select(r => r.Name).ToListAsync(cancellationToken) is { Count: > 0 } advised)
+            return Problems.Conflict("SET_IN_USE", $"The review routes {string.Join(", ", advised)} advise from {one.Name}: choose them another set first, or switch it off.");
         db.ValueEntries.RemoveRange(values);
         db.ListSets.Remove(one);
         await db.SaveChangesAsync(cancellationToken);

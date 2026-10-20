@@ -1,9 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, Check, Plus, Trash2, Users2, X } from "lucide-react";
+import { ArrowRight, Check, Plus, Trash2 } from "lucide-react";
 import { ActionForm } from "@/components/form";
-import { Field, Chip, inputCls, btn } from "@/components/ui";
+import { Field, ToneChip, inputCls } from "@/components/ui";
+import { SwitchControl } from "@/components/switch";
+import { cn } from "@/lib/core/utils";
 import { saveTemplateAction } from "@/lib/reviews/forms";
 
 export type WorkflowBuilderStep = {
@@ -25,26 +28,22 @@ export type WorkflowBuilderStep = {
 type Person = { id: string; name: string; role: string; party: { name: string; isInternal: boolean } | null };
 type ClassOption = { code: string; label: string };
 type ClassOptions = { documentTypes: ClassOption[]; disciplines: ClassOption[]; criticalities: ClassOption[]; deliverableTypes: ClassOption[]; originators: ClassOption[] };
-
-/**
- * A published status as this builder needs it: what it is called, and whether
- * the deciding step's choice of it is final.
- */
 type StatusChoice = { code: string; label: string };
 
-/** How the people on one step work, in the words a project uses. */
 // The two ways the backend runs a step (StepModes): everyone answers, or the first answer closes it.
 const HOW: { value: WorkflowBuilderStep["mode"]; label: string; hint: string }[] = [
-  { value: "ALL", label: "All of them, in any order", hint: "each gives a verdict; the step closes when everyone has" },
-  { value: "ANY_OF", label: "Whoever gets to it first", hint: "the first verdict closes the step" },
+  { value: "ALL", label: "All of them, in any order", hint: "each answers; the step closes when everyone has" },
+  { value: "ANY_OF", label: "Whoever gets to it first", hint: "the first answer closes the step" },
 ];
 
+const pick = (on: boolean) => cn("rounded-[0.3rem] border px-2 py-1 text-xs", on ? "border-brand-line bg-tint font-semibold text-brand-ink" : "border-line-strong bg-surface text-slate-600 hover:bg-tint-soft");
+
 /**
- * A route drawn as it runs: boxes left to right, joined by arrows, the last
- * one deciding. Two names in a box means they work in parallel. Add a box
- * between any two, or at the end, and give it whoever should be on it.
+ * A route, changed or made, as the route itself (no box in a box): its name and the sets it answers from, then its
+ * steps left to right, each with its working days in its own box, the last one deciding; the step chosen opens under
+ * them; then which documents take it. Cancel goes back to the routes as they are.
  */
-export function WorkflowTemplateBuilder({ level = "project", id, name = "", description = "", classes = "*", outcomeSetKey = "", isDefault = false, initialSteps, users, functions = [], outsideParties = [], outcomeSets, classOptions, statuses, reasons = [] }: {
+export function WorkflowTemplateBuilder({ level = "project", id, name = "", description = "", classes = "*", outcomeSetKey = "", adviceSetKey = "", isDefault = false, initialSteps, users, functions = [], outsideParties = [], outcomeSets, adviceSets, classOptions, statuses, reasons = [], cancelHref }: {
   /** The reasons for issue: an outside party's step says why it goes to them. */
   reasons?: { code: string; label: string }[];
   /** Where the route is kept: the organization's routes, or the project's (its own copy where routes are free). */
@@ -54,17 +53,21 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
   description?: string;
   classes?: string;
   outcomeSetKey?: string;
+  adviceSetKey?: string;
   isDefault?: boolean;
   initialSteps?: WorkflowBuilderStep[];
   users: Person[];
   functions?: { id: string; name: string }[];
   /** Parties that can hold a step: a client, a control office, a supplier. */
   outsideParties?: { id: string; name: string; participation: string }[];
-  /** The verdict lists (Settings, Verdict lists): key and name. */
+  /** The sets of the review outcomes (Types & sets): the deciding step answers from one. */
   outcomeSets: { key: string; title: string }[];
+  /** The sets of the review advice (Types & sets): the advising steps answer from one. */
+  adviceSets: { key: string; title: string }[];
   classOptions: ClassOptions;
-  /** The published statuses, with what each one lets a step do. */
   statuses: StatusChoice[];
+  /** Back to the routes, the form closed. */
+  cancelHref: string;
 }) {
   const [draft, setDraft] = useState<WorkflowBuilderStep[]>(
     initialSteps?.length ? initialSteps : [
@@ -73,25 +76,25 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
     ],
   );
   const [open, setOpen] = useState<number | null>(0);
-  const initialScope = parseScope(classes);
   const [allClasses, setAllClasses] = useState(classes === "*");
-  const [scope, setScope] = useState(initialScope);
+  const [scope, setScope] = useState(parseScope(classes));
 
-  // The last box always decides; everything before it advises.
+  // The last step always decides; everything before it advises.
   const steps = useMemo(
     () => draft.map((s, i) => ({ ...s, act: (i === draft.length - 1 ? "APPROVAL" : "REVIEW") as WorkflowBuilderStep["act"] })),
     [draft],
   );
-  const parties = useMemo(() => {
-    const groups = new Map<string, Person[]>();
+  const groups = useMemo(() => {
+    const out = new Map<string, Person[]>();
     for (const user of users) {
-      const label = user.party ? `${user.party.isInternal ? "Our organization" : user.party.name}` : "Unassigned organization";
-      groups.set(label, [...(groups.get(label) ?? []), user]);
+      const label = !user.party || user.party.isInternal ? "Our people" : user.party.name;
+      out.set(label, [...(out.get(label) ?? []), user]);
     }
-    return [...groups.entries()];
+    return [...out.entries()];
   }, [users]);
   const nameOf = (personId: string) => users.find((u) => u.id === personId)?.name ?? personId;
   const fnName = (functionId: string) => functions.find((f) => f.id === functionId)?.name ?? functionId;
+  const partyOf = (step: WorkflowBuilderStep) => outsideParties.find((party) => party.id === step.partyId);
 
   function update(index: number, change: Partial<WorkflowBuilderStep>) {
     setDraft((current) => current.map((step, i) => (i === index ? { ...step, ...change } : step)));
@@ -106,195 +109,158 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
   }
   function togglePerson(index: number, personId: string) {
     const selected = new Set(steps[index].participantIds);
-    selected.has(personId) ? selected.delete(personId) : selected.add(personId);
+    if (selected.has(personId)) selected.delete(personId); else selected.add(personId);
     update(index, { participantIds: [...selected] });
   }
-  function toggleFunction(index: number, functionId: string) {
-    const selected = new Set(steps[index].functionIds ?? []);
-    selected.has(functionId) ? selected.delete(functionId) : selected.add(functionId);
-    update(index, { functionIds: [...selected] });
-  }
+  const total = steps.reduce((n, x) => n + (x.days ?? 0), 0);
+  const chosen = open !== null ? steps[open] : null;
 
+  const formId = `route-${id ?? "new"}`;
   return (
-    <ActionForm action={saveTemplateAction} submitLabel={id ? "Save route" : "Publish route"} hidden={id ? { level, id } : { level }}>
+    <>
+    <ActionForm action={saveTemplateAction} id={formId} hideSubmit hidden={id ? { level, id } : { level }}
+      className="space-y-0" footerClassName="px-5 pt-3 sm:px-6 empty:hidden">
       <input type="hidden" name="steps" value={JSON.stringify(steps)} />
       <input type="hidden" name="classes" value={allClasses ? "*" : JSON.stringify([scope])} />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {/* One convention, so a list of routes reads as a list of answers:
-            what it covers, then who decides it. */}
-        <Field label="Route name" required hint="what it covers — who decides it">
+      {/* ── What it is ─────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-4 sm:px-6 md:grid-cols-3">
+        <Field label="Name" required hint="what it covers — who decides it">
           <input name="name" required defaultValue={name} className={inputCls} placeholder="Engineering drawings — lead engineer decides" />
         </Field>
-        <Field label="When to use it"><input name="description" defaultValue={description} className={inputCls} placeholder="Tell the sender when this route is the right one" /></Field>
-        <Field label="Verdicts" hint="the set of Review outcomes the deciding step answers with (Types & sets); the steps before it advise">
+        <div className="md:col-span-2">
+          <Field label="When to use it" hint="the sender reads it on Send for review">
+            <input name="description" defaultValue={description} className={inputCls} placeholder="Tell the sender when this route is the right one" />
+          </Field>
+        </div>
+        <Field label="Advice" hint="the set of Review advice the advising steps answer from (Types & sets)">
+          <select name="adviceSetKey" defaultValue={adviceSetKey} className={inputCls}>
+            <option value="">The set serving each document&rsquo;s deliverable type</option>
+            {adviceSets.map((one) => <option key={one.key} value={one.key}>{one.title}</option>)}
+          </select>
+        </Field>
+        <Field label="Verdicts" hint="the set of Review outcomes the deciding step answers from (Types & sets)">
           <select name="outcomeSetKey" defaultValue={outcomeSetKey} className={inputCls}>
             <option value="">The set serving each document&rsquo;s deliverable type</option>
             {outcomeSets.map((one) => <option key={one.key} value={one.key}>{one.title}</option>)}
           </select>
         </Field>
-        <label className="flex items-center gap-2 self-end pb-2 text-xs font-medium text-slate-700"><input type="checkbox" name="isDefault" defaultChecked={isDefault} /> Offer this route first</label>
+        <label className="flex cursor-pointer items-center gap-2.5 self-end pb-1.5 text-[13px] text-slate-700">
+          <SwitchControl name="isDefault" defaultChecked={isDefault} /> Offered first
+        </label>
       </div>
 
-      {/* ── The route, drawn ─────────────────────────────────────────────── */}
-      <section className="rounded-md border border-line bg-tint-soft/70 p-4">
-        <div className="mb-3">
-          <p className="text-sm font-semibold text-slate-800">The route</p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            It runs left to right. Every box before the last one gives advice; the last box gives the binding verdict, which is also the release approval.
-            Two or more names in one box work in parallel.
-          </p>
-        </div>
-
-        <div className="scroll-thin flex items-stretch gap-1 overflow-x-auto pb-2">
+      {/* ── The steps ──────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-1.5 border-y border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+        <span className="stencil mr-1 text-slate-500">Its steps</span>
+        <span className="text-[11px] text-slate-500">
+          left to right; each step before the last advises, the last decides. {total ? `${total} working days when every step uses its time.` : "No step has days yet: give each its working days, and reviews get a due date."}
+        </span>
+      </div>
+      <div className="px-5 py-4 sm:px-6">
+        <div className="scroll-thin flex items-stretch gap-1 overflow-x-auto p-1">
           <AddHere onClick={() => insert(0)} />
           {steps.map((step, index) => {
             const decides = index === steps.length - 1;
-            const people = step.participantIds.map(nameOf);
-            const fns = (step.functionIds ?? []).map(fnName);
-            const empty = !people.length && !fns.length;
+            const party = partyOf(step);
+            const who = party ? [party.name] : [...(step.functionIds ?? []).map((f) => `any ${fnName(f)}`), ...step.participantIds.map(nameOf)];
             return (
               <div key={index} className="flex items-stretch gap-1">
-                <div className="relative">
-                {steps.length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); remove(index); }}
-                    title="Remove this step"
-                    aria-label={`Remove step ${index + 1}`}
-                    className="absolute -right-1.5 -top-1.5 z-10 grid h-5 w-5 place-items-center rounded-full border border-line bg-surface text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <X className="h-3 w-3" />
+                <div className={cn("flex w-56 shrink-0 flex-col rounded-md ring-1 transition", open === index ? "bg-surface ring-2 ring-brand-line" : "bg-surface ring-line hover:ring-line-strong")}>
+                  <button type="button" onClick={() => setOpen(open === index ? null : index)} className="flex-1 px-3 pt-2.5 pb-2 text-left">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold text-slate-500">Step {index + 1}</span>
+                      <ToneChip tone={decides ? "done" : "moving"}>{decides ? "decides" : "advises"}</ToneChip>
+                    </span>
+                    <span className="mt-1 block text-[13px] font-semibold text-slate-900">{step.title || (decides ? "Decision" : `Review ${index + 1}`)}</span>
+                    <span className={cn("mt-1 block text-[11px] leading-4", who.length ? "text-slate-600" : "text-amber-700")}>
+                      {who.length ? who.join(", ") : "Nobody yet: name people, a function or an organization"}
+                    </span>
                   </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => setOpen(open === index ? null : index)}
-                  className={`w-56 shrink-0 rounded-md border p-3 text-left transition ${open === index ? "border-brand-line bg-surface" : decides ? "border-emerald-300 bg-emerald-50/60 hover:bg-emerald-50" : "border-line bg-surface hover:border-line-strong"}`}
-                >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Step {index + 1}</span>
-                    <Chip className={decides ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{decides ? "decides" : "advises"}</Chip>
-                  </span>
-                  <span className="mt-1 block text-sm font-semibold text-slate-900">{step.title || (decides ? "Decision" : `Review ${index + 1}`)}</span>
-                  <span className="mt-1.5 block text-[11px] leading-4 text-slate-600">
-                    {step.partyId
-                      ? <span className="font-medium text-slate-700">{outsideParties.find((party) => party.id === step.partyId)?.name ?? "An outside party"}<span className="block text-[11px] text-slate-500">outside party</span></span>
-                      : empty ? <span className="text-amber-700">Nobody yet — name a person or a function</span> : [...people, ...fns.map((f) => `${f} (function)`)].join(", ")}
-                  </span>
-                  {step.days ? <span className="mt-1.5 block text-[11px] text-slate-500">{step.days} working day{step.days === 1 ? "" : "s"}</span> : null}
-                  {people.length + fns.length > 1 ? (
-                    <span className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-500"><Users2 className="h-3 w-3" /> {HOW.find((h) => h.value === step.mode)?.label}</span>
-                  ) : null}
-                </button>
+                  <label className="flex items-center gap-2 whitespace-nowrap border-t border-line px-3 py-1.5 text-[11px] text-slate-500">
+                    <input type="number" min={0} max={90} value={step.days ?? ""} placeholder="—"
+                      onChange={(e) => update(index, { days: e.target.value ? Number(e.target.value) : undefined })}
+                      className={`${inputCls} !w-14 text-center`} aria-label={`Working days for step ${index + 1}`} />
+                    working days{step.days ? "" : ": no due date"}
+                  </label>
                 </div>
-                {index < steps.length - 1 ? <ArrowRight className="h-4 w-4 shrink-0 self-center text-slate-300" aria-hidden /> : null}
+                {index < steps.length - 1 ? <ArrowRight className="h-4 w-4 shrink-0 self-center text-slate-400" aria-hidden /> : null}
                 <AddHere onClick={() => insert(index + 1)} />
               </div>
             );
           })}
         </div>
+      </div>
 
-        {steps.some((x) => x.days) ? (
-          <p className="mt-2 text-xs text-slate-500">
-            The whole route takes <strong className="font-semibold text-slate-700">{steps.reduce((n, x) => n + (x.days ?? 0), 0)} working days</strong> when every step uses its time.
-            Steps without a number have no date.
-          </p>
-        ) : (
-          <p className="mt-2 text-xs text-slate-500">No step has a time limit yet. Open a box to give it one, and reviews get a due date.</p>
-        )}
-
-        {/* ── The open box ───────────────────────────────────────────────── */}
-        {open !== null && steps[open] ? (
-          <div className="mt-3 rounded-md border border-brand-line/40 bg-surface p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                value={steps[open].title ?? ""}
-                onChange={(e) => update(open, { title: e.target.value })}
-                className={`${inputCls} max-w-xs font-semibold`}
-                aria-label={`Name of step ${open + 1}`}
-                placeholder={open === steps.length - 1 ? "Decision" : "Review"}
-              />
-              <label className="flex items-center gap-1.5 text-xs text-slate-600">
-                <input
-                  type="number"
-                  min={0}
-                  max={90}
-                  value={steps[open].days ?? ""}
-                  onChange={(e) => update(open, { days: e.target.value ? Number(e.target.value) : undefined })}
-                  className={`${inputCls} w-16 text-center`}
-                  aria-label={`Working days for step ${open + 1}`}
-                  placeholder="—"
-                />
-                working days
-              </label>
-              <span className="text-xs text-slate-500">{open === steps.length - 1 ? "This box decides. Only people who may approve the document can be on it." : "This box advises the one that decides."}</span>
-              <button type="button" onClick={() => remove(open)} disabled={steps.length === 1} className={`ml-auto ${btn("ghost", "sm")} text-slate-600 hover:text-red-600`}>
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Remove this box
+      {/* ── The step chosen ────────────────────────────────────────────── */}
+      {open !== null && chosen ? (
+        <div className="space-y-4 border-t border-line px-5 py-4 sm:px-6">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
+            <Field label={`Step ${open + 1}`} hint={open === steps.length - 1 ? "it decides" : "it advises the one that decides"}>
+              <input value={chosen.title ?? ""} onChange={(e) => update(open, { title: e.target.value })} className={inputCls}
+                aria-label={`Name of step ${open + 1}`} placeholder={open === steps.length - 1 ? "Decision" : "Review"} />
+            </Field>
+            {chosen.participantIds.length + (chosen.functionIds?.length ?? 0) > 1 ? (
+              <Field label="How they answer" hint={HOW.find((h) => h.value === chosen.mode)?.hint}>
+                <select value={chosen.mode} onChange={(e) => update(open, { mode: e.target.value as WorkflowBuilderStep["mode"] })} className={inputCls}>
+                  {HOW.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
+                </select>
+              </Field>
+            ) : <span />}
+            <div className="flex items-end justify-end">
+              <button type="button" onClick={() => remove(open)} disabled={steps.length === 1} title="Remove this step" aria-label="Remove this step"
+                className="ask inline-flex items-center gap-1.5 hover:text-red-700 disabled:opacity-40">
+                <Trash2 className="h-3.5 w-3.5" aria-hidden /> Remove
               </button>
-              <button type="button" onClick={() => setOpen(null)} className="rounded-md p-1 text-slate-500 hover:text-slate-700" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
+          </div>
 
-            {steps[open].partyId ? (
-              <div className="mt-4 rounded-md border border-line bg-tint-soft p-3">
-                <p className="text-xs font-semibold text-slate-800">{outsideParties.find((party) => party.id === steps[open].partyId)?.name ?? "An outside party"} answers this step</p>
-                <p className="mt-1 text-[11px] leading-4 text-slate-500">
-                  {outsideParties.find((party) => party.id === steps[open].partyId)?.participation === "IN_APP"
-                    ? "They answer here, in their own account."
-                    : "We send it to them and write down their answer. Who carries that, and whether it needs proof, is set on the organization, in Organizations."}
-                </p>
-                <div className="mt-3 max-w-xs">
-                  <Field label="Why it goes to them" hint="the reason for issue on the transmittal">
-                    <select value={steps[open].reason ?? ""} onChange={(e) => update(open, { reason: e.target.value || undefined })} className={inputCls}>
-                      <option value="">Choose…</option>
-                      {reasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-                    </select>
-                  </Field>
-                </div>
-                <button type="button" onClick={() => update(open, { partyId: undefined, reason: undefined })} className="mt-2 text-[11px] font-semibold text-link hover:underline">
-                  Choose our own people instead
-                </button>
+          {chosen.partyId ? (
+            <div className="space-y-3">
+              <p className="text-xs leading-5 text-slate-600">
+                <span className="font-semibold text-slate-900">{partyOf(chosen)?.name ?? "Another organization"}</span> answers this step.{" "}
+                {partyOf(chosen)?.participation === "IN_APP" ? "They answer here, in their own account." : "It goes to them on a transmittal and their answer is recorded here."}
+              </p>
+              <div className="grid grid-cols-1 gap-x-6 md:grid-cols-3">
+                <Field label="Why it goes to them" required hint="the reason for issue on the transmittal">
+                  <select value={chosen.reason ?? ""} onChange={(e) => update(open, { reason: e.target.value || undefined })} className={inputCls}>
+                    <option value="">Choose…</option>
+                    {reasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                  </select>
+                </Field>
               </div>
-            ) : (
-            <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_280px]">
+              <button type="button" onClick={() => update(open, { partyId: undefined, reason: undefined })} className="text-xs font-semibold text-link hover:underline">
+                Our own people answer it instead
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
               <div>
-                <p className="text-xs font-medium text-slate-700">People</p>
-                <p className="mb-1.5 text-[11px] text-slate-500">Two or more work in parallel. Every step names someone: people, a function, or an outside party.</p>
-                <div className="scroll-thin max-h-56 overflow-y-auto rounded-md border border-line p-2">
-                  {/* An outside party sits in the same list as our own people:
-                      picking one is how a step becomes external. */}
+                <p className="text-xs font-medium text-slate-700">Who answers it</p>
+                <p className="mb-1.5 text-[11px] text-slate-500">People of ours (two or more answer side by side), or another organization.</p>
+                <div className="space-y-3">
                   {outsideParties.length ? (
-                    <div className="mb-2">
-                      <p className="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">Outside parties</p>
-                      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                    <div>
+                      <p className="stencil mb-1 text-slate-500">Another organization</p>
+                      <div className="flex flex-wrap gap-1.5">
                         {outsideParties.map((party) => (
-                          <button
-                            key={party.id}
-                            type="button"
-                            onClick={() => update(open, { partyId: party.id, participantIds: [], functionIds: [] })}
-                            className="flex items-center gap-2 rounded-md border border-transparent px-2.5 py-2 text-left text-xs text-slate-600 transition hover:bg-tint-soft"
-                          >
-                            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md border border-line-strong" />
-                            <span className="min-w-0">
-                              <span className="block truncate font-semibold">{party.name}</span>
-                              <span className="block text-[11px] text-slate-500">{party.participation === "IN_APP" ? "answers here" : "we record their answer"}</span>
-                            </span>
+                          <button key={party.id} type="button" className={pick(false)} title={party.participation === "IN_APP" ? "answers here" : "we record their answer"}
+                            onClick={() => update(open, { partyId: party.id, participantIds: [], functionIds: [] })}>
+                            {party.name}
                           </button>
                         ))}
                       </div>
                     </div>
                   ) : null}
-                  {parties.map(([party, list]) => (
-                    <div key={party} className="mb-2 last:mb-0">
-                      <p className="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">{party}</p>
-                      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                  {groups.map(([group, list]) => (
+                    <div key={group}>
+                      <p className="stencil mb-1 text-slate-500">{group}</p>
+                      <div className="flex flex-wrap gap-1.5">
                         {list.map((person) => {
-                          const selected = steps[open].participantIds.includes(person.id);
+                          const on = chosen.participantIds.includes(person.id);
                           return (
-                            <button key={person.id} type="button" onClick={() => togglePerson(open, person.id)}
-                              className={`flex items-center gap-2 rounded-md border px-2.5 py-2 text-left text-xs transition ${selected ? "border-brand-line bg-tint text-brand-ink" : "border-transparent text-slate-600 hover:bg-tint-soft"}`}>
-                              <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md ${selected ? "bg-brand text-white" : "border border-line-strong"}`}>{selected ? <Check className="h-3 w-3" /> : null}</span>
-                              <span className="min-w-0"><span className="block truncate font-semibold">{person.name}</span><span className="block text-[11px] text-slate-500">{person.role.toLowerCase()}</span></span>
+                            <button key={person.id} type="button" onClick={() => togglePerson(open, person.id)} className={pick(on)} title={person.role || undefined}>
+                              {on ? <Check className="mr-1 inline h-3 w-3" aria-hidden /> : null}{person.name}
                             </button>
                           );
                         })}
@@ -303,104 +269,77 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
                   ))}
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-medium text-slate-700">Or whoever holds a function</p>
-                  <p className="mb-1.5 text-[11px] text-slate-500">The matrix decides who that is for each document.</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {functions.map((f) => {
-                      const on = (steps[open].functionIds ?? []).includes(f.id);
-                      return (
-                        <button key={f.id} type="button" onClick={() => toggleFunction(open, f.id)}
-                          className={`rounded-[0.3rem] border px-2 py-1 text-xs ${on ? "border-brand-line bg-tint font-semibold text-brand-ink" : "border-line-strong bg-surface text-slate-600 hover:bg-tint-soft"}`}>
-                          {on ? "✓ " : ""}{f.name}
-                        </button>
-                      );
-                    })}
-                  </div>
+              <div>
+                <p className="text-xs font-medium text-slate-700">Or whoever holds a function</p>
+                <p className="mb-1.5 text-[11px] text-slate-500">One function; the matrix says who that is for each document.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {functions.map((f) => {
+                    const on = (chosen.functionIds ?? []).includes(f.id);
+                    return (
+                      <button key={f.id} type="button" onClick={() => update(open, { functionIds: on ? [] : [f.id] })} className={pick(on)}>
+                        {on ? <Check className="mr-1 inline h-3 w-3" aria-hidden /> : null}{f.name}
+                      </button>
+                    );
+                  })}
                 </div>
-
-                {steps[open].participantIds.length + (steps[open].functionIds?.length ?? 0) > 1 ? (
-                  <Field label="How they work" hint={HOW.find((h) => h.value === steps[open]!.mode)?.hint}>
-                    <select value={steps[open].mode} onChange={(e) => update(open, { mode: e.target.value as WorkflowBuilderStep["mode"] })} className={inputCls}>
-                      {HOW.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
-                    </select>
-                  </Field>
-                ) : null}
               </div>
             </div>
-            )}
+          )}
 
-            {/* ── What this step does to the status ─────────────────────── */}
-            <div className="mt-4 border-t border-line pt-4">
-              <p className="text-xs font-medium text-slate-700">What it does to the status</p>
-              <p className="mb-2 text-[11px] leading-4 text-slate-500">
-                {open === steps.length - 1
-                  ? "This box decides what the revision may be used for. Narrow the list if it may only decide on some of the statuses."
-                  : "Nothing. A revision has a status only once the control function publishes one; where it stands meanwhile is this route, and why it goes out is the reason for issue on the transmittal that carries it."}
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {open === steps.length - 1 ? (
-                  <div>
-                    <p className="text-xs font-medium text-slate-700">May decide on</p>
-                    <p className="mb-1.5 text-[11px] text-slate-500">Nothing ticked: any status it is allowed to name.</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {statuses.map((one) => {
-                        const on = (steps[open!].grantsStatuses ?? []).includes(one.code);
-                        return (
-                          <button
-                            key={one.code}
-                            type="button"
-                            title={`${one.code} is published exactly as this box names it.`}
-                            onClick={() => {
-                              const picked = new Set(steps[open!].grantsStatuses ?? []);
-                              picked.has(one.code) ? picked.delete(one.code) : picked.add(one.code);
-                              update(open!, { grantsStatuses: picked.size ? [...picked] : undefined });
-                            }}
-                            className={`rounded-[0.3rem] border px-2 py-1 text-xs ${on ? "border-brand-line bg-tint font-semibold text-brand-ink" : "border-line-strong bg-surface text-slate-600 hover:bg-tint-soft"}`}
-                          >
-                            {on ? "✓ " : ""}{one.code}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
+          {open === steps.length - 1 ? (
+            <div>
+              <p className="text-xs font-medium text-slate-700">The statuses it may release at</p>
+              <p className="mb-1.5 text-[11px] text-slate-500">None chosen: any published status.</p>
+              <div className="flex flex-wrap gap-1.5">
+                {statuses.map((one) => {
+                  const on = (chosen.grantsStatuses ?? []).includes(one.code);
+                  return (
+                    <button key={one.code} type="button" title={one.label} className={pick(on)}
+                      onClick={() => {
+                        const picked = new Set(chosen.grantsStatuses ?? []);
+                        if (picked.has(one.code)) picked.delete(one.code); else picked.add(one.code);
+                        update(open, { grantsStatuses: picked.size ? [...picked] : undefined });
+                      }}>
+                      {on ? <Check className="mr-1 inline h-3 w-3" aria-hidden /> : null}{one.code} — {one.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          </div>
-        ) : null}
-      </section>
-
-      {/* ── Which documents use it ───────────────────────────────────────── */}
-      <section className="rounded-md border border-line bg-tint-soft/70 p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-slate-800">Which documents use this route?</p>
-            <p className="mt-0.5 text-xs text-slate-500">All of them, or narrow it by type, discipline or criticality.</p>
-          </div>
-          <label className="flex items-center gap-2 text-xs font-medium text-slate-700"><input type="checkbox" checked={allClasses} onChange={(e) => setAllClasses(e.target.checked)} /> All documents</label>
+          ) : null}
         </div>
-        {!allClasses ? (
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <Field label="Document type"><select className={inputCls} value={scope.docType ?? ""} onChange={(e) => setScope((v) => ({ ...v, docType: e.target.value || undefined }))}><option value="">Any type</option>{classOptions.documentTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
-            <Field label="Discipline"><select className={inputCls} value={scope.discipline ?? ""} onChange={(e) => setScope((v) => ({ ...v, discipline: e.target.value || undefined }))}><option value="">Any discipline</option>{classOptions.disciplines.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
-            <Field label="Criticality"><select className={inputCls} value={scope.criticality ?? ""} onChange={(e) => setScope((v) => ({ ...v, criticality: e.target.value || undefined }))}><option value="">Any criticality</option>{classOptions.criticalities.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
-            <Field label="Produced by" hint="ours, a supplier's, the client's"><select className={inputCls} value={scope.deliverableType ?? ""} onChange={(e) => setScope((v) => ({ ...v, deliverableType: e.target.value || undefined }))}><option value="">Anyone</option>{classOptions.deliverableTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
-            <Field label="From which organization" hint="only documents that came from this one"><select className={inputCls} value={scope.originator ?? ""} onChange={(e) => setScope((v) => ({ ...v, originator: e.target.value || undefined }))}><option value="">Any organization</option>{classOptions.originators.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
-          </div>
-        ) : null}
-      </section>
+      ) : null}
+
+      {/* ── Which documents take it ────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-1.5 border-y border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+        <span className="stencil mr-1 text-slate-500">Which documents take it</span>
+        <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs text-slate-700">
+          <input type="checkbox" checked={allClasses} onChange={(e) => setAllClasses(e.target.checked)} /> All documents
+        </label>
+      </div>
+      {!allClasses ? (
+        <div className="grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-4 sm:px-6 md:grid-cols-3">
+          <Field label="Produced by" hint="ours, a supplier's, the client's"><select className={inputCls} value={scope.deliverableType ?? ""} onChange={(e) => setScope((v) => ({ ...v, deliverableType: e.target.value || undefined }))}><option value="">Anyone</option>{classOptions.deliverableTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
+          <Field label="Document type"><select className={inputCls} value={scope.docType ?? ""} onChange={(e) => setScope((v) => ({ ...v, docType: e.target.value || undefined }))}><option value="">Any type</option>{classOptions.documentTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
+          <Field label="Discipline"><select className={inputCls} value={scope.discipline ?? ""} onChange={(e) => setScope((v) => ({ ...v, discipline: e.target.value || undefined }))}><option value="">Any discipline</option>{classOptions.disciplines.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
+          <Field label="Criticality"><select className={inputCls} value={scope.criticality ?? ""} onChange={(e) => setScope((v) => ({ ...v, criticality: e.target.value || undefined }))}><option value="">Any criticality</option>{classOptions.criticalities.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
+          <Field label="From which organization" hint="only documents that came from it"><select className={inputCls} value={scope.originator ?? ""} onChange={(e) => setScope((v) => ({ ...v, originator: e.target.value || undefined }))}><option value="">Any organization</option>{classOptions.originators.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
+        </div>
+      ) : null}
     </ActionForm>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
+      <Link href={cancelHref} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
+      <button type="submit" form={formId} data-on="true" className="ask">{id ? "Save" : "Add the route"}</button>
+    </div>
+    </>
   );
 }
 
-/** The thin "+" that drops a new box in at this point of the chain. */
+/** The thin "+" that drops a new step in at this point of the route. */
 function AddHere({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} title="Add a step here" aria-label="Add a step here"
-      className="group grid w-6 shrink-0 place-items-center rounded-md text-slate-300 transition hover:bg-slate-100 hover:text-link">
+      className="grid w-6 shrink-0 place-items-center rounded-md text-slate-400 transition hover:bg-tint-soft hover:text-link">
       <Plus className="h-4 w-4" />
     </button>
   );

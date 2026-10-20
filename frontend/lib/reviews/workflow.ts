@@ -39,13 +39,15 @@ const STANDARD_ADVICE = { none: "NO_COMMENT", some: "COMMENTS", blocking: "COMME
  */
 export async function myAdvice(t: Tenant, cycleId: string, userId: string): Promise<{ code: string; comments: number; blocking: number }> {
   const { backendReview } = await import("@/lib/documents/api");
-  const mine = (await backendReview(t, cycleId)).comments.filter((c) => c.authorId === userId).map((c) => ({ progressionPreventing: c.blocking }));
-  return { code: await adviceCode(adviceFor(mine)), comments: mine.length, blocking: mine.filter((c) => c.progressionPreventing).length };
+  const review = await backendReview(t, cycleId);
+  const mine = review.comments.filter((c) => c.authorId === userId).map((c) => ({ progressionPreventing: c.blocking }));
+  return { code: await adviceCode(adviceFor(mine), review.adviceCodes), comments: mine.length, blocking: mine.filter((c) => c.progressionPreventing).length };
 }
 
-async function adviceCode(kind: "none" | "some" | "blocking"): Promise<string> {
+/** The advice meaning what the comments say, from the review's own set of advice where it has one. */
+async function adviceCode(kind: "none" | "some" | "blocking", offered?: string[] | null): Promise<string> {
   const { getActiveSet } = await import("@/lib/settings/config");
-  const values = await getActiveSet(ADVICE_SET);
+  const values = (await getActiveSet(ADVICE_SET)).filter((one) => !offered || offered.includes(one.code));
   const meant = values.find((one) => (one.props as { comments?: string }).comments === kind);
   return meant?.code ?? STANDARD_ADVICE[kind];
 }

@@ -57,7 +57,9 @@ export async function saveTemplateAction(_prev: { error?: string } | undefined, 
   const body = {
     name, description: text(formData, "description") || null, isDefault: formData.get("isDefault") === "on",
     // The set of the review outcomes it decides from; empty: the set serving each document's deliverable type.
-    verdicts: text(formData, "outcomeSetKey"), ...route,
+    verdicts: text(formData, "outcomeSetKey"),
+    // The set of the review advice its advising steps answer from; empty: the set serving each document's deliverable type.
+    advice: text(formData, "adviceSetKey"), ...route,
   };
   try {
     const base = await routesBase(formData);
@@ -67,7 +69,8 @@ export async function saveTemplateAction(_prev: { error?: string } | undefined, 
     return failed(e);
   }
   revalidateRoutes();
-  return {};
+  // Saved, the route reads again as it is (the page without the form open).
+  redirect(text(formData, "level") === "organization" ? "/organization/settings/routes" : "/settings/workflow-templates");
 }
 
 /** A route is taken out of use, never deleted: reviews that ran on it keep its name. */

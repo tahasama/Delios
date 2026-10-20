@@ -113,6 +113,7 @@ async function readCycle(scope: Scope, review: ReviewView) {
     revisionId: review.revisionId, revision: { ...rev, document: doc },
     binding: step.deciding, outcomeSetKey: step.deciding ? review.verdictSet ?? "REVIEW_OUTCOMES" : "REVIEW_ADVICE" as string | null,
     verdictCodes: step.deciding ? review.verdictCodes ?? null : null,
+    adviceCodes: step.deciding ? null : review.adviceCodes ?? null,
     outcome, outcomeByName: outcome ? (step.deciding ? by.names ?? review.closedBy : by.names) : null,
     outcomeAt: outcome ? (step.deciding && review.decidedAt ? new Date(review.decidedAt) : by.at) : null,
     status: step.state === "OPEN" ? "OPEN" : "CLOSED", grantsStatuses: JSON.stringify(step.grantsStatuses) as string | null,

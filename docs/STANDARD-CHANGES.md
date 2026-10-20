@@ -1342,3 +1342,10 @@ outside organization sends is either a placeholder of ours filled or registered 
   plan as it stands now, and says so.
 - **DCIOM** (a governance framework of measures, thresholds and advice) is on hold by the owner's choice: nothing
   of it is built. Notes in `docs/gaps/dciom.md`.
+
+## 69 · Advice from a set the route names
+
+A review route names the set of advice its advising steps answer from, as it names the set of verdicts its deciding
+step answers from; none named, each document's deliverable type chooses the set. The review keeps the set it started
+with, and an adviser can give only that set's advice. The Standard's single advice scale becomes one scale per kind of
+review.

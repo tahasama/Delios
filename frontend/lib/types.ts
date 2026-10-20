@@ -193,6 +193,8 @@ export type ReviewView = {
   verdictSet?: string;
   /** The set of the review outcomes it decides from, and its verdicts: only those are offered to the deciding step. */
   verdicts?: string | null; verdictCodes?: string[] | null;
+  /** The advice the advising steps may give: that of the review's set of advice. */
+  adviceCodes?: string[] | null;
   /** Who started the review: they may notify its people by hand. */
   startedById?: string | null;
   /** Sent for review, waiting for the control function to send it to its reviewers (the project's choice). */

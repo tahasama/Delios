@@ -12,6 +12,7 @@ internal sealed class ReviewRouteConfiguration : IEntityTypeConfiguration<Review
     public void Configure(EntityTypeBuilder<ReviewRoute> b)
     {
         b.Property(x => x.Verdicts).HasMaxLength(120);
+        b.Property(x => x.Advice).HasMaxLength(120);
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.TenantId, x.ProjectId, x.Name }).IsUnique().AreNullsDistinct(false);
@@ -28,6 +29,7 @@ internal sealed class ReviewConfiguration : IEntityTypeConfiguration<Review>
     public void Configure(EntityTypeBuilder<Review> b)
     {
         b.Property(x => x.Verdicts).HasMaxLength(120);
+        b.Property(x => x.Advice).HasMaxLength(120);
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Document>().WithMany().HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Restrict);
