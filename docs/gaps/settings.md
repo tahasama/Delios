@@ -45,3 +45,9 @@ Each found wrong in the Settings review of 2026-10-16 (`.impeccable/critique/`),
   project; the organization's reset keeps a copy of what it held, put back like a project's kept copy).
 - A review rejected a day before the action it serves leaves no time to put it right (owner: "still not resolved, it is
   problematic"). Nothing yet warns at sending, or plans the days back from the action; to be decided.
+
+## Functions & permissions: the opened function repeats the grid (owner: yes, do it, later)
+The opened function lists its "Every document" rule, which is what the ticks on its line already say, and "No rule
+yet", which the empty line already says. To do: the panel keeps only "For certain documents only" (those rules, each
+with its bin, and "Add a rule", which then asks which documents: every document is a tick) and, in the organization's
+Settings, the function itself.
