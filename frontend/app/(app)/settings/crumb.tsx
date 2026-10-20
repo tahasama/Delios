@@ -28,7 +28,7 @@ export function SettingsCrumb({ pages }: { pages: { href: string; title: string 
       ) : (
         <span className="font-semibold text-slate-700">{page.title}</span>
       )}
-      {deeper ? (
+      {deeper && !isId(path.split("/").filter(Boolean).slice(-1)[0]) ? (
         <>
           <span aria-hidden className="text-slate-300">/</span>
           <span className="font-semibold text-slate-700">{said(path.split("/").filter(Boolean).slice(-1)[0])}</span>
@@ -36,6 +36,11 @@ export function SettingsCrumb({ pages }: { pages: { href: string; title: string 
       ) : null}
     </nav>
   );
+}
+
+/** An id is never shown (a person's page says who they are under the breadcrumb). */
+function isId(segment: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment);
 }
 
 /** The last part of the address as a person would say it: "DOCUMENT_TYPES" reads "Document types". */

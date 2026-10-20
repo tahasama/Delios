@@ -3,7 +3,7 @@
  * People & access). A code not listed reads as its own words, lower case.
  */
 const WORDS: Record<string, string> = {
-  // Opened and downloaded
+  // Opened or downloaded
   DOCUMENT_VIEWED: "Opened a document",
   DOWNLOAD: "Downloaded a file",
   ACTIVITY_READ: "Read someone's activity",

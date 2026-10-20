@@ -70,7 +70,7 @@ export const RAILS = [
     { rail: "rail-schedule", name: "Schedule" },
     { rail: "rail-prep", name: "The register (registered, details, files)" },
     { rail: "rail-people", name: "People and settings" },
-    { rail: "rail-reading", name: "Opened and downloaded" },
+    { rail: "rail-reading", name: "Opened or downloaded" },
     { rail: "rail-signin", name: "Sign-ins and security" },
   ] },
 ] as const;
@@ -85,7 +85,7 @@ export const AUDIT_KINDS: { key: string; label: string }[] = [
   { key: "SCHEDULE", label: "Schedule" },
   { key: "REGISTER", label: "The register" },
   { key: "PEOPLE", label: "People and settings" },
-  { key: "READING", label: "Opened and downloaded" },
+  { key: "READING", label: "Opened or downloaded" },
   { key: "SIGN_IN", label: "Sign-ins and security" },
 ];
 

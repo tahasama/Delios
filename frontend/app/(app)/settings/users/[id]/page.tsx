@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { inputCls } from "@/components/ui";
-import { ArrowLeft } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
 import { api } from "@/lib/client";
@@ -53,6 +52,7 @@ export default async function PersonActivityPage({ params, searchParams }: { par
     <Logbook
       title={
         <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-start lg:justify-between">
+          {/* The way back is the breadcrumb above (Settings / People & access), once. */}
           <div className="min-w-0">
             <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
               {user?.email}
@@ -60,7 +60,6 @@ export default async function PersonActivityPage({ params, searchParams }: { par
             </p>
             <h1 className="dispatch-title mt-1">{user?.name ?? "A person's activity"}</h1>
           </div>
-          <Link href={`/settings/users#person-${id}`} className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100"><ArrowLeft className="h-4 w-4" /> People &amp; access</Link>
         </div>
       }
       lede={activity && user ? (
@@ -69,7 +68,7 @@ export default async function PersonActivityPage({ params, searchParams }: { par
           {activity.first ? `First act ${fmtDate(activity.first)}. ` : "Nothing recorded yet. "}
           What {user.name} did in the app, day by day: their acts on documents
           {activity.keepsReading ? ", what they opened and downloaded" : ""}{activity.showsSignIns ? ", and their sign-ins" : ""}, as the organization chose to keep them
-          {isAdmin(me) ? <> (<Link href="/organization#tracking" className="font-semibold text-link hover:underline">change it</Link>)</> : null}.
+          {isAdmin(me) ? <> (<Link href="/organization/settings/tracking" className="font-semibold text-link hover:underline">change it</Link>)</> : null}.
           Only an administrator or the control function reads this, and reading it is recorded too.
         </p>
       ) : <p>Their activity could not be read just now. Try again in a moment.</p>}

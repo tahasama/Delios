@@ -19,7 +19,7 @@ public static class AuditKinds
         ("SCHEDULE", "Schedule"),
         ("REGISTER", "The register"),
         ("PEOPLE", "People and settings"),
-        ("READING", "Opened and downloaded"),
+        ("READING", "Opened or downloaded"),
         ("SIGN_IN", "Sign-ins and security"),
     ];
 
