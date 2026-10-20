@@ -8,6 +8,8 @@ import { SendForReviewForm, type SendRoute } from "./send-for-review";
 import { getActiveSet } from "@/lib/settings/config";
 import { verdictEffect, VERDICT_EFFECT_SHORT } from "@/lib/reviews/verdict-effect";
 import { matrixBinds } from "@/lib/settings/control-activities";
+import { projectRoutes } from "@/lib/settings/api-admin";
+import { scopeWords } from "@/lib/reviews/route-scope";
 
 /**
  * Loads what the Send form needs for these revisions: the routes that apply
@@ -25,13 +27,23 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
   const docs = revisions.map((r) => r.document);
   if (!docs.length) return null;
 
-  const [routeLists, reviewers, approvers, strict] = await Promise.all([
+  const [routeLists, reviewers, approvers, strict, directory] = await Promise.all([
     Promise.all(docs.map((d) => api<RouteView[]>(projectPath(ctx, `/documents/${d.id}/routes`)))),
     eligiblePeople(ctx, docs, "REVIEW"),
     eligiblePeople(ctx, docs, "APPROVAL"),
     matrixBinds(ctx),
+    // The organizations taking part and their people: a step another organization answers offers its own people.
+    api<{ organizations: { id: string; code: string; name: string; kind: string }[]; people: { id: string; name: string; partyId: string | null; function: string }[] }>(projectPath(ctx, "/people/directory"))
+      .catch(() => ({ organizations: [], people: [] })),
   ]);
   const applicable = routeLists[0].filter((route) => routeLists.every((list) => list.some((one) => one.id === route.id)));
+  // The project's other routes, and why each is not offered here: it does not take every one of these documents.
+  const [all, documentTypes, disciplines, criticalities, deliverableTypes] = await Promise.all([
+    projectRoutes().then((r) => r.routes.filter((one) => one.active)).catch(() => []),
+    getActiveSet("DOCUMENT_TYPES"), getActiveSet("DISCIPLINES"), getActiveSet("CRITICALITY"), getActiveSet("DELIVERABLE_TYPES"),
+  ]);
+  const lists = { documentTypes, disciplines, criticalities, deliverableTypes, originators: directory.organizations.map((o) => ({ code: o.code, label: o.name })) };
+  const notOffered = all.filter((r) => !applicable.some((one) => one.id === r.id)).map((r) => ({ name: r.name, takes: scopeWords(r.patterns, lists) }));
   // The verdicts each route decides with: its own set of the review outcomes, else the set serving each document.
   const outcomes = await getActiveSet("REVIEW_OUTCOMES");
   const verdictsOf = (routeId: string) => {
@@ -55,23 +67,43 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
     // The backend lists the routes that serve these documents most specific first: the first is the one recommended.
     recommended: t.id === applicable[0]?.id,
     verdicts: verdictsOf(t.id),
-    // The last step decides; earlier steps advise. Its people are whoever holds the step's function, and whoever it names.
+    // A step decides where the route says so, the last always; the others advise. Its people are whoever holds the step's
+    // function and whoever it names; a matrix step, whoever the matrix gives for the documents' discipline; another
+    // organization's step, its own people (or the organization itself, recorded by one of ours).
     steps: t.steps.map((s, i) => {
-      const deciding = i === t.steps.length - 1;
+      const deciding = !!s.decides || i === t.steps.length - 1;
       const pool = deciding ? approvers : reviewers;
-      return {
+      const org = s.partyCode ? directory.organizations.find((o) => o.code === s.partyCode) : null;
+      const theirs = org ? directory.people.filter((p) => p.partyId === org.id) : [];
+      const base = {
         title: s.title || (deciding ? "Decision" : `Review ${i + 1}`),
         act: deciding ? "APPROVAL" as const : "REVIEW" as const,
         mode: s.mode === "ALL" ? "ALL" as const : "ANY_OF" as const,
+      };
+      if (s.partyCode) {
+        const named = theirs.filter((p) => (s.userIds ?? []).includes(p.id));
+        return {
+          ...base,
+          party: { name: org?.name ?? s.partyCode, asItself: org?.kind === "OFFLINE" || !theirs.length,
+            people: theirs.map((p) => ({ id: p.id, name: p.name, functionName: p.function })) },
+          proposed: (named.length ? named : theirs).map((p) => ({ id: p.id, why: named.length ? "named on the route" : `${org?.name ?? s.partyCode}` })),
+          fromFunctions: [],
+        };
+      }
+      return {
+        ...base,
         // Recommended: whoever the route names or its function holds; a step naming nobody takes the people the
         // distribution matrix gives for the documents' discipline. The sender may change any of them.
         proposed: (() => {
           const named = pool.filter((p) => p.functionId === s.functionCode || (s.userIds ?? []).includes(p.id))
             .map((p) => ({ id: p.id, why: p.functionId === s.functionCode ? `${p.functionName} · recommended by the route` : "recommended · named on the route" }));
-          if (named.length || s.functionCode || (s.userIds ?? []).length) return named;
           const disciplines = new Set(docs.map((d) => d.discipline).filter(Boolean));
-          return pool.filter((p) => p.department && disciplines.has(p.department))
+          const matrix = pool.filter((p) => p.department && disciplines.has(p.department) && (!s.functionCode || p.functionId === s.functionCode))
+            .filter((p) => !named.some((n) => n.id === p.id))
             .map((p) => ({ id: p.id, why: `${p.functionName} · recommended by the matrix` }));
+          if (s.fromMatrix) return [...named.filter((n) => (s.userIds ?? []).includes(n.id)), ...matrix];
+          if (named.length || s.functionCode || (s.userIds ?? []).length) return named;
+          return matrix;
         })(),
         fromFunctions: s.functionCode ? [pool.find((p) => p.functionId === s.functionCode)?.functionName ?? s.functionCode] : [],
       };
@@ -89,5 +121,5 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
   const pool = (named: { id: string; name: string; functionName: string }[]) => strict
     ? named.map(person)
     : [...named.map(person), ...everyone.filter((one) => !named.some((n) => n.id === one.id)).map((one) => ({ ...one, inMatrix: false }))];
-  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} reviewers={pool(reviewers)} approvers={pool(approvers)} everyone={everyone} strict={strict} ownFields={policy.own} copies={policy.rules.copies} />;
+  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} notOffered={notOffered} reviewers={pool(reviewers)} approvers={pool(approvers)} everyone={everyone} strict={strict} ownFields={policy.own} copies={policy.rules.copies} />;
 }

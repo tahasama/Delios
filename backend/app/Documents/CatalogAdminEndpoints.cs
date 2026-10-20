@@ -270,19 +270,30 @@ public static class CatalogAdminEndpoints
     private static async Task<IResult?> CheckStepsAsync(DeliosDbContext db, RouteStep[] steps, CancellationToken cancellationToken)
     {
         if (steps.Length == 0) return Problems.Invalid("STEPS_REQUIRED", "A route has at least one step: the one that decides.");
+        // The last step always decides.
+        steps[^1].Decides = true;
         foreach (var step in steps)
         {
             if (string.IsNullOrWhiteSpace(step.Title)) return Problems.Invalid("STEP_TITLE_REQUIRED", "Every step has a title.");
             step.UserIds ??= [];
             step.GrantsStatuses ??= [];
-            var ours = step.FunctionCode is not null || step.UserIds.Length > 0;
-            if (ours == (step.PartyCode is not null))
-                return Problems.Invalid("STEP_ANSWERER_REQUIRED", $"{step.Title}: a step is answered by one function of ours and people of ours named on it, or by one organization.");
+            // Who answers (owner): an organization, a function, people, or whoever the matrix gives for each document; at
+            // least one, each narrowing the others.
+            if (step.PartyCode is null && step.FunctionCode is null && step.UserIds.Length == 0 && !step.FromMatrix)
+                return Problems.Invalid("STEP_ANSWERER_REQUIRED", $"{step.Title}: say who answers it: an organization, a function, people, or whoever the matrix gives for each document.");
+            var answeringParty = step.PartyCode is { } partyCode ? await db.Parties.AsNoTracking().SingleOrDefaultAsync(p => p.Code == partyCode && p.Active, cancellationToken) : null;
+            if (answeringParty?.Participation == Participations.ByProxy && (step.FunctionCode is not null || step.UserIds.Length > 0 || step.FromMatrix))
+                return Problems.Invalid("STEP_PARTY_AS_ITSELF", $"{step.Title}: {answeringParty.Name} answers as itself, recorded by one of ours: nobody of theirs is named.");
             if (step.UserIds.Length > 0)
             {
                 var ids = step.UserIds.Distinct().ToArray();
-                if (await db.Users.CountAsync(u => ids.Contains(u.Id) && u.Active && (u.PartyId == null || u.Party!.IsInternal), cancellationToken) != ids.Length)
-                    return Problems.Invalid("STEP_PERSON_UNKNOWN", $"{step.Title}: everybody named on a step is one of our people, still active.");
+                var known = answeringParty is null
+                    ? await db.Users.CountAsync(u => ids.Contains(u.Id) && u.Active && (u.PartyId == null || u.Party!.IsInternal), cancellationToken)
+                    : await db.Users.CountAsync(u => ids.Contains(u.Id) && u.Active && u.PartyId == answeringParty.Id, cancellationToken);
+                if (known != ids.Length)
+                    return Problems.Invalid("STEP_PERSON_UNKNOWN", answeringParty is null
+                        ? $"{step.Title}: everybody named on it is one of our people, still active."
+                        : $"{step.Title}: everybody named on it is one of {answeringParty.Name}'s people, still active.");
                 step.UserIds = ids;
             }
             if (step.Mode is not (StepModes.Any or StepModes.All))

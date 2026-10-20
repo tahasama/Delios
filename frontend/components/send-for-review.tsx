@@ -10,7 +10,11 @@ import { ArrowRight } from "lucide-react";
 import { SearchPick } from "@/components/search-pick";
 
 type SendPerson = { id: string; name: string; functionName: string; inMatrix?: boolean };
-export type SendStep = { title: string; act: "REVIEW" | "APPROVAL"; mode: string; proposed: { id: string; why: string }[]; fromFunctions: string[] };
+export type SendStep = {
+  title: string; act: "REVIEW" | "APPROVAL"; mode: string; proposed: { id: string; why: string }[]; fromFunctions: string[];
+  /** Another organization answers it: its own people, or the organization itself (recorded by one of ours). */
+  party?: { name: string; asItself: boolean; people: { id: string; name: string; functionName: string }[] };
+};
 export type SendRoute = { id: string; name: string; description: string | null; isDefault: boolean; recommended?: boolean; steps: SendStep[]; verdicts: { title: string; values: { code: string; label: string; effectLabel: string }[]; warning?: string | null } | null };
 
 const MODE: Record<string, string> = {
@@ -29,11 +33,13 @@ const MODE: Record<string, string> = {
  * assigns (by the documents' discipline when the route names nobody); the
  * sender removes or adds anyone the matrix allows.
  */
-export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, everyone = [], strict = true, ownFields = [], copies = "OPTIONAL" }: {
+export function SendForReviewForm({ revisionIds, routes, notOffered = [], reviewers, approvers, everyone = [], strict = true, ownFields = [], copies = "OPTIONAL" }: {
   /** How the project's review form asks "Copied in" (Forms & fields): must, asked, or not asked. */
   copies?: "REQUIRED" | "OPTIONAL" | "OFF";
   revisionIds: string[];
   routes: SendRoute[];
+  /** The project's routes not offered here, each with the documents it takes: it does not take every one of these. */
+  notOffered?: { name: string; takes: string }[];
   reviewers: SendPerson[];
   approvers: SendPerson[];
   /** Everyone on the project, who may be copied in. */
@@ -47,7 +53,17 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, e
   const [routeId, setRouteId] = useState(routes.find((r) => r.recommended)?.id ?? routes.find((r) => r.isDefault)?.id ?? routes[0]?.id ?? "");
   const route = routes.find((r) => r.id === routeId);
   const [attempt] = useState(() => crypto.randomUUID());
-  if (!routes.length) return <p className="text-sm text-amber-800">No review route applies to {revisionIds.length > 1 ? "all of these documents" : "this document"}. Review routes are set up in Settings → Review routes.</p>;
+  const whyNot = notOffered.length ? (
+    <ul className="space-y-0.5 text-[11px] leading-4 text-slate-500">
+      {notOffered.map((r) => <li key={r.name}><span className="font-semibold text-slate-700">{r.name}</span> is not offered: it takes {r.takes.charAt(0).toLowerCase() + r.takes.slice(1)}.</li>)}
+    </ul>
+  ) : null;
+  if (!routes.length) return (
+    <div className="space-y-2">
+      <p className="text-sm text-amber-800">No review route takes {revisionIds.length > 1 ? "all of these documents" : "this document"}. Review routes are set up in Settings → Review routes.</p>
+      {whyNot}
+    </div>
+  );
 
   return (
     <ActionForm action={sendForReviewAction} submitLabel={revisionIds.length > 1 ? `Send ${revisionIds.length} documents` : "Send"} size="sm" hidden={{}}>
@@ -59,6 +75,7 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, e
         </select>
       </Field>
       {route?.description ? <p className="-mt-1 text-xs text-slate-500">{route.description}</p> : null}
+      {whyNot}
       <OwnFields fields={ownFields} />
       {route?.verdicts ? (
         <p className="text-[11px] text-slate-500">
@@ -109,7 +126,18 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400" title={approval ? "This step's verdict binds; a verdict that proceeds is the release approval" : "Advice for the decider"}>Step {index + 1} · {approval ? "Decides" : "Advises"}</p>
       <p className="text-sm font-semibold text-slate-800">{step.title}</p>
       <p className="mb-2 text-[11px] text-slate-500">{MODE[step.mode] ?? step.mode}{step.mode === "SERIAL" ? " — in the order listed" : ""}</p>
-      <SearchPick
+      {step.party?.asItself ? (
+        <p className="text-xs leading-5 text-slate-600">{step.party.name} answers it; one of ours sends it and records their answer.</p>
+      ) : step.party ? (
+        <SearchPick
+          compact
+          name={`participants_${index}`}
+          items={step.party.people.map((p) => ({ id: p.id, name: p.name, detail: `${step.party!.name} / ${p.functionName}` }))}
+          initial={step.proposed.map((p) => p.id)}
+          placeholder="Type a name, then Enter"
+          empty={`Nobody yet: ${step.party.name}'s people named on the route answer it.`}
+        />
+      ) : <SearchPick
         compact
         name={`participants_${index}`}
         items={pool.map((p) => ({
@@ -121,7 +149,7 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
         initial={step.proposed.map((p) => p.id).filter((id) => pool.some((p) => p.id === id))}
         placeholder={pool.length ? "Type a name, then Enter" : "Nobody allowed"}
         empty={pool.length ? "Nobody yet — add someone." : `Nobody may ${approval ? "approve" : "review"} ${many ? "all of these" : "this"} under the matrix.`}
-      />
+      />}
     </fieldset>
   );
 }

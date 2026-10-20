@@ -93,6 +93,8 @@ type AdminNumbering = {
 type RouteStepView = {
   title: string; functionCode: string | null; partyCode: string | null; reason: string | null; mode: string; days: number | null; grantsStatuses: string[];
   userIds?: string[];
+  /** The step decides (the last always does); whoever the matrix gives for each document answers it. */
+  decides?: boolean; fromMatrix?: boolean;
 };
 
 type AdminRoute = {
@@ -305,6 +307,10 @@ export async function partiesWithAnswers(projectId?: string) {
 export type EditorRouteStep = {
   act: "REVIEW" | "APPROVAL"; partyId?: string; reason?: string; mode: "ANY_OF" | "ALL"; participantIds: string[];
   functionIds?: string[]; title?: string; days?: number; grantsStatuses?: string[];
+  /** The step decides (owner: several may); the last always does. */
+  decides?: boolean;
+  /** Whoever the distribution matrix gives for each document's discipline answers it, narrowed by the rest. */
+  fromMatrix?: boolean;
 };
 
 /** The review routes a project offers (its own copy, else the organization's), whether they are free, and who may change them here. */
@@ -327,7 +333,9 @@ export async function routesForEditor(level: "organization" | "project" = "proje
       ? JSON.stringify(r.patterns.map((p) => Object.fromEntries(Object.entries(p).filter(([, v]) => v))))
       : "*",
     steps: JSON.stringify(r.steps.map((s, i): EditorRouteStep => ({
-      act: i === r.steps.length - 1 ? "APPROVAL" : "REVIEW",
+      act: s.decides || i === r.steps.length - 1 ? "APPROVAL" : "REVIEW",
+      decides: !!s.decides || i === r.steps.length - 1,
+      fromMatrix: !!s.fromMatrix,
       partyId: s.partyCode ? parties.find((p) => p.code === s.partyCode)?.id : undefined,
       reason: s.reason ?? undefined,
       mode: s.mode === "ALL" ? "ALL" : "ANY_OF",
@@ -344,7 +352,8 @@ export async function routesForEditor(level: "organization" | "project" = "proje
 export async function backendRoute(classes: string, steps: EditorRouteStep[]): Promise<{ patterns: unknown[]; steps: unknown[] } | { error: string }> {
   const parties = await adminParties();
   if (steps.some((s) => (s.functionIds ?? []).length > 1)) return { error: "A step is answered by the holders of one function: choose one per step." };
-  if (steps.some((s) => !s.partyId && !(s.functionIds ?? []).length && !s.participantIds.length)) return { error: "Say who answers each step: a function, people of ours, or an outside organization." };
+  const blank = steps.findIndex((s) => !s.partyId && !(s.functionIds ?? []).length && !s.participantIds.length && !s.fromMatrix);
+  if (blank >= 0) return { error: `Say who answers step ${blank + 1}: an organization, a function, people, or "recommended for each document".` };
   const patterns = classes === "*" ? [] : (JSON.parse(classes) as Record<string, string | undefined>[]).map((p) => ({
     deliverableType: p.deliverableType || null, docType: p.docType || null, discipline: p.discipline || null, criticality: p.criticality || null,
     originator: p.originator || null,
@@ -353,8 +362,10 @@ export async function backendRoute(classes: string, steps: EditorRouteStep[]): P
     patterns,
     steps: steps.map((s, i) => ({
       title: s.title || (i === steps.length - 1 ? "Decision" : `Review ${i + 1}`),
-      functionCode: s.partyId ? null : (s.functionIds ?? [])[0] ?? null,
-      userIds: s.partyId ? [] : s.participantIds,
+      functionCode: (s.functionIds ?? [])[0] ?? null,
+      userIds: s.participantIds,
+      decides: !!s.decides || i === steps.length - 1,
+      fromMatrix: !!s.fromMatrix,
       partyCode: s.partyId ? parties.find((p) => p.id === s.partyId)?.code ?? null : null,
       // Why it goes to an outside organization: kept on the step, carried on the transmittal that takes it to them.
       reason: s.partyId ? s.reason ?? null : null,

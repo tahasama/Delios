@@ -206,7 +206,7 @@ public static class ReviewListEndpoints
             var v = revisions[r.RevisionId];
             var steps = r.Steps.OrderBy(s => s.Index).ToList();
             var open = steps.FirstOrDefault(s => s.State == StepStates.Open);
-            var deciding = steps.FirstOrDefault(s => s.Deciding);
+            var deciding = steps.LastOrDefault(s => s.Deciding);
             var decidedBy = r.Verdict is null || deciding is null ? null
                 : deciding.PartyName ?? (deciding.FunctionCode is { } code ? functions.GetValueOrDefault(code, code) : null);
             var reviewers = open is null ? [] : open.ByProxy

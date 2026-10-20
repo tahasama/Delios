@@ -39,10 +39,15 @@ export function Switch({ on, label, disabled, form, words = ["On", "Off"] }: {
  * tick. It sits inside the label that says what it switches (or use `SwitchField`, which brings its own). For a setting
  * that is on or off; a choice among several, or a confirmation, stays a tick.
  */
-export function SwitchControl({ name, value, defaultChecked, className }: { name: string; value?: string; defaultChecked?: boolean; className?: string }) {
+export function SwitchControl({ name, value, defaultChecked, checked, onChange, className }: {
+  name?: string; value?: string; defaultChecked?: boolean; className?: string;
+  /** Held by the form around it, as a value it reads (no name needed then). */
+  checked?: boolean; onChange?: (on: boolean) => void;
+}) {
   return (
     <span className={`relative inline-flex shrink-0 ${className ?? ""}`}>
-      <input type="checkbox" role="switch" name={name} value={value} defaultChecked={defaultChecked} className="peer sr-only" />
+      <input type="checkbox" role="switch" name={name} value={value} className="peer sr-only"
+        {...(onChange ? { checked: !!checked, onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.checked) } : { defaultChecked })} />
       <span aria-hidden className="h-5 w-9 rounded-full bg-slate-300 transition-colors duration-200 peer-checked:bg-emerald-600 peer-focus-visible:ring-3 peer-focus-visible:ring-link/25" />
       <span aria-hidden className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out peer-checked:translate-x-4" />
     </span>

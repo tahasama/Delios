@@ -56,11 +56,16 @@ public sealed partial class ReviewService
             return document is null ? seated : await ClearedAsync(project, document, seated, cancellationToken);
         }
         if (participation == Participations.ByProxy) return await transmittals.CustodiansAsync(project.Id, party, cancellationToken);
-        return await (from m in db.Memberships
-                      join u in db.Users on m.UserId equals u.Id
-                      where m.ProjectId == project.Id && m.Active && m.Function!.Active && u.Active && u.PartyId == party.Id
-                      orderby u.Name
-                      select u).ToListAsync(cancellationToken);
+        // Its people on the project; those the step names, or those holding the function it names, where it names some.
+        var theirs = await (from m in db.Memberships
+                            join u in db.Users on m.UserId equals u.Id
+                            where m.ProjectId == project.Id && m.Active && m.Function!.Active && u.Active && u.PartyId == party.Id
+                            orderby u.Name
+                            select new { User = u, m.Function!.Code }).ToListAsync(cancellationToken);
+        var narrowed = named is { Length: > 0 } || functionCode is not null
+            ? theirs.Where(x => (named ?? []).Contains(x.User.Id) || (functionCode is not null && x.Code == functionCode)).ToList()
+            : theirs;
+        return narrowed.Select(x => x.User).DistinctBy(u => u.Id).ToList();
     }
 
     /// <summary>
@@ -117,8 +122,8 @@ public sealed partial class ReviewService
         if (await HoldsControlAsync(access, review, cancellationToken)) return true;
         if (await ControlHoldersAsync(access.Project.Id, cancellationToken) > 0) return false;
         // Not reviewed: whoever sent it on releases it.
-        return review.Steps.SingleOrDefault(s => s.Deciding)?.Participants.Any(p => p.UserId == access.UserId)
-            ?? review.StartedById == access.UserId;
+        var deciding = review.Steps.Where(s => s.Deciding).ToList();
+        return deciding.Count > 0 ? deciding.Any(s => s.Participants.Any(p => p.UserId == access.UserId)) : review.StartedById == access.UserId;
     }
 
     /// <summary>Whether a function, on this project, would allow the verb on a document with these facts. Used to check the deciding function may approve.</summary>
@@ -157,6 +162,11 @@ public sealed partial class ReviewService
             .Select(d => d.FromUserId).ToListAsync(cancellationToken);
         return step.Participants.FirstOrDefault(p => from.Contains(p.UserId));
     }
+
+    /// <summary>How severe a verdict is: not proceeding (rejected) 2, accepted with comments to take in 1, accepted or for information 0.</summary>
+    private static int Severity(Catalog catalog, string set, string verdict) =>
+        !Proceeds(catalog, set, verdict) ? 2
+            : catalog.Prop(set, verdict, "resubmit") is { ValueKind: JsonValueKind.True } ? 1 : 0;
 
     /// <summary>Whether a verdict lets the revision go on to release (its published <c>proceed</c> property is true).</summary>
     private static bool Proceeds(Catalog catalog, string set, string verdict) => ReviewSets.Proceeds(catalog, set, verdict);

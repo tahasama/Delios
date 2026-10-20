@@ -412,7 +412,7 @@ public static class RegisterEndpoints
                              {
                                  r.RevisionId,
                                  r.Verdict,
-                                 Decider = r.Steps.Where(s => s.Deciding).Select(s => s.PartyName ?? s.FunctionCode).FirstOrDefault(),
+                                 Decider = r.Steps.Where(s => s.Deciding).OrderByDescending(s => s.Index).Select(s => s.PartyName ?? s.FunctionCode).FirstOrDefault(),
                              }).AsNoTracking().ToListAsync(cancellationToken);
         var functions = await db.Functions.AsNoTracking().ToDictionaryAsync(f => f.Code, f => f.Name, cancellationToken);
         var files = await db.StoredFiles.AsNoTracking().Where(f => f.DocumentId != null && ids.Contains(f.DocumentId.Value))

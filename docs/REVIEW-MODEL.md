@@ -57,7 +57,9 @@ supplier; accepted or for information → us).
 
 The route itself names two sets (built): the **advice** its advising steps answer from (`ReviewRoute.Advice`) and the
 **verdicts** its deciding step answers from (`ReviewRoute.Verdicts`), each by its name in Types & sets; none named, the
-set serving the document's deliverable type. The review keeps both when it starts.
+set serving the document's deliverable type. The review keeps both when it starts. Several steps may decide (`RouteStep.Decides`, the last always): each answers in turn, the most
+severe verdict stands, the last decider's status is released at. A step is answered by an organization, a function,
+named people, or the matrix's people for each document (`FromMatrix`), each narrowing the others.
 
 A template already matches on deliverable type, document type, discipline and
 criticality. **Add originator to the match**, so "supplier document we produced"

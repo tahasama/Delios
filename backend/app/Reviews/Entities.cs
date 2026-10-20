@@ -53,7 +53,10 @@ public sealed class RoutePattern
 public sealed class RouteStep
 {
     public required string Title { get; set; }
-    /// <summary>The function whose holders on the project answer this step. Empty when a party answers it.</summary>
+    /// <summary>
+    /// The function whose holders answer this step: ours, or, with <see cref="PartyCode"/>, that organization's people
+    /// holding it on the project.
+    /// </summary>
     public string? FunctionCode { get; set; }
     /// <summary>
     /// An organization outside our control that answers this step. The step then
@@ -63,13 +66,26 @@ public sealed class RouteStep
     public string? PartyCode { get; set; }
     /// <summary>For a party's step: the reason for issue on the transmittal that carries it.</summary>
     public string? Reason { get; set; }
-    /// <summary>People of ours named on the step, seated as well as the function's holders (or alone), when they are on the project.</summary>
+    /// <summary>
+    /// People named on the step, seated as well as the function's holders (or alone), when they are on the project: ours,
+    /// or, with <see cref="PartyCode"/>, that organization's own people, who then answer here.
+    /// </summary>
     public Guid[] UserIds { get; set; } = [];
+    /// <summary>
+    /// The step is answered by whoever the distribution matrix gives for each document's discipline, narrowed by the
+    /// organization and function it names (owner: "recommends depending on the document"). The sender confirms them.
+    /// </summary>
+    public bool FromMatrix { get; set; }
+    /// <summary>
+    /// The step decides (owner: several steps may decide). The last step always does. Every deciding step answers in
+    /// turn; the most severe verdict stands, and the status is the last one's.
+    /// </summary>
+    public bool Decides { get; set; }
     /// <summary>ANY: the first answer closes the step. ALL: every holder answers.</summary>
     public string Mode { get; set; } = StepModes.Any;
     /// <summary>Working days, in the project's calendar, the step has once it opens.</summary>
     public int? Days { get; set; }
-    /// <summary>On the deciding step: the statuses it may grant. Empty means any published status.</summary>
+    /// <summary>On the last deciding step: the statuses it may grant. One: what every document it decides is released at. Empty means any published status.</summary>
     public string[] GrantsStatuses { get; set; } = [];
 }
 

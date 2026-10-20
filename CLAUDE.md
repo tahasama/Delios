@@ -923,7 +923,22 @@ a screen only words it. A new rule goes in the backend, never in a page.
   route" (`?new=1`), one sheet per route (advice, verdicts, what it takes in words, never a bare code; each step with who
   really answers it, an organization by its name, its working days and what the decision may release at), the pencil
   opening the route as its own form (`?edit=<id>`, Cancel / Save on one strip), each step's working days typed in its own
-  box. A step names people of ours only.
+  box.
+- **Several steps may decide** (owner; `RouteStep.Decides`, the last always does): each deciding step answers in turn
+  even after a rejection, and the most severe verdict of them all stands (rejected over accepted with comments over
+  accepted, read from the meaning; `Severity`), the later of equals; the status released at, and who receives it, are
+  the last step's. A decider before the last carries "issued for" like an adviser.
+- **Who answers a step** (owner): three choices side by side, any of them, at least one (backend STEP_ANSWERER_REQUIRED):
+  the organization (none: ours), the function, the people (a search field, never pills), each narrowing the others, and
+  the route's discipline narrowing the people; or "Recommended for each document" (`RouteStep.FromMatrix`): the
+  distribution matrix's people for each document's discipline, narrowed by the choices, proposed on Send for review and
+  confirmed by the sender (taken by the backend when the sender chose nobody). Another organization's people may be
+  named (they answer here); one that answers as itself (recorded by one of ours) names nobody (STEP_PARTY_AS_ITSELF).
+- A route's working days are only filled in by default (owner, never limited or enforced): five in all, each decider
+  given more than each adviser (2 + 3); days typed by hand are kept.
+- What a route takes is enforced: no other document is sent on it (backend NO_ROUTE). Send for review names every route
+  of the project not offered for the documents chosen, with what it takes, so a missing route is never a mystery.
+- One status chosen on the last step: every document the route accepts is released at it; several: the decider chooses.
 - A route's step is answered by all its people (any order) or by whoever gets to it first (`StepModes` ALL / ANY): no
   other kind is offered. A step another organization answers says why it goes to them (a published reason for issue,
   backend STEP_REASON_REQUIRED), carried on the transmittal that takes it. "Offer this route first" puts it first among

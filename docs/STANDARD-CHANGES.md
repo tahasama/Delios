@@ -1349,3 +1349,11 @@ A review route names the set of advice its advising steps answer from, as it nam
 step answers from; none named, each document's deliverable type chooses the set. The review keeps the set it started
 with, and an adviser can give only that set's advice. The Standard's single advice scale becomes one scale per kind of
 review.
+
+## 70 · Several deciders, and who answers a step
+
+A route may have several deciding steps. Each answers in turn, even after another rejected, so every decider's view is
+on record; the most severe verdict stands and the last decider's status is what the revision is released at. A step is
+answered by an organization, a function, named people, or whoever the distribution matrix gives for each document's
+discipline, alone or together, each narrowing the others. A route's days are a default (five in all, deciders given
+more), never a limit.

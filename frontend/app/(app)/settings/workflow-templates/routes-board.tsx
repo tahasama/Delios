@@ -8,6 +8,7 @@ import { WorkflowTemplateBuilder, type WorkflowBuilderStep } from "./workflow-te
 import { VERDICT_EFFECT_SHORT } from "@/lib/reviews/verdict-effect";
 import { api, projectPath } from "@/lib/client";
 import { requireScope } from "@/lib/core/scope";
+import { scopeWords, patternsOf } from "@/lib/reviews/route-scope";
 import { adminFunctions, adminParties, adminUsers, routesForEditor } from "@/lib/settings/api-admin";
 
 type Step = WorkflowBuilderStep;
@@ -29,12 +30,18 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
   adding?: boolean;
 }) {
   const here = level === "organization" ? "/organization/settings/routes" : "/settings/workflow-templates";
+  // On a project, what each person holds there; on the organization's card, on any project.
+  const projectId = level === "project" ? (await requireScope()).projectId : null;
   const [templates, users, classValues, functions, outsideParties, reasons, statuses, adviceValues, lists] = await Promise.all([
     routesForEditor(level),
-    adminUsers().then((all) => all.filter((u) => u.active).map((u) => ({
-      id: u.id, name: u.name, role: u.memberships.map((m) => m.functionName).filter(Boolean)[0] ?? "",
-      party: u.partyId && !u.internal ? { name: u.partyName ?? "", isInternal: false } : null,
-    }))),
+    // Who may be put on a step: their organization (none: ours), the functions they hold and their disciplines.
+    adminUsers().then((all) => all.filter((u) => u.active).map((u) => {
+      const held = u.memberships.filter((m) => m.active && (!projectId || m.projectId === projectId));
+      return {
+        id: u.id, name: u.name, partyId: u.partyId && !u.internal ? u.partyId : null,
+        functions: [...new Set(held.map((m) => m.functionCode))], departments: [...new Set(held.map((m) => m.department).filter((d): d is string => !!d))],
+      };
+    }).filter((u) => !projectId || u.functions.length > 0)),
     Promise.all(["DOCUMENT_TYPES", "DISCIPLINES", "CRITICALITY", "DELIVERABLE_TYPES"].map(async (setKey) =>
       (await getActiveSet(setKey)).map((v) => ({ ...v, setKey })))).then((all) => all.flat()),
     // A step names a function by its code.
@@ -67,8 +74,7 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
   const typeName = (code: string) => classOptions.deliverableTypes.find((d) => d.code === code)?.label ?? code;
   const builder = (route?: (typeof templates)[number], steps?: Step[]) => (
     <WorkflowTemplateBuilder level={level} cancelHref={here} outsideParties={parties} reasons={reasonChoices} functions={functions}
-      // A step names people of ours only (backend STEP_PERSON_UNKNOWN); another organization answers as itself.
-      users={users.filter((u) => !u.party)}
+      users={users}
       outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} adviceSets={adviceSets} classOptions={classOptions} statuses={statusChoices}
       {...(route ? { id: route.id, name: route.name, description: route.description ?? "", classes: route.classes, outcomeSetKey: route.outcomeSetKey,
         adviceSetKey: route.adviceSetKey, isDefault: route.isDefault, initialSteps: steps } : {})} />
@@ -81,8 +87,8 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
           <div className="min-w-0">
             <h1 className="plate-title text-slate-950">Review routes</h1>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-              The ways a document goes for review: each step before the last advises, from a set of advice; the last decides, from a set
-              of verdicts, and its decision is what the revision is released at.
+              The ways a document goes for review: a step advises, from a set of advice, or decides, from a set of verdicts. The last
+              always decides; where several decide, each answers in turn and the most severe verdict stands.
             </p>
             {lead ? <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">{lead}</p> : null}
           </div>
@@ -171,15 +177,18 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
                     {t.verdictsMismatch.length ? <span className="ml-2 text-amber-800">does not serve {unserved(t.verdictsMismatch)}, which this route takes</span> : null}
                   </dd>
                   <dt className="font-semibold text-slate-700">Takes</dt>
-                  <dd className="text-slate-600">{scopeWords(t.classes, classOptions)}</dd>
+                  <dd className="text-slate-600">{scopeWords(patternsOf(t.classes), classOptions)}</dd>
                 </dl>
 
                 <div className="scroll-thin flex items-stretch gap-1 overflow-x-auto pb-1">
                   {steps.map((s, i) => {
-                    const decides = i === steps.length - 1;
+                    const decides = !!s.decides || i === steps.length - 1;
+                    const last = i === steps.length - 1;
                     const party = s.partyId ? parties.find((p) => p.id === s.partyId) : null;
-                    const who = party ? [party.name]
-                      : [...(s.functionIds ?? []).map((fid) => `any ${functions.find((f) => f.id === fid)?.name ?? fid}`), ...s.participantIds.map(nameOf)];
+                    // Who answers it: its organization (with its people or function), or ours; the matrix where it says so.
+                    const parts = [...s.participantIds.map(nameOf), ...(s.functionIds ?? []).map((fid) => `any ${functions.find((f) => f.id === fid)?.name ?? fid}`),
+                      ...(s.fromMatrix ? ["recommended for each document"] : [])];
+                    const who = party ? [parts.length ? `${party.name}: ${parts.join(", ")}` : party.name] : parts;
                     return (
                       <div key={i} className="flex items-stretch gap-1">
                         <div className="w-56 shrink-0 rounded-md bg-surface px-3 py-2.5 ring-1 ring-line">
@@ -193,7 +202,7 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
                           {who.length > 1 ? <p className="mt-0.5 text-[11px] text-slate-500">{s.mode === "ANY_OF" ? "whoever gets to it first" : "all of them, any order"}</p> : null}
                           <p className="mt-1.5 border-t border-line pt-1.5 text-[11px] text-slate-500">
                             {s.days ? `${s.days} working day${s.days === 1 ? "" : "s"}` : "no days: no due date"}
-                            {decides && s.grantsStatuses?.length ? <> · releases at {s.grantsStatuses.join(", ")}</> : null}
+                            {last && s.grantsStatuses?.length ? <> · {s.grantsStatuses.length === 1 ? "releases at" : "releases at one of"} {s.grantsStatuses.join(", ")}</> : null}
                           </p>
                         </div>
                         {i < steps.length - 1 ? <ArrowRight className="h-4 w-4 shrink-0 self-center text-slate-400" aria-hidden /> : null}
@@ -208,27 +217,4 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
       })}
     </>
   );
-}
-
-/**
- * Which documents a route takes, in words: each value by its name as published, never a bare code. An empty answer on
- * any of the five means it does not narrow by that, so it is left out.
- */
-function scopeWords(classes: string, options: { documentTypes: { code: string; label: string }[]; disciplines: { code: string; label: string }[];
-  criticalities: { code: string; label: string }[]; deliverableTypes: { code: string; label: string }[]; originators: { code: string; label: string }[] }): string {
-  if (!classes || classes === "*") return "Every document";
-  const named = (list: { code: string; label: string }[], code: string | undefined) => (code ? `${code} — ${list.find((one) => one.code === code)?.label ?? code}` : null);
-  try {
-    const parsed = JSON.parse(classes) as { docType?: string; discipline?: string; criticality?: string; deliverableType?: string; originator?: string }[];
-    const said = parsed.map((p) => [
-      p.deliverableType ? `produced by ${named(options.deliverableTypes, p.deliverableType)}` : null,
-      p.docType ? `type ${named(options.documentTypes, p.docType)}` : null,
-      p.discipline ? `discipline ${named(options.disciplines, p.discipline)}` : null,
-      p.criticality ? `criticality ${named(options.criticalities, p.criticality)}` : null,
-      p.originator ? `from ${options.originators.find((o) => o.code === p.originator)?.label ?? p.originator}` : null,
-    ].filter(Boolean).join(", ")).filter(Boolean);
-    return said.length ? `Documents of ${said.join("; or ")}` : "Every document";
-  } catch {
-    return "Some documents";
-  }
 }

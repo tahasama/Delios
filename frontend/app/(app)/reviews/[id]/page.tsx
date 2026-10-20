@@ -94,7 +94,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   // The deciding step is offered the first request: the person who settles what
   // a revision is for is the likeliest to know who needs it.
   const askWho = (await issuePolicy(ctx)).asked;
-  const nextStep = cycle.binding && !cycle.outcome ? await requestChoices(ctx, doc) : null;
+  const nextStep = cycle.binding && cycle.final && !cycle.outcome ? await requestChoices(ctx, doc) : null;
   const issueReasons = nextStep ? await getActiveSet("REASONS_FOR_ISSUE") : [];
   const author = nextStep ? await authorOf(ctx, rev.id) : null;
   // The steps still to come on this route: a reservation may be held against

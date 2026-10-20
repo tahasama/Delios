@@ -111,7 +111,10 @@ async function readCycle(scope: Scope, review: ReviewView) {
   return {
     id: review.id, number: review.number as string | null, sequence: rev.cycles.find((one) => one.id === review.id)?.sequence ?? 1,
     revisionId: review.revisionId, revision: { ...rev, document: doc },
-    binding: step.deciding, outcomeSetKey: step.deciding ? review.verdictSet ?? "REVIEW_OUTCOMES" : "REVIEW_ADVICE" as string | null,
+    binding: step.deciding,
+    // The last step decides the status and who receives it (owner: several steps may decide, the last always does).
+    final: step.number === review.steps.length,
+    outcomeSetKey: step.deciding ? review.verdictSet ?? "REVIEW_OUTCOMES" : "REVIEW_ADVICE" as string | null,
     verdictCodes: step.deciding ? review.verdictCodes ?? null : null,
     adviceCodes: step.deciding ? null : review.adviceCodes ?? null,
     outcome, outcomeByName: outcome ? (step.deciding ? by.names ?? review.closedBy : by.names) : null,

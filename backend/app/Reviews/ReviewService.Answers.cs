@@ -45,6 +45,8 @@ public sealed partial class ReviewService
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         string answer;
         string? granted = null;
+        // The last step decides the status (owner); a step before it, deciding or advising, carries what it is issued for.
+        var last = step.Index == review.Steps.Max(s => s.Index);
         var kindWritten = Advice_None;
         if (step.Deciding)
         {
@@ -54,7 +56,13 @@ public sealed partial class ReviewService
                 return (null, Problems.Invalid("VALUE_NOT_PUBLISHED", $"{answer} is not a published verdict.",
                     new { field = "verdict", value = answer }));
             }
-            if (Proceeds(catalog, review.VerdictSet, answer) && review.IssueRequestId is null)
+            if (!last && !string.IsNullOrWhiteSpace(request.Status))
+            {
+                if (!catalog.IsActive(ReviewSets.Statuses, request.Status))
+                    return (null, Problems.Invalid("VALUE_NOT_PUBLISHED", $"{request.Status} is not a published status.", new { field = "status", value = request.Status }));
+                granted = request.Status;
+            }
+            if (last && Proceeds(catalog, review.VerdictSet, answer) && review.IssueRequestId is null)
             {
                 granted = request.Status ?? "";
                 if (!catalog.IsActive(ReviewSets.Statuses, granted))
@@ -117,7 +125,7 @@ public sealed partial class ReviewService
         IssueRequest? issue = null;
         if (request.Issue is not null)
         {
-            if (!step.Deciding || granted is null)
+            if (!step.Deciding || !last || granted is null)
             {
                 return (null, Problems.Invalid("ISSUE_ONLY_WITH_DECISION",
                     "Who receives it is asked with a decision that lets the revision out."));
@@ -164,7 +172,7 @@ public sealed partial class ReviewService
         }
         seat.Answer = answer;
         seat.GrantedStatus = granted;
-        if (!step.Deciding && granted is not null)
+        if (!last && granted is not null)
         {
             var (_, subject) = await SubjectAsync(review, cancellationToken);
             subject.StatusCode = granted;
@@ -223,13 +231,22 @@ public sealed partial class ReviewService
         var answered = step.Participants.Where(p => p.AnsweredAt is not null).OrderBy(p => p.AnsweredAt).ToList();
         step.State = StepStates.Done;
         step.CompletedAt = now;
+        var final = step.Index == review.Steps.Max(s => s.Index);
         if (step.Deciding)
         {
-            // Several deciders: the most restrictive verdict binds.
-            var binding = answered.FirstOrDefault(p => !Proceeds(catalog, review.VerdictSet, p.Answer!)) ?? answered[^1];
+            // Several deciders on the step: the most severe verdict binds.
+            var binding = answered.MaxBy(p => Severity(catalog, review.VerdictSet, p.Answer!)) ?? answered[^1];
             step.Answer = binding.Answer;
-            review.Verdict = binding.Answer;
-            review.GrantedStatus = Proceeds(catalog, review.VerdictSet, binding.Answer!) ? binding.GrantedStatus : null;
+        }
+        if (step.Deciding && final)
+        {
+            // Several deciding steps (owner): each answered in turn; the most severe verdict of them all stands, the
+            // later of equals, and the status is the last step's.
+            var verdict = review.Steps.Where(s => s.Deciding && s.Answer is not null).OrderBy(s => s.Index)
+                .Select(s => s.Answer!).Aggregate((kept, next) => Severity(catalog, review.VerdictSet, next) >= Severity(catalog, review.VerdictSet, kept) ? next : kept);
+            var lastBinding = answered.FirstOrDefault(p => p.Answer == step.Answer) ?? answered[^1];
+            review.Verdict = verdict;
+            review.GrantedStatus = Proceeds(catalog, review.VerdictSet, verdict) ? lastBinding.GrantedStatus ?? answered.Select(p => p.GrantedStatus).FirstOrDefault(g => g is not null) : null;
             // What the decider granted is what the revision now carries: release reads it from here.
             if (review.GrantedStatus is not null)
             {
@@ -237,7 +254,7 @@ public sealed partial class ReviewService
                 decided.StatusCode = review.GrantedStatus;
             }
         }
-        else
+        if (!step.Deciding)
         {
             var severity = new[] { Advice_None, Advice_Some, Advice_Blocking };
             step.Answer = answered.Select(p => p.Answer!)
@@ -255,7 +272,7 @@ public sealed partial class ReviewService
             }
         }
 
-        if (!step.Deciding)
+        if (!final)
         {
             await OpenStepAsync(access, review, step.Index + 1, cancellationToken);
             return;

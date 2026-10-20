@@ -7468,6 +7468,10 @@ namespace Delios.Host.Platform.Migrations
 
                             b1.Property<int?>("Days");
 
+                            b1.Property<bool>("Decides");
+
+                            b1.Property<bool>("FromMatrix");
+
                             b1.Property<string>("FunctionCode");
 
                             b1.PrimitiveCollection<string>("GrantsStatuses")

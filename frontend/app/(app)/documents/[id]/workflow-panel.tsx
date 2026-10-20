@@ -239,8 +239,8 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   const carrying = activeCycle
     ? (await documentPage(ctx, review.documentId))?.revisions.find((one) => one.id === activeCycle.revisionId)?.statusCode ?? null
     : null;
-  // The last step answers from the verdicts; every earlier one from the advice list.
-  const outcomeSetKey = run.currentStep === run.steps.length - 1 ? activeCycle?.outcomeSetKey ?? "REVIEW_OUTCOMES" : "REVIEW_ADVICE";
+  // A deciding step (the last always, others where the route says so) answers from the verdicts; the others from the advice.
+  const outcomeSetKey = run.steps[run.currentStep]?.act === "APPROVAL" ? activeCycle?.outcomeSetKey ?? "REVIEW_OUTCOMES" : "REVIEW_ADVICE";
   // The deciding step is offered the verdicts of the review's own set only.
   const outcomes = (await getActiveSet(outcomeSetKey)).filter((one) => outcomeSetKey === "REVIEW_OUTCOMES"
     ? !review.verdictCodes || review.verdictCodes.includes(one.code)
@@ -250,7 +250,7 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
   const alreadyGave = !!step && step.mode === "ALL" && (step.decidedBy ?? []).includes(user.id);
   const iDecide = !!step && mine && !alreadyGave && (step.mode !== "SERIAL" || serialNext === user.id);
   // The last step decides; the earlier steps' verdicts are advice shown to the decider.
-  const deciding = run.currentStep === run.steps.length - 1;
+  const deciding = run.steps[run.currentStep]?.act === "APPROVAL";
   // The deciding step is offered the first request.
   const askWho = (await issuePolicy(ctx)).asked;
   const nextStep = deciding && activeCycle && !activeCycle.outcome
@@ -352,8 +352,8 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
                 <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold ${s.status === "done" ? "bg-emerald-500 text-white" : s.status === "active" ? "bg-amber-500 text-white" : s.status === "declined" ? "bg-red-500 text-white" : "bg-slate-200 text-slate-500"}`}>
                   {s.status === "done" ? "✓" : i + 1}
                 </span>
-                <span className="font-medium text-slate-800">{s.title || (i === run.steps.length - 1 ? "Decision" : `Review ${i + 1}`)}</span>
-                <Chip className={i === run.steps.length - 1 ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{i === run.steps.length - 1 ? "decision" : "advice"}</Chip>
+                <span className="font-medium text-slate-800">{s.title || (s.act === "APPROVAL" ? "Decision" : `Review ${i + 1}`)}</span>
+                <Chip className={s.act === "APPROVAL" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{s.act === "APPROVAL" ? "decision" : "advice"}</Chip>
                 <span className="text-xs text-slate-500">{names}</span>
                 {s.status === "active" ? <Chip className="bg-amber-100 text-amber-800 ring-amber-300">waiting</Chip> : null}
                 {s.status === "active" && activeCycle?.dueAt ? (

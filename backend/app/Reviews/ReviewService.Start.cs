@@ -64,19 +64,39 @@ public sealed partial class ReviewService
         // The sender's choice of people on a step of ours replaces the route's for this
         // review: they answer it, and nobody else. The route itself is unchanged.
         var chosenBySender = new List<string>();
+        var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        var parties = await db.Parties.AsNoTracking().Where(p => p.Active && !p.IsInternal).ToDictionaryAsync(p => p.Code, cancellationToken);
         for (var i = 0; i < route.Steps.Count && request.People is { } chosen && i < chosen.Length; i++)
         {
-            if (route.Steps[i].PartyCode is not null || chosen[i] is not { Length: > 0 } ids) continue;
+            // A step another organization answers as itself (one of ours records it) has nobody to choose.
+            var byProxy = route.Steps[i].PartyCode is { } partyCode && parties.GetValueOrDefault(partyCode)?.Participation == Participations.ByProxy;
+            if (byProxy || chosen[i] is not { Length: > 0 } ids) continue;
             route.Steps[i].FunctionCode = null;
             route.Steps[i].UserIds = ids.Distinct().ToArray();
+            route.Steps[i].FromMatrix = false;
             chosenBySender.Add($"step {i + 1}");
+        }
+        // A step answered by whoever the matrix gives for the document's discipline, the sender having chosen nobody:
+        // those people, narrowed by the organization and function it names.
+        for (var i = 0; i < route.Steps.Count; i++)
+        {
+            var step = route.Steps[i];
+            if (!step.FromMatrix) continue;
+            var party = step.PartyCode is { } code ? parties.GetValueOrDefault(code) : null;
+            var matrix = await (from m in db.Memberships.AsNoTracking()
+                                join u in db.Users.AsNoTracking() on m.UserId equals u.Id
+                                where m.ProjectId == access.Project.Id && m.Active && m.Function!.Active && u.Active
+                                    && document.Discipline != null && m.Department == document.Discipline
+                                    && (party == null ? (u.PartyId == null || u.Party!.IsInternal) : u.PartyId == party.Id)
+                                    && (step.FunctionCode == null || m.Function.Code == step.FunctionCode)
+                                select u.Id).Distinct().ToListAsync(cancellationToken);
+            step.UserIds = [.. step.UserIds.Concat(matrix).Distinct()];
+            step.FunctionCode = step.UserIds.Length > 0 ? null : step.FunctionCode;
         }
 
         // Every step must have someone to answer it, a party's step a reason to
         // send it to them, and the one who decides, if ours, must be allowed to
         // approve this document. An outside party's approval is theirs to give.
-        var catalog = await Catalog.LoadAsync(db, cancellationToken);
-        var parties = await db.Parties.AsNoTracking().Where(p => p.Active && !p.IsInternal).ToDictionaryAsync(p => p.Code, cancellationToken);
         for (var i = 0; i < route.Steps.Count; i++)
         {
             var step = route.Steps[i];
@@ -98,6 +118,10 @@ public sealed partial class ReviewService
             }
             if ((await SeatsAsync(access.Project, step.FunctionCode, party, party?.Participation, cancellationToken, step.UserIds, document)).Count == 0)
             {
+                if (step.FromMatrix)
+                    return Fail(Problems.Invalid("STEP_HAS_NO_HOLDER",
+                        $"The distribution matrix gives nobody {(party is null ? "of ours" : $"of {party.Name}")} for {document.Discipline ?? "this document's discipline"} on step {i + 1} ({step.Title}): choose its people.",
+                        new { step = i + 1, discipline = document.Discipline }));
                 return Fail(Problems.Invalid("STEP_HAS_NO_HOLDER",
                     party is null ? step.FunctionCode is null
                         ? $"Nobody named on step {i + 1} ({step.Title}) is on this project and cleared for {document.Confidentiality ?? "this document"}, so it could not be answered."
@@ -108,28 +132,33 @@ public sealed partial class ReviewService
                     new { step = i + 1, function = step.FunctionCode, party = step.PartyCode }));
             }
         }
-        var deciding = route.Steps[^1];
-        if (deciding.PartyCode is null && deciding.FunctionCode is null)
+        // Every deciding step of ours (owner: several may decide; the last always does) is answered by someone who may approve.
+        for (var i = 0; i < route.Steps.Count; i++)
         {
-            // Only people named: each decides on the strength of a function of theirs on the project.
-            var named = await db.Memberships.AsNoTracking().Include(m => m.Function!).ThenInclude(f => f.Rules)
-                .Where(m => m.ProjectId == access.Project.Id && m.Active && m.Function!.Active && deciding.UserIds.Contains(m.UserId))
-                .ToListAsync(cancellationToken);
-            if (!named.Any(m => Allows(m.Function!, access.Project, Verbs.Approve, document.Facts)))
+            var deciding = route.Steps[i];
+            if (!(deciding.Decides || i == route.Steps.Count - 1) || deciding.PartyCode is not null) continue;
+            if (deciding.FunctionCode is null)
             {
-                return Fail(Problems.Invalid("DECIDER_CANNOT_APPROVE",
-                    "Nobody named on the deciding step may approve this document.", new { step = route.Steps.Count }));
+                // Only people named: each decides on the strength of a function of theirs on the project.
+                var named = await db.Memberships.AsNoTracking().Include(m => m.Function!).ThenInclude(f => f.Rules)
+                    .Where(m => m.ProjectId == access.Project.Id && m.Active && m.Function!.Active && deciding.UserIds.Contains(m.UserId))
+                    .ToListAsync(cancellationToken);
+                if (!named.Any(m => Allows(m.Function!, access.Project, Verbs.Approve, document.Facts)))
+                {
+                    return Fail(Problems.Invalid("DECIDER_CANNOT_APPROVE",
+                        $"Nobody named on step {i + 1} ({deciding.Title}), which decides, may approve this document.", new { step = i + 1 }));
+                }
             }
-        }
-        else if (deciding.PartyCode is null)
-        {
-            var decider = await db.Functions.AsNoTracking().Include(f => f.Rules)
-                .SingleOrDefaultAsync(f => f.Code == deciding.FunctionCode && f.Active, cancellationToken);
-            if (decider is null || !Allows(decider, access.Project, Verbs.Approve, document.Facts))
+            else
             {
-                return Fail(Problems.Invalid("DECIDER_CANNOT_APPROVE",
-                    $"The deciding step is answered by {deciding.FunctionCode}, which may not approve this document.",
-                    new { function = deciding.FunctionCode }));
+                var decider = await db.Functions.AsNoTracking().Include(f => f.Rules)
+                    .SingleOrDefaultAsync(f => f.Code == deciding.FunctionCode && f.Active, cancellationToken);
+                if (decider is null || !Allows(decider, access.Project, Verbs.Approve, document.Facts))
+                {
+                    return Fail(Problems.Invalid("DECIDER_CANNOT_APPROVE",
+                        $"Step {i + 1} ({deciding.Title}), which decides, is answered by {deciding.FunctionCode}, which may not approve this document.",
+                        new { step = i + 1, function = deciding.FunctionCode }));
+                }
             }
         }
 
@@ -159,16 +188,17 @@ public sealed partial class ReviewService
                     TenantId = access.Project.TenantId,
                     Index = i,
                     Title = s.Title,
-                    FunctionCode = party is null ? s.FunctionCode : null,
+                    // Another organization answering here: its people the step names, or those holding the function it names.
+                    FunctionCode = party?.Participation == Participations.ByProxy ? null : s.FunctionCode,
                     // A route stored before steps named people has no list at all: none named.
-                    UserIds = party is null ? s.UserIds ?? [] : [],
+                    UserIds = party?.Participation == Participations.ByProxy ? [] : s.UserIds ?? [],
                     PartyId = party?.Id,
                     PartyName = party?.Name,
                     Participation = party?.Participation,
                     Reason = party is null ? null : s.Reason,
                     // One of ours records the party's single answer.
                     Mode = party?.Participation == Participations.ByProxy ? StepModes.Any : s.Mode,
-                    Deciding = i == route.Steps.Count - 1,
+                    Deciding = s.Decides || i == route.Steps.Count - 1,
                     Days = s.Days,
                     GrantsStatuses = s.GrantsStatuses ?? [],
                 };
