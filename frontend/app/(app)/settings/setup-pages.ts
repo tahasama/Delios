@@ -117,12 +117,6 @@ export const SETUP_PAGES: SetupPage[] = [
     control: true,
   },
   {
-    href: "/settings/security",
-    title: "Sign-in & security",
-    text: "Whether everyone signs in with a second step, who has it on, and turning it off for someone who lost their phone.",
-    group: "Access",
-  },
-  {
     href: "/settings/users",
     title: "People & access",
     text: "Who is on which project, in which function. Add our people, or someone from another organization.",

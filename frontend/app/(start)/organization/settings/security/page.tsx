@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { ToneChip } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -29,6 +30,31 @@ export default async function SecurityPage() {
   // Passwords may be limited to administrators only once the organization's account is in use (backend
   // SSO_NOT_CONFIGURED otherwise): until then the switch is not offered, and the line says why.
   const ssoInUse = !!security.sso?.enabled;
+
+  // Where the provider sends people back, in full: the address of this site, as the browser reached it.
+  const head = await headers();
+  const origin = `${head.get("x-forwarded-proto") ?? "http"}://${head.get("x-forwarded-host") ?? head.get("host") ?? ""}`;
+  // autoComplete off on every field: a browser would otherwise put the administrator's own email and password here.
+  const ssoForm = (
+    <ActionForm action={setSsoAction} submitLabel="Save" className="space-y-3 px-5 py-4 sm:px-6">
+      <p className="text-xs leading-5 text-slate-600">
+        On the sign-in page, people open &ldquo;Sign in with your organization&rsquo;s account&rdquo; and type{" "}
+        <span className="font-mono font-semibold text-slate-800">{security.slug}</span>. Nobody is created by signing in: only people already
+        added here get in, by their email. Give your provider this address as where it sends people back:{" "}
+        <span className="font-mono text-slate-800 select-all">{origin}/api/auth/sso/callback</span>
+      </p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Field label="Name on the button" hint="e.g. Microsoft, Okta, our company"><input name="name" required autoComplete="off" defaultValue={security.sso?.name ?? ""} className={inputCls} /></Field>
+        <Field label="Provider's address" hint="its issuer, https://…"><input name="authority" required type="url" autoComplete="off" defaultValue={security.sso?.authority ?? ""} className={inputCls} /></Field>
+        <Field label="Client id" hint="given by the provider"><input name="clientId" required autoComplete="off" defaultValue={security.sso?.clientId ?? ""} className={inputCls} /></Field>
+        <Field label="Client secret" hint={security.sso ? "kept; type a new one only to change it" : "given by the provider"}>
+          <input name="clientSecret" type="password" autoComplete="new-password" required={!security.sso} className={inputCls} />
+        </Field>
+        <Field label="Email domains" hint="who may sign in this way, e.g. company.com; empty: any"><input name="domains" autoComplete="off" defaultValue={security.sso?.allowedDomains.join(", ") ?? ""} placeholder="company.com" className={inputCls} /></Field>
+      </div>
+      <div className="w-full"><SwitchField name="enabled" defaultChecked={security.sso?.enabled ?? false}>In use: offered on the sign-in page</SwitchField></div>
+    </ActionForm>
+  );
 
   return (
     <div className="space-y-4">
@@ -78,24 +104,19 @@ export default async function SecurityPage() {
           <span className="text-[11px] text-slate-500">single sign-on: people sign in with the account they use at work (OpenID Connect)</span>
           <span className="ml-auto"><ToneChip tone={security.sso?.enabled ? "done" : "idle"}>{security.sso?.enabled ? "In use" : security.sso ? "Set up, not in use" : "Not set up"}</ToneChip></span>
         </div>
-        <ActionForm action={setSsoAction} submitLabel="Save" className="space-y-3 px-5 py-4 sm:px-6">
-          <p className="text-xs leading-5 text-slate-600">
-            On the sign-in page, people open &ldquo;Sign in with your organization&rsquo;s account&rdquo; and type{" "}
-            <span className="font-mono font-semibold text-slate-800">{security.slug}</span>. Nobody is created by signing in: only people already
-            added here get in, by their email. Register this address with your provider as where it sends people back:{" "}
-            <span className="font-mono text-slate-800">/api/auth/sso/callback</span> on this site.
-          </p>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Field label="Name on the button" hint="e.g. Microsoft, Okta, our company"><input name="name" required defaultValue={security.sso?.name ?? ""} className={inputCls} /></Field>
-            <Field label="Provider's address" hint="its issuer, https://…"><input name="authority" required type="url" defaultValue={security.sso?.authority ?? ""} className={inputCls} /></Field>
-            <Field label="Client id" hint="given by the provider"><input name="clientId" required defaultValue={security.sso?.clientId ?? ""} className={inputCls} /></Field>
-            <Field label="Client secret" hint={security.sso ? "kept; type a new one only to change it" : "given by the provider"}>
-              <input name="clientSecret" type="password" autoComplete="off" required={!security.sso} className={inputCls} />
-            </Field>
-            <Field label="Email domains" hint="who may sign in this way; empty: any"><input name="domains" defaultValue={security.sso?.allowedDomains.join(", ") ?? ""} placeholder="company.com" className={inputCls} /></Field>
+        {security.sso ? ssoForm : (
+          <div className="space-y-3 px-5 py-4 sm:px-6">
+            <p className="max-w-3xl text-xs leading-5 text-slate-600">
+              Only for an organization whose people already have a work account with Microsoft, Google, Okta or the like: they
+              then sign in here with it, with no DELIOS password. Nothing to do otherwise; everyone signs in with their email
+              and password. Setting it up takes the details your IT team gets from that provider.
+            </p>
+            <details className="group">
+              <summary className="ask inline-flex list-none items-center">Set it up</summary>
+              <div className="-mx-5 mt-3 border-t border-line sm:-mx-6">{ssoForm}</div>
+            </details>
           </div>
-          <div className="w-full"><SwitchField name="enabled" defaultChecked={security.sso?.enabled ?? false}>In use: offered on the sign-in page</SwitchField></div>
-        </ActionForm>
+        )}
         <div className="space-y-2 border-t border-line px-5 py-4 sm:px-6">
           <p className="text-sm font-semibold text-slate-800">Password sign-in</p>
           <p className="text-xs leading-5 text-slate-600">

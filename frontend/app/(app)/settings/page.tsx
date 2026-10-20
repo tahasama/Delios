@@ -34,7 +34,7 @@ export default async function AdminPage() {
 
   // One live figure per card, so the hub says what is there, and what still needs doing, not just where to go.
   const ESSENTIAL = ["DELIVERABLE_TYPES", "DOCUMENT_TYPES", "DISCIPLINES", "STATUSES", "REASONS_FOR_ISSUE"];
-  const [projects, parties, sets, numbering, functions, people, routes, events, fieldsSet, verdictLists, security, deliverables, emptyLists] = await Promise.all([
+  const [projects, parties, sets, numbering, functions, people, routes, events, fieldsSet, verdictLists, deliverables, emptyLists] = await Promise.all([
     orEmpty(adminProjects).then((all) => all.filter((p) => p.status === "ACTIVE").length),
     orEmpty(adminParties).then((all) => all.filter((p) => p.active)),
     getSets().then((all) => all.length),
@@ -52,7 +52,6 @@ export default async function AdminPage() {
     projectForms(ctx.projectId).then((answer) => (answer?.forms ?? []).reduce((n, form) =>
       n + Object.entries(form.rules).filter(([key, rule]) => fieldsOf(form.form).find((f) => f.key === key)?.fallback !== rule).length + form.own.length, 0)).catch(() => 0),
     api<{ verdicts: { status: string; meaning: string | null }[] }[]>("/api/admin/verdict-lists").catch(() => null),
-    api<{ mfaRequired: boolean; mfaEnrolled: { enrolled: number; of: number } }>("/api/admin/security").catch(() => null),
     getActiveSet("DELIVERABLE_TYPES").catch(() => []),
     Promise.all(ESSENTIAL.map(async (key) => ((await getActiveSet(key).catch(() => [])).length ? null : key))).then((all) => all.filter(Boolean).length),
   ]);
@@ -87,9 +86,6 @@ export default async function AdminPage() {
     "/settings/functions": { text: plural(functions, "function") },
     "/settings/users": people > 1 ? { text: `${plural(people, "person", "people")} on ${ctx.project.code}` } : { text: `only you on ${ctx.project.code}`, attention: true },
     "/settings/workflow-templates": routes ? { text: plural(routes, "route") } : { text: "none yet", attention: true },
-    "/settings/security": security
-      ? { text: `${security.mfaRequired ? "second step asked of everyone" : "second step optional"} · ${security.mfaEnrolled.enrolled} of ${security.mfaEnrolled.of} have it` }
-      : { text: "" },
     "/settings/audit": { text: `${plural(events, "change")} this week` },
   };
 
