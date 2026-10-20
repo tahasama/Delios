@@ -937,7 +937,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A route's working days are only filled in by default (owner, never limited or enforced): five in all, each decider
   given more than each adviser (2 + 3); days typed by hand are kept.
 - What a route takes is enforced: no other document is sent on it (backend NO_ROUTE). Send for review names every route
-  of the project not offered for the documents chosen, with what it takes, so a missing route is never a mystery.
+  of the project not offered for the documents chosen, with what it takes and exactly what does not fit (the document,
+  the field, what it holds and what the route asks: `whyNot`, `lib/reviews/route-scope.ts`), so a missing route is never
+  a mystery.
+- A form whose submit sits outside it (`ActionForm` with `id`, `hideSubmit`, a button `form=…`) has an id used nowhere
+  else on the page, and no hidden field named "id" (it hides the form's own id): either leaves the button without its
+  form and the save silently does nothing (the route form, `route-form-<id>`, `routeId`; an organization, `partyId`).
 - One status chosen on the last step: every document the route accepts is released at it; several: the decider chooses.
 - On the route form each step says what it does, "Advises · Decides" (a choice on the step opened), the last always
   "Decides" (a route always ends with a decision). "Which documents take it" reads "Deliverable type", never "Produced by".

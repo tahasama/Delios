@@ -39,7 +39,7 @@ export function SendForReviewForm({ revisionIds, routes, notOffered = [], review
   revisionIds: string[];
   routes: SendRoute[];
   /** The project's routes not offered here, each with the documents it takes: it does not take every one of these. */
-  notOffered?: { name: string; takes: string }[];
+  notOffered?: { name: string; takes: string; why?: string | null }[];
   reviewers: SendPerson[];
   approvers: SendPerson[];
   /** Everyone on the project, who may be copied in. */
@@ -55,7 +55,12 @@ export function SendForReviewForm({ revisionIds, routes, notOffered = [], review
   const [attempt] = useState(() => crypto.randomUUID());
   const whyNot = notOffered.length ? (
     <ul className="space-y-0.5 text-[11px] leading-4 text-slate-500">
-      {notOffered.map((r) => <li key={r.name}><span className="font-semibold text-slate-700">{r.name}</span> is not offered: it takes {r.takes.charAt(0).toLowerCase() + r.takes.slice(1)}.</li>)}
+      {notOffered.map((r) => (
+        <li key={r.name}>
+          <span className="font-semibold text-slate-700">{r.name}</span> is not offered: it takes {r.takes.charAt(0).toLowerCase() + r.takes.slice(1)}.
+          {r.why ? <span className="block text-slate-500">{r.why}.</span> : null}
+        </li>
+      ))}
     </ul>
   ) : null;
   if (!routes.length) return (

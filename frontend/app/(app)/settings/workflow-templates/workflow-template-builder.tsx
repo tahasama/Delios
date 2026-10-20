@@ -147,10 +147,11 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
     return party ? (parts.length ? `${party.name}: ${parts.join(", ")}` : party.name) : parts.join(", ");
   };
 
-  const formId = `route-${id ?? "new"}`;
+  // Its own id: the route's sheet is "route-<id>", and two alike leave the Save button outside without its form.
+  const formId = `route-form-${id ?? "new"}`;
   return (
     <>
-    <ActionForm action={saveTemplateAction} id={formId} hideSubmit hidden={id ? { level, id } : { level }}
+    <ActionForm action={saveTemplateAction} id={formId} hideSubmit hidden={id ? { level, routeId: id } : { level }}
       className="space-y-0" footerClassName="px-5 pt-3 sm:px-6 empty:hidden">
       <input type="hidden" name="steps" value={JSON.stringify(steps)} />
       <input type="hidden" name="classes" value={allClasses ? "*" : JSON.stringify([scope])} />

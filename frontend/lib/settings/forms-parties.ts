@@ -19,7 +19,8 @@ const text = (formData: FormData, name: string) => String(formData.get(name) ?? 
  */
 export async function savePartyAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const ctx = await requireScope();
-  const id = text(formData, "id");
+  // "partyId": a field named id hides the form's own id, and a Save button outside the form finds no form.
+  const id = text(formData, "partyId") || text(formData, "id");
   const code = text(formData, "code").toUpperCase();
   const name = text(formData, "name");
   const contactId = text(formData, "contactId") || null;

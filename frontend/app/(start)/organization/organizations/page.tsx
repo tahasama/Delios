@@ -182,7 +182,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                       {c?.theirs ? (
                         // Its own DELIOS: its details are its own; we see them, and switch it off for us if need be.
                         <ActionForm id={`party-form-${p.id}`} action={savePartyAction} hideSubmit
-                          hidden={{ id: p.id, name: p.name, code: p.code, kind: p.kind === "COLLABORATOR" ? "COLLABORATOR" : "GUEST" }}
+                          hidden={{ partyId: p.id, name: p.name, code: p.code, kind: p.kind === "COLLABORATOR" ? "COLLABORATOR" : "GUEST" }}
                           className="asking space-y-4 px-5 py-5 sm:px-6">
                           <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-[13px] sm:grid-cols-[160px_minmax(0,1fr)]">
                             <dt className="text-xs font-semibold text-slate-500">Name and code</dt><dd>{p.name} · <span className="font-mono">{p.code}</span></dd>
@@ -193,7 +193,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                           <input type="hidden" name="active" value={p.active ? "on" : "off"} />
                         </ActionForm>
                       ) : (
-                      <ActionForm id={`party-form-${p.id}`} action={savePartyAction} hideSubmit hidden={{ id: p.id }} className="asking space-y-5 px-5 py-5 sm:px-6">
+                      <ActionForm id={`party-form-${p.id}`} action={savePartyAction} hideSubmit hidden={{ partyId: p.id }} className="asking space-y-5 px-5 py-5 sm:px-6">
                         <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                           <Field label="Name" required hint={onceHint(c, p.name, "name")}>
                             <input name="name" required defaultValue={p.name} readOnly={fixedOf(c, "name")} className={cn(field, fixedOf(c, "name") && "text-slate-500")} />

@@ -37,7 +37,8 @@ function revalidateRoutes() {
 }
 
 export async function saveTemplateAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
-  const id = text(formData, "id");
+  // "routeId", never "id": a field named id hides the form's own id, and the Save button outside it finds no form.
+  const id = text(formData, "routeId");
   const name = text(formData, "name");
   const classes = text(formData, "classes") || "*";
   if (!name) return { error: "Name is required." };

@@ -9,7 +9,7 @@ import { getActiveSet } from "@/lib/settings/config";
 import { verdictEffect, VERDICT_EFFECT_SHORT } from "@/lib/reviews/verdict-effect";
 import { matrixBinds } from "@/lib/settings/control-activities";
 import { projectRoutes } from "@/lib/settings/api-admin";
-import { scopeWords } from "@/lib/reviews/route-scope";
+import { scopeWords, whyNot } from "@/lib/reviews/route-scope";
 
 /**
  * Loads what the Send form needs for these revisions: the routes that apply
@@ -43,7 +43,12 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
     getActiveSet("DOCUMENT_TYPES"), getActiveSet("DISCIPLINES"), getActiveSet("CRITICALITY"), getActiveSet("DELIVERABLE_TYPES"),
   ]);
   const lists = { documentTypes, disciplines, criticalities, deliverableTypes, originators: directory.organizations.map((o) => ({ code: o.code, label: o.name })) };
-  const notOffered = all.filter((r) => !applicable.some((one) => one.id === r.id)).map((r) => ({ name: r.name, takes: scopeWords(r.patterns, lists) }));
+  const notOffered = all.filter((r) => !applicable.some((one) => one.id === r.id)).map((r) => ({
+    name: r.name, takes: scopeWords(r.patterns, lists),
+    // Exactly what does not fit: the field, what the document holds, what the route asks.
+    why: whyNot(r.patterns, docs.map((d) => ({ number: d.number, deliverableType: d.deliverableType, docType: d.docType, discipline: d.discipline,
+      criticality: d.criticality, originator: d.originator })), lists),
+  }));
   // The verdicts each route decides with: its own set of the review outcomes, else the set serving each document.
   const outcomes = await getActiveSet("REVIEW_OUTCOMES");
   const verdictsOf = (routeId: string) => {
