@@ -1,12 +1,15 @@
 "use client";
 
 import { TRANSMITTAL_KINDS, kind, kindOf, type TransmittalKind } from "@/lib/transmittals/kinds";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ActionForm } from "@/components/form";
 import { SearchPick } from "@/components/search-pick";
 import { createTransmittalAction } from "@/lib/transmittals/forms";
+import { askToJoinAction } from "@/lib/settings/forms-people";
+import { NewPerson, WhoConfirms } from "@/app/(app)/settings/users/new-person";
+import type { PickItem } from "@/components/search-pick";
 import { RecipientPicker, type Company } from "./recipient-picker";
 import type { OwnField } from "@/lib/settings/field-policy";
 import { OwnFields } from "@/app/(app)/documents/new/own-fields";
@@ -30,7 +33,19 @@ type Prefill = {
   /** The sent transmittal this one completes (a supplement) or corrects (it replaces one they rejected). */
   following?: { id: string; number: string; kind: "SUPPLEMENT" | "REPLACES"; rejection: string | null };
   /** The schedule action it asks a document to be added to: the control function answers it there. */
-  activity?: { id: string; code: string; ask: "DOCUMENT" | "DISCIPLINE" };
+  activity?: {
+    id: string; code: string; ask: "DOCUMENT" | "DISCIPLINE";
+    /** Asking about a discipline: every published one, and those the action carries now (to take one off). */
+    disciplines?: { code: string; label: string }[]; tagged?: string[];
+  };
+};
+
+/** Someone new asked to join the project (People & access, the directory): a request, its answer on People to confirm. */
+export type Joining = {
+  projectCode: string;
+  ourParties: { value: string; label: string }[]; guestParties: { value: string; label: string }[];
+  functions: { value: string; label: string }[]; disciplines: { value: string; label: string }[];
+  confirmers: PickItem[]; mayKeepProof: boolean;
 };
 
 const STEPS = ["Which way, and why", "What goes with it", "Who gets it"];
@@ -68,8 +83,10 @@ const field = "plain w-full py-1.5 text-[13px]";
  * only released revisions, and a received transmittal has no subject of ours.
  */
 export function NewTransmittalForm({
-  reasons, revisions, companies, ourOrganization, parties = [], defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askingBack, mayRecordReceived, outsider = false, unsent,
+  reasons, revisions, companies, ourOrganization, parties = [], defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askingBack, mayRecordReceived, outsider = false, unsent, joining,
 }: {
+  /** Asking for someone new to join: the person's fields in place of what it carries, and who confirms in place of who gets it. */
+  joining?: Joining;
   /** The organizations set up on the project, with their codes: who something was received from. */
   parties?: { id: string; code: string; name: string }[];
   /** Documents ticked in the register with nothing that can go (nothing released): named, not enclosed. */
@@ -115,7 +132,31 @@ export function NewTransmittalForm({
   const [subject, setSubject] = useState(prefill?.subject ?? "");
   const [message, setMessage] = useState(prefill?.message ?? "");
   // Already about something of ours going out: chosen in the register or a package, asked back, or followed up.
-  const sendingOurs = !!placeholders || !!askingBack || !!preselectedRevisionIds?.length || !!prefill?.revisionIds?.length || !!prefill?.following;
+  const sendingOurs = !!placeholders || !!askingBack || !!preselectedRevisionIds?.length || !!prefill?.revisionIds?.length || !!prefill?.following
+    || !!prefill?.activity || !!joining;
+  // What it asks sets its kind and type (owner: "prefill what is obvious, to prevent mistakes"): a request about an
+  // action, asking documents back, someone to join. Shown, never chosen.
+  const fixedAsk = (!!prefill?.activity || !!askingBack || !!joining) && reasons.some((r) => r.code === prefill?.reason);
+  // Who it goes to is set by it too: those who answer it. Copies stay free.
+  const lockedTo = prefill?.activity && prefill.userIds?.length ? `the control function: they answer it on ${prefill.activity.code}`
+    : askingBack && prefill?.userIds?.length ? `${askingBack.to}: it holds ${askingBack.items.length === 1 ? "the document" : "the documents"}`
+    : undefined;
+  const [joiner, setJoiner] = useState("");
+  const joinStep = useRef<HTMLElement>(null);
+  // A discipline asked about: which, and whether added or taken off, write the subject and the message's first line.
+  const [discOp, setDiscOp] = useState<"add" | "off">("add");
+  const [discCode, setDiscCode] = useState("");
+  const discLabel = prefill?.activity?.disciplines?.find((d) => d.code === discCode)?.label ?? "";
+  const tellDiscipline = (op: "add" | "off", code: string) => {
+    const label = prefill?.activity?.disciplines?.find((d) => d.code === code)?.label;
+    if (!prefill?.activity || !label) return;
+    const where = prefill.activity.code;
+    setSubject(op === "add" ? `Add ${label} to ${where}` : `Take ${label} off ${where}`);
+    setMessage((was) => {
+      const why = was.includes("\n\nWhy: ") ? was.slice(was.indexOf("\n\nWhy: ") + 7) : "";
+      return `${op === "add" ? `Please add ${label} to ${where}: the action concerns it.` : `Please take ${label} off ${where}: the action does not concern it.`}\n\nWhy: ${why}`;
+    });
+  };
   const fixedForPlaceholders = !!placeholders && !placeholders.mixed && reasons.some((r) => r.code === "IFU");
   const [chosen, setChosen] = useState<string[]>([...new Set([...(preselectedRevisionIds ?? []), ...(prefill?.revisionIds ?? [])])]);
   // Creating a transmittal sends nothing by itself. Saying so, and offering to
@@ -164,7 +205,7 @@ export function NewTransmittalForm({
     // A letter says something: on to who gets it when it does, else it stays here for its words.
     if (outgoing ? subject.trim() : message.trim()) setStep(3);
   };
-  const may = (n: number) => n === 1 || (askedFirst && (n === 2 || saysSomething));
+  const may = (n: number) => n === 1 || (askedFirst && (n === 2 || saysSomething || !!joining));
   const toggle = (id: string) => setChosen((ids) => (ids.includes(id) ? ids.filter((one) => one !== id) : [...ids, id]));
   // The register, opened for this form: what is enclosed starts ticked, and "Continue" comes back here, on this step,
   // with everything written so far.
@@ -240,7 +281,8 @@ export function NewTransmittalForm({
         })}
       </nav>
 
-      <ActionForm action={createTransmittalAction} hideSubmit className="space-y-0">
+      <ActionForm action={joining ? askToJoinAction : createTransmittalAction} hideSubmit className="space-y-0">
+        {joining ? <input type="hidden" name="openTransmittal" value="1" /> : null}
         {/* What this answers, where it answers something. The thread is kept by
             the record rather than by whoever remembers it. */}
         {prefill?.answering ? (
@@ -265,8 +307,28 @@ export function NewTransmittalForm({
               {" "}{prefill.activity.ask === "DISCIPLINE"
                 ? "Say which discipline, and why the action concerns it."
                 : "Enclose it in step 2 if it is released, or name it in the message."}
-              {" "}the control function answers on the action&rsquo;s page, and you are told.
+              {" "}The control function answers on the action&rsquo;s page, and you are told.
             </p>
+            {prefill.activity.ask === "DISCIPLINE" && prefill.activity.disciplines?.length ? (
+              // Which discipline, and which way: the subject and the message's first line follow; only why is written.
+              <div className="asking mb-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Ask label="Asks to" required>
+                  <select className={field} value={discOp} onChange={(e) => { const op = e.target.value as "add" | "off"; setDiscOp(op); setDiscCode(""); }}>
+                    <option value="add">Add a discipline</option>
+                    <option value="off" disabled={!prefill.activity.tagged?.length}>Take one off</option>
+                  </select>
+                </Ask>
+                <Ask label="Discipline" required hint={discOp === "add" ? "one the action does not carry yet" : `one ${prefill.activity.code} carries`}>
+                  <select className={field} required value={discCode} onChange={(e) => { setDiscCode(e.target.value); tellDiscipline(discOp, e.target.value); }}>
+                    <option value="" disabled>Choose…</option>
+                    {prefill.activity.disciplines
+                      .filter((d) => (discOp === "add" ? !prefill.activity!.tagged?.includes(d.code) : prefill.activity!.tagged?.includes(d.code)))
+                      .map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+                  </select>
+                </Ask>
+                {discLabel ? null : <p className="self-end text-[11px] text-slate-400 lg:col-span-2">Choose it: the subject and the message say it for you.</p>}
+              </div>
+            ) : null}
           </>
         ) : null}
 
@@ -306,7 +368,12 @@ export function NewTransmittalForm({
 
             <div className="asking grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
               {/* The kind first, then its own types (Settings, Reasons for issue). Placeholders are data, by themselves. */}
-              {fixedForPlaceholders ? null : (
+              {fixedAsk ? (
+                <Ask label="Kind" hint="set by what it asks">
+                  <input type="hidden" name="family" value={family} />
+                  <p className={cn(field, "flex items-center text-slate-700")}>{kind(family).label}</p>
+                </Ask>
+              ) : fixedForPlaceholders ? null : (
                 <Ask label="Kind" required hint={kind(family).says}>
                   <select name="family" className={field} value={family} onChange={(e) => { setFamily(e.target.value as TransmittalKind); setReasonCode(""); }}>
                     {TRANSMITTAL_KINDS.map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
@@ -324,7 +391,12 @@ export function NewTransmittalForm({
               )}
               <Ask label={fixedForPlaceholders ? says("reason", "Why") : kind(family).typeLabel} required hint={outgoing ? kind(family).typeHint : "what they sent it for"}>
                 {/* Placeholders go for use: the reason is set by itself, never chosen. */}
-                {outgoing && fixedForPlaceholders ? (
+                {outgoing && fixedAsk ? (
+                  <>
+                    <input type="hidden" name="reasonForIssue" value={reasonCode} />
+                    <p className={cn(field, "flex items-center text-slate-700")}>{reasonLabel}<span className="ml-2 text-[11px] text-slate-400">set by what it asks</span></p>
+                  </>
+                ) : outgoing && fixedForPlaceholders ? (
                   <>
                     <input type="hidden" name="reasonForIssue" value="IFU" />
                     <p className={cn(field, "flex items-center text-slate-700")}>{reasons.find((r) => r.code === "IFU")?.label ?? "For update"}<span className="ml-2 text-[11px] text-slate-400">set for placeholders</span></p>
@@ -338,7 +410,7 @@ export function NewTransmittalForm({
               </Ask>
               {/* An answer asked for: ticked by the sender (never by itself), and then by a day — the day says whether it
                   came in time. One row, level with the reason beside it. */}
-              {outgoing ? (
+              {outgoing && !joining ? (
                 <div className="min-w-0 lg:col-span-2">
                   <span className="mb-1.5 flex h-4 min-w-0 items-baseline gap-2 leading-4 overflow-hidden">
                     <span className="stencil shrink-0 text-slate-500">Answer by{answerRequired ? <span className="ml-0.5 text-red-500">*</span> : null}</span>
@@ -377,6 +449,31 @@ export function NewTransmittalForm({
         </section>
 
         {/* ── 2 · What goes with it ────────────────────────────────────────── */}
+        {joining ? (
+          <section ref={joinStep} className={cn("register register-sheet register-sheet-open", step !== 2 && "hidden")}>
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
+              <span className="stencil mr-1 text-slate-400">2 &middot; Who joins</span>
+              <span className="text-[11px] text-slate-400">someone new: their account is made, and their link to choose a password goes once they are on {joining.projectCode}</span>
+            </div>
+            <div className="asking space-y-5 px-5 py-5 sm:px-6">
+              <NewPerson projectCode={joining.projectCode} ourParties={joining.ourParties} guestParties={joining.guestParties}
+                functions={joining.functions} disciplines={joining.disciplines} mayKeepProof={joining.mayKeepProof} onName={setJoiner} />
+              <Ask label="Subject" hint="set by who joins">
+                <p className={cn(field, "flex items-center text-slate-700")}>{joiner || "Someone"} to join {joining.projectCode}</p>
+              </Ask>
+              <Ask label="Message" hint="optional — whoever confirms reads it">
+                <textarea name="why" rows={3} className={field} placeholder="e.g. joins the piping team for the detailed design" />
+              </Ask>
+            </div>
+            {foot(1,
+              <button type="button" onClick={() => { const bad = [...(joinStep.current?.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select") ?? [])].find((one) => !one.checkValidity()); if (bad) bad.reportValidity(); else setStep(3); }}
+                data-on="true" className="ask">Continue</button>,
+            )}
+          </section>
+        ) : null}
+
+{/* Joining carries a person, not documents: this step is not drawn (its fields would be sent, and insisted on). */}
+        {joining ? null : (
         <section className={cn("register register-sheet register-sheet-open", step !== 2 && "hidden")}>
           {band(2,
             outgoing ? (mustCarry ? "only released revisions can be sent — a data transmittal carries at least one" : "only released revisions can be sent — or send a letter alone")
@@ -509,20 +606,29 @@ export function NewTransmittalForm({
             saysSomething ? null : mustCarry ? null : outgoing ? "Write a subject and a message: the letter says something." : "Tick a document, keep a file, or write a message.",
           )}
         </section>
+        )}
 
-        {/* ── 3 · Who gets it ──────────────────────────────────────────────── */}
+                {/* ── 3 · Who gets it ──────────────────────────────────────────────── */}
         <section className={cn("register register-sheet register-sheet-open", step !== 3 && "hidden")}>
           {band(3, outgoing ? "a person at a company — or copy somebody in to keep them informed, without asking anything of them" : "which of our people it is for")}
           <div className="asking space-y-5 px-5 py-5 sm:px-6">
-            <RecipientPicker
-              companies={companies}
-              preselected={prefill?.userIds ?? []}
-              preselectedCopies={prefill?.copyIds ?? []}
-              label={outgoing ? "Sent to" : "For"}
-              onCount={countPeople}
-            />
+            {joining ? (
+              <>
+                <WhoConfirms confirmers={joining.confirmers} />
+                <p className="text-[11px] text-slate-500">It goes now, as a request to whoever confirms; once confirmed, {joiner || "they"} {joiner ? "is" : "are"} put on {joining.projectCode} and told, and you read the answer on the same thread.</p>
+              </>
+            ) : (
+              <RecipientPicker
+                companies={companies}
+                preselected={prefill?.userIds ?? []}
+                preselectedCopies={prefill?.copyIds ?? []}
+                label={outgoing ? "Sent to" : "For"}
+                onCount={countPeople}
+                lockedTo={lockedTo}
+              />
+            )}
 
-            {outgoing ? (
+            {joining ? null : outgoing ? (
               <label className="flex items-start gap-2.5 rounded-lg border border-line bg-tint-soft px-4 py-3 text-xs text-slate-700">
                 <input type="checkbox" name="issueNow" checked={issueNow} onChange={(e) => setIssueNow(e.target.checked)} className="mt-0.5" />
                 <span>
@@ -534,11 +640,12 @@ export function NewTransmittalForm({
             )}
           </div>
           {foot(2,
-            <button type="submit" disabled={!people} data-on={people ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">
-              {outgoing ? (issueNow ? "Create and send it" : "Create it as a draft") : outsider ? "Send it" : "Record receipt"}
+            <button type="submit" disabled={!people && !joining} data-on={people || joining ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">
+              {joining ? "Send the request" : outgoing ? (issueNow ? "Create and send it" : "Create it as a draft") : outsider ? "Send it" : "Record receipt"}
             </button>,
             // What is about to happen, in one line, beside the button that does it.
-            !people ? "Name at least one person it is addressed to." : `${picked.length ? `${picked.length} document${picked.length === 1 ? "" : "s"}` : "No documents"}${!outgoing && files ? ` + ${files} file${files === 1 ? "" : "s"}` : ""}${!outgoing && !picked.length && !files ? " — accepted as it is recorded" : ""} · ${reasonLabel ?? "no reason chosen"} · ${outgoing ? `from ${ourOrganization}` : outsider ? `to ${ourOrganization}` : `from ${party.trim() || "an unnamed party"}`}`,
+            joining ? `${reasonLabel ?? "Request"} · ${joiner || "someone"} to join ${joining.projectCode}`
+            : !people ? "Name at least one person it is addressed to." : `${picked.length ? `${picked.length} document${picked.length === 1 ? "" : "s"}` : "No documents"}${!outgoing && files ? ` + ${files} file${files === 1 ? "" : "s"}` : ""}${!outgoing && !picked.length && !files ? " — accepted as it is recorded" : ""} · ${reasonLabel ?? "no reason chosen"} · ${outgoing ? `from ${ourOrganization}` : outsider ? `to ${ourOrganization}` : `from ${party.trim() || "an unnamed party"}`}`,
           )}
         </section>
       </ActionForm>

@@ -1381,3 +1381,15 @@ its rules for certain documents; on every document is said by the grid's ticks a
 An email given to someone by an administrator counts only once its owner opens a link sent to that address; until
 then the account keeps the email it had, which is told of the change. Sign-in by the organization's own account
 matches people by email, so an unproven address would let in, or shut out, the wrong person.
+
+## 74 · One transmittal for every ask, its decision taken where it belongs
+
+Whatever one person asks of another on a project (a document or a discipline added to an action, someone to join,
+documents asked back from a supplier) is a transmittal, written on the one New transmittal form. What the ask fixes is
+filled in and shown, never chosen, so it cannot be got wrong: its kind and type (information, request), who it goes to
+where the ask names who answers it (copies stay free), its subject, and the first line of its message; the person only
+writes why. The request then names its decision for whoever is asked ("Confirm", "Refuse", "Add it", "Nothing to add",
+"Confirm the postponement", "Deliver it as it stands"), each leading to the place where it is taken (the action, People
+to confirm, the package), already chosen, because the decision needs what is known there. Anyone else reads who it waits
+for, and once answered, by whom, when, what, and the transmittal that answered it. Decisions are never taken on the
+request itself.

@@ -455,6 +455,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - "Issued for": a status is shown with its code in its full words ("IFU — Issued for update", as "IFR — Issued for
   review"); a reason is shown in its plain words ("For update").
 
+- **One transmittal for every ask** (owner, Standard §74): asks are written on the New transmittal form (an action's
+  "Request a document" / "Request a discipline", "Ask for someone to join" where it is asked of someone, `?join=1`,
+  asking documents back): what the ask fixes is filled in and shown, never chosen (owner: "prefill what is obvious, to
+  prevent mistakes"): kind and type, "Sent to" where the ask names who answers (`RecipientPicker` `lockedTo`; copies
+  free), the subject, the message's first line (a discipline: which, added or taken off). Put on at once (no
+  confirmation), joining is no letter and stays in People & access. A request transmittal names its decision for the
+  person asked (backend `Transmittals/Asks.cs`, `TransmittalPage.Ask`): buttons leading to where it is decided (owner:
+  "the buttons navigate to where decision is made"), the choice made (`?decide=<key>&as=<choice>#decide-<key>`: the
+  row ringed, Refuse's why open); anyone else reads who it waits for, or the answer with its reply. Postponements and a
+  package's shortfall are still sent by their own acts (their letter is written by the app).
+
 ### Organizations working together (docs/ORGANIZATIONS.md, Standard §55)
 - Another organization works on our project in one of three ways: **collaborator** (its own DELIOS,
   linked; its people use their own sign-in), **guest** (accounts we make), **not on DELIOS** (a code; one of

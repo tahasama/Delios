@@ -23,7 +23,12 @@ type Chosen = Person & { copy: boolean };
  * Only people who exist can be chosen, so a name nobody can be matched to never
  * reaches a transmittal, and everyone chosen can open it.
  */
-export function RecipientPicker({ companies, preselected = [], preselectedCopies = [], label = "Sent to", onCount }: {
+export function RecipientPicker({ companies, preselected = [], preselectedCopies = [], label = "Sent to", onCount, lockedTo }: {
+  /**
+   * Who it goes to is set by what it asks (owner: "prefill what is obvious, to prevent mistakes"): those it names
+   * answer it, so "Sent to" is shown, not chosen; copies stay free. The words say why.
+   */
+  lockedTo?: string;
   companies: Company[];
   preselected?: string[];
   /** People copied in — kept informed, and never asked for anything. */
@@ -47,23 +52,39 @@ export function RecipientPicker({ companies, preselected = [], preselectedCopies
 
   const add = (people: Person[], copy: boolean) =>
     setChosen((list) => [...list, ...people.filter((p) => !list.some((one) => one.id === p.id)).map((p) => ({ ...p, copy }))]);
-  const remove = (id: string) => setChosen((list) => list.filter((one) => one.id !== id));
+  const remove = (id: string) => setChosen((list) => list.filter((one) => one.id !== id || (!!lockedTo && !one.copy)));
 
   return (
     <div className="space-y-5">
       {/* The ids travel as the form's fields, whichever list they sit in. */}
       {chosen.map((one) => <input key={one.id} type="hidden" name={one.copy ? "copyUsers" : "recipientUsers"} value={one.id} />)}
-      <Block
-        label={label}
-        required
-        hint="asked to do something with it — type a name, a company or a job, then Enter"
-        copy={false}
-        everyone={everyone}
-        companies={companies}
-        chosen={chosen}
-        onAdd={add}
-        onRemove={remove}
-      />
+      {lockedTo ? (
+        <div>
+          <p className="mb-1.5 flex flex-wrap items-baseline gap-x-2">
+            <span className="stencil text-slate-500">{label}</span>
+            <span className="text-[11px] text-slate-400">{lockedTo}</span>
+          </p>
+          <ul className="flex flex-wrap gap-1.5">
+            {chosen.filter((one) => !one.copy).map((one) => (
+              <li key={one.id} className="rounded-md bg-tint-soft px-2 py-1 text-[12.5px] text-slate-800 ring-1 ring-line">
+                {one.name}<span className="ml-1.5 text-[11px] text-slate-500">{one.company}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <Block
+          label={label}
+          required
+          hint="asked to do something with it — type a name, a company or a job, then Enter"
+          copy={false}
+          everyone={everyone}
+          companies={companies}
+          chosen={chosen}
+          onAdd={add}
+          onRemove={remove}
+        />
+      )}
       <Block
         label="Copy to (cc)"
         hint="kept informed, never asked — optional"

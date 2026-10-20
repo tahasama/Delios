@@ -196,7 +196,9 @@ public static class JoinRequests
             why is null ? $"{said}." : $"{said}. Message: {why}", project.Id, cancellationToken);
         if (!held) await TellJoinedAsync(db, notifier, project, membership, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        return Results.Ok(new { user.Id, Held = held, Said = said, Invited = !held && newAccount && link is null, Link = link });
+        // Asked on a transmittal: its page is where the answer is read (the New transmittal form opens it).
+        return Results.Ok(new { user.Id, Held = held, Said = said, Invited = !held && newAccount && link is null, Link = link,
+            TransmittalId = held ? membership.ConfirmTransmittalId : null });
     }
 
     /// <summary>

@@ -14,7 +14,7 @@ import type { RegisterPage } from "@/lib/types";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };
 
-type Search = { step?: string; answer?: string; due?: string; doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string; askBack?: string; pkg?: string };
+type Search = { step?: string; answer?: string; due?: string; doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string; askBack?: string; pkg?: string; join?: string };
 
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -122,6 +122,22 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   const supplierPeople = supplier ? found.people.filter((one) => one.organization === supplier.name).map((one) => one.id) : [];
   const supplierTo = supplier ? (supplierPeople.length ? supplierPeople : [`party:${supplier.id}`]) : [];
 
+  // Someone new asked to join (People & access, the directory): the person's fields, and who confirms. Only where it is
+  // asked of someone; put on at once, it is no letter and stays where it was.
+  type JoinOptions = { functions: { id: string; name: string }[]; ours: { id: string; name: string }[]; guests: { id: string; name: string }[];
+    confirmers: { id: string; name: string; function: string; manager: boolean }[]; asks: boolean };
+  const joinOptions = sp.join === "1" && ctx.user.isInternal ? await api<JoinOptions>(projectPath(ctx, "/people/join-options")).catch(() => null) : null;
+  const disciplines = (await getActiveSet("DISCIPLINES")).map((one) => ({ code: one.code, label: one.label })).sort((x, y) => x.label.localeCompare(y.label));
+  const joining = joinOptions?.asks ? {
+    projectCode: ctx.project.code,
+    ourParties: joinOptions.ours.map((p) => ({ value: p.id, label: p.name })),
+    guestParties: joinOptions.guests.map((p) => ({ value: p.id, label: p.name })),
+    functions: joinOptions.functions.map((f) => ({ value: f.id, label: f.name })),
+    disciplines: disciplines.map((d) => ({ value: d.code, label: d.label })),
+    confirmers: joinOptions.confirmers.map((c) => ({ id: c.id, name: c.name, detail: c.function, note: c.manager ? "recommended" : null })),
+    mayKeepProof: ctx.can("CONTROL"),
+  } : undefined;
+
 
   return (
     <div>
@@ -159,6 +175,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         preselectedRevisionIds={preselected}
         unsent={unsent}
         parties={found.parties.map((p) => ({ id: p.id, code: p.code, name: p.name }))}
+        joining={joining}
         placeholders={placeholders.length ? { to: supplier!.name, items: placeholders, mixed: owners.length > 1 } : askedIds.length && owners.length > 1 ? { to: "", items: [], mixed: true } : undefined}
         prefill={{
           step: sp.step === "2" ? 2 : undefined,
@@ -169,7 +186,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
           copyIds: following ? followCopies : answerCopies,
           outsiders: sp.to,
           reason: (following && !following.items.length && isData(following.reasonForIssue) ? answerReason?.code : following?.reasonForIssue) ?? (askingBack.length ? requestReason?.code : undefined)
-            ?? (placeholders.length && reasons.some((r) => r.code === "IFU") ? "IFU" : undefined) ?? sp.reason,
+            ?? (placeholders.length && reasons.some((r) => r.code === "IFU") ? "IFU" : undefined) ?? (joining ? requestReason?.code : undefined) ?? sp.reason,
           party: answering && answering.direction === "INCOMING" ? answering.issuingParty : sp.party,
           // One short line whatever the count: the package, how many, to whom. The documents are listed on it.
           subject: askingBack.length && !sp.subject
@@ -187,7 +204,10 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
             : undefined),
           answering: answering ? { id: answering.id, number: answering.number, subject: answering.subject } : undefined,
           following: following ? { id: following.id, number: following.number, kind: followKind, rejection: following.rejectionReason } : undefined,
-          activity: asked ? { id: asked.activity.id, code: asked.activity.code, ask: sp.ask === "DISCIPLINE" ? "DISCIPLINE" : "DOCUMENT" } : undefined,
+          activity: asked ? {
+            id: asked.activity.id, code: asked.activity.code, ask: sp.ask === "DISCIPLINE" ? "DISCIPLINE" : "DOCUMENT",
+            disciplines, tagged: asked.activity.departments ?? [],
+          } : undefined,
         }}
       />
     </div>

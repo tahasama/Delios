@@ -1,45 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Search, UserPlus } from "lucide-react";
 import { ActionForm } from "@/components/form";
-import { Field } from "@/components/ui";
 import { SearchPick, type PickItem } from "@/components/search-pick";
+import { Field } from "@/components/ui";
+import { NewPerson, WhoConfirms, FunctionAndDepartment } from "./new-person";
 import { askToJoinAction } from "@/lib/settings/forms-people";
 
 type Option = { value: string; label: string };
 
 /** A field as on the new-document form: grey, no box, inside the sheet's `asking` body. */
 const field = "plain w-full";
-
-/** The function and department they would hold, the same on both forms. */
-function FunctionAndDepartment({ projectCode, functions, disciplines }: { projectCode: string; functions: Option[]; disciplines: Option[] }) {
-  return (
-    <>
-      <Field label={`Function on ${projectCode}`} required>
-        <select name="functionId" required defaultValue="" className={field}>
-          <option value="" disabled>Choose…</option>
-          {functions.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-        </select>
-      </Field>
-      <Field label="Department" hint="their discipline: told about actions, confirms going ahead">
-        <select name="department" defaultValue="" className={field}>
-          <option value="">None</option>
-          {disciplines.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-        </select>
-      </Field>
-    </>
-  );
-}
-
-/** Who confirms, when the project asks for it: holders of Manage recommended, anyone on the project choosable. */
-function WhoConfirms({ confirmers }: { confirmers: PickItem[] }) {
-  const recommended = confirmers.filter((c) => c.note === "recommended");
-  return (
-    <SearchPick single name="confirmerId" label="Who confirms" hint="nobody chosen: everyone who holds Manage is asked" items={confirmers}
-      initial={recommended.length === 1 ? [recommended[0].id] : []} />
-  );
-}
 
 /**
  * "Someone joins <project>": one sheet, the new-document form's way, never a sheet inside a sheet. Closed, its band
@@ -70,8 +43,6 @@ export function SomeoneJoins({
   footnote?: React.ReactNode;
 }) {
   const [chosen, setChosen] = useState<"add" | "ask" | null>(null);
-  const [from, setFrom] = useState<"ours" | "guest">("ours");
-  const orgs = from === "ours" ? ourParties : guestParties;
   const formId = `someone-joins-${chosen ?? "none"}`;
 
   const band = (title: string, said: string) => (
@@ -93,7 +64,13 @@ export function SomeoneJoins({
                 <Search aria-hidden className="h-3.5 w-3.5" /> Add someone
               </button>
             ) : null}
-            <button type="button" onClick={() => setChosen("ask")} className="ask"><UserPlus aria-hidden className="h-3.5 w-3.5" /> Ask for someone to join</button>
+            {/* Asked of someone, it is a request: written on the one transmittal form, everything obvious filled in.
+                Put on at once (no confirmation), it is no letter: it stays here. */}
+            {asks ? (
+              <Link href="/transmittals/new?join=1" className="ask"><UserPlus aria-hidden className="h-3.5 w-3.5" /> Ask for someone to join</Link>
+            ) : (
+              <button type="button" onClick={() => setChosen("ask")} className="ask"><UserPlus aria-hidden className="h-3.5 w-3.5" /> Ask for someone to join</button>
+            )}
           </div>
           {footnote ? <p className="text-[11px] leading-4 text-slate-500">{footnote}</p> : null}
         </div>
@@ -115,32 +92,8 @@ export function SomeoneJoins({
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-              <Field label="First name" required><input name="firstName" required autoComplete="off" className={field} /></Field>
-              <Field label="Last name" required><input name="lastName" required autoComplete="off" className={field} /></Field>
-              <Field label="Email" required hint="where their link to choose a password goes"><input type="email" name="email" required autoComplete="off" className={field} /></Field>
-              <Field label="Of" required hint="ours, or a guest organization (accounts we make)">
-                <div className="flex gap-2">
-                  <select value={from} onChange={(e) => setFrom(e.target.value as "ours" | "guest")} className="plain w-auto" aria-label="Ours or a guest">
-                    <option value="ours">Our organization</option>
-                    <option value="guest" disabled={!guestParties.length}>A guest organization</option>
-                  </select>
-                  {orgs.length > 1 || from === "guest" ? (
-                    <select name="partyId" required defaultValue="" key={from} className={field} aria-label="Which organization">
-                      <option value="" disabled>Choose…</option>
-                      {orgs.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  ) : <input type="hidden" name="partyId" value={orgs[0]?.value ?? ""} />}
-                </div>
-              </Field>
-              <FunctionAndDepartment projectCode={projectCode} functions={functions} disciplines={disciplines} />
-              {asks ? <WhoConfirms confirmers={confirmers} /> : null}
-              {mayKeepProof ? (
-                <Field label="What it came on" hint="optional — the email or letter that asked for them, kept with the request as proof">
-                  <input type="file" name="proof" className="w-full" />
-                </Field>
-              ) : null}
-            </div>
+            <NewPerson projectCode={projectCode} ourParties={ourParties} guestParties={guestParties} functions={functions}
+              disciplines={disciplines} mayKeepProof={mayKeepProof} />
             <Field label="Message" hint="optional — whoever answers reads it">
               <textarea name="why" rows={2} className={field} placeholder="e.g. joins the piping team for the detailed design" />
             </Field>

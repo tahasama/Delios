@@ -102,7 +102,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     users: controllers.map((one) => one.id).join(","),
     subject: `Add a document to ${action.code}${department ? ` (${deptLabel(department)})` : ""}`,
     message: [
-      `Please add the attached document to ${action.code}, ${action.name}, on ${fmtDate(action.start)}, for ${department ? deptLabel(department) : "the discipline …"}.`,
+      // Only what is known is written: the control function chooses its discipline when adding it, from its own details.
+      `Please add the attached document to ${action.code}, ${action.name}, on ${fmtDate(action.start)}${department ? `, for ${deptLabel(department)}` : ""}.`,
       "It was not on the requirements list.",
     ].join("\n\n"),
   })}`;
@@ -120,7 +121,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     ask: "DISCIPLINE",
     users: controllers.map((one) => one.id).join(","),
     subject: `A discipline on ${action.code}`,
-    message: `Please add the discipline … to (or take it off) ${action.code}, ${action.name}, on ${fmtDate(action.start)}.\n\nWhy: …`,
+    // Which discipline, and which way, are chosen on the form: it writes the message's first line; only why is written.
+    message: "",
   })}`;
 
   // The requests about this action not yet answered: the control function sees them all; whoever is asked to

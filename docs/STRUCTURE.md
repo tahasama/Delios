@@ -37,7 +37,7 @@ backend/
 │   │                     ListRules: groups, the app's lists, which set of a list serves a deliverable type; Catalog.IsOfferedFor checks it
 │   │                     SheetGuard: every spreadsheet checked before it is read (type, size unpacked, macros, viruses)
 │   ├── Reviews/          routes, steps, advice, verdicts, release
-│   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs); matching what arrived
+│   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs); what a request asks and where it is decided (Asks.cs); matching what arrived
 │   │                     to one of ours and packages taking documents as they come (IncomingService.Taking.cs)
 │   ├── Packages/         delivery packages and supplier packages; how other organizations' documents come in (Intake.cs: by placeholder or as they come)
 │   ├── Actions/          the schedule, its actions, what each needs, notices
