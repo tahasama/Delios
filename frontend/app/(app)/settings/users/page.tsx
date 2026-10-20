@@ -22,6 +22,7 @@ import { NotifyPanel } from "@/components/notify-panel";
 import { fromToday } from "@/lib/core/days";
 import { NoAccess } from "../no-access";
 import { SomeoneJoins } from "./join-form";
+import { JumpPick } from "@/components/jump-pick";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "People & access" };
@@ -206,22 +207,23 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
           <span id="list-head" className="stencil mr-1 text-slate-500">{shownOrg ? shownOrg.name : "Everyone"}</span>
           <span className="text-[11px] text-slate-500">{shown.length} · function and department shown for {project.code}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-2.5 text-xs sm:px-6">
-          <span className="stencil mr-1 text-slate-500">Organization</span>
-          <Link href={chip({ project: projectFilter || undefined })} data-on={!shownOrg} aria-current={!shownOrg ? "true" : undefined} className="ask">All</Link>
-          {parties.map((party) => (
-            <Link key={party.id} href={chip({ org: party.id, project: projectFilter || undefined })}
-              data-on={shownOrg?.id === party.id} aria-current={shownOrg?.id === party.id ? "true" : undefined} className="ask">{party.name}</Link>
-          ))}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line px-5 py-2.5 text-xs sm:px-6">
+          {/* Organization and project as search fields (owner): a row of chips grows with every organization. */}
+          <label className="flex items-center gap-2">
+            <span className="stencil text-slate-500">Organization</span>
+            <JumpPick label="Organization" className="w-56" items={[
+              { href: chip({ project: projectFilter || undefined }), label: "All organizations", on: !shownOrg },
+              ...parties.map((party) => ({ href: chip({ org: party.id, project: projectFilter || undefined }), label: party.name, detail: party.code, on: shownOrg?.id === party.id })),
+            ]} />
+          </label>
           {projects.length > 1 ? (
-            <>
-              <span className="stencil mr-1 ml-3 text-slate-500">Project</span>
-              <Link href={chip({ org: shownOrg?.id })} data-on={!projectFilter} aria-current={!projectFilter ? "true" : undefined} className="ask">Any</Link>
-              {projects.map((item) => (
-                <Link key={item.id} href={chip({ org: shownOrg?.id, project: item.id })}
-                  data-on={projectFilter === item.id} aria-current={projectFilter === item.id ? "true" : undefined} className="ask">{item.code}</Link>
-              ))}
-            </>
+            <label className="flex items-center gap-2">
+              <span className="stencil text-slate-500">Project</span>
+              <JumpPick label="Project" className="w-44" items={[
+                { href: chip({ org: shownOrg?.id }), label: "Any project", on: !projectFilter },
+                ...projects.map((item) => ({ href: chip({ org: shownOrg?.id, project: item.id }), label: item.code, detail: item.name, on: projectFilter === item.id })),
+              ]} />
+            </label>
           ) : null}
           {/* Find a person: Enter applies; the organization and project chosen stay. */}
           <form className="asking ml-auto flex min-w-56 items-center gap-2">

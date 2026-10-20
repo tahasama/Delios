@@ -574,7 +574,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   together. Ending a document is already its registrar's too; legal hold an administrator's.
 - People & access, in the reference style: masthead (on the project · waiting · refused, and how joining works here),
   "Someone joins <project>" ("Add someone", "Ask for someone to join"), "Waiting to be confirmed" (with Remind), and
-  Everyone (organization and project chips, a field to find a name or email; "Other projects" only when someone shown
+  Everyone (organization and project as search fields that apply at once, `JumpPick`, owner: chips grow with every
+  organization; a field to find a name or email; "Other projects" only when someone shown
   is on another; acts as icons: activity, change, ask for them to join; each person's Change: function, department, name and email unless
   linked, "Can sign in" on every project, "Take off <project>", asked first). A linked account (works here from its
   own DELIOS) changes only its function and department here. The organization's own extra fields on a person (Forms
