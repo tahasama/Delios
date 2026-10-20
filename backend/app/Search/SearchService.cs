@@ -18,7 +18,7 @@ public sealed record SearchResult(string Provider, IReadOnlyList<DocumentSummary
 /// reached, the search falls back to Postgres rather than failing.
 /// </summary>
 public sealed class SearchService(
-    ReadDatabase reads, DocumentService documents, IServiceProvider services, IOptions<SearchOptions> options,
+    ReadDatabase reads, IServiceProvider services, IOptions<SearchOptions> options,
     ILogger<SearchService> logger)
 {
     /// <summary>Most results one search returns.</summary>
@@ -32,7 +32,6 @@ public sealed class SearchService(
     public async Task<SearchResult> SearchAsync(ProjectAccess access, string words, int limit, CancellationToken cancellationToken)
     {
         var size = Math.Clamp(limit, 1, MaxResults);
-        var restricted = await documents.RestrictedAsync(cancellationToken);
         if (options.Value.UsesOpenSearch)
         {
             using var timer = AppMetrics.SearchSeconds.WithLabels(SearchOptions.OpenSearch).NewTimer();
@@ -40,7 +39,7 @@ public sealed class SearchService(
             {
                 var ranked = await services.GetRequiredService<OpenSearchClient>()
                     .QueryAsync(access.Project.TenantId, access.Project.Id, words, size * 3, cancellationToken);
-                var visible = await reads.ReadAsync(source => DocumentQueries.Visible(source, access, restricted).AsNoTracking()
+                var visible = await reads.ReadAsync(source => DocumentQueries.Visible(source, access).AsNoTracking()
                     .Where(d => ranked.Contains(d.Id)).Select(Summary).ToListAsync(cancellationToken), cancellationToken);
                 var order = ranked.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i);
                 return new SearchResult(SearchOptions.OpenSearch, visible.OrderBy(d => order[d.Id]).Take(size).ToList());
@@ -62,7 +61,7 @@ public sealed class SearchService(
             .Select(w => "%" + w.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%").ToList();
         var items = await reads.ReadAsync(source =>
         {
-            var query = DocumentQueries.Visible(source, access, restricted).AsNoTracking();
+            var query = DocumentQueries.Visible(source, access).AsNoTracking();
             foreach (var term in terms)
             {
                 query = query.Where(d => EF.Functions.ILike(d.Number, term) || EF.Functions.ILike(d.Title, term)

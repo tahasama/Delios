@@ -59,11 +59,10 @@ public static class ReviewListEndpoints
     {
         var access = ProjectAccessFilter.Of(http);
         if (!RegisterEndpoints.PageSizes.Contains(per)) per = 50;
-        var restricted = await documents.RestrictedAsync(cancellationToken);
         var today = WorkingCalendar.Today(clock, access.Project.TimeZone);
         return Results.Ok(await reads.ReadAsync(async db =>
         {
-            var query = Filter(db, Visible(db, access, restricted), filter, today);
+            var query = Filter(db, Visible(db, access), filter, today);
             var total = await query.CountAsync(cancellationToken);
             var pages = Math.Max(1, (int)Math.Ceiling(total / (double)per));
             page = Math.Clamp(page, 1, pages);
@@ -79,11 +78,10 @@ public static class ReviewListEndpoints
     {
         if (format is not ("csv" or "xlsx")) return Problems.Invalid("FORMAT_INVALID", "csv or xlsx.");
         var access = ProjectAccessFilter.Of(http);
-        var restricted = await documents.RestrictedAsync(cancellationToken);
         var today = WorkingCalendar.Today(clock, access.Project.TimeZone);
         var rows = await reads.ReadAsync(async db =>
         {
-            var ids = await Sort(db, Filter(db, Visible(db, access, restricted), filter, today), filter).Take(20_000)
+            var ids = await Sort(db, Filter(db, Visible(db, access), filter, today), filter).Take(20_000)
                 .Select(r => r.Id).ToListAsync(cancellationToken);
             return await RowsAsync(db, ids, cancellationToken);
         }, cancellationToken);
@@ -104,9 +102,9 @@ public static class ReviewListEndpoints
     }
 
     /// <summary>The reviews of documents the caller may read.</summary>
-    private static IQueryable<Review> Visible(DeliosDbContext db, ProjectAccess access, IReadOnlyList<string> restricted)
+    private static IQueryable<Review> Visible(DeliosDbContext db, ProjectAccess access)
     {
-        var documents = DocumentQueries.Visible(db, access, restricted).Select(d => d.Id);
+        var documents = DocumentQueries.Visible(db, access).Select(d => d.Id);
         // A revision of a type that is not reviewed is released through a review with no steps: not a review to list.
         return db.Reviews.AsNoTracking().Where(r => r.ProjectId == access.Project.Id && documents.Contains(r.DocumentId) && r.Steps.Any());
     }

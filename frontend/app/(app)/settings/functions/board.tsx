@@ -38,9 +38,9 @@ function parseVerbs(json: string): Verb[] {
  * that project, its first change taking the project's own copy (owner: "we should be able to change functions on a
  * project level"). Configure stays the organization's. Who holds which function on a project is changed in People & access.
  *
- * One place per function: the grid's ticks give a permission on every document; a function's name opens it under its
- * line (`?open=<id>`), with every rule it holds (every document, or certain documents only), "Add a rule" and, in the
- * organization's Settings, the function itself. The key under the grid says what each permission allows.
+ * One place per function: the grid's ticks give a permission on every document, and are the only place saying so; a
+ * function's name opens it under its line (`?open=<id>`), with what the grid cannot show: its rules for certain
+ * documents only, "Add a rule" (which asks which documents) and, in the organization's Settings, the function itself. The key under the grid says what each permission allows.
  */
 export async function FunctionsBoard({ level, open, adding }: { level: "project" | "organization"; open?: string; adding?: boolean }) {
   let scope: { projectId: string } | null = null;
@@ -302,33 +302,32 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
   fixedHere: (v: Verb) => boolean; scopeOf: (rule: BoardFunction["rules"][number]) => { field: string; value: string }[];
   selectors: Selector[];
 }) {
-  const ordered = [...rules].sort((a, b) => scopeOf(a).length - scopeOf(b).length);
+  // On every document is the ticks on its line, said once there; here only what the grid cannot show.
+  const narrowed = rules.filter((rule) => scopeOf(rule).length > 0);
   return (
     <div className="space-y-3">
       <p className="flex flex-wrap items-baseline gap-2">
-        <span className="stencil text-slate-500">What it may do</span>
-        <span className="text-[11px] text-slate-500">rules only add: nothing takes away what another rule gives</span>
+        <span className="stencil text-slate-500">For certain documents only</span>
+        <span className="text-[11px] text-slate-500">on top of its ticks: a rule only adds, nothing takes away what another gives</span>
       </p>
-      {ordered.length === 0 ? (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200">No rule yet: whoever holds {fn.name} can do nothing.</p>
+      {narrowed.length === 0 ? (
+        <p className="text-xs text-slate-500">Nothing: {fn.name} may do only what its ticks say, on every document.</p>
       ) : (
         <ul className="divide-y divide-line rounded-md ring-1 ring-line">
-          {ordered.map((rule) => {
+          {narrowed.map((rule) => {
             const verbs = parseVerbs(rule.verbs);
             const scope = scopeOf(rule);
             return (
               <li key={rule.id} className="flex items-start justify-between gap-3 px-3 py-2">
                 <div className="min-w-0 space-y-1">
                   <p className="text-xs text-slate-700">
-                    {scope.length
-                      ? scope.map((s, i) => <span key={s.field}>{i ? " · " : ""}<span className="text-slate-500">{s.field}</span> <span className="font-semibold">{s.value}</span></span>)
-                      : <span className="font-semibold">Every document</span>}
+                    {scope.map((s, i) => <span key={s.field}>{i ? " · " : ""}<span className="text-slate-500">{s.field}</span> <span className="font-semibold">{s.value}</span></span>)}
                   </p>
                   <p className="flex flex-wrap gap-1">{verbs.map((v) => <Chip key={v} title={VERB_BLURB[v]}>{VERB_LABEL[v]}</Chip>)}</p>
                 </div>
                 {rights && !verbs.some(fixedHere) ? (
                   <ActionForm action={deletePermissionRuleAction} hideSubmit hidden={{ ruleId: rule.id, level }} className="shrink-0 space-y-1"
-                    confirmText={`Remove this rule from ${fn.name}? ${verbs.map((v) => VERB_LABEL[v]).join(", ")}${scope.length ? ` for ${scope.map((s) => s.value).join(", ")}` : " on every document"} is then no longer given by it.`}>
+                    confirmText={`Remove this rule from ${fn.name}? ${verbs.map((v) => VERB_LABEL[v]).join(", ")} for ${scope.map((s) => s.value).join(", ")} is then no longer given by it.`}>
                     <button type="submit" title="Remove this rule" aria-label={`Remove this rule from ${fn.name}`}
                       className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" aria-hidden /></button>
                   </ActionForm>
@@ -345,7 +344,7 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
           <ActionForm action={savePermissionRuleAction} submitLabel="Add the rule" size="sm" hidden={{ functionId: fn.id, level }} className="mt-3 space-y-4">
             <VerbTicks verbs={GRANTABLE.filter((v) => !fixedHere(v))} label="May" />
             <div className="space-y-1.5">
-              <p className="stencil text-slate-500">On these documents <span className="font-normal normal-case tracking-normal text-slate-400">· empty: any</span></p>
+              <p className="stencil text-slate-500">On these documents <span className="font-normal normal-case tracking-normal text-slate-400">· at least one; on every document is a tick on its line</span></p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {selectors.map((sel) => (
                   <Field key={sel.name} label={sel.label} hint={sel.values.length > LONG ? "type part of the code or name" : undefined}>

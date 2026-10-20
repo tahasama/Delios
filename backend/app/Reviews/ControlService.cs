@@ -86,8 +86,7 @@ public sealed class ControlService(DeliosDbContext db, AuditLog audit, IClock cl
         ProjectAccess access, Guid revisionId, ControlRequest request, CancellationToken cancellationToken)
     {
         var revision = await db.Revisions.Include(r => r.Files).SingleOrDefaultAsync(r => r.Id == revisionId, cancellationToken);
-        var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
-        var document = revision is null ? null : await DocumentQueries.Visible(db, access, restricted)
+        var document = revision is null ? null : await DocumentQueries.Visible(db, access)
             .SingleOrDefaultAsync(d => d.Id == revision.DocumentId, cancellationToken);
         if (revision is null || document is null) return (null, Problems.NotFound("REVISION_NOT_FOUND", "No such revision."));
         if (!access.Allows(Verbs.Control, document.Facts) && !await StandIns.ArrivedRevisionAsync(db, access, revision.Id, cancellationToken))

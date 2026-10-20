@@ -227,7 +227,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             ("C", "Low", new { retention = "PROJECT_DURATION", meaning = "An error is put right with no consequence on site: lists, reports for information." }));
         Set(ValueSets.Confidentiality,
             ("PUBLIC", "Public", null), ("INTERNAL", "Internal", new { @default = true }),
-            ("CONFIDENTIAL", "Confidential", new { restricted = true }));
+            ("CONFIDENTIAL", "Confidential", null));
 
         // The recommendation, as data the administrator can change.
         Set(ValueSets.GenericTitleWords, [.. new[]

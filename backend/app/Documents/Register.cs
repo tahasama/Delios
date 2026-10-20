@@ -107,10 +107,9 @@ public static class RegisterEndpoints
         string? set = null)
     {
         var access = ProjectAccessFilter.Of(http);
-        var restricted = await documents.RestrictedAsync(cancellationToken);
         return Results.Ok(await reads.ReadAsync(async db =>
         {
-            var docs = Visible(db, access, restricted);
+            var docs = Visible(db, access);
             var (filter, codes) = set switch
             {
                 ValueSets.Disciplines => ("discipline", docs.Select(d => d.Discipline)),
@@ -138,10 +137,9 @@ public static class RegisterEndpoints
     {
         var access = ProjectAccessFilter.Of(http);
         if (!PageSizes.Contains(per)) per = 50;
-        var restricted = await documents.RestrictedAsync(cancellationToken);
         return Results.Ok(await reads.ReadAsync(async db =>
         {
-            var query = Filter(db, Visible(db, access, restricted), filter);
+            var query = Filter(db, Visible(db, access), filter);
             var total = await query.CountAsync(cancellationToken);
             var pages = Math.Max(1, (int)Math.Ceiling(total / (double)per));
             page = Math.Clamp(page, 1, pages);
@@ -167,10 +165,9 @@ public static class RegisterEndpoints
     {
         if (format is not ("csv" or "xlsx")) return Problems.Invalid("FORMAT_INVALID", "csv or xlsx.");
         var access = ProjectAccessFilter.Of(http);
-        var restricted = await documents.RestrictedAsync(cancellationToken);
         var rows = await reads.ReadAsync(async db =>
         {
-            var ids = await Sort(db, Filter(db, Visible(db, access, restricted), filter), filter).Take(ExportLimit)
+            var ids = await Sort(db, Filter(db, Visible(db, access), filter), filter).Take(ExportLimit)
                 .Select(d => d.Id).ToListAsync(cancellationToken);
             return await RowsAsync(db, ids, cancellationToken);
         }, cancellationToken);
@@ -249,8 +246,8 @@ public static class RegisterEndpoints
 
     private static readonly string[] OutOfUse = [DocumentStates.Withdrawn, DocumentStates.Cancelled, DocumentStates.Archived];
 
-    private static IQueryable<Document> Visible(DeliosDbContext db, ProjectAccess access, IReadOnlyList<string> restricted) =>
-        DocumentQueries.Visible(db, access, restricted).AsNoTracking();
+    private static IQueryable<Document> Visible(DeliosDbContext db, ProjectAccess access) =>
+        DocumentQueries.Visible(db, access).AsNoTracking();
 
     /// <summary>Applies every filter given. Each narrows; none widens.</summary>
     public static IQueryable<Document> Filter(DeliosDbContext db, IQueryable<Document> query, RegisterFilter f)

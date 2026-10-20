@@ -104,7 +104,6 @@ public sealed partial class KeepingService
 
     private async Task<Document?> VisibleAsync(ProjectAccess access, Guid documentId, CancellationToken cancellationToken)
     {
-        var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
-        return await DocumentQueries.Visible(db, access, restricted).SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
+        return await DocumentQueries.Visible(db, access).SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
     }
 }

@@ -4,7 +4,6 @@ import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { ReadersPanel } from "./readers-panel";
 import { documentAssets, projectAssets } from "@/lib/records/api";
 import { documentReaders, projectReaders } from "@/lib/documents/api-readers";
-import { openConfidentiality } from "@/lib/core/permissions";
 import { controlDoes, policy as controlPolicy } from "@/lib/settings/control-activities";
 import { notFound } from "next/navigation";
 import { requireScope } from "@/lib/core/scope";
@@ -129,8 +128,8 @@ export default async function DocumentDetailPage({
     ? (await activityList(ctx)).filter((a) => a.departments.includes(doc.discipline) && !doc.baselineEntries.some((e) => e.action.code === a.code))
     : [];
 
-  // A closed document — above the open confidentiality levels — is read by the
-  // people named on it. Whoever is answerable for the content names them.
+  // A document above some function's clearance is read by those people only if named on it. Whoever is answerable
+  // for the content names them.
   // Who retires a document and who voids a revision is the project's answer.
   const [withdrawIsControl, voidIsControl] = await Promise.all([
     controlDoes(ctx, "WITHDRAW"),
@@ -141,9 +140,9 @@ export default async function DocumentDetailPage({
   const lastReleased = doc.revisions.find((one) => one.state === "RELEASED" || one.state === "SUPERSEDED");
   const everReleased = !!lastReleased;
 
-  const confidentialityRows = await getSet("CONFIDENTIALITY");
-  const openCodes = openConfidentiality(confidentialityRows.map((one) => ({ code: one.code, props: one.props })));
-  const closed = !!doc.confidentiality && !openCodes.includes(doc.confidentiality);
+  // Clearance is the one confidentiality rule (owner): above some function's clearance on the project, its people read
+  // the document only if named on it, so who is named is shown, and may be changed.
+  const closed = doc.aboveSomeClearance;
   const answerableFor = closed
     ? [...new Set([doc.createdByName, ...doc.revisions.flatMap((r) => [r.authoredByName, r.uploadedByName])].filter((one): one is string => !!one))]
     : [];

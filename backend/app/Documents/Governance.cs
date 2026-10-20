@@ -32,7 +32,7 @@ public static class GovernanceEndpoints
     private static Actor Who(ProjectAccess a) => new(a.UserId, a.UserName);
 
     private static async Task<Document?> VisibleAsync(DeliosDbContext db, DocumentService documents, ProjectAccess access, Guid id, CancellationToken c) =>
-        await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(c)).SingleOrDefaultAsync(d => d.Id == id, c);
+        await DocumentQueries.Visible(db, access).SingleOrDefaultAsync(d => d.Id == id, c);
 
     /// <summary>A record is confirmed: fixed as evidence, never revised; a mistake is corrected by a further record.</summary>
     private static async Task<IResult> ConfirmAsync(Guid documentId, HttpContext h, DeliosDbContext db, DocumentService documents, AuditLog audit,

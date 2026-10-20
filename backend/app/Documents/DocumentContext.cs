@@ -28,8 +28,7 @@ public static class DocumentContextEndpoints
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Read)) return Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register.");
-        var restricted = await documents.RestrictedAsync(cancellationToken);
-        if (!await DocumentQueries.Visible(db, access, restricted).AnyAsync(d => d.Id == documentId, cancellationToken))
+        if (!await DocumentQueries.Visible(db, access).AnyAsync(d => d.Id == documentId, cancellationToken))
             return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
 
         var revisionIds = await db.Revisions.Where(r => r.DocumentId == documentId).Select(r => r.Id).ToListAsync(cancellationToken);

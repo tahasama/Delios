@@ -215,7 +215,7 @@ public sealed partial class IncomingService(
             var revisions = await db.Revisions.AsNoTracking().Where(r => attached.Contains(r.Id) && r.ProjectId == access.Project.Id)
                 .ToListAsync(cancellationToken);
             var ids = revisions.Select(r => r.DocumentId).ToList();
-            var owned = await DocumentQueries.Visible(db, access, catalog.RestrictedLevels())
+            var owned = await DocumentQueries.Visible(db, access)
                 .Where(d => ids.Contains(d.Id) && d.Originator == party.Code).ToDictionaryAsync(d => d.Id, cancellationToken);
             if (revisions.Count != attached.Count || revisions.Any(r => !owned.ContainsKey(r.DocumentId)))
                 return (null, Problems.Forbidden("NOT_THEIRS", $"Only revisions of {party.Name}'s own documents are attached.", new { revisionIds = attached }));

@@ -111,7 +111,7 @@ public sealed partial class TransmittalService
             return Fail(Problems.Invalid("FILE_REQUIRED", "A data transmittal carries a document: enclose one from the register, or choose an information reason to write a letter."));
         var revisions = await db.Revisions.Where(r => revisionIds.Contains(r.Id) && r.ProjectId == access.Project.Id).ToListAsync(cancellationToken);
         var documentIds = revisions.Select(r => r.DocumentId).ToList();
-        var documents = await DocumentQueries.Visible(db, access, catalog.RestrictedLevels())
+        var documents = await DocumentQueries.Visible(db, access)
             .Where(d => documentIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);
         if (revisions.Count != revisionIds.Count || revisions.Any(r => !documents.ContainsKey(r.DocumentId)))
             return Fail(Problems.NotFound("REVISION_NOT_FOUND", "A revision chosen does not exist or is not yours to see."));
@@ -170,7 +170,7 @@ public sealed partial class TransmittalService
         Party? supplierTo = null;
         if (placeholderIds.Count > 0)
         {
-            var asked = await DocumentQueries.Visible(db, access, catalog.RestrictedLevels())
+            var asked = await DocumentQueries.Visible(db, access)
                 .Where(d => placeholderIds.Contains(d.Id)).OrderBy(d => d.Number).ToListAsync(cancellationToken);
             if (asked.Count != placeholderIds.Count)
                 return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "A document chosen does not exist or is not yours to see."));

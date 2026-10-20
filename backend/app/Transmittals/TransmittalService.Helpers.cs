@@ -85,8 +85,7 @@ public sealed partial class TransmittalService
     /// <summary>The document when the caller may see it (respecting confidentiality levels), otherwise null.</summary>
     private async Task<Document?> VisibleDocumentAsync(ProjectAccess access, Guid documentId, CancellationToken cancellationToken)
     {
-        var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
-        return await DocumentQueries.Visible(db, access, restricted).SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
+        return await DocumentQueries.Visible(db, access).SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
     }
 
     /// <summary>

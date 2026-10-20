@@ -70,8 +70,7 @@ public sealed class Supersession(DeliosDbContext db, Notifications.Notifier noti
     /// <summary>Every replaced revision on the project still held by an organization that was never sent a newer one.</summary>
     public async Task<IReadOnlyList<Untold>> UntoldAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
-        var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
-        var visible = DocumentQueries.Visible(db, access, restricted).Select(d => d.Id);
+        var visible = DocumentQueries.Visible(db, access).Select(d => d.Id);
         var replaced = await (from r in db.Revisions
                               join d in db.Documents on r.DocumentId equals d.Id
                               where r.ProjectId == access.Project.Id && r.State == RevisionStates.Superseded && visible.Contains(d.Id)

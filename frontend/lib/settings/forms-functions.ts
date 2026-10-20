@@ -134,6 +134,10 @@ export async function savePermissionRuleAction(_prev: Result | undefined, formDa
     id: ruleId, verbs, deliverableType: blank("deliverableType"), docType: blank("docType"), discipline: blank("discipline"),
     criticality: blank("criticality"), confidentiality: blank("confidentiality"), projectRole: blank("projectRole"),
   };
+  // On every document is a tick in the grid (owner): a rule here says which documents, or it would be a second copy of it.
+  if (!ruleId && !rule.deliverableType && !rule.docType && !rule.discipline && !rule.criticality && !rule.confidentiality && !rule.projectRole) {
+    return { error: "Choose which documents. To give it on every document, tick it on the function's line." };
+  }
   if (rule.projectRole && !CONTRACT_ROLES.some((r) => r.code === rule.projectRole)) {
     return { error: `“${rule.projectRole}” is not a contract role — leave it blank for every project.` };
   }

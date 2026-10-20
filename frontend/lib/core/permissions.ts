@@ -103,36 +103,6 @@ function implies(held: readonly string[], verb: Verb): boolean {
   return held.includes(verb) || (ORGANIZATION_VERBS.includes(verb) && held.includes("CONFIGURE"));
 }
 
-/**
- * §5.7 — confidentiality as an ordered scale. The organization's own levels
- * come from the CONFIDENTIALITY value set's `level` property; this ordering is
- * the fallback when a value has not declared one.
- */
-const DEFAULT_CONFIDENTIALITY_LEVEL: Record<string, number> = {
-  PUBLIC: 1,
-  INTERNAL: 2,
-  RESTRICTED: 3,
-  CONFIDENTIAL: 4,
-  SECRET: 5,
-};
-
-/**
- * The confidentiality codes open to everybody on the project.
- *
- * A level at or below the one marked as the default — Internal, in the
- * reference configuration — is the ordinary register: everyone who reaches the
- * project reads it. Anything above it is closed, and closed means read by the
- * people named on the document itself, one by one, and by nobody else.
- */
-export function openConfidentiality(
-  values: { code: string; props?: Record<string, unknown> }[],
-): string[] {
-  const levels = new Map(values.map((one) => [one.code, typeof one.props?.level === "number" ? (one.props.level as number) : DEFAULT_CONFIDENTIALITY_LEVEL[one.code.toUpperCase()] ?? 1]));
-  const marked = values.filter((one) => one.props?.default === true).map((one) => levels.get(one.code) ?? 2);
-  const ceiling = marked.length ? Math.max(...marked) : 2;
-  return values.filter((one) => (levels.get(one.code) ?? 1) <= ceiling).map((one) => one.code);
-}
-
 // ── The actor ────────────────────────────────────────────────────────────────
 
 /** The class of a document, as far as the matrix is concerned. */

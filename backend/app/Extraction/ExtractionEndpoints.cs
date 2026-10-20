@@ -51,7 +51,7 @@ public static class ExtractionEndpoints
         var access = ProjectAccessFilter.Of(http);
         if (await RefusedAsync(access, db, options.Value, cancellationToken) is { } refused) return refused;
         var revision = await db.Revisions.AsNoTracking().SingleOrDefaultAsync(r => r.Id == revisionId, cancellationToken);
-        var visible = revision is not null && await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken))
+        var visible = revision is not null && await DocumentQueries.Visible(db, access)
             .AnyAsync(d => d.Id == revision.DocumentId, cancellationToken);
         if (revision is null || !visible) return Problems.NotFound("REVISION_NOT_FOUND", "No such revision.");
 

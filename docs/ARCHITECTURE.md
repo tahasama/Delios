@@ -129,8 +129,8 @@ choice belongs to the organization. Each is data its administrator changes:
 - **Numbering schemes:** fields, order, delimiter and sequence width, routed by
   deliverable type.
 - **Value lists:** disciplines, document and deliverable types, subprojects,
-  purchase orders, criticality, confidentiality (and which levels are
-  restricted to named readers), retention classes and which criticality maps
+  purchase orders, criticality, confidentiality (read through each function's
+  clearance), retention classes and which criticality maps
   to which, and the words that make a title generic.
 - **What each deliverable type requires** before it can be registered.
 - **Functions and the permission matrix.**

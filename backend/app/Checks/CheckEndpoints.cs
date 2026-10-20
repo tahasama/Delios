@@ -145,7 +145,7 @@ public static class CheckEndpoints
         string? status = null, string? severity = null, string? checkId = null, Guid? documentId = null)
     {
         var access = ProjectAccessFilter.Of(http);
-        var visible = DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken)).Select(d => d.Id);
+        var visible = DocumentQueries.Visible(db, access).Select(d => d.Id);
         var query = db.Defects.AsNoTracking().Where(d => d.ProjectId == access.Project.Id
             && (d.DocumentId == null || visible.Contains(d.DocumentId.Value)));
         query = status is null ? query.Where(d => d.Status != DefectStatuses.Closed) : query.Where(d => d.Status == status);

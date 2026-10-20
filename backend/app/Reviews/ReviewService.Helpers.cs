@@ -30,11 +30,10 @@ public sealed partial class ReviewService
             ? review : null;
     }
 
-    /// <summary>The document if the caller may see it (taking restricted confidentiality levels into account), otherwise null.</summary>
+    /// <summary>The document if the caller may see it (within their function's clearance, or named on it), otherwise null.</summary>
     private async Task<Document?> VisibleDocumentAsync(ProjectAccess access, Guid documentId, CancellationToken cancellationToken)
     {
-        var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
-        return await DocumentQueries.Visible(db, access, restricted).SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
+        return await DocumentQueries.Visible(db, access).SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
     }
 
     /// <summary>

@@ -150,13 +150,6 @@ public sealed class Catalog
             ? set.Values.Where(v => v.Status == ValueStatus.Active).Select(v => v.Code.ToLowerInvariant()).ToHashSet()
             : new HashSet<string>();
 
-    /// <summary>Confidentiality levels read only by the people named on the document.</summary>
-    public IReadOnlyList<string> RestrictedLevels() =>
-        _sets.TryGetValue(ValueSets.Confidentiality, out var set)
-            ? set.Values.Where(v => v.Props?.RootElement.TryGetProperty("restricted", out var r) == true
-                && r.ValueKind == JsonValueKind.True).Select(v => v.Code).ToList()
-            : [];
-
     /// <summary>
     /// The retention class a document gets when none is chosen: the one its
     /// criticality maps to, else the default class.

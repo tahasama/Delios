@@ -27,9 +27,8 @@ public sealed partial class TransmittalService
     /// </summary>
     public async Task<IReadOnlyList<NotIssued>> NotIssuedAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
-        var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
         var rows = await (
-            from d in DocumentQueries.Visible(db, access, restricted)
+            from d in DocumentQueries.Visible(db, access)
             join r in db.Revisions on d.Id equals r.DocumentId
             where r.State == RevisionStates.Released
                 && !db.TransmittalItems.Any(i => i.RevisionId == r.Id

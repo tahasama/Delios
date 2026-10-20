@@ -42,7 +42,7 @@ public static partial class ProjectRecordEndpoints
         var asset = await db.Set<Asset>().AsNoTracking().SingleOrDefaultAsync(a => a.Id == assetId && a.ProjectId == access.Project.Id, c);
         if (asset is null) return Problems.NotFound("ASSET_NOT_FOUND", "No such asset.");
         var linked = db.Set<DocumentAsset>().Where(l => l.AssetId == assetId).Select(l => l.DocumentId);
-        var docs = await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(c)).AsNoTracking()
+        var docs = await DocumentQueries.Visible(db, access).AsNoTracking()
             .Where(d => linked.Contains(d.Id)).OrderBy(d => d.Number)
             .Select(d => new
             {
@@ -130,7 +130,7 @@ public static partial class ProjectRecordEndpoints
     private static async Task<IResult> DocumentAssetsAsync(Guid documentId, HttpContext h, DeliosDbContext db, DocumentService documents, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        if (!await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(c)).AnyAsync(d => d.Id == documentId, c))
+        if (!await DocumentQueries.Visible(db, access).AnyAsync(d => d.Id == documentId, c))
             return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         return Results.Ok(await (from l in db.Set<DocumentAsset>()
                                  join a in db.Set<Asset>() on l.AssetId equals a.Id
@@ -143,7 +143,7 @@ public static partial class ProjectRecordEndpoints
         AuditLog audit, IClock clock, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);
-        var document = await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(c)).SingleOrDefaultAsync(d => d.Id == documentId, c);
+        var document = await DocumentQueries.Visible(db, access).SingleOrDefaultAsync(d => d.Id == documentId, c);
         if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         if (!MayEdit(access, document)) return Problems.Forbidden("EDIT_NOT_ALLOWED", "Your function on this project cannot change this document's details.");
         var code = r.AssetCode?.Trim().ToUpperInvariant() ?? "";
@@ -172,7 +172,7 @@ public static partial class ProjectRecordEndpoints
         var access = ProjectAccessFilter.Of(h);
         var link = await db.Set<DocumentAsset>().SingleOrDefaultAsync(l => l.Id == linkId && l.ProjectId == access.Project.Id, c);
         if (link is null) return Results.NoContent();
-        var document = await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(c)).SingleOrDefaultAsync(d => d.Id == link.DocumentId, c);
+        var document = await DocumentQueries.Visible(db, access).SingleOrDefaultAsync(d => d.Id == link.DocumentId, c);
         if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         if (!MayEdit(access, document)) return Problems.Forbidden("EDIT_NOT_ALLOWED", "Your function on this project cannot change this document's details.");
         var code = await db.Set<Asset>().Where(a => a.Id == link.AssetId).Select(a => a.Code).SingleAsync(c);
@@ -198,7 +198,7 @@ public static partial class ProjectRecordEndpoints
         var adding = r.Add?.Distinct().ToList() ?? [];
         var removing = r.Remove?.Distinct().Except(adding).ToList() ?? [];
         if (adding.Count == 0 && removing.Count == 0) return Problems.Invalid("NOTHING_CHANGED", "Tick a document to link it, untick one to unlink it.");
-        var visible = DocumentQueries.Visible(db, access, await documents.RestrictedAsync(c));
+        var visible = DocumentQueries.Visible(db, access);
         var found = await visible.Where(d => adding.Contains(d.Id) || removing.Contains(d.Id)).Select(d => new { d.Id, d.Number, d.TenantId, d.ProjectId })
             .ToDictionaryAsync(d => d.Id, c);
         var missing = adding.Concat(removing).Where(id => !found.ContainsKey(id)).ToList();

@@ -161,8 +161,7 @@ public sealed partial class KeepingService
     /// <summary>Voided revisions nobody has reassessed yet, newest first.</summary>
     public async Task<IReadOnlyList<UnresolvedVoid>> UnresolvedVoidsAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
-        var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
-        var visible = DocumentQueries.Visible(db, access, restricted).Select(d => d.Id);
+        var visible = DocumentQueries.Visible(db, access).Select(d => d.Id);
         return await (from r in db.Revisions
                       join d in db.Documents on r.DocumentId equals d.Id
                       where r.ProjectId == access.Project.Id && r.State == RevisionStates.Void && r.VoidReassessment == null

@@ -141,7 +141,7 @@ public static class SnapshotEndpoints
             CancellationToken c) =>
         {
             var access = ProjectAccessFilter.Of(h);
-            if (!await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(c)).AnyAsync(d => d.Id == documentId, c))
+            if (!await DocumentQueries.Visible(db, access).AnyAsync(d => d.Id == documentId, c))
                 return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
             var rows = await db.Set<DocumentSnapshot>().AsNoTracking().Where(s => s.DocumentId == documentId).OrderBy(s => s.CapturedAt)
                 .ToListAsync(c);

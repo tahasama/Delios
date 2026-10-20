@@ -52,7 +52,7 @@ public sealed partial class TransmittalService
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var documentIds = t.Items.Where(i => i.DocumentId is not null).Select(i => i.DocumentId!.Value).Distinct().ToList();
         var visible = access.Holds(Verbs.Read)
-            ? await DocumentQueries.Visible(db, access, catalog.RestrictedLevels()).Where(d => documentIds.Contains(d.Id))
+            ? await DocumentQueries.Visible(db, access).Where(d => documentIds.Contains(d.Id))
                 .Select(d => d.Id).ToListAsync(cancellationToken)
             : [];
         var revisions = await db.Revisions.AsNoTracking().Where(r => visible.Contains(r.DocumentId)).ToListAsync(cancellationToken);

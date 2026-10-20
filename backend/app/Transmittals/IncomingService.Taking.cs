@@ -48,8 +48,7 @@ public sealed partial class IncomingService
         if (request.DocumentId is null && written.Length == 0)
             return (null, Problems.Invalid("DOCUMENT_REQUIRED", "Choose the document of ours it is, from the register.", new { field = "documentId" }));
 
-        var restricted = (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
-        var visible = DocumentQueries.Visible(db, access, restricted);
+        var visible = DocumentQueries.Visible(db, access);
         var document = request.DocumentId is { } chosen
             ? await visible.SingleOrDefaultAsync(d => d.Id == chosen, cancellationToken)
             : await visible.SingleOrDefaultAsync(d => d.Number == written, cancellationToken);

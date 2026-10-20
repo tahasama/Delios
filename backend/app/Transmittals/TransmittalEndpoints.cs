@@ -189,7 +189,7 @@ public static class TransmittalEndpoints
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.IsInternal) return Problems.Forbidden("INTERNAL_ONLY", "Distribution is ours to read.");
-        var document = await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken))
+        var document = await DocumentQueries.Visible(db, access)
             .AsNoTracking().SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         return Results.Ok(await transmittals.DistributionAsync(access.Project, document, cancellationToken));

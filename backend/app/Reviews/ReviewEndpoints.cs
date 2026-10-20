@@ -93,7 +93,7 @@ public static class ReviewEndpoints
         CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        var document = await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken))
+        var document = await DocumentQueries.Visible(db, access)
             .AsNoTracking().SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         var routes = await reviews.RoutesForAsync(document, cancellationToken);

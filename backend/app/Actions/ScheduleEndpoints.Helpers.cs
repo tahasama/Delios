@@ -24,7 +24,7 @@ public static partial class ScheduleEndpoints
     {
         if (access.IsInternal) return null;
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
-        return (await DocumentQueries.Visible(db, access, catalog.RestrictedLevels()).Select(d => d.Id).ToListAsync(cancellationToken)).ToHashSet();
+        return (await DocumentQueries.Visible(db, access).Select(d => d.Id).ToListAsync(cancellationToken)).ToHashSet();
     }
 
     /// <summary>

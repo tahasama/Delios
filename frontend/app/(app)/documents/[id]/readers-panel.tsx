@@ -7,12 +7,10 @@ import { SearchPick } from "@/components/search-pick";
 type Reader = { id: string; name: string; addedByName: string; reason: string | null; at: Date };
 
 /**
- * Who may read a closed document.
+ * Who may read a document above some function's clearance.
  *
- * Above the open confidentiality levels there is no ladder to climb: the people
- * who may read it are named here, by whoever is answerable for the content. The
- * list is shown to them and to an administrator; to everybody else the document
- * does not exist at all, so there is nothing to show.
+ * Clearance is the one confidentiality rule: whoever's function does not reach the document's level reads it only if
+ * named here, by whoever is answerable for the content.
  */
 export function ReadersPanel({
   documentId, confidentiality, readers, candidates, mayName, answerable,
@@ -30,8 +28,9 @@ export function ReadersPanel({
     <section className="mt-5 rounded-md bg-amber-50 px-3 py-2.5 ring-1 ring-amber-200">
       <h3 className="text-[13px] font-semibold text-amber-950">Who may read this</h3>
       <p className="mt-1 text-xs leading-5 text-amber-950/80">
-        It is {confidentiality.toLowerCase()}, so it is not in anybody else&apos;s register, counts or searches.
-        {answerable.length ? ` ${answerable.join(" and ")} read it because they are answerable for it, and an administrator reads everything.` : " An administrator reads everything."}
+        It is {confidentiality.toLowerCase()}: whoever&apos;s function has a lower clearance reads it only if named here; for them it
+        is in no register, count or search.
+        {answerable.length ? ` ${answerable.join(" and ")} read it because they are answerable for it.` : ""}
       </p>
 
       <ul className="mt-3 space-y-1.5">

@@ -77,7 +77,7 @@ public static class Equivalents
         CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        var visible = await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken))
+        var visible = await DocumentQueries.Visible(db, access)
             .AnyAsync(d => d.Id == documentId, cancellationToken);
         if (!visible || !access.IsInternal) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         var rows = await (
@@ -94,7 +94,7 @@ public static class Equivalents
         DeliosDbContext db, DocumentService documents, AuditLog audit, IClock clock, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        var document = await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken))
+        var document = await DocumentQueries.Visible(db, access)
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
         if (!await KeepsAsync(db, access, document, cancellationToken))

@@ -1368,3 +1368,10 @@ corrected; its code never changes. A function has no department of its own (the 
 
 A project changes what each function may do by default; the organization may fix it for all. The administrators'
 function (the one that configures the organization) is changed only in the organization's Settings.
+
+## 72 · Clearance, the one confidentiality rule
+
+Who reads a confidential document is said once: by each function's clearance (the highest level its people read). A
+document above it is read by them only if named on it, if they registered it, or if it was sent to them. Levels
+"restricted to named readers" are dropped: they said the same thing a second way. A function's opened card shows only
+its rules for certain documents; on every document is said by the grid's ticks alone.

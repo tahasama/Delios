@@ -970,6 +970,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (asked first), "Add a rule"; in the organization's Settings also the function itself (name, code read only, clearance,
   in use). "New function" is the plate's act (`?new=1`), opening the added one. "What each permission allows" is always
   written under the grid (`VERB_BLURB`). No department on a function (never kept by the backend; the field is gone).
+  The opened function shows only what the grid cannot (owner, "redundancy"): its rules for certain documents only and
+  "Add a rule", which asks which documents (on every document is a tick, never a second copy); in the organization's
+  Settings also the function itself.
   **The administrators' function stays the organization's** (owner): a function holding Configure is read only on a
   project, whatever the switch (backend CONFIGURE_ORGANIZATIONS, checked on the rights in force before any copy).
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.
@@ -1317,5 +1320,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Row-level security is forced, even for the table owner: a data backfill loops over
   `tenants` and sets `set_config('app.tenant_id', …)` for each.
 - Organization defaults are added through `DemoSeed.Ensure*SetupAsync`, which adds only what is missing.
+- **Clearance is the one confidentiality rule** (owner): a document above a function's clearance is read by its people
+  only if named on it, its registrar, or sent it; every function, the control function too. No level is "restricted"
+  any more (the `restricted` prop is not read). The document page shows "Who may read this" when some function on the
+  project has a lower clearance (`aboveSomeClearance`, backend).
 - A function's clearance limits what its holders read (Standard §46); visibility always goes
   through `DocumentQueries.Visible`.

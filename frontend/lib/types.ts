@@ -119,6 +119,8 @@ export type DocumentView = {
   phase?: string | null;
   /** Taken as it came from a supplier's package with no placeholders: its number, revisions and states are theirs. */
   asReceived?: boolean;
+  /** Some function on the project has a clearance below its confidentiality: its people read it only if named on it. */
+  aboveSomeClearance?: boolean;
 };
 
 /** Something a person decided and wrote down: when, who, and why, in their words. */

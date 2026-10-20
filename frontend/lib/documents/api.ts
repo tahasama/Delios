@@ -73,6 +73,8 @@ export type PageDocument = {
   withSupplier: boolean | null;
   /** Taken as it came from a supplier's package with no placeholders. */
   asReceived: boolean;
+  /** Some function on the project has a clearance below its confidentiality: its people read it only if named on it. */
+  aboveSomeClearance: boolean;
   legacyScheme: string | null; createdDate: Date; receivedDate: Date | null; plannedDate: Date | null; appVersion: string | null;
   createdById: string; createdByName: string; createdAt: Date; updatedAt: Date;
   revisions: PageRevision[];
@@ -205,6 +207,7 @@ export const documentPage = cache(async (scope: Scope, id: string): Promise<Page
     holdLifted: doc.holdLifted ?? null, ended: doc.ended ?? null, reinstated: doc.reinstated ?? null,
     withSupplier: doc.withSupplier ?? null,
     asReceived: !!doc.asReceived,
+    aboveSomeClearance: !!doc.aboveSomeClearance,
     isPlaceholder: doc.isPlaceholder, previousId: doc.previousNumber, legacyScheme: doc.legacyScheme, createdDate: new Date(doc.createdAt), receivedDate: date(doc.receivedDate),
     plannedDate: date(doc.plannedDate), appVersion: doc.appVersion, createdById: doc.createdById, createdByName: doc.createdByName,
     createdAt: new Date(doc.createdAt), updatedAt: new Date(doc.updatedAt),

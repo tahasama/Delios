@@ -39,7 +39,7 @@ public static class DocumentEndpoints
             // A revision on its own, with the document it belongs to: for screens that hold only a revision's id.
             var access = ProjectAccessFilter.Of(h);
             var revision = await db.Revisions.AsNoTracking().SingleOrDefaultAsync(r => r.Id == revisionId && r.ProjectId == access.Project.Id, c);
-            var visible = revision is not null && await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(c))
+            var visible = revision is not null && await DocumentQueries.Visible(db, access)
                 .AnyAsync(d => d.Id == revision.DocumentId, c);
             return visible
                 ? Results.Ok(new { revision!.Id, revision.DocumentId, revision.Value, revision.State, revision.StatusCode, revision.AuthoredById, revision.AuthoredByName })
@@ -70,10 +70,9 @@ public static class DocumentEndpoints
         var size = Math.Clamp(limit ?? DefaultPageSize, 1, MaxPageSize);
         using var timer = AppMetrics.RegisterQuerySeconds.WithLabels(string.IsNullOrWhiteSpace(q) ? "no" : "yes").NewTimer();
 
-        var restricted = await documents.RestrictedAsync(cancellationToken);
         var rows = await reads.ReadAsync(source =>
         {
-            var query = DocumentQueries.Visible(source, access, restricted).AsNoTracking();
+            var query = DocumentQueries.Visible(source, access).AsNoTracking();
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var pattern = "%" + q.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
@@ -104,7 +103,7 @@ public static class DocumentEndpoints
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Read)) return Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register.");
-        var document = await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken))
+        var document = await DocumentQueries.Visible(db, access)
             .AsNoTracking()
             .Include(d => d.Revisions.OrderBy(r => r.CreatedAt)).ThenInclude(r => r.Files.OrderBy(f => f.Name))
             // One query per collection: a single join would repeat every revision once per file.
@@ -128,8 +127,19 @@ public static class DocumentEndpoints
                             group t by i.RevisionId into g
                             select new { RevisionId = g.Key!.Value, First = g.Min(t => t.IssuedAt) }).ToDictionaryAsync(x => x.RevisionId, x => x.First, cancellationToken);
         var view = View(document);
+        // Clearance is the one confidentiality rule (owner): whoever's function does not reach the document's level reads
+        // it only when named on it, so the document page shows who is named, and lets them be named.
+        var aboveSome = false;
+        if (document.Confidentiality is not null)
+        {
+            var clearances = await db.Memberships.AsNoTracking().Where(m => m.ProjectId == access.Project.Id && m.Active && m.Function!.Clearance != null)
+                .Select(m => m.Function!.Clearance).Distinct().ToListAsync(cancellationToken);
+            var ranks = clearances.Count == 0 ? null : await Identity.Clearance.RanksAsync(db, cancellationToken);
+            aboveSome = ranks is not null && clearances.Any(c => !Identity.Clearance.Reaches(ranks, c, document.Confidentiality));
+        }
         return Results.Ok(view with
         {
+            AboveSomeClearance = aboveSome,
             Revisions = view.Revisions.Select(r =>
             {
                 var ruling = decided.FirstOrDefault(d => d.RevisionId == r.Id);
@@ -289,7 +299,7 @@ public static class DocumentEndpoints
         // A file of a document is read by whoever reads the document; one that came on a transmittal and belongs to
         // no document yet (an unplanned item, a covering letter), by whoever sees that transmittal.
         var visible = file is not null && (file.DocumentId is { } documentId
-            ? await DocumentQueries.Visible(db, access, await documents.RestrictedAsync(cancellationToken))
+            ? await DocumentQueries.Visible(db, access)
                 .AnyAsync(d => d.Id == documentId, cancellationToken)
             : await transmittals.Visible(access).AnyAsync(t => t.ProofFileId == file.Id
                 || t.Items.Any(i => i.Id == file.TransmittalItemId), cancellationToken));

@@ -227,7 +227,7 @@ public sealed class DocumentService(
     public async Task<(Document? Document, IResult? Problem)> UpdateAsync(
         ProjectAccess access, Guid documentId, UpdateDocumentRequest request, CancellationToken cancellationToken)
     {
-        var document = await DocumentQueries.Visible(db, access, await RestrictedAsync(cancellationToken))
+        var document = await DocumentQueries.Visible(db, access)
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
         if (!access.IsInternal || !(access.Allows(Verbs.Create, document.Facts) || access.Allows(Verbs.Revise, document.Facts)
@@ -371,7 +371,7 @@ public sealed class DocumentService(
     public async Task<(Document? Document, IResult? Problem)> EndAsync(
         ProjectAccess access, Guid documentId, EndDocumentRequest request, CancellationToken cancellationToken)
     {
-        var document = await DocumentQueries.Visible(db, access, await RestrictedAsync(cancellationToken))
+        var document = await DocumentQueries.Visible(db, access)
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
         if (!access.Allows(Verbs.Control, document.Facts) && document.CreatedById != access.UserId)
@@ -420,7 +420,7 @@ public sealed class DocumentService(
     public async Task<(Document? Document, IResult? Problem)> ReinstateAsync(
         ProjectAccess access, Guid documentId, EndDocumentRequest request, CancellationToken cancellationToken)
     {
-        var document = await DocumentQueries.Visible(db, access, await RestrictedAsync(cancellationToken))
+        var document = await DocumentQueries.Visible(db, access)
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Fail(Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
         if (!access.Allows(Verbs.Control, document.Facts) && document.CreatedById != access.UserId)
@@ -875,7 +875,7 @@ public sealed class DocumentService(
     private async Task<(Document? Document, IResult? Problem)> ContributableAsync(
         ProjectAccess access, Guid documentId, CancellationToken cancellationToken, Incoming? incoming = null)
     {
-        var document = await DocumentQueries.Visible(db, access, await RestrictedAsync(cancellationToken))
+        var document = await DocumentQueries.Visible(db, access)
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return (null, Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document."));
         // Another organization sends on a transmittal, so that what came, and when, has a receipt.
@@ -952,10 +952,6 @@ public sealed class DocumentService(
             : null;
     }
 
-    /// <summary>The confidentiality levels that restrict a document to named readers. Passed to <see cref="DocumentQueries.Visible"/>.</summary>
-    public async Task<IReadOnlyList<string>> RestrictedAsync(CancellationToken cancellationToken) =>
-        (await Catalog.LoadAsync(db, cancellationToken)).RestrictedLevels();
-
     /// <summary>The trimmed text, or null when it is null, empty or only spaces.</summary>
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
@@ -982,11 +978,11 @@ public static class DocumentQueries
 {
     /// <summary>
     /// The documents of the project this person may read. Another party sees what
-    /// it produces once asked of it (or sent by it), and what was transmitted to its people. A restricted
-    /// confidentiality level is read by the people named on the document, its
-    /// creator, whoever it was transmitted to, and the control function.
+    /// it produces once asked of it (or sent by it), and what was transmitted to its people. Above their function's
+    /// clearance (the one confidentiality rule, owner), a document is read by the people named on it, its creator and
+    /// whoever it was transmitted to.
     /// </summary>
-    public static IQueryable<Document> Visible(DeliosDbContext db, ProjectAccess access, IReadOnlyList<string> restricted)
+    public static IQueryable<Document> Visible(DeliosDbContext db, ProjectAccess access)
     {
         var query = db.Documents.Where(d => d.ProjectId == access.Project.Id);
         var me = access.UserId;
@@ -1002,12 +998,6 @@ public static class DocumentQueries
                 || i.Kind == Transmittals.TransmittalItemKinds.Submission || i.Kind == Transmittals.TransmittalItemKinds.Unplanned)
                 .Select(i => i.DocumentId);
             query = query.Where(d => (d.Originator == access.PartyCode && exchanged.Contains(d.Id)) || sentToMe.Contains(d.Id));
-        }
-        if (!access.Holds(Verbs.Control) && restricted.Count > 0)
-        {
-            query = query.Where(d => d.Confidentiality == null || !restricted.Contains(d.Confidentiality)
-                || d.CreatedById == me || db.DocumentAccess.Any(a => a.DocumentId == d.Id && a.UserId == me)
-                || sentToMe.Contains(d.Id));
         }
         // Above your function's clearance, whatever your function: only where you are named on it.
         var aboveClearance = access.AboveClearance;
