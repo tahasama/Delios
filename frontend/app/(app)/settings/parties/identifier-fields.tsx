@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useState } from "react";
 import { Field } from "@/components/ui";
@@ -24,15 +25,15 @@ export function IdentifierFields({ country, kind, number, noReason, required, al
   return (
     <>
       <Field label="Country" required={required && !none} hint="where it was registered">
-        <select name="country" required={required && !none} disabled={none} defaultValue={country ?? ""} className={field}>
+        <Select name="country" required={required && !none} disabled={none} defaultValue={country ?? ""} className={field}>
           <option value="">Choose…</option>
           {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-        </select>
+        </Select>
       </Field>
       <Field label="Identified by" hint={IDENTIFIER_KINDS.find((k) => k.value === chosen)?.hint}>
-        <select name="identifierKind" value={chosen} disabled={none} onChange={(e) => setChosen(e.target.value)} className={field}>
+        <Select name="identifierKind" value={chosen} disabled={none} onChange={(e) => setChosen(e.target.value)} className={field}>
           {IDENTIFIER_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-        </select>
+        </Select>
       </Field>
       <Field label={NUMBER_LABEL[chosen] ?? "Number"} required={required && !none} hint="as written on its papers">
         <input name="identifierNumber" required={required && !none} disabled={none} defaultValue={number ?? ""} autoComplete="off" className={`${field} font-mono`} />

@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -128,16 +129,16 @@ export function NumberingSchemeBuilder({ level, id, initialName = "", initialDel
                   <span className="text-center font-mono text-xs font-semibold text-slate-400">{index + 1}</span>
                   <input name={fixedParts ? undefined : "fieldLabel"} value={one.label} onChange={(event) => update(index, { label: event.target.value })} required disabled={fixedParts}
                     className={field} placeholder="Name of this part" aria-label={`Name of part ${index + 1}`} />
-                  <select value={kind} onChange={(event) => setKind(index, event.target.value as Kind)} disabled={fixedParts}
+                  <Select value={kind} onChange={(event) => setKind(index, event.target.value as Kind)} disabled={fixedParts}
                     className={`${field} max-sm:col-span-2 max-sm:col-start-2`} aria-label={`What fills part ${index + 1}`}>
                     {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-                  </select>
+                  </Select>
                   {kind === "LIST" ? (
-                    <select value={one.valueSetKey} onChange={(event) => update(index, { valueSetKey: event.target.value })} required disabled={fixedParts}
+                    <Select value={one.valueSetKey} onChange={(event) => update(index, { valueSetKey: event.target.value })} required disabled={fixedParts}
                       className={`${field} max-sm:col-span-2 max-sm:col-start-2`} aria-label={`List part ${index + 1} reads`}>
                       <option value="">Choose a list</option>
                       {sets.map((set) => <option key={set.key} value={set.key}>{set.title}</option>)}
-                    </select>
+                    </Select>
                   ) : kind === "FIXED" ? (
                     <input value={fixedOf(one.rule)} onChange={(event) => update(index, { rule: `FIXED(${event.target.value.replace(/[()]/g, "")})` })} required maxLength={12} disabled={fixedParts}
                       className={`${field} font-mono uppercase max-sm:col-span-2 max-sm:col-start-2`} placeholder="TAG" aria-label={`Text of part ${index + 1}`} />

@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { plannedState, plannedProgress } from "@/lib/actions/planned-state";
 import { OwnFields } from "@/app/(app)/documents/new/own-fields";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
@@ -308,12 +309,12 @@ export default async function DocumentDetailPage({
   const detailFields = (<>
     <Field label="Title" required><input name="title" defaultValue={doc.title} className={inputCls} /></Field>
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <Field label="Type"><select name="docType" defaultValue={doc.docType} className={inputCls}>{offer("DOCUMENT_TYPES", types).filter((t) => t.status === "ACTIVE").map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}</select></Field>
-      <Field label="Discipline"><select name="discipline" defaultValue={doc.discipline} className={inputCls}>{offer("DISCIPLINES", disciplines).filter((d) => d.status === "ACTIVE").map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}</select></Field>
-      <Field label="Criticality"><select name="criticality" defaultValue={doc.criticality ?? ""} className={inputCls}><option value="">—</option>{offer("CRITICALITY", criticalities).map((c) => <option key={c.code} value={c.code}>{c.label}{c.code === types.find((t) => t.code === doc.docType)?.props.criticality ? " (recommended)" : ""}</option>)}</select></Field>
-      <Field label="Confidentiality"><select name="confidentiality" defaultValue={doc.confidentiality ?? ""} className={inputCls}>{offer("CONFIDENTIALITY", confidentialities).filter((c) => c.status === "ACTIVE" || c.code === doc.confidentiality).map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></Field>
-      <Field label="Retention"><select name="retentionClass" defaultValue={doc.retentionClass ?? ""} className={inputCls}><option value="">—</option>{offer("RETENTION_CLASSES", retentions).map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</select></Field>
-      <Field label="Phase" hint="names its next revision"><select name="phase" defaultValue={doc.phase ?? ""} className={inputCls}><option value="">—</option>{offer("PHASES", phases).map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}</select></Field>
+      <Field label="Type"><Select name="docType" defaultValue={doc.docType} className={inputCls}>{offer("DOCUMENT_TYPES", types).filter((t) => t.status === "ACTIVE").map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}</Select></Field>
+      <Field label="Discipline"><Select name="discipline" defaultValue={doc.discipline} className={inputCls}>{offer("DISCIPLINES", disciplines).filter((d) => d.status === "ACTIVE").map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}</Select></Field>
+      <Field label="Criticality"><Select name="criticality" defaultValue={doc.criticality ?? ""} className={inputCls}><option value="">—</option>{offer("CRITICALITY", criticalities).map((c) => <option key={c.code} value={c.code}>{c.label}{c.code === types.find((t) => t.code === doc.docType)?.props.criticality ? " (recommended)" : ""}</option>)}</Select></Field>
+      <Field label="Confidentiality"><Select name="confidentiality" defaultValue={doc.confidentiality ?? ""} className={inputCls}>{offer("CONFIDENTIALITY", confidentialities).filter((c) => c.status === "ACTIVE" || c.code === doc.confidentiality).map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</Select></Field>
+      <Field label="Retention"><Select name="retentionClass" defaultValue={doc.retentionClass ?? ""} className={inputCls}><option value="">—</option>{offer("RETENTION_CLASSES", retentions).map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}</Select></Field>
+      <Field label="Phase" hint="names its next revision"><Select name="phase" defaultValue={doc.phase ?? ""} className={inputCls}><option value="">—</option>{offer("PHASES", phases).map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}</Select></Field>
       <Field label="Previous number"><input name="previousId" defaultValue={doc.previousId ?? ""} className={inputCls} /></Field>
     </div>
     {/* What the project's form adds (Forms & fields): its own fields and lists, each list offering its serving set. */}
@@ -506,10 +507,10 @@ export default async function DocumentDetailPage({
             <ActionForm action={releaseRevisionAction} submitLabel="Release" size="sm" hidden={{ revisionId: working.id }}>
               {whoReceives}
               <Field label="Released as" required hint="older revisions have no decided status; newer ones carry the reviewers' choice">
-                <select name="statusCode" className={inputCls} defaultValue="">
+                <Select name="statusCode" className={inputCls} defaultValue="">
                   <option value="" disabled>Choose a status…</option>
                   {statuses.map((s) => <option key={s.code} value={s.code}>{s.code} — {s.label}</option>)}
-                </select>
+                </Select>
               </Field>
             </ActionForm>
           )}
@@ -581,10 +582,10 @@ export default async function DocumentDetailPage({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {/* What it is issued for, from the organization's statuses: proposed now, confirmed or changed by the approver. */}
               <Field label="Issued for" required hint="the approver confirms it or changes it in the verdict" className="sm:col-span-2">
-                <select name="purpose" required defaultValue="" className={inputCls}>
+                <Select name="purpose" required defaultValue="" className={inputCls}>
                   <option value="" disabled>Choose…</option>
                   {statuses.filter((one) => one.status === "ACTIVE").map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
-                </select>
+                </Select>
               </Field>
               {ground.kind === "FIRST" ? (
                 <input type="hidden" name="reasonForRevision" value="First issue" />
@@ -604,10 +605,10 @@ export default async function DocumentDetailPage({
               {/* The phase it is in, or the one it moves to: the new revision is named by that phase's line. */}
               {phases.length ? (
                 <Field label="Phase" hint="names this revision (Settings, Revisions)">
-                  <select name="phase" className={inputCls} defaultValue={doc.phase ?? ""}>
+                  <Select name="phase" className={inputCls} defaultValue={doc.phase ?? ""}>
                     {doc.phase ? null : <option value="">—</option>}
                     {offer("PHASES", phases).map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}
-                  </select>
+                  </Select>
                 </Field>
               ) : null}
               <Added fields={revisionPolicy.own} className="sm:col-span-2" />
@@ -1006,10 +1007,10 @@ export default async function DocumentDetailPage({
                     <div className="mt-2 max-w-md">
                       <ActionForm action={addDocumentToActionAction} submitLabel="Add" size="sm" hidden={{ documentIds: doc.id, department: doc.discipline }} className="space-y-3">
                         <Field label="Action" required>
-                          <select name="actionId" required className={inputCls} defaultValue="">
+                          <Select name="actionId" required className={inputCls} defaultValue="">
                             <option value="" disabled hidden>Action</option>
                             {actionChoices.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}{a.start ? ` · ${fmtDate(a.start)}` : ""}</option>)}
-                          </select>
+                          </Select>
                         </Field>
                         <p className="text-[11px] text-slate-500">For {label(disciplines, doc.discipline)}, its discipline: only actions that concern it are listed.</p>
                       </ActionForm>
@@ -1021,10 +1022,10 @@ export default async function DocumentDetailPage({
                     <summary className="cursor-pointer list-none text-xs font-semibold text-link">+ Link an asset</summary>
                     <div className="mt-2 max-w-md">
                       <ActionForm action={linkAssetAction} submitLabel="Link" size="sm" hidden={{ documentId: doc.id }}>
-                        <select name="assetCode" className={inputCls} defaultValue="">
+                        <Select name="assetCode" className={inputCls} defaultValue="">
                           <option value="" disabled>Choose…</option>
                           {assets.map((a) => <option key={a.code} value={a.code}>{a.code} · {a.name}</option>)}
-                        </select>
+                        </Select>
                       </ActionForm>
                     </div>
                   </details>

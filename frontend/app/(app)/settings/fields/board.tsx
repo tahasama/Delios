@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
@@ -259,7 +260,7 @@ function OwnFieldForm({ id, level, kind, sets, field }: {
         <AnswerKind controls={OWN_CONTROLS.map((c) => ({ value: c, label: CONTROL_LABEL[c] }))} sets={sets}
           control={field?.control ?? "TEXT"} setKey={field?.setKey ?? ""} fixed={fixed} />
         <Field label="Must it be filled">
-          <select name="rule" defaultValue={field?.rule ?? "OPTIONAL"} className={inputCls}>{RULES.map((one) => <option key={one} value={one}>{RULE_LABEL[one]}</option>)}</select>
+          <Select name="rule" defaultValue={field?.rule ?? "OPTIONAL"} className={inputCls}>{RULES.map((one) => <option key={one} value={one}>{RULE_LABEL[one]}</option>)}</Select>
         </Field>
         <div className="sm:col-span-2 lg:col-span-3"><Field label="Note under the box"><input name="help" maxLength={140} defaultValue={field?.help ?? ""} placeholder="What to put in it, in your words" className={inputCls} /></Field></div>
         {kind === "DOCUMENT" ? (

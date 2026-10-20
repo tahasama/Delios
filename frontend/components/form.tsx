@@ -37,6 +37,8 @@ function restore(form: HTMLFormElement, data: FormData) {
     if (field instanceof HTMLInputElement && (field.type === "checkbox" || field.type === "radio")) field.checked = values.includes(field.value);
     else if (field instanceof HTMLSelectElement && field.multiple) for (const option of Array.from(field.options)) option.selected = values.includes(option.value);
     else if (values.length) field.value = values[0];
+    // A dropdown drawn by the app (`Select`) shows what its hidden select holds once told.
+    if (field instanceof HTMLSelectElement) field.dispatchEvent(new Event("delios:sync"));
   }
 }
 

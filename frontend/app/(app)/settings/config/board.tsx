@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { api, projectPath } from "@/lib/client";
 import { requireScope } from "@/lib/core/scope";
@@ -196,7 +197,7 @@ export async function ListsBoard({ level, sp }: { level: "project" | "organizati
               <Field label="Name" required><input name="title" required className={field} placeholder="Areas" /></Field>
               <Field label="Short name" required hint="capitals, no spaces (use _); fixed once a value is used"><input name="key" required pattern="[A-Z][A-Z0-9_]*" title="Capital letters, digits and _ only, e.g. AREAS" className={field} placeholder="AREAS" /></Field>
               <Field label="Group">
-                <select name="group" className={field} defaultValue={categories[0]}>{categories.map((title) => <option key={title} value={title}>{title}</option>)}</select>
+                <Select name="group" className={field} defaultValue={categories[0]}>{categories.map((title) => <option key={title} value={title}>{title}</option>)}</Select>
               </Field>
               <Field label="What it is for"><input name="description" className={field} /></Field>
             </div>
@@ -349,7 +350,7 @@ export async function ListsBoard({ level, sp }: { level: "project" | "organizati
                         : <input name="newKey" defaultValue={set.key} pattern="[A-Z][A-Z0-9_]*" className={field} />}
                     </Field>
                     <Field label="Group">
-                      <select name="group" defaultValue={headingOf(set)} className={field}>{categories.map((title) => <option key={title} value={title}>{title}</option>)}</select>
+                      <Select name="group" defaultValue={headingOf(set)} className={field}>{categories.map((title) => <option key={title} value={title}>{title}</option>)}</Select>
                     </Field>
                     <Field label="What it is for"><input name="description" defaultValue={set.description ?? ""} className={field} /></Field>
                   </div>
@@ -514,10 +515,10 @@ function PropInput({ field, value, lists, unset = false }: {
   if (field.type === "set") {
     return (
       <Field label={field.label} hint={field.hint}>
-        <select name={`prop_${field.key}`} defaultValue={typeof value === "string" ? value : ""} className="plain w-full">
+        <Select name={`prop_${field.key}`} defaultValue={typeof value === "string" ? value : ""} className="plain w-full">
           <option value="">—</option>
           {(lists[field.setKey] ?? []).map((o) => <option key={o.code} value={o.code}>{o.code} — {o.label}</option>)}
-        </select>
+        </Select>
       </Field>
     );
   }
@@ -547,10 +548,10 @@ function PropInput({ field, value, lists, unset = false }: {
   if (field.type === "select") {
     return (
       <Field label={field.label} hint={field.hint}>
-        <select name={`prop_${field.key}`} defaultValue={typeof value === "string" ? value : ""} className="plain w-full">
+        <Select name={`prop_${field.key}`} defaultValue={typeof value === "string" ? value : ""} className="plain w-full">
           <option value="">—</option>
           {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
+        </Select>
       </Field>
     );
   }

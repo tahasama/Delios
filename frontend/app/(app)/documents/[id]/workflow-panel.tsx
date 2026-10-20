@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { requireScope } from "@/lib/core/scope";
 import { mayContributeToDocument, type SessionUser } from "@/lib/core/auth";
 import { Chip, Field, inputCls } from "@/components/ui";
@@ -189,10 +190,10 @@ async function SendPanel({ doc, revId, value, hasFiles, user, lead, extra, withd
       body: (
         <ActionForm action={submitForReleaseAction} submitLabel="Send on for release" hidden={{ revisionId: revId }}>
           <Field label="Released at" required>
-            <select name="issuedFor" required defaultValue="" className={inputCls}>
+            <Select name="issuedFor" required defaultValue="" className={inputCls}>
               <option value="" disabled>Choose the status…</option>
               {statuses.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
-            </select>
+            </Select>
           </Field>
           <RequestIssue onDecision author={author} reasons={reasons.map((one) => ({ code: one.code, label: one.label }))} proposed={choices.proposed} others={choices.others} parties={choices.parties} ours={choices.ours} askWho={(await issuePolicy(ctx)).asked} />
         </ActionForm>

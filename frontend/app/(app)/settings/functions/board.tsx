@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { SwitchControl } from "@/components/switch";
@@ -17,6 +18,7 @@ import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 import { Check, ChevronDown, ChevronRight, Contrast, Minus, Plus, Trash2 } from "lucide-react";
 import { functionsForMatrix, projectFunctionsForMatrix } from "@/lib/settings/api-admin";
 import { NoAccess } from "../no-access";
+import { SearchPick } from "@/components/search-pick";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 
 /** A list longer than this is shared on the page rather than repeated in each form. */
@@ -114,13 +116,6 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
 
   return (
     <div className="space-y-4">
-      {/* The long lists, once for the whole page; every rule form points here. */}
-      {selectors.filter((sel) => sel.values.length > LONG).map((sel) => (
-        <datalist key={sel.name} id={`list-${sel.name}`}>
-          {sel.values.map((v) => <option key={v.code} value={v.code}>{v.label}</option>)}
-        </datalist>
-      ))}
-
       <section className="register register-sheet register-sheet-open">
         <div className="flex flex-col gap-3 px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
@@ -148,10 +143,10 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
                 <Field label="Name" required hint="as your organization names the job"><input name="name" required className={inputCls} placeholder="Construction manager, HVAC technician…" /></Field>
                 <Field label="Short code" required hint="never changes once added"><input name="code" required className={`${inputCls} uppercase`} placeholder="ELEC_TECH" /></Field>
                 <Field label="Clearance" hint="the most confidential level it reads without being named on the document">
-                  <select name="clearance" defaultValue="" className={inputCls}>
+                  <Select name="clearance" defaultValue="" className={inputCls}>
                     <option value="">No limit</option>
                     {confidentialities.map((c) => <option key={c.code} value={c.code}>Up to {c.label}</option>)}
-                  </select>
+                  </Select>
                 </Field>
               </div>
               <VerbTicks verbs={GRANTABLE} label="May, on every document" checked={["READ"]} />
@@ -341,16 +336,16 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
               <p className="stencil text-slate-500">On these documents <span className="font-normal normal-case tracking-normal text-slate-400">· at least one</span></p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {selectors.map((sel) => (
-                  <Field key={sel.name} label={sel.label} hint={sel.values.length > LONG ? "type part of the code or name" : undefined}>
-                    {/* A long list is written once on the page and shared; repeating it in every function's form made the
-                        page megabytes long. */}
+                  <Field key={sel.name} label={sel.label} hint={sel.values.length > LONG ? "choose, or type to narrow" : undefined}>
+                    {/* A long list is the shared search field (owner: it lists on a click and narrows as one types); only
+                        the opened function's form is drawn, so the list is on the page once. */}
                     {sel.values.length > LONG ? (
-                      <input name={sel.name} list={`list-${sel.name}`} className={inputCls} placeholder="Any" autoComplete="off" />
+                      <SearchPick single name={sel.name} placeholder="Any" items={sel.values.map((v) => ({ id: v.code, name: v.label, detail: v.code }))} />
                     ) : (
-                      <select name={sel.name} className={inputCls} defaultValue="">
+                      <Select name={sel.name} className={inputCls} defaultValue="">
                         <option value="">Any</option>
                         {sel.values.map((v) => <option key={v.code} value={v.code}>{v.label}</option>)}
-                      </select>
+                      </Select>
                     )}
                   </Field>
                 ))}
@@ -375,10 +370,10 @@ function FunctionItself({ fn, confidentialities }: { fn: BoardFunction; confiden
           <Field label="Name" required><input name="name" required defaultValue={fn.name} className={inputCls} /></Field>
           <Field label="Code" hint="never changes"><span className="flex h-(--control-h) items-center font-mono text-(length:--control-text) text-slate-600">{fn.code}</span></Field>
           <Field label="Clearance" hint="the most confidential level it reads without being named on the document">
-            <select name="clearance" defaultValue={fn.clearance ?? ""} className={inputCls}>
+            <Select name="clearance" defaultValue={fn.clearance ?? ""} className={inputCls}>
               <option value="">No limit</option>
               {confidentialities.map((c) => <option key={c.code} value={c.code}>Up to {c.label}</option>)}
-            </select>
+            </Select>
           </Field>
           <label className="flex h-(--control-h) cursor-pointer items-center gap-2 text-xs text-slate-600"><SwitchControl name="active" defaultChecked={fn.active} /> In use</label>
         </div>

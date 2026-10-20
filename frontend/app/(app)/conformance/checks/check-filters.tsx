@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
@@ -31,7 +32,7 @@ export function CheckFilters({ base, choices, count, narrowed }: { base: string;
         {choices.map((choice) => (
           <label key={choice.name} className="min-w-0">
             <span className="sr-only">{choice.empty}</span>
-            <select
+            <Select
               name={choice.name}
               value={choice.value}
               disabled={choice.disabled}
@@ -46,7 +47,7 @@ export function CheckFilters({ base, choices, count, narrowed }: { base: string;
                   {option.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         ))}
         {narrowed ? (

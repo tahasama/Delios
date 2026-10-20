@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -167,16 +168,16 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
           </Field>
         </div>
         <Field label="Advice" hint="the set of Review advice the advising steps answer from (Types & sets)">
-          <select name="adviceSetKey" defaultValue={adviceSetKey} className={inputCls}>
+          <Select name="adviceSetKey" defaultValue={adviceSetKey} className={inputCls}>
             <option value="">The set serving each document&rsquo;s deliverable type</option>
             {adviceSets.map((one) => <option key={one.key} value={one.key}>{one.title}</option>)}
-          </select>
+          </Select>
         </Field>
         <Field label="Verdicts" hint="the set of Review outcomes the deciding steps answer from (Types & sets)">
-          <select name="outcomeSetKey" defaultValue={outcomeSetKey} className={inputCls}>
+          <Select name="outcomeSetKey" defaultValue={outcomeSetKey} className={inputCls}>
             <option value="">The set serving each document&rsquo;s deliverable type</option>
             {outcomeSets.map((one) => <option key={one.key} value={one.key}>{one.title}</option>)}
-          </select>
+          </Select>
         </Field>
         <label className="flex cursor-pointer items-center gap-2.5 self-end pb-1.5 text-[13px] text-slate-700">
           <SwitchControl name="isDefault" defaultChecked={isDefault} /> Offered first
@@ -193,11 +194,11 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
       </div>
       {!allClasses ? (
         <div className="grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-4 sm:px-6 md:grid-cols-3">
-          <Field label="Deliverable type" hint="who produces it: ours, a supplier's, the client's"><select className={inputCls} value={scope.deliverableType ?? ""} onChange={(e) => setScope((v) => ({ ...v, deliverableType: e.target.value || undefined }))}><option value="">Anyone</option>{classOptions.deliverableTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
-          <Field label="Document type"><select className={inputCls} value={scope.docType ?? ""} onChange={(e) => setScope((v) => ({ ...v, docType: e.target.value || undefined }))}><option value="">Any type</option>{classOptions.documentTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
-          <Field label="Discipline"><select className={inputCls} value={scope.discipline ?? ""} onChange={(e) => setScope((v) => ({ ...v, discipline: e.target.value || undefined }))}><option value="">Any discipline</option>{classOptions.disciplines.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
-          <Field label="Criticality"><select className={inputCls} value={scope.criticality ?? ""} onChange={(e) => setScope((v) => ({ ...v, criticality: e.target.value || undefined }))}><option value="">Any criticality</option>{classOptions.criticalities.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
-          <Field label="From which organization" hint="only documents that came from it"><select className={inputCls} value={scope.originator ?? ""} onChange={(e) => setScope((v) => ({ ...v, originator: e.target.value || undefined }))}><option value="">Any organization</option>{classOptions.originators.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
+          <Field label="Deliverable type" hint="who produces it: ours, a supplier's, the client's"><Select className={inputCls} value={scope.deliverableType ?? ""} onChange={(e) => setScope((v) => ({ ...v, deliverableType: e.target.value || undefined }))}><option value="">Anyone</option>{classOptions.deliverableTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</Select></Field>
+          <Field label="Document type"><Select className={inputCls} value={scope.docType ?? ""} onChange={(e) => setScope((v) => ({ ...v, docType: e.target.value || undefined }))}><option value="">Any type</option>{classOptions.documentTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</Select></Field>
+          <Field label="Discipline"><Select className={inputCls} value={scope.discipline ?? ""} onChange={(e) => setScope((v) => ({ ...v, discipline: e.target.value || undefined }))}><option value="">Any discipline</option>{classOptions.disciplines.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</Select></Field>
+          <Field label="Criticality"><Select className={inputCls} value={scope.criticality ?? ""} onChange={(e) => setScope((v) => ({ ...v, criticality: e.target.value || undefined }))}><option value="">Any criticality</option>{classOptions.criticalities.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</Select></Field>
+          <Field label="From which organization" hint="only documents that came from it"><Select className={inputCls} value={scope.originator ?? ""} onChange={(e) => setScope((v) => ({ ...v, originator: e.target.value || undefined }))}><option value="">Any organization</option>{classOptions.originators.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</Select></Field>
         </div>
       ) : null}
 
@@ -267,9 +268,9 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
               </span>
             </Field>
             <Field label="How they answer" hint={HOW.find((h) => h.value === chosen.mode)?.hint}>
-              <select value={chosen.mode} onChange={(e) => update(open, { mode: e.target.value as WorkflowBuilderStep["mode"] })} className={inputCls}>
+              <Select value={chosen.mode} onChange={(e) => update(open, { mode: e.target.value as WorkflowBuilderStep["mode"] })} className={inputCls}>
                 {HOW.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
-              </select>
+              </Select>
             </Field>
             <div className="flex items-end justify-end">
               <button type="button" onClick={() => remove(open)} disabled={steps.length === 1} title="Remove this step" aria-label="Remove this step"
@@ -285,19 +286,19 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
             <p className="mb-2 text-[11px] text-slate-500">Any of the three, at least one: an organization, a function, people. Each narrows the others.</p>
             <div key={open} className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
               <Field label="Organization" hint="none chosen: ours">
-                <select value={chosen.partyId ?? ""} className={inputCls}
+                <Select value={chosen.partyId ?? ""} className={inputCls}
                   onChange={(e) => update(open, { partyId: e.target.value || undefined, participantIds: [], reason: undefined,
                     ...(outsideParties.find((p) => p.id === e.target.value)?.participation === "BY_PROXY" ? { functionIds: [], fromMatrix: false } : {}) })}>
                   <option value="">Ours</option>
                   {outsideParties.map((p) => <option key={p.id} value={p.id}>{p.name}{p.participation === "BY_PROXY" ? " (answers as itself)" : ""}</option>)}
-                </select>
+                </Select>
               </Field>
               <Field label="Function" hint={asItself(chosen) ? "it answers as itself" : "whoever holds it"}>
-                <select value={(chosen.functionIds ?? [])[0] ?? ""} disabled={asItself(chosen)} className={inputCls}
+                <Select value={(chosen.functionIds ?? [])[0] ?? ""} disabled={asItself(chosen)} className={inputCls}
                   onChange={(e) => update(open, { functionIds: e.target.value ? [e.target.value] : [] })}>
                   <option value="">Any function</option>
                   {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                </select>
+                </Select>
               </Field>
               {asItself(chosen) ? (
                 <Field label="People" hint="nobody of theirs signs in">

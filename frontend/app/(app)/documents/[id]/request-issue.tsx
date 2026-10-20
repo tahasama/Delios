@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useState } from "react";
 import { Field, inputCls } from "@/components/ui";
@@ -74,10 +75,10 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
           {outside ? (
             <div className="mt-2">
               <Field label="Who approves it" required>
-                <select name="approverId" required defaultValue="" className={inputCls}>
+                <Select name="approverId" required defaultValue="" className={inputCls}>
                   <option value="" disabled>Choose…</option>
                   {parties.map((party) => <option key={party.id} value={party.id}>{party.name}</option>)}
-                </select>
+                </Select>
               </Field>
             </div>
           ) : null}
@@ -95,9 +96,9 @@ export function RequestIssue({ reasons, proposed, others, parties, author, onDec
       {chosen === "SEND" ? (
         <>
           <Field label="Why they are getting it" required hint="what is wanted of them, from your organization's list">
-            <select name="issueReason" required defaultValue={reasons[0]?.code ?? "INFORMATION"} className={inputCls}>
+            <Select name="issueReason" required defaultValue={reasons[0]?.code ?? "INFORMATION"} className={inputCls}>
               {reasons.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
-            </select>
+            </Select>
           </Field>
 
           {/* Found the way a transmittal is addressed: type, Enter. The

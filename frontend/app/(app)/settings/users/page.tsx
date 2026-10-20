@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { controlDoes, CONFIRM_KEY, effectiveAnswer } from "@/lib/settings/control-activities";
 import { SwitchControl } from "@/components/switch";
 import Link from "next/link";
@@ -310,15 +311,15 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                             </>
                           )}
                           <Field label={`Function on ${project.code}`} required>
-                            <select name="functionId" defaultValue={here.functionId} className="plain w-full">
+                            <Select name="functionId" defaultValue={here.functionId} className="plain w-full">
                               {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                            </select>
+                            </Select>
                           </Field>
                           <Field label="Department" hint="their discipline: told about actions, confirms going ahead">
-                            <select name="department" defaultValue={here.department ?? ""} className="plain w-full">
+                            <Select name="department" defaultValue={here.department ?? ""} className="plain w-full">
                               <option value="">None</option>
                               {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
-                            </select>
+                            </Select>
                           </Field>
                         </div>
                         {u.linked ? null : (

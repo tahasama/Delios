@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { Fragment } from "react";
 import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
 import { FilterMenu } from "@/components/filter-menu";
@@ -106,24 +107,24 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
         <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 px-3 py-3">
           {shown.includes("discipline") || one ? <label className="text-xs">
             <span className="mb-1 block font-medium text-slate-700">Discipline</span>
-            <select name="discipline" defaultValue={one ?? ""} className={`${inputCls} py-1.5 text-xs`}>
+            <Select name="discipline" defaultValue={one ?? ""} className={`${inputCls} py-1.5 text-xs`}>
               <option value="">Every discipline</option>
               {disciplines.map((d) => <option key={d.code} value={d.code}>{d.code} — {d.label}</option>)}
-            </select>
+            </Select>
           </label> : null}
           {shown.includes("producer") || producer ? <label className="text-xs">
             <span className="mb-1 block font-medium text-slate-700">Who produced it</span>
-            <select name="producer" defaultValue={producer ?? ""} className={`${inputCls} py-1.5 text-xs`}>
+            <Select name="producer" defaultValue={producer ?? ""} className={`${inputCls} py-1.5 text-xs`}>
               <option value="">Any producer</option>
               {producers.map((p) => <option key={p.code} value={p.code}>{p.code} — {p.label}</option>)}
-            </select>
+            </Select>
           </label> : null}
           {shown.includes("type") || docType ? <label className="text-xs">
             <span className="mb-1 block font-medium text-slate-700">Document type <span className="font-normal text-slate-400">— optional</span></span>
-            <select name="type" defaultValue={docType ?? ""} className={`${inputCls} py-1.5 text-xs`}>
+            <Select name="type" defaultValue={docType ?? ""} className={`${inputCls} py-1.5 text-xs`}>
               <option value="">Any type</option>
               {docTypes.map((t) => <option key={t.code} value={t.code}>{t.code} — {t.label}</option>)}
-            </select>
+            </Select>
           </label> : null}
           {shown.includes("inuse") || inUseOnly ? <label className="flex items-center gap-2 pb-2 text-xs text-slate-600">
             <input type="checkbox" name="inuse" value="1" defaultChecked={inUseOnly} />

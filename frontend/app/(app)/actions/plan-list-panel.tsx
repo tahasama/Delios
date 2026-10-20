@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { fmtDate } from "@/lib/core/utils";
 import { ActionForm } from "@/components/form";
@@ -105,10 +106,10 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
             <ActionForm action={uploadPlanListAction} hideSubmit resetOnSuccess hidden={{ kind: list.kind, ...(only ? { revisionId: only.released!.id } : {}) }} className="mt-5 max-w-xl space-y-4">
               {only ? null : (
                 <Field label="Which list" required>
-                  <select name="revisionId" required className={inputCls} defaultValue="">
+                  <Select name="revisionId" required className={inputCls} defaultValue="">
                     <option value="" disabled>Choose…</option>
                     {inForce.map((one) => <option key={one.id} value={one.released!.id}>{one.number} rev {one.released!.value} — {one.title}</option>)}
-                  </select>
+                  </Select>
                 </Field>
               )}
               <div className="flex flex-wrap items-center gap-2">

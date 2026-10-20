@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useState } from "react";
 import { inputCls, Field } from "@/components/ui";
@@ -16,15 +17,15 @@ export function AnswerKind({ controls, sets, control, setKey, fixed }: {
   return (
     <>
       <Field label="What kind of answer" hint={fixed ? "answered already: stays as it is" : undefined}>
-        <select name={fixed ? undefined : "control"} value={kind} onChange={(e) => setKind(e.target.value)} disabled={fixed} className={inputCls}>
+        <Select name={fixed ? undefined : "control"} value={kind} onChange={(e) => setKind(e.target.value)} disabled={fixed} className={inputCls}>
           {controls.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-        </select>
+        </Select>
       </Field>
       <Field label="Which list" required={choice && !fixed} hint={fixed ? "answered already: stays as it is" : choice ? "the answer is one of its values" : "only for an answer chosen from a list"}>
-        <select key={choice ? "list" : "none"} name={fixed || !choice ? undefined : "setKey"} defaultValue={choice ? setKey : ""} disabled={fixed || !choice} required={choice && !fixed} className={inputCls}>
+        <Select key={choice ? "list" : "none"} name={fixed || !choice ? undefined : "setKey"} defaultValue={choice ? setKey : ""} disabled={fixed || !choice} required={choice && !fixed} className={inputCls}>
           <option value="">{choice ? "Choose a list" : "Not a list"}</option>
           {sets.map((s) => <option key={s.key} value={s.key}>{s.title}</option>)}
-        </select>
+        </Select>
       </Field>
     </>
   );

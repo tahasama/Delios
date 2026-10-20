@@ -109,7 +109,7 @@ export function SearchPick({
 
         {/* Every list opens on a click and narrows as one types (owner, everywhere). */}
         {open ? (
-          <ul role="listbox" className="dt-menu absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg py-1">
+          <ul role="listbox" className="scroll-thin absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
             {options.length === 0 ? (
               <li className="px-3 py-2 text-xs text-slate-400">{query ? "Nobody matches that." : "Nobody left to choose."}</li>
             ) : options.map((one, i) => (
@@ -119,10 +119,12 @@ export function SearchPick({
                 aria-selected={i === hi}
                 onMouseDown={(e) => { e.preventDefault(); take(i); }}
                 onMouseEnter={() => setHi(i)}
-                className={cn("flex cursor-pointer items-baseline gap-2 px-3 py-1.5", compact ? "text-xs" : "text-[13px]", i === hi ? "bg-tint text-slate-900" : "text-slate-700")}
+                className={cn("flex cursor-pointer items-start gap-2 px-3 py-1.5", i === hi ? "bg-tint-soft" : "")}
               >
-                <span className="font-medium">{one.name}</span>
-                {one.detail ? <span className="truncate text-[11px] text-slate-400">{one.detail}</span> : null}
+                <span className="min-w-0">
+                  <span className={cn("block truncate text-slate-800", compact ? "text-xs" : "text-[13px]")}>{one.name}</span>
+                  {one.detail ? <span className="block truncate font-mono text-[11px] text-slate-500">{one.detail}</span> : null}
+                </span>
               </li>
             ))}
           </ul>

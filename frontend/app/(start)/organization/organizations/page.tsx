@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { Fragment } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Pencil, X } from "lucide-react";
@@ -253,10 +254,10 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                             </p>
                             <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                               <Field label="Its other line" required>
-                                <select name="keepId" required defaultValue="" className={field}>
+                                <Select name="keepId" required defaultValue="" className={field}>
                                   <option value="" disabled>Choose…</option>
                                   {others.map((o) => <option key={o.id} value={o.changed!.id}>{o.code} — {o.name}</option>)}
-                                </select>
+                                </Select>
                               </Field>
                               <Field label="Why" required hint="how you know they are one company"><input name="why" required className={field} /></Field>
                             </div>

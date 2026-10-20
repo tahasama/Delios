@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useState } from "react";
 import { Field } from "@/components/ui";
@@ -14,16 +15,16 @@ export function FunctionAndDepartment({ projectCode, functions, disciplines }: {
   return (
     <>
       <Field label={`Function on ${projectCode}`} required>
-        <select name="functionId" required defaultValue="" className={field}>
+        <Select name="functionId" required defaultValue="" className={field}>
           <option value="" disabled>Choose…</option>
           {functions.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-        </select>
+        </Select>
       </Field>
       <Field label="Department" hint="their discipline: told about actions, confirms going ahead">
-        <select name="department" defaultValue="" className={field}>
+        <Select name="department" defaultValue="" className={field}>
           <option value="">None</option>
           {disciplines.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-        </select>
+        </Select>
       </Field>
     </>
   );
@@ -49,15 +50,15 @@ export function NewPerson({ projectCode, ourParties, guestParties, functions, di
       <Field label="Email" required hint="where their link to choose a password goes"><input type="email" name="email" required autoComplete="off" className={field} /></Field>
       <Field label="Of" required hint="ours, or a guest organization (accounts we make)">
         <div className="flex gap-2">
-          <select value={from} onChange={(e) => setFrom(e.target.value as "ours" | "guest")} className="plain w-auto" aria-label="Ours or a guest">
+          <Select value={from} onChange={(e) => setFrom(e.target.value as "ours" | "guest")} className="plain w-auto" aria-label="Ours or a guest">
             <option value="ours">Our organization</option>
             <option value="guest" disabled={!guestParties.length}>A guest organization</option>
-          </select>
+          </Select>
           {orgs.length > 1 || from === "guest" ? (
-            <select name="partyId" required defaultValue="" key={from} className={field} aria-label="Which organization">
+            <Select name="partyId" required defaultValue="" key={from} className={field} aria-label="Which organization">
               <option value="" disabled>Choose…</option>
               {orgs.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            </Select>
           ) : <input type="hidden" name="partyId" value={orgs[0]?.value ?? ""} />}
         </div>
       </Field>

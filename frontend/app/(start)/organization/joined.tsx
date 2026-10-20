@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { ActionForm } from "@/components/form";
 import { DataTable, Th, Td, Field, inputCls } from "@/components/ui";
 import { joinPersonAction, switchOrganizationAction } from "@/lib/organization/forms";
@@ -59,10 +60,10 @@ export function JoinedProjects({ scope, joined, ours, roleLabel }: {
                       {p.startFunction ? (
                         <ActionForm action={joinPersonAction} submitLabel="Put on the project" size="sm" hidden={{ linkId: p.linkId, projectId: p.projectId }}>
                           <Field label="Who" required>
-                            <select name="userId" required defaultValue="" className={inputCls}>
+                            <Select name="userId" required defaultValue="" className={inputCls}>
                               <option value="" disabled>Choose…</option>
                               {ours.filter((u) => u.active && !p.ourPeople.some((one) => one.userId === u.id && one.active)).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                            </select>
+                            </Select>
                           </Field>
                           <p className="text-[11px] text-slate-400">They work there as {p.startFunction}, signing in here as usual. {p.hostOrganization} may change it.</p>
                         </ActionForm>

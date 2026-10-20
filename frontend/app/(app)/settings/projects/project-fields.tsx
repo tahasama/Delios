@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { Field } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
 
@@ -30,15 +31,15 @@ export function ProjectFields({ p, roles, kinds }: { p: ProjectLine; roles: { co
           : <input name="code" required defaultValue={p.code} autoComplete="off" className={`${field} uppercase`} />}
       </Field>
       <Field label="Type" hint="describes the project; from Project types">
-        <select name="kind" defaultValue={p.kind} className={field}>
+        <Select name="kind" defaultValue={p.kind} className={field}>
           {/* A type since retired stays readable on the project that carries it. */}
           {[...kinds, ...(kinds.some((k) => k.code === p.kind) ? [] : [{ code: p.kind, label: p.kind }])].map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
-        </select>
+        </Select>
       </Field>
       <Field label="Our role" hint="decides where approval sits">
-        <select name="role" defaultValue={p.contractRole} className={field}>
+        <Select name="role" defaultValue={p.contractRole} className={field}>
           {roles.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-        </select>
+        </Select>
       </Field>
       <Field label="Start"><input type="date" name="startDate" defaultValue={p.startDate.slice(0, 10)} className={field} /></Field>
       <Field label="End" hint="planned completion"><input type="date" name="endDate" defaultValue={p.endDate?.slice(0, 10) ?? ""} className={field} /></Field>

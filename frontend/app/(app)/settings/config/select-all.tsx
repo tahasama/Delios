@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useEffect, useState } from "react";
 import { Archive, ArchiveRestore, FolderInput, Trash2, X } from "lucide-react";
@@ -61,9 +62,9 @@ export function ValuesDock({ formId, otherSets }: { formId: string; otherSets: {
         <span className="inline-flex items-center gap-1 rounded-sm bg-white/10 py-1 pl-3 pr-1 text-xs">
           <FolderInput className="h-4 w-4" aria-hidden />
           <label className="sr-only" htmlFor={`${formId}-to`}>Move to the set</label>
-          <select id={`${formId}-to`} name="toSet" form={formId} value={toSet} onChange={(e) => setToSet(e.target.value)} className="rounded-sm bg-transparent px-1 py-1 text-xs font-semibold text-white outline-none [&>option]:text-slate-900">
+          <Select id={`${formId}-to`} name="toSet" form={formId} value={toSet} onChange={(e) => setToSet(e.target.value)} className="rounded-sm bg-transparent px-1 py-1 text-xs font-semibold text-white outline-none [&>option]:text-slate-900">
             {otherSets.map((one) => <option key={one.id} value={one.id}>to {one.name}</option>)}
-          </select>
+          </Select>
           <button type="submit" form={formId} name="op" value="MOVE" className="rounded-sm bg-white/15 px-2.5 py-1 font-semibold hover:bg-white/25">Move ({ticked.unused})</button>
         </span>
       ) : null}

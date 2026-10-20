@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
@@ -356,14 +357,14 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                       <div className="asking grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-[minmax(0,10rem)_minmax(0,9rem)_minmax(0,1fr)_minmax(0,9rem)_auto] sm:items-center">
                         <label className="min-w-0">
                           <span className="sr-only">How it went</span>
-                          <select name="channel" required defaultValue="" className="plain w-full">
+                          <Select name="channel" required defaultValue="" className="plain w-full">
                             <option value="" disabled>How it went…</option>
                             <option value="email">Email</option>
                             <option value={theirSystem(person.partyId) ? `their system (${theirSystem(person.partyId)})` : "their own system"}>
                               {theirSystem(person.partyId) ? `Their system — ${theirSystem(person.partyId)}` : "Their own system"}
                             </option>
                             <option value="post or by hand">Post, or by hand</option>
-                          </select>
+                          </Select>
                         </label>
                         <label className="min-w-0">
                           <span className="sr-only">The day it went</span>

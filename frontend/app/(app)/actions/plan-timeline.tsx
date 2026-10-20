@@ -34,6 +34,16 @@ export const TONE: Record<PlanRow["readiness"], string> = {
   NOT_READY: "bg-red-500/70",
   UNKNOWN: "bg-slate-300",
 };
+/** The lead-in (from the day documents are needed to the day of the work): the same hue, lighter, as a planner draws it. */
+const LEAD: Record<PlanRow["readiness"], string> = {
+  DONE: "bg-emerald-700/30",
+  LATE_RECEIPT: "bg-fuchsia-400/35",
+  READY: "bg-emerald-400/35",
+  UPCOMING: "bg-sky-500/30",
+  AT_RISK: "bg-amber-500/35",
+  NOT_READY: "bg-red-500/35",
+  UNKNOWN: "bg-slate-300/60",
+};
 const DAY = 86_400_000;
 
 /** The state in words, for whoever cannot see the bar's colour. */
@@ -127,12 +137,17 @@ export function PlanTimeline({ rows, window, fit }: {
             last one however far down it was loaded. */}
         <div className="relative min-h-full">
           <div className="pointer-events-none absolute inset-y-0 left-52 right-16">
-            {ticks.map((t, index) => (
-              <div key={`${index}-${t.label}`} className="absolute top-0 h-full border-l border-dashed border-line" style={{ left: `${t.left}%` }} />
-            ))}
+            {/* Each month a column, every other one lightly shaded, a plain line between them (owner: a planner's chart). */}
+            {ticks.map((t, index) => {
+              const next = ticks[index + 1]?.left ?? 100;
+              return (
+                <div key={`${index}-${t.label}`} className={`absolute top-0 h-full border-l border-line ${index % 2 ? "bg-tint-soft/70" : ""}`}
+                  style={{ left: `${t.left}%`, width: `${next - t.left}%` }} />
+              );
+            })}
             <div className="absolute top-0 h-full border-l-2 border-brand/60" style={{ left: `${at(now)}%` }} />
           </div>
-          <ul className="relative space-y-2.5 pt-3">
+          <ul className="relative pt-1">
           {dated.map((r) => {
             const start = (r.firstNeeded ?? r.start!).getTime();
             const end = r.start!.getTime();
@@ -144,30 +159,40 @@ export function PlanTimeline({ rows, window, fit }: {
             const width = Math.max(Math.min(rawRight, 100) - left, 0.6);
             const fromBefore = rawLeft < 0;
             return (
-              <li key={r.code} className="flex items-center gap-2">
+              <li key={r.code} className="flex items-center gap-2 border-b border-line/60 py-1">
                 <Link href={`/actions/${r.code}`} className="w-50 shrink-0 truncate text-xs text-slate-600 hover:text-link" title={`${r.code} — ${r.name}${r.moved ? `\n${r.moved}` : ""}`}>
                   <span className="font-mono font-semibold text-slate-700">{r.code}</span>
                   {r.moved ? <span className="stamp mx-1.5 text-amber-700">moved</span> : " "}
                   {r.name}
                 </Link>
                 <span className="relative h-5 flex-1">
+                  {/* The lead-in, lighter; the work, solid; a day of work with no finish, a diamond (as a milestone is drawn). */}
                   <span
-                    className={`absolute top-1/2 h-2.5 -translate-y-1/2 ${TONE[r.readiness]} ${fromBefore ? "rounded-r-full" : "rounded-full"}`}
+                    className={`absolute top-1/2 h-3.5 -translate-y-1/2 ${LEAD[r.readiness]} ${fromBefore ? "rounded-r-[3px]" : "rounded-[3px]"}`}
                     style={{ left: `${left}%`, width: `${width}%` }}
                     role="img"
                     aria-label={`${STATE_WORD[r.readiness]}: ${r.firstNeeded ? `documents needed from ${fmtDate(r.firstNeeded)}, ` : ""}work on ${fmtDate(r.start)}, ${r.ready} of ${r.total} ready`}
                     title={`${r.code}: documents needed from ${fmtDate(r.firstNeeded)} · work on ${fmtDate(r.start)} · ${r.ready} of ${r.total} ready`}
                   />
-                  {/* The work itself, start to finish, as a dark block on the end of the bar;
-                      with no finish date, a tick on its day. */}
                   {(() => {
                     const finish = r.finish && r.finish.getTime() > end ? r.finish.getTime() : end;
                     const from = Math.max(at(end), 0);
                     const to = Math.min(at(finish), 100);
                     if (to < 0 || from > 100) return null;
+                    if (finish === end) {
+                      return (
+                        <span
+                          className={`absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] ${TONE[r.readiness]}`}
+                          style={{ left: `${from}%` }}
+                          role="img"
+                          aria-label={`Work on ${fmtDate(r.start)}`}
+                          title={`Work on ${fmtDate(r.start)}`}
+                        />
+                      );
+                    }
                     return (
                       <span
-                        className="absolute top-1/2 h-3.5 -translate-y-1/2 rounded bg-slate-700"
+                        className={`absolute top-1/2 h-3.5 -translate-y-1/2 rounded-[3px] ${TONE[r.readiness]}`}
                         style={{ left: `${from}%`, width: `max(4px, ${Math.max(to - from, 0)}%)` }}
                         role="img"
                         aria-label={r.finish ? `Work from ${fmtDate(r.start)} to ${fmtDate(r.finish)}` : `Work on ${fmtDate(r.start)}`}

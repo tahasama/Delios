@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import Link from "next/link";
 import { TONE } from "./plan-timeline";
@@ -466,7 +467,7 @@ export function PlanRegister({
               {/* How many more each press draws. */}
               <label className="flex items-center justify-end gap-1.5 leading-none">
                 <span className="sr-only">How many actions to load at a time</span>
-                <select
+                <Select
                   className="plain"
                   value={more.step}
                   onChange={(event) => {
@@ -475,7 +476,7 @@ export function PlanRegister({
                   }}
                 >
                   {more.steps.map((one) => <option key={one.by} value={one.by}>{one.by}</option>)}
-                </select>
+                </Select>
                 <span className="stencil text-slate-500">at a time</span>
               </label>
             </div>
@@ -610,9 +611,9 @@ export function PlanRegister({
               ) : <span />}
               <label className="flex items-center justify-end gap-1.5">
                 <span className="stencil text-slate-500">Rows</span>
-                <select className="plain" value={paging.perPage} onChange={(event) => go(sized(Number(event.target.value)))}>
+                <Select className="plain" value={paging.perPage} onChange={(event) => go(sized(Number(event.target.value)))}>
                   {paging.sizes.map((size) => <option key={size} value={size}>{size}</option>)}
-                </select>
+                </Select>
               </label>
             </div>
           ) : null}
@@ -632,7 +633,7 @@ function Narrow({ name, value, empty, options }: { name: string; value: string; 
   return (
     <label className="min-w-0 flex-1">
       <span className="sr-only">{empty}</span>
-      <select
+      <Select
         name={name}
         defaultValue={value}
         data-on={value ? "true" : "false"}
@@ -652,7 +653,7 @@ function Narrow({ name, value, empty, options }: { name: string; value: string; 
       >
         <option value="">{empty}</option>
         <FilterOptions options={options} />
-      </select>
+      </Select>
     </label>
   );
 }

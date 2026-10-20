@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useState } from "react";
 import { SwitchControl } from "@/components/switch";
@@ -56,9 +57,9 @@ export function PartyKindFields({ kind, contactId, backupId, carriedBy, people, 
         </Field>
       ) : (
         <Field label="How they work with us" required hint={access ? "changed once only, for a mistake" : PARTY_KINDS.find((k) => k.value === chosen)?.hint}>
-          <select name="kind" value={chosen} onChange={(event) => setChosen(event.target.value)} className={field}>
+          <Select name="kind" value={chosen} onChange={(event) => setChosen(event.target.value)} className={field}>
             {PARTY_KINDS.filter((item) => item.value !== "COLLABORATOR").map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-          </select>
+          </Select>
         </Field>
       )}
 

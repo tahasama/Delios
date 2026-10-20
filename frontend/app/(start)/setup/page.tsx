@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
@@ -111,10 +112,10 @@ export default async function SetupPage() {
                   <Field label="Email" required><input type="email" name="email" required className={inputCls} /></Field>
                 </div>
                 <Field label="Function" required hint="What they do — change it any time">
-                  <select name="functionId" required className={inputCls} defaultValue="">
+                  <Select name="functionId" required className={inputCls} defaultValue="">
                     <option value="" disabled>Choose…</option>
                     {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="Initial password" required hint="You hand this over yourself — nothing is emailed">
                   <input name="password" required minLength={8} className={inputCls} placeholder="at least 8 characters" />
@@ -149,14 +150,14 @@ export default async function SetupPage() {
                   </Field>
                 </div>
                 <Field label="Type" hint="Affects defaults only, never the rules">
-                  <select name="kind" className={inputCls} defaultValue="GENERIC">
+                  <Select name="kind" className={inputCls} defaultValue="GENERIC">
                     {kinds.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="What you do on it" hint="Decides where approval sits, and the matrix it starts from">
-                  <select name="role" className={inputCls} defaultValue="GENERIC">
+                  <Select name="role" className={inputCls} defaultValue="GENERIC">
                     {roleOptions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-                  </select>
+                  </Select>
                 </Field>
                 <p className="text-[11px] text-slate-400">
                   {people.length === 1

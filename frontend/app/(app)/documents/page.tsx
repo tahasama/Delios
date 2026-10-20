@@ -255,6 +255,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     codes[`CONFIDENTIALITY|${item.code}`] = item.label;
     codes[`CONFIDENTIALITY_SHORT|${item.code}`] = item.label.split(" — ")[0].toLowerCase();
   }
+  // A list's code opens its page in Types & sets for our people (who read Settings); another organization's read no Settings.
+  if (user.isInternal) codes["@lists"] = "1";
   for (const code of DOC_STATES) codes[`DOC_STATE|${code}`] = `${DOC_STATE_LABEL[code]} — ${DOC_MEANING[code].means}`;
   for (const code of REV_STATES) codes[`REV_STATE|${code}`] = `${stateName(names, code)} — ${REV_MEANING[code].means}`;
 

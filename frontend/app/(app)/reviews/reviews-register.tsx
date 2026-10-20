@@ -1,10 +1,12 @@
 "use client";
+import { Select } from "@/components/select";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Search, X } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
+import { TONE } from "@/lib/core/tones";
 import { useCardHeight } from "@/components/card-height";
 import { DateWindow } from "@/components/date-window";
 import { FilterMenu } from "@/components/filter-menu";
@@ -367,9 +369,9 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
           ) : <span />}
           <label className="flex items-center justify-end gap-1.5">
             <span className="stencil text-slate-400">Rows</span>
-            <select className="plain" value={paging.perPage} onChange={(event) => go(sized(Number(event.target.value)))}>
+            <Select className="plain" value={paging.perPage} onChange={(event) => go(sized(Number(event.target.value)))}>
               {paging.sizes.map((size) => <option key={size} value={size}>{size}</option>)}
-            </select>
+            </Select>
           </label>
         </div>
       ) : null}
@@ -382,10 +384,10 @@ function Narrow({ name, value, empty, options }: { name: string; value: string; 
   return (
     <label className="min-w-0 flex-1">
       <span className="sr-only">{empty}</span>
-      <select name={name} defaultValue={value} data-on={value ? "true" : "false"} className="plain w-full">
+      <Select name={name} defaultValue={value} data-on={value ? "true" : "false"} className="plain w-full">
         <option value="">{empty}</option>
         <FilterOptions options={options} />
-      </select>
+      </Select>
     </label>
   );
 }
@@ -454,7 +456,7 @@ const COLUMNS: Column[] = [
     cell: (row) =>
       row.withdrawn ? (
         <span className="text-slate-600">
-          <Chip className="bg-slate-100 text-slate-700 ring-slate-300">withdrawn</Chip>
+          <Chip className={TONE.idle}>withdrawn</Chip>
           <span className="mt-0.5 block max-w-64 truncate text-[11px] text-slate-500" title={row.withdrawn}>{row.withdrawn}</span>
         </span>
       ) : row.verdict || row.verdictLabel ? (
@@ -463,7 +465,7 @@ const COLUMNS: Column[] = [
           {row.verdictLabel && row.verdictLabel !== row.verdict ? <span className={row.verdict ? "ml-1.5" : ""}>{row.verdictLabel}</span> : null}
           {row.decidedBy ? <span className="block text-[11px] text-slate-400">{row.decidedBy}</span> : null}
         </span>
-      ) : row.open ? <span className="text-amber-700">waiting</span> : <span className="text-slate-300">—</span>,
+      ) : row.open ? <Chip className={TONE.waiting}>waiting</Chip> : <span className="text-slate-300">—</span>,
   },
   {
     key: "reviewers", label: "Reviewers",

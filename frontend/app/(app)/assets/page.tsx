@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
 import { FilterMenu } from "@/components/filter-menu";
@@ -53,16 +54,16 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
             <input name="q" defaultValue={q} placeholder="Find a tag, name, system or area" className="plain w-full !pl-7" />
           </label>
           {shown.includes("area") || sp.area ? (
-            <select name="area" defaultValue={sp.area ?? ""} className="plain" aria-label="Area">
+            <Select name="area" defaultValue={sp.area ?? ""} className="plain" aria-label="Area">
               <option value="">Any area</option>
               {areas.map((one) => <option key={one} value={one}>Area {one}</option>)}
-            </select>
+            </Select>
           ) : null}
           {shown.includes("system") || sp.system ? (
-            <select name="system" defaultValue={sp.system ?? ""} className="plain" aria-label="System">
+            <Select name="system" defaultValue={sp.system ?? ""} className="plain" aria-label="System">
               <option value="">Any system</option>
               {systems.map((one) => <option key={one} value={one}>{one}</option>)}
-            </select>
+            </Select>
           ) : null}
           <FilterMenu page="assets" shown={shown} filters={[{ key: "area", label: "Area", held: !!sp.area }, { key: "system", label: "System", held: !!sp.system }]} />
           <button type="submit" className="ask">Apply</button>

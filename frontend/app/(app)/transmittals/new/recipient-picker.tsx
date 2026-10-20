@@ -188,7 +188,7 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
 
         {/* It opens on a click and narrows as one types (owner, everywhere). */}
         {open ? (
-          <ul id={listId} role="listbox" className="dt-menu absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg py-1">
+          <ul id={listId} role="listbox" className="scroll-thin absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
             {options.length === 0 ? (
               <li className="px-3 py-2 text-xs text-slate-400">Nobody matches that.</li>
             ) : options.map((option, i) => (
@@ -198,12 +198,12 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
                 aria-selected={i === hi}
                 onMouseDown={(e) => { e.preventDefault(); take(i); }}
                 onMouseEnter={() => setHi(i)}
-                className={cn("flex cursor-pointer items-baseline gap-2 px-3 py-1.5 text-[13px]", i === hi ? "bg-tint text-slate-900" : "text-slate-700")}
+                className={cn("cursor-pointer px-3 py-1.5 text-[13px] text-slate-800", i === hi ? "bg-tint-soft" : "")}
               >
                 {option.person ? (
                   <>
-                    <span className="font-medium">{option.person.name}</span>
-                    <span className="text-[11px] text-slate-400">{option.person.company}{option.person.job ? ` · ${option.person.job}` : ""}{option.person.offline ? " · not on this system" : ""}</span>
+                    <span className="block truncate">{option.person.name}</span>
+                    <span className="block truncate text-[11px] text-slate-500">{option.person.company}{option.person.job ? ` · ${option.person.job}` : ""}{option.person.offline ? " · not on this system" : ""}</span>
                   </>
                 ) : (
                   <span className="font-medium text-brand-ink">Everyone at {option.everyoneAt} <span className="font-normal text-slate-400">({option.people.length})</span></span>

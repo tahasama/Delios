@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Building2, Plus, Search } from "lucide-react";
@@ -79,10 +80,10 @@ export function OrganizationJoins({ project, projects = [], roles = [], ours, co
   const toUs = project ? (
     <>
       <Field label="Role with us" required hint="what they are to us on this project">
-        <select name="role" required defaultValue="" className={field}>
+        <Select name="role" required defaultValue="" className={field}>
           <option value="" disabled>Choose…</option>
           {roles.filter((r) => r.code !== "GENERIC").map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-        </select>
+        </Select>
       </Field>
       <Field label="Contract number" hint="optional — its contract with us; unique on DELIOS">
         <input name="contractNumber" maxLength={64} autoComplete="off" className={`${field} font-mono`} />

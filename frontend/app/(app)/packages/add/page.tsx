@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { Field, inputCls } from "@/components/ui";
@@ -51,13 +52,13 @@ export default async function AddToPackagePage({ searchParams }: { searchParams:
             {docs.map((d) => <input key={d.id} type="hidden" name="documentId" value={d.id} />)}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Package" required>
-                <select name="packageId" required className={inputCls} defaultValue="">
+                <Select name="packageId" required className={inputCls} defaultValue="">
                   <option value="" disabled>Choose…</option>
                   {packages.map((p) => {
                     const already = docs.filter((d) => p.members.some((m) => m.documentId === d.id)).length;
                     return <option key={p.id} value={p.id}>{p.number} — {p.title ?? p.names.to}, due {fmtDate(p.completionDate)}{already ? ` (${already} already in it)` : ""}</option>;
                   })}
-                </select>
+                </Select>
               </Field>
               <SearchPick browse name="requiredStatus" required label="Needed at" hint="one or several — ready at any of them" items={statuses.map((one) => ({ id: one.code, name: one.code, detail: one.label }))} />
             </div>

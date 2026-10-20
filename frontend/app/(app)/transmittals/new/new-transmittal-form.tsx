@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { TRANSMITTAL_KINDS, kind, kindOf, type TransmittalKind } from "@/lib/transmittals/kinds";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -313,18 +314,18 @@ export function NewTransmittalForm({
               // Which discipline, and which way: the subject and the message's first line follow; only why is written.
               <div className="asking mb-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Ask label="Asks to" required>
-                  <select className={field} value={discOp} onChange={(e) => { const op = e.target.value as "add" | "off"; setDiscOp(op); setDiscCode(""); }}>
+                  <Select className={field} value={discOp} onChange={(e) => { const op = e.target.value as "add" | "off"; setDiscOp(op); setDiscCode(""); }}>
                     <option value="add">Add a discipline</option>
                     <option value="off" disabled={!prefill.activity.tagged?.length}>Take one off</option>
-                  </select>
+                  </Select>
                 </Ask>
                 <Ask label="Discipline" required hint={discOp === "add" ? "one the action does not carry yet" : `one ${prefill.activity.code} carries`}>
-                  <select className={field} required value={discCode} onChange={(e) => { setDiscCode(e.target.value); tellDiscipline(discOp, e.target.value); }}>
+                  <Select className={field} required value={discCode} onChange={(e) => { setDiscCode(e.target.value); tellDiscipline(discOp, e.target.value); }}>
                     <option value="" disabled>Choose…</option>
                     {prefill.activity.disciplines
                       .filter((d) => (discOp === "add" ? !prefill.activity!.tagged?.includes(d.code) : prefill.activity!.tagged?.includes(d.code)))
                       .map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
-                  </select>
+                  </Select>
                 </Ask>
                 {discLabel ? null : <p className="self-end text-[11px] text-slate-400 lg:col-span-2">Choose it: the subject and the message say it for you.</p>}
               </div>
@@ -375,9 +376,9 @@ export function NewTransmittalForm({
                 </Ask>
               ) : fixedForPlaceholders ? null : (
                 <Ask label="Kind" required hint={kind(family).says}>
-                  <select name="family" className={field} value={family} onChange={(e) => { setFamily(e.target.value as TransmittalKind); setReasonCode(""); }}>
+                  <Select name="family" className={field} value={family} onChange={(e) => { setFamily(e.target.value as TransmittalKind); setReasonCode(""); }}>
                     {TRANSMITTAL_KINDS.map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
-                  </select>
+                  </Select>
                 </Ask>
               )}
               {!recording ? null : (
@@ -402,10 +403,10 @@ export function NewTransmittalForm({
                     <p className={cn(field, "flex items-center text-slate-700")}>{reasons.find((r) => r.code === "IFU")?.label ?? "For update"}<span className="ml-2 text-[11px] text-slate-400">set for placeholders</span></p>
                   </>
                 ) : (
-                  <select name="reasonForIssue" required className={field} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
+                  <Select name="reasonForIssue" required className={field} value={reasonCode} onChange={(e) => setReasonCode(e.target.value)}>
                     <option value="" disabled>{familyReasons.length ? "Choose…" : "None published for this kind (Settings, Reasons for issue)"}</option>
                     {familyReasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-                  </select>
+                  </Select>
                 )}
               </Ask>
               {/* An answer asked for: ticked by the sender (never by itself), and then by a day — the day says whether it
@@ -588,10 +589,10 @@ export function NewTransmittalForm({
                 <>
                   <label className="min-w-52">
                     <span className="sr-only">Type of information</span>
-                    <select value={infoType} onChange={(e) => setInfoType(e.target.value)} className={field}>
+                    <Select value={infoType} onChange={(e) => setInfoType(e.target.value)} className={field}>
                       <option value="" disabled>Type of information…</option>
                       {infoReasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-                    </select>
+                    </Select>
                   </label>
                   <button type="button" onClick={makeItInformation} disabled={!infoType} data-on={infoType ? "true" : undefined} className="ask disabled:cursor-not-allowed disabled:opacity-50">Make it information</button>
                 </>

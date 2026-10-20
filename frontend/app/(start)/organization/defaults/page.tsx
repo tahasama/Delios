@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
@@ -70,10 +71,10 @@ export default async function DefaultsPage() {
               <div className="px-4 py-4">
                 <ActionForm action={makeDefaultsAction} submitLabel="Make its choices the defaults" size="sm">
                   <Field label="Project" required>
-                    <select name="projectId" required defaultValue="" className={inputCls}>
+                    <Select name="projectId" required defaultValue="" className={inputCls}>
                       <option value="" disabled>Choose…</option>
                       {open.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-                    </select>
+                    </Select>
                   </Field>
                 </ActionForm>
               </div>

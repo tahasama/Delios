@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 
 export type JumpItem = { href: string; label: string; detail?: string | null; on?: boolean };
@@ -59,7 +59,7 @@ export function JumpPick({ items, label, className }: { items: JumpItem[]; label
       />
       <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
       {open ? (
-        <ul role="listbox" className="dt-menu absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg py-1">
+        <ul role="listbox" className="scroll-thin absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
           {options.length === 0 ? (
             <li className="px-3 py-2 text-xs text-slate-400">Nothing matches that.</li>
           ) : options.map((one, i) => (
@@ -69,10 +69,13 @@ export function JumpPick({ items, label, className }: { items: JumpItem[]; label
               aria-selected={one.on ?? false}
               onMouseDown={(e) => { e.preventDefault(); go(i); }}
               onMouseEnter={() => setHi(i)}
-              className={cn("flex cursor-pointer items-baseline gap-2 px-3 py-1.5 text-[13px]", i === hi ? "bg-tint text-slate-900" : "text-slate-700")}
+              className={cn("flex cursor-pointer items-start gap-2 px-3 py-1.5", i === hi ? "bg-tint-soft" : "")}
             >
-              <span className={cn(one.on ? "font-semibold" : "font-medium")}>{one.label}</span>
-              {one.detail ? <span className="truncate text-[11px] text-slate-400">{one.detail}</span> : null}
+              <Check className={cn("mt-0.5 h-3.5 w-3.5 shrink-0 text-link", one.on ? "" : "invisible")} aria-hidden />
+              <span className="min-w-0">
+                <span className={cn("block truncate text-[13px] text-slate-800", one.on && "font-semibold")}>{one.label}</span>
+                {one.detail ? <span className="block truncate text-[11px] text-slate-500">{one.detail}</span> : null}
+              </span>
             </li>
           ))}
         </ul>

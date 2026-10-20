@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { inputCls } from "@/components/ui";
 import { requireScope } from "@/lib/core/scope";
@@ -80,10 +81,10 @@ export default async function PersonActivityPage({ params, searchParams }: { par
       find={{
         q: sp.q, from: sp.from, to: sp.to, hidden: { kind: sp.kind, action: sp.action }, clear: address({ kind: sp.kind, action: sp.action }),
         extra: projects.length > 1 ? (
-          <select name="project" defaultValue={sp.project ?? ""} className={inputCls} aria-label="Project">
+          <Select name="project" defaultValue={sp.project ?? ""} className={inputCls} aria-label="Project">
             <option value="">Every project</option>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-          </select>
+          </Select>
         ) : null,
       }}
       paging={{ page: activity?.page ?? 1, pages: activity?.pages ?? 1, total: activity?.total ?? 0 }}

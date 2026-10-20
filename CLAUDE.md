@@ -637,6 +637,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   it stands share one line. Which values: the segmented choice (`.seg` / `.segment`, In use · Retired · All, with counts).
   "Used" names what uses a value ("recommended by document types: Calculation"), only real references (`Pointers`).
   The bottom bar for ticked values: Retire, Bring back, and for those never used, Move to another set and Delete.
+- **Every dropdown is the app's** (owner: "all drawers, lists of choices adopt this styling", the numbering's): `Select`
+  (`components/select.tsx`) replaces every `<select>`: the chosen one ticked and bold, the one under the keys shaded,
+  groups under their names, a field to narrow a list longer than 12. The native select stays hidden in the form holding
+  the value (name, `form`, `required`, `defaultValue`, `value`, `onChange` work as before; a pointer pick applies a
+  filter at once, a keyboard one on leaving). Never a bare `<select>` again. The search fields' lists (`SearchPick`,
+  `JumpPick`, the recipient picker, "One of ours?") take the same look, and every one lists on a click and narrows as
+  one types (Functions' long lists and "One of ours?" included).
+- **States read as pills** (owner, "keep the way the pills were colored, everywhere"): `Chip` in the app's tones
+  (`TONE`): the register's document and revision states (`DOC_STATE_COLOR`, `REV_STATE_COLOR`), transmittals' status,
+  reviews' waiting / withdrawn, packages' stage (`ToneChip` is a `Chip`).
 - **On/off is a switch** (owner, everywhere): `components/switch.tsx` (`role="switch"`): `Switch` acts at once,
   `SwitchControl` / `SwitchField` are a form's field (can sign in, in use, pop-ups, stamps, confirmation needed, only
   moves forward, shown in the register…). Never a "Switch off" button or an on/off chip beside a button; a choice among
@@ -1142,12 +1152,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   schedule read). Every new kind of work gets a row there.
 
 ### Help & orientation
-- `/guide` (owner), in the reference style: a plate with jumps; **the colours**: eight areas four by two, each folding
-  open (`details`) on its colours (no strip of colours closed: owner, distracting); **the codes**: one line each, Do the
+- `/guide` (owner), in the reference style: a plate with jumps; **the colours**: eight areas four by two, all open
+  (owner: opening one by one is clicks for nothing; no strip of colours: distracting); **the codes**: one line each, Do the
   work's way, in the register's own column words (Document state, Revision state, Review verdict, Review advice,
-  Released for, Criticality, Confidentiality, Refused titles), each opening its part of `/guide/codes`; an address's part
+  Released for, Criticality, Confidentiality, Refused titles): the two states open **the states** below (each state's
+  pill, what it means, how it gets there, the organization's names), every list opens its values in Types & sets
+  (`?set=<list>`) for whoever reads Settings. `/guide/codes` is gone (owner: it repeated Types & sets; it only redirects
+  to `/guide#states`), and the register's codes link the same way; an address's part
   lands under the sticky top bar (`:where([id])` scroll margin, globals.css); **roles on a project** (every role an
-  organization can play on any project): the app's segmented tabs (`.seg`, `?role=`), ours marked "us", one another
+  organization can play on any project): tabs drawn as the Schedule's view tabs (owner; one frame, the chosen part lit
+  with the brand line under it, `?role=`), ours marked "us", one another
   organization plays here marked by a dot (its key shown only then), each with what it does, where approval sits, what
   it sends, what comes to it, what its verdict is worth (`lib/settings/role-word.ts` `ROLE_WORD`, read by the Control
   room's flows too) and who plays it here; **reading a number** (one fold, the project's schemes read on one of its own
@@ -1356,6 +1370,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Under each stage of Schedule & actions: the revision in force, "Uploaded
   directly" (with the day) when a direct upload is newer, "Not released yet",
   or "None yet".
+- The plan is drawn as a planner's chart (owner): each month a column, every other one lightly shaded, a plain line
+  between them and between actions; each action's lead-in (from the day documents are needed) a lighter bar, its work
+  (start → finish) a solid one in the same hue, a day of work with no finish a diamond; corners barely rounded.
 - An action whose dates the latest schedule read moved carries a "moved" stamp
   in the table and on the plan; its page says "Moved by rev C: was … , now …".
   The stamp goes when a later read leaves its dates where they are.

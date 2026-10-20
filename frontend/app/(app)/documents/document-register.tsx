@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { setAssetDocumentsAction } from "@/lib/records/forms";
 import { setPackageMembersAction } from "@/lib/packages/forms";
@@ -12,7 +13,9 @@ import { FilterOptions } from "@/components/filter-options";
 import { sendSupplierFromRegisterAction as sendFromRegister } from "@/lib/packages/forms-supplier";
 import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
-import { Th, Td, Info } from "@/components/ui";
+import { Th, Td, Info, Chip } from "@/components/ui";
+import { TONE } from "@/lib/core/tones";
+import { DOC_STATE_COLOR, REV_STATE_COLOR, type DocState, type RevState } from "@/lib/core/standard";
 import { useCardHeight } from "@/components/card-height";
 import { ActionForm } from "@/components/form";
 import { setActionDocumentsAction } from "@/lib/actions/forms-links";
@@ -83,24 +86,22 @@ type Paging = {
 
 type Filters = { pick: string; q: string; terms: string[]; state: string; rev: string; status: string; verdict: string; supplier: string; po: string; discipline: string; docType: string; criticality: string; confidentiality: string; deliverable: string; phase: string; action: string; view: string; on: string; from: string; to: string };
 
-/** Where the guide explains each kind of code. */
+/** Where each kind of code is explained: the states on Help, a list's values in Types & sets (read by everyone of ours). */
 const GUIDE: Record<string, string> = {
-  DOC_STATE: "/guide/codes#document",
-  REV_STATE: "/guide/codes#revision",
-  VERDICT: "/guide/codes#outcome",
-  STATUS: "/guide/codes#status",
-  CRITICALITY: "/guide/codes#criticality",
-  CONFIDENTIALITY: "/guide/codes#confidentiality",
+  DOC_STATE: "/guide#states",
+  REV_STATE: "/guide#states",
+  VERDICT: "/settings/config?set=REVIEW_OUTCOMES",
+  STATUS: "/settings/config?set=STATUSES",
+  CRITICALITY: "/settings/config?set=CRITICALITY",
+  CONFIDENTIALITY: "/settings/config?set=CONFIDENTIALITY",
 };
+/** A list's page in Types & sets, for a reader who opens it (`codes["@lists"]`, set for our people only). */
+const listHref = (codes: Record<string, string>, key: string) => (codes["@lists"] ? GUIDE[key] : undefined);
 
 /** The rail colour per revision state: the row's state, read before any word. */
 const RAIL: Record<string, string> = {
   NONE: "rail-none", IN_PREPARATION: "rail-prep", IN_REVIEW: "rail-review",
   RELEASED: "rail-released", SUPERSEDED: "rail-superseded", VOID: "rail-void",
-};
-const REV_INK: Record<string, string> = {
-  IN_PREPARATION: "text-amber-700", IN_REVIEW: "text-sky-700", RELEASED: "text-emerald-700",
-  SUPERSEDED: "text-violet-700", VOID: "text-red-700",
 };
 
 const ORDER_KEY = "register:columns";
@@ -638,9 +639,9 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
 
           <label className="flex items-center justify-end gap-1.5">
             <span className="stencil text-slate-400">Rows</span>
-            <select className="plain" value={paging.perPage} onChange={(event) => go(pageHref({ per: Number(event.target.value), page: 1 }))}>
+            <Select className="plain" value={paging.perPage} onChange={(event) => go(pageHref({ per: Number(event.target.value), page: 1 }))}>
               {paging.sizes.map((size) => <option key={size} value={size}>{size}</option>)}
-            </select>
+            </Select>
           </label>
         </div>
       ) : null}
@@ -728,7 +729,7 @@ const COLUMNS: Column[] = [
     label: "Document state",
     note: "Where the document itself stands: planned, active, superseded, withdrawn. It is about the document, not any one revision.",
     cellClass: "whitespace-nowrap",
-    cell: (row, codes) => <CodeRef code={row.docStateLabel} note={codes[`DOC_STATE|${row.docState}`]} href={GUIDE.DOC_STATE} className="meta font-sans!" />,
+    cell: (row, codes) => <CodeRef code={row.docStateLabel} note={codes[`DOC_STATE|${row.docState}`]} href={GUIDE.DOC_STATE} chip={DOC_STATE_COLOR[row.docState as DocState] ?? TONE.idle} />,
   },
   {
     key: "rev", sort: "rev",
@@ -743,7 +744,7 @@ const COLUMNS: Column[] = [
     cellClass: "whitespace-nowrap",
     cell: (row, codes) => (
       <>
-        <CodeRef code={row.revStateLabel} note={codes[`REV_STATE|${row.revState ?? ""}`]} href={row.revState ? GUIDE.REV_STATE : undefined} className={`meta font-sans! ${REV_INK[row.revState ?? ""] ?? ""}`} />
+        <CodeRef code={row.revStateLabel} note={codes[`REV_STATE|${row.revState ?? ""}`]} href={row.revState ? GUIDE.REV_STATE : undefined} chip={REV_STATE_COLOR[row.revState as RevState] ?? TONE.idle} />
         {/* Released, and nobody asked for it to be sent. It is in use; nobody
             has been told, including anyone whose approval it may still need. */}
       </>
@@ -754,8 +755,8 @@ const COLUMNS: Column[] = [
     label: "Review verdict",
     note: "What the deciding step of the review route said about this revision. Advice from earlier steps is on the review itself, not here.",
     cellClass: "whitespace-nowrap text-xs",
-    cell: (row) =>
-      row.verdict ? <CodeRef code={row.verdict} note={row.verdictLabel ?? undefined} href={GUIDE.VERDICT} className="code-chip" />
+    cell: (row, codes) =>
+      row.verdict ? <CodeRef code={row.verdict} note={row.verdictLabel ?? undefined} href={listHref(codes, "VERDICT")} className="code-chip" />
         : row.verdictLabel ? <span className="meta">{row.verdictLabel}</span> : <Muted />,
   },
   {
@@ -769,9 +770,9 @@ const COLUMNS: Column[] = [
       !row.releasedFor && row.proposedFor ? (
         <CodeRef code={row.proposedFor} note={`${codes[`STATUS|${row.proposedFor}`] ?? row.proposedFor}
 
-The revision is not released, so nobody works from this status yet.`} href={GUIDE.STATUS} className="code-chip code-chip-held" />
+The revision is not released, so nobody works from this status yet.`} href={listHref(codes, "STATUS")} className="code-chip code-chip-held" />
       ) : row.releasedFor ? (
-        <CodeRef code={row.releasedFor} note={codes[`STATUS|${row.releasedFor}`]} href={GUIDE.STATUS} className="code-chip code-chip-live" />
+        <CodeRef code={row.releasedFor} note={codes[`STATUS|${row.releasedFor}`]} href={listHref(codes, "STATUS")} className="code-chip code-chip-live" />
       ) : <Muted />,
   },
   { key: "created", sort: "created", label: "Created", headClass: "text-right", cellClass: "whitespace-nowrap text-right font-mono text-xs tabular-nums", cell: (row) => date(row.createdDate) },
@@ -819,7 +820,7 @@ The revision is not released, so nobody works from this status yet.`} href={GUID
     note: "How serious an error in it would be. It decides who must approve, how long it is kept, and the format it is kept in.",
     cellClass: "whitespace-nowrap",
     cell: (row, codes) => row.criticality
-      ? <CodeRef code={codes[`CRITICALITY_SHORT|${row.criticality}`] ?? row.criticality.replaceAll("_", " ").toLowerCase()} note={codes[`CRITICALITY|${row.criticality}`]} href={GUIDE.CRITICALITY} className="meta font-sans!" />
+      ? <CodeRef code={codes[`CRITICALITY_SHORT|${row.criticality}`] ?? row.criticality.replaceAll("_", " ").toLowerCase()} note={codes[`CRITICALITY|${row.criticality}`]} href={listHref(codes, "CRITICALITY")} className="meta font-sans!" />
       : <Muted />,
   },
   {
@@ -828,7 +829,7 @@ The revision is not released, so nobody works from this status yet.`} href={GUID
     note: "Who may see it. Above the open levels it is read only by the people named on the document itself — to anybody else it is not in lists, counts or searches.",
     cellClass: "whitespace-nowrap",
     cell: (row, codes) => row.confidentiality
-      ? <CodeRef code={codes[`CONFIDENTIALITY_SHORT|${row.confidentiality}`] ?? row.confidentiality.toLowerCase()} note={codes[`CONFIDENTIALITY|${row.confidentiality}`]} href={GUIDE.CONFIDENTIALITY} className="meta font-sans!" />
+      ? <CodeRef code={codes[`CONFIDENTIALITY_SHORT|${row.confidentiality}`] ?? row.confidentiality.toLowerCase()} note={codes[`CONFIDENTIALITY|${row.confidentiality}`]} href={listHref(codes, "CONFIDENTIALITY")} className="meta font-sans!" />
       : <Muted />,
   },
   {
@@ -863,7 +864,7 @@ function Filter({ name, value, empty, options, disabled }: { name: string; value
   return (
     <label className="min-w-0 flex-1">
       <span className="sr-only">{empty}</span>
-      <select
+      <Select
         name={name}
         defaultValue={value}
         disabled={disabled}
@@ -884,7 +885,7 @@ function Filter({ name, value, empty, options, disabled }: { name: string; value
       >
         <option value="">{empty}</option>
         <FilterOptions options={options} />
-      </select>
+      </Select>
     </label>
   );
 }
@@ -897,12 +898,13 @@ function day(value: string) { return value ? new Intl.DateTimeFormat("en-GB", { 
  * and the whole list is one click away in the guide — so the register stays a
  * register, and nobody has to memorise IFC, C2 or AB to read it.
  */
-function CodeRef({ code, note, href, className }: { code: string; note?: string; href?: string; className?: string }) {
-  const body = <span className={`code-ref ${className ?? ""}`}>{code}</span>;
+function CodeRef({ code, note, href, className, chip }: { code: string; note?: string; href?: string; className?: string; chip?: string }) {
+  // A state reads as its pill, in the app's tones (owner: "keep the way the pills were colored, everywhere").
+  const body = chip ? <Chip className={chip}>{code}</Chip> : <span className={`code-ref ${className ?? ""}`}>{code}</span>;
   // A code with a note but nowhere to go still says, under the cursor, that
   // hovering it will tell you something.
   if (!href) return <span title={note} className={note ? "cursor-help" : undefined}>{body}</span>;
-  return <Link href={href} title={note ? `${note}\n\nEvery code, and what it means →` : undefined} scroll={false}>{body}</Link>;
+  return <Link href={href} title={note ? `${note}\n\nWhat it means, and the others →` : undefined} scroll={false}>{body}</Link>;
 }
 
 /** A column header that orders the register. The arrow is always there, dim. */

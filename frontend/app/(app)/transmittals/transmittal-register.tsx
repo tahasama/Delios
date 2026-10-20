@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -8,7 +9,8 @@ import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
 import { FilterMenu } from "@/components/filter-menu";
 import { FilterOptions } from "@/components/filter-options";
-import { Th, Td, Info } from "@/components/ui";
+import { Th, Td, Info, Chip } from "@/components/ui";
+import { TONE } from "@/lib/core/tones";
 import { useCardHeight } from "@/components/card-height";
 
 /**
@@ -50,8 +52,9 @@ const FREEZE_KEY = "transmittals:frozen";
 const RAIL: Record<string, string> = {
   DRAFT: "rail-draft", ISSUED: "rail-sent", ACCEPTED: "rail-accepted", REJECTED: "rail-returned", CLOSED: "rail-received",
 };
-const STATUS_INK: Record<string, string> = {
-  DRAFT: "text-slate-500", ISSUED: "text-sky-700", ACCEPTED: "text-emerald-700", REJECTED: "text-red-700",
+/** Each status as its pill, in the app's tones. */
+const STATUS_TONE: Record<string, string> = {
+  DRAFT: TONE.idle, ISSUED: TONE.moving, ACCEPTED: TONE.done, REJECTED: TONE.refused,
 };
 
 type Column = {
@@ -394,9 +397,9 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
           ) : <span />}
           <label className="flex items-center justify-end gap-1.5">
             <span className="stencil text-slate-400">Rows</span>
-            <select className="plain" value={paging.perPage} onChange={(event) => go(pageHref({ per: Number(event.target.value), page: 1 }))}>
+            <Select className="plain" value={paging.perPage} onChange={(event) => go(pageHref({ per: Number(event.target.value), page: 1 }))}>
               {paging.sizes.map((size) => <option key={size} value={size}>{size}</option>)}
-            </select>
+            </Select>
           </label>
         </div>
       ) : null}
@@ -421,7 +424,7 @@ const COLUMNS: Column[] = [
     key: "status", sort: "status", label: "Status",
     note: "Draft means nothing has been sent. Issued means the recipients were told. On what arrives: to check, then accepted or rejected, then closed.",
     cellClass: "whitespace-nowrap",
-    cell: (row) => <span className={`meta font-sans! ${STATUS_INK[row.status] ?? ""}`}>{row.statusLabel}</span>,
+    cell: (row) => <Chip className={STATUS_TONE[row.status] ?? TONE.idle}>{row.statusLabel}</Chip>,
   },
   {
     key: "seen", label: "Seen by",
@@ -486,7 +489,7 @@ function Filter({ name, value, empty, options }: { name: string; value: string; 
   return (
     <label className="min-w-0 flex-1">
       <span className="sr-only">{empty}</span>
-      <select
+      <Select
         name={name}
         defaultValue={value}
         data-on={value ? "true" : "false"}
@@ -494,7 +497,7 @@ function Filter({ name, value, empty, options }: { name: string; value: string; 
       >
         <option value="">{empty}</option>
         <FilterOptions options={options} />
-      </select>
+      </Select>
     </label>
   );
 }

@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { SwitchControl } from "@/components/switch";
 import { DataTable, Th, Td, Field, inputCls, ToneChip } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -70,10 +71,10 @@ export function RevisionBoard({ level, editable, schemes, routing, deliverables,
                 </Td>
                 <Td>
                   <input type="hidden" name="deliverableType" value={d.code} />
-                  <select name={`scheme_${d.code}`} defaultValue={routing.find((r) => r.deliverableType === d.code)?.schemeId ?? ""} className={`${inputCls} w-72`} aria-label={`Scheme for ${d.code}`}>
+                  <Select name={`scheme_${d.code}`} defaultValue={routing.find((r) => r.deliverableType === d.code)?.schemeId ?? ""} className={`${inputCls} w-72`} aria-label={`Scheme for ${d.code}`}>
                     <option value="">The default{fallback ? ` (${fallback.name})` : ""}</option>
                     {schemes.filter((s) => !s.isDefault).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
+                  </Select>
                 </Td>
               </tr>
             ))}

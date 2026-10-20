@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { Fragment } from "react";
 import Link from "next/link";
 import { Pencil, Plus, SlidersHorizontal, X } from "lucide-react";
@@ -70,14 +71,14 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const opening = sp.new === "1";
 
   const kindSelect = (value: string, required: boolean) => (
-    <select name="kind" required={required} defaultValue={value} className={field}>
+    <Select name="kind" required={required} defaultValue={value} className={field}>
       {kinds.offered.map((k) => <option key={k.code} value={k.code}>{k.label}</option>)}
-    </select>
+    </Select>
   );
   const roleSelect = (value: string, required: boolean) => (
-    <select name="role" required={required} defaultValue={value} className={field}>
+    <Select name="role" required={required} defaultValue={value} className={field}>
       {roleOptions.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-    </select>
+    </Select>
   );
   const band = (title: string, said: string) => (
     <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
@@ -153,10 +154,10 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
               </details>
               <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                 <Field label="Its people" hint="the same functions; take anyone off afterwards in People & access">
-                  <select name="copyFrom" defaultValue="" className={field}>
+                  <Select name="copyFrom" defaultValue="" className={field}>
                     <option value="">Only you, to start</option>
                     {projects.filter((p) => p.status === "ACTIVE").map((p) => <option key={p.id} value={p.id}>Everyone on {p.code}</option>)}
-                  </select>
+                  </Select>
                 </Field>
               </div>
             </ActionForm>

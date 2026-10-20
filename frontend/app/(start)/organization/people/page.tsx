@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { Fragment } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -155,10 +156,10 @@ function PersonPanel({ user: u, me, functions, projects, disciplines, close }: {
   const seats = [...u.memberships].sort((a, b) => Number(b.active) - Number(a.active) || a.projectCode.localeCompare(b.projectCode));
   const elsewhere = projects.filter((p) => !u.memberships.some((m) => m.projectId === p.id));
   const departmentSelect = (name: string, value: string | null) => (
-    <select name={name} defaultValue={value ?? ""} className={field}>
+    <Select name={name} defaultValue={value ?? ""} className={field}>
       <option value="">None</option>
       {disciplines.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
-    </select>
+    </Select>
   );
   const fact = (term: string, value: React.ReactNode) => (
     <div className="px-5 py-3 sm:px-6">
@@ -211,9 +212,9 @@ function PersonPanel({ user: u, me, functions, projects, disciplines, close }: {
                       ) : (
                         <>
                           <td className="min-w-48 px-3 py-2">
-                            <select name={`fn:${m.projectId}`} defaultValue={m.functionId} className={field}>
+                            <Select name={`fn:${m.projectId}`} defaultValue={m.functionId} className={field}>
                               {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                            </select>
+                            </Select>
                           </td>
                           <td className="min-w-40 px-3 py-2">{departmentSelect(`dep:${m.projectId}`, m.department)}</td>
                           <td className="px-3 py-2 whitespace-nowrap text-slate-600">{m.since ? fmtDate(m.since) : "—"}</td>
@@ -233,16 +234,16 @@ function PersonPanel({ user: u, me, functions, projects, disciplines, close }: {
         {elsewhere.length ? (
           <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
             <Field label="Put on another project" hint="optional">
-              <select name="newProject" defaultValue="" className={field}>
+              <Select name="newProject" defaultValue="" className={field}>
                 <option value="">None</option>
                 {elsewhere.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-              </select>
+              </Select>
             </Field>
             <Field label="Function there">
-              <select name="newFunction" defaultValue="" className={field}>
+              <Select name="newFunction" defaultValue="" className={field}>
                 <option value="">Choose…</option>
                 {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
+              </Select>
             </Field>
             <Field label="Department there">{departmentSelect("newDepartment", null)}</Field>
           </div>

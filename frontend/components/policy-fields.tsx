@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { Field, inputCls } from "@/components/ui";
 import type { OwnField, Rules } from "@/lib/settings/field-policy";
 
@@ -54,18 +55,18 @@ export function Added({ fields, values, className }: { fields: OwnField[]; value
             {field.control === "LONG_TEXT" ? (
               <textarea name={name} required={required} defaultValue={value} rows={3} maxLength={2000} className={inputCls} />
             ) : field.control === "CHOICE" ? (
-              <select name={name} required={required} defaultValue={value} className={inputCls}>
+              <Select name={name} required={required} defaultValue={value} className={inputCls}>
                 <option value="">{required ? "Choose…" : "—"}</option>
                 {(field.options ?? []).map((o) => (
                   <option key={o.code} value={o.code}>{o.label}</option>
                 ))}
-              </select>
+              </Select>
             ) : field.control === "YES_NO" ? (
-              <select name={name} required={required} defaultValue={value} className={inputCls}>
+              <Select name={name} required={required} defaultValue={value} className={inputCls}>
                 <option value="">{required ? "Choose…" : "—"}</option>
                 <option value="yes">Yes</option>
                 <option value="no">No</option>
-              </select>
+              </Select>
             ) : (
               <input
                 name={name}

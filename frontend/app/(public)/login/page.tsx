@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import Link from "next/link";
 import { Suspense, useActionState, useState } from "react";
@@ -86,10 +87,10 @@ function LoginForm() {
               {state?.chooseOrg?.length ? (
                 <div>
                   <label htmlFor="org" className="mb-1 block text-xs font-medium text-slate-700">Organization</label>
-                  <select id="org" name="org" required className={inputCls} defaultValue="">
+                  <Select id="org" name="org" required className={inputCls} defaultValue="">
                     <option value="" disabled>Choose your organization…</option>
                     {state.chooseOrg.map((o) => <option key={o.slug} value={o.slug}>{o.name}</option>)}
-                  </select>
+                  </Select>
                 </div>
               ) : null}
               </>

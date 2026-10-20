@@ -26,9 +26,9 @@ export async function takeBackNumberAction(_prev: State | undefined, formData: F
 /** Our documents a few words find (number, title, or a number of theirs matched before): for choosing one of ours, never typing it. */
 export async function findOursAction(words: string): Promise<{ id: string; number: string; title: string; revision: string | null }[]> {
   const ctx = await requireScope();
+  // Nothing typed yet: the register's first lines, so the list shows on a click (owner); words narrow it.
   const q = words.trim();
-  if (q.length < 2) return [];
   const page = await api<{ items: { id: string; number: string; title: string; latestRevision: string | null }[] }>(
-    projectPath(ctx, "/documents"), { query: { q, limit: "8" } }).catch(() => ({ items: [] }));
+    projectPath(ctx, "/documents"), { query: q ? { q, limit: "30" } : { limit: "30" } }).catch(() => ({ items: [] }));
   return page.items.map((one) => ({ id: one.id, number: one.number, title: one.title, revision: one.latestRevision }));
 }

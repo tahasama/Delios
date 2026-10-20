@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { inputCls } from "@/components/ui";
 import type { OwnField } from "@/lib/settings/field-policy";
@@ -36,18 +37,18 @@ export function OwnFields({ fields, values, className, deliverableType, serving 
             {field.control === "LONG_TEXT" ? (
               <textarea name={name} required={required} defaultValue={value} rows={3} className={inputCls} />
             ) : field.control === "CHOICE" ? (
-              <select name={name} required={required} defaultValue={value} className={inputCls}>
+              <Select name={name} required={required} defaultValue={value} className={inputCls}>
                 <option value="">{required ? "Choose…" : "—"}</option>
                 {(serving && field.setKey ? forType(serving, field.setKey, deliverableType, field.options ?? []) : field.options ?? []).map((o) => (
                   <option key={o.code} value={o.code}>{o.label}</option>
                 ))}
-              </select>
+              </Select>
             ) : field.control === "YES_NO" ? (
-              <select name={name} required={required} defaultValue={value} className={inputCls}>
+              <Select name={name} required={required} defaultValue={value} className={inputCls}>
                 <option value="">{required ? "Choose…" : "—"}</option>
                 <option value="yes">Yes</option>
                 <option value="no">No</option>
-              </select>
+              </Select>
             ) : (
               <input
                 name={name}

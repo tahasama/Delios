@@ -44,8 +44,10 @@ export function markMissing(form: HTMLFormElement, elements: Element[]) {
     // A picker keeps its value in a hidden input: outline what the person sees, next to it.
     const shown = el instanceof HTMLInputElement && el.type === "hidden" ? el.parentElement?.querySelector("input:not([type=hidden]), select") ?? el.parentElement : el;
     if (!shown) continue;
-    shown.setAttribute("data-missing", "true");
-    const clear = () => shown.removeAttribute("data-missing");
+    // A dropdown drawn by the app (`Select`) keeps a hidden select: outline its button, cleared when the select changes.
+    const seen = el instanceof HTMLSelectElement && el.getAttribute("aria-hidden") === "true" ? el.parentElement?.querySelector("button") ?? shown : shown;
+    seen.setAttribute("data-missing", "true");
+    const clear = () => seen.removeAttribute("data-missing");
     shown.addEventListener("input", clear, { once: true });
     shown.addEventListener("change", clear, { once: true });
   }

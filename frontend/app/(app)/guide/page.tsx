@@ -14,11 +14,14 @@ import { projectNumbering } from "@/lib/settings/api-admin";
 import { getMe } from "@/lib/account/api";
 import { SETUP_PAGES, maySetup } from "@/app/(app)/settings/setup-pages";
 import { cn } from "@/lib/core/utils";
+import { Chip } from "@/components/ui";
+import { stateNames, stateName } from "@/lib/core/state-names";
+import { DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_STATE_COLOR, REV_MEANING } from "@/lib/core/standard";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Help & orientation" };
 
-type Place = { href: string; title: string; text: string; icon: React.ComponentType<{ className?: string }> };
+type Place = { href?: string; title: string; text: string; icon: React.ComponentType<{ className?: string }> };
 
 const DAILY: Place[] = [
   { href: "/documents", title: "Documents", text: "Find documents in the register, choose several, and send them for review or out on a transmittal together.", icon: FileText },
@@ -44,16 +47,19 @@ const SETUP_ICON: Record<string, React.ComponentType<{ className?: string }>> = 
   "/settings/parties": Network, "/settings/projects": Settings, "/settings/audit": ListChecks,
 };
 
-/** The codes, one line each, each opening its part of the full page (/guide/codes). */
-const CODES: Place[] = [
-  { href: "/guide/codes#document", title: "Document state", text: "The document as a whole: planned, active, withdrawn or cancelled. Moves by itself; the control function or its registrar ends it.", icon: CircleDot },
-  { href: "/guide/codes#revision", title: "Revision state", text: "One revision, A, B, C…: being prepared, in review, released, superseded. Moves as the work moves.", icon: FileText },
-  { href: "/guide/codes#outcome", title: "Review verdict", text: "The verdict on a revision in review, from the organization's review outcomes, each meaning accepted, accepted with comments, rejected or for information.", icon: ClipboardCheck },
-  { href: "/guide/codes#advice", title: "Review advice", text: "The advice a step gives before the decision; never less than its comments say.", icon: MessageSquareText },
-  { href: "/guide/codes#status", title: "Released for", text: "What a released revision may be used for (IFC, IFR…): the decider grants it, and the revision is released at it.", icon: Tags },
-  { href: "/guide/codes#criticality", title: "Criticality", text: "How much a document matters; its type recommends a level.", icon: Gauge },
-  { href: "/guide/codes#confidentiality", title: "Confidentiality", text: "A document above a function's clearance is read only by those named on it, its registrar, or those it was sent to.", icon: Lock },
-  { href: "/guide/codes#titles", title: "Refused titles", text: "A title that only repeats the document's type says nothing, and is refused.", icon: Type },
+/**
+ * The codes, one line each, in the register's column words: the two states the app fixes open their part of this page
+ * (#states); every other is a list, opening its page in Types & sets (`list`) for whoever reads Settings.
+ */
+const CODES: (Place & { list?: string })[] = [
+  { href: "#states", title: "Document state", text: "The document as a whole: planned, active, withdrawn or cancelled. Moves by itself; the control function or its registrar ends it.", icon: CircleDot },
+  { href: "#states", title: "Revision state", text: "One revision, A, B, C…: being prepared, in review, released, superseded. Moves as the work moves.", icon: FileText },
+  { list: "REVIEW_OUTCOMES", title: "Review verdict", text: "The verdict on a revision in review, from the organization's review outcomes, each meaning accepted, accepted with comments, rejected or for information.", icon: ClipboardCheck },
+  { list: "REVIEW_ADVICE", title: "Review advice", text: "The advice a step gives before the decision; never less than its comments say.", icon: MessageSquareText },
+  { list: "STATUSES", title: "Released for", text: "What a released revision may be used for (IFC, IFR…): the decider grants it, and the revision is released at it.", icon: Tags },
+  { list: "CRITICALITY", title: "Criticality", text: "How much a document matters; its type recommends a level.", icon: Gauge },
+  { list: "CONFIDENTIALITY", title: "Confidentiality", text: "A document above a function's clearance is read only by those named on it, its registrar, or those it was sent to.", icon: Lock },
+  { list: "GENERIC_TITLE_WORDS", title: "Refused titles", text: "A title that only repeats the document's type says nothing, and is refused.", icon: Type },
 ];
 
 /**
@@ -106,10 +112,15 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
     text: page.href === "/settings/functions" && mine ? `${page.text} Yours here is ${mine.function.name}.` : page.text,
   }));
   const numberingOpen = setup.some((one) => one.href === "/settings/numbering");
+  // A list's code opens its values in Types & sets for whoever reads it; otherwise it is named only.
+  const listsOpen = setup.some((one) => one.href === "/settings/config");
+  const codes: Place[] = CODES.map(({ list, ...one }) => ({ ...one, href: list ? (listsOpen ? `/settings/config?set=${list}` : undefined) : one.href }));
+  const names = await stateNames(ctx);
 
   const jumps = [
     { href: "#colours", label: "The colours" },
     { href: "#codes", label: "The codes" },
+    { href: "#states", label: "The states" },
     { href: "#roles", label: "Roles on a project" },
     { href: "#setup", label: "Reading a number" },
     { href: "#places", label: "Where things are done" },
@@ -131,7 +142,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
         </div>
       </section>
 
-      {/* The key to the side colours: eight areas, four by two, each folding open on its colours (globals.css .rail-*). */}
+      {/* The key to the side colours: eight areas, four by two, all open (owner: opening one by one is clicks for nothing). */}
       <section id="colours" className="register register-sheet register-sheet-open scroll-mt-24">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">What the colours say</span>
@@ -139,27 +150,35 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
         </div>
         <div className="grid grid-cols-1 items-start gap-3 px-5 py-4 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
           {RAILS.map((group) => (
-            <details key={group.area} className="group overflow-hidden rounded-md ring-1 ring-line">
-              <summary className="flex cursor-pointer list-none flex-col px-3 py-2.5 hover:bg-tint-soft [&::-webkit-details-marker]:hidden">
-                <span className="flex items-center gap-1.5">
-                  <ChevronRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-150 ease-out group-open:rotate-90" />
-                  <span className="stencil text-slate-600">{group.area}</span>
-                  <span className="ml-auto text-[11px] text-slate-400">{group.items.length}</span>
-                </span>
-              </summary>
+            <div key={group.area} className="overflow-hidden rounded-md ring-1 ring-line">
+              <p className="stencil px-3 py-2 text-slate-600">{group.area}</p>
               <ul className="space-y-0.5 border-t border-line px-3 py-2">
                 {group.items.map((one) => (
                   <li key={one.rail + one.name} className={`rail ${one.rail} py-0.5 text-xs text-slate-700`}>{one.name}</li>
                 ))}
               </ul>
-            </details>
+            </div>
           ))}
         </div>
       </section>
 
       <div id="codes" className="scroll-mt-24">
-        <Places title="The codes" said="the words of the register’s columns, each opening its full explanation" places={CODES} />
+        <Places title="The codes" said={listsOpen ? "the words of the register’s columns: the states below, each list in Types & sets" : "the words of the register’s columns"} places={codes} />
       </div>
+
+      {/* The two states the app fixes (no Settings page shows them to everyone): their pills, what each means, how it gets there. */}
+      <section id="states" className="register register-sheet register-sheet-open scroll-mt-24">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span className="stencil mr-1 text-slate-500">The states</span>
+          <span className="text-[11px] text-slate-500">fixed by the app, the same on every project; they only move forward</span>
+        </div>
+        <div className="grid grid-cols-1 gap-x-8 gap-y-5 px-5 py-4 sm:px-6 xl:grid-cols-2">
+          <States title="Document state" said="the document as a whole"
+            rows={DOC_STATES.map((s) => ({ key: s, name: DOC_STATE_LABEL[s], tone: DOC_STATE_COLOR[s], ...DOC_MEANING[s] }))} />
+          <States title="Revision state" said="one revision, A, B, C…"
+            rows={REV_STATES.map((s) => ({ key: s, name: stateName(names, s), tone: REV_STATE_COLOR[s], ...REV_MEANING[s] }))} />
+        </div>
+      </section>
 
       {/* Every role an organization can play on a project, as tabs: ours marked "us", those taking part here marked. */}
       <section id="roles" className="register register-sheet register-sheet-open scroll-mt-24">
@@ -167,14 +186,18 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
           <span className="stencil mr-1 text-slate-500">Roles on a project</span>
           <span className="text-[11px] text-slate-500">what an organization can be contracted to do, on any project: what it does, where approval sits, what its verdict is worth</span>
         </div>
-        <div className="border-b border-line px-5 py-2.5 sm:px-6">
-        <nav aria-label="Roles" className="seg max-w-full">
+        <div className="border-b border-line px-5 py-3 sm:px-6">
+        {/* The Schedule's tabs (owner): one frame split in equal parts, the chosen one lit with the brand line under it. */}
+        <nav aria-label="Roles" className="grid grid-cols-2 overflow-hidden rounded-xl border border-line bg-surface sm:grid-cols-5">
           {roleOptions.map((r) => {
             const us = r.code === project.role;
             const here = playing.has(r.code);
+            const on = shown?.code === r.code;
             return (
-              <Link key={r.code} href={`/guide?role=${r.code}#roles`} scroll={false} title={r.label} aria-current={shown?.code === r.code ? "page" : undefined}
-                className="segment gap-1.5">
+              <Link key={r.code} href={`/guide?role=${r.code}#roles`} scroll={false} title={r.label} aria-current={on ? "page" : undefined}
+                className={cn("flex items-center justify-center gap-1.5 border-line px-3 py-2.5 text-[13px] font-semibold transition [&:not(:last-child)]:border-r [&:nth-child(-n+5)]:sm:border-b",
+                  on ? "bg-surface text-brand-ink shadow-[inset_0_-3px_0_0_var(--color-brand)]"
+                    : "bg-slate-100 text-slate-600 shadow-[inset_0_-3px_0_0_var(--color-brand)]/20 hover:bg-surface hover:text-brand-ink")}>
                 {r.code}
                 {us ? <span className="rounded-sm bg-brand px-1 text-[10px] font-bold uppercase leading-4 text-white">us</span>
                   : here ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-label={`on ${project.code}`} /> : null}
@@ -268,9 +291,9 @@ function Places({ title, said, places }: { title: string; said: string; places: 
       </div>
       <ul className="divide-y divide-line">
         {places.map(({ href, title: name, text, icon: Icon }) => (
-          <li key={href} className="grid grid-cols-[1rem_minmax(0,1fr)] items-baseline gap-x-3 px-5 py-2.5 sm:grid-cols-[1rem_14rem_minmax(0,1fr)] sm:px-6">
+          <li key={name} className="grid grid-cols-[1rem_minmax(0,1fr)] items-baseline gap-x-3 px-5 py-2.5 sm:grid-cols-[1rem_14rem_minmax(0,1fr)] sm:px-6">
             <Icon aria-hidden className="h-4 w-4 translate-y-0.5 text-slate-400" />
-            <Link href={href} className="text-[13px] font-semibold text-link hover:underline">{name}</Link>
+            {href ? <Link href={href} className="text-[13px] font-semibold text-link hover:underline">{name}</Link> : <span className="text-[13px] font-semibold text-slate-800">{name}</span>}
             <p className="col-start-2 text-xs leading-5 text-slate-600 sm:col-start-3">{text}</p>
           </li>
         ))}
@@ -295,5 +318,22 @@ function Fold({ icon: Icon, title, href, children }: { icon: React.ComponentType
         </div>
       </details>
     </li>
+  );
+}
+
+/** One of the fixed states, as a short table: its pill (the register's own colours), what it means, how it gets there. */
+function States({ title, said, rows }: { title: string; said: string; rows: { key: string; name: string; tone: string; means: string; how: string }[] }) {
+  return (
+    <div>
+      <p className="text-xs"><span className="font-semibold text-slate-900">{title}</span> <span className="text-slate-500">· {said}</span></p>
+      <ul className="mt-2 divide-y divide-line rounded-md ring-1 ring-line">
+        {rows.map((one) => (
+          <li key={one.key} className="grid grid-cols-1 gap-x-3 gap-y-1 px-3 py-2 text-xs leading-5 sm:grid-cols-[9rem_minmax(0,1fr)]">
+            <span><Chip className={one.tone}>{one.name}</Chip></span>
+            <span className="text-slate-700">{one.means} <span className="text-slate-500">{one.how}</span></span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

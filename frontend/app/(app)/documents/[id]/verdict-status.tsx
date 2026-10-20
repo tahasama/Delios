@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useState } from "react";
 import { Field, inputCls } from "@/components/ui";
@@ -84,16 +85,16 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
           required
           hint="the decider reads it"
         >
-          <select name="outcome" required className={inputCls} value={code || advice.code} onChange={(event) => setCode(event.target.value)}>
+          <Select name="outcome" required className={inputCls} value={code || advice.code} onChange={(event) => setCode(event.target.value)}>
             {verdicts.map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
-          </select>
+          </Select>
         </Field>
       ) : (
         <Field label="Your verdict" required hint={deciding ? "this one decides the revision" : "input for whoever decides"}>
-          <select name="outcome" required className={inputCls} value={code} onChange={(event) => setCode(event.target.value)}>
+          <Select name="outcome" required className={inputCls} value={code} onChange={(event) => setCode(event.target.value)}>
             <option value="" disabled>Choose…</option>
             {verdicts.map((one) => <option key={one.code} value={one.code}>{one.advice ? one.label : `${one.code} — ${one.label} (${one.effect})`}</option>)}
-          </select>
+          </Select>
           {verdict?.meaning ? <span className="mt-1.5 block text-[11px] text-slate-500">{verdict.meaning}</span> : null}
         </Field>
       )}
@@ -119,10 +120,10 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
       {/* A reservation on somebody else's answer is settled by that answer. */}
       {needsComment && (isAdvice ? verdict!.blocks : proceeds) && laterSteps.length ? (
         <Field label="What settles it" hint="a reservation on a later step is closed when that step answers — the revision does not go round again for it">
-          <select name="closesWithStep" defaultValue="" className={inputCls}>
+          <Select name="closesWithStep" defaultValue="" className={inputCls}>
             <option value="">The next revision</option>
             {laterSteps.map((step) => <option key={step.number} value={step.number}>{step.number}. {step.title}</option>)}
-          </select>
+          </Select>
         </Field>
       ) : null}
       <>
@@ -131,10 +132,10 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
             required
             hint={carrying ? `it carries ${carrying} — confirm it, or change it` : "what the revision is issued for once this step is done"}
           >
-            <select name="issuedFor" required value={status} onChange={(event) => setStatus(event.target.value)} className={inputCls}>
+            <Select name="issuedFor" required value={status} onChange={(event) => setStatus(event.target.value)} className={inputCls}>
               <option value="" disabled>Choose…</option>
               {statuses.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
-            </select>
+            </Select>
             {chosen ? (
               <span className={`mt-1.5 block text-[11px] ${chosen.allowsWork ? "font-semibold text-amber-700" : "text-slate-500"}`}>
                 {chosen.may

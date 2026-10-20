@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
@@ -42,15 +43,15 @@ export function WhoWeAre({ own, claimable, mergeList }: { own: OwnIdentity | nul
               <ActionForm action={saveOwnIdentityAction} submitLabel={own.number ? "Correct it" : "Save"} size="sm" variant="secondary">
                 <div className="grid gap-2 sm:grid-cols-3">
                   <Field label="Country">
-                    <select name="country" defaultValue={own.country ?? ""} className={inputCls}>
+                    <Select name="country" defaultValue={own.country ?? ""} className={inputCls}>
                       <option value="">Choose…</option>
                       {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-                    </select>
+                    </Select>
                   </Field>
                   <Field label="Kind">
-                    <select name="identifierKind" defaultValue={own.kind ?? "COMPANY"} className={inputCls}>
+                    <Select name="identifierKind" defaultValue={own.kind ?? "COMPANY"} className={inputCls}>
                       {IDENTIFIER_KINDS.map((k) => <option key={k.value} value={k.value} title={k.hint}>{k.label}</option>)}
-                    </select>
+                    </Select>
                   </Field>
                   <Field label="Number"><input name="identifierNumber" defaultValue={own.number ?? ""} className={`${inputCls} font-mono`} /></Field>
                 </div>

@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { ActionForm } from "@/components/form";
@@ -95,10 +96,10 @@ export function LinksCard({ actionId, code, departments, disciplines, documents,
                 >
                   <SearchPick browse items={documents} name="documentIds" initial={ask.documentIds} label="Document" placeholder="Type a number or a title" required />
                   <Field label="For" required>
-                    <select name="department" required defaultValue={tagged.length === 1 ? tagged[0].code : ""} className={inputCls}>
+                    <Select name="department" required defaultValue={tagged.length === 1 ? tagged[0].code : ""} className={inputCls}>
                       <option value="" disabled hidden>Discipline</option>
                       {tagged.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
-                    </select>
+                    </Select>
                   </Field>
                   {ask.confirm ? confirmerField : null}
                 </ActionForm>

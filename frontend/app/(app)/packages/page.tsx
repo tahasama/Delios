@@ -1,6 +1,7 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
-import { Field, inputCls, Info, ToneChip, DataTable, Th, Td } from "@/components/ui";
+import { Field, inputCls, Info, ToneChip, Chip, DataTable, Th, Td } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
 import { formPolicy } from "@/lib/settings/field-policy";
@@ -108,7 +109,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                       <Td className="w-10"><input type="radio" name="number" value={pkg.number} form="package-export" required aria-label={`Tick ${pkg.number} to export it`} /></Td>
                       <Td><Link href={`/packages/${pkg.number}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.names.to}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.number}</span></Td>
                       <Td className={`text-xs`}>
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
+                        <Chip className={where.tone}>{where.word}</Chip>
                       </Td>
                       {supplierOnly ? null : <Td className="text-xs tabular-nums">{f.notSent ? `${f.notSent} of ${f.total}` : <span className="text-slate-400">none</span>}</Td>}
                       <Td className="text-xs tabular-nums">{f.withThem} of {f.total}</Td>
@@ -149,9 +150,9 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
         <div className="border-t border-line px-5 py-4 sm:px-6">
           <ActionForm action={createSupplierPackageAction} submitLabel="Create">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Supplier" required><select name="partyCode" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{parties.filter((p) => !p.isInternal).map((p) => <option key={p.id} value={p.code}>{p.name}</option>)}</select></Field>
+              <Field label="Supplier" required><Select name="partyCode" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{parties.filter((p) => !p.isInternal).map((p) => <option key={p.id} value={p.code}>{p.name}</option>)}</Select></Field>
               <Field label="PO" hint="optional — one package per PO"><input name="po" className={inputCls} /></Field>
-              <Field label="Needed at status" hint="optional — each document goes as it is asked"><select name="requiredStatus" className={inputCls} defaultValue=""><option value="">None</option>{statuses.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.label}</option>)}</select></Field>
+              <Field label="Needed at status" hint="optional — each document goes as it is asked"><Select name="requiredStatus" className={inputCls} defaultValue=""><option value="">None</option>{statuses.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.label}</option>)}</Select></Field>
             </div>
             <p className="text-[11px] text-slate-500">Every placeholder whose supplier is this company is in the package automatically. Each document is due on its own planned date.</p>
           </ActionForm>

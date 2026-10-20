@@ -129,7 +129,7 @@ frontend/
 │   └── settings/         (forms-revisions.ts: Settings → Revisions; verdicts are the list Review outcomes, kept in Types & sets)
 │
 ├── components/           only the pieces several areas use
-│                         (ui.tsx: buttons and fields; form, data-table, timeline, search-pick,
+│                         (ui.tsx: buttons and fields; form, data-table, timeline, search-pick, select (every dropdown),
 │                          send-for-review, notify-panel, preflight, how-it-works: the form How this
                          project works and the organization's defaults share)
 ├── public/               files served as they are (sw.js, for pop-up notifications)

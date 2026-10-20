@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useState } from "react";
 import { X, Undo2 } from "lucide-react";
@@ -73,9 +74,9 @@ export function ReleaseRecipients({ asked, leftTo, choices, reasons, required }:
         <summary className="ask w-fit cursor-pointer list-none">Add people or organizations</summary>
         <div className="mt-3 space-y-3">
           <Field label="Why they are getting it" hint="from your organization's list">
-            <select name="issueReason" defaultValue={reasons[0]?.code ?? ""} className={inputCls}>
+            <Select name="issueReason" defaultValue={reasons[0]?.code ?? ""} className={inputCls}>
               {reasons.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
-            </select>
+            </Select>
           </Field>
           <SearchPick
             name="internalUserIds"

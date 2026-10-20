@@ -163,7 +163,7 @@ export function Tip({
 }
 
 export function ToneChip({ tone, children, title }: { tone: keyof typeof TONE; children: React.ReactNode; title?: string }) {
-  return <span title={title} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1", TONE[tone])}>{children}</span>;
+  return <Chip title={title} className={TONE[tone]}>{children}</Chip>;
 }
 
 export function Chip({ children, className, title }: { children: React.ReactNode; className?: string; title?: string }) {

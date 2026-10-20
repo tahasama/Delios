@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { SwitchControl } from "@/components/switch";
 import { ActionForm } from "@/components/form";
@@ -282,7 +283,7 @@ export function HowItWorks({
                           <span className="font-semibold text-slate-700">{carrier(activity.key, controlDoes)}:</span> {controlDoes ? activity.control : activity.self}
                         </p>
                       </div>
-                      <select
+                      <Select
                         name={`mode:${activity.key}`}
                         defaultValue={controlDoes ? "CONTROL" : "SELF"}
                         className={cn(inputCls, "w-full sm:w-56")}
@@ -291,7 +292,7 @@ export function HowItWorks({
                         {(["CONTROL", "SELF"] as ControlMode[]).map((one) => (
                           <option key={one} value={one}>{activity.key === PEOPLE_KEY ? PEOPLE_MODE_LABEL[one] : MODE_LABEL[one]}</option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                   {/* An act whose absence leaves the record whole may be left out altogether. */}
                   {SKIPPABLE[activity.key] ? (

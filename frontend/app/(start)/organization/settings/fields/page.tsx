@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { keptCopies } from "@/lib/settings/api-admin";
 import { KeptCopies } from "../copies";
 import { ActionForm } from "@/components/form";
@@ -47,7 +48,7 @@ export default async function OrganizationFieldsPage({ searchParams }: { searchP
                     className="mt-2 flex flex-wrap items-end gap-2 space-y-0">
                     <label className="w-56">
                       <span className="sr-only">Which form</span>
-                      <select name="form" required className={inputCls}>{one.forms.map((form) => <option key={form} value={form}>{nameOf(form)}</option>)}</select>
+                      <Select name="form" required className={inputCls}>{one.forms.map((form) => <option key={form} value={form}>{nameOf(form)}</option>)}</Select>
                     </label>
                     <label className="min-w-64 flex-1">
                       <span className="sr-only">Why</span>

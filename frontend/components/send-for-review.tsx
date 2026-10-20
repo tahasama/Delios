@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useState } from "react";
 import { ActionForm } from "@/components/form";
@@ -59,9 +60,9 @@ export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, e
       <input type="hidden" name="attempt" value={attempt} />
       {revisionIds.map((id) => <input key={id} type="hidden" name="revisionIds" value={id} />)}
       <Field label="Route" required hint={routes.length > 1 ? "the recommended one serves what you are sending most closely; the choice is yours" : undefined}>
-        <select name="templateId" required className={inputCls} value={routeId} onChange={(e) => setRouteId(e.target.value)}>
+        <Select name="templateId" required className={inputCls} value={routeId} onChange={(e) => setRouteId(e.target.value)}>
           {routes.map((r) => <option key={r.id} value={r.id}>{r.name}{r.recommended ? " (recommended)" : ""}</option>)}
-        </select>
+        </Select>
       </Field>
       {route?.description ? <p className="-mt-1 text-xs text-slate-500">{route.description}</p> : null}
       <OwnFields fields={ownFields} />

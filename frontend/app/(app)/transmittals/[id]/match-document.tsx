@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { inputCls } from "@/components/ui";
 import { cn } from "@/lib/core/utils";
@@ -16,12 +16,20 @@ export function MatchDocument({ proposed }: { proposed?: Found | null }) {
   const [words, setWords] = useState("");
   const [found, setFound] = useState<Found[]>([]);
   const [chosen, setChosen] = useState<Found | null>(proposed ?? null);
+  // Lists on a click and narrows as one types (owner), like every search field.
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
-    if (chosen || words.trim().length < 2) { setFound([]); return; }
+    if (chosen || !open) { setFound([]); return; }
     let live = true;
-    const wait = setTimeout(() => { findOursAction(words).then((rows) => { if (live) setFound(rows); }); }, 250);
+    const wait = setTimeout(() => { findOursAction(words).then((rows) => { if (live) setFound(rows); }); }, words ? 250 : 0);
     return () => { live = false; clearTimeout(wait); };
-  }, [words, chosen]);
+  }, [words, chosen, open]);
+  useEffect(() => {
+    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, []);
 
   if (chosen) {
     return (
@@ -34,17 +42,18 @@ export function MatchDocument({ proposed }: { proposed?: Found | null }) {
     );
   }
   return (
-    <span className="relative block w-72">
+    <span ref={box} className="relative block w-72">
       <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" aria-hidden />
-      <input value={words} onChange={(e) => setWords(e.target.value)} placeholder="Find it in the register" aria-label="Find our document in the register"
+      <input value={words} onChange={(e) => { setWords(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onClick={() => setOpen(true)}
+        onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} autoComplete="off" placeholder="Choose, or type to narrow" aria-label="Find our document in the register"
         className={cn(inputCls, "w-full pl-8")} />
-      {found.length ? (
-        <ul className="absolute z-20 mt-1 max-h-64 w-[28rem] overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-line dark:bg-slate-900">
+      {open && found.length ? (
+        <ul className="scroll-thin absolute z-30 mt-1 max-h-80 w-[28rem] overflow-y-auto rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
           {found.map((one) => (
             <li key={one.id}>
               <button type="button" onClick={() => setChosen(one)} className="block w-full px-3 py-1.5 text-left text-xs hover:bg-tint-soft">
-                <span className="font-mono font-semibold text-slate-900">{one.number}</span>
-                <span className="ml-2 text-slate-500">{one.title}{one.revision ? ` · rev ${one.revision}` : ""}</span>
+                <span className="block truncate text-[13px] text-slate-800">{one.title}{one.revision ? ` · rev ${one.revision}` : ""}</span>
+                <span className="block truncate font-mono text-[11px] text-slate-500">{one.number}</span>
               </button>
             </li>
           ))}

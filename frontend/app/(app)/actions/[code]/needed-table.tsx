@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -499,9 +500,9 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link, toget
         ) : <span />}
         <label className="flex items-center justify-end gap-1.5">
           <span className="stencil text-slate-500">Rows</span>
-          <select className="plain" value={perPage} onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1); }}>
+          <Select className="plain" value={perPage} onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1); }}>
             {SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
-          </select>
+          </Select>
         </label>
       </div>
     </section>
@@ -523,11 +524,11 @@ function Narrow({ value, onChange, empty, options }: {
   return (
     <label className="min-w-0 flex-1">
       <span className="sr-only">{empty}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} data-on={value ? "true" : "false"} className="plain w-full">
+      <Select value={value} onChange={(event) => onChange(event.target.value)} data-on={value ? "true" : "false"} className="plain w-full">
         {/* The filter's name shows while nothing is chosen; it is not a choice. Clear it with its chip. */}
         <option value="" disabled hidden>{empty}</option>
         {options.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
-      </select>
+      </Select>
     </label>
   );
 }

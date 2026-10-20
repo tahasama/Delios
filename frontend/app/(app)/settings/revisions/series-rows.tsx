@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useState } from "react";
 import { Field, inputCls } from "@/components/ui";
@@ -29,17 +30,17 @@ export function SeriesRows({ series, phases }: { series: RevisionSeries[]; phase
           <div key={s.key} className="grid grid-cols-2 items-end gap-x-4 gap-y-3 md:grid-cols-[repeat(6,minmax(0,1fr))_auto]">
             {s.code ? <input type="hidden" name={`code_${i}`} value={s.code} /> : <input type="hidden" name={`code_${i}`} value="" />}
             <Field label="Phase" hint={i === 0 ? "a line per phase" : undefined}>
-              <select name={`phase_${i}`} defaultValue={s.phase ?? ""} className={inputCls}>
+              <Select name={`phase_${i}`} defaultValue={s.phase ?? ""} className={inputCls}>
                 <option value="" disabled={others.has("")}>Any phase (the default)</option>
                 {phases.map((p) => <option key={p.code} value={p.code} disabled={others.has(p.code)}>{p.label}</option>)}
-              </select>
+              </Select>
             </Field>
             <Field label="Name" hint="empty: the phase's"><input name={`label_${i}`} defaultValue={s.label ?? ""} className={inputCls} /></Field>
             <Field label="Counts in">
-              <select name={`kind_${i}`} defaultValue={s.kind ?? "LETTERS"} className={inputCls}>
+              <Select name={`kind_${i}`} defaultValue={s.kind ?? "LETTERS"} className={inputCls}>
                 <option value="LETTERS">Letters</option>
                 <option value="NUMBERS">Numbers</option>
-              </select>
+              </Select>
             </Field>
             <Field label="Prefix" hint="before each value, e.g. P"><input name={`prefix_${i}`} defaultValue={s.prefix ?? ""} className={inputCls} /></Field>
             <Field label="Starts at" hint="empty: A, or 0 · a: small letters · 01: two digits">

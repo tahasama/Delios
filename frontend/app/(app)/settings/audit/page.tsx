@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
 import { adminAudit, adminProjects, orEmpty } from "@/lib/settings/api-admin";
@@ -49,10 +50,10 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       find={{
         q: sp.q, from: sp.from, to: sp.to, hidden: { kind: sp.kind, action: sp.action }, clear: address({ kind: sp.kind, action: sp.action }),
         extra: projects.length > 1 ? (
-          <select name="project" defaultValue={sp.project ?? ""} className={inputCls} aria-label="Project">
+          <Select name="project" defaultValue={sp.project ?? ""} className={inputCls} aria-label="Project">
             <option value="">Every project</option>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-          </select>
+          </Select>
         ) : null,
       }}
       paging={{ page: log?.page ?? 1, pages: log?.pages ?? 1, total: log?.total ?? 0 }}

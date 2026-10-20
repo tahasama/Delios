@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/select";
 
 import { useActionState, useEffect, useState } from "react";
 import { Lock } from "lucide-react";
@@ -38,10 +39,10 @@ export function IntakeChoice({ mode, filing, deliverableTypes, docTypes, discipl
   const select = (field: string, label: string, list: Option[], value: string | null) => (
     <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-700">
       <span className="font-medium">{label}</span>
-      <select name={field} defaultValue={value ?? ""} className={inputCls}>
+      <Select name={field} defaultValue={value ?? ""} className={inputCls}>
         <option value="">Choose…</option>
         {list.map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
-      </select>
+      </Select>
     </label>
   );
 

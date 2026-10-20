@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { Fragment } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
@@ -71,16 +72,16 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
     </div>
   );
   const roleSelect = (value: string | null) => (
-    <select name="role" defaultValue={value ?? ""} className={field}>
+    <Select name="role" defaultValue={value ?? ""} className={field}>
       <option value="">Not stated</option>
       {roles.filter((r) => r.code !== "GENERIC").map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-    </select>
+    </Select>
   );
   const startSelect = (value: string | null) => (
-    <select name="startFunctionId" defaultValue={value ?? ""} className={field}>
+    <Select name="startFunctionId" defaultValue={value ?? ""} className={field}>
       <option value="">Not said</option>
       {functions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-    </select>
+    </Select>
   );
 
   return (

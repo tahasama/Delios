@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
@@ -427,11 +428,11 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
                   <ActionForm action={markDispatchedAction} submitLabel="Mark as sent" size="sm" hidden={{ cycleId: cycle.id }}>
                     <p className="text-xs leading-5 text-slate-500">Send them the documents first — their system, or email. Then record it, and the clock starts.</p>
                     <Field label="Where it went" required>
-                      <select name="channel" required defaultValue="" className={inputCls}>
+                      <Select name="channel" required defaultValue="" className={inputCls}>
                         <option value="" disabled>Choose…</option>
                         <option value="Their own system">Their own system</option>
                         <option value="Email">Email, or a link we sent them</option>
-                      </select>
+                      </Select>
                     </Field>
                     <Field label="Date sent"><input type="date" name="sentOn" defaultValue={new Date().toISOString().slice(0, 10)} className={inputCls} /></Field>
                     <Field label="Proof" required hint="the sent email, or the receipt their system gave you"><input type="file" name="evidence" required className="w-full" /></Field>
@@ -558,16 +559,16 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
               <p className="text-[11px] leading-4 text-slate-500">Not with the document — a document that is wrong is answered by the next revision. This sends the same revision back to a step that has already answered.</p>
               <ActionForm action={rewindRouteAction} submitLabel="Send it back" variant="danger" size="sm" hidden={{ runId: run!.id }}>
                 <Field label="Back to" required>
-                  <select name="toStep" required defaultValue="" className={inputCls}>
+                  <Select name="toStep" required defaultValue="" className={inputCls}>
                     <option value="" disabled>Choose a step…</option>
                     {rewindTo.map((step) => <option key={step.number} value={step.number}>{step.number}. {step.title}</option>)}
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="What went wrong" required>
-                  <select name="returnReason" required defaultValue="" className={inputCls}>
+                  <Select name="returnReason" required defaultValue="" className={inputCls}>
                     <option value="" disabled>Choose…</option>
                     {rewindReasons.map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="Say what happened" required hint="everyone on the route is told, with your name">
                   <textarea name="reason" rows={2} required className={inputCls} placeholder="what you found, and what you want done" />
