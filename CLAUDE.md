@@ -1137,11 +1137,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
   schedule read). Every new kind of work gets a row there.
 
 ### Help & orientation
-- `/guide` (owner, after the critique), in the reference style: a plate with jumps (the colours, the codes, who
-  approves, where things are done), the colour key (`rails.ts`), the codes (`/guide/codes`), the roles with where
-  approval sits (the project's marked), then where each thing is done as one line each in three sheets (everyone; the
-  control function; administrators, the organization's cards opening the organization's Settings). No banner, no
-  figures (Home has them), no grid of cards, no counts; never a link to a page that does not exist.
+- `/guide` (owner), in the reference style: a plate with jumps; **the colours**: eight areas four by two, each folding
+  open (`details`) on its colours, its strip of colours shown closed; **the codes**: one line each, Do the work's way,
+  each opening its part of `/guide/codes` (the register's column heads and the new-document form link there too);
+  **roles on a project** (owner: not "who approves", every role an organization can play on any project): tabs by role
+  (`?role=`), ours marked "us", one played by another organization on the project marked (from the directory), each with
+  what it does, where approval sits, what its verdict is worth (`lib/settings/role-word.ts` `ROLE_WORD`, the same the
+  Control room's flows read) and who plays it here; **how it is set up**, for everyone, each line folding on what is good
+  to know (how to read a document number, from the project's own schemes read on one of its numbers; why a form offers
+  only some values; how a review goes; how other organizations work with us; what you may do and see; the two levels of
+  settings), "Where it is changed" only for whoever changes it; then Do the work, and See the whole flow for the
+  control function. No banner, no figures, no grid of cards; never a link to a page that does not exist.
 
 ### Pop-up notifications
 - Every notification can also pop up in the person's browsers, even when no

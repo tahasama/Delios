@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ROLE_WORD } from "@/lib/settings/role-word";
 import { SETUP_PAGES, maySetup, mayChangeControlRoom } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath } from "@/lib/client";
@@ -417,39 +418,39 @@ type RoleWork = {
 };
 const ROLE_WORK: Record<string, RoleWork> = {
   // Everything comes to the owner, who decides.
-  OWNER: { order: ["receive", "supplier", "produce"], ours: "final",
+  OWNER: { order: ["receive", "supplier", "produce"], ...ROLE_WORD.OWNER,
     titles: { receive: "Documents we approve", supplier: "Documents owed to us", produce: "Documents we issue" },
     tabs: { receive: "We approve", supplier: "Owed to us", produce: "We issue" } },
   // A project management consultant manages for the owner: it reviews and recommends, the owner decides.
-  PMC: { order: ["receive", "produce", "supplier"], ours: "recommends", decider: "The owner",
+  PMC: { order: ["receive", "produce", "supplier"], ...ROLE_WORD.PMC,
     titles: { receive: "Documents we review for the owner", produce: "Documents we issue", supplier: "Documents owed to the project" },
     tabs: { receive: "We review", produce: "We issue", supplier: "Owed to the project" } },
   // EPCM manages engineering, vendors and contractors on the owner's behalf, and approves for it.
-  EPCM: { order: ["produce", "receive", "supplier"], ours: "final", approver: "The owner",
+  EPCM: { order: ["produce", "receive", "supplier"], ...ROLE_WORD.EPCM, approver: "The owner",
     titles: { produce: "Engineering we produce for the owner", receive: "Documents we approve on the owner's behalf", supplier: "Documents vendors owe the project" },
     tabs: { produce: "We engineer", receive: "We approve", supplier: "Vendors owe" } },
   // EPC approves its own engineering and its suppliers' data; the client may ask to approve.
-  EPC: { order: ["produce", "supplier", "receive"], ours: "final",
+  EPC: { order: ["produce", "supplier", "receive"], ...ROLE_WORD.EPC,
     titles: { supplier: "Documents our suppliers owe us" } },
   // The designer (architect, engineer of record) produces the design the client approves, and approves shop
   // drawings and submittals for conformance with it.
-  DESIGN: { order: ["produce", "receive", "client"], ours: "final", approver: "The client", client: "the client",
+  DESIGN: { order: ["produce", "receive", "client"], ...ROLE_WORD.DESIGN, approver: "The client", client: "the client",
     titles: { produce: "Design we produce for the client", receive: "Shop drawings and submittals we approve" },
     tabs: { produce: "We design", receive: "We approve" } },
   // A construction manager checks the trades' submittals first and passes them to the designer, who approves.
-  CM: { order: ["receive", "produce", "supplier"], ours: "passes", decider: "The designer",
+  CM: { order: ["receive", "produce", "supplier"], ...ROLE_WORD.CM,
     titles: { receive: "Submittals we check and pass on", produce: "Documents we issue", supplier: "Documents the trades owe us" },
     tabs: { receive: "We check", produce: "We issue", supplier: "Trades owe us" } },
   // A contractor produces for the client or its engineer, and checks its subcontractors' and suppliers' first.
-  CONTRACTOR: { order: ["produce", "client", "receive", "supplier"], ours: "passes", decider: "The client or its engineer", approver: "The client or its engineer", client: "the client",
+  CONTRACTOR: { order: ["produce", "client", "receive", "supplier"], ...ROLE_WORD.CONTRACTOR, approver: "The client or its engineer", client: "the client",
     titles: { produce: "Documents we produce for the client", receive: "Submittals we check and pass on", supplier: "Documents our suppliers owe us" },
     tabs: { receive: "We check" } },
-  SUBCONTRACTOR: { order: ["produce", "client", "supplier", "receive"], ours: "passes", decider: "The main contractor", approver: "The main contractor", client: "the main contractor",
+  SUBCONTRACTOR: { order: ["produce", "client", "supplier", "receive"], ...ROLE_WORD.SUBCONTRACTOR, approver: "The main contractor", client: "the main contractor",
     titles: { produce: "Documents we produce for the main contractor", supplier: "Documents our suppliers owe us" } },
-  SUPPLIER: { order: ["produce", "client", "supplier", "receive"], ours: "final", approver: "Our customer", client: "our customer",
+  SUPPLIER: { order: ["produce", "client", "supplier", "receive"], ...ROLE_WORD.SUPPLIER, approver: "Our customer", client: "our customer",
     titles: { produce: "Documents we produce for our customer", supplier: "Documents our own suppliers owe us" } },
   // A third-party inspector certifies its own scope and comments on the rest; it never approves design.
-  INSPECTOR: { order: ["produce", "receive"], ours: "recommends", decider: "The client", approver: "The client",
+  INSPECTOR: { order: ["produce", "receive"], ...ROLE_WORD.INSPECTOR, approver: "The client",
     titles: { produce: "Reports and certificates we issue", receive: "Documents we review and comment on" },
     tabs: { produce: "We certify", receive: "We comment" } },
 };
