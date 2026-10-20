@@ -55,7 +55,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   organization** (owner): a switch made Fixed later leaves it as it is; only that reset touches it. **A reset keeps a
   copy** (owner): what the project held is kept whole (`Settings/KeptCopies.cs`, `kept_copies`), listed on the card under
   "Kept when put back" (when, by whom, why), and may be put back on the project, with why, its control function told
-  (`POST /api/admin/kept-copies/{id}/put-back`, SETTING_PUT_BACK; refused while it has its own copy again, OWN_AGAIN). **Fixed** (every project uses
+  (`POST /api/admin/kept-copies/{id}/put-back`, SETTING_PUT_BACK; refused while it has its own copy again, OWN_AGAIN). **Three levels** (owner): the app's
+  defaults (with what it fixes) → the organization's (the app's, as its administrator changed them; with what it
+  fixes) → the project's (the organization's, as the project changed them where free). Nothing changed: both read the
+  app's; the organization changed something: the project reads the organization's. The organization may reset to the
+  app's defaults, **keeping a copy of its own** (to build: put back like a project's kept copy, `docs/gaps/settings.md`);
+  a project goes back to the organization's ("Back to the defaults", Control room). **Fixed** (every project uses
   the organization's; only an administrator changes it, for all) or **Free** (a project may take its own copy; the
   organization's later changes never touch it). Two degrees only, never a third. Made stricter later, what a project
   already changed stays, read as changed before the rule. Where each starts, and why, is in `Liberty.Items`, chosen

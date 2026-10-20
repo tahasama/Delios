@@ -41,3 +41,5 @@ Each found wrong in the Settings review of 2026-10-16 (`.impeccable/critique/`),
 - ~~A Control room answer made fixed later~~ (decided, owner: what a project changed is never overridden by the
   organization; only a reset from the organization's card touches it, and a reset keeps a copy that can be put back).
 - Demo data: schemes seeded with documents are not marked as having given numbers (real use marks them).
+- The organization's "Reset to the app's defaults" keeps no copy yet (owner: three levels, app → organization →
+  project; the organization's reset keeps a copy of what it held, put back like a project's kept copy).
