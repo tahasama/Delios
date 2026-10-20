@@ -162,8 +162,13 @@ export function Tip({
   );
 }
 
-export function ToneChip({ tone, children, title }: { tone: keyof typeof TONE; children: React.ReactNode; title?: string }) {
-  return <span title={title} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1", TONE[tone])}>{children}</span>;
+/**
+ * A state in one of the app's tones, drawn as every state pill is (`Chip`). Inside a register's lines it keeps the round
+ * shape those lines always had (owner: registers are not restyled), `inRegister`.
+ */
+export function ToneChip({ tone, children, title, inRegister }: { tone: keyof typeof TONE; children: React.ReactNode; title?: string; inRegister?: boolean }) {
+  if (inRegister) return <span title={title} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1", TONE[tone])}>{children}</span>;
+  return <Chip title={title} className={TONE[tone]}>{children}</Chip>;
 }
 
 export function Chip({ children, className, title }: { children: React.ReactNode; className?: string; title?: string }) {
@@ -180,10 +185,10 @@ export function StateChip({ label, color }: { label: string; color: string }) {
 
 export function SeverityChip({ severity }: { severity: string }) {
   const map: Record<string, string> = {
-    CRITICAL: "bg-red-100 text-red-800 ring-red-300",
-    MAJOR: "bg-orange-100 text-orange-800 ring-orange-300",
-    MINOR: "bg-amber-100 text-amber-800 ring-amber-300",
-    ADVISORY: "bg-sky-100 text-sky-800 ring-sky-300",
+    CRITICAL: "bg-red-50 text-red-800 ring-red-200",
+    MAJOR: "bg-orange-50 text-orange-800 ring-orange-200",
+    MINOR: "bg-amber-50 text-amber-900 ring-amber-200",
+    ADVISORY: "bg-sky-50 text-sky-800 ring-sky-200",
   };
   return <Chip className={map[severity] ?? ""}>{severity}</Chip>;
 }

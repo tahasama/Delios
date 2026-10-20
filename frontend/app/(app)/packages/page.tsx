@@ -206,5 +206,5 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
 
 function Status({ state }: { state: string }) {
   const tone = state === "READY" || state === "CLOSED" || state === "ACCEPTED" ? "done" : state === "OVERDUE" ? "refused" : state === "SHORTFALL" ? "waiting" : "idle";
-  return <ToneChip tone={tone}>{state === "CLOSED" ? "delivered" : state.toLowerCase()}</ToneChip>;
+  return <ToneChip inRegister tone={tone}>{state === "CLOSED" ? "delivered" : state.toLowerCase()}</ToneChip>;
 }

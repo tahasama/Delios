@@ -56,7 +56,7 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
                     <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-open:rotate-90" />
                     <span className="text-sm font-semibold text-slate-900">{eventLabel(snapshot.eventType)}</span>
                     {revision ? <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-semibold text-slate-600">rev {revision.value}</span> : null}
-                    {index === 0 ? <Chip className="bg-amber-100 text-amber-800 ring-amber-300">latest</Chip> : null}
+                    {index === 0 ? <Chip className="bg-amber-50 text-amber-900 ring-amber-200">latest</Chip> : null}
                     <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{snapshot.eventLabel ?? ""}</span>
                     <span className="shrink-0 text-[11px] text-slate-400">{fmtDateTime(snapshot.capturedAt)} · {snapshot.actorName}</span>
                   </summary>

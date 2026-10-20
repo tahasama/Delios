@@ -354,15 +354,15 @@ async function RunActivePanel({ run, user, extra }: { run: { id: string; templat
                   {s.status === "done" ? "✓" : i + 1}
                 </span>
                 <span className="font-medium text-slate-800">{s.title || (s.act === "APPROVAL" ? "Decision" : `Review ${i + 1}`)}</span>
-                <Chip className={s.act === "APPROVAL" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>{s.act === "APPROVAL" ? "decision" : "advice"}</Chip>
+                <Chip className={s.act === "APPROVAL" ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-sky-50 text-sky-800 ring-sky-200"}>{s.act === "APPROVAL" ? "decision" : "advice"}</Chip>
                 <span className="text-xs text-slate-500">{names}</span>
-                {s.status === "active" ? <Chip className="bg-amber-100 text-amber-800 ring-amber-300">waiting</Chip> : null}
+                {s.status === "active" ? <Chip className="bg-amber-50 text-amber-900 ring-amber-200">waiting</Chip> : null}
                 {s.status === "active" && activeCycle?.dueAt ? (
-                  <Chip className={dueState(activeCycle.dueAt, false) === "overdue" ? "bg-red-100 text-red-800 ring-red-300" : dueState(activeCycle.dueAt, false) === "at risk" ? "bg-amber-100 text-amber-900 ring-amber-400" : "bg-slate-100 text-slate-600 ring-slate-300"}>
+                  <Chip className={dueState(activeCycle.dueAt, false) === "overdue" ? "bg-red-50 text-red-800 ring-red-200" : dueState(activeCycle.dueAt, false) === "at risk" ? "bg-amber-100 text-amber-900 ring-amber-400" : "bg-slate-100 text-slate-600 ring-slate-300"}>
                     due {fmtDate(activeCycle.dueAt)}
                   </Chip>
                 ) : null}
-                {s.status === "declined" ? <Chip className="bg-red-100 text-red-800 ring-red-300">declined</Chip> : null}
+                {s.status === "declined" ? <Chip className="bg-red-50 text-red-800 ring-red-200">declined</Chip> : null}
               </li>
             );
           })}

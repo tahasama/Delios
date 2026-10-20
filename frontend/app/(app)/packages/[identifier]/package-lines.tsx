@@ -94,7 +94,7 @@ export function PackageLines({ packageId, packageNumber, supplier, shared, lines
                     <span className="block max-w-80 truncate text-xs text-slate-500">{one.title}</span>
                   </Td>
                   <Td className="text-xs">
-                    <ToneChip tone={one.stage.tone}>{one.stage.word}</ToneChip>
+                    <ToneChip inRegister tone={one.stage.tone}>{one.stage.word}</ToneChip>
                     {one.stage.holder ? <span className="mt-1 block text-[11px] text-slate-500">{one.stage.holder}</span> : null}
                     {one.reason ? <p className="mt-1 max-w-72 text-[11px] text-slate-600">&ldquo;{one.reason}&rdquo;</p> : null}
                   </Td>

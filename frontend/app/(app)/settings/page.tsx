@@ -205,7 +205,7 @@ export default async function AdminPage() {
                         </span>
                         <span className="mt-0.5 block text-xs leading-[1.45] text-slate-600">{page.text}</span>
                         {f?.text ? (
-                          <Chip className={`mt-2 ${f.attention ? "bg-amber-100 text-amber-900 ring-amber-300" : "bg-slate-100 text-slate-700 ring-slate-300"}`}>
+                          <Chip className={`mt-2 ${f.attention ? "bg-amber-50 text-amber-900 ring-amber-200" : "bg-slate-100 text-slate-600 ring-slate-200"}`}>
                             {f.attention ? "To do · " : ""}{f.text}
                           </Chip>
                         ) : null}

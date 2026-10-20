@@ -211,8 +211,8 @@ function columnsFor(together: boolean): Column[] {
     label: "Ready",
     by: (row) => (row.ready ? 0 : row.late ? 2 : 1),
     cell: (row) => row.ready
-      ? <Chip className="bg-emerald-100 text-emerald-800 ring-emerald-300">yes</Chip>
-      : <Chip className={row.late ? "bg-red-100 text-red-800 ring-red-300" : "bg-amber-100 text-amber-800 ring-amber-300"}>{row.late ? "late" : "no"}</Chip>,
+      ? <Chip className="bg-emerald-50 text-emerald-800 ring-emerald-200">yes</Chip>
+      : <Chip className={row.late ? "bg-red-50 text-red-800 ring-red-200" : "bg-amber-50 text-amber-900 ring-amber-200"}>{row.late ? "late" : "no"}</Chip>,
   },
 ];
 }

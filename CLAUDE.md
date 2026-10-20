@@ -535,6 +535,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   No open project mailbox.
 - Roles on a project (CONTRACT_ROLES): GENERIC, EPC, EPCM, PMC, DESIGN, OWNER, CM, CONTRACTOR, SUBCONTRACTOR,
   SUPPLIER, INSPECTOR (docs/ORGANIZATIONS.md). New ones only with the owner's approval.
+  Roles stay exactly as they are (owner, settled): our role does not shift the project's starting defaults, no new
+  roles are added, and what a role's verdict is worth is not a setting.
 
 ### Settings
 - **Settings are read by everyone of ours** (owner: "access without the editing liberty"): the Control room, Types &
@@ -646,7 +648,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   one types (Functions' long lists and "One of ours?" included).
 - **Never pills inside a register** (owner: "we are very satisfied with the current styling"): a register's state
   reads as coloured text (the revision state in its colour, `REV_INK`; transmittals' status, `STATUS_INK`), as it was.
-  Outside registers a state is its pill in the app's tones (`Chip`, `TONE`: the document page, Help's states).
+  Outside registers every state is its pill in the app's tones (`Chip`, `TONE`; `ToneChip` draws a `Chip`, and keeps
+  its round shape only inside a register's lines, `inRegister`: packages, package and delivery lines, report lines);
+  no chip carries colours of its own (the old -100 / -300 fills were brought onto the tones).
 - **On/off is a switch** (owner, everywhere): `components/switch.tsx` (`role="switch"`): `Switch` acts at once,
   `SwitchControl` / `SwitchField` are a form's field (can sign in, in use, pop-ups, stamps, confirmation needed, only
   moves forward, shown in the register…). Never a "Switch off" button or an on/off chip beside a button; a choice among

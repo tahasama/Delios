@@ -337,18 +337,18 @@ export default async function TransmittalDetailPage({ params, searchParams }: { 
                   </div>
                   {outside(person) ? (
                     person.dispatchedAt ? (
-                      <Chip className={person.kind === "CC" ? "bg-slate-50/40 text-slate-600 ring-slate-300" : "bg-emerald-100 text-emerald-800 ring-emerald-300"}>sent on</Chip>
+                      <Chip className={person.kind === "CC" ? "bg-slate-100 text-slate-600 ring-slate-200" : "bg-emerald-50 text-emerald-800 ring-emerald-200"}>sent on</Chip>
                     ) : status === "DRAFT" ? (
-                      <Chip className="bg-slate-100 text-slate-500 ring-slate-200">not sent yet</Chip>
+                      <Chip className="bg-slate-100 text-slate-600 ring-slate-200">not sent yet</Chip>
                     ) : (
-                      <Chip className="bg-amber-100 text-amber-800 ring-amber-300">to send</Chip>
+                      <Chip className="bg-amber-50 text-amber-900 ring-amber-200">to send</Chip>
                     )
                   ) : person.openedAt ? (
-                    <Chip className={person.kind === "CC" ? "bg-slate-50/40 text-slate-600 ring-slate-300" : "bg-emerald-100 text-emerald-800 ring-emerald-300"}>seen</Chip>
+                    <Chip className={person.kind === "CC" ? "bg-slate-100 text-slate-600 ring-slate-200" : "bg-emerald-50 text-emerald-800 ring-emerald-200"}>seen</Chip>
                   ) : person.notifiedAt ? (
-                    <Chip className="bg-amber-100 text-amber-800 ring-amber-300">notified</Chip>
+                    <Chip className="bg-amber-50 text-amber-900 ring-amber-200">notified</Chip>
                   ) : (
-                    <Chip className="bg-slate-100 text-slate-500 ring-slate-200">not sent yet</Chip>
+                    <Chip className="bg-slate-100 text-slate-600 ring-slate-200">not sent yet</Chip>
                   )}
                   {/* Whoever carries this organization says it went, with what
                       proves it. The form takes the whole line under the row. */}

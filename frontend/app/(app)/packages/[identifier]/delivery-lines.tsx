@@ -58,7 +58,7 @@ export function DeliveryLines({ packageId, packageNumber, lines, mayTakeOut, rul
                   <Td className="max-w-72 text-[12.5px] text-slate-500">{m.title}{m.missing && !m.ready ? <span className="block text-[11px] text-amber-700">not yet at required status</span> : null}</Td>
                   <Td className="whitespace-nowrap text-xs text-slate-600">{m.revision ? <>rev {m.revision} · {m.status}</> : "not released"}</Td>
                   <Td className="whitespace-nowrap text-xs text-slate-600" title={m.requiredMeaning ?? undefined}>{m.required.join(" or ")}</Td>
-                  <Td>{m.ready ? <ToneChip tone="done">ready</ToneChip> : <ToneChip tone="waiting">not ready</ToneChip>}</Td>
+                  <Td>{m.ready ? <ToneChip inRegister tone="done">ready</ToneChip> : <ToneChip inRegister tone="waiting">not ready</ToneChip>}</Td>
                   <Td className="min-w-64 max-w-md text-xs text-slate-600">
                     {m.comments.length ? (
                       <ul className="space-y-1">

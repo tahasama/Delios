@@ -233,7 +233,7 @@ function renderCell(cell: Cell) {
     return said ? <span title={String(cell)} className="whitespace-nowrap"><span className="no-print">{said}</span><span className="print-only">{String(cell)}</span></span> : cell;
   }
   if (cell.href) return <Link href={cell.href} className="font-mono font-semibold text-link hover:underline">{cell.text}</Link>;
-  if (cell.tone) return <ToneChip tone={TONE_OF[cell.tone]}>{cell.text}</ToneChip>;
+  if (cell.tone) return <ToneChip inRegister tone={TONE_OF[cell.tone]}>{cell.text}</ToneChip>;
   return cell.text;
 }
 

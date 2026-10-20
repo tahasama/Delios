@@ -130,7 +130,7 @@ export default async function OrganizationSettingsPage() {
                           <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-500 transition group-hover:text-link" aria-hidden="true" />
                         </span>
                         <span className="mt-0.5 block text-xs leading-[1.45] text-slate-600">{card.text}</span>
-                        <Chip className="mt-2 bg-slate-100 text-slate-700 ring-slate-300">
+                        <Chip className="mt-2 bg-slate-100 text-slate-600 ring-slate-200">
                           {state?.text ?? "The organization's only"}
                         </Chip>
                       </span>

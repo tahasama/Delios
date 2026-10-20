@@ -167,7 +167,7 @@ export function RevisionRow({ rev, latest, followedBy, statusLabel, stateLabel, 
           ) : null}
 
           {state === "SUPERSEDED" ? <Chip className="bg-violet-50 text-violet-700 ring-violet-200">replaced — do not use</Chip> : null}
-          {state === "VOID" ? <Chip className="bg-red-50 text-red-700 ring-red-200">void — never valid</Chip> : null}
+          {state === "VOID" ? <Chip className="bg-red-50 text-red-800 ring-red-200">void — never valid</Chip> : null}
         </div>
       </details>
     </li>
