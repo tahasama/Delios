@@ -26,8 +26,9 @@ export type SetupPage = {
   /** Also open to whoever holds Manage, where everyone on the project adds people. */
   manage?: true;
   /**
-   * Read by everyone of ours on the project (the Control room: how the project works, and what makes it work that
-   * way); changed only by an administrator or the control function.
+   * Read by everyone of ours on the project (owner: "access without the editing liberty"): the page shows as it is, with
+   * nothing to change, and says who changes it; changed only by whoever may (an administrator, the control function).
+   * People & access, Organizations, This project and the audit trail stay closed: people's details, contacts, activity.
    */
   read?: true;
 };
@@ -63,6 +64,7 @@ export const SETUP_PAGES: SetupPage[] = [
     title: "Types & sets",
     text: "The lists every document is described with: disciplines, document types, statuses, reasons and more.",
     group: "Classification",
+    read: true,
   },
   {
     href: "/settings/families",
@@ -84,6 +86,7 @@ export const SETUP_PAGES: SetupPage[] = [
     text: "How document numbers are built, and which deliverable type uses which scheme.",
     group: "Classification",
     control: true,
+    read: true,
   },
   {
     href: "/settings/revisions",
@@ -91,6 +94,7 @@ export const SETUP_PAGES: SetupPage[] = [
     text: "How revisions are named (A, B, C then 0, 1, 2, or your own), and which deliverable type follows which scheme.",
     group: "Classification",
     control: true,
+    read: true,
   },
 
   {
@@ -107,6 +111,7 @@ export const SETUP_PAGES: SetupPage[] = [
     group: "How work flows",
     verb: "ROUTES",
     control: true,
+    read: true,
   },
 
   {
@@ -115,6 +120,7 @@ export const SETUP_PAGES: SetupPage[] = [
     text: "What each function may do. Only an administrator changes an administrator's own function.",
     group: "Access",
     control: true,
+    read: true,
   },
   {
     href: "/settings/users",

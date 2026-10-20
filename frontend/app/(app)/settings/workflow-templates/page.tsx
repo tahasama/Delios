@@ -18,7 +18,7 @@ export default async function WorkflowTemplatesPage({ searchParams }: { searchPa
   const project = ctx.project.code;
   const lead = routes.own
     ? routes.free
-      ? `${project}'s own review routes, changed here. The organization's later changes do not touch them.`
+      ? `${project}'s own review routes, changed here${routes.mayChange ? "" : " by whoever acts as the control function"}. The organization's later changes do not touch them.`
       : `${project}'s own review routes, changed here before the organization fixed them for every project: they stay as they are, and nothing more is changed here.`
     : routes.free
       ? <>The organization&rsquo;s review routes. Projects may change them: a change here gives {project} its own copy, which the organization&rsquo;s later changes never touch.{routes.mayChange ? null : " Whoever acts as the control function changes them."}</>

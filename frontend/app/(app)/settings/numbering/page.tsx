@@ -35,7 +35,7 @@ export default async function NumberingPage({ searchParams }: { searchParams: Pr
   const project = ctx.project.code;
   const said = numbering.own
     ? numbering.free
-      ? `${project}'s own numbering, changed here. The organization's later changes do not touch it.`
+      ? `${project}'s own numbering, changed here${numbering.mayChange ? "" : " by whoever acts as the control function"}. The organization's later changes do not touch it.`
       : `${project}'s own numbering, changed here before the organization fixed numbering for every project: it stays as it is, and nothing more is changed here.`
     : numbering.free
       ? `The organization's numbering. Projects may change it: a change here gives ${project} its own copy, which the organization's later changes never touch.`
@@ -51,7 +51,7 @@ export default async function NumberingPage({ searchParams }: { searchParams: Pr
             ? <> An administrator changes it in the organization&rsquo;s Settings: <Link href="/organization/settings/numbering" className="font-semibold text-link hover:underline">Numbering</Link>.</>
             : <> An administrator changes it, for every project.</>
         ) : null}
-        {numbering.free && !numbering.mayChange ? <> Whoever acts as the control function changes it.</> : null}
+        {!numbering.own && numbering.free && !numbering.mayChange ? <> Whoever acts as the control function changes it.</> : null}
       </p>
       <NumberingBoard level="project" editable={numbering.mayChange} schemes={numbering.schemes} routing={numbering.routing}
         deliverables={deliverables.map((d) => ({ code: d.code, label: d.label }))} sets={sets.map((s) => ({ key: s.key, title: s.title }))}

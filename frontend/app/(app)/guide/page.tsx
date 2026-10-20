@@ -10,9 +10,9 @@ import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { ROLE_WORD, wordOf } from "@/lib/settings/role-word";
 import { api, projectPath } from "@/lib/client";
 import { getActiveSet } from "@/lib/settings/config";
-import { projectNumbering, projectRoutes } from "@/lib/settings/api-admin";
-import { VERB_LABEL, VERB_BLURB, type Verb } from "@/lib/core/permissions";
+import { projectNumbering } from "@/lib/settings/api-admin";
 import { getMe } from "@/lib/account/api";
+import { SETUP_PAGES, maySetup } from "@/app/(app)/settings/setup-pages";
 import { cn } from "@/lib/core/utils";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +27,7 @@ const DAILY: Place[] = [
   { href: "/transmittals", title: "Transmittals", text: "What was sent and received, to whom, whether it was opened, and what was answered.", icon: ArrowLeftRight },
   { href: "/packages", title: "Packages", text: "Documents gathered for a supplier or a delivery: what is in, what is missing, what went.", icon: FolderKanban },
   { href: "/assets", title: "Assets & tags", text: "Every document describing a piece of equipment, a system or an area.", icon: Boxes },
+  { href: "/directory", title: "Project directory", text: "Who takes part, in which role, their people, who acts as the control function and who confirms.", icon: Users },
 ];
 
 const CONTROL: Place[] = [
@@ -36,9 +37,11 @@ const CONTROL: Place[] = [
   { href: "/import", title: "Import & export", text: "A deliverable list, a team, the matrix or a list, brought in from a template: each file is checked before anything is written.", icon: Import },
 ];
 
-/** How another organization works with us, in the directory's words. */
-const KIND_WORDS: Record<string, string> = {
-  COLLABORATOR: "works from its own DELIOS", GUEST: "its people have accounts from us", OFFLINE: "not on DELIOS: one of ours records for it",
+/** Each Settings page's icon on Help. */
+const SETUP_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  "/settings/flow": Workflow, "/settings/config": Tags, "/settings/numbering": Hash, "/settings/revisions": FileText,
+  "/settings/workflow-templates": ClipboardCheck, "/settings/fields": Type, "/settings/functions": Lock, "/settings/users": Users,
+  "/settings/parties": Network, "/settings/projects": Settings, "/settings/audit": ListChecks,
 };
 
 /** The codes, one line each, each opening its part of the full page (/guide/codes). */
@@ -55,8 +58,9 @@ const CODES: Place[] = [
 
 /**
  * Help & orientation, in the reference style (owner): the colour key as eight folding boxes, the codes one line each,
- * every role an organization can play on a project as tabs (ours marked "us", those taking part here marked), what
- * everyone should know of how the project is set up, folding, then where each thing is done.
+ * every role an organization can play on a project as tabs (ours marked "us", those taking part here marked), how to
+ * read a document number, then where each thing is done. How the project is set up is not repeated here (owner: "no more
+ * redundancies"): the Settings pages are read by everyone of ours, and listed here as they open for the person.
  */
 export default async function GuidePage({ searchParams }: { searchParams: Promise<{ role?: string }> }) {
   const ctx = await requireScope();
@@ -66,28 +70,16 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
   const canConfigure = isAdmin(user);
   type Directory = {
     organizations: { name: string; role: string | null; kind: string; contact: string | null }[];
-    people: { name: string; control: boolean; manages: boolean }[];
   };
-  const [roleOptions, directory, numbering, deliverables, register, routes] = await Promise.all([
+  const [roleOptions, directory, numbering, deliverables, register, me] = await Promise.all([
     contractRoleOptions().then((all) => all.filter((r) => r.code !== "GENERIC")),
     api<Directory>(projectPath(ctx, "/people/directory")).catch(() => null),
     projectNumbering().catch(() => null),
     getActiveSet("DELIVERABLE_TYPES").catch(() => []),
     api<{ rows: { number: string }[] }>(projectPath(ctx, "/register"), { query: { per: 100 } }).catch(() => ({ rows: [] })),
-    projectRoutes().then((p) => p.routes.filter((r) => r.active)).catch(() => []),
+    getMe(),
   ]);
-  const others = (directory?.organizations ?? []).filter((o) => o.kind !== "OURS");
-  const controllers = (directory?.people ?? []).filter((p) => p.control).map((p) => p.name);
-  const managers = (directory?.people ?? []).filter((p) => p.manages).map((p) => p.name);
-  const [me, levels, disciplines] = await Promise.all([getMe(), getActiveSet("CONFIDENTIALITY").catch(() => []), getActiveSet("DISCIPLINES").catch(() => [])]);
   const mine = me?.projects.find((p) => p.id === ctx.projectId) ?? null;
-  const said = (list: { code: string; label: string }[], code: string | null | undefined) => (code ? list.find((v) => v.code === code)?.label ?? code : null);
-  // What a route takes, in words: its deliverable types, else every document.
-  const takes = (patterns: { deliverableType: string | null }[]) => {
-    const types = [...new Set(patterns.map((p) => p.deliverableType).filter((t): t is string => !!t))]
-      .map((t) => deliverables.find((d) => d.code === t)?.label ?? t);
-    return types.length ? `takes ${types.join(", ")}` : "takes every document";
-  };
   const ours = roleOptions.find((r) => r.code === project.role);
   // Who plays each role on this project: the other organizations taking part, by the role the project gives them.
   const playing = new Map<string, string[]>();
@@ -108,11 +100,18 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
     return { scheme: s, types, pieces: example ? example.split(s.delimiter) : null };
   }).filter((r) => r.scheme.fields.length > 0);
 
+  // The Settings pages this person opens (the hub's own list): read only for whoever may not change them.
+  const setup: Place[] = SETUP_PAGES.filter((page) => maySetup(user, page)).map((page) => ({
+    href: page.href, title: page.title, icon: SETUP_ICON[page.href] ?? Settings,
+    text: page.href === "/settings/functions" && mine ? `${page.text} Yours here is ${mine.function.name}.` : page.text,
+  }));
+  const numberingOpen = setup.some((one) => one.href === "/settings/numbering");
+
   const jumps = [
     { href: "#colours", label: "The colours" },
     { href: "#codes", label: "The codes" },
     { href: "#roles", label: "Roles on a project" },
-    { href: "#setup", label: "How it is set up" },
+    { href: "#setup", label: "Reading a number" },
     { href: "#places", label: "Where things are done" },
   ];
 
@@ -224,11 +223,11 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
       {/* How the project is set up: what everyone should know, folding; the page itself opens for those who change it. */}
       <section id="setup" className="register register-sheet register-sheet-open scroll-mt-24">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-          <span className="stencil mr-1 text-slate-500">How it is set up</span>
-          <span className="text-[11px] text-slate-500">what is good to know, whoever you are; open a line</span>
+          <span className="stencil mr-1 text-slate-500">Reading a number</span>
+          <span className="text-[11px] text-slate-500">what each part of a document number says, read on one of this project&rsquo;s own</span>
         </div>
         <ul className="divide-y divide-line">
-          <Fold icon={Hash} title="How to read a document number" href={canConfigure ? "/organization/settings/numbering" : undefined}>
+          <Fold icon={Hash} title="How to read a document number" href={numberingOpen ? "/settings/numbering" : undefined}>
             {readings.length ? readings.map(({ scheme, types, pieces }) => (
               <div key={scheme.id} className="space-y-1.5">
                 <p className="text-slate-600">
@@ -247,93 +246,13 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
             )) : <p className="text-slate-500">No numbering is set up on {project.code} yet.</p>}
             <p className="text-slate-500">A number is given by the app when a document is registered, and never changes: nobody types it.</p>
           </Fold>
-          <Fold icon={Tags} title="Why a form offers only some values" href={canConfigure ? "/organization/settings/types" : undefined}>
-            <p className="text-slate-600">
-              Every list (document types, disciplines, statuses…) holds sets, each serving some deliverable types: a document is offered only
-              the values of the set serving its own type. A value retired stays on what already carries it, and is no longer offered.
-            </p>
-          </Fold>
-          <Fold icon={Workflow} title="Which route a document takes for review" href={canControl || canConfigure ? "/settings/workflow-templates" : undefined}>
-            {routes.length ? (
-              <ul className="space-y-3">
-                {routes.map((r) => (
-                  <li key={r.id} className="space-y-1">
-                    <p className="text-slate-600">
-                      <span className="font-semibold text-slate-800">{r.name}</span>
-                      {r.isDefault ? <span className="text-slate-500"> · offered first</span> : null}
-                      {" · "}{takes(r.patterns)}
-                    </p>
-                    <ol className="flex flex-wrap items-center gap-1 text-[11px] text-slate-600">
-                      {r.steps.map((step, n) => (
-                        <li key={n} className="flex items-center gap-1">
-                          {n ? <ChevronRight aria-hidden className="h-3 w-3 text-slate-300" /> : null}
-                          <span className="rounded-md bg-tint-soft px-2 py-0.5 ring-1 ring-line">
-                            <span className="font-semibold text-slate-800">{step.title}</span>
-                            {" · "}{step.decides || n === r.steps.length - 1 ? "decides" : "advises"}
-                            {step.days ? ` · ${step.days} working day${step.days === 1 ? "" : "s"}` : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="text-slate-500">No review route is set up on {project.code} yet.</p>}
-            <p className="text-slate-500">Send for review proposes the route that fits your documents best, and its people for each step; you may change them.</p>
-          </Fold>
-          <Fold icon={Network} title={`Who takes part in ${project.code}`} href={canControl || canConfigure ? "/settings/parties" : undefined}>
-            {others.length ? (
-              <ul className="divide-y divide-line rounded-md ring-1 ring-line">
-                {others.map((o) => (
-                  <li key={o.name} className="grid grid-cols-1 gap-x-6 px-3 py-1.5 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
-                    <span className="font-semibold text-slate-800">{o.name}</span>
-                    <span className="text-slate-600">
-                      {roleOptions.find((r) => r.code === o.role)?.label ?? "no role stated"} · {KIND_WORDS[o.kind] ?? o.kind}
-                      {o.contact ? <> · answers for it: {o.contact}</> : null}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="text-slate-500">No other organization takes part in {project.code}.</p>}
-            <p className="text-slate-500">What another organization sends becomes a document only once the control function&rsquo;s check accepts it. The <Link href="/directory" className="font-semibold text-link hover:underline">project directory</Link> lists their people.</p>
-          </Fold>
-          <Fold icon={Users} title="What you may do here" href={canControl || canConfigure ? "/settings/users" : undefined}>
-            {mine ? (
-              <>
-                <p className="text-slate-600">
-                  On {project.code} you are <span className="font-semibold text-slate-800">{mine.function.name}</span>
-                  {mine.department ? <>, department {said(disciplines, mine.department)}</> : null}. Your function lets you:
-                </p>
-                <ul className="flex flex-wrap gap-1">
-                  {(mine.verbs ?? []).filter((v): v is Verb => v in VERB_LABEL).map((v) => (
-                    <li key={v} title={VERB_BLURB[v]} className="rounded-md bg-tint-soft px-2 py-0.5 text-[11px] text-slate-700 ring-1 ring-line">{VERB_LABEL[v]}</li>
-                  ))}
-                </ul>
-                <p className="text-slate-500">
-                  {mine.function.clearance
-                    ? <>You read documents up to <span className="font-semibold text-slate-700">{said(levels, mine.function.clearance)}</span> without being named on them; above it, only those you are named on, registered, or were sent.</>
-                    : <>Your function reads every document of the project.</>}
-                </p>
-              </>
-            ) : <p className="text-slate-500">You are not on {project.code}.</p>}
-          </Fold>
-          <Fold icon={Settings} title="Who to ask" href={canControl || canConfigure ? "/settings" : undefined}>
-            <p className="text-slate-600">
-              <span className="font-semibold text-slate-800">The control function</span>
-              {controllers.length ? <> ({controllers.join(", ")})</> : <>: nobody is named on {project.code}, so the people doing the work carry its acts out</>}:
-              {" "}checks what arrives, keeps the register, sends documents out, and changes how {project.code} works.
-            </p>
-            {managers.length ? (
-              <p className="text-slate-600"><span className="font-semibold text-slate-800">Whoever holds Manage</span> ({managers.join(", ")}): confirms who joins, and requests that need confirming.</p>
-            ) : null}
-            <p className="text-slate-500">What the organization keeps the same for every project (numbering, revisions…) is changed by its administrators.</p>
-          </Fold>
         </ul>
       </section>
 
       <div id="places" className="scroll-mt-24 space-y-4">
         <Places title="Do the work" said="what everyone on the project uses" places={DAILY} />
         {canControl ? <Places title="See the whole flow" said="for the control function: how the register stands, and what to put right" places={CONTROL} /> : null}
+        {setup.length ? <Places title="How it is set up" said="read by everyone of ours; changed by whoever each page names" places={setup} /> : null}
       </div>
     </div>
   );

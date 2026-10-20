@@ -23,7 +23,7 @@ export default async function RevisionsPage() {
   const project = ctx.project.code;
   const lead = naming.own
     ? naming.free
-      ? `${project}'s own revision naming, changed here. The organization's later changes do not touch it.`
+      ? `${project}'s own revision naming, changed here${naming.mayChange ? "" : " by whoever acts as the control function"}. The organization's later changes do not touch it.`
       : `${project}'s own revision naming, changed here before the organization fixed it for every project: it stays as it is, and nothing more is changed here.`
     : naming.free
       ? <>The organization&rsquo;s revision naming. Projects may change it: a change here gives {project} its own copy, which the organization&rsquo;s later changes never touch.{naming.mayChange ? null : " Whoever acts as the control function changes it."}</>
