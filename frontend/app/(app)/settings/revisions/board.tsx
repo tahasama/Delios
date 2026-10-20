@@ -120,7 +120,7 @@ export function RevisionBoard({ level, editable, schemes, routing, deliverables,
           {editable ? <details>
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-t border-line px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
               <span className="text-[13px] text-slate-600">Its name or its lines to change? A line revisions already carry stays, counted as it is.</span>
-              <span className="ask inline-flex items-center gap-1.5"><Pencil className="h-3.5 w-3.5" /> Edit</span>
+              <span className="ask inline-flex items-center" title="Change it" aria-label="Change it"><Pencil className="h-3.5 w-3.5" aria-hidden /></span>
             </summary>
             <div className="border-t border-line px-5 py-4 sm:px-6">
               <ActionForm action={updateRevisionSchemeAction} submitLabel="Save" size="sm" hidden={{ ...hidden, id: s.id }}>

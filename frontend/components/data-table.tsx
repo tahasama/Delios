@@ -337,7 +337,7 @@ export function DataTable({
             {tools}
             {exportName ? (
               <button type="button" className="dt-tool" onClick={() => exportShown(tableRef.current, exportName)} title="The columns that are showing, as they read">
-                <Download className="h-3.5 w-3.5" /> Export
+                <Download className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">Export</span>
               </button>
             ) : null}
 
@@ -347,10 +347,11 @@ export function DataTable({
                 type="button"
                 onClick={() => setMenu((open) => { if (!open) setMenuAt(placeMenu()); return !open; })}
                 className="dt-tool"
+                title="Columns: which show, and in what order"
                 aria-expanded={menu}
                 aria-haspopup="true"
               >
-                <Columns3 className="h-3.5 w-3.5" /> Columns{shown < hideable.length ? ` ${shown}/${hideable.length}` : ""}
+                <Columns3 className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">Columns</span>{shown < hideable.length ? <span className="tabular-nums">{shown}/{hideable.length}</span> : null}
               </button>
               {menu && menuAt ? createPortal(
                 <div

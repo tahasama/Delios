@@ -538,7 +538,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
             className="dt-tool"
             title="The rows these filters match, in the columns you are looking at, as CSV"
           >
-            <Download className="h-3.5 w-3.5" /> Export
+            <Download className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">Export</span>
           </a>
         } head={<tr>
           <Th className={`rail-head ${frozen ? "sticky left-0 z-4" : ""} w-10`}>

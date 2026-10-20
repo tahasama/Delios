@@ -4,7 +4,7 @@ import { Select } from "@/components/select";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Search, X, Bell } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { TONE } from "@/lib/core/tones";
 import { useCardHeight } from "@/components/card-height";
@@ -273,7 +273,7 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
                 className="dt-tool"
                 title={selected.length && !allMatching ? "The reviews you have ticked, as CSV" : "Every review these filters match, as CSV"}
               >
-                <Download className="h-3.5 w-3.5" /> Export
+                <Download className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">Export</span>
               </a>
             }
             onMove={move}
@@ -490,7 +490,7 @@ const COLUMNS: Column[] = [
           <span className={`block font-sans text-[11px] ${row.dueState === "overdue" ? "text-red-600" : row.dueState === "at risk" ? "text-amber-700" : "text-slate-400"}`}>
             {row.open ? row.dueState : "answered"}
           </span>
-          {row.notifyHref ? <Link href={row.notifyHref} className="mt-0.5 block font-sans text-[11px] font-semibold text-link hover:underline">Notify</Link> : null}
+          {row.notifyHref ? <Link href={row.notifyHref} title="Notify the people it waits on" aria-label="Notify the people it waits on" className="mt-0.5 inline-flex text-link hover:text-brand-ink"><Bell className="h-3.5 w-3.5" aria-hidden /></Link> : null}
           {row.warnedAt ? <span className="block font-sans text-[10px] text-slate-400">warned {row.warnedAt}</span> : null}
         </>
       ) : <span className="text-slate-300" title="The route gives this step no time limit">—</span>,

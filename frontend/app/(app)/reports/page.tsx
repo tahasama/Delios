@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, X } from "lucide-react";
+import { Download, X, FileSpreadsheet } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
 import { DataTable, Th, Td, ToneChip, inputCls, btn } from "@/components/ui";
 import { when } from "@/app/(app)/home-parts";
@@ -93,8 +93,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </div>
           {report ? (
             <div className="no-print flex shrink-0 flex-wrap items-center gap-2">
-              <a href={download("xlsx")} title={narrowed ? "The lines shown, in Excel" : "The lines below, in Excel"}
-                className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" aria-hidden="true" /> Excel</a>
+              {/* An icon says it (owner); Excel's green, faintly, says which file. */}
+              <a href={download("xlsx")} title={narrowed ? "Download the lines shown, in Excel" : "Download the lines below, in Excel"}
+                aria-label="Download in Excel" className="ask inline-flex items-center"><FileSpreadsheet className="h-3.5 w-3.5 text-emerald-700" aria-hidden="true" /></a>
               <PrintButton />
             </div>
           ) : null}

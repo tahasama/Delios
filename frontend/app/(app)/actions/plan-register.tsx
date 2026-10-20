@@ -515,7 +515,7 @@ export function PlanRegister({
                     className="dt-tool"
                     title={selected.length && !allMatching ? "The actions you have ticked, with what each one needs, as CSV" : "Every action, with what each one needs, as CSV"}
                   >
-                    <Download className="h-3.5 w-3.5" /> Export
+                    <Download className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">Export</span>
                   </a>
                 }
                 onMove={move}

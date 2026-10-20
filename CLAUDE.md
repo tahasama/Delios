@@ -650,8 +650,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **On/off is a switch** (owner, everywhere): `components/switch.tsx` (`role="switch"`): `Switch` acts at once,
   `SwitchControl` / `SwitchField` are a form's field (can sign in, in use, pop-ups, stamps, confirmation needed, only
   moves forward, shown in the register…). Never a "Switch off" button or an on/off chip beside a button; a choice among
-  several, or a confirmation, stays a tick. Acts whose icon says them are icons (add, change, download, delete, retire, order),
-  their name on hover; Save, Cancel and a page's first act keep their words.
+  several, or a confirmation, stays a tick. Acts whose icon says them are icons (owner: "obvious icons instead of long
+  buttons everywhere"): add, change (pencil), download, export, print, columns, notify (bell), take off (×), delete,
+  retire, order, open the PDF, the source file; their words on hover and for screen readers (`title`, `aria-label` or
+  `sr-only`). Colour only where it tells them apart (owner: "clarity purposes only"): Excel's green, the PDF's red, a
+  red ×. Save, Cancel, Close, a page's first act and any act an icon would not say plainly keep their words.
 - **Forms & fields on two levels, form by form** (owner; backend `Settings/FormRules.cs`): the organization's forms are
   the default every project reads, changed on the organization's Settings card (`/organization/settings/fields`,
   `/api/admin/forms`, the same board `settings/fields/board.tsx` with `level`), opening a project and adding an

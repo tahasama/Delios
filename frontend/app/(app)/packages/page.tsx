@@ -82,7 +82,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
           {rows.length ? (
             <form id="package-export" action="/api/export/packages" method="get" className="flex items-center gap-2">
               <span className="text-[11px] text-slate-500">tick a package, then</span>
-              <button type="submit" className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5"/> Export CSV</button>
+              <button type="submit" className="ask inline-flex items-center" title="Export the ticked package as CSV" aria-label="Export the ticked package as CSV"><Download className="h-3.5 w-3.5" aria-hidden /></button>
             </form>
           ) : null}
         </div>

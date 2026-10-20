@@ -113,10 +113,10 @@ export function CarriedTable({ plate, rows, exportHref }: {
             stretch={!!cardHeight}
             tools={<>
               <button type="button" onClick={() => window.print()} className="dt-tool" title="Print this transmittal as a note to file or send on">
-                <Printer className="h-3.5 w-3.5" /> Print
+                <Printer className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">Print</span>
               </button>
               <a href={exportHref} className="dt-tool" title="This transmittal, who it went to and what came back, as CSV">
-                <Download className="h-3.5 w-3.5" /> Export
+                <Download className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">Export</span>
               </a>
             </>}
             head={

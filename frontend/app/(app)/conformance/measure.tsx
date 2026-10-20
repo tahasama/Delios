@@ -1,3 +1,4 @@
+import { Pencil } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
@@ -21,7 +22,7 @@ export function HowMeasured({ scope, mayChange }: { scope: ScopeConfig; mayChang
     <details className="register register-sheet register-sheet-open no-print">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
         {line}
-        <span className="ask">Change</span>
+        <span className="ask" title="Change it" aria-label="Change it"><Pencil className="h-3.5 w-3.5" aria-hidden /></span>
       </summary>
       <div className="border-t border-line px-5 py-4 sm:px-6">
         <ActionForm action={setMeasureAction} submitLabel="Save">

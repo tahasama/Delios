@@ -413,7 +413,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link, toget
             onReorder={moveTo}
             tools={
               <a href={href} className="dt-tool" title={ticked.length ? "The documents you have ticked, with every checkpoint, as CSV" : "Every document this action needs, with every checkpoint, as CSV"}>
-                <Download className="h-3.5 w-3.5" /> Export
+                <Download className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">Export</span>
               </a>
             }
             head={

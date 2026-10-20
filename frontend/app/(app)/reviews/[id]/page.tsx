@@ -29,7 +29,7 @@ import { VerdictDecision } from "@/app/(app)/documents/[id]/verdict-status";
 import { preflight } from "@/lib/conformance/rules/preflight";
 import { Guarded } from "@/components/preflight";
 import { issueToReviewAction, withdrawRevisionAction, removeCommentAction, editCommentAction, recordOutcomeAction, returnToOriginatorAction } from "@/lib/documents/forms-revisions";
-import { ArrowLeft, Bell, ExternalLink, FileText } from "lucide-react";
+import { ArrowLeft, Bell, ExternalLink, FileText, Pencil } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -324,7 +324,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             <details id="notify" open={opened === "notify"} className="register register-sheet register-sheet-open scroll-mt-24">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
                 <span className="text-[13px] text-slate-600">Remind the people the review still waits on</span>
-                <span className="ask"><Bell aria-hidden className="h-3.5 w-3.5" /> Notify</span>
+                <span className="ask" title="Notify them" aria-label="Notify them"><Bell aria-hidden className="h-3.5 w-3.5" /></span>
               </summary>
               <div className="border-t border-line px-5 py-4 sm:px-6">
                 <NotifyPanel
@@ -396,7 +396,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
                       {mayComment && comment.authorId === user.id && comment.status === "OPEN" ? (
                         <div className="mt-2 flex flex-wrap items-start gap-3">
                           <details>
-                            <summary className="cursor-pointer text-[11px] font-semibold text-link">Change</summary>
+                            <summary className="cursor-pointer list-none text-link [&::-webkit-details-marker]:hidden" title="Change your comment" aria-label="Change your comment"><Pencil className="h-3.5 w-3.5" aria-hidden /></summary>
                             <div className="mt-2">
                               <ActionForm action={editCommentAction} submitLabel="Save" size="sm" hidden={{ cycleId: cycle.id, commentId: comment.id }}>
                                 <textarea name="text" required rows={3} defaultValue={comment.text} className={inputCls} />

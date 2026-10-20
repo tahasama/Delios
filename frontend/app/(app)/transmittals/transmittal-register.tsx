@@ -301,7 +301,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
                 className="dt-tool"
                 title={selected.length && !allMatching ? "The transmittals you have ticked, as CSV" : "Every transmittal these filters match, as CSV"}
               >
-                <Download className="h-3.5 w-3.5" /> Export
+                <Download className="h-3.5 w-3.5" aria-hidden /><span className="sr-only">Export</span>
               </a>
             }
             head={<tr>
