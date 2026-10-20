@@ -1138,16 +1138,21 @@ a screen only words it. A new rule goes in the backend, never in a page.
 
 ### Help & orientation
 - `/guide` (owner), in the reference style: a plate with jumps; **the colours**: eight areas four by two, each folding
-  open (`details`) on its colours, its strip of colours shown closed; **the codes**: one line each, Do the work's way,
-  each opening its part of `/guide/codes` (the register's column heads and the new-document form link there too);
-  **roles on a project** (owner: not "who approves", every role an organization can play on any project): tabs by role
-  (`?role=`), ours marked "us", one played by another organization on the project marked (from the directory), each with
-  what it does, where approval sits, what its verdict is worth (`lib/settings/role-word.ts` `ROLE_WORD`, the same the
-  Control room's flows read) and who plays it here; **how it is set up**, for everyone, each line folding on what is good
-  to know (how to read a document number, from the project's own schemes read on one of its numbers; why a form offers
-  only some values; how a review goes; how other organizations work with us; what you may do and see; the two levels of
-  settings), "Where it is changed" only for whoever changes it; then Do the work, and See the whole flow for the
-  control function. No banner, no figures, no grid of cards; never a link to a page that does not exist.
+  open (`details`) on its colours (no strip of colours closed: owner, distracting); **the codes**: one line each, Do the
+  work's way, in the register's own column words (Document state, Revision state, Review verdict, Review advice,
+  Released for, Criticality, Confidentiality, Refused titles), each opening its part of `/guide/codes`; an address's part
+  lands under the sticky top bar (`:where([id])` scroll margin, globals.css); **roles on a project** (every role an
+  organization can play on any project): the app's segmented tabs (`.seg`, `?role=`), ours marked "us", one another
+  organization plays here marked by a dot (its key shown only then), each with what it does, where approval sits, what
+  it sends, what comes to it, what its verdict is worth (`lib/settings/role-word.ts` `ROLE_WORD`, read by the Control
+  room's flows too) and who plays it here; **how it is set up**, for everyone, each line folding on this project's own
+  facts: how to read a document number (its schemes read on one of its numbers), why a form offers only some values,
+  which route a document takes (each route, what it takes, its steps, advises or decides, days), who takes part (the
+  directory's organizations, role, how they work with us, who answers), what you may do here (your function, department,
+  permissions, clearance), who to ask (the control function and whoever holds Manage, by name); "Where it is changed"
+  only for whoever changes it; then Do the work, and See the whole flow for the control function. No banner, no
+  figures, no grid of cards; never a link to a page that does not exist. A project's role does not start a matrix of
+  its own (the matrix written per role in `profiles/roles.ts` is applied nowhere): Help never says it does.
 
 ### Pop-up notifications
 - Every notification can also pop up in the person's browsers, even when no
