@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, Check, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { Field, ToneChip, inputCls } from "@/components/ui";
 import { SwitchControl } from "@/components/switch";
@@ -55,7 +55,6 @@ function defaultDays(steps: WorkflowBuilderStep[]): WorkflowBuilderStep[] {
   return steps.map((s, i) => ({ ...s, days: days[i] }));
 }
 
-const pick = (on: boolean) => cn("rounded-[0.3rem] border px-2 py-1 text-xs", on ? "border-brand-line bg-tint font-semibold text-brand-ink" : "border-line-strong bg-surface text-slate-600 hover:bg-tint-soft");
 
 /**
  * A route, changed or made, as the route itself (no box in a box): its name and the sets it answers from, then its
@@ -157,7 +156,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
       <input type="hidden" name="classes" value={allClasses ? "*" : JSON.stringify([scope])} />
 
       {/* ── 1 · The route itself ────────────────────────────────────────── */}
-      <Band n={1} title="The route" words="what it is called, and the sets its steps answer from: it holds for every step" />
+      <Band title="The route" words="its name, and the sets its steps answer from: for every step" />
       <div className="grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-4 sm:px-6 md:grid-cols-3">
         <Field label="Name" required hint="what it covers — who decides it">
           <input name="name" required defaultValue={name} className={inputCls} placeholder="Engineering drawings — lead engineer decides" />
@@ -186,8 +185,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
 
       {/* ── Which documents take it: it narrows who answers, and what may be sent on it ─── */}
       <div className="flex flex-wrap items-center gap-1.5 border-y border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-        <span className="mr-1 grid h-5 w-5 place-items-center rounded-full bg-brand text-[11px] font-semibold text-white">2</span>
-        <span className="stencil mr-1 text-slate-600">Which documents take it</span>
+        <span className="stencil mr-1 text-slate-500">Which documents take it</span>
         <span className="text-[11px] text-slate-500">no other document can be sent on it; its discipline narrows the people of its steps</span>
         <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs text-slate-700">
           <input type="checkbox" checked={allClasses} onChange={(e) => setAllClasses(e.target.checked)} /> All documents
@@ -205,8 +203,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
 
       {/* ── The steps ──────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-1.5 border-y border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-        <span className="mr-1 grid h-5 w-5 place-items-center rounded-full bg-brand text-[11px] font-semibold text-white">3</span>
-        <span className="stencil mr-1 text-slate-600">Its steps</span>
+        <span className="stencil mr-1 text-slate-500">Its steps</span>
         <span className="text-[11px] text-slate-500">
           left to right; each advises or decides, the last always decides; the most severe verdict stands. {total ? `${total} working days when every step uses its time.` : ""}
         </span>
@@ -218,7 +215,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
             const who = whoOf(step);
             return (
               <div key={index} className="flex items-stretch gap-1">
-                <div className={cn("flex w-56 shrink-0 flex-col rounded-md ring-1 transition", open === index ? "bg-surface ring-2 ring-brand" : "bg-surface ring-line hover:ring-line-strong")}>
+                <div className={cn("flex w-56 shrink-0 flex-col rounded-md ring-1 transition", open === index ? "bg-surface ring-2 ring-brand-line" : "bg-surface ring-line hover:ring-line-strong")}>
                   <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
                     <span className="text-[11px] font-semibold text-slate-500">Step {index + 1}</span>
                     <ToneChip tone={step.decides ? "done" : "moving"}>{step.decides ? "decides" : "advises"}</ToneChip>
@@ -248,12 +245,9 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
       {open !== null && chosen ? (
         // The step opened, set up under the steps: its own band names it, and a brand rail ties it to its box, so what
         // is said here is this step's alone (owner: it was not obvious it was a step's, not the route's).
-        <div className="border-t border-line border-l-4 border-l-brand bg-tint-soft/60">
-        <p className="flex flex-wrap items-baseline gap-2 border-b border-line px-5 py-2.5 sm:px-6">
-          <span className="stencil text-brand-ink">Setting up step {open + 1}</span>
-          <span className="text-[13px] font-semibold text-slate-900">{chosen.title || (chosen.decides ? "Decision" : `Review ${open + 1}`)}</span>
-          <span className="text-[11px] text-slate-500">what is chosen here is this step&rsquo;s only; choose another step&rsquo;s box above to set it up</span>
-        </p>
+        <div>
+        <Band title={`Step ${open + 1} · ${chosen.title || (chosen.decides ? "Decision" : `Review ${open + 1}`)}`}
+          words="what is chosen here is this step's only; choose another step's box above to set it up" />
         <div className="space-y-4 px-5 py-4 sm:px-6">
           <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-[1fr_auto_1fr_auto]">
             <Field label={`Step ${open + 1}`} hint="its name">
@@ -323,32 +317,19 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
               <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-[13px] text-slate-700">
                 <SwitchControl checked={!!chosen.fromMatrix} onChange={(on) => update(open, { fromMatrix: on })} />
                 Recommended for each document
-                <span className="text-[11px] text-slate-500">proposes whoever may review it (or approve it, on a step that decides) under Who may do what, its discipline first, narrowed by the choices above; the sender confirms</span>
+                <span className="text-[11px] text-slate-500">who may review or approve it, by Who may do what; the sender confirms</span>
               </label>
             ) : null}
           </div>
 
           {open === lastDecider ? (
-            <div>
-              <p className="text-xs font-medium text-slate-700">The status it releases at</p>
-              <p className="mb-1.5 text-[11px] text-slate-500">
-                One chosen: every document this route accepts is released at it. Several: the decider chooses among them. None: any published status.
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {statuses.map((one) => {
-                  const on = (chosen.grantsStatuses ?? []).includes(one.code);
-                  return (
-                    <button key={one.code} type="button" title={one.label} className={pick(on)}
-                      onClick={() => {
-                        const picked = new Set(chosen.grantsStatuses ?? []);
-                        if (picked.has(one.code)) picked.delete(one.code); else picked.add(one.code);
-                        update(open, { grantsStatuses: picked.size ? [...picked] : undefined });
-                      }}>
-                      {on ? <Check className="mr-1 inline h-3 w-3" aria-hidden /> : null}{one.code} — {one.label}
-                    </button>
-                  );
-                })}
-              </div>
+            // One chosen: every document the route accepts is released at it; several: the decider chooses; none: any.
+            <div className="grid grid-cols-1 gap-x-6 md:grid-cols-3">
+              <SearchPick key={`statuses-${open}`} name={`statuses_${open}`} label="The status it releases at"
+                hint="one: every document is released at it; several: the decider chooses; none: any"
+                items={statuses.map((one) => ({ id: one.code, name: `${one.code} — ${one.label}` }))}
+                initial={chosen.grantsStatuses ?? []} empty="None chosen: any published status"
+                onChange={(ids) => { if (ids.join() !== (chosen.grantsStatuses ?? []).join()) update(open, { grantsStatuses: ids.length ? ids : undefined }); }} />
             </div>
           ) : chosen.decides ? (
             <p className="text-[11px] text-slate-500">It gives a verdict; the status is the last deciding step&rsquo;s.</p>
@@ -365,12 +346,11 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
   );
 }
 
-/** A numbered part of the route form, so the route's own answers, the documents it takes and its steps read apart. */
-function Band({ n, title, words }: { n: number; title: string; words: string }) {
+/** A part of the route form, a sheet's band, so the route's own answers, the documents it takes and its steps read apart. */
+function Band({ title, words }: { title: string; words: string }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-      <span className="mr-1 grid h-5 w-5 place-items-center rounded-full bg-brand text-[11px] font-semibold text-white">{n}</span>
-      <span className="stencil mr-1 text-slate-600">{title}</span>
+      <span className="stencil mr-1 text-slate-500">{title}</span>
       <span className="text-[11px] text-slate-500">{words}</span>
     </div>
   );

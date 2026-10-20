@@ -99,11 +99,10 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
       </section>
 
       {editable && adding ? (
-        // The route being made stands apart from those in use: its own head, a brand ring.
-        <section className="register register-sheet register-sheet-open ring-2 ring-brand">
-          <div className="flex flex-wrap items-center gap-2 border-b border-line bg-brand px-5 py-3 sm:px-6">
-            <span className="text-[14px] font-semibold text-white">New review route</span>
-            <span className="text-[11px] text-white/80">offered on Send for review once added</span>
+        <section className="register register-sheet register-sheet-open">
+          <div className="flex flex-wrap items-baseline gap-2 border-b border-line px-5 py-3 sm:px-6">
+            <span className="text-[14px] font-semibold text-slate-900">New review route</span>
+            <span className="text-[11px] text-slate-500">offered on Send for review once added</span>
           </div>
           {builder()}
         </section>
@@ -134,7 +133,7 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
         };
         const unserved = (codes: string[]) => codes.map(typeName).join(", ");
         return (
-          <section key={t.id} id={`route-${t.id}`} className={`register register-sheet register-sheet-open scroll-mt-20 ${open ? "ring-2 ring-brand" : ""}`}>
+          <section key={t.id} id={`route-${t.id}`} className="register register-sheet register-sheet-open scroll-mt-20">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-3 sm:px-6">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2">

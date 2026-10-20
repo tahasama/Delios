@@ -35,32 +35,3 @@ export function patternsOf(classes: string): RoutePattern[] {
     return [];
   }
 }
-
-/** A document as a route's patterns read it. */
-export type RouteSubject = { number: string; deliverableType: string | null; docType: string | null; discipline: string | null; criticality: string | null; originator: string | null };
-
-/**
- * Why a route does not take these documents, in words: for the pattern closest to fitting, each field that differs,
- * what the route asks and what the document holds ("from Acme Pumps, but P1001-… comes from no organization").
- * Never a mystery (owner: a route that should fit and is not offered).
- */
-export function whyNot(patterns: RoutePattern[], docs: RouteSubject[], lists: ScopeLists): string | null {
-  const name = (list: { code: string; label: string }[], code: string | null) =>
-    code ? `${code} — ${list.find((one) => one.code === code)?.label ?? code}` : "none";
-  const fields: { key: keyof RoutePattern & keyof RouteSubject; words: string; list: { code: string; label: string }[] }[] = [
-    { key: "deliverableType", words: "deliverable type", list: lists.deliverableTypes },
-    { key: "docType", words: "document type", list: lists.documentTypes },
-    { key: "discipline", words: "discipline", list: lists.disciplines },
-    { key: "criticality", words: "criticality", list: lists.criticalities },
-    { key: "originator", words: "organization it comes from", list: lists.originators },
-  ];
-  for (const doc of docs) {
-    const misses = patterns.map((p) => fields.filter((f) => p[f.key] && p[f.key] !== doc[f.key]));
-    if (misses.some((m) => m.length === 0)) continue;
-    const closest = patterns[misses.reduce((best, m, i) => (m.length < misses[best].length ? i : best), 0)];
-    const said = fields.filter((f) => closest[f.key] && closest[f.key] !== doc[f.key])
-      .map((f) => `its ${f.words} is ${name(f.list, doc[f.key] ?? null)}, the route asks ${name(f.list, closest[f.key] ?? null)}`);
-    return `${doc.number}: ${said.join("; ")}`;
-  }
-  return null;
-}

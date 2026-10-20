@@ -939,17 +939,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   named (they answer here); one that answers as itself (recorded by one of ours) names nobody (STEP_PARTY_AS_ITSELF).
 - A route's working days are only filled in by default (owner, never limited or enforced): five in all, each decider
   given more than each adviser (2 + 3); days typed by hand are kept.
-- What a route takes is enforced: no other document is sent on it (backend NO_ROUTE). Send for review names every route
-  of the project not offered for the documents chosen, with what it takes and exactly what does not fit (the document,
-  the field, what it holds and what the route asks: `whyNot`, `lib/reviews/route-scope.ts`), so a missing route is never
-  a mystery.
+- What a route takes is enforced: no other document is sent on it (backend NO_ROUTE); Send for review offers only the
+  routes that take every document chosen (owner: the lines saying why one is not offered were removed).
 - A form whose submit sits outside it (`ActionForm` with `id`, `hideSubmit`, a button `form=…`) has an id used nowhere
   else on the page, and no hidden field named "id" (it hides the form's own id): either leaves the button without its
   form and the save silently does nothing (the route form, `route-form-<id>`, `routeId`; an organization, `partyId`).
-- The route form (owner: "everything blended in one big chunk") stands apart from the routes in use: a brand head and
-  ring, three numbered parts (1 The route, 2 Which documents take it, 3 Its steps), the step opened set up under its own
-  band "Setting up step N" with a brand rail (what is chosen there is that step's only), then "Routes in use"; a route
-  being changed is ringed and marked "being changed".
+- The route form (owner: "everything blended in one big chunk", then "follow our app's styling") reads in the sheet's
+  own bands, never brand fills or rings: The route · Which documents take it · Its steps, then the step opened under its
+  band "Step N · <title>" (what is chosen there is that step's only); "Routes in use" heads the routes below; a route
+  being changed is marked "being changed". "The status it releases at" is a dropdown (`SearchPick`), never pills.
 - A revision whose files are not through the virus check is refused in plain words by what happened (`FilesNotReady`):
   still being checked (about a minute; if it stays, the worker or scanner is not running), set aside (replace it), or
   no file yet.

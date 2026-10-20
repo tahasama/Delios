@@ -33,13 +33,11 @@ const MODE: Record<string, string> = {
  * assigns (by the documents' discipline when the route names nobody); the
  * sender removes or adds anyone the matrix allows.
  */
-export function SendForReviewForm({ revisionIds, routes, notOffered = [], reviewers, approvers, everyone = [], strict = true, ownFields = [], copies = "OPTIONAL" }: {
+export function SendForReviewForm({ revisionIds, routes, reviewers, approvers, everyone = [], strict = true, ownFields = [], copies = "OPTIONAL" }: {
   /** How the project's review form asks "Copied in" (Forms & fields): must, asked, or not asked. */
   copies?: "REQUIRED" | "OPTIONAL" | "OFF";
   revisionIds: string[];
   routes: SendRoute[];
-  /** The project's routes not offered here, each with the documents it takes: it does not take every one of these. */
-  notOffered?: { name: string; takes: string; why?: string | null }[];
   reviewers: SendPerson[];
   approvers: SendPerson[];
   /** Everyone on the project, who may be copied in. */
@@ -53,22 +51,8 @@ export function SendForReviewForm({ revisionIds, routes, notOffered = [], review
   const [routeId, setRouteId] = useState(routes.find((r) => r.recommended)?.id ?? routes.find((r) => r.isDefault)?.id ?? routes[0]?.id ?? "");
   const route = routes.find((r) => r.id === routeId);
   const [attempt] = useState(() => crypto.randomUUID());
-  const whyNot = notOffered.length ? (
-    <ul className="space-y-0.5 text-[11px] leading-4 text-slate-500">
-      {notOffered.map((r) => (
-        <li key={r.name}>
-          <span className="font-semibold text-slate-700">{r.name}</span> is not offered: it takes {r.takes.charAt(0).toLowerCase() + r.takes.slice(1)}.
-          {r.why ? <span className="block text-slate-500">{r.why}.</span> : null}
-        </li>
-      ))}
-    </ul>
-  ) : null;
-  if (!routes.length) return (
-    <div className="space-y-2">
-      <p className="text-sm text-amber-800">No review route takes {revisionIds.length > 1 ? "all of these documents" : "this document"}. Review routes are set up in Settings → Review routes.</p>
-      {whyNot}
-    </div>
-  );
+
+  if (!routes.length) return <p className="text-sm text-amber-800">No review route takes {revisionIds.length > 1 ? "all of these documents" : "this document"}. Review routes are set up in Settings → Review routes.</p>;
 
   return (
     <ActionForm action={sendForReviewAction} submitLabel={revisionIds.length > 1 ? `Send ${revisionIds.length} documents` : "Send"} size="sm" hidden={{}}>
@@ -80,7 +64,6 @@ export function SendForReviewForm({ revisionIds, routes, notOffered = [], review
         </select>
       </Field>
       {route?.description ? <p className="-mt-1 text-xs text-slate-500">{route.description}</p> : null}
-      {whyNot}
       <OwnFields fields={ownFields} />
       {route?.verdicts ? (
         <p className="text-[11px] text-slate-500">

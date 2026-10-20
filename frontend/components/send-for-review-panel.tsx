@@ -8,8 +8,6 @@ import { SendForReviewForm, type SendRoute } from "./send-for-review";
 import { getActiveSet } from "@/lib/settings/config";
 import { verdictEffect, VERDICT_EFFECT_SHORT } from "@/lib/reviews/verdict-effect";
 import { matrixBinds } from "@/lib/settings/control-activities";
-import { projectRoutes } from "@/lib/settings/api-admin";
-import { scopeWords, whyNot } from "@/lib/reviews/route-scope";
 
 /**
  * Loads what the Send form needs for these revisions: the routes that apply
@@ -37,18 +35,7 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
       .catch(() => ({ organizations: [], people: [] })),
   ]);
   const applicable = routeLists[0].filter((route) => routeLists.every((list) => list.some((one) => one.id === route.id)));
-  // The project's other routes, and why each is not offered here: it does not take every one of these documents.
-  const [all, documentTypes, disciplines, criticalities, deliverableTypes] = await Promise.all([
-    projectRoutes().then((r) => r.routes.filter((one) => one.active)).catch(() => []),
-    getActiveSet("DOCUMENT_TYPES"), getActiveSet("DISCIPLINES"), getActiveSet("CRITICALITY"), getActiveSet("DELIVERABLE_TYPES"),
-  ]);
-  const lists = { documentTypes, disciplines, criticalities, deliverableTypes, originators: directory.organizations.map((o) => ({ code: o.code, label: o.name })) };
-  const notOffered = all.filter((r) => !applicable.some((one) => one.id === r.id)).map((r) => ({
-    name: r.name, takes: scopeWords(r.patterns, lists),
-    // Exactly what does not fit: the field, what the document holds, what the route asks.
-    why: whyNot(r.patterns, docs.map((d) => ({ number: d.number, deliverableType: d.deliverableType, docType: d.docType, discipline: d.discipline,
-      criticality: d.criticality, originator: d.originator })), lists),
-  }));
+
   // The verdicts each route decides with: its own set of the review outcomes, else the set serving each document.
   const outcomes = await getActiveSet("REVIEW_OUTCOMES");
   const verdictsOf = (routeId: string) => {
@@ -129,5 +116,5 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
   const pool = (named: { id: string; name: string; functionName: string }[]) => strict
     ? named.map(person)
     : [...named.map(person), ...everyone.filter((one) => !named.some((n) => n.id === one.id)).map((one) => ({ ...one, inMatrix: false }))];
-  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} notOffered={notOffered} reviewers={pool(reviewers)} approvers={pool(approvers)} everyone={everyone} strict={strict} ownFields={policy.own} copies={policy.rules.copies} />;
+  return <SendForReviewForm revisionIds={revisions.map((r) => r.id)} routes={routes} reviewers={pool(reviewers)} approvers={pool(approvers)} everyone={everyone} strict={strict} ownFields={policy.own} copies={policy.rules.copies} />;
 }
