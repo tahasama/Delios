@@ -536,6 +536,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   carries a real figure, and what still needs doing reads "To do · …" in amber (an empty essential list, a
   deliverable type with no numbering, no revision scheme, a verdict without a meaning, only you on the project).
   Group icons take one neutral tint.
+- **A new email counts once its owner opens the link sent to it** (owner): an administrator changing someone's email
+  (organization's People, a project's People & access) sends a link to the new address and a word to the old one; the
+  account keeps its email until the link is opened (`EmailConfirmation.SendChange`, the same `/confirm-email` page,
+  EMAIL_CHANGED; refused if the email changed since or the new one is taken). Email off: the link is handed to whoever
+  asked. Nobody changes their own email.
 - People & access never asks a password: our people and someone of another organization with no DELIOS get the
   7-day link to choose their own (email off: the link is shown to whoever added them). Someone whose company has its
   own DELIOS is never added there: link the organizations; their administrator puts them on the project.
@@ -1007,8 +1012,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Sign-in & security** (administrators) is the organization's, on its Settings (`/organization/settings/security`; owner,
   after the critique; `/settings/security` only redirects there, and a project's Settings carry no such card):
   two-step sign-in asked of everyone or not; the organization's own account (owner: "explain the work with a progress
-  diagram") drawn as its four steps, each lit done / next / to come (register DELIOS with the provider, type its details
-  here, switch it on, people sign in with it; `SsoSteps`), said plainly as only for an organization whose people have a
+  diagram", then "look like what we have in the app") drawn as the app's own stage path (`StagePath`, as under a
+  document's title): Register DELIOS · Type its details · Switch it on · People sign in, a short line under each (`SsoSteps`), said plainly as only for an organization whose people have a
   work account elsewhere; its form only once set up or asked for ("Set it up", `?sso=1`), never filled by the browser
   (autoComplete off), the address the provider sends people back to given in it, for step 1; the organization's own account
   (single sign-on, OpenID Connect: name on the button, provider's address, client id and secret kept encrypted, email

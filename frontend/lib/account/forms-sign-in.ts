@@ -120,7 +120,7 @@ export async function logoutAction() {
   redirect("/login");
 }
 
-type PasswordState = { error?: string; done?: boolean };
+type PasswordState = { error?: string; done?: boolean; email?: string };
 
 /** "Forgot password": asks the backend to email a reset link. The answer is the same whether or not the account exists. */
 export async function forgotPasswordAction(_prev: PasswordState | undefined, formData: FormData): Promise<PasswordState> {
@@ -161,7 +161,9 @@ export async function confirmEmailAction(_prev: PasswordState | undefined, formD
   if (!response) return { error: "The server cannot be reached. Try again in a moment." };
   if (response.status === 429) return { error: "Too many attempts. Wait a minute and try again." };
   if (!response.ok) return { error: (await problemOf(response)).message };
-  return { done: true };
+  // A new email given by an administrator comes back with the address that now counts.
+  const changed = response.status === 200 ? ((await response.json().catch(() => null)) as { email?: string } | null)?.email : undefined;
+  return { done: true, email: changed };
 }
 
 export type SsoState = { error?: string; name?: string; slug?: string };

@@ -1,4 +1,5 @@
 using Delios.Host.Audit;
+using Delios.Host.Notifications;
 using Delios.Host.Documents;
 using Delios.Host.Platform;
 using Delios.Host.Tenancy;
@@ -312,7 +313,8 @@ public static class DirectoryEndpoints
     /// <summary><c>PUT /api/admin/users/{id}</c>: name, email, organization, sign-in, administration rights, a new password.</summary>
     private static async Task<IResult> UpdateUserAsync(
         Guid userId, UpdateUserRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IPasswordHasher<User> hasher,
-        SessionStore sessions, Organizations.OrganizationService organizations, CancellationToken cancellationToken)
+        SessionStore sessions, Organizations.OrganizationService organizations, Notifier notifier,
+        Microsoft.AspNetCore.DataProtection.IDataProtectionProvider protection, CancellationToken cancellationToken)
     {
         var user = await db.Users.SingleOrDefaultAsync(u => u.Id == userId, cancellationToken);
         if (user is null) return Problems.NotFound("USER_NOT_FOUND", "No such person.");
@@ -327,6 +329,7 @@ public static class DirectoryEndpoints
         if (self && (request.Active == false || request.IsAdmin == false))
             return Problems.Conflict("SELF_LOCKOUT", "You cannot remove your own access.");
         var changes = new List<string>();
+        (string To, string? Link)? emailAsked = null;
         if (Blank(request.Name) is { } name && name != user.Name) { changes.Add($"name → {name}"); user.Name = name; }
         if (Blank(request.Email)?.ToLowerInvariant() is { } email && email != user.Email.ToLowerInvariant())
         {
@@ -334,9 +337,11 @@ public static class DirectoryEndpoints
             var normalized = email.ToUpperInvariant();
             if (await db.SignInNames.AnyAsync(n => n.NormalizedEmail == normalized, cancellationToken))
                 return Problems.Conflict("EMAIL_TAKEN", $"{email} already signs somebody in.");
-            changes.Add($"email → {email}");
-            user.Email = email;
-            user.NormalizedEmail = normalized;
+            // The new email counts only once its owner opens the link sent to it (owner): the account keeps its email till then.
+            var askedBy = (await ActorAsync(http, db, cancellationToken)).Name;
+            var link = EmailConfirmation.SendChange(user, email, askedBy, notifier, protection);
+            changes.Add($"asked to confirm the email {email}");
+            emailAsked = (email, notifier.Sends(EmailKinds.Account) ? null : link);
         }
         if (request.ClearParty && user.PartyId is not null) { changes.Add("one of ours"); user.PartyId = null; }
         else if (request.PartyId is { } partyId && partyId != user.PartyId)
@@ -369,7 +374,8 @@ public static class DirectoryEndpoints
         await db.SaveChangesAsync(cancellationToken);
         // Switched off (or back on) here: the accounts standing for them in our partners' organizations follow.
         if (user.Active != wasActive && user.HomeTenantId is null) await organizations.FollowPersonAsync(user.Id, user.Active, cancellationToken);
-        return Results.NoContent();
+        // A new email asked: said back, with the link where email is off (whoever asked hands it on).
+        return emailAsked is { } asked ? Results.Ok(new { emailAskedTo = asked.To, link = asked.Link }) : Results.NoContent();
     }
 
     // ── Projects and who is on them ─────────────────────────────────────────

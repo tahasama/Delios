@@ -16,7 +16,8 @@ public sealed record ResendConfirmationRequest(string? Email, string? Turnstile 
 /// <summary>
 /// An organization registering itself proves its email: while email is on, sign-up sends a link (good for two days)
 /// and sign-in waits for it. Nothing is stored: the link carries who it is for, sealed with the application's keys.
-/// A password reset proves the address too.
+/// A password reset proves the address too. A new email given to someone by an administrator counts only once its
+/// owner opens the link sent to it (owner): until then the account keeps the email it had, which is told of the change.
 /// </summary>
 public static class EmailConfirmation
 {
@@ -44,6 +45,24 @@ public static class EmailConfirmation
             + "If you did not register, ignore this email: nothing happens without it.", "User", user.Id);
     }
 
+    /// <summary>
+    /// Queues the link that makes <paramref name="newEmail"/> this person's email once opened, and a word to the address
+    /// they have now. Does not save: the caller does. Returns the link, to hand over where email is off.
+    /// </summary>
+    public static string SendChange(User user, string newEmail, string askedBy, Notifier notifier, IDataProtectionProvider protection)
+    {
+        var token = Links(protection).Protect($"{user.TenantId:N}|{user.Id:N}|{user.NormalizedEmail}|{newEmail}", Lifetime);
+        var link = notifier.Url($"/confirm-email?token={Uri.EscapeDataString(token)}");
+        notifier.Queue(user.TenantId, null, EmailKinds.Account, newEmail, user.Name, "Confirm your new email for DELIOS",
+            $"{askedBy} gave {newEmail} as your email on DELIOS. If it is yours, open this link within two days:\n\n{link}\n\n"
+            + $"Until then you keep signing in with {user.Email}. If you do not know what this is, ignore this email: nothing changes without it.",
+            "User", user.Id);
+        notifier.Queue(user.TenantId, null, EmailKinds.Account, user.Email, user.Name, "Your email on DELIOS may change",
+            $"{askedBy} gave {newEmail} as your email on DELIOS. It changes only once the link sent there is opened; "
+            + $"until then you sign in with {user.Email}, as now.", "User", user.Id);
+        return link;
+    }
+
     /// <summary><c>POST /api/auth/confirm-email</c>: confirms the address from a valid link; the person then signs in.</summary>
     private static async Task<IResult> ConfirmAsync(ConfirmEmailRequest request, DeliosDbContext db, TenantContext tenant, AuditLog audit,
         IDataProtectionProvider protection, CancellationToken cancellationToken)
@@ -59,11 +78,31 @@ public static class EmailConfirmation
         {
             return invalid;
         }
-        if (parts.Length != 2 || !Guid.TryParse(parts[0], out var tenantId) || !Guid.TryParse(parts[1], out var userId)) return invalid;
+        if (parts.Length is not (2 or 4) || !Guid.TryParse(parts[0], out var tenantId) || !Guid.TryParse(parts[1], out var userId)) return invalid;
         tenant.Set(tenantId);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var user = await db.Users.SingleOrDefaultAsync(u => u.Id == userId, cancellationToken);
         if (user is null) return invalid;
+        if (parts.Length == 4)
+        {
+            // A new email asked by an administrator: it counts now, if the account still has the email it had then.
+            var (was, email) = (parts[2], parts[3]);
+            if (user.NormalizedEmail != was)
+                return Problems.Problem(StatusCodes.Status400BadRequest, "CONFIRM_LINK_INVALID",
+                    "This link no longer applies: the email was changed since. Ask your administrator.", null);
+            var normalized = email.ToUpperInvariant();
+            if (await db.SignInNames.AnyAsync(n => n.NormalizedEmail == normalized, cancellationToken))
+                return Problems.Conflict("EMAIL_TAKEN", $"{email} already signs somebody in. Ask your administrator.");
+            var before = user.Email;
+            user.Email = email;
+            user.NormalizedEmail = normalized;
+            user.EmailToConfirm = false;
+            await db.SaveChangesAsync(cancellationToken);
+            await audit.WriteAsync(new Actor(user.Id, user.Name), "EMAIL_CHANGED", "User", user.Id, user.Name,
+                $"email: {before} → {email}, confirmed by its owner", cancellationToken: cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Ok(new { email });
+        }
         if (user.EmailToConfirm)
         {
             user.EmailToConfirm = false;

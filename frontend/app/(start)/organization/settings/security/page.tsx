@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StagePath } from "@/app/(app)/documents/[id]/next-step";
 import { headers } from "next/headers";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { ToneChip } from "@/components/ui";
@@ -164,34 +165,27 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
 }
 
 /**
- * How the organization's own account works, step by step, each step lit as it stands (owner: "explain the work with a
- * progress diagram"): done, the next one to do, or still to come.
+ * How the organization's own account works, step by step (owner: "explain the work with a progress diagram", in the
+ * app's own look): the stage path drawn under a document's title, the step it is at filled, a line under each.
  */
 function SsoSteps({ saved, inUse, slug }: { saved: boolean; inUse: boolean; slug: string }) {
-  const steps = [
-    { title: "Register DELIOS with your provider", text: "Your IT team does it at Microsoft, Google, Okta…; it gives back a client id and a secret.", done: saved },
-    { title: "Type its details here", text: "The name on the button, the provider's address, the client id and the secret.", done: saved },
-    { title: "Switch it on", text: "\u201CIn use\u201D: from then on it is offered on the sign-in page.", done: inUse },
-    { title: "People sign in with it", text: `They choose \u201CSign in with your organization\u2019s account\u201D, type ${slug}, sign in at the provider and come back here. Only people already added here get in, by their email.`, done: inUse },
-  ];
-  const next = steps.findIndex((step) => !step.done);
   return (
-    <ol className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
-      {steps.map((step, i) => {
-        const state = step.done ? "done" : i === next ? "next" : "later";
-        return (
-          <li key={step.title} className={`rounded-md px-3 py-2.5 ring-1 ${state === "done" ? "bg-emerald-50 ring-emerald-200" : state === "next" ? "bg-amber-50 ring-amber-200" : "bg-tint-soft ring-line"}`}>
-            <p className="flex items-center gap-2 text-xs font-semibold text-slate-800">
-              <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] ${state === "done" ? "bg-emerald-600 text-white" : state === "next" ? "bg-amber-500 text-white" : "bg-slate-200 text-slate-600"}`}>{i + 1}</span>
-              {step.title}
-            </p>
-            <p className="mt-1 text-[11px] leading-4 text-slate-600">{step.text}</p>
-            <p className={`mt-1.5 text-[11px] font-semibold ${state === "done" ? "text-emerald-800" : state === "next" ? "text-amber-900" : "text-slate-500"}`}>
-              {state === "done" ? "Done" : state === "next" ? "Next" : "To come"}
-            </p>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="space-y-3 px-5 py-4 sm:px-6">
+      <StagePath
+        stages={["Register DELIOS", "Type its details", "Switch it on", "People sign in"]}
+        at={inUse ? 4 : saved ? 2 : 0}
+        under={[
+          "your IT team, at the provider",
+          "below: two codes it gives",
+          "“In use”",
+          "with their work account",
+        ].map((line) => <span key={line} className="text-[11px] text-slate-500">{line}</span>)}
+      />
+      <p className="max-w-3xl text-xs leading-5 text-slate-600">
+        Once on, people choose &ldquo;Sign in with your organization&rsquo;s account&rdquo; on the sign-in page, type{" "}
+        <span className="font-mono font-semibold text-slate-800">{slug}</span>, sign in at the provider and come back here. Only people
+        already added here get in, by their email: nobody is created by signing in.
+      </p>
+    </div>
   );
 }

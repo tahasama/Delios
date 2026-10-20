@@ -127,11 +127,11 @@ export async function savePersonAction(_prev: Result | undefined, formData: Form
     const person: Record<string, unknown> = {};
     if (!linked) {
     if (name !== target.name) { person.name = name; changes.push(`name → ${name}`); }
-    if (email !== target.email.toLowerCase()) { person.email = email; changes.push(`email → ${email}`); }
+    if (email !== target.email.toLowerCase()) { person.email = email; }
     if (partyId !== target.partyId) { if (partyId) person.partyId = partyId; else person.clearParty = true; changes.push("company changed"); }
     if (active !== target.active) { person.active = active; changes.push(active ? "may sign in" : "can no longer sign in"); }
     }
-    if (Object.keys(person).length) await api(`/api/admin/users/${userId}`, { method: "PUT", body: person });
+    if (Object.keys(person).length) changes.push(...emailSaid(await api<EmailAsked | undefined>(`/api/admin/users/${userId}`, { method: "PUT", body: person })));
     if ((functionId && functionId !== here?.functionId) || department !== (here?.department ?? null)) {
       await api(`/api/admin/projects/${ctx.projectId}/members`, { method: "PUT", body: { userId, functionId: functionId || null, department, active: true, confirmerId: text(formData, "confirmerId") || null } });
       changes.push(here ? "function or department changed" : `added to ${ctx.project.code}`);
@@ -141,4 +141,13 @@ export async function savePersonAction(_prev: Result | undefined, formData: Form
   }
   revalidatePath("/settings/users");
   return { ok: changes.length ? `${name || target.name}: ${changes.join("; ")}.${here ? "" : await waitingSaid(userId, ctx.projectId, ctx.project.code)}` : "Nothing changed." };
+}
+
+type EmailAsked = { emailAskedTo?: string; link?: string | null };
+/** A new email counts once its owner opens the link sent to it: said so, with the link where email is off. */
+function emailSaid(answer: EmailAsked | undefined): string[] {
+  if (!answer?.emailAskedTo) return [];
+  return [answer.link
+    ? `the new email ${answer.emailAskedTo} counts once they open this link (email is off here, so pass it on): ${answer.link}`
+    : `a link went to ${answer.emailAskedTo}: the new email counts once they open it`];
 }

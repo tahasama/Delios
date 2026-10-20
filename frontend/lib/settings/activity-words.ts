@@ -162,6 +162,7 @@ const WORDS: Record<string, string> = {
   USER_UPDATED: "Changed an account",
   SIGN_UP: "Signed the organization up",
   EMAIL_CONFIRMED: "Confirmed an email",
+  EMAIL_CHANGED: "Confirmed a new email",
   MEMBERSHIP_CHANGED: "Changed who is on a project",
   PERSON_CONFIRMED: "Confirmed someone joining",
   PERSON_REFUSED: "Refused someone joining",

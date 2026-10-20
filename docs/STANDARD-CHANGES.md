@@ -1375,3 +1375,9 @@ Who reads a confidential document is said once: by each function's clearance (th
 document above it is read by them only if named on it, if they registered it, or if it was sent to them. Levels
 "restricted to named readers" are dropped: they said the same thing a second way. A function's opened card shows only
 its rules for certain documents; on every document is said by the grid's ticks alone.
+
+## 73 · A person's email is proven before it counts
+
+An email given to someone by an administrator counts only once its owner opens a link sent to that address; until
+then the account keeps the email it had, which is told of the change. Sign-in by the organization's own account
+matches people by email, so an unproven address would let in, or shut out, the wrong person.

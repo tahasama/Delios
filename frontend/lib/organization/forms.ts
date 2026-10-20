@@ -374,8 +374,17 @@ export async function savePersonEverywhereAction(_prev: Result | undefined, form
   const newProject = text(formData, "newProject");
   const newFunction = text(formData, "newFunction");
   if (newProject && !newFunction) return { error: "Choose the function they hold on that project.", fields: ["newFunction"] };
+  let emailNote = "";
   try {
-    if (Object.keys(person).length) await api(`/api/admin/users/${userId}`, { method: "PUT", body: person });
+    if (Object.keys(person).length) {
+      const answer = await api<{ emailAskedTo?: string; link?: string | null } | undefined>(`/api/admin/users/${userId}`, { method: "PUT", body: person });
+      // A new email counts once its owner opens the link sent to it.
+      if (answer?.emailAskedTo) {
+        emailNote = answer.link
+          ? ` The new email ${answer.emailAskedTo} counts once they open this link (email is off here, so pass it on): ${answer.link}`
+          : ` A link went to ${answer.emailAskedTo}: the new email counts once they open it.`;
+      }
+    }
     for (const seat of target.memberships) {
       if (seat.pendingSince) continue;
       const functionId = text(formData, `fn:${seat.projectId}`) || seat.functionId;
@@ -395,7 +404,7 @@ export async function savePersonEverywhereAction(_prev: Result | undefined, form
   }
   revalidatePath("/organization", "layout");
   revalidatePath("/settings/users");
-  return { ok: `${text(formData, "name") || target.name} saved.` };
+  return { ok: `${text(formData, "name") || target.name} saved.${emailNote}` };
 }
 
 /** Puts one of a project's lists back to the organization's (its Settings only, for a mess): always with why. */
