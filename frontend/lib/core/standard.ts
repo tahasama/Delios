@@ -1,4 +1,5 @@
 import { TONE } from "@/lib/core/tones";
+import { STATE_LOOK } from "@/lib/core/state-look";
 // Domain constants from the Document Management Standard v1.
 
 export const ROLES = ["ADMIN", "CONTROLLER", "APPROVER", "REVIEWER", "AUTHOR", "VIEWER"] as const;
@@ -43,16 +44,10 @@ export function revStateColor(state: string): string {
   return REV_STATE_COLOR[state as RevState] ?? "";
 }
 
-/** In the reference tones: under way, waiting on someone, done, sent back, out of play. */
-export const REV_STATE_COLOR: Record<RevState, string> = {
-  IN_PREPARATION: TONE.idle,
-  IN_REVIEW: TONE.moving,
-  NOT_RELEASED: TONE.waiting,
-  RETURNED: TONE.refused,
-  RELEASED: TONE.done,
-  SUPERSEDED: TONE.idle,
-  VOID: TONE.refused,
-};
+/** Each revision state's pill, in the same hue the register writes it in (`lib/core/state-look.ts`): one colour per state. */
+export const REV_STATE_COLOR: Record<RevState, string> = Object.fromEntries(
+  REV_STATES.map((state) => [state, STATE_LOOK[state].pill]),
+) as Record<RevState, string>;
 
 // §7.3 — document states (fixed set)
 export const DOC_STATES = ["PLANNED", "ACTIVE", "WITHDRAWN", "CANCELLED", "ARCHIVED"] as const;

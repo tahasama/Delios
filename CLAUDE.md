@@ -647,7 +647,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `JumpPick`, the recipient picker, "One of ours?") take the same look, and every one lists on a click and narrows as
   one types (Functions' long lists and "One of ours?" included).
 - **Never pills inside a register** (owner: "we are very satisfied with the current styling"): a register's state
-  reads as coloured text (the revision state in its colour, `REV_INK`; transmittals' status, `STATUS_INK`), as it was.
+  reads as coloured text, as it was (transmittals' status, `STATUS_INK`). **One colour per state in a register** (owner:
+  "In preparation" and "Accepted" were both amber): the revision states and a supplier's stages, read in the same
+  column, each have their own hue, text, side colour and pill alike (`lib/core/state-look.ts` `STATE_LOOK`; a state
+  meaning the same in both, in review or released, reads the same). A state in the register opens its own line on Help
+  (`/guide#state-<code>`), lit (`.state-line:target`), with what it means and how it gets there: document states,
+  revision states (no revision yet included) and a supplier's stages.
   Outside registers every state is its pill in the app's tones (`Chip`, `TONE`; `ToneChip` draws a `Chip`, and keeps
   its round shape only inside a register's lines, `inRegister`: packages, package and delivery lines, report lines);
   no chip carries colours of its own (the old -100 / -300 fills were brought onto the tones).
@@ -1167,12 +1172,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`?set=<list>`) for whoever reads Settings. `/guide/codes` is gone (owner: it repeated Types & sets; it only redirects
   to `/guide#states`), and the register's codes link the same way; an address's part
   lands under the sticky top bar (`:where([id])` scroll margin, globals.css); **roles on a project** (every role an
-  organization can play on any project): tabs drawn as the Schedule's view tabs (owner; one frame, the chosen part lit
-  with the brand line under it, `?role=`), ours marked "us", one another
+  organization can play on any project, `?role=`), ours marked "us", one another
   organization plays here marked by a dot (its key shown only then), each with what it does, where approval sits, what
   it sends, what comes to it, what its verdict is worth (`lib/settings/role-word.ts` `ROLE_WORD`, read by the Control
-  room's flows too) and who plays it here; **reading a number** (one fold, the project's schemes read on one of its own
-  numbers, opening Numbering); then Do the work (the Project directory among them: who takes part, who to ask), See the
+  room's flows too) and who plays it here, as plain tabs on one line (owner: "simplistic tabs, inline", the document
+  page's); no "Reading a number" (owner: not needed, Numbering is read by everyone); then Do the work (the Project directory among them: who takes part, who to ask), See the
   whole flow for the control function, and **How it is set up**: the Settings pages the person opens, read only for
   whoever may not change them. Help repeats nothing a Settings page shows (owner: "we need no more redundancies"): what
   values a form offers, the routes, what you may do are read on their pages. No banner, no

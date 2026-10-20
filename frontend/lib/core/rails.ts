@@ -8,6 +8,8 @@ export const RAILS = [
     { rail: "rail-none", name: "No revision yet" },
     { rail: "rail-prep", name: "Being prepared" },
     { rail: "rail-review", name: "In review" },
+    { rail: "rail-issue", name: "Decided, not released yet" },
+    { rail: "rail-rejected", name: "Returned by its review" },
     { rail: "rail-released", name: "Released" },
     { rail: "rail-superseded", name: "Superseded by a newer revision" },
     { rail: "rail-void", name: "Void" },

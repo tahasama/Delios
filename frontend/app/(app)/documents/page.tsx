@@ -199,6 +199,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,
       revision: doc.revision,
       revState: latestState,
+      // The stage a supplier's document reads in (its own colour and line on Help), else none.
+      supplierStage: doc.supplier && (SUPPLIER_STAGES as readonly string[]).includes(doc.supplier) ? doc.supplier : null,
       // Asked of a supplier: read in the supplier's own set (sent, received, accepted…).
       revStateLabel: doc.supplier && (SUPPLIER_STAGES as readonly string[]).includes(doc.supplier)
         ? supplierStageName(names, doc.supplier as SupplierStage, { together, held: false })
@@ -259,6 +261,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   if (user.isInternal) codes["@lists"] = "1";
   for (const code of DOC_STATES) codes[`DOC_STATE|${code}`] = `${DOC_STATE_LABEL[code]} — ${DOC_MEANING[code].means}`;
   for (const code of REV_STATES) codes[`REV_STATE|${code}`] = `${stateName(names, code)} — ${REV_MEANING[code].means}`;
+  // A supplier's stages, read in the same column (in review and released mean what ours do).
+  const { SUPPLIER_STAGE_MEANING } = await import("@/lib/core/state-names");
+  for (const code of SUPPLIER_STAGES) if (code !== "IN_REVIEW" && code !== "RELEASED") codes[`REV_STATE|${code}`] = `${supplierStageName(names, code)} — ${SUPPLIER_STAGE_MEANING[code].means}`;
 
   const query = new URLSearchParams();
   if (q) query.set("q", q); if (state) query.set("state", state); if (discipline) query.set("discipline", discipline); if (docType) query.set("docType", docType); if (revState) query.set("rev", revState); if (statusCode) query.set("status", statusCode); if (verdictCode) query.set("verdict", verdictCode); if (supplier) query.set("supplier", supplier); if (po) query.set("po", po); if (view === "all") query.set("view", "all"); if (criticality) query.set("criticality", criticality); if (confidentiality) query.set("confidentiality", confidentiality); if (deliverable) query.set("deliverable", deliverable); if (sp.phase) query.set("phase", sp.phase);

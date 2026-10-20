@@ -72,7 +72,7 @@ export function stateName(
 export const SUPPLIER_STAGES = ["SENT", "RECEIVED", "ACCEPTED", "RETURNED_CHECK", "IN_REVIEW", "RELEASED", "RETURNED_REVIEW"] as const;
 export type SupplierStage = (typeof SUPPLIER_STAGES)[number];
 
-const SUPPLIER_STAGE_LABEL: Record<SupplierStage, string> = {
+export const SUPPLIER_STAGE_LABEL: Record<SupplierStage, string> = {
   SENT: "Sent",
   RECEIVED: "Received",
   ACCEPTED: "Accepted",
@@ -80,6 +80,17 @@ const SUPPLIER_STAGE_LABEL: Record<SupplierStage, string> = {
   IN_REVIEW: "In review",
   RELEASED: "Released & issued",
   RETURNED_REVIEW: "Returned",
+};
+
+/** What each stage of a supplier's document means, and how it gets there (Help, "The states"). */
+export const SUPPLIER_STAGE_MEANING: Record<SupplierStage, { means: string; how: string }> = {
+  SENT: { means: "Asked of the supplier, who holds it: theirs to send.", how: "On a transmittal from its package, or the register." },
+  RECEIVED: { means: "The supplier sent it; it waits for our check before it counts.", how: "Their transmittal arrives." },
+  ACCEPTED: { means: "Our check let it in: it is in the register, to send for review.", how: "Whoever checks what arrives accepts it." },
+  RETURNED_CHECK: { means: "Our check sent it back, with why: the supplier corrects it and sends it again.", how: "Whoever checks what arrives returns it." },
+  IN_REVIEW: { means: "On its review route, with its reviewers.", how: "Sent for review once accepted." },
+  RELEASED: { means: "In force: people work from it.", how: "Released after its review; with comments to take in, back with the supplier for the next revision." },
+  RETURNED_REVIEW: { means: "Its review rejected it: back with the supplier, to revise.", how: "The decider's verdict." },
 };
 
 /** Where a document asked of a supplier stands; null when it was not asked of one. */

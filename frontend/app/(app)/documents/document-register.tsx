@@ -14,6 +14,7 @@ import { sendSupplierFromRegisterAction as sendFromRegister } from "@/lib/packag
 import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
 import { Th, Td, Info } from "@/components/ui";
+import { stateLook, stateHref } from "@/lib/core/state-look";
 import { useCardHeight } from "@/components/card-height";
 import { ActionForm } from "@/components/form";
 import { setActionDocumentsAction } from "@/lib/actions/forms-links";
@@ -48,6 +49,8 @@ type RegisterRow = {
   actions: { code: string; name: string }[];
   docState: string; docStateLabel: string;
   revision: string | null; revState: string | null; revStateLabel: string;
+  /** Asked of a supplier: the stage it reads in (`SENT`, `ACCEPTED`…), coloured as its own. */
+  supplierStage?: string | null;
   verdict: string | null; verdictLabel: string | null;
   releasedFor: string | null; releasedForLabel: string | null; releasedForUse: string | null; proposedFor: string | null;
   /** Released, then put on hold for an outside approval: not for use. */
@@ -86,8 +89,6 @@ type Filters = { pick: string; q: string; terms: string[]; state: string; rev: s
 
 /** Where each kind of code is explained: the states on Help, a list's values in Types & sets (read by everyone of ours). */
 const GUIDE: Record<string, string> = {
-  DOC_STATE: "/guide#states",
-  REV_STATE: "/guide#states",
   VERDICT: "/settings/config?set=REVIEW_OUTCOMES",
   STATUS: "/settings/config?set=STATUSES",
   CRITICALITY: "/settings/config?set=CRITICALITY",
@@ -95,17 +96,10 @@ const GUIDE: Record<string, string> = {
 };
 /** A list's page in Types & sets, for a reader who opens it (`codes["@lists"]`, set for our people only). */
 const listHref = (codes: Record<string, string>, key: string) => (codes["@lists"] ? GUIDE[key] : undefined);
-/** A revision state reads in its colour, as text (owner: no pills inside registers). */
-const REV_INK: Record<string, string> = {
-  IN_PREPARATION: "text-amber-700", IN_REVIEW: "text-sky-700", RELEASED: "text-emerald-700",
-  SUPERSEDED: "text-violet-700", VOID: "text-red-700",
-};
 
-/** The rail colour per revision state: the row's state, read before any word. */
-const RAIL: Record<string, string> = {
-  NONE: "rail-none", IN_PREPARATION: "rail-prep", IN_REVIEW: "rail-review",
-  RELEASED: "rail-released", SUPERSEDED: "rail-superseded", VOID: "rail-void",
-};
+
+/** The state a row reads in: a supplier's stage when it was asked of one, else its revision's (`lib/core/state-look.ts`). */
+const stateOf = (row: { supplierStage?: string | null; revState: string | null }) => row.supplierStage ?? row.revState ?? "NONE";
 
 const ORDER_KEY = "register:columns";
 const FREEZE_KEY = "register:frozen";
@@ -598,7 +592,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           const on = selected.includes(row.id);
           const pin = on ? "bg-tint" : "bg-surface";
           return <tr key={row.id} className={on ? "[&>td]:bg-tint" : undefined}>
-            <Td className={`rail ${RAIL[row.revState ?? "NONE"] ?? "rail-none"} ${frozen ? "sticky left-0 z-1" : ""} ${pin}`}>
+            <Td className={`rail ${stateLook(stateOf(row)).rail} ${frozen ? "sticky left-0 z-1" : ""} ${pin}`}>
               <input aria-label={`Select ${row.docNumber}`} type="checkbox" checked={on} onChange={() => toggle(row.id)}
                 disabled={!!picking?.locked?.includes(row.id)} title={picking?.locked?.includes(row.id) ? "Sent to the supplier: it stays in the package" : undefined} />
             </Td>
@@ -732,7 +726,7 @@ const COLUMNS: Column[] = [
     label: "Document state",
     note: "Where the document itself stands: planned, active, superseded, withdrawn. It is about the document, not any one revision.",
     cellClass: "whitespace-nowrap",
-    cell: (row, codes) => <CodeRef code={row.docStateLabel} note={codes[`DOC_STATE|${row.docState}`]} href={GUIDE.DOC_STATE} className="meta font-sans!" />,
+    cell: (row, codes) => <CodeRef code={row.docStateLabel} note={codes[`DOC_STATE|${row.docState}`]} href={stateHref(row.docState)} className="meta font-sans!" />,
   },
   {
     key: "rev", sort: "rev",
@@ -747,7 +741,7 @@ const COLUMNS: Column[] = [
     cellClass: "whitespace-nowrap",
     cell: (row, codes) => (
       <>
-        <CodeRef code={row.revStateLabel} note={codes[`REV_STATE|${row.revState ?? ""}`]} href={row.revState ? GUIDE.REV_STATE : undefined} className={`meta font-sans! ${REV_INK[row.revState ?? ""] ?? ""}`} />
+        <CodeRef code={row.revStateLabel} note={codes[`REV_STATE|${stateOf(row)}`]} href={stateHref(stateOf(row))} className={`meta font-sans! ${stateLook(stateOf(row)).ink}`} />
         {/* Released, and nobody asked for it to be sent. It is in use; nobody
             has been told, including anyone whose approval it may still need. */}
       </>
