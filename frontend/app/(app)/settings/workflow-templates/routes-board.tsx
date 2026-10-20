@@ -99,10 +99,11 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
       </section>
 
       {editable && adding ? (
-        <section className="register register-sheet register-sheet-open">
-          <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-            <span className="stencil mr-1 text-slate-500">New review route</span>
-            <span className="text-[11px] text-slate-500">offered on Send for review once added</span>
+        // The route being made stands apart from those in use: its own head, a brand ring.
+        <section className="register register-sheet register-sheet-open ring-2 ring-brand">
+          <div className="flex flex-wrap items-center gap-2 border-b border-line bg-brand px-5 py-3 sm:px-6">
+            <span className="text-[14px] font-semibold text-white">New review route</span>
+            <span className="text-[11px] text-white/80">offered on Send for review once added</span>
           </div>
           {builder()}
         </section>
@@ -112,6 +113,13 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
         <section className="register register-sheet register-sheet-open">
           <p className="px-5 py-4 text-xs leading-5 text-slate-600 sm:px-6">No review route yet: nobody can send a document for review until one is added.</p>
         </section>
+      ) : null}
+
+      {templates.length ? (
+        <p className="flex items-center gap-2 px-1 pt-2">
+          <span className="stencil text-slate-500">Routes in use</span>
+          <span className="text-[11px] text-slate-500">{templates.length} · offered on Send for review where they take the documents</span>
+        </p>
       ) : null}
 
       {templates.map((t) => {
@@ -126,12 +134,13 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
         };
         const unserved = (codes: string[]) => codes.map(typeName).join(", ");
         return (
-          <section key={t.id} id={`route-${t.id}`} className="register register-sheet register-sheet-open scroll-mt-20">
+          <section key={t.id} id={`route-${t.id}`} className={`register register-sheet register-sheet-open scroll-mt-20 ${open ? "ring-2 ring-brand" : ""}`}>
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-3 sm:px-6">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2">
                   <span className="text-[14px] font-semibold text-slate-900">{t.name}</span>
                   {t.isDefault ? <ToneChip tone="done">offered first</ToneChip> : null}
+                  {open ? <span className="stencil text-brand-ink">being changed</span> : null}
                 </p>
                 {t.description ? <p className="mt-0.5 text-xs leading-5 text-slate-600">{t.description}</p> : null}
               </div>

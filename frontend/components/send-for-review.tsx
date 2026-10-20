@@ -128,6 +128,9 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
     <fieldset className={`flex w-64 shrink-0 flex-col rounded-xl border p-2.5 ${approval ? "border-brand-line/30 bg-tint-soft" : "border-line bg-surface"}`}>
       <legend className="sr-only">Step {index + 1}</legend>
       <input type="hidden" name={`stepShown_${index}`} value="1" />
+      {/* Another organization answering as itself names nobody; every other step names at least one person. */}
+      {step.party?.asItself ? <input type="hidden" name={`stepItself_${index}`} value="1" /> : null}
+      <input type="hidden" name={`stepTitle_${index}`} value={step.title} />
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400" title={approval ? "This step's verdict binds; a verdict that proceeds is the release approval" : "Advice for the decider"}>Step {index + 1} · {approval ? "Decides" : "Advises"}</p>
       <p className="text-sm font-semibold text-slate-800">{step.title}</p>
       <p className="mb-2 text-[11px] text-slate-500">{MODE[step.mode] ?? step.mode}{step.mode === "SERIAL" ? " — in the order listed" : ""}</p>

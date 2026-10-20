@@ -163,6 +163,18 @@ public sealed partial class ReviewService
         return step.Participants.FirstOrDefault(p => from.Contains(p.UserId));
     }
 
+    /// <summary>
+    /// The refusal for a revision whose files are not all through the virus check, said by what happened (owner: "what
+    /// does it mean"): still being checked, set aside, or no file yet.
+    /// </summary>
+    internal static IResult FilesNotReady(Revision revision) => Problems.Conflict("FILES_NOT_READY", revision.FilesState switch
+    {
+        FilesStates.Processing => $"Rev {revision.Value}'s files are still being checked for viruses, which takes about a minute: try again shortly. If it stays so, the virus check is not running (the worker or the scanner): whoever runs the app restarts it.",
+        FilesStates.Rejected => $"A file of rev {revision.Value} failed the virus check and was set aside: replace it in Edit rev {revision.Value}, then try again.",
+        FilesStates.None => $"Rev {revision.Value} has no files yet: add its PDF in Edit rev {revision.Value}, then try again.",
+        _ => $"Rev {revision.Value}'s files have not all passed the virus check yet.",
+    }, new { filesState = revision.FilesState });
+
     /// <summary>How severe a verdict is: not proceeding (rejected) 2, accepted with comments to take in 1, accepted or for information 0.</summary>
     private static int Severity(Catalog catalog, string set, string verdict) =>
         !Proceeds(catalog, set, verdict) ? 2

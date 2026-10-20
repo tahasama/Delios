@@ -39,8 +39,7 @@ public sealed partial class ReviewService
         // its scan, or on no readable copy at all, is worth less than no verdict.
         if (revision.FilesState != FilesStates.Ready)
         {
-            return Fail(Problems.Conflict("FILES_NOT_READY", "The revision's files have not all passed scanning.",
-                new { filesState = revision.FilesState }));
+            return Fail(FilesNotReady(revision));
         }
         if (!revision.Files.Any(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission))
         {
@@ -70,7 +69,11 @@ public sealed partial class ReviewService
         {
             // A step another organization answers as itself (one of ours records it) has nobody to choose.
             var byProxy = route.Steps[i].PartyCode is { } partyCode && parties.GetValueOrDefault(partyCode)?.Participation == Participations.ByProxy;
-            if (byProxy || chosen[i] is not { Length: > 0 } ids) continue;
+            if (byProxy) continue;
+            // The sender names who answers each step (owner): a step left with nobody is refused, never filled behind them.
+            if (chosen[i] is not { Length: > 0 } ids)
+                return Fail(Problems.Invalid("STEP_PEOPLE_REQUIRED", $"Name who answers step {i + 1} ({route.Steps[i].Title}): nobody is on it.",
+                    new { step = i + 1 }));
             route.Steps[i].FunctionCode = null;
             route.Steps[i].UserIds = ids.Distinct().ToArray();
             route.Steps[i].FromMatrix = false;
@@ -83,13 +86,16 @@ public sealed partial class ReviewService
             var step = route.Steps[i];
             if (!step.FromMatrix) continue;
             var party = step.PartyCode is { } code ? parties.GetValueOrDefault(code) : null;
-            var matrix = await (from m in db.Memberships.AsNoTracking()
-                                join u in db.Users.AsNoTracking() on m.UserId equals u.Id
-                                where m.ProjectId == access.Project.Id && m.Active && m.Function!.Active && u.Active
-                                    && document.Discipline != null && m.Department == document.Discipline
-                                    && (party == null ? (u.PartyId == null || u.Party!.IsInternal) : u.PartyId == party.Id)
-                                    && (step.FunctionCode == null || m.Function.Code == step.FunctionCode)
-                                select u.Id).Distinct().ToListAsync(cancellationToken);
+            // The matrix: whoever may review (or, on a deciding step, approve) this document, by their function's rules
+            // for its facts, narrowed by the organization and function the step names.
+            var verb = step.Decides || i == route.Steps.Count - 1 ? Verbs.Approve : Verbs.Review;
+            var members = await db.Memberships.AsNoTracking().Include(m => m.Function!).ThenInclude(f => f.Rules)
+                .Where(m => m.ProjectId == access.Project.Id && m.Active && m.Function!.Active
+                    && db.Users.Any(u => u.Id == m.UserId && u.Active
+                        && (party == null ? (u.PartyId == null || u.Party!.IsInternal) : u.PartyId == party.Id))
+                    && (step.FunctionCode == null || m.Function.Code == step.FunctionCode))
+                .ToListAsync(cancellationToken);
+            var matrix = members.Where(m => Allows(m.Function!, access.Project, verb, document.Facts)).Select(m => m.UserId).Distinct();
             step.UserIds = [.. step.UserIds.Concat(matrix).Distinct()];
             step.FunctionCode = step.UserIds.Length > 0 ? null : step.FunctionCode;
         }
@@ -123,7 +129,7 @@ public sealed partial class ReviewService
             {
                 if (step.FromMatrix)
                     return Fail(Problems.Invalid("STEP_HAS_NO_HOLDER",
-                        $"The distribution matrix gives nobody {(party is null ? "of ours" : $"of {party.Name}")} for {document.Discipline ?? "this document's discipline"} on step {i + 1} ({step.Title}): choose its people.",
+                        $"Nobody {(party is null ? "of ours" : $"of {party.Name}")} may {(step.Decides || i == route.Steps.Count - 1 ? "approve" : "review")} this document under the matrix (Who may do what), so step {i + 1} ({step.Title}) has nobody to recommend: choose its people.",
                         new { step = i + 1, discipline = document.Discipline }));
                 return Fail(Problems.Invalid("STEP_HAS_NO_HOLDER",
                     party is null ? step.FunctionCode is null

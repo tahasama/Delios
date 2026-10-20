@@ -932,7 +932,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the organization (none: ours), the function, the people (a search field, never pills), each narrowing the others, and
   the route's discipline narrowing the people; or "Recommended for each document" (`RouteStep.FromMatrix`): the
   distribution matrix's people for each document's discipline, narrowed by the choices, proposed on Send for review and
-  confirmed by the sender (taken by the backend when the sender chose nobody). Another organization's people may be
+  confirmed by the sender. "The matrix" is Who may do what: whoever may review the document (approve it, on a step that
+  decides) by their function's rules for its facts, its discipline first; never a person's department alone (which
+  recommended nobody). On Send for review every step names at least one person (owner; backend STEP_PEOPLE_REQUIRED,
+  the form says which step), but an organization answering as itself; a step is no longer filled behind the sender. Another organization's people may be
   named (they answer here); one that answers as itself (recorded by one of ours) names nobody (STEP_PARTY_AS_ITSELF).
 - A route's working days are only filled in by default (owner, never limited or enforced): five in all, each decider
   given more than each adviser (2 + 3); days typed by hand are kept.
@@ -943,6 +946,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A form whose submit sits outside it (`ActionForm` with `id`, `hideSubmit`, a button `form=…`) has an id used nowhere
   else on the page, and no hidden field named "id" (it hides the form's own id): either leaves the button without its
   form and the save silently does nothing (the route form, `route-form-<id>`, `routeId`; an organization, `partyId`).
+- The route form (owner: "everything blended in one big chunk") stands apart from the routes in use: a brand head and
+  ring, three numbered parts (1 The route, 2 Which documents take it, 3 Its steps), the step opened set up under its own
+  band "Setting up step N" with a brand rail (what is chosen there is that step's only), then "Routes in use"; a route
+  being changed is ringed and marked "being changed".
+- A revision whose files are not through the virus check is refused in plain words by what happened (`FilesNotReady`):
+  still being checked (about a minute; if it stays, the worker or scanner is not running), set aside (replace it), or
+  no file yet.
 - One status chosen on the last step: every document the route accepts is released at it; several: the decider chooses.
 - On the route form each step says what it does, "Advises · Decides" (a choice on the step opened), the last always
   "Decides" (a route always ends with a decision). "Which documents take it" reads "Deliverable type", never "Produced by".

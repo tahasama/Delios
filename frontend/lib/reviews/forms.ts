@@ -90,9 +90,16 @@ export async function sendForReviewAction(_prev: Result | undefined, formData: F
   const routeId = text(formData, "templateId");
   if (!revisionIds.length) return { error: "Nothing to send." };
   if (!routeId) return { error: "Choose a route." };
-  // The people the sender kept or chose on each step; a step left empty keeps the route's own.
+  // The people the sender kept or chose on each step: every step names at least one (owner), but another
+  // organization answering as itself (one of ours records its answer).
   const people: string[][] = [];
-  for (let i = 0; formData.has(`stepShown_${i}`); i++) people.push(formData.getAll(`participants_${i}`).map(String).filter(Boolean));
+  const empty: string[] = [];
+  for (let i = 0; formData.has(`stepShown_${i}`); i++) {
+    const chosen = formData.getAll(`participants_${i}`).map(String).filter(Boolean);
+    if (!chosen.length && !formData.has(`stepItself_${i}`)) empty.push(`step ${i + 1} (${text(formData, `stepTitle_${i}`) || "untitled"})`);
+    people.push(chosen);
+  }
+  if (empty.length) return { error: `Name who answers ${empty.join(" and ")}: nobody is on ${empty.length > 1 ? "them" : "it"}.` };
   // One key per press of Send: a revision sent again later is a new review, not a replay of the old one.
   // Copied in (cc): told it went out for review and of what comes of it, never asked to answer.
   const copies = [...new Set(formData.getAll("copyUsers").map(String).filter(Boolean))];

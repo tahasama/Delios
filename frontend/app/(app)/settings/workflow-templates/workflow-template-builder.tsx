@@ -156,7 +156,8 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
       <input type="hidden" name="steps" value={JSON.stringify(steps)} />
       <input type="hidden" name="classes" value={allClasses ? "*" : JSON.stringify([scope])} />
 
-      {/* ── What it is ─────────────────────────────────────────────────── */}
+      {/* ── 1 · The route itself ────────────────────────────────────────── */}
+      <Band n={1} title="The route" words="what it is called, and the sets its steps answer from: it holds for every step" />
       <div className="grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-4 sm:px-6 md:grid-cols-3">
         <Field label="Name" required hint="what it covers — who decides it">
           <input name="name" required defaultValue={name} className={inputCls} placeholder="Engineering drawings — lead engineer decides" />
@@ -185,7 +186,8 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
 
       {/* ── Which documents take it: it narrows who answers, and what may be sent on it ─── */}
       <div className="flex flex-wrap items-center gap-1.5 border-y border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-        <span className="stencil mr-1 text-slate-500">Which documents take it</span>
+        <span className="mr-1 grid h-5 w-5 place-items-center rounded-full bg-brand text-[11px] font-semibold text-white">2</span>
+        <span className="stencil mr-1 text-slate-600">Which documents take it</span>
         <span className="text-[11px] text-slate-500">no other document can be sent on it; its discipline narrows the people of its steps</span>
         <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs text-slate-700">
           <input type="checkbox" checked={allClasses} onChange={(e) => setAllClasses(e.target.checked)} /> All documents
@@ -203,7 +205,8 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
 
       {/* ── The steps ──────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-1.5 border-y border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-        <span className="stencil mr-1 text-slate-500">Its steps</span>
+        <span className="mr-1 grid h-5 w-5 place-items-center rounded-full bg-brand text-[11px] font-semibold text-white">3</span>
+        <span className="stencil mr-1 text-slate-600">Its steps</span>
         <span className="text-[11px] text-slate-500">
           left to right; each advises or decides, the last always decides; the most severe verdict stands. {total ? `${total} working days when every step uses its time.` : ""}
         </span>
@@ -215,7 +218,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
             const who = whoOf(step);
             return (
               <div key={index} className="flex items-stretch gap-1">
-                <div className={cn("flex w-56 shrink-0 flex-col rounded-md ring-1 transition", open === index ? "bg-surface ring-2 ring-brand-line" : "bg-surface ring-line hover:ring-line-strong")}>
+                <div className={cn("flex w-56 shrink-0 flex-col rounded-md ring-1 transition", open === index ? "bg-surface ring-2 ring-brand" : "bg-surface ring-line hover:ring-line-strong")}>
                   <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
                     <span className="text-[11px] font-semibold text-slate-500">Step {index + 1}</span>
                     <ToneChip tone={step.decides ? "done" : "moving"}>{step.decides ? "decides" : "advises"}</ToneChip>
@@ -243,7 +246,15 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
 
       {/* ── The step chosen ────────────────────────────────────────────── */}
       {open !== null && chosen ? (
-        <div className="space-y-4 border-t border-line px-5 py-4 sm:px-6">
+        // The step opened, set up under the steps: its own band names it, and a brand rail ties it to its box, so what
+        // is said here is this step's alone (owner: it was not obvious it was a step's, not the route's).
+        <div className="border-t border-line border-l-4 border-l-brand bg-tint-soft/60">
+        <p className="flex flex-wrap items-baseline gap-2 border-b border-line px-5 py-2.5 sm:px-6">
+          <span className="stencil text-brand-ink">Setting up step {open + 1}</span>
+          <span className="text-[13px] font-semibold text-slate-900">{chosen.title || (chosen.decides ? "Decision" : `Review ${open + 1}`)}</span>
+          <span className="text-[11px] text-slate-500">what is chosen here is this step&rsquo;s only; choose another step&rsquo;s box above to set it up</span>
+        </p>
+        <div className="space-y-4 px-5 py-4 sm:px-6">
           <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-[1fr_auto_1fr_auto]">
             <Field label={`Step ${open + 1}`} hint="its name">
               <input value={chosen.title ?? ""} onChange={(e) => update(open, { title: e.target.value })} className={inputCls}
@@ -312,7 +323,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
               <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-[13px] text-slate-700">
                 <SwitchControl checked={!!chosen.fromMatrix} onChange={(on) => update(open, { fromMatrix: on })} />
                 Recommended for each document
-                <span className="text-[11px] text-slate-500">the distribution matrix proposes whoever answers for its discipline, narrowed by the choices above; the sender confirms</span>
+                <span className="text-[11px] text-slate-500">proposes whoever may review it (or approve it, on a step that decides) under Who may do what, its discipline first, narrowed by the choices above; the sender confirms</span>
               </label>
             ) : null}
           </div>
@@ -343,6 +354,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
             <p className="text-[11px] text-slate-500">It gives a verdict; the status is the last deciding step&rsquo;s.</p>
           ) : null}
         </div>
+        </div>
       ) : null}
     </ActionForm>
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
@@ -350,6 +362,17 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
       <button type="submit" form={formId} data-on="true" className="ask">{id ? "Save" : "Add the route"}</button>
     </div>
     </>
+  );
+}
+
+/** A numbered part of the route form, so the route's own answers, the documents it takes and its steps read apart. */
+function Band({ n, title, words }: { n: number; title: string; words: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+      <span className="mr-1 grid h-5 w-5 place-items-center rounded-full bg-brand text-[11px] font-semibold text-white">{n}</span>
+      <span className="stencil mr-1 text-slate-600">{title}</span>
+      <span className="text-[11px] text-slate-500">{words}</span>
+    </div>
   );
 }
 

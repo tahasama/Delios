@@ -102,10 +102,13 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
         proposed: (() => {
           const named = pool.filter((p) => p.functionId === s.functionCode || (s.userIds ?? []).includes(p.id))
             .map((p) => ({ id: p.id, why: p.functionId === s.functionCode ? `${p.functionName} · recommended by the route` : "recommended · named on the route" }));
+          // The matrix: whoever may review (or approve) every one of these documents (the pool, read from Who may do
+          // what for each document's facts), narrowed by the step's function; those of its discipline first.
           const disciplines = new Set(docs.map((d) => d.discipline).filter(Boolean));
-          const matrix = pool.filter((p) => p.department && disciplines.has(p.department) && (!s.functionCode || p.functionId === s.functionCode))
+          const matrix = pool.filter((p) => !s.functionCode || p.functionId === s.functionCode)
             .filter((p) => !named.some((n) => n.id === p.id))
-            .map((p) => ({ id: p.id, why: `${p.functionName} · recommended by the matrix` }));
+            .sort((a, b) => Number(!!b.department && disciplines.has(b.department)) - Number(!!a.department && disciplines.has(a.department)))
+            .map((p) => ({ id: p.id, why: `${p.functionName} · recommended by the matrix${p.department && disciplines.has(p.department) ? `, ${p.department}` : ""}` }));
           if (s.fromMatrix) return [...named.filter((n) => (s.userIds ?? []).includes(n.id)), ...matrix];
           if (named.length || s.functionCode || (s.userIds ?? []).length) return named;
           return matrix;

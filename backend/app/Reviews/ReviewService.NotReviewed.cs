@@ -45,7 +45,7 @@ public sealed partial class ReviewService
         }
         if (revision.FilesState != FilesStates.Ready)
         {
-            return Fail(Problems.Conflict("FILES_NOT_READY", "The revision's files have not all passed scanning.", new { filesState = revision.FilesState }));
+            return Fail(FilesNotReady(revision));
         }
         if (!revision.Files.Any(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission))
         {
