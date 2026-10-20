@@ -1138,11 +1138,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 
 ### Help & orientation
 - `/guide` (owner, after the critique), in the reference style: a plate with jumps (the colours, the codes, who
-  approves, where things are done), the colour key drawn as the lists draw it (each area a small list, rows with the
-  real rail, widening on hover), the four kinds of status side by side with this organization's own values (state
-  names, Review outcomes, statuses; full page `/guide/codes`), who approves (ours first, then every role by what our
-  verdict is worth under it, `lib/settings/role-word.ts` `ROLE_WORD`, the same the Control room's flows read; a name
-  opens what the role does), then where each thing is done as one line each in three sheets (everyone; the
+  approves, where things are done), the colour key (`rails.ts`), the codes (`/guide/codes`), the roles with where
+  approval sits (the project's marked), then where each thing is done as one line each in three sheets (everyone; the
   control function; administrators, the organization's cards opening the organization's Settings). No banner, no
   figures (Home has them), no grid of cards, no counts; never a link to a page that does not exist.
 
