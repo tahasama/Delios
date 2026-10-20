@@ -2,12 +2,16 @@ import Link from "next/link";
 import { RAILS } from "@/lib/core/rails";
 import { requireScope } from "@/lib/core/scope";
 import {
-  ArrowLeftRight, Boxes, CalendarRange, ClipboardCheck, FileText, FolderKanban, Import,
+  ArrowLeftRight, Boxes, ChevronRight, CalendarRange, ClipboardCheck, FileText, FolderKanban, Import,
   ListChecks, Network, Settings, ShieldCheck, Tags, Users, Workflow,
 } from "lucide-react";
 import { isAdmin, isController } from "@/lib/core/auth";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { cn } from "@/lib/core/utils";
+import { getActiveSet } from "@/lib/settings/config";
+import { stateNames, stateName } from "@/lib/core/state-names";
+import { DOC_STATE_LABEL } from "@/lib/core/standard";
+import { ROLE_WORD, WORD_GROUPS } from "@/lib/settings/role-word";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Help & orientation" };
@@ -51,6 +55,18 @@ export default async function GuidePage() {
   const canConfigure = isAdmin(user);
   const roleOptions = (await contractRoleOptions()).filter((r) => r.code !== "GENERIC");
   const ours = roleOptions.find((r) => r.code === project.role);
+  const [outcomes, statuses, names] = await Promise.all([getActiveSet("REVIEW_OUTCOMES").catch(() => []), getActiveSet("STATUSES").catch(() => []), stateNames()]);
+  // The four things called "status", each with this organization's own values where it publishes them.
+  const kinds = [
+    { title: "Where the document stands", about: "The document number as a whole.", values: (["PLANNED", "ACTIVE", "WITHDRAWN", "CANCELLED"] as const).map((one) => DOC_STATE_LABEL[one]),
+      who: "moves by itself; the control function ends it" },
+    { title: "Where a revision stands", about: "One revision, A, B, C…", values: ["IN_PREPARATION", "IN_REVIEW", "RELEASED", "SUPERSEDED"].map((one) => stateName(names, one)),
+      who: "moves as the work moves" },
+    { title: "What the review decided", about: "The decision on a revision in review, one of four meanings.", values: outcomes.map((o) => o.code),
+      who: "whoever decides on the route" },
+    { title: "What it is issued for", about: "What a released revision may be used for.", values: statuses.map((o) => o.code),
+      who: "the decider grants it; it is released at it" },
+  ];
 
   const jumps = [
     { href: "#colours", label: "The colours" },
@@ -80,16 +96,14 @@ export default async function GuidePage() {
           <span className="stencil mr-1 text-slate-500">What the colours say</span>
           <span className="text-[11px] text-slate-500">the line down the side of a row or a card: one colour per state, close states in close colours</span>
         </div>
-        <div className="grid grid-cols-1 gap-x-8 gap-y-4 px-5 py-4 sm:grid-cols-2 sm:px-6 xl:grid-cols-3">
+        {/* Each area as the lists draw it: rows, the real rail down the side (register .rail), widening on hover. */}
+        <div className="grid grid-cols-1 gap-4 px-5 py-4 sm:grid-cols-2 sm:px-6 xl:grid-cols-3">
           {RAILS.map((group) => (
-            <div key={group.area}>
-              <p className="stencil mb-1.5 text-slate-500">{group.area}</p>
-              <ul className="space-y-1">
+            <div key={group.area} className="overflow-hidden rounded-md ring-1 ring-line">
+              <p className="stencil border-b border-line bg-tint-soft px-3 py-1.5 text-slate-500">{group.area}</p>
+              <ul className="divide-y divide-line">
                 {group.items.map((one) => (
-                  <li key={one.rail + one.name} className={`${one.rail} flex items-center gap-2.5 text-xs text-slate-700`}>
-                    <span className="h-4 w-1 shrink-0 rounded-full bg-(--rail)" aria-hidden />
-                    {one.name}
-                  </li>
+                  <li key={one.rail + one.name} className={`key-row rail ${one.rail} py-1.5 pr-3 text-xs text-slate-700`}>{one.name}</li>
                 ))}
               </ul>
             </div>
@@ -100,12 +114,23 @@ export default async function GuidePage() {
       <section id="codes" className="register register-sheet register-sheet-open scroll-mt-24">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">The codes</span>
-          <span className="text-[11px] text-slate-500">Planned, Released, IFC, C1…: four kinds of status</span>
+          <span className="text-[11px] text-slate-500">four different things are called “status”: each answers its own question</span>
         </div>
-        <p className="px-5 py-3.5 text-xs leading-5 text-slate-600 sm:px-6">
-          Where a document stands, what it is issued for, what a review decided, and what a transmittal is for: who decides each, and how one
-          leads to the next.{" "}
-          <Link href="/guide/codes" className="font-semibold text-link hover:underline">Read the codes</Link>
+        <dl className="grid grid-cols-1 divide-y divide-line sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
+          {kinds.map((one) => (
+            <div key={one.title} className="space-y-1.5 px-5 py-3.5 sm:px-6">
+              <dt className="text-[13px] font-semibold text-slate-900">{one.title}</dt>
+              <dd className="text-xs leading-5 text-slate-600">{one.about}</dd>
+              <dd className="flex flex-wrap gap-1">
+                {one.values.length ? one.values.map((v) => <span key={v} className="code-chip">{v}</span>) : <span className="text-[11px] text-slate-400">none published yet</span>}
+              </dd>
+              <dd className="text-[11px] leading-4 text-slate-500"><span className="font-semibold text-slate-600">Who:</span> {one.who}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="border-t border-line px-5 py-2.5 text-[11px] text-slate-500 sm:px-6">
+          Each in full, with what it means and how one leads to the next:{" "}
+          <Link href="/guide/codes" className="font-semibold text-link hover:underline">States and codes</Link>
         </p>
       </section>
 
@@ -113,25 +138,45 @@ export default async function GuidePage() {
       <section id="roles" className="register register-sheet register-sheet-open scroll-mt-24">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">Who approves</span>
-          <span className="text-[11px] text-slate-500">what our organization is contracted to do decides where approval sits, and the matrix a project starts from</span>
+          <span className="text-[11px] text-slate-500">what we are contracted to do decides what our verdict is worth</span>
         </div>
-        <ul className="divide-y divide-line">
-          {roleOptions.map((r) => {
-            const here = r.code === project.role;
+        {ours ? (
+          <div className="border-b border-line bg-tint-soft px-5 py-4 sm:px-6">
+            <p className="text-sm font-semibold text-slate-900">On {project.code} we are {ours.label}</p>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">{ours.description}</p>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-700"><span className="font-semibold">Approval:</span> {ours.approval}</p>
+          </div>
+        ) : null}
+        {/* Every role, by what our verdict is worth under it (ROLE_WORD, as the Control room draws it); a name opens what the role does. */}
+        <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+          {WORD_GROUPS.map((g) => {
+            const roles = roleOptions.filter((r) => (ROLE_WORD[r.code]?.ours ?? "final") === g.key);
             return (
-              <li key={r.code} className={cn("grid grid-cols-1 gap-x-6 gap-y-1 px-5 py-3 text-xs leading-5 sm:px-6 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]", here && "bg-tint-soft")}>
-                <p className="font-semibold text-slate-900">
-                  {r.label}
-                  {here ? <span className="ml-2 text-[11px] font-semibold text-link">{project.code}</span> : null}
-                </p>
-                <div>
-                  <p className="text-slate-600">{r.description}</p>
-                  <p className="text-slate-500"><span className="font-semibold text-slate-700">Approval:</span> {r.approval}</p>
-                </div>
-              </li>
+              <div key={g.key} className="px-5 py-3.5 sm:px-6">
+                <p className="text-[13px] font-semibold text-slate-900">{g.title}</p>
+                <p className="mb-2 text-[11px] text-slate-500">{g.said}</p>
+                <ul className="space-y-1.5">
+                  {roles.map((r) => (
+                    <li key={r.code}>
+                      <details className="group">
+                        <summary className={cn("flex cursor-pointer list-none items-baseline gap-1.5 text-xs [&::-webkit-details-marker]:hidden",
+                          r.code === project.role ? "font-semibold text-link" : "text-slate-800")}>
+                          <ChevronRight aria-hidden className="h-3 w-3 shrink-0 translate-y-0.5 text-slate-400 transition-transform duration-150 ease-out group-open:rotate-90" />
+                          <span>{r.label}{r.code === project.role ? <span className="ml-1.5 text-[11px]">· {project.code}</span> : null}</span>
+                        </summary>
+                        <div className="mt-1 space-y-1 pl-4.5 text-xs leading-5">
+                          <p className="text-slate-600">{r.description}</p>
+                          <p className="text-slate-500"><span className="font-semibold text-slate-700">Approval:</span> {r.approval}</p>
+                          {ROLE_WORD[r.code]?.decider ? <p className="text-slate-500"><span className="font-semibold text-slate-700">Decides after us:</span> {ROLE_WORD[r.code]!.decider}</p> : null}
+                        </div>
+                      </details>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             );
           })}
-        </ul>
+        </div>
         {canConfigure ? (
           <p className="border-t border-line px-5 py-2.5 text-[11px] leading-4 text-slate-500 sm:px-6">
             A role your contracts use that is not here is added to Contract roles in the organization&rsquo;s{" "}
