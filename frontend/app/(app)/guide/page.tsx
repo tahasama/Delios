@@ -2,11 +2,12 @@ import Link from "next/link";
 import { RAILS } from "@/lib/core/rails";
 import { requireScope } from "@/lib/core/scope";
 import {
-  ArrowLeftRight, Boxes, ChevronRight, CalendarRange, ClipboardCheck, FileText, FolderKanban, Import,
+  ArrowLeftRight, Boxes, CalendarRange, ClipboardCheck, FileText, FolderKanban, Import,
   ListChecks, Network, Settings, ShieldCheck, Tags, Users, Workflow,
 } from "lucide-react";
 import { isAdmin, isController } from "@/lib/core/auth";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
+import { cn } from "@/lib/core/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Help & orientation" };
@@ -36,14 +37,6 @@ const SETUP: Place[] = [
   { href: "/settings/workflow-templates", title: "Review routes", text: "Each route, its steps, who answers each, and the outcomes it decides with.", icon: Workflow },
   { href: "/settings/parties", title: "Organizations", text: "Who takes part in the project, their role with us, and the function their people get.", icon: Network },
   { href: "/settings/users", title: "People & access", text: "Who is on the project, in which function and department, and how someone joins.", icon: Users },
-];
-
-/** The four things called "status" (in full: /guide/codes), each with the question it answers and who moves it. */
-const STATUS_KINDS = [
-  { title: "Where the document stands", answers: "The document as a whole: planned, active, withdrawn or cancelled.", who: "moves by itself; the control function or its registrar ends it" },
-  { title: "Where a revision stands", answers: "One revision, A, B, C…: being prepared, in review, released, superseded.", who: "moves as the work moves" },
-  { title: "What the review decided", answers: "The verdict on a revision in review, from the organization's review outcomes.", who: "whoever decides on the route; several steps may, the most severe verdict stands" },
-  { title: "What it is issued for", answers: "What a released revision may be used for: IFC, IFR…", who: "the decider grants it; the revision is released at it" },
 ];
 
 /**
@@ -88,13 +81,13 @@ export default async function GuidePage() {
           <span className="text-[11px] text-slate-500">the line down the side of a row or a card: one colour per state, close states in close colours</span>
         </div>
         <div className="grid grid-cols-1 gap-x-8 gap-y-4 px-5 py-4 sm:grid-cols-2 sm:px-6 xl:grid-cols-3">
-          {RAILS.filter((group) => group.area !== "Audit trail" || canControl || canConfigure).map((group) => (
+          {RAILS.map((group) => (
             <div key={group.area}>
               <p className="stencil mb-1.5 text-slate-500">{group.area}</p>
-              <ul className="space-y-0.5">
+              <ul className="space-y-1">
                 {group.items.map((one) => (
-                  // The line down the side, as the lists draw it (register .rail), not a mark beside the words.
-                  <li key={one.rail + one.name} className={`rail ${one.rail} py-0.5 text-xs text-slate-700`}>
+                  <li key={one.rail + one.name} className={`${one.rail} flex items-center gap-2.5 text-xs text-slate-700`}>
+                    <span className="h-4 w-1 shrink-0 rounded-full bg-(--rail)" aria-hidden />
                     {one.name}
                   </li>
                 ))}
@@ -107,19 +100,11 @@ export default async function GuidePage() {
       <section id="codes" className="register register-sheet register-sheet-open scroll-mt-24">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">The codes</span>
-          <span className="text-[11px] text-slate-500">four different things are called “status”; each answers its own question</span>
+          <span className="text-[11px] text-slate-500">Planned, Released, IFC, C1…: four kinds of status</span>
         </div>
-        <ul className="divide-y divide-line">
-          {STATUS_KINDS.map((one) => (
-            <li key={one.title} className="grid grid-cols-1 gap-x-6 gap-y-0.5 px-5 py-2.5 text-xs leading-5 sm:px-6 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_minmax(0,16rem)]">
-              <p className="font-semibold text-slate-900">{one.title}</p>
-              <p className="text-slate-600">{one.answers}</p>
-              <p className="text-slate-500"><span className="font-semibold text-slate-700">Who:</span> {one.who}</p>
-            </li>
-          ))}
-        </ul>
-        <p className="border-t border-line px-5 py-2.5 text-[11px] text-slate-500 sm:px-6">
-          Each with its values and what they mean, and how one leads to the next:{" "}
+        <p className="px-5 py-3.5 text-xs leading-5 text-slate-600 sm:px-6">
+          Where a document stands, what it is issued for, what a review decided, and what a transmittal is for: who decides each, and how one
+          leads to the next.{" "}
           <Link href="/guide/codes" className="font-semibold text-link hover:underline">Read the codes</Link>
         </p>
       </section>
@@ -128,29 +113,24 @@ export default async function GuidePage() {
       <section id="roles" className="register register-sheet register-sheet-open scroll-mt-24">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">Who approves</span>
-          <span className="text-[11px] text-slate-500">what we are contracted to do decides where approval sits, and the matrix a project starts from</span>
+          <span className="text-[11px] text-slate-500">what our organization is contracted to do decides where approval sits, and the matrix a project starts from</span>
         </div>
-        <p className="border-b border-line px-5 py-3.5 text-[13px] leading-6 text-slate-800 sm:px-6">
-          {ours
-            ? <>On {project.code} we are <strong className="font-semibold">{ours.label}</strong>. Approval: {ours.approval}</>
-            : <>{project.code} does not say what we are contracted to do, so where approval sits is not known here.</>}
-        </p>
-        {/* The other roles, one line each; what each does folded under its name. */}
         <ul className="divide-y divide-line">
-          {roleOptions.filter((r) => r.code !== project.role).map((r) => (
-            <li key={r.code} className="px-5 py-2 text-xs leading-5 sm:px-6">
-              <details className="group">
-                <summary className="grid cursor-pointer list-none grid-cols-1 gap-x-6 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] [&::-webkit-details-marker]:hidden">
-                  <span className="flex items-baseline gap-1.5 font-semibold text-slate-900">
-                    <ChevronRight aria-hidden className="h-3 w-3 shrink-0 translate-y-0.5 text-slate-400 group-open:rotate-90" />
-                    {r.label}
-                  </span>
-                  <span className="pl-4.5 text-slate-600 md:pl-0">{r.approval}</span>
-                </summary>
-                <p className="mt-1 pl-4.5 text-slate-500 md:pl-[calc(16rem+1.5rem)]">{r.description}</p>
-              </details>
-            </li>
-          ))}
+          {roleOptions.map((r) => {
+            const here = r.code === project.role;
+            return (
+              <li key={r.code} className={cn("grid grid-cols-1 gap-x-6 gap-y-1 px-5 py-3 text-xs leading-5 sm:px-6 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]", here && "bg-tint-soft")}>
+                <p className="font-semibold text-slate-900">
+                  {r.label}
+                  {here ? <span className="ml-2 text-[11px] font-semibold text-link">{project.code}</span> : null}
+                </p>
+                <div>
+                  <p className="text-slate-600">{r.description}</p>
+                  <p className="text-slate-500"><span className="font-semibold text-slate-700">Approval:</span> {r.approval}</p>
+                </div>
+              </li>
+            );
+          })}
         </ul>
         {canConfigure ? (
           <p className="border-t border-line px-5 py-2.5 text-[11px] leading-4 text-slate-500 sm:px-6">
