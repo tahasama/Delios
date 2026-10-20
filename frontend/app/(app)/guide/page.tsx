@@ -2,98 +2,80 @@ import Link from "next/link";
 import { RAILS } from "@/lib/core/rails";
 import { requireScope } from "@/lib/core/scope";
 import {
-  ArrowLeftRight, ArrowRight, Boxes, CalendarRange, ChartNoAxesCombined,
-  ClipboardCheck, FilePlus2, FileText, FolderKanban, Import, ListChecks,
-  Network, Search, Settings, ShieldCheck, Tags, Users, Workflow,
+  ArrowLeftRight, Boxes, CalendarRange, ClipboardCheck, FileText, FolderKanban, Import,
+  ListChecks, Network, Settings, ShieldCheck, Tags, Users, Workflow,
 } from "lucide-react";
-import { mayCreateDocument } from "@/lib/core/auth";
-import { Chip } from "@/components/ui";
 import { isAdmin, isController } from "@/lib/core/auth";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
-import { api, projectPath } from "@/lib/client";
-import { documentCount } from "@/lib/conformance/api";
+import { cn } from "@/lib/core/utils";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Explore DELIOS" };
+export const metadata = { title: "Help & orientation" };
 
-type CapabilityItem = {
-  href: string;
-  title: string;
-  text: string;
-  icon: React.ComponentType<{ className?: string }>;
-  action?: string;
-};
+type Place = { href: string; title: string; text: string; icon: React.ComponentType<{ className?: string }> };
 
-const DAILY: CapabilityItem[] = [
-  { href: "/documents", title: "Find, select and act on documents", text: "Search the register, switch metadata views, export, or select several documents to route and transmit together.", icon: FileText, action: "Open document register" },
-  { href: "/reviews", title: "Review and approve", text: "See assignments, comments, workflow steps and decisions that need a response.", icon: ClipboardCheck, action: "Open reviews" },
-  { href: "/schedule", title: "Know if scheduled work is ready", text: "Connect action codes and dates to the documents required for execution, use or handover.", icon: CalendarRange, action: "Open schedule readiness" },
-  { href: "/transmittals", title: "Issue and receive information", text: "Raise outgoing or incoming transmittals and follow notified, opened and acknowledged evidence.", icon: ArrowLeftRight, action: "Open transmittals" },
-  { href: "/packages", title: "Assemble handover packages", text: "Define a package, track required status, assess shortfalls and close with evidence.", icon: FolderKanban, action: "Open packages" },
-  { href: "/assets", title: "Retrieve by equipment or area", text: "See every document associated with an asset, system, equipment tag or project area.", icon: Boxes, action: "Open assets" },
-  { href: "/guide/codes", title: "States and codes explained", text: "Planned, Released, IFC, C1 … — the four kinds of \"status\", who decides each, and how one leads to the next.", icon: Tags, action: "Read the codes" },
+const DAILY: Place[] = [
+  { href: "/documents", title: "Documents", text: "Find documents in the register, choose several, and send them for review or out on a transmittal together.", icon: FileText },
+  { href: "/reviews", title: "Reviews", text: "What waits for your advice or your decision, with its comments and steps.", icon: ClipboardCheck },
+  { href: "/schedule", title: "Schedule", text: "Each action on the schedule, the documents it needs, and whether they will be ready on its day.", icon: CalendarRange },
+  { href: "/transmittals", title: "Transmittals", text: "What was sent and received, to whom, whether it was opened, and what was answered.", icon: ArrowLeftRight },
+  { href: "/packages", title: "Packages", text: "Documents gathered for a supplier or a delivery: what is in, what is missing, what went.", icon: FolderKanban },
+  { href: "/assets", title: "Assets & tags", text: "Every document describing a piece of equipment, a system or an area.", icon: Boxes },
 ];
 
-const CONTROL: CapabilityItem[] = [
-  { href: "/pipeline/submission", title: "Submission pipeline", text: "Planned versus arrived documents, lateness, resubmissions and supply backlog.", icon: ChartNoAxesCombined },
-  { href: "/pipeline/review", title: "Review pipeline", text: "Our queue, pending contractor work, review timeliness, outcomes and revision rate.", icon: Workflow },
-  { href: "/conformance", title: "Assurance and defects", text: "Run the checks, see how much of the register can be trusted, correct or accept what they find.", icon: ShieldCheck },
-  { href: "/reports", title: "Reports", text: "Where the register stands, who delivers on time, reviews waiting, transmittals, activity readiness, progress week by week, who owes what between organizations, and which revision was current on any day. Each prints.", icon: ListChecks },
-  { href: "/exposures", title: "Use and copy exposure", text: "Find obsolete copies, affected recipients and unresolved use consequences.", icon: Network },
-  { href: "/import", title: "Import and export", text: "Bring in a deliverable list, a team, the matrix or the Settings lists from a template: each file is checked before anything is written.", icon: Import },
+const CONTROL: Place[] = [
+  { href: "/conformance", title: "Assurance", text: "The checks run every day, how far the register can be trusted, and what to put right.", icon: ShieldCheck },
+  { href: "/reports", title: "Reports", text: "Where the register stands, deliveries against plan, reviews waiting, progress week by week, who owes what, and the register on any day. Each prints.", icon: ListChecks },
+  { href: "/exposures", title: "Use and copy exposure", text: "Copies that went out of a revision no longer valid, who holds them, and what is still to settle.", icon: Network },
+  { href: "/import", title: "Import & export", text: "A deliverable list, a team, the matrix or a list, brought in from a template: each file is checked before anything is written.", icon: Import },
 ];
 
-const SETUP: CapabilityItem[] = [
-  { href: "/settings", title: "Set the project up", text: "Work through what a project needs — organizations, people, lists, numbering, routes — in the order it is decided.", icon: Settings },
-  { href: "/settings/config", title: "Types and sets", text: "Define the codes and behavior that belong to your organization—not to the software vendor.", icon: Tags },
-  { href: "/settings/workflow-templates", title: "Review routes", text: "Build review and approval routes, participant modes and applicable document classes.", icon: Workflow },
-  { href: "/settings/numbering", title: "Numbering", text: "Define schemes, fields, routing and issued number ranges.", icon: FileText },
-  { href: "/settings/parties", title: "Organizations and suppliers", text: "Separate your organization from external parties and group people correctly.", icon: Network },
-  { href: "/settings/users", title: "People and access", text: "Assign accountability and access without confusing job title with workflow action.", icon: Users },
+const SETUP: Place[] = [
+  { href: "/settings", title: "Settings", text: "How this project works, in the order it is set up: organizations, people, lists, numbering, revisions, outcomes, routes.", icon: Settings },
+  { href: "/organization/settings/types", title: "Types & sets", text: "The organization's lists, the default of every project, and which ones a project may change.", icon: Tags },
+  { href: "/organization/settings/numbering", title: "Numbering", text: "How documents, transmittals, packages and tags are numbered, the same on every project.", icon: FileText },
+  { href: "/settings/workflow-templates", title: "Review routes", text: "Each route, its steps, who answers each, and the outcomes it decides with.", icon: Workflow },
+  { href: "/settings/parties", title: "Organizations", text: "Who takes part in the project, their role with us, and the function their people get.", icon: Network },
+  { href: "/settings/users", title: "People & access", text: "Who is on the project, in which function and department, and how someone joins.", icon: Users },
 ];
 
+/**
+ * Help & orientation, in the reference style (owner, after the critique): what the side colours say, what the codes
+ * mean, where approval sits under each role, then where each thing is done, one line each. No banner, no figures (Home
+ * has them), no grid of cards repeating the menu; a group of places shows only to those who may use it.
+ */
 export default async function GuidePage() {
   const ctx = await requireScope();
   const { user, project } = ctx;
   const canControl = isController(user);
   const canConfigure = isAdmin(user);
-  const [documents, reviews, actions, transmittals] = await Promise.all([
-    // Whatever this person may not read counts as none.
-    documentCount(ctx.projectId).catch(() => 0),
-    api<{ total: number }>(projectPath(ctx, "/reviews"), { query: { status: "OPEN", per: 25 } }).then((page) => page.total).catch(() => 0),
-    api<unknown[]>(projectPath(ctx, "/activities")).then((rows) => rows.length).catch(() => 0),
-    api<{ total: number }>(projectPath(ctx, "/transmittals/log"), { query: { per: 25 } }).then((page) => page.total).catch(() => 0),
-  ]);
-  const roleOptions = await contractRoleOptions();
+  const roleOptions = (await contractRoleOptions()).filter((r) => r.code !== "GENERIC");
+  const ours = roleOptions.find((r) => r.code === project.role);
+
+  const jumps = [
+    { href: "#colours", label: "The colours" },
+    { href: "#codes", label: "The codes" },
+    { href: "#roles", label: "Who approves" },
+    { href: "#places", label: "Where things are done" },
+  ];
 
   return (
-    <div className="space-y-8">
-      <section className="overflow-hidden rounded-3xl bg-brand-strong text-white shadow-[0_24px_70px_-35px_rgba(15,42,67,0.8)]">
-        <div className="grid grid-cols-[minmax(0,1fr)_340px]">
-          <div className="p-8">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#9fb8cc]"><Search className="h-4 w-4" /> Product map</div>
-            <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-[-0.03em]">Everything in DELIOS, in the language of the work.</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#c7d7e5]">Start with what you need to achieve. Each area below explains what it controls, why it exists and where to continue.</p>
-            <div className="mt-6 flex gap-2">
-              {mayCreateDocument(user) ? <Link href="/documents/new" className="inline-flex items-center gap-2 rounded-xl bg-[#d9a441] px-4 py-2.5 text-sm font-bold text-[#102a43]"><FilePlus2 className="h-4 w-4" /> Create a document</Link> : null}
-              <Link href="/" className="inline-flex items-center gap-2 rounded-xl border border-white/20 px-4 py-2.5 text-sm font-semibold text-white">Return home</Link>
-            </div>
-          </div>
-          <div className="border-l border-white/10 bg-white/4 p-7">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#91acc2]">Workspace now</p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <Metric label="Documents" value={documents} />
-              <Metric label="Open reviews" value={reviews} />
-              <Metric label="Actions" value={actions} />
-              <Metric label="Transmittals" value={transmittals} />
-            </div>
-            <p className="mt-5 text-xs leading-5 text-[#a9c0d2]">Signed in as <strong className="text-white">{user.name}</strong>. The map only shows control and setup areas when your role may use them.</p>
-          </div>
+    <div className="space-y-4">
+      <section className="register register-sheet register-sheet-open">
+        <div className="px-5 pt-6 pb-4 sm:px-6">
+          <h1 className="plate-title text-slate-950">Help &amp; orientation</h1>
+          <p className="plate-meta mt-2">{project.code} · {ours ? `we are ${ours.label}` : "our role is not stated"}</p>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+            What the colours down the side of a line say, what the codes mean, who approves under each role, and where each thing is done.
+          </p>
+          <nav aria-label="On this page" className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            {jumps.map((one) => <a key={one.href} href={one.href} className="font-semibold text-link hover:underline">{one.label}</a>)}
+          </nav>
         </div>
       </section>
 
       {/* The key to the side colours: one meaning each, on every list, card and plan (globals.css .rail-*). */}
-      <section id="colours" className="register register-sheet register-sheet-open">
+      <section id="colours" className="register register-sheet register-sheet-open scroll-mt-24">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
           <span className="stencil mr-1 text-slate-500">What the colours say</span>
           <span className="text-[11px] text-slate-500">the line down the side of a row or a card: one colour per state, close states in close colours</span>
@@ -115,51 +97,77 @@ export default async function GuidePage() {
         </div>
       </section>
 
-      <section>
-        <div className="mb-4">
-          <h2 className="mt-1 text-xl font-semibold text-slate-900">What we are contracted to do</h2>
-          <p className="mt-1 max-w-3xl text-sm text-slate-500">
-            Every project says what this organization does on it. That one answer decides where approval sits and which distribution
-            matrix the project starts from — {roleOptions.find((r) => r.code === project.role)?.label ?? "not stated"} on {project.code}.
-          </p>
+      <section id="codes" className="register register-sheet register-sheet-open scroll-mt-24">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span className="stencil mr-1 text-slate-500">The codes</span>
+          <span className="text-[11px] text-slate-500">Planned, Released, IFC, C1…: four kinds of status</span>
         </div>
-        <dl className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {roleOptions.filter((r) => r.code !== "GENERIC").map((r) => (
-            <div key={r.code} className={`rounded-2xl border px-4 py-3 ${r.code === project.role ? "border-link bg-tint" : "border-line bg-surface"}`}>
-              <dt className="flex items-baseline gap-2 text-sm font-semibold text-slate-900">
-                <span className="font-mono text-[11px] text-slate-400">{r.code}</span> {r.label}
-                {r.code === project.role ? <span className="text-[11px] font-semibold text-link">this project</span> : null}
-              </dt>
-              <dd className="mt-1 text-xs leading-5 text-slate-600">{r.description}</dd>
-              <dd className="mt-1 text-xs leading-5 text-slate-500"><span className="font-semibold text-slate-600">Approval:</span> {r.approval}</dd>
-            </div>
-          ))}
-        </dl>
+        <p className="px-5 py-3.5 text-xs leading-5 text-slate-600 sm:px-6">
+          Where a document stands, what it is issued for, what a review decided, and what a transmittal is for: who decides each, and how one
+          leads to the next.{" "}
+          <Link href="/guide/codes" className="font-semibold text-link hover:underline">Read the codes</Link>
+        </p>
+      </section>
+
+      {/* Where approval sits under each role; this project's marked. */}
+      <section id="roles" className="register register-sheet register-sheet-open scroll-mt-24">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span className="stencil mr-1 text-slate-500">Who approves</span>
+          <span className="text-[11px] text-slate-500">what our organization is contracted to do decides where approval sits, and the matrix a project starts from</span>
+        </div>
+        <ul className="divide-y divide-line">
+          {roleOptions.map((r) => {
+            const here = r.code === project.role;
+            return (
+              <li key={r.code} className={cn("grid grid-cols-1 gap-x-6 gap-y-1 px-5 py-3 text-xs leading-5 sm:px-6 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]", here && "bg-tint-soft")}>
+                <p className="font-semibold text-slate-900">
+                  {r.label}
+                  {here ? <span className="ml-2 text-[11px] font-semibold text-link">{project.code}</span> : null}
+                </p>
+                <div>
+                  <p className="text-slate-600">{r.description}</p>
+                  <p className="text-slate-500"><span className="font-semibold text-slate-700">Approval:</span> {r.approval}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
         {canConfigure ? (
-          <p className="mt-3 text-xs text-slate-500">
-            A role your contracts use that is not here is added like any other published list, with its own definition, in{" "}
-            <Link href="/settings/config" className="font-semibold text-link hover:underline">Settings → Published lists</Link> under
-            Contract roles. Only the ones above carry a starting matrix; one you add starts with no rows, and you write them in the{" "}
+          <p className="border-t border-line px-5 py-2.5 text-[11px] leading-4 text-slate-500 sm:px-6">
+            A role your contracts use that is not here is added to Contract roles in the organization&rsquo;s{" "}
+            <Link href="/organization/settings/types" className="font-semibold text-link hover:underline">Types &amp; sets</Link>. Only the roles above
+            start with a matrix; one you add starts empty, and its lines are written in the{" "}
             <Link href="/distribution" className="font-semibold text-link hover:underline">distribution matrix</Link>.
           </p>
         ) : null}
       </section>
 
-      <CapabilitySection title="Do the work" description="The areas every project participant uses to find, create, review, issue and assemble information." items={DAILY} />
-      {canControl ? <CapabilitySection title="See the whole flow" description="Operational control, performance evidence and exceptions across the project." items={CONTROL} /> : null}
-      {canConfigure ? <CapabilitySection title="Set it up your way" description="These pages define your disciplines, types, sets, schemas, organizations and responsibilities." items={SETUP} /> : null}
+      <div id="places" className="scroll-mt-24 space-y-4">
+        <Places title="Do the work" said="what everyone on the project uses" places={DAILY} />
+        {canControl ? <Places title="See the whole flow" said="for the control function: how the register stands, and what to put right" places={CONTROL} /> : null}
+        {canConfigure ? <Places title="Set it up" said="for administrators: how the project and the organization work" places={SETUP} /> : null}
+      </div>
     </div>
   );
 }
 
-function CapabilitySection({ title, description, items }: { title: string; description: string; items: CapabilityItem[] }) {
-  return <section><div className="mb-4 flex items-end justify-between gap-5"><div><h2 className="mt-1 text-xl font-semibold text-slate-900">{title}</h2><p className="mt-1 text-sm text-slate-500">{description}</p></div><Chip>{items.length} areas</Chip></div><div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">{items.map((item) => <CapabilityCard key={item.href} {...item} />)}</div></section>;
-}
-
-function CapabilityCard({ href, title, text, icon: Icon, action }: { href: string; title: string; text: string; icon: React.ComponentType<{ className?: string }>; action?: string }) {
-  return <Link href={href} className="group flex min-h-44 flex-col rounded-2xl border border-line bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-line/40 hover:shadow-md"><span className="grid h-10 w-10 place-items-center rounded-xl bg-tint text-brand-ink"><Icon className="h-5 w-5" /></span><h3 className="mt-4 text-sm font-semibold text-slate-900">{title}</h3><p className="mt-1.5 flex-1 text-xs leading-5 text-slate-500">{text}</p><span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-link">{action ?? "Open this area"}<ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span></Link>;
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3"><p className="text-xl font-semibold tabular-nums">{value}</p><p className="mt-0.5 text-[10px] uppercase tracking-wide text-[#91acc2]">{label}</p></div>;
+/** One group of places: a sheet, one line each (its name a link, one sentence), never a grid of cards. */
+function Places({ title, said, places }: { title: string; said: string; places: Place[] }) {
+  return (
+    <section className="register register-sheet register-sheet-open">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+        <span className="stencil mr-1 text-slate-500">{title}</span>
+        <span className="text-[11px] text-slate-500">{said}</span>
+      </div>
+      <ul className="divide-y divide-line">
+        {places.map(({ href, title: name, text, icon: Icon }) => (
+          <li key={href} className="grid grid-cols-[1rem_minmax(0,1fr)] items-baseline gap-x-3 px-5 py-2.5 sm:grid-cols-[1rem_12rem_minmax(0,1fr)] sm:px-6">
+            <Icon aria-hidden className="h-4 w-4 translate-y-0.5 text-slate-400" />
+            <Link href={href} className="text-[13px] font-semibold text-link hover:underline">{name}</Link>
+            <p className="col-start-2 text-xs leading-5 text-slate-600 sm:col-start-3">{text}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }

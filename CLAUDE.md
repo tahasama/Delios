@@ -1136,6 +1136,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   documents to confirm, postponements to confirm, untagged actions, a failed
   schedule read). Every new kind of work gets a row there.
 
+### Help & orientation
+- `/guide` (owner, after the critique), in the reference style: a plate with jumps (the colours, the codes, who
+  approves, where things are done), the colour key (`rails.ts`), the codes (`/guide/codes`), the roles with where
+  approval sits (the project's marked), then where each thing is done as one line each in three sheets (everyone; the
+  control function; administrators, the organization's cards opening the organization's Settings). No banner, no
+  figures (Home has them), no grid of cards, no counts; never a link to a page that does not exist.
+
 ### Pop-up notifications
 - Every notification can also pop up in the person's browsers, even when no
   DELIOS page is open (browser push, `public/sw.js`); clicking it opens the
