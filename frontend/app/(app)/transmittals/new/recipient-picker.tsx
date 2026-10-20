@@ -110,7 +110,7 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
   const matches = everyone
     .filter((p) => !taken.has(p.id))
     .filter((p) => words.every((w) => `${p.name} ${p.company} ${p.job ?? ""}`.toLowerCase().includes(w)))
-    .slice(0, 12);
+    .slice(0, 1000);
   // A company whose name matches offers everyone at it at once, after the people.
   const whole = words.length
     ? companies
@@ -147,6 +147,7 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
               value={query}
               onChange={(e) => { setQuery(e.target.value); setOpen(true); setHi(0); }}
               onFocus={() => setOpen(true)}
+              onClick={() => setOpen(true)}
               onKeyDown={(e) => {
                 if (e.key === "ArrowDown") { e.preventDefault(); setOpen(true); setHi((n) => Math.min(n + 1, options.length - 1)); }
                 else if (e.key === "ArrowUp") { e.preventDefault(); setHi((n) => Math.max(n - 1, 0)); }
@@ -164,7 +165,8 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
           </label>
         </div>
 
-        {open && query ? (
+        {/* It opens on a click and narrows as one types (owner, everywhere). */}
+        {open ? (
           <ul id={listId} role="listbox" className="dt-menu absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg py-1">
             {options.length === 0 ? (
               <li className="px-3 py-2 text-xs text-slate-400">Nobody matches that.</li>

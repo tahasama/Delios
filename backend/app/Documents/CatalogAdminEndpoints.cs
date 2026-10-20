@@ -302,14 +302,12 @@ public static class CatalogAdminEndpoints
                 return Problems.Invalid("FUNCTION_UNKNOWN", $"{step.Title}: {function} is not a function in use.");
             if (step.PartyCode is { } party && !await db.Parties.AnyAsync(p => p.Code == party && p.Active, cancellationToken))
                 return Problems.Invalid("PARTY_UNKNOWN", $"{step.Title}: {party} is not an organization taking part.");
-            // A step another organization answers goes to them on a transmittal: it says why (a published reason for issue).
+            // A step another organization answers goes to them on a transmittal: why is set by itself from what the step does.
             if (step.PartyCode is not null)
             {
-                step.Reason = Blank(step.Reason);
+                step.Reason = ReviewSets.StepReason(await Catalog.LoadAsync(db, cancellationToken), step.Decides || ReferenceEquals(step, steps[^1]));
                 if (step.Reason is null)
-                    return Problems.Invalid("STEP_REASON_REQUIRED", $"{step.Title}: say why it goes to {step.PartyCode}, the reason for issue on the transmittal.");
-                if (!(await Catalog.LoadAsync(db, cancellationToken)).IsActive(Transmittals.TransmittalSets.Reasons, step.Reason))
-                    return Problems.Invalid("VALUE_NOT_PUBLISHED", $"{step.Title}: {step.Reason} is not a published reason for issue.");
+                    return Problems.Invalid("STEP_REASON_REQUIRED", $"{step.Title}: it goes to {step.PartyCode} on a transmittal, \"For review\" or \"For approval\": publish one of them in Types & sets, Reasons for issue.");
             }
             else step.Reason = null;
         }

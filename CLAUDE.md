@@ -939,9 +939,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - What a route takes is enforced: no other document is sent on it (backend NO_ROUTE). Send for review names every route
   of the project not offered for the documents chosen, with what it takes, so a missing route is never a mystery.
 - One status chosen on the last step: every document the route accepts is released at it; several: the decider chooses.
+- On the route form each step says what it does, "Advises · Decides" (a choice on the step opened), the last always
+  "Decides" (a route always ends with a decision). "Which documents take it" reads "Deliverable type", never "Produced by".
+- Why a step another organization answers goes to them is never asked on a route (owner): set by itself from what the
+  step does, "For approval" when it decides, "For review" when it advises (`ReviewSets.StepReason`, the codes APPROVAL /
+  REVIEW), refused only when neither is published (STEP_REASON_REQUIRED).
+- **Every search field lists on a click and narrows as one types** (owner, everywhere): `SearchPick` (its `browse` no
+  longer differs) and the transmittal recipient picker; "Choose, or type to narrow".
 - A route's step is answered by all its people (any order) or by whoever gets to it first (`StepModes` ALL / ANY): no
-  other kind is offered. A step another organization answers says why it goes to them (a published reason for issue,
-  backend STEP_REASON_REQUIRED), carried on the transmittal that takes it. "Offer this route first" puts it first among
+  other kind is offered. A step another organization answers goes to them on a transmittal whose reason is set by itself
+  (above). "Offer this route first" puts it first among
   routes equally specific. "From which organization" chooses among the organizations taking part (a document's
   originator is an organization's code).
 - Removing a review route is "Stop using it", asked first; a permission tick asks first, naming everyone it changes.

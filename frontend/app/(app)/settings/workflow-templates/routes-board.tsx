@@ -73,7 +73,7 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
   const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? "someone no longer here";
   const typeName = (code: string) => classOptions.deliverableTypes.find((d) => d.code === code)?.label ?? code;
   const builder = (route?: (typeof templates)[number], steps?: Step[]) => (
-    <WorkflowTemplateBuilder level={level} cancelHref={here} outsideParties={parties} reasons={reasonChoices} functions={functions}
+    <WorkflowTemplateBuilder level={level} cancelHref={here} outsideParties={parties} functions={functions}
       users={users}
       outcomeSets={outcomeSets.map((s) => ({ key: s.key, title: s.title }))} adviceSets={adviceSets} classOptions={classOptions} statuses={statusChoices}
       {...(route ? { id: route.id, name: route.name, description: route.description ?? "", classes: route.classes, outcomeSetKey: route.outcomeSetKey,

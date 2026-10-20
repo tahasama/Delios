@@ -340,6 +340,17 @@ public static class DelegationStates
 /// <summary>Value lists a review reads, all the organization's to edit.</summary>
 public static class ReviewSets
 {
+    /// <summary>
+    /// Why a step another organization answers goes to them, on its transmittal: set by itself from what the step does
+    /// (owner: never asked on a route), "For approval" (APPROVAL) when it decides, "For review" (REVIEW) when it advises,
+    /// the other where only one is published; null when neither is.
+    /// </summary>
+    public static string? StepReason(Documents.Catalog catalog, bool decides)
+    {
+        string[] order = decides ? ["APPROVAL", "REVIEW"] : ["REVIEW", "APPROVAL"];
+        return order.FirstOrDefault(code => catalog.IsActive(Transmittals.TransmittalSets.Reasons, code));
+    }
+
     /// <summary>What a released revision is for: IFC, IFA… Props: executes (bool).</summary>
     public const string Statuses = "STATUSES";
     /// <summary>The deciding step's verdicts. Props: proceed (bool).</summary>

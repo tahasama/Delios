@@ -14,7 +14,7 @@ export type WorkflowBuilderStep = {
   act: "REVIEW" | "APPROVAL";
   /** An organization answers this step: its own people (named, or holding the function), or itself, recorded by one of ours. */
   partyId?: string;
-  /** For another organization's step: the reason for issue on the transmittal that carries it to them. */
+  /** For another organization's step: the reason for issue on its transmittal, set by itself from what the step does. */
   reason?: string;
   mode: "ANY_OF" | "ALL";
   participantIds: string[];
@@ -63,9 +63,7 @@ const pick = (on: boolean) => cn("rounded-[0.3rem] border px-2 py-1 text-xs", on
  * step chosen opens under them, who answers it said by three choices side by side (organization, function, people)
  * that narrow one another, or "recommended for each document"; then which documents take it. Cancel goes back.
  */
-export function WorkflowTemplateBuilder({ level = "project", id, name = "", description = "", classes = "*", outcomeSetKey = "", adviceSetKey = "", isDefault = false, initialSteps, users, functions = [], outsideParties = [], outcomeSets, adviceSets, classOptions, statuses, reasons = [], cancelHref }: {
-  /** The reasons for issue: another organization's step says why it goes to them. */
-  reasons?: { code: string; label: string }[];
+export function WorkflowTemplateBuilder({ level = "project", id, name = "", description = "", classes = "*", outcomeSetKey = "", adviceSetKey = "", isDefault = false, initialSteps, users, functions = [], outsideParties = [], outcomeSets, adviceSets, classOptions, statuses, cancelHref }: {
   /** Where the route is kept: the organization's routes, or the project's (its own copy where routes are free). */
   level?: "organization" | "project";
   id?: string;
@@ -194,7 +192,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
       </div>
       {!allClasses ? (
         <div className="grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-4 sm:px-6 md:grid-cols-3">
-          <Field label="Produced by" hint="ours, a supplier's, the client's"><select className={inputCls} value={scope.deliverableType ?? ""} onChange={(e) => setScope((v) => ({ ...v, deliverableType: e.target.value || undefined }))}><option value="">Anyone</option>{classOptions.deliverableTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
+          <Field label="Deliverable type" hint="who produces it: ours, a supplier's, the client's"><select className={inputCls} value={scope.deliverableType ?? ""} onChange={(e) => setScope((v) => ({ ...v, deliverableType: e.target.value || undefined }))}><option value="">Anyone</option>{classOptions.deliverableTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
           <Field label="Document type"><select className={inputCls} value={scope.docType ?? ""} onChange={(e) => setScope((v) => ({ ...v, docType: e.target.value || undefined }))}><option value="">Any type</option>{classOptions.documentTypes.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
           <Field label="Discipline"><select className={inputCls} value={scope.discipline ?? ""} onChange={(e) => setScope((v) => ({ ...v, discipline: e.target.value || undefined }))}><option value="">Any discipline</option>{classOptions.disciplines.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
           <Field label="Criticality"><select className={inputCls} value={scope.criticality ?? ""} onChange={(e) => setScope((v) => ({ ...v, criticality: e.target.value || undefined }))}><option value="">Any criticality</option>{classOptions.criticalities.map((i) => <option key={i.code} value={i.code}>{i.code} — {i.label}</option>)}</select></Field>
@@ -219,11 +217,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
                 <div className={cn("flex w-56 shrink-0 flex-col rounded-md ring-1 transition", open === index ? "bg-surface ring-2 ring-brand-line" : "bg-surface ring-line hover:ring-line-strong")}>
                   <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
                     <span className="text-[11px] font-semibold text-slate-500">Step {index + 1}</span>
-                    {index === lastDecider ? <ToneChip tone="done">decides</ToneChip> : (
-                      <button type="button" onClick={() => update(index, { decides: !step.decides })} title={step.decides ? "Make it advise" : "Make it decide"}>
-                        <ToneChip tone={step.decides ? "done" : "moving"}>{step.decides ? "decides" : "advises"}</ToneChip>
-                      </button>
-                    )}
+                    <ToneChip tone={step.decides ? "done" : "moving"}>{step.decides ? "decides" : "advises"}</ToneChip>
                   </div>
                   <button type="button" onClick={() => setOpen(open === index ? null : index)} className="flex-1 px-3 pt-1 pb-2 text-left">
                     <span className="block text-[13px] font-semibold text-slate-900">{step.title || (step.decides ? "Decision" : `Review ${index + 1}`)}</span>
@@ -249,10 +243,22 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
       {/* ── The step chosen ────────────────────────────────────────────── */}
       {open !== null && chosen ? (
         <div className="space-y-4 border-t border-line px-5 py-4 sm:px-6">
-          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
-            <Field label={`Step ${open + 1}`} hint={chosen.decides ? "it decides" : "it advises"}>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-[1fr_auto_1fr_auto]">
+            <Field label={`Step ${open + 1}`} hint="its name">
               <input value={chosen.title ?? ""} onChange={(e) => update(open, { title: e.target.value })} className={inputCls}
                 aria-label={`Name of step ${open + 1}`} placeholder={chosen.decides ? "Decision" : "Review"} />
+            </Field>
+            {/* Advises or decides: the step's own choice; the last always decides, so a route ends with a decision. */}
+            <Field label="What it does" hint={open === lastDecider ? "the last step always decides" : "several steps may decide"}>
+              <span className="choice" role="group" aria-label="What it does">
+                {([["advises", false], ["decides", true]] as const).map(([word, on]) => (
+                  <button key={word} type="button" aria-pressed={!!chosen.decides === on} disabled={open === lastDecider && !on}
+                    onClick={() => update(open, { decides: on })}
+                    className={cn("choice-side", !!chosen.decides === on && "choice-on", open === lastDecider && !on && "cursor-not-allowed opacity-40")}>
+                    {word === "advises" ? "Advises" : "Decides"}
+                  </button>
+                ))}
+              </span>
             </Field>
             <Field label="How they answer" hint={HOW.find((h) => h.value === chosen.mode)?.hint}>
               <select value={chosen.mode} onChange={(e) => update(open, { mode: e.target.value as WorkflowBuilderStep["mode"] })} className={inputCls}>
@@ -274,7 +280,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
             <div key={open} className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
               <Field label="Organization" hint="none chosen: ours">
                 <select value={chosen.partyId ?? ""} className={inputCls}
-                  onChange={(e) => update(open, { partyId: e.target.value || undefined, participantIds: [], reason: e.target.value ? chosen.reason : undefined,
+                  onChange={(e) => update(open, { partyId: e.target.value || undefined, participantIds: [], reason: undefined,
                     ...(outsideParties.find((p) => p.id === e.target.value)?.participation === "BY_PROXY" ? { functionIds: [], fromMatrix: false } : {}) })}>
                   <option value="">Ours</option>
                   {outsideParties.map((p) => <option key={p.id} value={p.id}>{p.name}{p.participation === "BY_PROXY" ? " (answers as itself)" : ""}</option>)}
@@ -296,7 +302,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
                   <SearchPick key={`${open}-${chosen.partyId ?? "ours"}-${(chosen.functionIds ?? []).join()}-${scope.discipline ?? ""}-${allClasses}`}
                     name={`people_${open}`} label="People" hint="found by name"
                     items={peopleFor(chosen).map((u) => ({ id: u.id, name: u.name, detail: [u.functions.map(fnName).join(", "), u.departments.join(", ")].filter(Boolean).join(" · ") }))}
-                    initial={chosen.participantIds} placeholder="Type a name" empty="Nobody named"
+                    initial={chosen.participantIds} empty="Nobody named"
                     onChange={(ids) => { if (ids.join() !== chosen.participantIds.join()) update(open, { participantIds: ids }); }} />
                 </div>
               )}
@@ -309,17 +315,6 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
               </label>
             ) : null}
           </div>
-
-          {chosen.partyId ? (
-            <div className="grid grid-cols-1 gap-x-6 md:grid-cols-3">
-              <Field label="Why it goes to them" required hint="the reason for issue on the transmittal">
-                <select value={chosen.reason ?? ""} onChange={(e) => update(open, { reason: e.target.value || undefined })} className={inputCls}>
-                  <option value="">Choose…</option>
-                  {reasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-                </select>
-              </Field>
-            </div>
-          ) : null}
 
           {open === lastDecider ? (
             <div>

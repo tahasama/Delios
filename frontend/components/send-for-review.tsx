@@ -134,7 +134,7 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
           name={`participants_${index}`}
           items={step.party.people.map((p) => ({ id: p.id, name: p.name, detail: `${step.party!.name} / ${p.functionName}` }))}
           initial={step.proposed.map((p) => p.id)}
-          placeholder="Type a name, then Enter"
+          placeholder="Choose, or type to narrow"
           empty={`Nobody yet: ${step.party.name}'s people named on the route answer it.`}
         />
       ) : <SearchPick
@@ -147,7 +147,7 @@ function StepCard({ index, step, pool, many }: { index: number; step: SendStep; 
           note: p.inMatrix === false ? `Not named in the matrix to ${approval ? "approve" : "review"} this — flagged.` : null,
         }))}
         initial={step.proposed.map((p) => p.id).filter((id) => pool.some((p) => p.id === id))}
-        placeholder={pool.length ? "Type a name, then Enter" : "Nobody allowed"}
+        placeholder={pool.length ? "Choose, or type to narrow" : "Nobody allowed"}
         empty={pool.length ? "Nobody yet — add someone." : `Nobody may ${approval ? "approve" : "review"} ${many ? "all of these" : "this"} under the matrix.`}
       />}
     </fieldset>

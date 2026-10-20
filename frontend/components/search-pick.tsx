@@ -32,10 +32,7 @@ export function SearchPick({
   onCount?: (n: number) => void;
   /** Told the chosen ids whenever they change. */
   onChange?: (ids: string[]) => void;
-  /**
-   * A list worth reading whole — types, disciplines, documents, organizations —
-   * opens on click, and typing narrows it. People are only ever found by name.
-   */
+  /** Kept for callers: every list now opens on a click and narrows as one types (owner). */
   browse?: boolean;
   /** Tighter, for a narrow card. */
   compact?: boolean;
@@ -63,7 +60,7 @@ export function SearchPick({
   const options = items
     .filter((one) => !chosen.includes(one.id))
     .filter((one) => words.every((w) => `${one.name} ${one.detail ?? ""}`.toLowerCase().includes(w)))
-    .slice(0, browse ? 1000 : 12);
+    .slice(0, 1000);
 
   const take = (index: number) => {
     const one = options[index];
@@ -101,19 +98,20 @@ export function SearchPick({
               else if (e.key === "Escape") setOpen(false);
               else if (e.key === "Backspace" && !query && chosen.length) remove(chosen[chosen.length - 1]);
             }}
-            placeholder={placeholder ?? (chosen.length && !single ? "Add another…" : "Type a name, then Enter")}
+            placeholder={placeholder ?? (chosen.length && !single ? "Add another…" : "Choose, or type to narrow")}
             aria-label={label ?? placeholder ?? "Search"}
             role="combobox"
-            aria-expanded={open && (!!query || !!browse)}
+            aria-expanded={open}
             autoComplete="off"
             className={cn("plain w-full !pl-7", compact ? "py-1 text-xs" : "py-1.5 text-[13px]")}
           />
         </div>
 
-        {open && (query || browse) ? (
+        {/* Every list opens on a click and narrows as one types (owner, everywhere). */}
+        {open ? (
           <ul role="listbox" className="dt-menu absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg py-1">
             {options.length === 0 ? (
-              <li className="px-3 py-2 text-xs text-slate-400">Nobody matches that.</li>
+              <li className="px-3 py-2 text-xs text-slate-400">{query ? "Nobody matches that." : "Nobody left to choose."}</li>
             ) : options.map((one, i) => (
               <li
                 key={one.id}

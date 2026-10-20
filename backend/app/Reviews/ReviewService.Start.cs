@@ -109,7 +109,10 @@ public sealed partial class ReviewService
                         $"Step {i + 1} ({step.Title}) names {code}, which is not an active outside party.",
                         new { step = i + 1, party = code }));
                 }
+                // Why it goes to them is set by itself from what the step does (a route made before keeps its own, if still published).
                 if (step.Reason is null || !catalog.IsActive(TransmittalSets.Reasons, step.Reason))
+                    step.Reason = ReviewSets.StepReason(catalog, step.Decides || i == route.Steps.Count - 1);
+                if (step.Reason is null)
                 {
                     return Fail(Problems.Invalid("STEP_NEEDS_REASON",
                         $"Step {i + 1} ({step.Title}) goes to {party.Name} by transmittal and needs a published reason for issue.",
