@@ -17,7 +17,6 @@ import { CONTRACT_ROLES } from "@/lib/settings/profiles/roles";
 import { Check, ChevronDown, ChevronRight, Contrast, Minus, Plus, Trash2 } from "lucide-react";
 import { functionsForMatrix, projectFunctionsForMatrix } from "@/lib/settings/api-admin";
 import { NoAccess } from "../no-access";
-import { VerbPills } from "./verb-pills";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 
 /** A list longer than this is shared on the page rather than repeated in each form. */
@@ -306,7 +305,7 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
     <div className="space-y-3">
       <p className="flex flex-wrap items-baseline gap-2">
         <span className="stencil text-slate-500">Only on certain documents</span>
-        <span className="text-[11px] text-slate-500">what it holds, narrowed to the documents chosen, e.g. Approve on one discipline&rsquo;s documents</span>
+        <span className="text-[11px] text-slate-500">what its ticks give, narrowed to the documents chosen</span>
       </p>
       {narrowed.length === 0 ? null : (
         <ul className="divide-y divide-line rounded-md ring-1 ring-line">
@@ -336,8 +335,8 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
 
       {rights && everywhere.length ? (
         <ActionForm action={savePermissionRuleAction} submitLabel="Only on these documents" size="sm" resetOnSuccess hidden={{ functionId: fn.id, level, narrow: "1" }} className="space-y-4"
-          confirmText={`${fn.name} will hold what is left in the pills on the documents chosen only, no longer on every document. Go ahead?`}>
-            <VerbPills verbs={everywhere.map((v) => ({ code: v, label: VERB_LABEL[v], blurb: VERB_BLURB[v] }))} />
+          confirmText={`${fn.name} will hold ${everywhere.map((v) => VERB_LABEL[v]).join(", ")} on the documents chosen only, no longer on every document. Go ahead?`}>
+            {everywhere.map((v) => <input key={v} type="hidden" name="verbs" value={v} />)}
             <div className="space-y-1.5">
               <p className="stencil text-slate-500">On these documents <span className="font-normal normal-case tracking-normal text-slate-400">· at least one</span></p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
