@@ -970,9 +970,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (asked first), "Add a rule"; in the organization's Settings also the function itself (name, code read only, clearance,
   in use). "New function" is the plate's act (`?new=1`), opening the added one. "What each permission allows" is always
   written under the grid (`VERB_BLURB`). No department on a function (never kept by the backend; the field is gone).
-  The opened function shows only what the grid cannot (owner, "redundancy"): its rules for certain documents only and
-  "Add a rule", which asks which documents (on every document is a tick, never a second copy); in the organization's
-  Settings also the function itself.
+  The opened function shows only what the grid cannot (owner, "redundancy"; then "useless… i'd rather see the form
+  directly"): its rules for certain documents only, if any, and the form to add one, open at once (it asks which
+  documents: on every document is a tick, never a second copy); in the organization's Settings also the function
+  itself. Nothing else: no "none yet", no line on what is the organization's. A name opens only when there is something
+  there (whoever may not change it, on a function with no such rule, reads a plain name).
   **On a project every function is changed, Configure excepted** (owner: "project level should be able to edit that by
   default, except the admin function"): Configure, the administrators' permission, is neither given nor taken on a
   project; the backend leaves it out of what comes and keeps it where the function held it (`ProjectFunctions.RulesAsync`).

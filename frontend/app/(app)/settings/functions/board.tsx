@@ -188,16 +188,20 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
           }
         >
               {grid.map(({ fn, held, partly }) => {
-                const isOpen = open === fn.id;
                 const narrowCount = fn.rules.filter(narrow).length;
+                // Opened only when there is something to see or do: the function itself, a rule to add, or its rules.
+                const opens = admin || (rights && fn.active) || narrowCount > 0;
+                const isOpen = opens && open === fn.id;
                 return [
                   <tr key={fn.id} id={`fn-${fn.id}`} className={`scroll-mt-20 ${isOpen ? "bg-tint-soft" : ""} ${fn.active ? "" : "text-slate-400"}`}>
                     <Td className={`sticky left-0 z-1 py-2 ${isOpen ? "bg-tint-soft" : "bg-surface"}`}>
-                      <Link href={isOpen ? here : `${here}?open=${fn.id}#fn-${fn.id}`} scroll={false} aria-expanded={isOpen}
-                        className="group inline-flex items-center gap-1 font-semibold text-slate-800 hover:text-link">
-                        {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" aria-hidden /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-link" aria-hidden />}
-                        {fn.name}
-                      </Link>
+                      {opens ? (
+                        <Link href={isOpen ? here : `${here}?open=${fn.id}#fn-${fn.id}`} scroll={false} aria-expanded={isOpen}
+                          className="group inline-flex items-center gap-1 font-semibold text-slate-800 hover:text-link">
+                          {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" aria-hidden /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-link" aria-hidden />}
+                          {fn.name}
+                        </Link>
+                      ) : <span className="font-semibold text-slate-800">{fn.name}</span>}
                       {fn.active ? null : <span className="ml-1.5 text-[11px] text-slate-500">· not in use</span>}
                       {narrowCount ? <p className="ml-4.5 text-[11px] text-slate-500">and {narrowCount === 1 ? "1 rule" : `${narrowCount} rules`} for certain documents</p> : null}
                     </Td>
@@ -240,11 +244,7 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
                           <FunctionRules fn={fn} rules={fn.rules} level={level} rights={rights && fn.active} fixedHere={fixedHere} scopeOf={scopeOf} selectors={selectors} />
                           {admin ? (
                             <FunctionItself fn={fn} confidentialities={confidentialities} />
-                          ) : (
-                            <p className="border-t border-line pt-3 text-[11px] text-slate-500">
-                              Its name and clearance ({clearanceOf(fn.clearance) ? `up to ${clearanceOf(fn.clearance)}` : "no limit"}) are the organization&rsquo;s, changed in the organization&rsquo;s Settings.
-                            </p>
-                          )}
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -302,12 +302,10 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
   return (
     <div className="space-y-3">
       <p className="flex flex-wrap items-baseline gap-2">
-        <span className="stencil text-slate-500">For certain documents only</span>
-        <span className="text-[11px] text-slate-500">on top of its ticks: a rule only adds, nothing takes away what another gives</span>
+        <span className="stencil text-slate-500">More on certain documents only</span>
+        <span className="text-[11px] text-slate-500">on top of its ticks, e.g. Approve on one discipline&rsquo;s documents</span>
       </p>
-      {narrowed.length === 0 ? (
-        <p className="text-xs text-slate-500">None yet.</p>
-      ) : (
+      {narrowed.length === 0 ? null : (
         <ul className="divide-y divide-line rounded-md ring-1 ring-line">
           {narrowed.map((rule) => {
             const verbs = parseVerbs(rule.verbs);
@@ -334,9 +332,7 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
       )}
 
       {rights ? (
-        <details className="group">
-          <summary className="ask inline-flex list-none items-center gap-1.5"><Plus className="h-3.5 w-3.5" aria-hidden /> Add a rule</summary>
-          <ActionForm action={savePermissionRuleAction} submitLabel="Add the rule" size="sm" hidden={{ functionId: fn.id, level }} className="mt-3 space-y-4">
+        <ActionForm action={savePermissionRuleAction} submitLabel="Add the rule" size="sm" resetOnSuccess hidden={{ functionId: fn.id, level }} className="space-y-4">
             <VerbTicks verbs={GRANTABLE.filter((v) => !fixedHere(v))} label="May" />
             <div className="space-y-1.5">
               <p className="stencil text-slate-500">On these documents <span className="font-normal normal-case tracking-normal text-slate-400">· at least one; on every document is a tick on its line</span></p>
@@ -357,8 +353,7 @@ function FunctionRules({ fn, rules, level, rights, fixedHere, scopeOf, selectors
                 ))}
               </div>
             </div>
-          </ActionForm>
-        </details>
+        </ActionForm>
       ) : null}
     </div>
   );
