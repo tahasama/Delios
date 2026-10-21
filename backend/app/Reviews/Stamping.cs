@@ -87,7 +87,7 @@ public sealed class Stamping(
     /// <summary>
     /// Handles a <see cref="RevisionMarked"/> message: the copy people were reading (the stamped one where there is
     /// one) is copied with VOID or ON HOLD across every page. Done once per copy; a redelivered message does no harm.
-    /// A revision its review returned is stamped RETURNED where the project chose it (off unless chosen).
+    /// A revision its review returned is stamped RETURNED, unless the project switched it off.
     /// </summary>
     public async Task MarkAsync(RevisionMarked message, CancellationToken cancellationToken)
     {
@@ -117,7 +117,7 @@ public sealed class Stamping(
     }
 
     /// <summary>
-    /// A revision its review sent back, where the project stamps it (<c>STAMP:RETURNED</c> = ON): the same stamp, RETURNED
+    /// A revision its review sent back, unless the project switched it off (<c>STAMP:RETURNED</c> = OFF): the same stamp, RETURNED
     /// in red, the verdict that sent it back leading, then what the stamp is set to show.
     /// </summary>
     private async Task StampReturnedAsync(Revision revision, Document document, Guid? reviewId, StampChoices choices, CancellationToken cancellationToken)
@@ -451,7 +451,7 @@ public sealed class EmbeddedFonts : IFontResolver
 /// What is asked of the stamp (owner: a card of its own, Settings → The stamp): the organization's answers are every
 /// project's default, a project's own answers (where the organization leaves it free) stand over them. Stamped at all
 /// (<c>POLICY_PDF_STAMP</c>); when: released after its review (<c>STAMP:RELEASED</c>, on unless set OFF) and returned by
-/// it (<c>STAMP:RETURNED</c>, off unless set ON); its other lines (<c>STAMP_SHOW:STEPS</c> on unless OFF; <c>STATUS</c>,
+/// it (<c>STAMP:RETURNED</c>, on unless set OFF); its other lines (<c>STAMP_SHOW:STEPS</c> on unless OFF; <c>STATUS</c>,
 /// <c>DOCUMENT</c>, <c>REVIEW</c> off unless ON); why, the comments on a last page (<c>STAMP_COMMENTS</c> = ON); where it
 /// sits (<c>STAMP_PLACE</c>, top right by default); and the marks across the page (<c>STAMP:SUPERSEDED</c>,
 /// <c>STAMP:VOID</c>, <c>STAMP:HELD</c>; each on unless OFF).
@@ -460,7 +460,7 @@ public sealed record StampChoices(bool All, IReadOnlyDictionary<string, string> 
 {
     public const string TopRight = "TOP_RIGHT";
     private static readonly string[] Places = [TopRight, "TOP_LEFT", "BOTTOM_RIGHT", "BOTTOM_LEFT"];
-    public bool On(string kind) => All && (Answers.GetValueOrDefault($"STAMP:{kind}") is { } set ? set != "OFF" : kind != FileKinds.Returned);
+    public bool On(string kind) => All && Answers.GetValueOrDefault($"STAMP:{kind}") != "OFF";
     public bool Shows(string what) => Answers.GetValueOrDefault($"STAMP_SHOW:{what}") is { } set ? set == "ON" : what == "STEPS";
     public bool Comments => All && Answers.GetValueOrDefault("STAMP_COMMENTS") == "ON";
     public string Place => Answers.GetValueOrDefault("STAMP_PLACE") is { } place && Places.Contains(place) ? place : TopRight;

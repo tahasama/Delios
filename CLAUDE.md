@@ -258,7 +258,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`POLICY_PDF_STAMP`, area "The stamp", Free by default) leaves it free, a project keeps only what differs from them
   (refused otherwise, ROOM_FIXED). The card: **stamped or not** (`POLICY_PDF_STAMP`); **when** a review stamps the revision
   it decided (owner: freedom): released after its review (`STAMP:RELEASED`, on) and returned by it (`STAMP:RETURNED`, red,
-  off unless chosen); released without a review, nothing to stamp. **What it shows**: always its word, the grade that
+  on: owner, "reject stamp didnt appear"; to its author or to its sender for correction alike); released without a review, nothing to stamp. **What it shows**: always its word, the grade that
   stands, larger (the most severe of the deciding steps, usually the last decider's), who gave it and when; then
   (`STAMP_SHOW:<what>`) every grade given with who and when (on), what it is released for, the document and its
   revision, the review's number (off), and why, the comments on a last page (`STAMP_COMMENTS`, off). **Where it sits**
@@ -269,7 +269,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   grade given as a small table (STEP · GRADE · BY · ON, each cell cut to its own width), then its notes. A grade reads by
   its name, a short code people cite before it ("C1 — Accepted"); a code with no name reads as words ("No comment"),
   never as the app's code (`StampFace.Grade`). The Control room only reads it, one line on each step that stamps, with "change" to the card; the Defaults for
-  new projects no longer carry it. The PDF opened from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`).
+  new projects no longer carry it. The PDF opened from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`), of its newest
+  submission only. **The document's Preview follows the newest revision** (owner), whatever its state, named on its tab
+  ("Preview · rev B"): just started, nothing until its PDF is in; prepared or in review, its own newest PDF; returned, its
+  returned copy; released, its stamped copy. The review's page shows the same copy of its revision.
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
   every project" (Default rules, tabs by area, `prevented.ts`), never checked.
 - Assurance: each finding points to the exact spot where it is put right: a document's tab, or else the thing

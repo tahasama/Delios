@@ -166,10 +166,13 @@ export default async function DocumentDetailPage({
   const current = doc.revisions.find((r) => r.state === "RELEASED");
   const working = inPrep ?? inReview ?? notReleased ?? null;
   const shown = current ?? working ?? doc.revisions[0] ?? null;
+  // The preview follows the newest revision, whatever it is (owner): one just started shows nothing until its PDF is
+  // in, one in preparation or in review its own PDF, one returned its returned copy, one released its stamped copy.
+  const previewed = doc.revisions[0] ?? null;
   // The copy that says where it stands (stamped, returned, superseded, void, on hold), else the PDF as sent.
-  const pdf = shown ? openCopy(shown.files) : null;
+  const pdf = previewed ? openCopy(previewed.files) : null;
   // Just released after its review, where the project stamps: the stamped copy is a few seconds away; the page waits for it.
-  const stampWaited = !!current && !!current.releasedAt && Date.now() - current.releasedAt.getTime() < 120_000
+  const stampWaited = !!current && previewed?.id === current.id && !!current.releasedAt && Date.now() - current.releasedAt.getTime() < 120_000
     && current.cycles.length > 0 && !current.files.some((f) => f.kind === "STAMPED")
     && await (async () => {
       const { stampAnswers } = await import("@/lib/settings/stamp");
@@ -177,7 +180,7 @@ export default async function DocumentDetailPage({
       const a = stampAnswers(await orgSettings().catch(() => new Map()), await projectSettings(ctx.projectId).catch(() => new Map()));
       return a.POLICY_PDF_STAMP !== "OFF" && a["STAMP:RELEASED"] !== "OFF";
     })();
-  const native = shown?.files.find((f) => f.kind === "NATIVE") ?? null;
+  const native = previewed?.files.find((f) => f.kind === "NATIVE") ?? null;
   // Requests on the revision in hand: who asked for it to be sent, to whom, and
   // whether it has gone.
   const carrying = working ?? current ?? null;
@@ -735,15 +738,15 @@ export default async function DocumentDetailPage({
         tabs={[
           {
             id: "viewer",
-            label: "Preview",
+            label: previewed ? `Preview · rev ${previewed.value}` : "Preview",
             content: pdf ? (<>
               {stampWaited ? <StampPending /> : null}
-              <iframe src={`/api/files/${pdf.id}`} title={`${doc.docNumber} rev ${shown?.value ?? ""}`} className="h-[70vh] min-h-120 w-full bg-slate-100" />
+              <iframe src={`/api/files/${pdf.id}`} title={`${doc.docNumber} rev ${previewed?.value ?? ""}`} className="h-[70vh] min-h-120 w-full bg-slate-100" />
             </>) : (
               <div className="grid h-48 place-items-center p-6 text-center">
                 <div>
                   <FileText className="mx-auto h-8 w-8 text-slate-400" />
-                  <p className="mt-2 text-sm font-semibold text-slate-700">No PDF to show yet</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-700">{previewed ? `No PDF for rev ${previewed.value} yet` : "No PDF to show yet"}</p>
                   <p className="mt-1 text-xs text-slate-500">{working ? `Attach one to rev ${working.value} in the step above.` : "Start a revision to add content."}</p>
                 </div>
               </div>

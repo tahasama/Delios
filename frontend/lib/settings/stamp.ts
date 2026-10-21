@@ -8,10 +8,10 @@
 /** Stamped at all: on unless switched off. */
 export const STAMP_ON_KEY = "POLICY_PDF_STAMP";
 
-/** When a review stamps the PDF: released after it (on unless off), returned by it (off unless on). */
+/** When a review stamps the PDF: released after it, and returned by it (each on unless off). */
 export const STAMP_WHEN = [
   { key: "STAMP:RELEASED", label: "Released after its review", text: "the revision a review released, stamped RELEASED in green", on: true },
-  { key: "STAMP:RETURNED", label: "Returned by its review", text: "the revision a review sent back, stamped RETURNED in red", on: false },
+  { key: "STAMP:RETURNED", label: "Returned by its review", text: "the revision a review sent back, stamped RETURNED in red", on: true },
 ] as const;
 
 /**
