@@ -264,7 +264,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   revision, the review's number (off), and why, the comments on a last page (`STAMP_COMMENTS`, off). **Where it sits**
   (`STAMP_PLACE`, top right by default, or another corner). **The marks across the page**, as they were (owner):
   superseded, void, on hold (`STAMP:SUPERSEDED|VOID|HELD`, on). Beside the form, the stamp drawn on a page as it will
-  read. The Control room only reads it, one line on each step that stamps, with "change" to the card; the Defaults for
+  read. **Its look** (owner: the first one was "bad"; `Stamping.Stamp`): a double rule, a band in its colour with the
+  word in white (and what it is released for on the right), the grade that stands large, who gave it · when, then every
+  grade given as a small table (STEP · GRADE · BY · ON, each cell cut to its own width), then its notes. A grade reads by
+  its name, a short code people cite before it ("C1 — Accepted"); a code with no name reads as words ("No comment"),
+  never as the app's code (`StampFace.Grade`). The Control room only reads it, one line on each step that stamps, with "change" to the card; the Defaults for
   new projects no longer carry it. The PDF opened from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`).
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
   every project" (Default rules, tabs by area, `prevented.ts`), never checked.

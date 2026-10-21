@@ -149,30 +149,33 @@ public sealed class Stamping(
         var labels = await db.ValueEntries.AsNoTracking()
             .Where(v => v.SetKey == review.VerdictSet || v.SetKey == ReviewSets.Advice)
             .Select(v => new { v.SetKey, v.Code, v.Label }).ToListAsync(cancellationToken);
-        string Grade(string set, string? code) =>
-            code is null ? "" : $"{code} {labels.FirstOrDefault(l => l.SetKey == set && l.Code == code)?.Label}".Trim();
+        string Grade(string? set, string? code) =>
+            code is null ? "" : StampFace.Grade(code, labels.FirstOrDefault(l => l.SetKey == set && l.Code == code)?.Label);
         var steps = review.Steps.OrderBy(s => s.Index).ToList();
         // Who gave the standing verdict: on the last deciding step that gave it, whoever of its people answered so.
         var standingStep = steps.LastOrDefault(s => s.Deciding && s.Answer == review.Verdict);
         var standingBy = standingStep?.Participants.Where(p => p.Answer == review.Verdict && p.AnsweredAt is not null)
             .OrderBy(p => p.AnsweredAt).LastOrDefault();
-        var lines = new List<string>();
-        if (standingBy is not null)
-            lines.Add($"by {standingBy.UserName}, {Day(standingBy.AnsweredAt)}");
+        var by = standingBy is not null ? $"{standingBy.UserName} · {Day(standingBy.AnsweredAt)}"
+            : standingStep is { ByProxy: true } ? $"{standingStep.PartyName} · {Day(standingStep.CompletedAt)}" : "";
+        var rows = new List<StampRow>();
         if (choices.Shows("STEPS"))
         {
             foreach (var step in steps)
             {
                 foreach (var one in step.Participants.Where(p => p.AnsweredAt is not null && p.Answer is not null).OrderBy(p => p.AnsweredAt))
-                    lines.Add($"{step.Index + 1}. {step.Title}: {Grade(step.Deciding ? review.VerdictSet : ReviewSets.Advice, one.Answer)}, {one.UserName}, {Day(one.AnsweredAt)}");
+                    rows.Add(new($"{step.Index + 1}. {step.Title}", Grade(step.Deciding ? review.VerdictSet : ReviewSets.Advice, one.Answer), one.UserName, Day(one.AnsweredAt)));
                 if (step.ByProxy && step.ForeignAnswer is { } theirs)
-                    lines.Add($"{step.Index + 1}. {step.Title}: {theirs}, {step.PartyName}, {Day(step.CompletedAt)}");
+                    rows.Add(new($"{step.Index + 1}. {step.Title}", theirs, step.PartyName ?? "", Day(step.CompletedAt)));
             }
         }
-        if (choices.Shows("STATUS") && review.GrantedStatus is { } status) lines.Add($"Released for {status}");
-        if (choices.Shows("DOCUMENT")) lines.Add($"{document.Number}  rev {revision.Value}");
-        if (choices.Shows("REVIEW")) lines.Add($"Review {review.Number}");
-        return new StampFace("RELEASED", Grade(review.VerdictSet, review.Verdict), lines, false);
+        var notes = new List<string>();
+        var where = new List<string>();
+        if (choices.Shows("DOCUMENT")) where.Add($"{document.Number} rev {revision.Value}");
+        if (choices.Shows("REVIEW")) where.Add($"Review {review.Number}");
+        if (where.Count > 0) notes.Add(string.Join("  ·  ", where));
+        var status = choices.Shows("STATUS") ? review.GrantedStatus : null;
+        return new StampFace("RELEASED", Grade(review.VerdictSet, review.Verdict), by, rows, notes, status, false);
     }
 
     /// <summary>The comments written on a review, as they read (taken back ones left out): who, and what.</summary>
@@ -242,42 +245,93 @@ public sealed class Stamping(
     }
 
     /// <summary>
-    /// A box in a corner of every page (<paramref name="place"/>, top right unless the project chose another): RELEASED,
-    /// the standing verdict larger, then the face's lines; with comments, a line saying so and a last page listing them.
-    /// A line too long for the box is cut with an ellipsis (the review keeps it whole in the app).
+    /// The stamp, in a corner of every page (<paramref name="place"/>, top right unless the project chose another), drawn
+    /// as a review stamp is: a double rule, a band with its word (RELEASED in green, RETURNED in red) and what it is
+    /// released for, the grade that stands large with who gave it and when, then every grade given as a small table
+    /// (step, grade, who, when), and its notes (the document, the review, why). Each cell is cut to its own width with an
+    /// ellipsis, never a line cut mid-name; the review keeps everything whole in the app.
     /// </summary>
     public static byte[] Stamp(byte[] pdf, StampFace face, string place = StampChoices.TopRight, IReadOnlyList<string>? comments = null, string? commentsTitle = null)
     {
         using var input = new MemoryStream(pdf);
         using var document = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
-        var word = new XFont(EmbeddedFonts.Family, 8, XFontStyleEx.Bold);
-        var verdict = new XFont(EmbeddedFonts.Family, 11, XFontStyleEx.Bold);
-        var regular = new XFont(EmbeddedFonts.Family, 7.5, XFontStyleEx.Regular);
-        var colour = face.Red ? XColor.FromArgb(255, 170, 30, 30) : XColor.FromArgb(255, 20, 90, 50);
+        var band = new XFont(EmbeddedFonts.Family, 8, XFontStyleEx.Bold);
+        var grade = new XFont(EmbeddedFonts.Family, 13, XFontStyleEx.Bold);
+        var small = new XFont(EmbeddedFonts.Family, 7, XFontStyleEx.Regular);
+        var head = new XFont(EmbeddedFonts.Family, 5.5, XFontStyleEx.Bold);
+        var cell = new XFont(EmbeddedFonts.Family, 6.5, XFontStyleEx.Regular);
+        var colour = face.Red ? XColor.FromArgb(255, 160, 28, 28) : XColor.FromArgb(255, 22, 92, 56);
         var ink = new XSolidBrush(colour);
-        var border = new XPen(colour, 1.2);
+        var soft = new XSolidBrush(XColor.FromArgb(255, 70, 80, 90));
+        var paper = new XSolidBrush(XColor.FromArgb(235, 255, 255, 255));
+        var outer = new XPen(colour, 1.4);
+        var inner = new XPen(colour, 0.4);
+        var rule = new XPen(XColor.FromArgb(120, colour.R, colour.G, colour.B), 0.4);
         var withComments = comments is { Count: > 0 };
-        var lines = withComments ? [.. face.Lines, $"Why: {comments!.Count} comment{(comments.Count == 1 ? "" : "s")}, on the last page"] : face.Lines.ToList();
-        const double width = 230, pad = 6;
-        var height = 30 + (face.Verdict.Length > 0 ? 14 : 0) + lines.Count * 10 + 2;
-        var pages = document.Pages.Cast<PdfPage>().ToList();
-        foreach (var page in pages)
+        var notes = withComments ? [.. face.Notes, $"Why: {comments!.Count} comment{(comments.Count == 1 ? "" : "s")}, on the last page"] : face.Notes.ToList();
+
+        const double width = 250, pad = 7, bandH = 15, rowH = 9;
+        // Step · grade · who · when, as fractions of the inner width.
+        double[] cols = [0.29, 0.27, 0.23, 0.21];
+        var height = bandH + 6 + 15 + (face.By.Length > 0 ? 10 : 0)
+            + (face.Rows.Count > 0 ? 6 + 8 + face.Rows.Count * rowH : 0)
+            + (notes.Count > 0 ? 4 + notes.Count * 8.5 : 0) + pad - 1;
+
+        foreach (var page in document.Pages.Cast<PdfPage>().ToList())
         {
             using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
-            string Fit(string text, XFont font)
+            string Fit(string text, XFont font, double room)
             {
-                if (gfx.MeasureString(text, font).Width <= width - 2 * pad) return text;
-                while (text.Length > 1 && gfx.MeasureString(text + "…", font).Width > width - 2 * pad) text = text[..^1];
-                return text + "…";
+                if (gfx.MeasureString(text, font).Width <= room) return text;
+                while (text.Length > 1 && gfx.MeasureString(text + "…", font).Width > room) text = text[..^1];
+                return text.TrimEnd() + "…";
             }
-            var box = new XRect(place.EndsWith("LEFT") ? 18 : page.Width.Point - width - 18,
-                place.StartsWith("BOTTOM") ? page.Height.Point - height - 18 : 18, width, height);
-            gfx.DrawRectangle(border, XBrushes.White, box);
-            gfx.DrawString(face.Title, word, ink, box.X + pad, box.Y + 12);
-            var y = box.Y + 12;
-            if (face.Verdict.Length > 0) { y += 15; gfx.DrawString(Fit(face.Verdict, verdict), verdict, ink, box.X + pad, y); }
-            y += 4;
-            foreach (var line in lines) { y += 10; gfx.DrawString(Fit(line, regular), regular, ink, box.X + pad, y); }
+            var x = place.EndsWith("LEFT") ? 18 : page.Width.Point - width - 18;
+            var top = place.StartsWith("BOTTOM") ? page.Height.Point - height - 18 : 18;
+            var box = new XRect(x, top, width, height);
+            gfx.DrawRectangle(outer, paper, box);
+            gfx.DrawRectangle(inner, new XRect(x + 2.2, top + 2.2, width - 4.4, height - 4.4));
+
+            // The band: the word, and what it is released for.
+            var bandBox = new XRect(x + 2.2, top + 2.2, width - 4.4, bandH);
+            gfx.DrawRectangle(ink, bandBox);
+            gfx.DrawString(face.Title, band, XBrushes.White, new XRect(bandBox.X + pad - 2, bandBox.Y, bandBox.Width, bandBox.Height), XStringFormats.CenterLeft);
+            if (face.Status is { Length: > 0 } status)
+                gfx.DrawString(status, band, XBrushes.White, new XRect(bandBox.X, bandBox.Y, bandBox.Width - pad + 2, bandBox.Height), XStringFormats.CenterRight);
+
+            var left = x + pad;
+            var room = width - 2 * pad;
+            var y = top + 2.2 + bandH + 6 + 11;
+            gfx.DrawString(Fit(face.Verdict, grade, room), grade, ink, left, y);
+            if (face.By.Length > 0) { y += 10; gfx.DrawString(Fit(face.By, small, room), small, soft, left, y); }
+
+            if (face.Rows.Count > 0)
+            {
+                y += 5;
+                gfx.DrawLine(rule, left, y, left + room, y);
+                y += 7;
+                string[] heads = ["STEP", "GRADE", "BY", "ON"];
+                var cx = left;
+                for (var i = 0; i < 4; i++) { gfx.DrawString(heads[i], head, ink, cx, y); cx += cols[i] * room; }
+                foreach (var row in face.Rows)
+                {
+                    y += rowH;
+                    string[] cells = [row.Step, row.Grade, row.Who, row.On];
+                    cx = left;
+                    for (var i = 0; i < 4; i++)
+                    {
+                        var w = cols[i] * room - 3;
+                        gfx.DrawString(Fit(cells[i], cell, w), cell, i == 1 ? ink : soft, cx, y);
+                        cx += cols[i] * room;
+                    }
+                }
+            }
+            if (notes.Count > 0)
+            {
+                y += 4;
+                gfx.DrawLine(rule, left, y, left + room, y);
+                foreach (var note in notes) { y += 8.5; gfx.DrawString(Fit(note, cell, room), cell, soft, left, y); }
+            }
         }
         if (withComments) AppendComments(document, commentsTitle ?? "Comments", comments!);
         using var output = new MemoryStream();
@@ -350,8 +404,27 @@ public sealed class Stamping(
     }
 }
 
-/// <summary>What the stamp says: its word, the standing verdict, and the lines under it.</summary>
-public sealed record StampFace(string Title, string Verdict, IReadOnlyList<string> Lines, bool Red);
+/// <summary>
+/// What the stamp says: its word, the grade that stands, who gave it and when, every grade given (one row each), its
+/// notes, and what it is released for (in the band, when shown).
+/// </summary>
+public sealed record StampFace(string Title, string Verdict, string By, IReadOnlyList<StampRow> Rows, IReadOnlyList<string> Notes, string? Status, bool Red)
+{
+    /// <summary>
+    /// A grade as people read it: its name; a short code people cite (C1, A) goes before it. A code with no name reads
+    /// as words (NO_COMMENT, "No comment"), never as the app's code.
+    /// </summary>
+    public static string Grade(string code, string? label)
+    {
+        var words = string.IsNullOrWhiteSpace(label)
+            ? System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(code.Replace('_', ' ').ToLowerInvariant())
+            : label.Trim();
+        return code.Length <= 3 && !string.Equals(code, words, StringComparison.OrdinalIgnoreCase) ? $"{code} — {words}" : words;
+    }
+}
+
+/// <summary>One grade given on the stamp: the step, the grade, who gave it, the day.</summary>
+public sealed record StampRow(string Step, string Grade, string Who, string On);
 
 /// <summary>DejaVu Sans, shipped inside the assembly (Resources/Fonts, with its licence).</summary>
 public sealed class EmbeddedFonts : IFontResolver
