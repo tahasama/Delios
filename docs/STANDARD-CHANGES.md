@@ -1399,14 +1399,15 @@ request itself.
 A stamp on a PDF holds legally: it says what a review decided. It is set in one place, the same for every document: the
 organization's card is every project's default, and a project changes its own where the organization leaves it free.
 The card says whether PDFs are stamped at all; when a review stamps (the revision it released, on; the one it returned,
-off unless chosen; released without a review, nothing to stamp); what the stamp shows (always its word, the grade that
-stands, who gave it and when; then, as chosen, every grade given with who and when, what it is released for, the
-document's number and revision, the review's number, and why, the comments on a last page); and the corner it sits in
-(top right by default). The marks across the page (superseded, void, on hold) are kept as they were.
+on; released without a review, nothing to stamp); what the stamp shows (always the organization, the project and the
+outcome alone, in the colour the register gives the revision's state; who gave it and when unless every grade given is
+shown; then, as chosen, every grade given with who and when, what it is released for, the document's number and
+revision, the review's number, the time with each date, and why, the comments on a last page); the words at its foot;
+the corner it sits in (top right by default); and how large it is drawn. The marks across the page (superseded, void, on hold) are kept as they were.
 
 Document families group document types and help with recommendations; they decide nothing, so they carry no stamp
 rule and have no Settings page: they are a set in Types & sets, read on Help.
 
 **Depends on it:** `POLICY_PDF_STAMP`, `STAMP:RELEASED|RETURNED|SUPERSEDED|VOID|HELD`, `STAMP_SHOW:<what>`,
-`STAMP_COMMENTS`, `STAMP_PLACE` (Settings → The stamp, both levels); `Stamping.StampChoices`, `FaceAsync` (worker);
+`STAMP_COMMENTS`, `STAMP_PLACE`, `STAMP_SIZE`, `STAMP_NOTE` (Settings → The stamp, both levels); `Stamping.StampChoices`, `FaceAsync` (worker);
 `DOC_FAMILIES` (Types & sets).

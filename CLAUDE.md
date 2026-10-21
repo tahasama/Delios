@@ -257,17 +257,19 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `Stamping.StampChoices`). Two levels: the organization's answers are every project's default; where its switch
   (`POLICY_PDF_STAMP`, area "The stamp", Free by default) leaves it free, a project keeps only what differs from them
   (refused otherwise, ROOM_FIXED). The card: **stamped or not** (`POLICY_PDF_STAMP`); **when** a review stamps the revision
-  it decided (owner: freedom): released after its review (`STAMP:RELEASED`, on) and returned by it (`STAMP:RETURNED`, red,
-  on: owner, "reject stamp didnt appear"; to its author or to its sender for correction alike); released without a review, nothing to stamp. **One design, whatever the outcome** (owner: "the stamp is unified"; researched: vendor-document and shop-drawing
-  review stamps all list every outcome with a box and tick the one given): a double rule in one ink (navy, never green or
-  red: the ticked box says the outcome); the reviewing organization's name and "Document review" with the project;
-  every grade the review could give, from its own set (a review that kept none: the set its verdict belongs to), each
-  with its box, the one given ticked and bold, a short code people cite in its own column (a long code only repeats the
-  words, so it is left out); "Reviewed by" and "Date" (who gave the standing verdict, the most severe of the deciding
-  steps, usually the last decider's); then (`STAMP_SHOW:<what>`) what it is released for, the document and its revision,
-  the review's number (off), every grade given as a small table, STEP · GRADE · BY · ON (on); why, the comments on a
-  last page (`STAMP_COMMENTS`, off); and the organization's words at its foot (`STAMP_NOTE`, what the review does not
-  relieve the sender of, as its contracts say it; none unless written, 240 characters). **Where it sits** (`STAMP_PLACE`,
+  it decided (owner: freedom): released after its review (`STAMP:RELEASED`, on) and returned by it (`STAMP:RETURNED`,
+  on: owner, "reject stamp didnt appear"; to its author or to its sender for correction alike); released without a review, nothing to stamp. **One design, whatever the outcome** (owner: "the stamp is unified"):
+  a rounded frame, modern (owner: "looks good but old"), in the colour its revision's state has in the register (owner:
+  released emerald, returned rose); the reviewing organization's name and the project, "Document review"; **the outcome
+  alone** (owner: "show only the outcome… for space management"), a tinted badge with ✓ or ✕, its short code people
+  cite and its words ("C1 — Accepted"; a code longer than 4 characters only repeats the words, left out); "Reviewed by"
+  and "Date" (the standing verdict's, the most severe of the deciding steps) only when every grade given is not shown
+  (owner: "reviewed by repeats the steps"); then (`STAMP_SHOW:<what>`) every grade given as a small table, STEP · GRADE
+  · BY · ON (on), what it is released for, the document and its revision, the review's number (off), **the time with
+  each date** (`STAMP_SHOW:TIME`, off: the date only by default); why, the comments on a last page (`STAMP_COMMENTS`,
+  off); and the organization's words at its foot (`STAMP_NOTE`, what the review does not relieve the sender of, as its
+  contracts say it; none unless written, 240 characters). **How large** (`STAMP_SIZE`, S · M · L · XL = 0.8 · 1 · 1.25
+  · 1.5, Normal by default): frame and words grow or shrink together. **Where it sits** (`STAMP_PLACE`,
   top right by default, or another corner). **The marks across the page**, as they were (owner): superseded, void, on
   hold (`STAMP:SUPERSEDED|VOID|HELD`, on). Beside the form, the stamp drawn on a page as it will read (`Stamping.Stamp`,
   `StampFace`; a code with no name reads as words, "No comment", never the app's code). The Control room only reads it, one line on each step that stamps, with "change" to the card; the Defaults for

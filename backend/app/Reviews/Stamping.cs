@@ -27,6 +27,8 @@ public sealed class Stamping(
 {
     /// <summary>Date format printed on stamps, for example "07 Oct 2026".</summary>
     private static readonly LocalDatePattern DatePattern = LocalDatePattern.CreateWithInvariantCulture("dd MMM yyyy");
+    /// <summary>Date and time, for a stamp the project asked to carry the time (<c>STAMP_SHOW:TIME</c>).</summary>
+    private static readonly LocalDateTimePattern DateTimePattern = LocalDateTimePattern.CreateWithInvariantCulture("dd MMM yyyy HH:mm");
 
     /// <summary>Runs once before the class is first used: tells the PDF library (PdfSharp) to load fonts from <see cref="EmbeddedFonts"/>, unless a resolver is already set.</summary>
     static Stamping() => GlobalFontSettings.FontResolver ??= new EmbeddedFonts();
@@ -51,13 +53,13 @@ public sealed class Stamping(
             .OrderByDescending(r => r.ClosedAt).FirstOrDefaultAsync(cancellationToken);
         if (review is not null && choices.On("RELEASED"))
         {
-            var face = await FaceAsync(review, document, revision, zone, choices, cancellationToken);
+            var face = await FaceAsync(review, document, revision, zone, choices, false, cancellationToken);
             var comments = choices.Comments ? await CommentsAsync(review.Id, cancellationToken) : [];
             foreach (var rendition in revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean
                 && f.Submission == revision.Submission).ToList())
             {
                 if (revision.Files.Any(f => f.DerivedFromId == rendition.Id && f.Kind == FileKinds.Stamped)) continue;
-                await DeriveAsync(rendition, FileKinds.Stamped, document, revision, bytes => Stamp(bytes, face, choices.Place, comments: comments,
+                await DeriveAsync(rendition, FileKinds.Stamped, document, revision, bytes => Stamp(bytes, face, choices.Place, scale: choices.Scale, comments: comments,
                     commentsTitle: $"{document.Number} rev {revision.Value}: why, the comments of review {review.Number}"), cancellationToken);
             }
         }
@@ -128,12 +130,12 @@ public sealed class Stamping(
         var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == revision.ProjectId, cancellationToken);
         var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(project.TimeZone) ?? DateTimeZone.Utc;
         // The same stamp as a release's (owner: "the stamp is unified"): the grade ticked says it was returned.
-        var face = await FaceAsync(review, document, revision, zone, choices, cancellationToken);
+        var face = await FaceAsync(review, document, revision, zone, choices, true, cancellationToken);
         var comments = choices.Comments ? await CommentsAsync(review.Id, cancellationToken) : [];
         foreach (var source in revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission).ToList())
         {
             if (revision.Files.Any(f => f.DerivedFromId == source.Id && f.Kind == FileKinds.Returned)) continue;
-            await DeriveAsync(source, FileKinds.Returned, document, revision, bytes => Stamp(bytes, face, choices.Place, comments: comments,
+            await DeriveAsync(source, FileKinds.Returned, document, revision, bytes => Stamp(bytes, face, choices.Place, scale: choices.Scale, comments: comments,
                 commentsTitle: $"{document.Number} rev {revision.Value}: why, the comments of review {review.Number}"), cancellationToken);
         }
     }
@@ -144,36 +146,23 @@ public sealed class Stamping(
     /// review worked it out), and who gave it and when; then, each as the project chose: every grade given with who and
     /// when, what it is released for, the document and its revision, the review's number.
     /// </summary>
-    private async Task<StampFace> FaceAsync(Review review, Document document, Revision revision, DateTimeZone zone, StampChoices choices, CancellationToken cancellationToken)
+    private async Task<StampFace> FaceAsync(Review review, Document document, Revision revision, DateTimeZone zone, StampChoices choices,
+        bool returned, CancellationToken cancellationToken)
     {
-        string Day(Instant? at) => at is { } i ? DatePattern.Format(i.InZone(zone).Date) : "";
+        // The day, or the day and the time where the project asked for it.
+        string Day(Instant? at) => at is not { } i ? ""
+            : choices.Shows("TIME") ? DateTimePattern.Format(i.InZone(zone).LocalDateTime) : DatePattern.Format(i.InZone(zone).Date);
         var labels = await db.ValueEntries.AsNoTracking()
             .Where(v => v.SetKey == review.VerdictSet || v.SetKey == ReviewSets.Advice)
             .Select(v => new { v.SetKey, v.Code, v.Label }).ToListAsync(cancellationToken);
         string? LabelOf(string? set, string code) => labels.FirstOrDefault(l => l.SetKey == set && l.Code == code)?.Label;
         string Grade(string? set, string? code) => code is null ? "" : StampFace.Grade(code, LabelOf(set, code));
 
-        // Every grade the review could give, in its set's order, the one given ticked (a review stamp's way).
-        var catalog = await Catalog.LoadAsync(db, cancellationToken);
-        // A review that kept no set of its own lists the set its verdict belongs to, never every set of the list.
-        var setName = review.Verdicts ?? (review.Verdict is { } v ? catalog.SetNameOf(review.VerdictSet, v) : null);
-        var codes = catalog.ActiveIn(review.VerdictSet, setName).ToList();
-        if (review.Verdict is { } given && !codes.Contains(given)) codes.Add(given);
-        var options = codes.Select(code => new StampOption(code, StampFace.Words(code, LabelOf(review.VerdictSet, code)), code == review.Verdict)).ToList();
-
         var steps = review.Steps.OrderBy(s => s.Index).ToList();
         // Who gave the standing verdict: on the last deciding step that gave it, whoever of its people answered so.
         var standingStep = steps.LastOrDefault(s => s.Deciding && s.Answer == review.Verdict);
         var standingBy = standingStep?.Participants.Where(p => p.Answer == review.Verdict && p.AnsweredAt is not null)
             .OrderBy(p => p.AnsweredAt).LastOrDefault();
-        var fields = new List<StampField>
-        {
-            new("Reviewed by", standingBy?.UserName ?? (standingStep is { ByProxy: true } ? standingStep.PartyName ?? "" : "")),
-            new("Date", Day(standingBy?.AnsweredAt ?? standingStep?.CompletedAt ?? review.DecidedAt)),
-        };
-        if (choices.Shows("STATUS") && review.GrantedStatus is { } status) fields.Add(new("Released for", status));
-        if (choices.Shows("DOCUMENT")) fields.Add(new("Document", $"{document.Number} rev {revision.Value}"));
-        if (choices.Shows("REVIEW")) fields.Add(new("Review", review.Number));
 
         var rows = new List<StampRow>();
         if (choices.Shows("STEPS"))
@@ -186,9 +175,22 @@ public sealed class Stamping(
                     rows.Add(new($"{step.Index + 1}. {step.Title}", theirs, step.PartyName ?? "", Day(step.CompletedAt)));
             }
         }
+        // Who decided and when, only where the steps do not already say it (owner: "reviewed by repeats the steps").
+        var fields = new List<StampField>();
+        if (rows.Count == 0)
+        {
+            fields.Add(new("Reviewed by", standingBy?.UserName ?? (standingStep is { ByProxy: true } ? standingStep.PartyName ?? "" : "")));
+            fields.Add(new("Date", Day(standingBy?.AnsweredAt ?? standingStep?.CompletedAt ?? review.DecidedAt)));
+        }
+        if (choices.Shows("STATUS") && review.GrantedStatus is { } status) fields.Add(new("Released for", status));
+        if (choices.Shows("DOCUMENT")) fields.Add(new("Document", $"{document.Number} rev {revision.Value}"));
+        if (choices.Shows("REVIEW")) fields.Add(new("Review", review.Number));
+
         var organization = await db.Tenants.AsNoTracking().Where(t => t.Id == document.TenantId).Select(t => t.Name).FirstOrDefaultAsync(cancellationToken) ?? "";
         var project = await db.Projects.AsNoTracking().Where(p => p.Id == document.ProjectId).Select(p => p.Code).FirstOrDefaultAsync(cancellationToken) ?? "";
-        return new StampFace(organization, project, options, fields, rows, choices.Note);
+        var outcome = review.Verdict is { } given ? StampFace.Words(given, LabelOf(review.VerdictSet, given)) : "";
+        var code = review.Verdict is { Length: <= 4 } shortCode && !string.Equals(shortCode, outcome, StringComparison.OrdinalIgnoreCase) ? shortCode : null;
+        return new StampFace(organization, project, code, outcome, returned, fields, rows, choices.Note);
     }
 
     /// <summary>The comments written on a review, as they read (taken back ones left out): who, and what.</summary>
@@ -258,135 +260,127 @@ public sealed class Stamping(
     }
 
     /// <summary>
-    /// The stamp, one design for every outcome (owner: "the stamp is unified"), drawn as review stamps are (vendor
-    /// documents, shop drawings): a double rule in one ink; the reviewing organization and "Document review" with the
-    /// project; every grade the review could give, each with its box, the one given ticked and bold; who reviewed it and
-    /// when (and, as chosen, what it is released for, the document, the review); every grade given as a small table;
-    /// the organization's words at its foot. In a corner of every page (<paramref name="place"/>, top right by default).
-    /// Each cell is cut to its width with an ellipsis; the review keeps everything whole in the app.
+    /// The stamp, one design for every outcome (owner: "the stamp is unified"), in the colour its revision's state has in
+    /// the register (released emerald, returned rose): a thin rounded border; the reviewing organization and the project,
+    /// "Document review"; the outcome alone, in a tinted badge with a tick or a cross (owner: "show only the outcome");
+    /// who reviewed it and when, unless every grade given follows as a small table (step, grade, by, on); what the project
+    /// chose to add; the organization's words at its foot. In a corner of every page (<paramref name="place"/>).
     /// </summary>
-    public static byte[] Stamp(byte[] pdf, StampFace face, string place = StampChoices.TopRight, IReadOnlyList<string>? comments = null, string? commentsTitle = null)
+    public static byte[] Stamp(byte[] pdf, StampFace face, string place = StampChoices.TopRight, IReadOnlyList<string>? comments = null,
+        string? commentsTitle = null, double scale = 1)
     {
         using var input = new MemoryStream(pdf);
         using var document = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
-        var org = new XFont(EmbeddedFonts.Family, 8.5, XFontStyleEx.Bold);
         var caps = new XFont(EmbeddedFonts.Family, 5.8, XFontStyleEx.Bold);
-        var option = new XFont(EmbeddedFonts.Family, 7.2, XFontStyleEx.Regular);
-        var chosen = new XFont(EmbeddedFonts.Family, 7.6, XFontStyleEx.Bold);
+        var heading = new XFont(EmbeddedFonts.Family, 7.2, XFontStyleEx.Bold);
+        var outcome = new XFont(EmbeddedFonts.Family, 11.5, XFontStyleEx.Bold);
         var value = new XFont(EmbeddedFonts.Family, 7, XFontStyleEx.Regular);
         var cell = new XFont(EmbeddedFonts.Family, 6.2, XFontStyleEx.Regular);
         var foot = new XFont(EmbeddedFonts.Family, 5.6, XFontStyleEx.Regular);
-        // One ink, as a rubber stamp: the box ticked says the outcome, never a colour.
-        var colour = XColor.FromArgb(255, 28, 52, 110);
+        // The register's colours for the state the review left it in: released (emerald 700), returned (rose 700).
+        var colour = face.Returned ? XColor.FromArgb(255, 190, 18, 60) : XColor.FromArgb(255, 4, 120, 87);
+        var tint = face.Returned ? XColor.FromArgb(255, 255, 241, 242) : XColor.FromArgb(255, 236, 253, 245);
         var ink = new XSolidBrush(colour);
-        var faint = new XSolidBrush(XColor.FromArgb(200, colour.R, colour.G, colour.B));
-        var paper = new XSolidBrush(XColor.FromArgb(235, 255, 255, 255));
-        var outer = new XPen(colour, 1.4);
-        var inner = new XPen(colour, 0.45);
-        var rule = new XPen(colour, 0.4);
-        var boxPen = new XPen(colour, 0.6);
+        var text = new XSolidBrush(XColor.FromArgb(255, 30, 41, 59));
+        var muted = new XSolidBrush(XColor.FromArgb(255, 100, 116, 139));
+        var paper = new XSolidBrush(XColor.FromArgb(240, 255, 255, 255));
+        var border = new XPen(colour, 0.9);
+        var line = new XPen(XColor.FromArgb(255, 226, 232, 240), 0.5);
         var withComments = comments is { Count: > 0 };
-
-        const double width = 236, pad = 7, optionH = 9.5, fieldH = 9, rowH = 8.5, footH = 7;
-        double[] cols = [0.29, 0.27, 0.23, 0.21];
         var fields = withComments ? [.. face.Fields, new StampField("Why", $"{comments!.Count} comment{(comments.Count == 1 ? "" : "s")}, on the last page")] : face.Fields.ToList();
+
+        const double width = 250, pad = 8, fieldH = 9, rowH = 8.6, footH = 6.8, badgeH = 19;
+        // Step · grade · by · on; "on" takes more room when it carries the time as well.
+        double[] cols = face.Rows.Any(r => r.On.Contains(':')) ? [0.25, 0.24, 0.22, 0.29] : [0.29, 0.26, 0.24, 0.21];
 
         foreach (var page in document.Pages.Cast<PdfPage>().ToList())
         {
             using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
-            string Fit(string text, XFont font, double room)
+            string Fit(string s, XFont font, double room)
             {
-                if (gfx.MeasureString(text, font).Width <= room) return text;
-                while (text.Length > 1 && gfx.MeasureString(text + "…", font).Width > room) text = text[..^1];
-                return text.TrimEnd() + "…";
+                if (gfx.MeasureString(s, font).Width <= room) return s;
+                while (s.Length > 1 && gfx.MeasureString(s + "…", font).Width > room) s = s[..^1];
+                return s.TrimEnd() + "…";
             }
-            List<string> Wrap(string text, XFont font, double room)
+            List<string> Wrap(string s, XFont font, double room)
             {
                 var lines = new List<string>();
-                var line = "";
-                foreach (var word in text.Replace("\r", "").Split(' ', '\n'))
+                var current = "";
+                foreach (var word in s.Replace("\r", "").Split(' ', '\n'))
                 {
-                    var candidate = line.Length == 0 ? word : $"{line} {word}";
-                    if (gfx.MeasureString(candidate, font).Width > room && line.Length > 0) { lines.Add(line); line = word; }
-                    else line = candidate;
+                    var candidate = current.Length == 0 ? word : $"{current} {word}";
+                    if (gfx.MeasureString(candidate, font).Width > room && current.Length > 0) { lines.Add(current); current = word; }
+                    else current = candidate;
                 }
-                if (line.Length > 0) lines.Add(line);
+                if (current.Length > 0) lines.Add(current);
                 return lines.Take(4).ToList();
             }
             var room = width - 2 * pad;
             var footLines = face.Note is { Length: > 0 } note ? Wrap(note, foot, room) : [];
-            var height = 4 + 12 + 8 + 5 + face.Options.Count * optionH + 5 + fields.Count * fieldH
-                + (face.Rows.Count > 0 ? 5 + 7 + face.Rows.Count * rowH : 0)
-                + (footLines.Count > 0 ? 5 + footLines.Count * footH : 0) + pad;
+            var height = pad + 8 + 6 + badgeH + (fields.Count > 0 ? 4 + fields.Count * fieldH : 0)
+                + (face.Rows.Count > 0 ? 6 + 7 + face.Rows.Count * rowH : 0)
+                + (footLines.Count > 0 ? 6 + footLines.Count * footH : 0) + pad;
 
-            var x = place.EndsWith("LEFT") ? 18 : page.Width.Point - width - 18;
-            var top = place.StartsWith("BOTTOM") ? page.Height.Point - height - 18 : 18;
-            gfx.DrawRectangle(outer, paper, new XRect(x, top, width, height));
-            gfx.DrawRectangle(inner, new XRect(x + 2.2, top + 2.2, width - 4.4, height - 4.4));
+            // The stamp is drawn at its own size, then scaled as the project chose (frame and words together).
+            var atX = place.EndsWith("LEFT") ? 18 : page.Width.Point - width * scale - 18;
+            var atY = place.StartsWith("BOTTOM") ? page.Height.Point - height * scale - 18 : 18;
+            var state = gfx.Save();
+            gfx.TranslateTransform(atX, atY);
+            gfx.ScaleTransform(scale);
+            const double x = 0, top = 0;
+            gfx.DrawRoundedRectangle(border, paper, new XRect(x, top, width, height), new XSize(7, 7));
             var left = x + pad;
 
-            // Who reviewed, and what this is.
-            var y = top + 4 + 10;
-            gfx.DrawString(Fit(face.Organization.ToUpperInvariant(), org, room * 0.62), org, ink, left, y);
-            gfx.DrawString("DOCUMENT REVIEW", caps, ink, new XRect(left, y - 7, room, 8), XStringFormats.TopRight);
-            y += 8;
-            if (face.Project.Length > 0) gfx.DrawString(Fit($"Project {face.Project}", value, room), value, faint, left, y);
-            y += 4;
-            gfx.DrawLine(rule, left, y, left + room, y);
+            // Who reviewed, on what.
+            var y = top + pad + 6;
+            var who = face.Project.Length > 0 ? $"{face.Organization} · {face.Project}" : face.Organization;
+            gfx.DrawString(Fit(who, heading, room * 0.66), heading, text, left, y);
+            gfx.DrawString("DOCUMENT REVIEW", caps, ink, new XRect(left, y - 5.6, room, 7), XStringFormats.TopRight);
 
-            // Every grade it could give, the one given ticked.
-            y += 3;
-            foreach (var one in face.Options)
-            {
-                y += optionH;
-                var box = new XRect(left, y - 6.2, 6.2, 6.2);
-                gfx.DrawRectangle(boxPen, box);
-                if (one.Given)
-                {
-                    var tick = new XPen(colour, 1.1);
-                    gfx.DrawLine(tick, box.X + 1.1, box.Y + 1.1, box.Right - 1.1, box.Bottom - 1.1);
-                    gfx.DrawLine(tick, box.Right - 1.1, box.Y + 1.1, box.X + 1.1, box.Bottom - 1.1);
-                }
-                var font = one.Given ? chosen : option;
-                // A short code people cite (C1, A) stands in its own column; a long one (ACCEPTED) only repeats the words.
-                var cited = one.Code.Length <= 4 && !string.Equals(one.Code, one.Words, StringComparison.OrdinalIgnoreCase);
-                var codeW = face.Options.Any(o => o.Code.Length <= 4 && !string.Equals(o.Code, o.Words, StringComparison.OrdinalIgnoreCase)) ? 24.0 : 0;
-                if (cited) gfx.DrawString(one.Code, font, ink, left + 10, y);
-                gfx.DrawString(Fit(one.Words, font, room - 10 - codeW), font, one.Given ? ink : faint, left + 10 + codeW, y);
-            }
-            y += 4;
-            gfx.DrawLine(rule, left, y, left + room, y);
+            // The outcome alone, in its badge: a tick for a release, a cross for a return.
+            y += 6;
+            var badge = new XRect(left, y, room, badgeH);
+            gfx.DrawRoundedRectangle(new XSolidBrush(tint), badge, new XSize(5, 5));
+            var mark = face.Returned ? "✕" : "✓";
+            gfx.DrawString(mark, outcome, ink, new XRect(badge.X + 6, badge.Y, 12, badge.Height), XStringFormats.CenterLeft);
+            var said = face.Code is { } c ? $"{c} — {face.Outcome}" : face.Outcome;
+            gfx.DrawString(Fit(said, outcome, room - 24), outcome, ink, new XRect(badge.X + 20, badge.Y, room - 24, badge.Height), XStringFormats.CenterLeft);
+            y = badge.Bottom;
 
-            // Who reviewed it and when, and what was chosen besides.
-            foreach (var one in fields)
-            {
-                y += fieldH;
-                gfx.DrawString(one.Label.ToUpperInvariant(), caps, faint, left, y);
-                gfx.DrawString(Fit(one.Value, value, room - 52), value, ink, left + 52, y);
-            }
-
-            if (face.Rows.Count > 0)
+            if (fields.Count > 0)
             {
                 y += 4;
-                gfx.DrawLine(rule, left, y, left + room, y);
-                y += 7;
+                foreach (var one in fields)
+                {
+                    y += fieldH;
+                    gfx.DrawString(one.Label.ToUpperInvariant(), caps, muted, left, y);
+                    gfx.DrawString(Fit(one.Value, value, room - 52), value, text, left + 52, y);
+                }
+            }
+            if (face.Rows.Count > 0)
+            {
+                y += 6;
+                gfx.DrawLine(line, left, y - 2, left + room, y - 2);
+                y += 5;
                 string[] heads = ["STEP", "GRADE", "BY", "ON"];
                 var cx = left;
-                for (var i = 0; i < 4; i++) { gfx.DrawString(heads[i], caps, faint, cx, y); cx += cols[i] * room; }
+                for (var i = 0; i < 4; i++) { gfx.DrawString(heads[i], caps, muted, cx, y); cx += cols[i] * room; }
                 foreach (var row in face.Rows)
                 {
                     y += rowH;
                     string[] cells = [row.Step, row.Grade, row.Who, row.On];
                     cx = left;
-                    for (var i = 0; i < 4; i++) { gfx.DrawString(Fit(cells[i], cell, cols[i] * room - 3), cell, ink, cx, y); cx += cols[i] * room; }
+                    for (var i = 0; i < 4; i++) { gfx.DrawString(Fit(cells[i], cell, cols[i] * room - 3), cell, text, cx, y); cx += cols[i] * room; }
                 }
             }
             if (footLines.Count > 0)
             {
-                y += 4;
-                gfx.DrawLine(rule, left, y, left + room, y);
-                foreach (var line in footLines) { y += footH; gfx.DrawString(line, foot, faint, left, y); }
+                y += 5;
+                gfx.DrawLine(line, left, y - 1, left + room, y - 1);
+                y += 1;
+                foreach (var l in footLines) { y += footH; gfx.DrawString(l, foot, muted, left, y); }
             }
+            gfx.Restore(state);
         }
         if (withComments) AppendComments(document, commentsTitle ?? "Comments", comments!);
         using var output = new MemoryStream();
@@ -460,11 +454,11 @@ public sealed class Stamping(
 }
 
 /// <summary>
-/// What the stamp says, one design whatever the outcome: the reviewing organization and the project; every grade the
-/// review could give, the one given ticked; its fields (reviewed by, date, and what the project chose to add); every grade
-/// given (one row each); the organization's words at its foot.
+/// What the stamp says, one design whatever the outcome: the reviewing organization and the project; the outcome alone
+/// (its short code, its words, and whether its review returned the revision, which gives the stamp its colour); its
+/// fields; every grade given (one row each); the organization's words at its foot.
 /// </summary>
-public sealed record StampFace(string Organization, string Project, IReadOnlyList<StampOption> Options,
+public sealed record StampFace(string Organization, string Project, string? Code, string Outcome, bool Returned,
     IReadOnlyList<StampField> Fields, IReadOnlyList<StampRow> Rows, string? Note)
 {
     /// <summary>A grade's words: its name, else its code read as words (NO_COMMENT, "No comment"), never the app's code.</summary>
@@ -479,9 +473,6 @@ public sealed record StampFace(string Organization, string Project, IReadOnlyLis
         return code.Length <= 3 && !string.Equals(code, words, StringComparison.OrdinalIgnoreCase) ? $"{code} — {words}" : words;
     }
 }
-
-/// <summary>One grade the review could give: its code, its words, and whether it is the one given.</summary>
-public sealed record StampOption(string Code, string Words, bool Given);
 
 /// <summary>A field of the stamp: what it is, and what it says.</summary>
 public sealed record StampField(string Label, string Value);
@@ -527,10 +518,12 @@ public sealed record StampChoices(bool All, IReadOnlyDictionary<string, string> 
     public bool Shows(string what) => Answers.GetValueOrDefault($"STAMP_SHOW:{what}") is { } set ? set == "ON" : what == "STEPS";
     public bool Comments => All && Answers.GetValueOrDefault("STAMP_COMMENTS") == "ON";
     public string Place => Answers.GetValueOrDefault("STAMP_PLACE") is { } place && Places.Contains(place) ? place : TopRight;
+    /// <summary>How large the stamp is drawn (<c>STAMP_SIZE</c>): small, normal (the default), large, larger.</summary>
+    public double Scale => Answers.GetValueOrDefault("STAMP_SIZE") switch { "S" => 0.8, "L" => 1.25, "XL" => 1.5, _ => 1 };
     /// <summary>The organization's words at the stamp's foot (what the review does not relieve the sender of…); none unless written.</summary>
     public string? Note => Answers.GetValueOrDefault("STAMP_NOTE") is { Length: > 0 } note ? note : null;
 
-    private static bool IsStamp(string key) => key is "POLICY_PDF_STAMP" or "STAMP_COMMENTS" or "STAMP_PLACE" or "STAMP_NOTE" || key.StartsWith("STAMP:") || key.StartsWith("STAMP_SHOW:");
+    private static bool IsStamp(string key) => key is "POLICY_PDF_STAMP" or "STAMP_COMMENTS" or "STAMP_PLACE" or "STAMP_NOTE" or "STAMP_SIZE" || key.StartsWith("STAMP:") || key.StartsWith("STAMP_SHOW:");
 
     public static async Task<StampChoices> ReadAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken)
     {

@@ -342,7 +342,11 @@ export async function setStampAction(_prev: State | undefined, formData: FormDat
   const { STAMP_NOTE_KEY: noteKey, STAMP_NOTE_MAX: noteMax } = await import("@/lib/settings/stamp");
   const note = String(formData.get(noteKey) ?? "").trim().replace(/\s+/g, " ");
   if (note.length > noteMax) return { error: `The words at its foot: ${noteMax} characters at most.` };
-  const asked = Object.fromEntries(STAMP_KEYS.map((key) => [key, key === placeKey ? place : key === noteKey ? note : formData.get(key) === "on" ? "ON" : "OFF"]));
+  const { STAMP_SIZE_KEY: sizeKey, STAMP_SIZES: sizes } = await import("@/lib/settings/stamp");
+  const size = String(formData.get(sizeKey) ?? "M");
+  if (!sizes.some((one) => one.value === size)) return { error: "Choose how large the stamp is." };
+  const asked = Object.fromEntries(STAMP_KEYS.map((key) => [key, key === placeKey ? place : key === noteKey ? note : key === sizeKey ? size
+    : formData.get(key) === "on" ? "ON" : "OFF"]));
   try {
     const organization = await orgSettings();
     if (String(formData.get("level")) === "organization") {
