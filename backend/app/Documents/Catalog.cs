@@ -69,6 +69,14 @@ public sealed class Catalog
         return (value.SetId ?? sets.FirstOrDefault(s => s.IsDefault)?.Id) == set.Id;
     }
 
+    /// <summary>The name of the set a value of a list belongs to (a value with no set: the default set's).</summary>
+    public string? SetNameOf(string listKey, string code)
+    {
+        if (!_sets.TryGetValue(listKey, out var values) || !values.TryGetValue(code, out var value)) return null;
+        var sets = _listSets.GetValueOrDefault(listKey) ?? [];
+        return (value.SetId is { } id ? sets.FirstOrDefault(s => s.Id == id) : sets.FirstOrDefault(s => s.IsDefault))?.Name;
+    }
+
     /// <summary>The active codes of a set of a list, in order (no name: every active code of the list).</summary>
     public IReadOnlyList<string> ActiveIn(string listKey, string? setName) =>
         _sets.TryGetValue(listKey, out var values)

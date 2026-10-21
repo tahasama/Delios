@@ -400,8 +400,10 @@ public sealed class StampingRuleTests
     public void Stamping_keeps_every_page()
     {
         var pdf = Flow.Pdf(pages: 3);
-        var stamped = Stamping.Stamp(pdf, new StampFace("RELEASED", "C1 — Accepted", "A. Approver · 07 Oct 2026",
-            [new StampRow("1. Approval", "C1 — Accepted", "A. Approver", "07 Oct 2026")], ["P1001-10-CI-DWG-00001 rev A"], "IFC", false));
+        var stamped = Stamping.Stamp(pdf, new StampFace("Demo Engineering", "P1001",
+            [new StampOption("C1", "Accepted", true), new StampOption("C3", "Rejected", false)],
+            [new StampField("Reviewed by", "A. Approver"), new StampField("Date", "07 Oct 2026")],
+            [new StampRow("1. Approval", "C1 — Accepted", "A. Approver", "07 Oct 2026")], "Review does not relieve the sender of its obligations."));
 
         Assert.NotEqual(pdf, stamped);
         using var result = PdfReader.Open(new MemoryStream(stamped), PdfDocumentOpenMode.Import);

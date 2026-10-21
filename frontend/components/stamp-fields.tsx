@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { SwitchControl } from "@/components/switch";
 import { cn } from "@/lib/core/utils";
+import { inputCls } from "@/components/ui";
 import {
-  STAMP_ON_KEY, STAMP_WHEN, STAMP_SHOWS, STAMP_COMMENTS_KEY, STAMP_PLACE_KEY, STAMP_PLACES, STAMP_KINDS, type StampAnswers,
+  STAMP_ON_KEY, STAMP_WHEN, STAMP_SHOWS, STAMP_COMMENTS_KEY, STAMP_PLACE_KEY, STAMP_PLACES, STAMP_KINDS, STAMP_NOTE_KEY, STAMP_NOTE_MAX,
+  type StampAnswers,
 } from "@/lib/settings/stamp";
 
 /** One switch with what it switches, a line of the card. */
@@ -42,7 +44,6 @@ export function StampFields({ initial, disabled = false }: { initial: StampAnswe
   const flip = (key: string) => (value: boolean) => setA({ ...a, [key]: value ? "ON" : "OFF" });
   const stamped = on(STAMP_ON_KEY);
   const place = a[STAMP_PLACE_KEY];
-  const returned = on("STAMP:RETURNED") && !on("STAMP:RELEASED");
 
   return (
     <fieldset disabled={disabled} className="min-w-0 disabled:opacity-70">
@@ -58,12 +59,19 @@ export function StampFields({ initial, disabled = false }: { initial: StampAnswe
             <ul className="divide-y divide-line">
               {STAMP_WHEN.map((one) => <Line key={one.key} name={one.key} on={on(one.key)} set={flip(one.key)} label={one.label} text={one.text} />)}
             </ul>
-            <Band title="What it shows" said="always: its word, the grade that stands, larger (usually the last decider's), who gave it and when" />
+            <Band title="What it shows" said="always: the organization and the project, every grade the review could give with the one given ticked, who reviewed it and when" />
             <ul className="divide-y divide-line">
               {STAMP_SHOWS.map((one) => <Line key={one.key} name={one.key} on={on(one.key)} set={flip(one.key)} label={one.label} text={one.text} />)}
               <Line name={STAMP_COMMENTS_KEY} on={on(STAMP_COMMENTS_KEY)} set={flip(STAMP_COMMENTS_KEY)} label="Why: the comments"
                 text="the stamp says how many, and they are listed on a last page of the PDF" />
             </ul>
+            <Band title="Words at its foot" said="what the review does not relieve the sender of, as your contracts say it; none unless written" />
+            <div className="px-5 py-3 sm:px-6">
+              <textarea name={STAMP_NOTE_KEY} rows={2} maxLength={STAMP_NOTE_MAX} value={a[STAMP_NOTE_KEY] ?? ""}
+                onChange={(e) => setA({ ...a, [STAMP_NOTE_KEY]: e.target.value })} aria-label="Words at the stamp's foot"
+                placeholder="e.g. Review does not relieve the sender of its responsibility for the work and its compliance with the contract."
+                className={cn(inputCls, "h-auto py-1.5")} />
+            </div>
             <Band title="Where it sits" said="on every page" />
             <div className="px-5 py-3 sm:px-6">
               <span className="choice" role="group" aria-label="Where the stamp sits">
@@ -88,32 +96,38 @@ export function StampFields({ initial, disabled = false }: { initial: StampAnswe
           <div aria-hidden className={cn("flex h-64 rounded-sm bg-white p-2 shadow-sm ring-1 ring-line",
             place.startsWith("TOP") ? "items-start" : "items-end", place.endsWith("RIGHT") ? "justify-end" : "justify-start", !stamped && "opacity-40")}>
             {stamped ? (
-              // As the worker draws it (Stamping.Stamp): a double rule, the band with its word and status, the grade
-              // that stands large with who and when, every grade given as a small table, then its notes.
-              <div className={cn("w-48 border-[1.5px] bg-white p-[2px]", returned ? "border-red-800" : "border-emerald-800")}>
-                <div className={cn("border-[0.5px]", returned ? "border-red-800" : "border-emerald-800")}>
-                  <div className={cn("flex items-center justify-between px-1.5 py-[2px] text-[6.5px] font-bold tracking-wide text-white", returned ? "bg-red-800" : "bg-emerald-800")}>
-                    <span>{returned ? "RETURNED" : "RELEASED"}</span>
-                    {on("STAMP_SHOW:STATUS") ? <span>IFC</span> : null}
+              // As the worker draws it (Stamping.Stamp): one design, one ink; the box ticked says the outcome.
+              <div className="w-52 border-[1.5px] border-[#1c346e] bg-white p-[2px] text-[#1c346e]">
+                <div className="border-[0.5px] border-[#1c346e] px-1.5 py-1">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[7.5px] font-bold">YOUR ORGANIZATION</span>
+                    <span className="text-[5px] font-bold">DOCUMENT REVIEW</span>
                   </div>
-                  <div className="px-1.5 pt-1 pb-1">
-                    <p className={cn("text-[10px] leading-3 font-bold", returned ? "text-red-900" : "text-emerald-900")}>{returned ? "C3 — Rejected" : "C1 — Accepted"}</p>
-                    <p className="text-[6px] leading-[8px] text-slate-600">the decider · the day</p>
-                    {on("STAMP_SHOW:STEPS") ? (
-                      <div className="mt-[3px] border-t border-slate-300 pt-[2px] text-[5px] leading-[7px]">
-                        <div className={cn("grid grid-cols-[1.3fr_1.2fr_1fr_0.9fr] font-bold", returned ? "text-red-900" : "text-emerald-900")}><span>STEP</span><span>GRADE</span><span>BY</span><span>ON</span></div>
-                        <div className="grid grid-cols-[1.3fr_1.2fr_1fr_0.9fr] text-slate-600"><span>1. Review</span><span>No comment</span><span>an adviser</span><span>the day</span></div>
-                        <div className="grid grid-cols-[1.3fr_1.2fr_1fr_0.9fr] text-slate-600"><span>2. Decision</span><span>{returned ? "C3 — Rejected" : "C1 — Accepted"}</span><span>the decider</span><span>the day</span></div>
+                  <p className="text-[5.5px] opacity-75">Project code</p>
+                  <div className="mt-[2px] space-y-[1px] border-t border-[#1c346e] pt-[2px] text-[6px] leading-[8px]">
+                    {[["C1", "Accepted", true], ["C2", "Accepted with comments", false], ["C3", "Rejected", false]].map(([code, words, given]) => (
+                      <div key={String(code)} className={cn("flex items-center gap-1", given ? "font-bold" : "opacity-75")}>
+                        <span className="grid h-[6px] w-[6px] place-items-center border-[0.5px] border-[#1c346e] text-[5px] leading-none">{given ? "×" : ""}</span>
+                        <span className="w-4">{code}</span><span>{words}</span>
                       </div>
-                    ) : null}
-                    {on("STAMP_SHOW:DOCUMENT") || on("STAMP_SHOW:REVIEW") || on(STAMP_COMMENTS_KEY) ? (
-                      <div className="mt-[3px] border-t border-slate-300 pt-[2px] text-[5px] leading-[7px] text-slate-600">
-                        {on("STAMP_SHOW:DOCUMENT") || on("STAMP_SHOW:REVIEW")
-                          ? <p>{[on("STAMP_SHOW:DOCUMENT") ? "Its number rev A" : null, on("STAMP_SHOW:REVIEW") ? "Review number" : null].filter(Boolean).join("  ·  ")}</p> : null}
-                        {on(STAMP_COMMENTS_KEY) ? <p>Why: the comments, on the last page</p> : null}
-                      </div>
-                    ) : null}
+                    ))}
                   </div>
+                  <div className="mt-[2px] border-t border-[#1c346e] pt-[2px] text-[5.5px] leading-[8px]">
+                    <p><span className="inline-block w-12 font-bold opacity-75">REVIEWED BY</span>the decider</p>
+                    <p><span className="inline-block w-12 font-bold opacity-75">DATE</span>the day</p>
+                    {on("STAMP_SHOW:STATUS") ? <p><span className="inline-block w-12 font-bold opacity-75">RELEASED FOR</span>its status</p> : null}
+                    {on("STAMP_SHOW:DOCUMENT") ? <p><span className="inline-block w-12 font-bold opacity-75">DOCUMENT</span>its number rev A</p> : null}
+                    {on("STAMP_SHOW:REVIEW") ? <p><span className="inline-block w-12 font-bold opacity-75">REVIEW</span>its number</p> : null}
+                    {on(STAMP_COMMENTS_KEY) ? <p><span className="inline-block w-12 font-bold opacity-75">WHY</span>comments, on the last page</p> : null}
+                  </div>
+                  {on("STAMP_SHOW:STEPS") ? (
+                    <div className="mt-[2px] border-t border-[#1c346e] pt-[2px] text-[5px] leading-[7px]">
+                      <div className="grid grid-cols-[1.3fr_1.2fr_1fr_0.9fr] font-bold opacity-75"><span>STEP</span><span>GRADE</span><span>BY</span><span>ON</span></div>
+                      <div className="grid grid-cols-[1.3fr_1.2fr_1fr_0.9fr]"><span>1. Review</span><span>No comment</span><span>an adviser</span><span>the day</span></div>
+                      <div className="grid grid-cols-[1.3fr_1.2fr_1fr_0.9fr]"><span>2. Decision</span><span>C1 — Accepted</span><span>the decider</span><span>the day</span></div>
+                    </div>
+                  ) : null}
+                  {a[STAMP_NOTE_KEY] ? <p className="mt-[2px] border-t border-[#1c346e] pt-[2px] text-[4.5px] leading-[6px] opacity-75">{a[STAMP_NOTE_KEY]}</p> : null}
                 </div>
               </div>
             ) : <p className="m-auto text-[11px] text-slate-400">Not stamped</p>}

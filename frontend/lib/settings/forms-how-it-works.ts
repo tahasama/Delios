@@ -339,14 +339,17 @@ export async function setStampAction(_prev: State | undefined, formData: FormDat
   const { STAMP_KEYS, STAMP_PLACE_KEY: placeKey, STAMP_PLACES: places, stampAnswers } = await import("@/lib/settings/stamp");
   const place = String(formData.get(placeKey) ?? "");
   if (!places.some((one) => one.value === place)) return { error: "Choose where the stamp sits." };
-  const asked = Object.fromEntries(STAMP_KEYS.map((key) => [key, key === placeKey ? place : formData.get(key) === "on" ? "ON" : "OFF"]));
+  const { STAMP_NOTE_KEY: noteKey, STAMP_NOTE_MAX: noteMax } = await import("@/lib/settings/stamp");
+  const note = String(formData.get(noteKey) ?? "").trim().replace(/\s+/g, " ");
+  if (note.length > noteMax) return { error: `The words at its foot: ${noteMax} characters at most.` };
+  const asked = Object.fromEntries(STAMP_KEYS.map((key) => [key, key === placeKey ? place : key === noteKey ? note : formData.get(key) === "on" ? "ON" : "OFF"]));
   try {
     const organization = await orgSettings();
     if (String(formData.get("level")) === "organization") {
       const { requireOrgAdmin } = await import("@/lib/core/org-scope");
       await requireOrgAdmin();
       const now = stampAnswers(organization);
-      for (const key of STAMP_KEYS) if (now[key] !== asked[key]) await setOrgSetting(key, asked[key]);
+      for (const key of STAMP_KEYS) if (now[key] !== asked[key]) await setOrgSetting(key, asked[key] || null);
       revalidatePath("/organization/settings/stamp");
       return { ok: "Saved. Every project reading the organization's stamp uses it from now on." };
     }

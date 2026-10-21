@@ -258,17 +258,19 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`POLICY_PDF_STAMP`, area "The stamp", Free by default) leaves it free, a project keeps only what differs from them
   (refused otherwise, ROOM_FIXED). The card: **stamped or not** (`POLICY_PDF_STAMP`); **when** a review stamps the revision
   it decided (owner: freedom): released after its review (`STAMP:RELEASED`, on) and returned by it (`STAMP:RETURNED`, red,
-  on: owner, "reject stamp didnt appear"; to its author or to its sender for correction alike); released without a review, nothing to stamp. **What it shows**: always its word, the grade that
-  stands, larger (the most severe of the deciding steps, usually the last decider's), who gave it and when; then
-  (`STAMP_SHOW:<what>`) every grade given with who and when (on), what it is released for, the document and its
-  revision, the review's number (off), and why, the comments on a last page (`STAMP_COMMENTS`, off). **Where it sits**
-  (`STAMP_PLACE`, top right by default, or another corner). **The marks across the page**, as they were (owner):
-  superseded, void, on hold (`STAMP:SUPERSEDED|VOID|HELD`, on). Beside the form, the stamp drawn on a page as it will
-  read. **Its look** (owner: the first one was "bad"; `Stamping.Stamp`): a double rule, a band in its colour with the
-  word in white (and what it is released for on the right), the grade that stands large, who gave it · when, then every
-  grade given as a small table (STEP · GRADE · BY · ON, each cell cut to its own width), then its notes. A grade reads by
-  its name, a short code people cite before it ("C1 — Accepted"); a code with no name reads as words ("No comment"),
-  never as the app's code (`StampFace.Grade`). The Control room only reads it, one line on each step that stamps, with "change" to the card; the Defaults for
+  on: owner, "reject stamp didnt appear"; to its author or to its sender for correction alike); released without a review, nothing to stamp. **One design, whatever the outcome** (owner: "the stamp is unified"; researched: vendor-document and shop-drawing
+  review stamps all list every outcome with a box and tick the one given): a double rule in one ink (navy, never green or
+  red: the ticked box says the outcome); the reviewing organization's name and "Document review" with the project;
+  every grade the review could give, from its own set (a review that kept none: the set its verdict belongs to), each
+  with its box, the one given ticked and bold, a short code people cite in its own column (a long code only repeats the
+  words, so it is left out); "Reviewed by" and "Date" (who gave the standing verdict, the most severe of the deciding
+  steps, usually the last decider's); then (`STAMP_SHOW:<what>`) what it is released for, the document and its revision,
+  the review's number (off), every grade given as a small table, STEP · GRADE · BY · ON (on); why, the comments on a
+  last page (`STAMP_COMMENTS`, off); and the organization's words at its foot (`STAMP_NOTE`, what the review does not
+  relieve the sender of, as its contracts say it; none unless written, 240 characters). **Where it sits** (`STAMP_PLACE`,
+  top right by default, or another corner). **The marks across the page**, as they were (owner): superseded, void, on
+  hold (`STAMP:SUPERSEDED|VOID|HELD`, on). Beside the form, the stamp drawn on a page as it will read (`Stamping.Stamp`,
+  `StampFace`; a code with no name reads as words, "No comment", never the app's code). The Control room only reads it, one line on each step that stamps, with "change" to the card; the Defaults for
   new projects no longer carry it. The PDF opened from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`), of its newest
   submission only. **The document's Preview follows the newest revision** (owner), whatever its state, named on its tab
   ("Preview · rev B"): just started, nothing until its PDF is in; prepared or in review, its own newest PDF; returned, its
