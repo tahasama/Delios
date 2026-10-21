@@ -120,14 +120,11 @@ export function StampFields({ initial, disabled = false }: { initial: StampAnswe
               // As the worker draws it (Stamping.Stamp): the register's colour for the state, the outcome alone.
               <div style={{ transform: `scale(${scale})`, transformOrigin: `${place.startsWith("TOP") ? "top" : "bottom"} ${place.endsWith("RIGHT") ? "right" : "left"}` }}
                 className={cn("w-48 shrink-0 rounded-md border bg-white px-2 py-1.5", shownReturned ? "border-rose-700" : "border-emerald-700")}>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-[6.5px] font-bold text-slate-800">Your organization · project code</span>
-                  <span className={cn("text-[5px] font-bold", shownReturned ? "text-rose-700" : "text-emerald-700")}>DOCUMENT REVIEW</span>
-                </div>
-                <div className={cn("mt-1 flex items-center gap-1 rounded px-1.5 py-[3px] text-[9.5px] font-bold",
+                <p className="text-[6.5px] font-bold text-slate-800">Your organization · project code</p>
+                <p className={cn("mt-1 rounded px-1.5 py-[2px] text-[7.5px] font-bold",
                   shownReturned ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700")}>
-                  <span>{shownReturned ? "✕" : "✓"}</span><span>{shownReturned ? "C3 — Rejected" : "C1 — Accepted"}</span>
-                </div>
+                  {shownReturned ? "C3 — Rejected" : "C1 — Accepted"}
+                </p>
                 <div className="mt-1 text-[5.5px] leading-[8px] text-slate-800">
                   {!on("STAMP_SHOW:STEPS") ? <>
                     <p><span className="inline-block w-12 font-bold text-slate-500">REVIEWED BY</span>the decider</p>

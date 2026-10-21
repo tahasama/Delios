@@ -261,8 +261,8 @@ public sealed class Stamping(
 
     /// <summary>
     /// The stamp, one design for every outcome (owner: "the stamp is unified"), in the colour its revision's state has in
-    /// the register (released emerald, returned rose): a thin rounded border; the reviewing organization and the project,
-    /// "Document review"; the outcome alone, in a tinted badge with a tick or a cross (owner: "show only the outcome");
+    /// the register (released emerald, returned rose): a thin rounded border; the reviewing organization and the project;
+    /// the outcome alone, in a tinted badge, its words only (owner: "show only the outcome", no tick, no "Document review");
     /// who reviewed it and when, unless every grade given follows as a small table (step, grade, by, on); what the project
     /// chose to add; the organization's words at its foot. In a corner of every page (<paramref name="place"/>).
     /// </summary>
@@ -273,7 +273,7 @@ public sealed class Stamping(
         using var document = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
         var caps = new XFont(EmbeddedFonts.Family, 5.8, XFontStyleEx.Bold);
         var heading = new XFont(EmbeddedFonts.Family, 7.2, XFontStyleEx.Bold);
-        var outcome = new XFont(EmbeddedFonts.Family, 11.5, XFontStyleEx.Bold);
+        var outcome = new XFont(EmbeddedFonts.Family, 8.6, XFontStyleEx.Bold);
         var value = new XFont(EmbeddedFonts.Family, 7, XFontStyleEx.Regular);
         var cell = new XFont(EmbeddedFonts.Family, 6.2, XFontStyleEx.Regular);
         var foot = new XFont(EmbeddedFonts.Family, 5.6, XFontStyleEx.Regular);
@@ -289,7 +289,7 @@ public sealed class Stamping(
         var withComments = comments is { Count: > 0 };
         var fields = withComments ? [.. face.Fields, new StampField("Why", $"{comments!.Count} comment{(comments.Count == 1 ? "" : "s")}, on the last page")] : face.Fields.ToList();
 
-        const double width = 250, pad = 8, fieldH = 9, rowH = 8.6, footH = 6.8, badgeH = 19;
+        const double width = 250, pad = 8, fieldH = 9, rowH = 8.6, footH = 6.8, badgeH = 14;
         // Step · grade · by · on; "on" takes more room when it carries the time as well.
         double[] cols = face.Rows.Any(r => r.On.Contains(':')) ? [0.25, 0.24, 0.22, 0.29] : [0.29, 0.26, 0.24, 0.21];
 
@@ -334,17 +334,14 @@ public sealed class Stamping(
             // Who reviewed, on what.
             var y = top + pad + 6;
             var who = face.Project.Length > 0 ? $"{face.Organization} · {face.Project}" : face.Organization;
-            gfx.DrawString(Fit(who, heading, room * 0.66), heading, text, left, y);
-            gfx.DrawString("DOCUMENT REVIEW", caps, ink, new XRect(left, y - 5.6, room, 7), XStringFormats.TopRight);
+            gfx.DrawString(Fit(who, heading, room), heading, text, left, y);
 
-            // The outcome alone, in its badge: a tick for a release, a cross for a return.
+            // The outcome alone, in its badge.
             y += 6;
             var badge = new XRect(left, y, room, badgeH);
             gfx.DrawRoundedRectangle(new XSolidBrush(tint), badge, new XSize(5, 5));
-            var mark = face.Returned ? "✕" : "✓";
-            gfx.DrawString(mark, outcome, ink, new XRect(badge.X + 6, badge.Y, 12, badge.Height), XStringFormats.CenterLeft);
             var said = face.Code is { } c ? $"{c} — {face.Outcome}" : face.Outcome;
-            gfx.DrawString(Fit(said, outcome, room - 24), outcome, ink, new XRect(badge.X + 20, badge.Y, room - 24, badge.Height), XStringFormats.CenterLeft);
+            gfx.DrawString(Fit(said, outcome, room - 12), outcome, ink, new XRect(badge.X + 6, badge.Y, room - 12, badge.Height), XStringFormats.CenterLeft);
             y = badge.Bottom;
 
             if (fields.Count > 0)

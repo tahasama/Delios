@@ -260,8 +260,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   it decided (owner: freedom): released after its review (`STAMP:RELEASED`, on) and returned by it (`STAMP:RETURNED`,
   on: owner, "reject stamp didnt appear"; to its author or to its sender for correction alike); released without a review, nothing to stamp. **One design, whatever the outcome** (owner: "the stamp is unified"):
   a rounded frame, modern (owner: "looks good but old"), in the colour its revision's state has in the register (owner:
-  released emerald, returned rose); the reviewing organization's name and the project, "Document review"; **the outcome
-  alone** (owner: "show only the outcome… for space management"), a tinted badge with ✓ or ✕, its short code people
+  released emerald, returned rose); the reviewing organization's name and the project; **the outcome
+  alone** (owner: "show only the outcome… for space management"), a tinted badge, words only (owner: no tick, no
+  "Document review", the outcome no larger than needed), its short code people
   cite and its words ("C1 — Accepted"; a code longer than 4 characters only repeats the words, left out); "Reviewed by"
   and "Date" (the standing verdict's, the most severe of the deciding steps) only when every grade given is not shown
   (owner: "reviewed by repeats the steps"); then (`STAMP_SHOW:<what>`) every grade given as a small table, STEP · GRADE

@@ -16,7 +16,7 @@ export const STAMP_WHEN = [
 
 /**
  * What the stamp shows besides what it always carries: one design whatever the outcome (owner: "the stamp is unified"),
- * in the colour its revision's state has in the register: the organization and "Document review" with the project, the
+ * in the colour its revision's state has in the register: the organization and the project, the
  * outcome alone (owner: "show only the outcome"), who reviewed it and when unless every grade given follows.
  */
 export const STAMP_SHOWS = [
