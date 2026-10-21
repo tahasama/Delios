@@ -825,8 +825,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
-  of the hub (`CONTROL_ROOM`): how the project works, and what makes it work that way (the control function, who does
-  what, releasing, adding people), opening on "Open the Control room". Everyone of ours reads it (`read: true`, "See
+  of the hub (`CONTROL_ROOM`), drawn as the console itself (owner: navy, `scene-deck`, to stand out): one line on how the
+  project works with the control function named once, "Open the Control room", and the project's flows as entries in
+  our role's order and words (`flow/role-work.ts` `flowEntries`, the same words the console's tabs read), each opening
+  the console on that flow (`/settings/flow#<flow>`). The four facts it held before (control function, who does what,
+  releasing, adding people) are gone: the console says them. Everyone of ours reads it (`read: true`, "See
   how it works"); an administrator or the control function changes it (`mayChangeControlRoom`; read only otherwise:
   switches shown, nothing chosen). Every page below is what it is built from.
   **The flows follow our role on the project** (owner; This project, "our role", CONTRACT_ROLES, named on the masthead

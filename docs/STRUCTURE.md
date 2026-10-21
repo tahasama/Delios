@@ -108,7 +108,7 @@ frontend/
 │   │   ├── account/
 │   │   ├── guide/
 │   │   └── settings/     + distribution/, people/; flow/ (the Control room: the flows, read only, linking
-│   │                     to every card), control/ (only redirects to the Control room), flow/ (the Control room; project-wide.tsx: who acts as the control function, back to the defaults)
+│   │                     to every card), control/ (only redirects to the Control room), flow/ (the Control room; project-wide.tsx: who acts as the control function, back to the defaults; role-work.ts: our role's flows and their words, read by the console and the hub's Control room panel)
 │   └── api/              file downloads (exports, delivery lists, templates)
 │
 ├── lib/                  the code behind the pages, by area
