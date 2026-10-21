@@ -1411,3 +1411,17 @@ rule and have no Settings page: they are a set in Types & sets, read on Help.
 **Depends on it:** `POLICY_PDF_STAMP`, `STAMP:RELEASED|RETURNED|SUPERSEDED|VOID|HELD`, `STAMP_SHOW:<what>`,
 `STAMP_COMMENTS`, `STAMP_PLACE`, `STAMP_SIZE`, `STAMP_NOTE` (Settings → The stamp, both levels); `Stamping.StampChoices`, `FaceAsync` (worker);
 `DOC_FAMILIES` (Types & sets).
+
+## 76 · What a project starts with, and what it may change, said in one place each
+
+The Standard has each project write down how it works. In DELIOS the organization says it once for every project:
+its Control room is the same console as a project's, every step with its answers, and is what a new project starts
+with (Defaults for new projects, a page of its own with the whole form). A second page, What projects may change,
+lists every setting with one switch each: Fixed, every project uses the organization's as it is; Free, a project may
+take its own copy, which the organization's later changes never touch. Making a setting fixed later never undoes
+what a project already changed. A project already open keeps its own answers when the defaults change, and goes
+back to them only by its own "Back to the defaults". What only a project knows (who acts as its control function, its
+schedule's days, how its suppliers send) stays the project's.
+
+**Depends on it:** `PROJECT_DEFAULTS`, `LIBERTY:<key>` (`Settings/Liberty.cs`); `/organization/settings/flow`,
+`/organization/defaults`, `/organization/settings/may-change`.
