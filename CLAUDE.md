@@ -250,11 +250,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the key on Help, "What the colours say". Every list of documents takes them, the package lists too (a supplier's
   line by its stage, a delivery line by ready / released short of its status / nothing released); a card (Next step)
   takes none.
-- Stamps on the PDF are the project's choice (the Control room): `POLICY_PDF_STAMP` (stamped or not), each
-  stamp `STAMP:<kind>` (RELEASED, RETURNED, SUPERSEDED, VOID, HELD; on unless turned off) and `STAMP_COMMENTS` (off
-  unless chosen: a verdict's comments listed on a last page). Read once in the worker (`Stamping.StampChoices`). A
-  rejected revision is stamped RETURNED. The PDF opened from a document is its marked copy (`openCopy`,
-  `lib/documents/copies.ts`).
+- **A stamp is a review's, and only a review's** (owner: "stamps are an engagement that legally holds"; the superseded,
+  void and on-hold marks were a mistake and are no longer made, old marked copies stay as they are). A revision a review
+  releases is stamped RELEASED, one it returns RETURNED (`STAMP:RELEASED`, `STAMP:RETURNED`, on unless turned off;
+  `POLICY_PDF_STAMP` stamped at all). The stamp carries the grades given, the one that stands first and largest (the
+  most severe of the deciding steps, usually the last decider's), then what the project chose it shows
+  (`STAMP_SHOW:<what>`, each on unless turned off): DECIDER who gave it and when, STEPS every step's grade with who and
+  when, STATUS what it is released for, DOCUMENT its number and revision, REVIEW the review's number; and, when chosen,
+  why: the comments on a last page (`STAMP_COMMENTS`, off unless chosen). Chosen in the Control room on Accepted and
+  Returned; read once in the worker (`Stamping.StampChoices`, `FaceAsync`). The organization's switch for all of them is
+  `POLICY_PDF_STAMP`. The PDF opened from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`).
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
   every project" (Default rules, tabs by area, `prevented.ts`), never checked.
 - Assurance: each finding points to the exact spot where it is put right: a document's tab, or else the thing
@@ -782,10 +787,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the Control room (done: an answer whose switch is Fixed is read only on a project, "the organization's", backend
   ROOM_FIXED via `Liberty.RoomItemOf` / `RoomRefusalAsync`, accepted only when it equals the organization's default;
   the risk window likewise; a project keeps the answers it already held). Until a page is moved, it says plainly what is the organization's and what is the project's.
-- Document families are **on hold** (owner): the idea is to group document types (internal like DWG, supplier like C102)
-  to tell criticality and whether an outside stamp / wet signature is needed or the app's approval is enough, legally.
-  That needs research before deciding (`docs/gaps/families.md`). Meanwhile document types are grouped by deliverable
-  type. The families' stamp rule is not applied by the app, so nothing states it.
+- **Document families organise, they regulate nothing** (owner): they group the document types, whatever their codes
+  (ours like DWG, a supplier's like C102), and help with recommendations. A family is a value of the set `DOC_FAMILIES`,
+  kept in Types & sets like any other, coded as the organization likes; a type names its family on the type (else a code
+  whose first letter is a family's code falls in it). Read on Help (`/guide#families`, each family with its types);
+  no Settings card (`/settings/families` only redirects). No outside stamp rule: a stamp is a review's (above).
 - **Every Control room switch is read by the backend** (owner: "make them work", not removed). Sending a review to its
   reviewers (`REVIEW_ISSUE`): with the control function, a review sent for review waits, no step open
   (`ReviewService.AwaitsIssue`), until they send it on (`POST /reviews/{id}/issue`, REVIEW_ISSUED); they are told, it is
@@ -876,7 +882,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   preservation formats on keeping); "Keeping & ending" draws kept (retention, confidentiality, what is kept about
   people's activity read only, the checks switched off), legal hold, withdrawn / cancelled (ending under Kept),
   archived with the project; assets & tags and every form are linked. Left out on purpose: the organization's own
-  (sign-in & security, the audit trail, the switches, defaults for new projects), each person's (pop-ups), families (on hold).
+  (sign-in & security, the audit trail, the switches, defaults for new projects), each person's (pop-ups), families (read on Help).
   **The Control room simplifies the work, never adds clicks** (owner, after looking at how flow designers
   work: a step chosen on the flow opens its properties beside it). Its flows: documents we produce, we receive, a
   supplier owes us, our client asks of us (roles with a client), packages we deliver, an action on the schedule,
@@ -956,7 +962,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   choice of this project or a rule that always holds, with who and when; a line naming a button, tab or click is
   manual and belongs in Help. It includes what each form asks where the organization decided otherwise (Forms &
   fields: made required, left out, added), the acts left out, each reason's expected answer, delivery packages, and
-  how fine the matrix is cut. A setting the app does not apply is never stated (the families' outside stamp is not).
+  how fine the matrix is cut. A setting the app does not apply is never stated.
   **Plan v1** (owner: "I like it; if the next one doesn't work we fall back to it") is commit `ef95589`
   (`frontend/app/(app)/conformance/plan/`, `backend/app/Checks/PlanEndpoints.cs`): restore those files from it.
 - **Assurance tabs share one top** (owner: tabs must not jump): `conformance/head.tsx` (`AssuranceHead`): the same plate

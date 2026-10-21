@@ -1393,3 +1393,18 @@ writes why. The request then names its decision for whoever is asked ("Confirm",
 to confirm, the package), already chosen, because the decision needs what is known there. Anyone else reads who it waits
 for, and once answered, by whom, when, what, and the transmittal that answered it. Decisions are never taken on the
 request itself.
+
+## 75 · A stamp is a review's engagement; families only organise
+
+A stamp on a PDF holds legally: it says what a review decided. So only a review stamps: RELEASED when its review
+releases the revision, RETURNED when the review sends it back. Superseded, void and on-hold marks are no longer put on
+the PDF (the register and the document's page say those). The stamp shows the grades given, the one that stands first
+(the most severe of the deciding steps, usually the last decider's), and, as the project chooses in the Control room,
+who gave it and when, each step's grade with who and when, what it is released for, the document's number and revision,
+the review's number, and why (the comments, on a last page).
+
+Document families group document types and help with recommendations; they decide nothing, so they carry no stamp
+rule and have no Settings page: they are a set in Types & sets, read on Help.
+
+**Depends on it:** `STAMP:RELEASED`, `STAMP:RETURNED`, `STAMP_SHOW:<what>`, `STAMP_COMMENTS`, `POLICY_PDF_STAMP`
+(Control room); `Stamping.FaceAsync` (worker); `DOC_FAMILIES` (Types & sets).

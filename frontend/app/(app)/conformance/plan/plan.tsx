@@ -4,7 +4,7 @@ import { fmtDate } from "@/lib/core/utils";
 import { getMe } from "@/lib/account/api";
 import { getActiveSet, getSets } from "@/lib/settings/config";
 import { projectSettings, orgSettings } from "@/lib/settings/api";
-import { controlSettings, effectiveAnswer, STAMP_KINDS, STAMP_COMMENTS_KEY, PROJECT_MODE_LABEL, SKIPPABLE } from "@/lib/settings/control-activities";
+import { controlSettings, effectiveAnswer, STAMP_KINDS, STAMP_SHOWS, STAMP_COMMENTS_KEY, PROJECT_MODE_LABEL, SKIPPABLE } from "@/lib/settings/control-activities";
 import { KINDS, KIND_LABEL, fieldsOf, fieldRules, fieldLabels, storedOwnFields, type FieldRule } from "@/lib/settings/field-policy";
 import { ESCALATE_AFTER_KEY } from "@/lib/actions/escalation";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
@@ -522,8 +522,9 @@ export async function DocumentManagementPlan() {
         <Part title="The PDF people open">
           {stamped ? (
             <Say>
-              It is stamped where it stands: {STAMP_KINDS.filter((k) => answer(k.key) !== "OFF").map((k) => k.label.toLowerCase()).join(", ")}.
-              {answer(STAMP_COMMENTS_KEY) === "ON" ? " A verdict's comments are listed on a last page." : ""} The file as sent is kept either way.
+              A review stamps it when it is {STAMP_KINDS.filter((k) => answer(k.key) !== "OFF").map((k) => k.label.toLowerCase()).join(", or ") || "never"}: the
+              standing verdict first, then {STAMP_SHOWS.filter((k) => answer(k.key) !== "OFF").map((k) => k.label.charAt(0).toLowerCase() + k.label.slice(1)).join(", ") || "nothing more"}.
+              {answer(STAMP_COMMENTS_KEY) === "ON" ? " Why, the verdict's comments, is listed on a last page." : ""} Nothing else stamps a PDF. The file as sent is kept either way.
             </Say>
           ) : <Say>It stays as it was sent; where it stands is read in the app.</Say>}
         </Part>

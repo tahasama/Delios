@@ -8,7 +8,6 @@ import { NoAccess } from "./no-access";
 import { api } from "@/lib/client";
 import { getActiveSet } from "@/lib/settings/config";
 import { SETUP_PAGES, SETUP_GROUPS, maySetup, mayChangeControlRoom, CONTROL_ROOM, type SetupPage } from "./setup-pages";
-import { families } from "@/lib/settings/families";
 import { Tags, Route, ArrowRight } from "lucide-react";
 import { SETUP_ICON } from "./icons";
 
@@ -55,8 +54,7 @@ export default async function AdminPage() {
     getActiveSet("DELIVERABLE_TYPES").catch(() => []),
     Promise.all(ESSENTIAL.map(async (key) => ((await getActiveSet(key).catch(() => [])).length ? null : key))).then((all) => all.filter(Boolean).length),
   ]);
-  const [familyList, how, chosen, controllers] = await Promise.all([
-    families(ctx),
+  const [how, chosen, controllers] = await Promise.all([
     controlSettings(ctx),
     policies(ctx),
     holdersOf(ctx, "CONTROL").catch(() => []),
@@ -76,7 +74,6 @@ export default async function AdminPage() {
     "/settings/projects": { text: ctx.project.code },
     "/settings/parties": { text: `yours + ${plural(outside, "other")}` },
     "/settings/config": emptyLists ? { text: `${plural(emptyLists, "essential list")} still empty`, attention: true } : { text: plural(sets, "list") },
-    "/settings/families": { text: plural(familyList.length, "family", "families") },
     "/settings/flow": { text: `who does what on ${ctx.project.code}` },
     "/settings/fields": { text: fieldsSet ? `${plural(fieldsSet, "field")} decided here` : "as the app asks" },
     "/settings/numbering": notNumbered

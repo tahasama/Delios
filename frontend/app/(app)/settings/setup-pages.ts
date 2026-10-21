@@ -67,12 +67,6 @@ export const SETUP_PAGES: SetupPage[] = [
     read: true,
   },
   {
-    href: "/settings/families",
-    title: "Document families",
-    text: "The ten families every document type falls in, and when each one needs an outside stamp.",
-    group: "Classification",
-  },
-  {
     href: "/settings/fields",
     title: "Forms & fields",
     text: "What each form asks, and what it insists on: documents, revisions, transmittals, reviews, packages, tags.",

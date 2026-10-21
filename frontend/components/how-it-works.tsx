@@ -19,6 +19,7 @@ import {
   PROJECT_MODE_LABEL,
   STAMP_KINDS,
   STAMP_COMMENTS_KEY,
+  STAMP_SHOWS,
   POLICIES,
   roomItemOf,
   type ControlMode,
@@ -103,10 +104,12 @@ export function StampChoices({ source }: { source: AnswerSource }) {
   return (
     <fieldset disabled={fixed} className="min-w-0 space-y-2 disabled:opacity-70">
       <input type="hidden" name="stamps" value="1" />
-      <p className="text-sm font-semibold text-slate-800">Which stamps</p>
-      <p className="text-xs leading-5 text-slate-600">Used when the PDF is stamped. Switch a stamp off to leave it off.</p>
+      <p className="text-sm font-semibold text-slate-800">A review's stamp</p>
+      <p className="text-xs leading-5 text-slate-600">
+        Put on the PDF when its review is decided: an engagement, so it shows what you choose. The standing verdict always leads.
+      </p>
       <div className="grid gap-2 md:grid-cols-2">
-        {STAMP_KINDS.map((kind) => (
+        {[...STAMP_KINDS, ...STAMP_SHOWS].map((kind) => (
           <label key={kind.key} className="flex cursor-pointer items-start gap-2.5 rounded-md px-3 py-2 ring-1 ring-line hover:bg-tint-soft has-checked:bg-tint-soft">
             <SwitchControl name={kind.key} defaultChecked={effectiveAnswer(kind.key, source.answers.get(kind.key)) === "ON"} className="mt-0.5" />
             <span className="min-w-0 flex-1">
@@ -119,9 +122,9 @@ export function StampChoices({ source }: { source: AnswerSource }) {
         <label className="flex cursor-pointer items-start gap-2.5 rounded-md px-3 py-2 ring-1 ring-line hover:bg-tint-soft has-checked:bg-tint-soft md:col-span-2">
           <SwitchControl name={STAMP_COMMENTS_KEY} defaultChecked={effectiveAnswer(STAMP_COMMENTS_KEY, source.answers.get(STAMP_COMMENTS_KEY)) === "ON"} className="mt-0.5" />
           <span className="min-w-0 flex-1">
-            <span className="block text-[13px] font-semibold text-slate-800">The comments too</span>
+            <span className="block text-[13px] font-semibold text-slate-800">Why: the comments</span>
             <span className="block text-xs text-slate-600">
-              A stamp whose verdict carries comments (accepted with comments, rejected) says so, and the comments are listed on a last page of the PDF.
+              A verdict that carries comments (accepted with comments, rejected) says so on the stamp, and the comments are listed on a last page of the PDF.
             </span>
           </span>
           <AnswerFrom source={source} of={STAMP_COMMENTS_KEY} />
@@ -134,8 +137,9 @@ export function StampChoices({ source }: { source: AnswerSource }) {
 /** Which stamps are on, in words, for whoever only reads. */
 export function stampsSaid(answers: Map<string, string>): string {
   const on = STAMP_KINDS.filter((kind) => effectiveAnswer(kind.key, answers.get(kind.key)) === "ON").map((kind) => kind.label.toLowerCase());
+  const shows = STAMP_SHOWS.filter((one) => effectiveAnswer(one.key, answers.get(one.key)) === "ON").map((one) => one.label.toLowerCase());
   const comments = effectiveAnswer(STAMP_COMMENTS_KEY, answers.get(STAMP_COMMENTS_KEY)) === "ON";
-  return `${on.length ? `Stamps: ${on.join(", ")}` : "No stamp is on"}${comments ? "; a verdict's comments listed on a last page" : ""}.`;
+  return `${on.length ? `A review's stamp when ${on.join(", ")}: the standing verdict${shows.length ? `, ${shows.join(", ")}` : ""}` : "No review is stamped"}${on.length && comments ? "; the comments on a last page" : ""}.`;
 }
 
 /** The answer chosen to one question, in words, for whoever only reads. */

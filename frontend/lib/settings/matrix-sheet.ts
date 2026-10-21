@@ -82,7 +82,6 @@ export async function buildSheet(
     getActiveSet("DOC_FAMILIES").then((rows) => rows.map((row): Family => ({
       code: row.code, label: row.label,
       description: typeof row.props.description === "string" ? row.props.description : "",
-      stamp: row.props.stamp === "BEFORE" || row.props.stamp === "AFTER" ? row.props.stamp : "NONE",
     }))),
     matrixDetail(t),
     getActiveSet("DOCUMENT_TYPES"),

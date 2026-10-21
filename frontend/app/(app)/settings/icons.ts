@@ -1,5 +1,5 @@
 import {
-  FolderKanban, Building2, Tags, FileDigit, BadgeCheck, Users, Workflow, ScrollText, Layers, Route, ClipboardList, KeyRound, GitBranch,
+  FolderKanban, Building2, Tags, FileDigit, BadgeCheck, Users, Workflow, ScrollText, Route, ClipboardList, KeyRound, GitBranch,
   type LucideIcon,
 } from "lucide-react";
 
@@ -8,7 +8,6 @@ export const SETUP_ICON: Record<string, LucideIcon> = {
   "/settings/projects": FolderKanban,
   "/settings/parties": Building2,
   "/settings/config": Tags,
-  "/settings/families": Layers,
   "/settings/fields": ClipboardList,
   "/settings/numbering": FileDigit,
   "/settings/flow": Route,

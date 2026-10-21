@@ -397,14 +397,13 @@ public sealed class StampingRuleTests
     }
 
     [Fact]
-    public void Stamping_and_watermarking_keep_every_page()
+    public void Stamping_keeps_every_page()
     {
         var pdf = Flow.Pdf(pages: 3);
-        var stamped = Stamping.Stamp(pdf, "P1001-10-CI-DWG-00001", "Rev A   IFC", "Released 07 Oct 2026");
-        var marked = Stamping.Watermark(stamped, "Superseded by rev B on 09 Oct 2026");
+        var stamped = Stamping.Stamp(pdf, new StampFace("RELEASED", "C1 Accepted", ["by A. Approver, 07 Oct 2026", "P1001-10-CI-DWG-00001  rev A"], false));
 
         Assert.NotEqual(pdf, stamped);
-        using var result = PdfReader.Open(new MemoryStream(marked), PdfDocumentOpenMode.Import);
+        using var result = PdfReader.Open(new MemoryStream(stamped), PdfDocumentOpenMode.Import);
         Assert.Equal(3, result.PageCount);
     }
 }

@@ -2,50 +2,17 @@ import { getActiveSet } from "@/lib/settings/config";
 import type { Tenant } from "@/lib/core/tenant";
 
 /**
- * Document families, and when an outside stamp is needed.
- *
- * A project holds hundreds of document types and nobody will answer a question
- * about each one. They answer it ten times, for the families, and every type
- * inherits. The family says *when* a stamp is needed; the distribution matrix
- * says *who* gives it. Neither repeats the other.
- *
- * Two notations, one family table:
- *
- *   ours       a three-letter mnemonic    DWG   family declared on the type
- *   supplier   family letter and number   D101  family read off the letter
- *
- * The family is keyed by that letter. It once carried a digit as well, from a
- * notation our own codes no longer use.
- *
- * Our own codes stay clean because they go into the document number, where a
- * family prefix would sit in every title block and transmittal for the life of
- * the project. The family is data on the type instead. A supplier code carries
- * its letter because that notation is built that way and never enters our
- * numbering.
- *
- * An organization is free to publish its own types in its own notation — the one
- * condition is that each type names a family, or no matrix can be drawn.
+ * Document families: they organise document types and help with recommendations (owner). A family is a value of the
+ * set DOC_FAMILIES, kept in Types & sets like any other, coded as the organization likes; there is nothing in them to
+ * regulate, so they are read on Help, never a Settings page. A type names its family (`family` on the type), or a code
+ * whose first letter is a family's code falls in it (the supplier notation, D101 in D).
  */
-
-/** When an outside body must stamp a document of this family. */
-export type StampRule = "NONE" | "BEFORE" | "AFTER";
-
-export const STAMP_RULES: { value: StampRule; label: string; text: string }[] = [
-  { value: "NONE", label: "No outside stamp", text: "Our own verdict is the approval. Nothing is asked for from outside." },
-  { value: "BEFORE", label: "Stamped before release", text: "The revision is not released until the stamped copy is back. Use it where a visa is a legal precondition — a control office, a notified body, an authority." },
-  { value: "AFTER", label: "Stamped after release", text: "The verdict releases it and work proceeds; the stamped copy is owed and chased until it arrives." },
-];
 
 export type Family = {
   code: string;
   label: string;
   description: string;
-  stamp: StampRule;
 };
-
-function asRule(value: unknown): StampRule {
-  return value === "BEFORE" || value === "AFTER" ? value : "NONE";
-}
 
 /** Every family this organization publishes. */
 export async function families(_t: Tenant): Promise<Family[]> {
@@ -56,7 +23,6 @@ export async function families(_t: Tenant): Promise<Family[]> {
       code: row.code,
       label: row.label,
       description: typeof props.description === "string" ? props.description : "",
-      stamp: asRule(props.stamp),
     };
   });
 }

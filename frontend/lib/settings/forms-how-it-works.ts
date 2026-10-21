@@ -21,6 +21,7 @@ import {
   POLICIES,
   STAMP_KINDS,
   STAMP_COMMENTS_KEY,
+  STAMP_SHOWS,
   PROJECT_KEY,
   PROJECT_MODE_LABEL,
   roomItemOf,
@@ -150,7 +151,7 @@ export async function setPolicyAction(_prev: State | undefined, formData: FormDa
   }
   // Which stamps, and the comments: ticked is on, unticked off (the section says it was on the form).
   if (formData.has("stamps")) {
-    for (const kind of STAMP_KINDS) wanted.push([kind.key, formData.get(kind.key) === "on" ? "ON" : "OFF"]);
+    for (const kind of [...STAMP_KINDS, ...STAMP_SHOWS]) wanted.push([kind.key, formData.get(kind.key) === "on" ? "ON" : "OFF"]);
     wanted.push([STAMP_COMMENTS_KEY, formData.get(STAMP_COMMENTS_KEY) === "on" ? "ON" : "OFF"]);
   }
   const escalate = String(formData.get(ESCALATE_AFTER_KEY) ?? "").trim();
@@ -296,10 +297,12 @@ export async function setRoomAnswerAction(_prev: State | undefined, formData: Fo
       if (value !== "ON" && value !== "OFF") return { error: "Choose yes or no." };
       await save(formData, [[key, value]]);
       said = value === "ON" ? "Whoever holds Manage confirms it from now on." : "No confirmation from now on.";
-    } else if (key === STAMP_COMMENTS_KEY || STAMP_KINDS.some((one) => one.key === key)) {
+    } else if (key === STAMP_COMMENTS_KEY || STAMP_KINDS.some((one) => one.key === key) || STAMP_SHOWS.some((one) => one.key === key)) {
       if (value !== "ON" && value !== "OFF") return { error: "Choose on or off." };
       await save(formData, [[key, value]]);
-      said = value === "ON" ? "That stamp goes on the PDF from now on." : "That stamp is left off from now on.";
+      said = key.startsWith("STAMP_SHOW:") || key === STAMP_COMMENTS_KEY
+        ? (value === "ON" ? "The stamp shows it from now on." : "The stamp leaves it out from now on.")
+        : (value === "ON" ? "That stamp goes on the PDF from now on." : "That stamp is left off from now on.");
     } else if (key === ESCALATE_AFTER_KEY) {
       const days = Number(value);
       if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Notify again after 1 to 60 working days." };

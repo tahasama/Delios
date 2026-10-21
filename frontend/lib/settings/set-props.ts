@@ -115,8 +115,6 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   // What this organization is contracted to do on a project. The seven the app
   // ships carry a starting matrix; one an organization adds carries its own
   // definition, and its rows are written in the matrix like any other.
-  // The ten families. The family answers the stamp question once for every
-  // document type that falls in it, so nobody answers it hundreds of times.
   // The handful of groups every discipline falls in, so a new sector adds its
   // disciplines under an existing group instead of inventing structure.
   DISCIPLINE_GROUPS: [
@@ -126,7 +124,6 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
     { key: "group", label: "Discipline group", type: "text", hint: "a published group code — ENG, SITE, QSE, MGMT, OPS" },
   ],
   DOC_FAMILIES: [
-    { key: "stamp", label: "Outside stamp", type: "select", options: ["NONE", "BEFORE", "AFTER"], hint: "NONE our verdict is the approval · BEFORE not released until the stamped copy is back · AFTER released now, stamped copy owed" },
     { key: "description", label: "What falls in it", type: "text", hint: "" },
   ],
   CONTRACT_ROLES: [

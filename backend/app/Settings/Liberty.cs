@@ -143,7 +143,7 @@ public static class Liberty
         "POLICY_RELEASE" or "POLICY_READY" or "POLICY_MATRIX" or "POLICY_MATRIX_DETAIL" or "ESCALATE_AFTER_DAYS" => settingKey,
         "POLICY_PDF_STAMP" or "STAMP_COMMENTS" => "POLICY_PDF_STAMP",
         "SUPPLIER_INTAKE" or "AS_RECEIVED_FILING" => "SUPPLIER_INTAKE",
-        _ when settingKey.StartsWith("STAMP:") => "POLICY_PDF_STAMP",
+        _ when settingKey.StartsWith("STAMP:") || settingKey.StartsWith("STAMP_SHOW:") => "POLICY_PDF_STAMP",
         _ => null,
     };
 

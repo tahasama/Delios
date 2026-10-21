@@ -431,21 +431,31 @@ export function controlFrom(byKey: Map<string, string>, follows: boolean): Contr
  * defaults it is compared with read the same when they mean the same.
  */
 /**
- * Which stamps go on the PDF, each on unless switched off (`STAMP:<kind>`, read by the backend's `StampChoices`), and
- * whether a stamp whose verdict carries comments lists them on a last page (`STAMP_COMMENTS`, off unless switched on).
+ * A stamp is a review's: the engagement it records, put on the PDF when the review is decided (owner: "stamps only
+ * concern reviews", the marks for superseded, void and on hold were a mistake and are no longer made). Each on unless
+ * switched off (`STAMP:<kind>`, read by the backend's `StampChoices`).
  */
 export const STAMP_KINDS = [
-  { key: "STAMP:RELEASED", label: "Released", text: "number, revision, status and day, in a green box" },
-  { key: "STAMP:RETURNED", label: "Returned by the review", text: "rejected: the verdict and the day, in a red box" },
-  { key: "STAMP:SUPERSEDED", label: "Superseded", text: "across the page, once a later revision is released" },
-  { key: "STAMP:VOID", label: "Void", text: "across the page, with why" },
-  { key: "STAMP:HELD", label: "On hold", text: "across the page, while it is not for use" },
+  { key: "STAMP:RELEASED", label: "Released by its review", text: "a green box: the standing verdict first, then what the stamp is set to show" },
+  { key: "STAMP:RETURNED", label: "Returned by its review", text: "a red box: the verdict that sent it back, then what the stamp is set to show" },
 ] as const;
 export const STAMP_COMMENTS_KEY = "STAMP_COMMENTS";
+/**
+ * What a review's stamp shows (owner: "a stamp is an engagement that legally holds; I need a way to decide what it
+ * shows"). The standing verdict always leads, larger (the most severe of the deciders', usually the last's); each of
+ * these is on unless switched off (`STAMP_SHOW:<what>`). Why (the comments) is `STAMP_COMMENTS`, on a last page.
+ */
+export const STAMP_SHOWS = [
+  { key: "STAMP_SHOW:DECIDER", label: "Who gave the standing verdict, and when", text: "the decider's name and the day, under the verdict" },
+  { key: "STAMP_SHOW:STEPS", label: "Every step's grade", text: "each step of the route: its grade (advice or verdict), who gave it and when" },
+  { key: "STAMP_SHOW:STATUS", label: "What it is released for", text: "the status the decider granted (IFC, IFR…)" },
+  { key: "STAMP_SHOW:DOCUMENT", label: "The document and its revision", text: "its number and revision" },
+  { key: "STAMP_SHOW:REVIEW", label: "The review", text: "the review's number, to find it in the app" },
+] as const;
 
 export function effectiveAnswer(key: string, value: string | null | undefined): string {
   if (value) return value;
-  if (key.startsWith("STAMP:")) return "ON";
+  if (key.startsWith("STAMP:") || key.startsWith("STAMP_SHOW:")) return "ON";
   if (key === STAMP_COMMENTS_KEY) return "OFF";
   const declared = POLICIES.find((one) => one.key === key);
   if (declared) return declared.options[0].value;
@@ -467,6 +477,6 @@ const ACT_KEYS = new Set(["REVIEW_ISSUE", "RETURN_OUTCOME", "ISSUE", "DELEGATE",
 export function roomItemOf(key: string): string | null {
   if (ACT_KEYS.has(key) || key.startsWith("SKIP:") || key.startsWith("CONFIRM:")) return "WHO_DOES_WHAT";
   if (["POLICY_RELEASE", "POLICY_READY", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL", "ESCALATE_AFTER_DAYS"].includes(key)) return key;
-  if (key === "POLICY_PDF_STAMP" || key === "STAMP_COMMENTS" || key.startsWith("STAMP:")) return "POLICY_PDF_STAMP";
+  if (key === "POLICY_PDF_STAMP" || key === "STAMP_COMMENTS" || key.startsWith("STAMP:") || key.startsWith("STAMP_SHOW:")) return "POLICY_PDF_STAMP";
   return null;
 }

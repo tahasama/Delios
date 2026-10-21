@@ -10,6 +10,7 @@ import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { ROLE_WORD, wordOf } from "@/lib/settings/role-word";
 import { api, projectPath } from "@/lib/client";
 import { getActiveSet } from "@/lib/settings/config";
+import { families, typesByFamily } from "@/lib/settings/families";
 import { getMe } from "@/lib/account/api";
 import { SETUP_PAGES, maySetup } from "@/app/(app)/settings/setup-pages";
 import { cn } from "@/lib/core/utils";
@@ -77,10 +78,12 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
   type Directory = {
     organizations: { name: string; role: string | null; kind: string; contact: string | null }[];
   };
-  const [roleOptions, directory, me] = await Promise.all([
+  const [roleOptions, directory, me, familyList, typed] = await Promise.all([
     contractRoleOptions().then((all) => all.filter((r) => r.code !== "GENERIC")),
     api<Directory>(projectPath(ctx, "/people/directory")).catch(() => null),
     getMe(),
+    families(ctx).catch(() => []),
+    typesByFamily(ctx).catch(() => []),
   ]);
   const mine = me?.projects.find((p) => p.id === ctx.projectId) ?? null;
   const ours = roleOptions.find((r) => r.code === project.role);
@@ -107,6 +110,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
     { href: "#codes", label: "The codes" },
     { href: "#states", label: "The states" },
     { href: "#roles", label: "Roles on a project" },
+    { href: "#families", label: "Document families" },
     { href: "#places", label: "Where things are done" },
   ];
 
@@ -233,6 +237,47 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
             is and where approval sits.
           </p>
         ) : null}
+      </section>
+
+      {/* Families organise document types and help with recommendations; nothing in them is regulated (owner), so they are
+          read here, their set kept in Types & sets like any other. */}
+      <section id="families" className="register register-sheet register-sheet-open scroll-mt-24">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span className="stencil mr-1 text-slate-500">Document families</span>
+          <span className="text-[11px] text-slate-500">
+            they group the document types, whatever their codes, and help recommend what suits each type; they decide nothing
+          </span>
+          {listsOpen ? <Link href="/settings/config?set=DOC_FAMILIES" className="ml-auto text-[11px] font-semibold text-link hover:underline">The set in Types &amp; sets</Link> : null}
+        </div>
+        {familyList.length ? (
+          <ul className="divide-y divide-line">
+            {familyList.map((family) => {
+              const types = typed.filter((t) => t.family?.code === family.code);
+              return (
+                <li key={family.code} className="grid grid-cols-[3rem_minmax(0,1fr)] items-baseline gap-x-3 px-5 py-2.5 sm:grid-cols-[3rem_14rem_minmax(0,1fr)] sm:px-6">
+                  <span className="font-mono text-xs font-semibold text-slate-700">{family.code}</span>
+                  <span>
+                    <span className="block text-[13px] font-semibold text-slate-800">{family.label}</span>
+                    {family.description ? <span className="block text-xs leading-5 text-slate-500">{family.description}</span> : null}
+                  </span>
+                  <p className="col-start-2 text-xs leading-5 text-slate-600 sm:col-start-3">
+                    {types.length ? types.map((t) => `${t.code} ${t.label}`).join(" · ") : <span className="text-slate-400">No document type in it yet.</span>}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="px-5 py-3 text-xs text-slate-500 sm:px-6">No family is set up yet: they are values of Document families, in Types &amp; sets.</p>
+        )}
+        {(() => {
+          const none = typed.filter((t) => !t.family);
+          return none.length && familyList.length ? (
+            <p className="border-t border-line px-5 py-2.5 text-[11px] leading-4 text-slate-500 sm:px-6">
+              In no family: {none.map((t) => `${t.code} ${t.label}`).join(" · ")}. A type names its family on the type, in Types &amp; sets.
+            </p>
+          ) : null;
+        })()}
       </section>
 
       <div id="places" className="scroll-mt-24 space-y-4">

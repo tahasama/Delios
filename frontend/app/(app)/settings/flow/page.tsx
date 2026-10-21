@@ -5,7 +5,7 @@ import { api, projectPath } from "@/lib/client";
 import { projectSettings, orgSettings } from "@/lib/settings/api";
 import { optOutsOf } from "@/lib/conformance/api";
 import { isAdmin } from "@/lib/core/auth";
-import { controlSettings, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES, SKIPPABLE, CONFIRMABLE, PEOPLE_KEY, PEOPLE_MODE_LABEL, STAMP_KINDS, STAMP_COMMENTS_KEY, roomItemOf } from "@/lib/settings/control-activities";
+import { controlSettings, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES, SKIPPABLE, CONFIRMABLE, PEOPLE_KEY, PEOPLE_MODE_LABEL, STAMP_KINDS, STAMP_SHOWS, STAMP_COMMENTS_KEY, roomItemOf } from "@/lib/settings/control-activities";
 import { stateNames } from "@/lib/core/state-names";
 import { holdersOf } from "@/lib/core/permissions";
 import { scheduleSource } from "@/lib/actions/api";
@@ -29,6 +29,9 @@ import { AsReceivedWarning } from "@/components/as-received-warning";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { roleLabel } from "@/lib/settings/profiles/roles";
 import { ROLE_WORK, GENERIC_WORK, flowWords, cap, type RoleWork } from "./role-work";
+
+/** What a review's stamp shows, one choice each, on the steps where a review is decided. */
+const STAMP_SHOW_KEYS = ["STAMP_SHOW:DECIDER", "STAMP_SHOW:STEPS", "STAMP_SHOW:STATUS", "STAMP_SHOW:DOCUMENT", "STAMP_SHOW:REVIEW"];
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Control room" };
@@ -101,14 +104,14 @@ const STAGES: Stage[] = [
     who: [{ title: "Deciding", by: "The step of the route that decides" }],
     sets: ["REVIEW_OUTCOMES"],
     extras: ["routes"],
-    answers: ["POLICY_PDF_STAMP", "STAMP_COMMENTS"],
+    answers: ["POLICY_PDF_STAMP", "STAMP:RELEASED", ...STAMP_SHOW_KEYS, "STAMP_COMMENTS"],
   },
   {
     key: "returned", title: "Returned", tagline: "Back to the author", rail: "rail-rejected",
     text: "The verdict refuses it: it goes back to the author with the comments, and this revision ends.",
     who: ["RETURN_OUTCOME"],
     sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES"],
-    answers: ["STAMP:RETURNED", "POLICY_PDF_STAMP", "STAMP_COMMENTS"],
+    answers: ["STAMP:RETURNED", "POLICY_PDF_STAMP", ...STAMP_SHOW_KEYS, "STAMP_COMMENTS"],
   },
   {
     key: "to-sender", title: "Returned to the sender", tagline: "For correction", rail: "rail-returned",
@@ -116,7 +119,7 @@ const STAGES: Stage[] = [
     who: ["RETURN_OUTCOME"],
     sets: ["REVIEW_OUTCOMES", "COMMENT_CLASSES"],
     extras: ["parties", "form:TRANSMITTAL"],
-    answers: ["STAMP:RETURNED", "POLICY_PDF_STAMP", "STAMP_COMMENTS"],
+    answers: [],
   },
   {
     key: "gate", title: "The control function's check", tagline: "Before it is published", rail: "rail-check",
@@ -137,26 +140,26 @@ const STAGES: Stage[] = [
     text: "Somebody outside approves it before it is released, when an approval was asked for.",
     who: [{ title: "Approving", by: "The outside party named when it was asked" }],
     extras: ["parties"],
-    answers: ["STAMP:HELD", "STATE:ON_HOLD"],
+    answers: ["STATE:ON_HOLD"],
   },
   {
     key: "approval-refused", title: "Not approved", tagline: "Back to the author", rail: "rail-rejected",
     text: "The outside party refuses it: it goes back to the author with a reason. This revision ends.",
     who: [{ title: "Sending it back", by: "Whoever asked for the approval" }],
-    answers: ["STAMP:HELD"],
+    answers: [],
     extras: ["parties"],
   },
   {
     key: "release", title: "Release", tagline: "In force", rail: "rail-released",
     text: "The revision comes into force, and the one before it is superseded.",
     who: [{ title: "Releasing", by: "The decider, or the control function where it checks first" }],
-    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "STAMP:RELEASED", "STAMP:SUPERSEDED", "STAMP_COMMENTS", "STATE:RELEASED"],
+    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "STAMP:RELEASED", "STATE:RELEASED"],
   },
   {
     key: "released-issued", title: "Released & issued", tagline: "In force, and sent", rail: "rail-released",
     text: "In one act it comes into force and goes to the people named by whoever decided or asked.",
     who: ["ISSUE"],
-    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "POLICY_READY", "STAMP:RELEASED", "STAMP:SUPERSEDED", "STAMP_COMMENTS", "STATE:RELEASED"],
+    answers: ["POLICY_RELEASE", "POLICY_PDF_STAMP", "POLICY_READY", "STAMP:RELEASED", "STATE:RELEASED"],
     sets: ["REASONS_FOR_ISSUE", "ISSUE_CODES"],
     extras: ["distribution", "form:TRANSMITTAL"],
   },
@@ -164,7 +167,7 @@ const STAGES: Stage[] = [
     key: "voided", title: "Voided", tagline: "Released in error", rail: "rail-void",
     text: "A revision released in error, or never reviewed, is voided with why; what was done from it is reassessed.",
     who: ["VOID"],
-    answers: ["STAMP:VOID", "STATE:VOID"],
+    answers: ["STATE:VOID"],
   },
   {
     key: "issue", title: "Issue", tagline: "Sent out", rail: "rail-issue",
@@ -274,7 +277,7 @@ const STAGES: Stage[] = [
     key: "held", title: "On legal hold", tagline: "Kept against disposal", rail: "rail-held",
     text: "Held for a legal reason, with why: it cannot be ended and no revision voided until the hold is lifted, with why. New revisions and reviews go on.",
     who: [{ title: "Holding it, and lifting the hold", by: "The control function, or an administrator" }],
-    answers: ["STAMP:HELD"],
+    answers: [],
   },
   {
     key: "cancelled", title: "Cancelled", tagline: "Never to be produced", rail: "rail-withdrawn",
@@ -675,6 +678,16 @@ export default async function ControlRoomPage() {
       const code = key.slice(6) === "RELEASED" && together ? "RELEASED_ISSUED" : key.slice(6);
       return fact(key, "This state is called", stateNames_[code as keyof typeof stateNames_] ?? code, isAdmin(me) ? "/organization/settings/states" : undefined);
     }
+    const shows = STAMP_SHOWS.find((one) => one.key === key);
+    if (shows) {
+      const stamped = effectiveAnswer("POLICY_PDF_STAMP", answers.get("POLICY_PDF_STAMP")) === "ON";
+      const options = [
+        { value: "ON", label: "Shown", text: `The stamp shows ${shows.text}.${stamped ? "" : " Only once the PDF is stamped."}` },
+        { value: "OFF", label: "Left out", text: "The stamp leaves it out; the review keeps it in the app." },
+      ];
+      return <Choice key={key} title={`On the stamp: ${shows.label.charAt(0).toLowerCase()}${shows.label.slice(1)}`} options={options} value={effectiveAnswer(key, answers.get(key))}
+        action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
+    }
     const stamp = STAMP_KINDS.find((one) => one.key === key);
     if (stamp || key === STAMP_COMMENTS_KEY) {
       const stamped = effectiveAnswer("POLICY_PDF_STAMP", answers.get("POLICY_PDF_STAMP")) === "ON";
@@ -682,7 +695,7 @@ export default async function ControlRoomPage() {
         { value: "ON", label: "On", text: stamp ? `${stamp.text}.${stamped ? "" : " Only once the PDF is stamped."}` : `A stamp whose verdict carries comments lists them on a last page of the PDF.${stamped ? "" : " Only once the PDF is stamped."}` },
         { value: "OFF", label: "Off", text: stamp ? "This stamp is left off the PDF." : "The comments stay in the app only." },
       ];
-      return <Choice key={key} title={stamp ? `The stamp "${stamp.label}"` : "The verdict's comments on the PDF"} options={options} value={effectiveAnswer(key, answers.get(key))}
+      return <Choice key={key} title={stamp ? `The stamp "${stamp.label}"` : "On the stamp: why (the comments)"} options={options} value={effectiveAnswer(key, answers.get(key))}
         action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
     }
     const act = CONTROL_ACTIVITIES.find((one) => one.key === key);
