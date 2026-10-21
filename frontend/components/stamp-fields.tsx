@@ -19,7 +19,7 @@ function Line({ name, on, set, label, text }: { name: string; on: boolean; set: 
         <SwitchControl name={name} checked={on} onChange={set} className="mt-0.5" />
         <span className="min-w-0">
           <span className="block text-[13px] font-semibold text-slate-800">{label}</span>
-          <span className="block text-xs text-slate-600">{text}</span>
+          {text ? <span className="block text-xs text-slate-600">{text}</span> : null}
         </span>
       </label>
     </li>
@@ -119,7 +119,7 @@ export function StampFields({ initial, disabled = false, pane = null }: { initia
         </div>
 
         {/* The page, with the stamp where it will sit, at its size, reading as it will. */}
-        <ResizablePane name={PREF.stampPane} initial={pane} min={240} edge="left" className="w-full border-t border-line p-4 md:w-60 md:border-t-0 md:border-l">
+        <ResizablePane name={PREF.stampPane} initial={pane} min={240} edge="left" className="w-full border-t border-line p-4 md:w-90 md:border-t-0 md:border-l">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-[11px] text-slate-500">As it reads on the page</p>
             <span className="choice" role="group" aria-label="Show it as">

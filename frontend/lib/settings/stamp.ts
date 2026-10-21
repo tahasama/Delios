@@ -22,8 +22,8 @@ export const STAMP_WHEN = [
 export const STAMP_SHOWS = [
   { key: "STAMP_SHOW:STEPS", label: "Every grade given", text: "each step of the route: its grade (advice or verdict), who gave it and when", on: true },
   { key: "STAMP_SHOW:STATUS", label: "What it is released for", text: "the status the decider granted", on: false },
-  { key: "STAMP_SHOW:DOCUMENT", label: "The document and its revision", text: "its number and revision", on: false },
-  { key: "STAMP_SHOW:REVIEW", label: "The review", text: "the review's number, to find it in the app", on: false },
+  { key: "STAMP_SHOW:DOCUMENT", label: "Document number and revision", text: "", on: false },
+  { key: "STAMP_SHOW:REVIEW", label: "Review number", text: "to find it in the app", on: false },
   { key: "STAMP_SHOW:TIME", label: "The time with each date", text: "21 Oct 2026 14:32 instead of 21 Oct 2026, in the project's time zone", on: false },
 ] as const;
 export const STAMP_COMMENTS_KEY = "STAMP_COMMENTS";
