@@ -43,6 +43,7 @@ import type { StepItem } from "./next-step";
 import { SupplierDelivery } from "./supplier-delivery";
 import { Timeline } from "@/components/timeline";
 import { openCopy } from "@/lib/documents/copies";
+import { StampPending } from "@/components/stamp-pending";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, Download, ExternalLink, FileText, Send, X, FileDown } from "lucide-react";
 import { activityList, scheduleSource } from "@/lib/actions/api";
@@ -167,6 +168,15 @@ export default async function DocumentDetailPage({
   const shown = current ?? working ?? doc.revisions[0] ?? null;
   // The copy that says where it stands (stamped, returned, superseded, void, on hold), else the PDF as sent.
   const pdf = shown ? openCopy(shown.files) : null;
+  // Just released after its review, where the project stamps: the stamped copy is a few seconds away; the page waits for it.
+  const stampWaited = !!current && !!current.releasedAt && Date.now() - current.releasedAt.getTime() < 120_000
+    && current.cycles.length > 0 && !current.files.some((f) => f.kind === "STAMPED")
+    && await (async () => {
+      const { stampAnswers } = await import("@/lib/settings/stamp");
+      const { orgSettings, projectSettings } = await import("@/lib/settings/api");
+      const a = stampAnswers(await orgSettings().catch(() => new Map()), await projectSettings(ctx.projectId).catch(() => new Map()));
+      return a.POLICY_PDF_STAMP !== "OFF" && a["STAMP:RELEASED"] !== "OFF";
+    })();
   const native = shown?.files.find((f) => f.kind === "NATIVE") ?? null;
   // Requests on the revision in hand: who asked for it to be sent, to whom, and
   // whether it has gone.
@@ -726,9 +736,10 @@ export default async function DocumentDetailPage({
           {
             id: "viewer",
             label: "Preview",
-            content: pdf ? (
+            content: pdf ? (<>
+              {stampWaited ? <StampPending /> : null}
               <iframe src={`/api/files/${pdf.id}`} title={`${doc.docNumber} rev ${shown?.value ?? ""}`} className="h-[70vh] min-h-120 w-full bg-slate-100" />
-            ) : (
+            </>) : (
               <div className="grid h-48 place-items-center p-6 text-center">
                 <div>
                   <FileText className="mx-auto h-8 w-8 text-slate-400" />

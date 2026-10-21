@@ -29,6 +29,7 @@ import { VerdictDecision } from "@/app/(app)/documents/[id]/verdict-status";
 import { preflight } from "@/lib/conformance/rules/preflight";
 import { Guarded } from "@/components/preflight";
 import { issueToReviewAction, withdrawRevisionAction, removeCommentAction, editCommentAction, recordOutcomeAction, returnToOriginatorAction } from "@/lib/documents/forms-revisions";
+import { openCopy } from "@/lib/documents/copies";
 import { ArrowLeft, Bell, ExternalLink, FileText, Pencil } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -82,7 +83,8 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   const assigned = cycle.assignments.some((assignment) => assignment.userId === user.id);
   const rev = cycle.revision;
   const doc = rev.document;
-  const rendition = rev.files.find((file) => file.kind === "RENDITION") ?? null;
+  // The PDF people open: the stamped copy once its review released (or returned) it, else the PDF as sent.
+  const rendition = openCopy(rev.files);
   // The route this step belongs to, if any. Progress draws the whole of it, so
   // there is no separate picture of the route on this page.
   const run = await reviewRun(ctx, cycle.id).catch(() => null);
