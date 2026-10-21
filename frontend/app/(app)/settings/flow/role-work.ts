@@ -74,15 +74,3 @@ export function flowWords(work: RoleWork) {
     keep: { key: "keep", tab: "Keeping & ending", title: "A document kept, and ended", from: "In the register", to: "kept as long as it must be, or ended with why" },
   };
 }
-
-/**
- * The flows a project's role draws, in its order and words (the console's tabs): the Settings hub lists them as entries
- * into the Control room, each opening it on that flow (`/settings/flow#<key>`).
- */
-export function flowEntries(role: string | null | undefined): { key: string; tab: string; title: string; from: string; to: string }[] {
-  const work = ROLE_WORK[role ?? ""] ?? GENERIC_WORK;
-  const words = flowWords(work) as Record<string, { key: string; tab: string; title: string; from: string; to: string }>;
-  const lead = work.order.filter((key) => key in words);
-  const rest = ["produce", "receive", "supplier", "deliver", "action", "join", "keep"].filter((key) => !lead.includes(key));
-  return [...lead, ...rest].map((key) => ({ ...words[key], title: work.titles?.[key] ?? words[key].title, tab: work.tabs?.[key] ?? words[key].tab }));
-}

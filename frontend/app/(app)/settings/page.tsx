@@ -1,4 +1,4 @@
-import { controlDoes } from "@/lib/settings/control-activities";
+import { controlDoes, controlSettings, policies, PROJECT_MODE_LABEL, PEOPLE_MODE_LABEL } from "@/lib/settings/control-activities";
 import { projectForms, fieldsOf } from "@/lib/settings/field-policy";
 import { holdersOf } from "@/lib/core/permissions";
 import Link from "next/link";
@@ -15,7 +15,6 @@ import { SETUP_ICON } from "./icons";
 import { adminAudit, adminFunctions, adminNumbering, projectNumbering, projectRevisions, projectRoutes, adminParties, adminProjects, adminUsers, orEmpty } from "@/lib/settings/api-admin";
 import { orgSettings, projectSettings } from "@/lib/settings/api";
 import { getSets } from "@/lib/settings/config";
-import { flowEntries } from "./flow/role-work";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings" };
@@ -56,10 +55,14 @@ export default async function AdminPage() {
     getActiveSet("DELIVERABLE_TYPES").catch(() => []),
     Promise.all(ESSENTIAL.map(async (key) => ((await getActiveSet(key).catch(() => [])).length ? null : key))).then((all) => all.filter(Boolean).length),
   ]);
-  const [familyList, controllers] = await Promise.all([
+  const [familyList, how, chosen, controllers] = await Promise.all([
     families(ctx),
+    controlSettings(ctx),
+    policies(ctx),
     holdersOf(ctx, "CONTROL").catch(() => []),
   ]);
+  const together = chosen.find((one) => one.policy.key === "POLICY_RELEASE")?.value !== "SEPARATE";
+  const adding = how.rows.find((row) => row.activity.key === "PROJECT_PEOPLE");
   const changesIt = mayChangeControlRoom(user);
   const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
   const outside = parties.filter((p) => !p.isInternal).length;
@@ -126,10 +129,10 @@ export default async function AdminPage() {
         </div>
       </header>
 
-      {/* The Control room stands above every page below (owner): drawn as the console itself, navy, with the project's
-          flows as its entries, each opening the console on that flow; the control function named once. */}
-      <section className="scene-deck p-5 sm:p-6" aria-labelledby="control-room-head">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      {/* The Control room stands above every page below (owner): drawn as the console itself, navy, to stand out; what it
+          says of how the project works, and the way in. */}
+      <section className="scene-deck" aria-labelledby="control-room-head">
+        <div className="flex flex-col gap-3 px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 max-w-2xl gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-[var(--deck-station)] text-[var(--deck-lit)]">
               <Route className="h-5 w-5" aria-hidden="true" />
@@ -137,34 +140,41 @@ export default async function AdminPage() {
             <div className="min-w-0">
               <h2 id="control-room-head" className="text-base font-semibold text-[var(--deck-ink)]">Control room</h2>
               <p className="mt-0.5 text-xs leading-5 text-[var(--deck-mute)]">
-                How {ctx.project.code} works, step by step: who carries each act out, and what the project has settled. Every page
-                below is what it is built from.{" "}
-                {controllers.length
-                  ? <>The control function: <span className="font-semibold text-[var(--deck-ink)]">{controllers.map((one) => one.name).slice(0, 4).join(", ")}{controllers.length > 4 ? ` +${controllers.length - 4}` : ""}</span>.</>
-                  : <>No control function: the people doing the work run the register.</>}
+                How {ctx.project.code} works, and what makes it work that way: every step a document goes through, who carries each act out, and
+                what the project has settled. Every page below is what it is built from.
               </p>
             </div>
           </div>
-          <Link href={CONTROL_ROOM} className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md bg-[var(--deck-lit)] px-3 py-1.5 text-xs font-semibold text-[var(--deck)] transition-colors hover:bg-white">
-            {changesIt ? "Open the Control room" : "See how it works"} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          <Link href={CONTROL_ROOM} className="inline-flex h-(--control-h) shrink-0 items-center gap-2 self-start rounded-md bg-[var(--deck-lit)] px-4 text-(length:--control-text) font-semibold text-[var(--deck)] transition-colors hover:bg-white">
+            {changesIt ? "Open the Control room" : "See how it works"} <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
-        <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {flowEntries(ctx.project.role).map((flow) => (
-            <li key={flow.key}>
-              <Link href={`${CONTROL_ROOM}#${flow.key}`} title={flow.title}
-                className="group flex h-full flex-col rounded-md bg-[var(--deck-station)] px-3 py-2.5 ring-1 ring-[var(--deck-ring)] transition-colors hover:bg-[var(--deck-station-hover)]">
-                <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--deck-ink)]">
-                  {flow.tab}
-                  <ArrowRight className="ml-auto h-3.5 w-3.5 text-[var(--deck-faint)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--deck-lit)]" aria-hidden="true" />
-                </span>
-                <span className="mt-0.5 text-[11px] leading-4 text-[var(--deck-mute)]">{flow.from} → {flow.to}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <dl className="grid grid-cols-1 divide-y divide-[var(--deck-ring)] border-t border-[var(--deck-ring)] sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-[var(--deck-faint)]">Control function</dt>
+            <dd className="mt-1 text-[13px] font-medium text-[var(--deck-ink)]">
+              {controllers.length ? controllers.map((one) => one.name).slice(0, 3).join(", ") + (controllers.length > 3 ? ` +${controllers.length - 3}` : "") : "None"}
+            </dd>
+            <dd className="text-[11px] text-[var(--deck-mute)]">{controllers.length ? "stands between the work and the register" : "the people doing the work run the register"}</dd>
+          </div>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-[var(--deck-faint)]">Who does what</dt>
+            <dd className="mt-1 text-[13px] font-medium text-[var(--deck-ink)]">{PROJECT_MODE_LABEL[how.projectMode]}</dd>
+            <dd className="text-[11px] text-[var(--deck-mute)]">{how.set ? "chosen for this project" : "read from the project"}</dd>
+          </div>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-[var(--deck-faint)]">Releasing</dt>
+            <dd className="mt-1 text-[13px] font-medium text-[var(--deck-ink)]">{together ? "Released and issued in one act" : "Released, then issued"}</dd>
+            <dd className="text-[11px] text-[var(--deck-mute)]">{together ? "releasing sends it" : "releasing means go ahead"}</dd>
+          </div>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-[var(--deck-faint)]">Adding people</dt>
+            <dd className="mt-1 text-[13px] font-medium text-[var(--deck-ink)]">{PEOPLE_MODE_LABEL[adding?.controlDoes === false ? "SELF" : "CONTROL"]}</dd>
+            <dd className="text-[11px] text-[var(--deck-mute)]">{adding?.confirm ? "confirmed by whoever holds Manage" : "no confirmation"}</dd>
+          </div>
+        </dl>
         {changesIt ? null : (
-          <p className="mt-3 text-[11px] text-[var(--deck-faint)]">You read it; an administrator or the control function changes it.</p>
+          <p className="border-t border-[var(--deck-ring)] px-5 py-2.5 text-[11px] text-[var(--deck-faint)] sm:px-6">You read it; an administrator or the control function changes it.</p>
         )}
       </section>
 
