@@ -15,7 +15,7 @@ import { holders } from "@/lib/settings/api";
 import { noticesAbout, noticeHistory } from "@/lib/actions/api";
 import { NotifyPanel } from "@/components/notify-panel";
 import { rewindRouteAction } from "@/lib/reviews/forms";
-import { requestChoices, authorOf, issuePolicy } from "@/lib/transmittals/issue-requests";
+import { requestChoices, authorOf, issuePolicy, decisionLetsItOut } from "@/lib/transmittals/issue-requests";
 import { DelegatePanel, DelegateForm, type DelegationRow } from "./delegate-panel";
 import { AnswerCard } from "./answer-card";
 import { delegateCandidates, delegationFlag, delegationsOn } from "@/lib/reviews/delegation";
@@ -235,6 +235,11 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
 
   // Before anything is chosen, "no outcome chosen yet" says nothing the form
   // does not; the check still runs when the answer is given.
+  // Decided and waiting to be released: the control function releases it (or sends it back) from here, on the document's
+  // own release form, as from the document page (owner: "release do not appear in the review detail").
+  const waitsRelease = controller && rev.state === "NOT_RELEASED";
+  const letsItOut = waitsRelease ? await decisionLetsItOut(ctx, rev.id) : false;
+
   const outcomeCheckRun = cycle.outcome ? null : await preflight("RECORD_OUTCOME", { cycleId: cycle.id });
   const outcomeChecks = outcomeCheckRun ? { ...outcomeCheckRun, warnings: outcomeCheckRun.warnings.filter((one) => one.id !== "OUT-SET") } : null;
 
@@ -285,6 +290,19 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
           </div>
         </div>
       </section>
+
+      {waitsRelease ? (
+        <section className="register register-sheet register-sheet-open">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-6">
+            <p className="text-[13px] text-slate-700">
+              {letsItOut
+                ? <>Decided{rev.statusCode ? <> at <span className="font-mono font-semibold">{rev.statusCode}</span></> : null}: rev {rev.value} is <strong>not released</strong> until it is released.</>
+                : <>Decided with a verdict that asks for changes: rev {rev.value} is not released, and goes back.</>}
+            </p>
+            <Link href={`/documents/${doc.id}#step-release`} data-on="true" className="ask">{letsItOut ? `Release rev ${rev.value}` : `Send rev ${rev.value} back`}</Link>
+          </div>
+        </section>
+      ) : null}
 
       {cycle.withdrawn ? <Banner tone="info" title={`Withdrawn${cycle.withdrawn.at ? ` on ${fmtDate(cycle.withdrawn.at)}` : ""}`}>{cycle.withdrawn.note ?? "Taken back out of review to be changed."} Its comments are kept here; the revision goes round a new review once the change is in.</Banner> : null}
       {reserves.length ? <Banner tone="warn" title="Held under reserve">{reserves.length} comment{reserves.length === 1 ? " carries a reserve" : "s carry a reserve"} that the route has still to settle. The decider's verdict is what releases the revision.</Banner> : null}

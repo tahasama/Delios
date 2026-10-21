@@ -399,7 +399,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   SEPARATE: a release needs someone to send to (an open request naming people
   or organizations, or the people named on the release form); the backend
   refuses otherwise (ISSUE_REQUIRED). The release sends it.
-- Release is offered only for a decided revision (never in Prepare). Document
+- Release is offered only for a decided revision (never in Prepare). The review's page offers it too (owner): decided and
+  not released, the control function reads it under the plate with "Release rev X" (or "Send rev X back" after a
+  verdict asking for changes), opening the document's release form (`#step-release`). Document
   Control does not say who receives it: the decider or whoever asked did. The
   release form shows them, each removable (the request keeps who was taken off,
   by whom, when: `IssueRequest.ReleaseNote`), and "Add people or organizations".
