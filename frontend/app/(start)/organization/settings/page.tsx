@@ -9,6 +9,7 @@ import { SETUP_PAGES, SETUP_GROUPS } from "@/app/(app)/settings/setup-pages";
 import { SETUP_ICON } from "@/app/(app)/settings/icons";
 import { fmtDate } from "@/lib/core/utils";
 import { ORG_CARDS } from "./cards";
+import { controlFrom, effectiveAnswer, PEOPLE_KEY, PEOPLE_MODE_LABEL, PROJECT_MODE_LABEL } from "@/lib/settings/control-activities";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "The organization's Settings" };
@@ -41,6 +42,10 @@ export default async function OrganizationSettingsPage() {
   };
   const groupOf = (card: (typeof ORG_CARDS)[number]) => card.group ?? SETUP_PAGES.find((p) => p.href === card.project)?.group ?? "Organization";
   const room = switches.filter((one) => one.area === "Control room");
+  const answers = new Map(Object.entries(defaults?.values ?? {}));
+  const reading = controlFrom(answers, true);
+  const actRow = new Map(reading.rows.map((row) => [row.activity.key, row]));
+  const together = effectiveAnswer("POLICY_RELEASE", answers.get("POLICY_RELEASE")) === "TOGETHER";
 
   return (
     <>
@@ -71,38 +76,46 @@ export default async function OrganizationSettingsPage() {
         </dl>
       </header>
 
-      {/* The Control room stands above the cards, as on a project: here, what a project starts with. */}
-      <section className="register register-sheet register-sheet-open" aria-labelledby="org-room-head">
+      {/* The Control room stands above the cards, drawn as the console itself, as on a project (owner): here, what every
+          new project starts with, and the way in. */}
+      <section className="scene-deck" aria-labelledby="org-room-head">
         <div className="flex flex-col gap-3 px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 max-w-2xl gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-tint text-brand-ink">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-[var(--deck-station)] text-[var(--deck-lit)]">
               <Route className="h-5 w-5" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <h2 id="org-room-head" className="text-base font-semibold text-slate-950">Control room</h2>
-              <p className="mt-0.5 text-xs leading-5 text-slate-600">
-                How a project works when it opens: who carries each act out, releasing, stamps, planning. Copied into each new project;
-                a project then changes what is free.
+              <h2 id="org-room-head" className="text-base font-semibold text-[var(--deck-ink)]">Control room</h2>
+              <p className="mt-0.5 text-xs leading-5 text-[var(--deck-mute)]">
+                How a new project works, step by step: who carries each act out, releasing, planning, and what projects may change.
+                Copied into each new project; a project then changes what is free.
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2 self-start">
-            <Link href="/organization/defaults" className="ask">Defaults for new projects <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
-            <Link href="/organization/settings/flow" className="ask">What projects may change</Link>
-          </div>
+          <Link href="/organization/settings/flow" className="inline-flex h-(--control-h) shrink-0 items-center gap-2 self-start rounded-md bg-[var(--deck-lit)] px-4 text-(length:--control-text) font-semibold text-[var(--deck)] transition-colors hover:bg-white">
+            Open the Control room <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
         </div>
-        <dl className="grid grid-cols-1 divide-y divide-line border-t border-line sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+        <dl className="grid grid-cols-1 divide-y divide-[var(--deck-ring)] border-t border-[var(--deck-ring)] sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
           <div className="px-5 py-3 sm:px-6">
-            <dt className="stencil text-slate-500">Defaults</dt>
-            <dd className="mt-1 text-[13px] font-medium text-slate-900">
-              {defaults ? (defaults.fromProject ? `Taken from ${defaults.fromProject}${defaults.edited ? ", then changed" : ""}` : "Set here") : "The app's own"}
-            </dd>
-            <dd className="text-[11px] text-slate-500">{defaults ? `last changed ${fmtDate(defaults.at)} by ${defaults.by}` : "nothing changed yet"}</dd>
+            <dt className="stencil text-[var(--deck-faint)]">Who does what</dt>
+            <dd className="mt-1 text-[13px] font-medium text-[var(--deck-ink)]">{PROJECT_MODE_LABEL[reading.projectMode]}</dd>
+            <dd className="text-[11px] text-[var(--deck-mute)]">{defaults ? (defaults.fromProject ? `taken from ${defaults.fromProject}` : `changed ${fmtDate(defaults.at)}`) : "the app's own"}</dd>
           </div>
           <div className="px-5 py-3 sm:px-6">
-            <dt className="stencil text-slate-500">Projects may change</dt>
-            <dd className="mt-1 text-[13px] font-medium text-slate-900">{room.filter((one) => one.free).length} of {room.length} answers</dd>
-            <dd className="text-[11px] text-slate-500">the rest stay as the defaults say</dd>
+            <dt className="stencil text-[var(--deck-faint)]">Releasing</dt>
+            <dd className="mt-1 text-[13px] font-medium text-[var(--deck-ink)]">{together ? "Released and issued in one act" : "Released, then issued"}</dd>
+            <dd className="text-[11px] text-[var(--deck-mute)]">{together ? "releasing sends it" : "releasing means go ahead"}</dd>
+          </div>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-[var(--deck-faint)]">Adding people</dt>
+            <dd className="mt-1 text-[13px] font-medium text-[var(--deck-ink)]">{PEOPLE_MODE_LABEL[actRow.get(PEOPLE_KEY)?.controlDoes === false ? "SELF" : "CONTROL"]}</dd>
+            <dd className="text-[11px] text-[var(--deck-mute)]">{actRow.get(PEOPLE_KEY)?.confirm ? "confirmed by whoever holds Manage" : "no confirmation"}</dd>
+          </div>
+          <div className="px-5 py-3 sm:px-6">
+            <dt className="stencil text-[var(--deck-faint)]">Projects may change</dt>
+            <dd className="mt-1 text-[13px] font-medium text-[var(--deck-ink)]">{room.filter((one) => one.free).length} of {room.length} answers</dd>
+            <dd className="text-[11px] text-[var(--deck-mute)]">the rest stay as the organization sets them</dd>
           </div>
         </dl>
       </section>

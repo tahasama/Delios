@@ -8,9 +8,7 @@ import { orgCard } from "../cards";
 export const dynamic = "force-dynamic";
 
 /** Where a card's organization's version stands until it is moved onto this card, said plainly. */
-const TODAY: Record<string, React.ReactNode> = {
-  flow: <>The organization&rsquo;s version is what a project starts with: <Link href="/organization/defaults" className="font-semibold text-link hover:underline">Defaults for new projects</Link>. Each project then changes its own where it is free.</>,
-};
+const TODAY: Record<string, React.ReactNode> = {};
 
 /** One card of the organization's Settings not moved onto it yet: its switches, and where its organization's version is. */
 export default async function OrganizationCardPage({ params }: { params: Promise<{ slug: string }> }) {

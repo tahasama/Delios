@@ -149,7 +149,7 @@ export async function makeDefaultsAction(_prev: Result | undefined, formData: Fo
     return failed(e);
   }
   revalidatePath("/organization", "layout");
-  revalidatePath("/organization/defaults");
+  revalidatePath("/organization/settings/flow");
   return { ok: `New projects now start with ${project.code}'s choices. Projects already open keep theirs.` };
 }
 
@@ -176,7 +176,7 @@ export async function resetDefaultsAction(_prev: Result | undefined, _formData: 
     return failed(e);
   }
   revalidatePath("/organization", "layout");
-  revalidatePath("/organization/defaults");
+  revalidatePath("/organization/settings/flow");
   return { ok: "Back on the app's own defaults. Projects already open keep theirs." };
 }
 

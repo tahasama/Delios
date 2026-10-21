@@ -11,6 +11,7 @@ import { ESCALATE_AFTER_KEY } from "@/lib/actions/escalation";
 import {
   CONTROL_ACTIVITIES,
   controlSettings,
+  controlFrom,
   SKIPPABLE,
   SKIP_KEY,
   CONFIRMABLE,
@@ -90,7 +91,8 @@ function revalidateHowItWorks() {
   revalidatePath("/settings/flow");
   revalidatePath("/settings/flow");
   revalidatePath("/organization");
-  revalidatePath("/organization/defaults");
+  revalidatePath("/organization/settings");
+  revalidatePath("/organization/settings/flow");
 }
 
 /**
@@ -266,7 +268,27 @@ export async function setRoomAnswerAction(_prev: State | undefined, formData: Fo
   const activity = CONTROL_ACTIVITIES.find((one) => one.key === key);
   let said: string;
   try {
-    if (activity) {
+    if (activity && String(formData.get("target") ?? "") === "defaults") {
+      // The organization's defaults: the act answers for itself, the others written down as they stand, so that
+      // moving this one never moves another.
+      if (value === "OFF") {
+        if (!SKIPPABLE[key]) return { error: `${activity.title} cannot be left out.` };
+        await save(formData, [[SKIP_KEY(key), "OFF"]]);
+        said = `${activity.title}: left out.`;
+      } else {
+        if (!ACT_MODES.includes(value as ControlMode)) return { error: "Choose who carries it out." };
+        const { projectDefaults } = await import("@/lib/organization/defaults");
+        const now = controlFrom(new Map(Object.entries((await projectDefaults())?.values ?? {})), true);
+        const wanted: [string, string | null][] = [];
+        if (!now.set || now.projectMode !== "CUSTOM") {
+          for (const row of now.rows) if (row.activity.key !== key) wanted.push([row.activity.key, row.controlDoes ? "CONTROL" : "SELF"]);
+        }
+        wanted.push([PROJECT_KEY, "CUSTOM"], [key, value]);
+        if (SKIPPABLE[key]) wanted.push([SKIP_KEY(key), null]);
+        await save(formData, wanted);
+        said = `${activity.title}: ${MODE_LABEL[value as ControlMode].toLowerCase()}.`;
+      }
+    } else if (activity) {
       if (value === "OFF") {
         if (!SKIPPABLE[key]) return { error: `${activity.title} cannot be left out.` };
         await put(SKIP_KEY(key), "OFF", `${activity.title} — left out`);

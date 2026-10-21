@@ -108,7 +108,7 @@ frontend/
 │   │   ├── account/
 │   │   ├── guide/
 │   │   └── settings/     + distribution/, people/; flow/ (the Control room: the flows, read only, linking
-│   │                     to every card), control/ (only redirects to the Control room), flow/ (the Control room; project-wide.tsx: who acts as the control function, back to the defaults; role-work.ts: what our role makes of the flows, and their words), stamp/ (The stamp: its card, the same as the organization's at organization/settings/stamp; lib/settings/stamp.ts holds its keys and defaults)
+│   │                     to every card), control/ (only redirects to the Control room), flow/ (the Control room; project-wide.tsx: who acts as the control function, back to the defaults; role-work.ts: what our role makes of the flows, and their words; stages.ts and step-panel.tsx: its steps, flows and panels, shared with the organization's Control room at organization/settings/flow), stamp/ (The stamp: its card, the same as the organization's at organization/settings/stamp; lib/settings/stamp.ts holds its keys and defaults)
 │   └── api/              file downloads (exports, delivery lists, templates)
 │
 ├── lib/                  the code behind the pages, by area

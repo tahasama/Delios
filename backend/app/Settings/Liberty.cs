@@ -174,7 +174,7 @@ public static class Liberty
             return Problems.Forbidden("ROOM_FIXED", "The stamp: the organization keeps it the same on every project. An administrator changes it in the organization's Settings (The stamp).");
         var title = Items.FirstOrDefault(i => i.Key == item)?.Title ?? item;
         return Problems.Forbidden("ROOM_FIXED",
-            $"{title}: the organization keeps it the same on every project. An administrator changes it in the organization's Settings (Defaults for new projects).");
+            $"{title}: the organization keeps it the same on every project. An administrator changes it in the organization's Settings (Control room).");
     }
 
     /// <summary>The lists a part of a numbering scheme reads (<c>LIST:&lt;key&gt;</c>, and the app's lists numbering reads).</summary>

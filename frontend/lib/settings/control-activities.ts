@@ -439,6 +439,6 @@ const ACT_KEYS = new Set(["REVIEW_ISSUE", "RETURN_OUTCOME", "ISSUE", "DELEGATE",
 export function roomItemOf(key: string): string | null {
   if (ACT_KEYS.has(key) || key.startsWith("SKIP:") || key.startsWith("CONFIRM:")) return "WHO_DOES_WHAT";
   if (["POLICY_RELEASE", "POLICY_READY", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL", "ESCALATE_AFTER_DAYS"].includes(key)) return key;
-  if (key === "POLICY_PDF_STAMP" || key === "STAMP_COMMENTS" || key === "STAMP_PLACE" || key.startsWith("STAMP:") || key.startsWith("STAMP_SHOW:")) return "POLICY_PDF_STAMP";
+  if (key === "POLICY_PDF_STAMP" || key === "STAMP_COMMENTS" || key === "STAMP_PLACE" || key === "STAMP_NOTE" || key === "STAMP_SIZE" || key.startsWith("STAMP:") || key.startsWith("STAMP_SHOW:")) return "POLICY_PDF_STAMP";
   return null;
 }

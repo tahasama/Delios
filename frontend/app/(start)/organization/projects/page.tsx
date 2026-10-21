@@ -99,7 +99,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Link href="/organization/defaults" className="ask"><SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" /> Defaults for new projects</Link>
+            <Link href="/organization/settings/flow" className="ask"><SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" /> Defaults for new projects</Link>
             {opening ? null : <Link href="/organization/projects?new=1#new" scroll={false} data-on="true" className="ask"><Plus className="h-3.5 w-3.5" aria-hidden="true" /> New project</Link>}
           </div>
         </div>

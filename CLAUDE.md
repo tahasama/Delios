@@ -525,10 +525,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   no side menu, no overview of tiles. `/organization` opens on Projects (ours with Open a new project, and other
   organizations' we take part in, with our people on them). What waits for our answer shows as one amber banner above
   every tab: invitations answered there, merges and claims one click away. Settings holds every card of how the
-  organization works, drawn like a project's hub (masthead with fixed / free / own copies, the Control room panel with
-  Defaults for new projects, the cards by group, each chip saying where its switch stands), Who we are on DELIOS
-  (`/organization/settings/identity`) and What is kept (`/organization/settings/tracking`) among them; Defaults has the
-  form beside an aside (start from a project, the app's own defaults, reset). People (`/organization/people`) and
+  organization works, drawn like a project's hub (masthead with fixed / free / own copies, the Control room panel drawn as the
+  navy console as on a project, the cards by group, each chip saying where its switch stands), Who we are on DELIOS
+  (`/organization/settings/identity`) and What is kept (`/organization/settings/tracking`) among them. People (`/organization/people`) and
   Organizations (with those whose projects we work on, and the links refused or ended) are each one list. On
   Organizations a name opens its card under its line, in place (`?open=<id>`, `party-card.tsx`). Its dates are per
   project (owner), never summed: one line per project it worked on with us (role, contract, joined, last active, the
@@ -553,13 +552,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - The organization's page (`/organization`, administrators): projects ours and joined, people, organizations
   we work with, invitations (also on Home), defaults for new projects. Its projects, people and organizations
   are links (open or switch into a project; People & access; Organizations).
-- Defaults for new projects (`/organization/defaults`, `PROJECT_DEFAULTS`): edited directly with the same form
-  as a project's Control room (`components/how-it-works.tsx`), or taken from one project; they keep only what
-  differs from the app's own; "Reset to the app's defaults". Copied when a project opens, never changing one
-  already open; a joined project follows its owner. A project marks only an answer "changed here" (or
-  "the organization's" where fixed); an unmarked answer is the defaults', said once at the head of each sheet (the
-  same answer marked on every line was noise). It has "Reset to the organization's defaults" (what the project is, and
-  checks ticked off, stay).
+- **The organization's Control room** (owner: "is it on purpose it does not look like the project's?", then "those
+  are full pages hiding"): `/organization/settings/flow`, the same console as a project's, its flows, steps and panels
+  shared (`settings/flow/stages.ts`, `step-panel.tsx`), drawn for any role, set to what every new project starts with
+  (`PROJECT_DEFAULTS`, saved by the same `Choice`s with `target=defaults`). Each step's panel carries "Projects may change
+  it": the switches of the answers it holds (`room-switches.tsx`), so "What projects may change" is no longer a page of
+  its own; what only a project knows (who acts as its control function, its schedule's days, how its suppliers send) is
+  said, changed on the project. Under the console: "Start from a project" and "Back to the app's own". The hub's panel
+  is the navy console with four facts and "Open the Control room". `/organization/defaults` only redirects there; the
+  Projects plate's "Defaults for new projects" opens it. They keep only what differs from the app's own; copied when a
+  project opens, never changing one already open; a joined project follows its owner. A project marks only an answer
+  "changed here" (or "the organization's" where fixed); an unmarked answer is the defaults', said once at the head of
+  each sheet. It has "Back to the defaults" (what the project is, and checks ticked off, stay).
 - Not on DELIOS, with "Their email for transmittals" (`Party.ContactEmail`): our transmittals to them go by
   email with their files (`EmailReplies`), each with a reply address of its own (`replies+<key>@…`,
   `ReplyAddress`, kept outside organization fencing). A reply from that address only is taken in: it waits on
