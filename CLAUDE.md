@@ -79,7 +79,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   advise → decide → release → issue), not only the line reported.
 - Never remove behaviour that exists without saying so and why.
 - No code written inside the page (no inline scripts, no `dangerouslySetInnerHTML`).
-  Display preferences (theme, sidebar width) live in cookies the server reads.
+  Display preferences (theme, sidebar width, a pane's width: `components/resizable-pane.tsx`) live in cookies the server reads.
 
 ## Design — locked in by the owner
 
@@ -272,12 +272,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   contracts say it; none unless written, 240 characters). **How large** (`STAMP_SIZE`, S · M · L · XL = 0.8 · 1 · 1.25
   · 1.5, Normal by default): frame and words grow or shrink together. **Where it sits** (`STAMP_PLACE`,
   top right by default, or another corner). **The marks across the page**, as they were (owner): superseded, void, on
-  hold (`STAMP:SUPERSEDED|VOID|HELD`, on). Beside the form, the stamp drawn on a page as it will read (`Stamping.Stamp`,
+  hold (`STAMP:SUPERSEDED|VOID|HELD`, on). Beside the form, the stamp drawn on a page as it will read, dragged larger by its left edge (owner: "give more by making it
+  resizable"; `ResizablePane`, cookie `pane-stamp`; the stamp drawn to the page's scale) (`Stamping.Stamp`,
   `StampFace`; a code with no name reads as words, "No comment", never the app's code). The Control room only reads it, one line on each step that stamps, with "change" to the card; the Defaults for
   new projects no longer carry it. The PDF opened from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`), of its newest
   submission only. **The document's Preview follows the newest revision** (owner), whatever its state, named on its tab
   ("Preview · rev B"): just started, nothing until its PDF is in; prepared or in review, its own newest PDF; returned, its
-  returned copy; released, its stamped copy. The review's page shows the same copy of its revision.
+  returned copy; released, its stamped copy. The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
+  the side cards going under it once there is no room beside it (owner; `ResizablePane`, cookie `pane-review`; a double-click puts it back).
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
   every project" (Default rules, tabs by area, `prevented.ts`), never checked.
 - Assurance: each finding points to the exact spot where it is put right: a document's tab, or else the thing

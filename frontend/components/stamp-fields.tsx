@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ResizablePane } from "@/components/resizable-pane";
+import { PREF } from "@/lib/core/preferences";
 import { SwitchControl } from "@/components/switch";
 import { cn } from "@/lib/core/utils";
 import { inputCls } from "@/components/ui";
@@ -34,11 +36,14 @@ function Band({ title, said }: { title: string; said: string }) {
   );
 }
 
+/** The preview's page at its own width, in pixels: the stamp drawn on it is at scale 1. */
+const PAGE_W = 208;
+
 /**
  * The stamp, as one card (owner): stamped or not, when a review stamps, what the stamp shows, why, where it sits, and the
  * marks across the page; beside it, the stamp drawn on a page as it will read. Fields of the form around it.
  */
-export function StampFields({ initial, disabled = false }: { initial: StampAnswers; disabled?: boolean }) {
+export function StampFields({ initial, disabled = false, pane = null }: { initial: StampAnswers; disabled?: boolean; pane?: number | null }) {
   const [a, setA] = useState<StampAnswers>(initial);
   const on = (key: string) => a[key] === "ON";
   const flip = (key: string) => (value: boolean) => setA({ ...a, [key]: value ? "ON" : "OFF" });
@@ -48,12 +53,22 @@ export function StampFields({ initial, disabled = false }: { initial: StampAnswe
   const scale = STAMP_SIZES.find((one) => one.value === size)?.scale ?? 1;
   const when = on("STAMP_SHOW:TIME") ? "21 Oct 2026 14:32" : "21 Oct 2026";
   const [shownReturned, setShownReturned] = useState(false);
+  // The page grows with the preview, dragged wider: the stamp is drawn to the page's scale.
+  const page = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    const box = page.current;
+    if (!box) return;
+    const watch = new ResizeObserver(() => setZoom(box.offsetWidth / PAGE_W));
+    watch.observe(box);
+    return () => watch.disconnect();
+  }, []);
 
   return (
     <fieldset disabled={disabled} className="min-w-0 disabled:opacity-70">
       <input type="hidden" name={STAMP_PLACE_KEY} value={place} />
-      <div className="grid md:grid-cols-[minmax(0,1fr)_15rem]">
-        <div className="min-w-0">
+      <div className="flex flex-wrap">
+        <div className="min-w-0 flex-1 basis-96">
           <ul>
             <Line name={STAMP_ON_KEY} on={stamped} set={flip(STAMP_ON_KEY)} label="Stamp the PDF people open"
               text="a copy is made with the stamp; the file as sent is kept either way. Off: no PDF is stamped or marked." />
@@ -104,7 +119,7 @@ export function StampFields({ initial, disabled = false }: { initial: StampAnswe
         </div>
 
         {/* The page, with the stamp where it will sit, at its size, reading as it will. */}
-        <div className="border-t border-line p-4 md:border-t-0 md:border-l">
+        <ResizablePane name={PREF.stampPane} initial={pane} min={240} edge="left" className="w-full border-t border-line p-4 md:w-60 md:border-t-0 md:border-l">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-[11px] text-slate-500">As it reads on the page</p>
             <span className="choice" role="group" aria-label="Show it as">
@@ -114,11 +129,11 @@ export function StampFields({ initial, disabled = false }: { initial: StampAnswe
               ))}
             </span>
           </div>
-          <div aria-hidden className={cn("flex h-72 overflow-hidden rounded-sm bg-white p-2 shadow-sm ring-1 ring-line",
+          <div ref={page} aria-hidden className={cn("flex aspect-[1/1.414] overflow-hidden rounded-sm bg-white p-2 shadow-sm ring-1 ring-line",
             place.startsWith("TOP") ? "items-start" : "items-end", place.endsWith("RIGHT") ? "justify-end" : "justify-start", !stamped && "opacity-40")}>
             {stamped ? (
               // As the worker draws it (Stamping.Stamp): the register's colour for the state, the outcome alone.
-              <div style={{ transform: `scale(${scale})`, transformOrigin: `${place.startsWith("TOP") ? "top" : "bottom"} ${place.endsWith("RIGHT") ? "right" : "left"}` }}
+              <div style={{ transform: `scale(${scale * zoom})`, transformOrigin: `${place.startsWith("TOP") ? "top" : "bottom"} ${place.endsWith("RIGHT") ? "right" : "left"}` }}
                 className={cn("w-48 shrink-0 rounded-md border bg-white px-2 py-1.5", shownReturned ? "border-rose-700" : "border-emerald-700")}>
                 <p className="text-[6.5px] font-bold text-slate-800">Your organization · project code</p>
                 <p className={cn("mt-1 rounded px-1.5 py-[2px] text-[7.5px] font-bold",
@@ -146,7 +161,8 @@ export function StampFields({ initial, disabled = false }: { initial: StampAnswe
               </div>
             ) : <p className="m-auto text-[11px] text-slate-400">Not stamped</p>}
           </div>
-        </div>
+          <p className="mt-2 hidden text-[11px] text-slate-400 md:block">Drag its left edge to see it larger.</p>
+        </ResizablePane>
       </div>
     </fieldset>
   );

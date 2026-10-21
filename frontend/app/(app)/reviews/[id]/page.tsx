@@ -30,6 +30,9 @@ import { preflight } from "@/lib/conformance/rules/preflight";
 import { Guarded } from "@/components/preflight";
 import { issueToReviewAction, withdrawRevisionAction, removeCommentAction, editCommentAction, recordOutcomeAction, returnToOriginatorAction } from "@/lib/documents/forms-revisions";
 import { openCopy } from "@/lib/documents/copies";
+import { cookies } from "next/headers";
+import { PREF, paneWidth } from "@/lib/core/preferences";
+import { ResizablePane } from "@/components/resizable-pane";
 import { ArrowLeft, Bell, ExternalLink, FileText, Pencil } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -309,8 +312,11 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
       {cycle.withdrawn ? <Banner tone="info" title={`Withdrawn${cycle.withdrawn.at ? ` on ${fmtDate(cycle.withdrawn.at)}` : ""}`}>{cycle.withdrawn.note ?? "Taken back out of review to be changed."} Its comments are kept here; the revision goes round a new review once the change is in.</Banner> : null}
       {reserves.length ? <Banner tone="warn" title="Held under reserve">{reserves.length} comment{reserves.length === 1 ? " carries a reserve" : "s carry a reserve"} that the route has still to settle. The decider's verdict is what releases the revision.</Banner> : null}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="space-y-4">
+      {/* The document's column is dragged wider by its right edge (owner: "make the preview resizable"); with no room
+          left beside it, the side cards go under it. */}
+      <div className="flex flex-wrap items-start gap-4">
+        <ResizablePane name={PREF.reviewPane} initial={paneWidth((await cookies()).get(PREF.reviewPane)?.value, 420)} min={420}
+          className="w-full min-w-0 space-y-4 xl:w-[calc(100%-380px-1rem)]">
           {/* The document under review, on a sheet of its own. Opening it in a
               tab of its own acts on the whole of it, so it sits in the band. */}
           <section className="register register-sheet">
@@ -434,9 +440,9 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             </Card>
           ) : null}
 
-        </div>
+        </ResizablePane>
 
-        <aside className="space-y-4">
+        <aside className="min-w-[320px] flex-1 space-y-4">
           {/* A step held by an organization that is not on this system. Our
               people do its work here, in the same screen as any other review:
               the same comments, the same verdict, with proof of what they sent

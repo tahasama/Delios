@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { PREF, paneWidth } from "@/lib/core/preferences";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
@@ -19,7 +21,7 @@ export const metadata = { title: "The stamp" };
 export default async function StampPage() {
   const ctx = await requireScope();
   if (!maySetup(ctx.user, SETUP_PAGES.find((p) => p.href === "/settings/stamp")!)) return <NoAccess title="The stamp" who="control" />;
-  const [own, organization, switches] = await Promise.all([projectSettings(ctx.projectId), orgSettings(), liberty()]);
+  const [own, organization, switches, jar] = await Promise.all([projectSettings(ctx.projectId), orgSettings(), liberty(), cookies()]);
   const free = switches.find((one) => one.key === "POLICY_PDF_STAMP")?.free ?? true;
   const mine = stampOwn(own);
   const project = ctx.project.code;
@@ -34,5 +36,5 @@ export default async function StampPage() {
           {isAdmin(ctx.user)
             ? <>An administrator changes it in the organization&rsquo;s Settings: <Link href="/organization/settings/stamp" className="font-semibold text-link hover:underline">The stamp</Link>.</>
             : "An administrator changes it, for every project."}</>;
-  return <StampCard initial={stampAnswers(organization, own)} level="project" editable={changes && free} lead={lead} />;
+  return <StampCard initial={stampAnswers(organization, own)} level="project" editable={changes && free} lead={lead} pane={paneWidth(jar.get(PREF.stampPane)?.value)} />;
 }

@@ -9,11 +9,13 @@ import type { StampAnswers } from "@/lib/settings/stamp";
  * The stamp card, the same at both levels (owner: "the same cards"): the organization's (every project's default) or a
  * project's (where the organization leaves it free). One form, saved as one; read only for whoever may not change it.
  */
-export function StampCard({ initial, level, editable, lead }: {
+export function StampCard({ initial, level, editable, lead, pane }: {
   initial: StampAnswers;
   level: "organization" | "project";
   editable: boolean;
   lead: React.ReactNode;
+  /** The preview's width, as the person left it. */
+  pane: number | null;
 }) {
   const [state, formAction, pending] = useActionState(setStampAction, undefined);
   return (
@@ -27,7 +29,7 @@ export function StampCard({ initial, level, editable, lead }: {
       </div>
       <form action={formAction}>
         <input type="hidden" name="level" value={level} />
-        <StampFields initial={initial} disabled={!editable} />
+        <StampFields initial={initial} disabled={!editable} pane={pane} />
         {editable ? (
           <div className="flex items-center gap-3 border-t border-line px-5 py-3 sm:px-6">
             <button type="submit" disabled={pending} data-on="true" className="ask">{pending ? "Saving…" : "Save the stamp"}</button>
