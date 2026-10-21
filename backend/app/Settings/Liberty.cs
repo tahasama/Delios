@@ -141,7 +141,7 @@ public static class Liberty
     {
         _ when Acts.Contains(settingKey) || settingKey.StartsWith("SKIP:") || settingKey.StartsWith("CONFIRM:") => "WHO_DOES_WHAT",
         "POLICY_RELEASE" or "POLICY_READY" or "POLICY_MATRIX" or "POLICY_MATRIX_DETAIL" or "ESCALATE_AFTER_DAYS" => settingKey,
-        "POLICY_PDF_STAMP" or "STAMP_COMMENTS" => "POLICY_PDF_STAMP",
+        "POLICY_PDF_STAMP" or "STAMP_COMMENTS" or "STAMP_PLACE" => "POLICY_PDF_STAMP",
         "SUPPLIER_INTAKE" or "AS_RECEIVED_FILING" => "SUPPLIER_INTAKE",
         _ when settingKey.StartsWith("STAMP:") || settingKey.StartsWith("STAMP_SHOW:") => "POLICY_PDF_STAMP",
         _ => null,

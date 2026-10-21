@@ -250,16 +250,19 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the key on Help, "What the colours say". Every list of documents takes them, the package lists too (a supplier's
   line by its stage, a delivery line by ready / released short of its status / nothing released); a card (Next step)
   takes none.
-- **A stamp is a review's, and only a review's** (owner: "stamps are an engagement that legally holds"; the superseded,
-  void and on-hold marks were a mistake and are no longer made, old marked copies stay as they are). A revision a review
-  releases is stamped RELEASED, one it returns RETURNED (`STAMP:RELEASED`, `STAMP:RETURNED`, on unless turned off;
-  `POLICY_PDF_STAMP` stamped at all). The stamp carries the grades given, the one that stands first and largest (the
-  most severe of the deciding steps, usually the last decider's), then what the project chose it shows
-  (`STAMP_SHOW:<what>`, each on unless turned off): DECIDER who gave it and when, STEPS every step's grade with who and
-  when, STATUS what it is released for, DOCUMENT its number and revision, REVIEW the review's number; and, when chosen,
-  why: the comments on a last page (`STAMP_COMMENTS`, off unless chosen). Chosen in the Control room on Accepted and
-  Returned; read once in the worker (`Stamping.StampChoices`, `FaceAsync`). The organization's switch for all of them is
-  `POLICY_PDF_STAMP`. The PDF opened from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`).
+- **The stamp is one thing** (owner: "an engagement that legally holds"; "what applies on something applies on
+  everything"): one stamp, the same on every document, put on a revision **released after it went for review** (released
+  without a review: nothing to stamp; a returned revision is not stamped). It always carries RELEASED, the grade that
+  stands, larger (the most severe of the deciding steps, usually the last decider's), who gave it and when; the project
+  adds (`STAMP_SHOW:<what>`): STEPS every grade given with who and when (on unless turned off), STATUS what it is released
+  for, DOCUMENT its number and revision, REVIEW the review's number (off unless turned on); why, the comments on a last
+  page (`STAMP_COMMENTS`, off unless chosen); and where it sits (`STAMP_PLACE`, top right by default, or another
+  corner). Set as one block, saved as one: in the Control room on the release step ("The stamp", `flow/stamp-form.tsx`,
+  `setStampAction`), and for the organization in Defaults for new projects (`StampChoices`, `components/stamp-fields.tsx`,
+  the stamp drawn on a page as it will read); `POLICY_PDF_STAMP` stamps at all and is the organization's switch for all of
+  it. The marks across the page stay as they were (owner): superseded, void, on hold (`STAMP:SUPERSEDED|VOID|HELD`, on
+  unless turned off), on their own steps. Read once in the worker (`Stamping.StampChoices`, `FaceAsync`). The PDF opened
+  from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`).
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
   every project" (Default rules, tabs by area, `prevented.ts`), never checked.
 - Assurance: each finding points to the exact spot where it is put right: a document's tab, or else the thing
@@ -791,7 +794,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (ours like DWG, a supplier's like C102), and help with recommendations. A family is a value of the set `DOC_FAMILIES`,
   kept in Types & sets like any other, coded as the organization likes; a type names its family on the type (else a code
   whose first letter is a family's code falls in it). Read on Help (`/guide#families`, each family with its types);
-  no Settings card (`/settings/families` only redirects). No outside stamp rule: a stamp is a review's (above).
+  no Settings card (`/settings/families` only redirects). No outside stamp rule: the stamp is the review's (above).
 - **Every Control room switch is read by the backend** (owner: "make them work", not removed). Sending a review to its
   reviewers (`REVIEW_ISSUE`): with the control function, a review sent for review waits, no step open
   (`ReviewService.AwaitsIssue`), until they send it on (`POST /reviews/{id}/issue`, REVIEW_ISSUED); they are told, it is
@@ -889,7 +892,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   someone joins the project, keeping & ending. The chosen step's
   panel says what happens (one plain sentence), **Who does it** (fixed acts in words; the project's acts as one
   `Choice` each), **How it works here** (its questions, confirmations, days, the stamps it puts on the PDF, each a `Choice`;
-  after a review, Accepted / Returned carry stamping, the verdict's comments and Returned's stamp too; Review carries
+  the release step carries the stamp, as one block; Review carries
   which set of Review outcomes each route decides with, one `Choice` per route, `setRouteVerdictsAction`;
   what its state is called and who acts as the control function, with where they are changed), and **Set up in**
   (tiles: each list with how many values in use, or "not set up yet" in amber, the pages it reads and the form it asks; a tile only

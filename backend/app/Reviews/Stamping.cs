@@ -16,10 +16,11 @@ using PdfSharp.Pdf.IO;
 namespace Delios.Host.Reviews;
 
 /// <summary>
-/// The worker's part of a review's outcome: a copy of each rendition carrying the review's stamp, the engagement it
-/// records (owner: "stamps only concern reviews"; superseded, void and on hold are no longer marked on the PDF). The
-/// standing verdict leads; what else the stamp shows is the project's choice (<see cref="StampChoices"/>). Originals are
-/// never changed: every copy is a new file, derived from the one it was made from. Safe to run twice.
+/// The worker's part of a release: a copy of each rendition carrying the stamp, the engagement of the review that
+/// released it (owner: "stamps only concern reviews", one stamp, the same on every document; released without a review,
+/// nothing is stamped), and the marks across the page as they were (superseded, void, on hold). What the stamp shows
+/// beyond what it always carries, and where it sits, is the project's choice (<see cref="StampChoices"/>). Originals
+/// are never changed: every copy is a new file, derived from the one it was made from. Safe to run twice.
 /// </summary>
 public sealed class Stamping(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, AuditLog audit, IClock clock, ILogger<Stamping> logger)
@@ -44,11 +45,11 @@ public sealed class Stamping(
         var project = await db.Projects.SingleAsync(p => p.Id == revision.ProjectId, cancellationToken);
         var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(project.TimeZone) ?? DateTimeZone.Utc;
         var choices = await StampChoices.ReadAsync(db, project.Id, cancellationToken);
-        // The review that released it: no review, no stamp (a stamp is a review's engagement, never the release's own).
+        // The review that released it: it went for review, so it is stamped; released without one, nothing to stamp.
         var review = await db.Reviews.AsNoTracking().Include(r => r.Steps).ThenInclude(s => s.Participants)
             .Where(r => r.RevisionId == revision.Id && r.Verdict != null)
             .OrderByDescending(r => r.ClosedAt).FirstOrDefaultAsync(cancellationToken);
-        if (review is not null && choices.Released)
+        if (review is not null && choices.All)
         {
             var face = await FaceAsync(review, document, revision, zone, choices, cancellationToken);
             var comments = choices.Comments ? await CommentsAsync(review.Id, cancellationToken) : [];
@@ -56,8 +57,28 @@ public sealed class Stamping(
                 && f.Submission == revision.Submission).ToList())
             {
                 if (revision.Files.Any(f => f.DerivedFromId == rendition.Id && f.Kind == FileKinds.Stamped)) continue;
-                await DeriveAsync(rendition, FileKinds.Stamped, document, revision, bytes => Stamp(bytes, face, comments: comments,
+                await DeriveAsync(rendition, FileKinds.Stamped, document, revision, bytes => Stamp(bytes, face, choices.Place, comments: comments,
                     commentsTitle: $"{document.Number} rev {revision.Value}: why, the comments of review {review.Number}"), cancellationToken);
+            }
+        }
+
+        var released = DatePattern.Format((revision.ReleasedAt ?? clock.GetCurrentInstant()).InZone(zone).Date);
+        foreach (var oldId in choices.On(FileKinds.Superseded) ? message.SupersededRevisionIds : [])
+        {
+            var old = await db.Revisions.Include(r => r.Files).SingleAsync(r => r.Id == oldId, cancellationToken);
+            // The copy people were reading: the stamped one where there is one.
+            var sources = old.Files.Where(f => f.Kind == FileKinds.Stamped && f.Status == FileStatuses.Clean
+                && f.Submission == old.Submission).ToList();
+            if (sources.Count == 0)
+            {
+                sources = old.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean
+                    && f.Submission == old.Submission).ToList();
+            }
+            foreach (var source in sources)
+            {
+                if (old.Files.Any(f => f.DerivedFromId == source.Id && f.Kind == FileKinds.Superseded)) continue;
+                await DeriveAsync(source, FileKinds.Superseded, document, old, bytes => Watermark(bytes,
+                    $"Superseded by rev {revision.Value} on {released}"), cancellationToken);
             }
         }
         await transaction.CommitAsync(cancellationToken);
@@ -66,47 +87,34 @@ public sealed class Stamping(
     /// <summary>
     /// Handles a <see cref="RevisionMarked"/> message: the copy people were reading (the stamped one where there is
     /// one) is copied with VOID or ON HOLD across every page. Done once per copy; a redelivered message does no harm.
+    /// A returned revision is not stamped (the stamp is only for what its review released).
     /// </summary>
     public async Task MarkAsync(RevisionMarked message, CancellationToken cancellationToken)
     {
         tenant.Set(message.TenantId);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var revision = await db.Revisions.Include(r => r.Files).SingleOrDefaultAsync(r => r.Id == message.RevisionId, cancellationToken);
-        // Only a review's return is stamped: void and on hold are no longer marked on the PDF (owner: a mistake).
-        if (revision is null || message.Mark != FileKinds.Returned) return;
+        if (revision is null || message.Mark is not (FileKinds.Void or FileKinds.Held)) return;
         var document = await db.Documents.SingleAsync(d => d.Id == revision.DocumentId, cancellationToken);
         var choices = await StampChoices.ReadAsync(db, revision.ProjectId, cancellationToken);
         if (!choices.On(message.Mark)) { await transaction.CommitAsync(cancellationToken); return; }
-        await StampReturnedAsync(revision, document, Guid.TryParse(message.Note, out var reviewId) ? reviewId : null, choices, cancellationToken);
+        var sources = revision.Files.Where(f => f.Kind == FileKinds.Stamped && f.Status == FileStatuses.Clean && f.Submission == revision.Submission).ToList();
+        if (sources.Count == 0)
+            sources = revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission).ToList();
+        var word = message.Mark == FileKinds.Void ? "VOID" : "ON HOLD";
+        foreach (var source in sources)
+        {
+            if (revision.Files.Any(f => f.DerivedFromId == source.Id && f.Kind == message.Mark)) continue;
+            await DeriveAsync(source, message.Mark, document, revision, bytes => Watermark(bytes, message.Note, word), cancellationToken);
+        }
         await transaction.CommitAsync(cancellationToken);
     }
 
     /// <summary>
-    /// A revision its review sent back (rejected): its PDF is stamped RETURNED, the verdict that sent it back leading, then
-    /// what the stamp is set to show, and, if the project asks it, why (the comments) on a page of their own.
-    /// </summary>
-    private async Task StampReturnedAsync(Revision revision, Document document, Guid? reviewId, StampChoices choices, CancellationToken cancellationToken)
-    {
-        var review = reviewId is { } id ? await db.Reviews.AsNoTracking().Include(r => r.Steps).ThenInclude(s => s.Participants)
-            .SingleOrDefaultAsync(r => r.Id == id, cancellationToken) : null;
-        if (review is null) return;
-        var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == revision.ProjectId, cancellationToken);
-        var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(project.TimeZone) ?? DateTimeZone.Utc;
-        var face = (await FaceAsync(review, document, revision, zone, choices, cancellationToken)) with { Title = "RETURNED", Red = true };
-        var comments = choices.Comments ? await CommentsAsync(review.Id, cancellationToken) : [];
-        foreach (var source in revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission).ToList())
-        {
-            if (revision.Files.Any(f => f.DerivedFromId == source.Id && f.Kind == FileKinds.Returned)) continue;
-            await DeriveAsync(source, FileKinds.Returned, document, revision, bytes => Stamp(bytes, face, comments: comments,
-                commentsTitle: $"{document.Number} rev {revision.Value}: why, the comments of review {review.Number}"), cancellationToken);
-        }
-    }
-
-    /// <summary>
-    /// What a review's stamp says (owner: the grades given, the most influential standing out, who gave it and when, and
-    /// sometimes why): the standing verdict leads (the most severe of the deciders', the later of equals, as the review
-    /// worked it out); then, each as the project chose: who gave it and when, every step's grade with who and when, what
-    /// it is released for, the document and its revision, the review's number.
+    /// What the stamp says (owner: the grades given, the most influential standing out, who gave it and when, and
+    /// sometimes why): always the standing verdict, larger (the most severe of the deciders', the later of equals, as the
+    /// review worked it out), and who gave it and when; then, each as the project chose: every grade given with who and
+    /// when, what it is released for, the document and its revision, the review's number.
     /// </summary>
     private async Task<StampFace> FaceAsync(Review review, Document document, Revision revision, DateTimeZone zone, StampChoices choices, CancellationToken cancellationToken)
     {
@@ -122,7 +130,7 @@ public sealed class Stamping(
         var standingBy = standingStep?.Participants.Where(p => p.Answer == review.Verdict && p.AnsweredAt is not null)
             .OrderBy(p => p.AnsweredAt).LastOrDefault();
         var lines = new List<string>();
-        if (choices.Shows("DECIDER") && standingBy is not null)
+        if (standingBy is not null)
             lines.Add($"by {standingBy.UserName}, {Day(standingBy.AnsweredAt)}");
         if (choices.Shows("STEPS"))
         {
@@ -137,7 +145,7 @@ public sealed class Stamping(
         if (choices.Shows("STATUS") && review.GrantedStatus is { } status) lines.Add($"Released for {status}");
         if (choices.Shows("DOCUMENT")) lines.Add($"{document.Number}  rev {revision.Value}");
         if (choices.Shows("REVIEW")) lines.Add($"Review {review.Number}");
-        return new StampFace("RELEASED", Grade(review.VerdictSet, review.Verdict), lines, false);
+        return new StampFace("RELEASED", Grade(review.VerdictSet, review.Verdict), lines);
     }
 
     /// <summary>The comments written on a review, as they read (taken back ones left out): who, and what.</summary>
@@ -207,18 +215,18 @@ public sealed class Stamping(
     }
 
     /// <summary>
-    /// A box in the top right corner of every page: the word (RELEASED in green, RETURNED in red), the standing verdict
-    /// larger, then the face's lines; with comments, a line saying so and a last page listing them. A line too long for
-    /// the box is cut with an ellipsis (the review keeps it whole in the app).
+    /// A box in a corner of every page (<paramref name="place"/>, top right unless the project chose another): RELEASED,
+    /// the standing verdict larger, then the face's lines; with comments, a line saying so and a last page listing them.
+    /// A line too long for the box is cut with an ellipsis (the review keeps it whole in the app).
     /// </summary>
-    public static byte[] Stamp(byte[] pdf, StampFace face, IReadOnlyList<string>? comments = null, string? commentsTitle = null)
+    public static byte[] Stamp(byte[] pdf, StampFace face, string place = StampChoices.TopRight, IReadOnlyList<string>? comments = null, string? commentsTitle = null)
     {
         using var input = new MemoryStream(pdf);
         using var document = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
         var word = new XFont(EmbeddedFonts.Family, 8, XFontStyleEx.Bold);
         var verdict = new XFont(EmbeddedFonts.Family, 11, XFontStyleEx.Bold);
         var regular = new XFont(EmbeddedFonts.Family, 7.5, XFontStyleEx.Regular);
-        var colour = face.Red ? XColor.FromArgb(255, 170, 30, 30) : XColor.FromArgb(255, 20, 90, 50);
+        var colour = XColor.FromArgb(255, 20, 90, 50);
         var ink = new XSolidBrush(colour);
         var border = new XPen(colour, 1.2);
         var withComments = comments is { Count: > 0 };
@@ -235,7 +243,8 @@ public sealed class Stamping(
                 while (text.Length > 1 && gfx.MeasureString(text + "…", font).Width > width - 2 * pad) text = text[..^1];
                 return text + "…";
             }
-            var box = new XRect(page.Width.Point - width - 18, 18, width, height);
+            var box = new XRect(place.EndsWith("LEFT") ? 18 : page.Width.Point - width - 18,
+                place.StartsWith("BOTTOM") ? page.Height.Point - height - 18 : 18, width, height);
             gfx.DrawRectangle(border, XBrushes.White, box);
             gfx.DrawString(face.Title, word, ink, box.X + pad, box.Y + 12);
             var y = box.Y + 12;
@@ -244,6 +253,29 @@ public sealed class Stamping(
             foreach (var line in lines) { y += 10; gfx.DrawString(Fit(line, regular), regular, ink, box.X + pad, y); }
         }
         if (withComments) AppendComments(document, commentsTitle ?? "Comments", comments!);
+        using var output = new MemoryStream();
+        document.Save(output);
+        return output.ToArray();
+    }
+
+    /// <summary>SUPERSEDED (or another word) across every page, with a note under it.</summary>
+    public static byte[] Watermark(byte[] pdf, string note, string word = "SUPERSEDED")
+    {
+        using var input = new MemoryStream(pdf);
+        using var document = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
+        var big = new XFont(EmbeddedFonts.Family, 64, XFontStyleEx.Bold);
+        var small = new XFont(EmbeddedFonts.Family, 12, XFontStyleEx.Bold);
+        var red = new XSolidBrush(XColor.FromArgb(90, 200, 30, 30));
+        foreach (var page in document.Pages)
+        {
+            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            var center = new XPoint(page.Width.Point / 2, page.Height.Point / 2);
+            var state = gfx.Save();
+            gfx.RotateAtTransform(-45, center);
+            gfx.DrawString(word, big, red, center, XStringFormats.Center);
+            gfx.DrawString(note, small, red, new XPoint(center.X, center.Y + 46), XStringFormats.Center);
+            gfx.Restore(state);
+        }
         using var output = new MemoryStream();
         document.Save(output);
         return output.ToArray();
@@ -291,8 +323,8 @@ public sealed class Stamping(
     }
 }
 
-/// <summary>What a review's stamp says: its word, the standing verdict, and the lines the project chose.</summary>
-public sealed record StampFace(string Title, string Verdict, IReadOnlyList<string> Lines, bool Red);
+/// <summary>What the stamp says: its word, the standing verdict, and the lines under it.</summary>
+public sealed record StampFace(string Title, string Verdict, IReadOnlyList<string> Lines);
 
 /// <summary>DejaVu Sans, shipped inside the assembly (Resources/Fonts, with its licence).</summary>
 public sealed class EmbeddedFonts : IFontResolver
@@ -316,17 +348,19 @@ public sealed class EmbeddedFonts : IFontResolver
 }
 
 /// <summary>
-/// What the project asked of a review's stamp (the Control room): stamped at all (<c>POLICY_PDF_STAMP</c>), when released
-/// and when returned (<c>STAMP:RELEASED</c>, <c>STAMP:RETURNED</c>; each ON unless set OFF), what it shows besides the
-/// standing verdict (<c>STAMP_SHOW:DECIDER</c>, <c>STEPS</c>, <c>STATUS</c>, <c>DOCUMENT</c>, <c>REVIEW</c>; each ON unless
-/// set OFF), and why: the comments on a last page (<c>STAMP_COMMENTS</c> = ON).
+/// What the project asked (the Control room): stamped at all (<c>POLICY_PDF_STAMP</c>); the stamp's other lines
+/// (<c>STAMP_SHOW:STEPS</c> ON unless set OFF; <c>STATUS</c>, <c>DOCUMENT</c>, <c>REVIEW</c> OFF unless set ON), why: the
+/// comments on a last page (<c>STAMP_COMMENTS</c> = ON), where it sits (<c>STAMP_PLACE</c>, top right by default); and
+/// the marks across the page (<c>STAMP:SUPERSEDED</c>, <c>STAMP:VOID</c>, <c>STAMP:HELD</c>; each ON unless set OFF).
 /// </summary>
 public sealed record StampChoices(bool All, IReadOnlyDictionary<string, string> Answers)
 {
+    public const string TopRight = "TOP_RIGHT";
+    private static readonly string[] Places = [TopRight, "TOP_LEFT", "BOTTOM_RIGHT", "BOTTOM_LEFT"];
     public bool On(string kind) => All && Answers.GetValueOrDefault($"STAMP:{kind}") != "OFF";
-    public bool Released => On("RELEASED");
-    public bool Shows(string what) => Answers.GetValueOrDefault($"STAMP_SHOW:{what}") != "OFF";
+    public bool Shows(string what) => Answers.GetValueOrDefault($"STAMP_SHOW:{what}") is { } set ? set == "ON" : what == "STEPS";
     public bool Comments => All && Answers.GetValueOrDefault("STAMP_COMMENTS") == "ON";
+    public string Place => Answers.GetValueOrDefault("STAMP_PLACE") is { } place && Places.Contains(place) ? place : TopRight;
 
     public static async Task<StampChoices> ReadAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken)
     {

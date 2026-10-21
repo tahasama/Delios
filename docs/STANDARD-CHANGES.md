@@ -1394,17 +1394,19 @@ to confirm, the package), already chosen, because the decision needs what is kno
 for, and once answered, by whom, when, what, and the transmittal that answered it. Decisions are never taken on the
 request itself.
 
-## 75 · A stamp is a review's engagement; families only organise
+## 75 · One stamp, a review's engagement; families only organise
 
-A stamp on a PDF holds legally: it says what a review decided. So only a review stamps: RELEASED when its review
-releases the revision, RETURNED when the review sends it back. Superseded, void and on-hold marks are no longer put on
-the PDF (the register and the document's page say those). The stamp shows the grades given, the one that stands first
-(the most severe of the deciding steps, usually the last decider's), and, as the project chooses in the Control room,
-who gave it and when, each step's grade with who and when, what it is released for, the document's number and revision,
-the review's number, and why (the comments, on a last page).
+A stamp on a PDF holds legally: it says what a review decided. So there is one stamp, the same on every document, put
+on a revision released after it went for review; released without a review, or returned, nothing is stamped. It always
+carries RELEASED, the grade that stands (the most severe of the deciding steps, usually the last decider's), who gave it
+and when. The project may add every grade given (with who and when; on by default), what it is released for, the
+document's number and revision, the review's number, and why (the comments, on a last page), and choose the corner it
+sits in (top right by default). It is set as one, for the organization and for each project where the organization
+leaves it free. The marks across the page (superseded, void, on hold) are kept as they were.
 
 Document families group document types and help with recommendations; they decide nothing, so they carry no stamp
 rule and have no Settings page: they are a set in Types & sets, read on Help.
 
-**Depends on it:** `STAMP:RELEASED`, `STAMP:RETURNED`, `STAMP_SHOW:<what>`, `STAMP_COMMENTS`, `POLICY_PDF_STAMP`
-(Control room); `Stamping.FaceAsync` (worker); `DOC_FAMILIES` (Types & sets).
+**Depends on it:** `STAMP_SHOW:<what>`, `STAMP_COMMENTS`, `STAMP_PLACE`, `STAMP:SUPERSEDED|VOID|HELD`,
+`POLICY_PDF_STAMP` (Control room, release step; Defaults for new projects); `Stamping.FaceAsync` (worker);
+`DOC_FAMILIES` (Types & sets).

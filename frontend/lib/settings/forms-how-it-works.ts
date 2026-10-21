@@ -22,6 +22,8 @@ import {
   STAMP_KINDS,
   STAMP_COMMENTS_KEY,
   STAMP_SHOWS,
+  STAMP_PLACE_KEY,
+  STAMP_PLACES,
   PROJECT_KEY,
   PROJECT_MODE_LABEL,
   roomItemOf,
@@ -149,10 +151,12 @@ export async function setPolicyAction(_prev: State | undefined, formData: FormDa
     wanted.push([one.key, asked]);
     said.push(one.options.find((option) => option.value === asked)!.label.toLowerCase());
   }
-  // Which stamps, and the comments: ticked is on, unticked off (the section says it was on the form).
+  // The stamp and the marks: ticked is on, unticked off (the section says it was on the form); where the stamp sits.
   if (formData.has("stamps")) {
     for (const kind of [...STAMP_KINDS, ...STAMP_SHOWS]) wanted.push([kind.key, formData.get(kind.key) === "on" ? "ON" : "OFF"]);
     wanted.push([STAMP_COMMENTS_KEY, formData.get(STAMP_COMMENTS_KEY) === "on" ? "ON" : "OFF"]);
+    const place = String(formData.get(STAMP_PLACE_KEY) ?? "");
+    if (STAMP_PLACES.some((one) => one.value === place)) wanted.push([STAMP_PLACE_KEY, place]);
   }
   const escalate = String(formData.get(ESCALATE_AFTER_KEY) ?? "").trim();
   if (escalate) {
@@ -297,12 +301,10 @@ export async function setRoomAnswerAction(_prev: State | undefined, formData: Fo
       if (value !== "ON" && value !== "OFF") return { error: "Choose yes or no." };
       await save(formData, [[key, value]]);
       said = value === "ON" ? "Whoever holds Manage confirms it from now on." : "No confirmation from now on.";
-    } else if (key === STAMP_COMMENTS_KEY || STAMP_KINDS.some((one) => one.key === key) || STAMP_SHOWS.some((one) => one.key === key)) {
+    } else if (STAMP_KINDS.some((one) => one.key === key)) {
       if (value !== "ON" && value !== "OFF") return { error: "Choose on or off." };
       await save(formData, [[key, value]]);
-      said = key.startsWith("STAMP_SHOW:") || key === STAMP_COMMENTS_KEY
-        ? (value === "ON" ? "The stamp shows it from now on." : "The stamp leaves it out from now on.")
-        : (value === "ON" ? "That stamp goes on the PDF from now on." : "That stamp is left off from now on.");
+      said = value === "ON" ? "That mark goes on the PDF from now on." : "That mark is left off from now on.";
     } else if (key === ESCALATE_AFTER_KEY) {
       const days = Number(value);
       if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Notify again after 1 to 60 working days." };
@@ -342,4 +344,26 @@ export async function setIntakeAction(_prev: State | undefined, formData: FormDa
   revalidatePath("/settings/flow");
   revalidatePath("/packages");
   return { ok: mode === "AS_RECEIVED" ? "Saved: other organizations' documents are taken as they come." : "Saved: other organizations' documents come by placeholder." };
+}
+
+/**
+ * The stamp, saved as one (owner: "it is one thing"): what it shows besides what it always carries, why (the
+ * comments), and where it sits. The same for every document the project releases after a review.
+ */
+export async function setStampAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const place = String(formData.get(STAMP_PLACE_KEY) ?? "");
+  if (!STAMP_PLACES.some((one) => one.value === place)) return { error: "Choose where the stamp sits." };
+  const wanted: [string, string][] = [
+    ...STAMP_SHOWS.map((one): [string, string] => [one.key, formData.get(one.key) === "on" ? "ON" : "OFF"]),
+    [STAMP_COMMENTS_KEY, formData.get(STAMP_COMMENTS_KEY) === "on" ? "ON" : "OFF"],
+    [STAMP_PLACE_KEY, place],
+  ];
+  try {
+    const changed = await save(formData, wanted);
+    revalidatePath("/settings/flow");
+    revalidatePath("/conformance/plan");
+    return { ok: changed ? "Saved. Revisions released from now on carry this stamp." : "Nothing changed." };
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
 }

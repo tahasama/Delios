@@ -279,12 +279,12 @@ export const POLICIES: Policy[] = [
   {
     key: "POLICY_PDF_STAMP",
     title: "Stamping the PDF",
-    text: "Whether the PDF people open says where the revision stands (released, returned, superseded, void, on hold), or stays as it was sent. The file as sent is kept either way; which stamps, and the comments, are chosen below.",
+    text: "Whether the PDF people open carries the stamp of the review that released it, and the marks across the page (superseded, void, on hold), or stays as it was sent. The file as sent is kept either way.",
     options: [
       {
         value: "ON",
         label: "Stamp the PDF people open",
-        text: "A copy is made with the stamp in the top right of every page (or across the page, for superseded, void and on hold). Whoever opens the file reads where it stands without the app.",
+        text: "A revision released after its review carries the stamp on every page; superseded, void and on hold are marked across the page. Whoever opens the file reads where it stands without the app.",
       },
       {
         value: "OFF",
@@ -430,32 +430,14 @@ export function controlFrom(byKey: Map<string, string>, follows: boolean): Contr
  * What one stored answer amounts to, the app's own default standing in for no answer: so a project's answer and the
  * defaults it is compared with read the same when they mean the same.
  */
-/**
- * A stamp is a review's: the engagement it records, put on the PDF when the review is decided (owner: "stamps only
- * concern reviews", the marks for superseded, void and on hold were a mistake and are no longer made). Each on unless
- * switched off (`STAMP:<kind>`, read by the backend's `StampChoices`).
- */
-export const STAMP_KINDS = [
-  { key: "STAMP:RELEASED", label: "Released by its review", text: "a green box: the standing verdict first, then what the stamp is set to show" },
-  { key: "STAMP:RETURNED", label: "Returned by its review", text: "a red box: the verdict that sent it back, then what the stamp is set to show" },
-] as const;
-export const STAMP_COMMENTS_KEY = "STAMP_COMMENTS";
-/**
- * What a review's stamp shows (owner: "a stamp is an engagement that legally holds; I need a way to decide what it
- * shows"). The standing verdict always leads, larger (the most severe of the deciders', usually the last's); each of
- * these is on unless switched off (`STAMP_SHOW:<what>`). Why (the comments) is `STAMP_COMMENTS`, on a last page.
- */
-export const STAMP_SHOWS = [
-  { key: "STAMP_SHOW:DECIDER", label: "Who gave the standing verdict, and when", text: "the decider's name and the day, under the verdict" },
-  { key: "STAMP_SHOW:STEPS", label: "Every step's grade", text: "each step of the route: its grade (advice or verdict), who gave it and when" },
-  { key: "STAMP_SHOW:STATUS", label: "What it is released for", text: "the status the decider granted (IFC, IFR…)" },
-  { key: "STAMP_SHOW:DOCUMENT", label: "The document and its revision", text: "its number and revision" },
-  { key: "STAMP_SHOW:REVIEW", label: "The review", text: "the review's number, to find it in the app" },
-] as const;
+export { STAMP_KINDS, STAMP_SHOWS, STAMP_COMMENTS_KEY, STAMP_PLACE_KEY, STAMP_PLACES } from "@/lib/settings/stamp";
+import { STAMP_SHOWS, STAMP_COMMENTS_KEY, STAMP_PLACE_KEY } from "@/lib/settings/stamp";
 
 export function effectiveAnswer(key: string, value: string | null | undefined): string {
   if (value) return value;
-  if (key.startsWith("STAMP:") || key.startsWith("STAMP_SHOW:")) return "ON";
+  if (key.startsWith("STAMP:")) return "ON";
+  if (key.startsWith("STAMP_SHOW:")) return STAMP_SHOWS.find((one) => one.key === key)?.on ? "ON" : "OFF";
+  if (key === STAMP_PLACE_KEY) return "TOP_RIGHT";
   if (key === STAMP_COMMENTS_KEY) return "OFF";
   const declared = POLICIES.find((one) => one.key === key);
   if (declared) return declared.options[0].value;
@@ -477,6 +459,6 @@ const ACT_KEYS = new Set(["REVIEW_ISSUE", "RETURN_OUTCOME", "ISSUE", "DELEGATE",
 export function roomItemOf(key: string): string | null {
   if (ACT_KEYS.has(key) || key.startsWith("SKIP:") || key.startsWith("CONFIRM:")) return "WHO_DOES_WHAT";
   if (["POLICY_RELEASE", "POLICY_READY", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL", "ESCALATE_AFTER_DAYS"].includes(key)) return key;
-  if (key === "POLICY_PDF_STAMP" || key === "STAMP_COMMENTS" || key.startsWith("STAMP:") || key.startsWith("STAMP_SHOW:")) return "POLICY_PDF_STAMP";
+  if (key === "POLICY_PDF_STAMP" || key === "STAMP_COMMENTS" || key === "STAMP_PLACE" || key.startsWith("STAMP:") || key.startsWith("STAMP_SHOW:")) return "POLICY_PDF_STAMP";
   return null;
 }
