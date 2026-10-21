@@ -1115,23 +1115,25 @@ summary::-webkit-details-marker {
 
   /* A hint of grey behind each control, and nothing else: no box, no border.
      An underlined field on white reads as a word until the pointer finds it;
-     a surface behind it reads as something to operate. */
-  .register .asking select.plain,
-  .register .asking button.plain,
-  .register .asking input.plain,
-  .register .asking textarea.plain {
+     a surface behind it reads as something to operate. Every field and
+     dropdown of the app (owner), not only a register's question; a switch
+     drawn as a plain button (no caret) stays bare. */
+  .register select.plain,
+  .register button.plain:not([data-caret="none"]),
+  .register input.plain:not([type="checkbox"]):not([type="radio"]),
+  .register textarea.plain {
     background-color: color-mix(in oklab, var(--color-canvas) 60%, var(--color-surface));
     padding-left: 0.4rem;
     border-radius: 0.25rem 0.25rem 0 0;
   }
-  .register .asking select.plain:hover,
-  .register .asking button.plain:hover,
-  .register .asking input.plain:hover,
-  .register .asking textarea.plain:hover {
+  .register select.plain:hover,
+  .register button.plain:not([data-caret="none"]):hover,
+  .register input.plain:not([type="checkbox"]):not([type="radio"]):hover,
+  .register textarea.plain:hover {
     background-color: color-mix(in oklab, var(--color-canvas) 85%, var(--color-surface));
   }
-  .register .asking select.plain[data-on="true"],
-  .register .asking button.plain[data-on="true"] { background-color: var(--color-tint); }
+  .register select.plain[data-on="true"],
+  .register button.plain[data-on="true"]:not([data-caret="none"]) { background-color: var(--color-tint); }
 
 
   /* The kept views are a way back to a question, so they sit quieter than the

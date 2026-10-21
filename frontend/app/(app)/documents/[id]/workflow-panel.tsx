@@ -446,8 +446,9 @@ function Card({ title, description, className, status, items }: { title: string;
     : tone.includes("brand") || tone.includes("sky") ? "rail-review"
     : "rail-none";
   return (
-    <section className={cn("register register-sheet register-sheet-open relative", rail)}>
-      <span className="absolute inset-y-0 left-0 w-0.75 rounded-l-[0.875rem] bg-(--rail)" aria-hidden />
+    // The side colour is the sheet's own left edge, so it follows the rounded corners (a bar laid over it stood out
+    // past them, and took the header's rounding away).
+    <section className={cn("register register-sheet register-sheet-open border-l-[3px] border-l-(--rail)", rail)}>
       <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
         <span className="stencil mr-1 text-slate-500">{title}</span>
         {description ? <span className="text-[11px] text-slate-500">{description}</span> : null}

@@ -94,6 +94,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Use the shared pieces only: `btn()` and `inputCls` (`frontend/components/ui.tsx`),
   `.ask`, `.plain`, `ActionForm`. Never give a field or button its own height,
   padding or text size on a page; never restyle the file button locally.
+- Every field and dropdown stands on the same hint of grey (owner): `inputCls` and every `.plain` control in a
+  register (not only a register's question), its top corners barely rounded; a switch drawn as a plain button stays bare.
+- A card's side colour is its own left edge (`border-l-[3px] border-l-(--rail)`), never a bar laid over it: it
+  follows the rounded corners.
 
 ## Rules that must never break
 
