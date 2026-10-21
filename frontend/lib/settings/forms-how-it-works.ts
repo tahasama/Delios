@@ -93,6 +93,7 @@ function revalidateHowItWorks() {
   revalidatePath("/organization");
   revalidatePath("/organization/settings");
   revalidatePath("/organization/settings/flow");
+  revalidatePath("/organization/defaults");
 }
 
 /**

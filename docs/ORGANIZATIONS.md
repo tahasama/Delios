@@ -70,9 +70,10 @@ People            everyone in our organization, which projects each is on (ours 
 Companies         the organizations we work with: collaborators (linked), guests, not on DELIOS.
                   Invitations we sent, invitations we received (accept or refuse).
 Defaults          the configuration a new project of ours starts with: who does what, how the project
-                  works: the organization's Control room (/organization/settings/flow), the same console
-                  as a project's, each answer changed on its step with whether projects may change it;
-                  can start from one project's choices; "Reset to the app's defaults".
+                  works (/organization/defaults, a card of the organization's Settings), the same
+                  answers as the organization's Control room (/organization/settings/flow); can start
+                  from one project's choices; "Reset to the app's defaults". What projects may change:
+                  every switch in one list (/organization/settings/may-change).
                   Copied when the project is opened; the project then changes it freely, each answer
                   marked "as the defaults" or "changed here", and "Reset to the organization's defaults"
                   puts it back. Changing the defaults later changes only projects opened afterwards.

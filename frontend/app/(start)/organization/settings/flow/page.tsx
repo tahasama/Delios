@@ -1,13 +1,8 @@
 import Link from "next/link";
-import { Select } from "@/components/select";
-import { ActionForm } from "@/components/form";
-import { Field, inputCls } from "@/components/ui";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { orgSettings } from "@/lib/settings/api";
-import { adminProjects } from "@/lib/settings/api-admin";
 import { liberty } from "@/lib/organization/liberty";
 import { projectDefaults } from "@/lib/organization/defaults";
-import { makeDefaultsAction, resetDefaultsAction } from "@/lib/organization/forms";
 import { setRoomAnswerAction } from "@/lib/settings/forms-how-it-works";
 import { controlFrom, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES, SKIPPABLE, CONFIRMABLE, PEOPLE_KEY, PEOPLE_MODE_LABEL, roomItemOf } from "@/lib/settings/control-activities";
 import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
@@ -58,11 +53,10 @@ const SWITCH_OF: Record<string, string> = { DAYS: "RISK_WINDOW", INTAKE: "SUPPLI
 
 export default async function OrganizationControlRoomPage() {
   const scope = await requireOrgAdmin();
-  const [defaults, switches, organization, projects, names] = await Promise.all([
+  const [defaults, switches, organization, names] = await Promise.all([
     projectDefaults().catch(() => null),
     liberty(),
     orgSettings().catch(() => new Map<string, string>()),
-    adminProjects().catch(() => []),
     stateNames(),
   ]);
   const sets = await organizationSets().catch(() => []);
@@ -79,7 +73,6 @@ export default async function OrganizationControlRoomPage() {
   const switchOf = (key: string) => room.find((one) => one.key === (SWITCH_OF[key] ?? roomItemOf(key) ?? key));
   const clean = (label: string) => label.replace(/ — recommended$/, "").replace(/ \(recommended\)$/, "");
   const hidden = (key: string) => ({ key, target: "defaults" });
-  const open = projects.filter((p) => p.status === "ACTIVE");
 
   /** A plain line of what stands, with where it is changed. */
   const fact = (key: string, title: string, value: string, href?: string) => (
@@ -193,7 +186,13 @@ export default async function OrganizationControlRoomPage() {
           <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
             <Link href="/organization/settings" className="hover:underline">{scope.organization.name} · Settings</Link>
           </p>
-          <h1 className="plate-title mt-1 text-slate-950">Control room</h1>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h1 className="plate-title mt-1 text-slate-950">Control room</h1>
+            <span className="flex flex-wrap gap-2">
+              <Link href="/organization/defaults" className="ask">Defaults for new projects</Link>
+              <Link href="/organization/settings/may-change" className="ask">What projects may change</Link>
+            </span>
+          </div>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
             How a new project of ours works, step by step: what each starts with. Choose a flow, then a step: its answers are changed
             right there, with whether projects may change them. A project already open keeps its own; another organization&rsquo;s
@@ -221,39 +220,6 @@ export default async function OrganizationControlRoomPage() {
 
       <SceneDeck flows={flows} panels={panels} />
 
-      {/* What holds for every answer at once, under the console as on a project. */}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        {open.length ? (
-          <section className="register register-sheet register-sheet-open">
-            <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-              <span className="stencil mr-1 text-slate-500">Start from a project</span>
-              <span className="text-[11px] text-slate-500">its answers become what every new project starts with, all at once</span>
-            </div>
-            <div className="px-5 py-4 sm:px-6">
-              <ActionForm action={makeDefaultsAction} submitLabel="Take its answers" size="sm">
-                <Field label="Project" required>
-                  <Select name="projectId" required defaultValue="" className={inputCls}>
-                    <option value="" disabled>Choose…</option>
-                    {open.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-                  </Select>
-                </Field>
-              </ActionForm>
-            </div>
-          </section>
-        ) : null}
-        <section className="register register-sheet register-sheet-open">
-          <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-            <span className="stencil mr-1 text-slate-500">Back to the app&rsquo;s own</span>
-            <span className="text-[11px] text-slate-500">what a project starts with when the organization says nothing</span>
-          </div>
-          <div className="px-5 py-4 sm:px-6">
-            {defaults ? (
-              <ActionForm action={resetDefaultsAction} submitLabel="Reset to the app's defaults" variant="secondary" size="sm"
-                confirmText="The organization's answers are forgotten; new projects start with the app's own. Projects already open keep theirs. Go ahead?" />
-            ) : <p className="text-xs text-slate-600">These are the app&rsquo;s own: nothing was changed here yet.</p>}
-          </div>
-        </section>
-      </div>
     </div>
   );
 }

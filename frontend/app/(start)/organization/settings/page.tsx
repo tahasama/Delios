@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, FileClock, Route, Tags } from "lucide-react";
+import { ArrowRight, BadgeCheck, FileClock, Route, SlidersHorizontal, Tags, ToggleRight } from "lucide-react";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { Chip } from "@/components/ui";
 import { liberty } from "@/lib/organization/liberty";
@@ -129,7 +129,7 @@ export default async function OrganizationSettingsPage() {
               <h2 className="stencil mb-2 text-slate-600">{group}</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {cards.map((card) => {
-                  const Icon = SETUP_ICON[card.project] ?? (card.slug === "identity" ? BadgeCheck : card.slug === "tracking" ? FileClock : Tags);
+                  const Icon = SETUP_ICON[card.project] ?? (card.slug === "identity" ? BadgeCheck : card.slug === "tracking" ? FileClock : card.project === "defaults" ? SlidersHorizontal : card.project === "may-change" ? ToggleRight : Tags);
                   const state = said(card.area);
                   const href = card.slug ? `/organization/settings/${card.slug}` : card.elsewhere!;
                   return (
@@ -144,7 +144,10 @@ export default async function OrganizationSettingsPage() {
                         </span>
                         <span className="mt-0.5 block text-xs leading-[1.45] text-slate-600">{card.text}</span>
                         <Chip className="mt-2 bg-slate-100 text-slate-600 ring-slate-200">
-                          {state?.text ?? "The organization's only"}
+                          {card.project === "defaults"
+                            ? defaults ? (defaults.fromProject ? `Taken from ${defaults.fromProject}` : `Changed ${fmtDate(defaults.at)}`) : "The app's own"
+                            : card.project === "may-change" ? `${switches.length - free} fixed · ${free} free`
+                            : state?.text ?? "The organization's only"}
                         </Chip>
                       </span>
                     </Link>

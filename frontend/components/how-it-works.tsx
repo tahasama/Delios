@@ -323,5 +323,5 @@ export function HowItWorks({
 
 /** The way from a project's settings to the organization's defaults, for its administrators. */
 export function DefaultsLink() {
-  return <Link href="/organization/settings/flow" className="font-semibold text-link hover:underline">defaults for new projects</Link>;
+  return <Link href="/organization/defaults" className="font-semibold text-link hover:underline">defaults for new projects</Link>;
 }

@@ -552,18 +552,23 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - The organization's page (`/organization`, administrators): projects ours and joined, people, organizations
   we work with, invitations (also on Home), defaults for new projects. Its projects, people and organizations
   are links (open or switch into a project; People & access; Organizations).
-- **The organization's Control room** (owner: "is it on purpose it does not look like the project's?", then "those
-  are full pages hiding"): `/organization/settings/flow`, the same console as a project's, its flows, steps and panels
-  shared (`settings/flow/stages.ts`, `step-panel.tsx`), drawn for any role, set to what every new project starts with
+- **The organization's Control room** (owner: "is it on purpose it does not look like the project's?"):
+  `/organization/settings/flow`, the same console as a project's, its flows, steps and panels shared
+  (`settings/flow/stages.ts`, `step-panel.tsx`), drawn for any role, set to what every new project starts with
   (`PROJECT_DEFAULTS`, saved by the same `Choice`s with `target=defaults`). Each step's panel carries "Projects may change
-  it": the switches of the answers it holds (`room-switches.tsx`), so "What projects may change" is no longer a page of
-  its own; what only a project knows (who acts as its control function, its schedule's days, how its suppliers send) is
-  said, changed on the project. Under the console: "Start from a project" and "Back to the app's own". The hub's panel
-  is the navy console with four facts and "Open the Control room". `/organization/defaults` only redirects there; the
-  Projects plate's "Defaults for new projects" opens it. They keep only what differs from the app's own; copied when a
-  project opens, never changing one already open; a joined project follows its owner. A project marks only an answer
-  "changed here" (or "the organization's" where fixed); an unmarked answer is the defaults', said once at the head of
-  each sheet. It has "Back to the defaults" (what the project is, and checks ticked off, stay).
+  it": the switches of the answers it holds (`room-switches.tsx`); what only a project knows (who acts as its control
+  function, its schedule's days, how its suppliers send) is said, changed on the project. The hub's panel is the navy
+  console with four facts and "Open the Control room"; the console's masthead links the two pages below.
+- **Defaults for new projects** and **What projects may change** are pages of their own (owner: "I did not say remove
+  them… not reduced to 2 buttons no one sees"), each a card of the organization's Settings, group Organization, with its
+  figure (where the defaults come from; n fixed · n free). Defaults (`/organization/defaults`, `PROJECT_DEFAULTS`):
+  the whole form of how a new project works (`components/how-it-works.tsx`), start from a project, the app's own
+  defaults, reset; the Projects plate's "Defaults for new projects" opens it. What projects may change
+  (`/organization/settings/may-change`): every switch in one list, by card, each card's link above its switches (the
+  same switches sit on each card too). The defaults keep only what differs from the app's own; copied when a project
+  opens, never changing one already open; a joined project follows its owner. A project marks only an answer "changed
+  here" (or "the organization's" where fixed); an unmarked answer is the defaults', said once at the head of each
+  sheet. It has "Back to the defaults" (what the project is, and checks ticked off, stay).
 - Not on DELIOS, with "Their email for transmittals" (`Party.ContactEmail`): our transmittals to them go by
   email with their files (`EmailReplies`), each with a reply address of its own (`replies+<key>@…`,
   `ReplyAddress`, kept outside organization fencing). A reply from that address only is taken in: it waits on
