@@ -78,7 +78,7 @@ export function StampFields({ initial, disabled = false, pane = null }: { initia
             <ul className="divide-y divide-line">
               {STAMP_WHEN.map((one) => <Line key={one.key} name={one.key} on={on(one.key)} set={flip(one.key)} label={one.label} text={one.text} />)}
             </ul>
-            <Band title="What it shows" said="always: the organization and the project, the outcome in the colour the register gives it, and who reviewed it and when unless every grade given follows" />
+            <Band title="What it shows" said="besides the outcome" />
             <ul className="divide-y divide-line">
               {STAMP_SHOWS.map((one) => <Line key={one.key} name={one.key} on={on(one.key)} set={flip(one.key)} label={one.label} text={one.text} />)}
               <Line name={STAMP_COMMENTS_KEY} on={on(STAMP_COMMENTS_KEY)} set={flip(STAMP_COMMENTS_KEY)} label="Why: the comments"

@@ -1103,12 +1103,17 @@ summary::-webkit-details-marker {
      holding the table needs to clip, so this one does not. */
   .register-sheet-open { overflow: visible; }
   /* Not clipping means a band's square corners would stand out past the
-     sheet's rounded ones, so the first and last strips round their own. */
-  .register-sheet-open > :first-child {
+     sheet's rounded ones, so the first and last strips round their own.
+     The first strip is the first one seen: a hidden field, a mark laid over
+     the sheet or a script before it does not count, and a form wrapping the
+     strips passes the rounding on to its own first and last. */
+  .register-sheet-open > :nth-child(1 of :not(input[type="hidden"], [aria-hidden="true"], script, template, style)),
+  .register-sheet-open > :nth-child(1 of :not(input[type="hidden"], [aria-hidden="true"], script, template, style)):is(form, div:not([class*="bg-"])) > :nth-child(1 of :not(input[type="hidden"], [aria-hidden="true"], script, template, style)) {
     border-top-left-radius: calc(0.875rem - 1px);
     border-top-right-radius: calc(0.875rem - 1px);
   }
-  .register-sheet-open > :last-child {
+  .register-sheet-open > :nth-last-child(1 of :not(input[type="hidden"], [aria-hidden="true"], script, template, style)),
+  .register-sheet-open > :nth-last-child(1 of :not(input[type="hidden"], [aria-hidden="true"], script, template, style)):is(form, div:not([class*="bg-"])) > :nth-last-child(1 of :not(input[type="hidden"], [aria-hidden="true"], script, template, style)) {
     border-bottom-left-radius: calc(0.875rem - 1px);
     border-bottom-right-radius: calc(0.875rem - 1px);
   }

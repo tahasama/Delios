@@ -97,7 +97,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Every field and dropdown stands on the same hint of grey (owner): `inputCls` and every `.plain` control in a
   register (not only a register's question), its top corners barely rounded; a switch drawn as a plain button stays bare.
 - A card's side colour is its own left edge (`border-l-[3px] border-l-(--rail)`), never a bar laid over it: it
-  follows the rounded corners.
+  follows the rounded corners. A sheet left open (`register-sheet-open`) rounds its first and last strip seen (a hidden field or a
+  mark before it does not count; a form wrapping the strips passes it on), so no band's square corner stands out.
 
 ## Rules that must never break
 
