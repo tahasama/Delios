@@ -4,7 +4,8 @@ import { fmtDate } from "@/lib/core/utils";
 import { getMe } from "@/lib/account/api";
 import { getActiveSet, getSets } from "@/lib/settings/config";
 import { projectSettings, orgSettings } from "@/lib/settings/api";
-import { controlSettings, effectiveAnswer, STAMP_KINDS, STAMP_SHOWS, STAMP_COMMENTS_KEY, STAMP_PLACE_KEY, STAMP_PLACES, PROJECT_MODE_LABEL, SKIPPABLE } from "@/lib/settings/control-activities";
+import { stampAnswers, stampSaid } from "@/lib/settings/stamp";
+import { controlSettings, effectiveAnswer, PROJECT_MODE_LABEL, SKIPPABLE } from "@/lib/settings/control-activities";
 import { KINDS, KIND_LABEL, fieldsOf, fieldRules, fieldLabels, storedOwnFields, type FieldRule } from "@/lib/settings/field-policy";
 import { ESCALATE_AFTER_KEY } from "@/lib/actions/escalation";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
@@ -162,7 +163,7 @@ export async function DocumentManagementPlan() {
   const roleLabel = (code: string | null) => (code ? roles.find((r) => r.code === code)?.label ?? code : "—");
 
   const releaseSends = answer("POLICY_RELEASE") !== "SEPARATE";
-  const stamped = answer("POLICY_PDF_STAMP") !== "OFF";
+  const stamp = stampAnswers(org, settings);
   const strictMatrix = answer("POLICY_MATRIX") === "STRICT";
   const readyMeans = answer("POLICY_READY") === "STATUS" ? "carrying the status the action needs" : "released and issued at the status the action needs";
   const escalateAfter = Number(answer(ESCALATE_AFTER_KEY));
@@ -520,14 +521,7 @@ export async function DocumentManagementPlan() {
             empty="No status yet." />
         </Part>
         <Part title="The PDF people open">
-          {stamped ? (
-            <Say>
-              A revision released after it went for review is stamped on every page, {STAMP_PLACES.find((p) => p.value === effectiveAnswer(STAMP_PLACE_KEY, answer(STAMP_PLACE_KEY)))?.label.toLowerCase()}:
-              released, the grade that stands, who gave it and when{STAMP_SHOWS.filter((k) => effectiveAnswer(k.key, answer(k.key)) === "ON").map((k) => `, ${k.label.charAt(0).toLowerCase()}${k.label.slice(1)}`).join("")}.
-              {answer(STAMP_COMMENTS_KEY) === "ON" ? " Why, the comments, is listed on a last page." : ""}
-              {STAMP_KINDS.some((k) => answer(k.key) !== "OFF") ? ` Marked across the page: ${STAMP_KINDS.filter((k) => answer(k.key) !== "OFF").map((k) => k.label.toLowerCase()).join(", ")}.` : ""} The file as sent is kept either way.
-            </Say>
-          ) : <Say>It stays as it was sent; where it stands is read in the app.</Say>}
+          <Say>{stampSaid(stamp)}{stamp.POLICY_PDF_STAMP === "OFF" ? "" : " The file as sent is kept either way."}</Say>
         </Part>
         <Part title="Handing documents over together: delivery packages">
           <Flow steps={[

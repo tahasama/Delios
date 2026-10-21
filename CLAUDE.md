@@ -250,19 +250,22 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the key on Help, "What the colours say". Every list of documents takes them, the package lists too (a supplier's
   line by its stage, a delivery line by ready / released short of its status / nothing released); a card (Next step)
   takes none.
-- **The stamp is one thing** (owner: "an engagement that legally holds"; "what applies on something applies on
-  everything"): one stamp, the same on every document, put on a revision **released after it went for review** (released
-  without a review: nothing to stamp; a returned revision is not stamped). It always carries RELEASED, the grade that
-  stands, larger (the most severe of the deciding steps, usually the last decider's), who gave it and when; the project
-  adds (`STAMP_SHOW:<what>`): STEPS every grade given with who and when (on unless turned off), STATUS what it is released
-  for, DOCUMENT its number and revision, REVIEW the review's number (off unless turned on); why, the comments on a last
-  page (`STAMP_COMMENTS`, off unless chosen); and where it sits (`STAMP_PLACE`, top right by default, or another
-  corner). Set as one block, saved as one: in the Control room on the release step ("The stamp", `flow/stamp-form.tsx`,
-  `setStampAction`), and for the organization in Defaults for new projects (`StampChoices`, `components/stamp-fields.tsx`,
-  the stamp drawn on a page as it will read); `POLICY_PDF_STAMP` stamps at all and is the organization's switch for all of
-  it. The marks across the page stay as they were (owner): superseded, void, on hold (`STAMP:SUPERSEDED|VOID|HELD`, on
-  unless turned off), on their own steps. Read once in the worker (`Stamping.StampChoices`, `FaceAsync`). The PDF opened
-  from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`).
+- **The stamp is a Settings card of its own** (owner: "an engagement that legally holds"; "make a card in settings";
+  "what applies on something applies on everything"): Settings → **The stamp** (`/settings/stamp`) and the organization's
+  same card (`/organization/settings/stamp`), one form saved as one (`components/stamp-card.tsx`, `stamp-fields.tsx`,
+  `setStampAction`; the keys and defaults in `lib/settings/stamp.ts`, read by the worker the same way,
+  `Stamping.StampChoices`). Two levels: the organization's answers are every project's default; where its switch
+  (`POLICY_PDF_STAMP`, area "The stamp", Free by default) leaves it free, a project keeps only what differs from them
+  (refused otherwise, ROOM_FIXED). The card: **stamped or not** (`POLICY_PDF_STAMP`); **when** a review stamps the revision
+  it decided (owner: freedom): released after its review (`STAMP:RELEASED`, on) and returned by it (`STAMP:RETURNED`, red,
+  off unless chosen); released without a review, nothing to stamp. **What it shows**: always its word, the grade that
+  stands, larger (the most severe of the deciding steps, usually the last decider's), who gave it and when; then
+  (`STAMP_SHOW:<what>`) every grade given with who and when (on), what it is released for, the document and its
+  revision, the review's number (off), and why, the comments on a last page (`STAMP_COMMENTS`, off). **Where it sits**
+  (`STAMP_PLACE`, top right by default, or another corner). **The marks across the page**, as they were (owner):
+  superseded, void, on hold (`STAMP:SUPERSEDED|VOID|HELD`, on). Beside the form, the stamp drawn on a page as it will
+  read. The Control room only reads it, one line on each step that stamps, with "change" to the card; the Defaults for
+  new projects no longer carry it. The PDF opened from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`).
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
   every project" (Default rules, tabs by area, `prevented.ts`), never checked.
 - Assurance: each finding points to the exact spot where it is put right: a document's tab, or else the thing
@@ -892,7 +895,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   someone joins the project, keeping & ending. The chosen step's
   panel says what happens (one plain sentence), **Who does it** (fixed acts in words; the project's acts as one
   `Choice` each), **How it works here** (its questions, confirmations, days, the stamps it puts on the PDF, each a `Choice`;
-  the release step carries the stamp, as one block; Review carries
+  the steps that stamp read the stamp in one line, changed on its card; Review carries
   which set of Review outcomes each route decides with, one `Choice` per route, `setRouteVerdictsAction`;
   what its state is called and who acts as the control function, with where they are changed), and **Set up in**
   (tiles: each list with how many values in use, or "not set up yet" in amber, the pages it reads and the form it asks; a tile only

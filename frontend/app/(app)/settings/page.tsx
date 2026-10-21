@@ -75,6 +75,7 @@ export default async function AdminPage() {
     "/settings/parties": { text: `yours + ${plural(outside, "other")}` },
     "/settings/config": emptyLists ? { text: `${plural(emptyLists, "essential list")} still empty`, attention: true } : { text: plural(sets, "list") },
     "/settings/flow": { text: `who does what on ${ctx.project.code}` },
+    "/settings/stamp": { text: "what goes on the PDF" },
     "/settings/fields": { text: fieldsSet ? `${plural(fieldsSet, "field")} decided here` : "as the app asks" },
     "/settings/numbering": notNumbered
       ? { text: `${plural(notNumbered, "deliverable type")} with no numbering yet`, attention: true }

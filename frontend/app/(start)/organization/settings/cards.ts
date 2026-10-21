@@ -25,6 +25,7 @@ export const ORG_CARDS: OrgCard[] = [
   { project: "/settings/numbering", title: "Numbering", text: "How every number is built, and which scheme numbers what.", slug: "numbering", area: "Numbering" },
   { project: "/settings/revisions", title: "Revisions", text: "How revisions are named, line by line for each phase.", slug: "revisions", area: "Revisions" },
   { project: "/settings/flow", title: "Control room", text: "How a project works when it opens: who carries each act out, releasing, stamps, planning.", slug: "flow", area: "Control room", elsewhere: "/organization/defaults" },
+  { project: "/settings/stamp", title: "The stamp", text: "What a review's decision puts on the PDF, on every project.", slug: "stamp", area: "The stamp" },
   { project: "states", title: "What the states are called", text: "The organization's words for each state of a revision, on every project.", slug: "states", group: "How work flows" },
   { project: "/settings/workflow-templates", title: "Review routes", text: "Who reviews, and in which order.", slug: "routes", area: "Review routes" },
   { project: "/settings/functions", title: "Functions & permissions", text: "The organization's jobs, and what each may do.", slug: "functions", area: "Functions & permissions" },

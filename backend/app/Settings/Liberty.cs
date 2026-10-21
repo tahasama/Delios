@@ -46,6 +46,7 @@ public static class Liberty
 
     private const string Lists = "Types & sets";
     private const string Room = "Control room";
+    private const string Stamp = "The stamp";
 
     /// <summary>
     /// Every switch the app has, the app's lists included, with where it starts and why. The organization's own lists are
@@ -86,7 +87,7 @@ public static class Liberty
 
         new("WHO_DOES_WHAT", Room, "Who carries each act out, and what is confirmed", "The project's contract and team", true),
         new("POLICY_RELEASE", Room, "What releasing a revision means", "The project's contract", true),
-        new("POLICY_PDF_STAMP", Room, "Stamping the PDF", "What the project's client asks", true),
+        new("POLICY_PDF_STAMP", Stamp, "The stamp", "What the project's client asks of the PDFs it receives", true),
         new("POLICY_READY", Room, "When an action has what it needs", "The project's way of planning", true),
         new("POLICY_MATRIX", Room, "Who may be put on a review", "The project's team", true),
         new("POLICY_MATRIX_DETAIL", Room, "How fine the distribution matrix is cut", "The project's team", true),
@@ -163,8 +164,14 @@ public static class Liberty
                 && values.TryGetProperty(settingKey, out var one)) standard = one.GetString();
         }
         catch (System.Text.Json.JsonException) { }
+        // The stamp is a card of its own: the organization's answer is the default every project reads.
+        if (item == "POLICY_PDF_STAMP")
+            standard = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && s.Key == settingKey)
+                .Select(s => s.Value).FirstOrDefaultAsync(cancellationToken);
         var asked = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         if (asked == standard) return null;
+        if (item == "POLICY_PDF_STAMP")
+            return Problems.Forbidden("ROOM_FIXED", "The stamp: the organization keeps it the same on every project. An administrator changes it in the organization's Settings (The stamp).");
         var title = Items.FirstOrDefault(i => i.Key == item)?.Title ?? item;
         return Problems.Forbidden("ROOM_FIXED",
             $"{title}: the organization keeps it the same on every project. An administrator changes it in the organization's Settings (Defaults for new projects).");

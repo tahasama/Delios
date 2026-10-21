@@ -1394,19 +1394,19 @@ to confirm, the package), already chosen, because the decision needs what is kno
 for, and once answered, by whom, when, what, and the transmittal that answered it. Decisions are never taken on the
 request itself.
 
-## 75 · One stamp, a review's engagement; families only organise
+## 75 · The stamp, a review's engagement, set on a card of its own; families only organise
 
-A stamp on a PDF holds legally: it says what a review decided. So there is one stamp, the same on every document, put
-on a revision released after it went for review; released without a review, or returned, nothing is stamped. It always
-carries RELEASED, the grade that stands (the most severe of the deciding steps, usually the last decider's), who gave it
-and when. The project may add every grade given (with who and when; on by default), what it is released for, the
-document's number and revision, the review's number, and why (the comments, on a last page), and choose the corner it
-sits in (top right by default). It is set as one, for the organization and for each project where the organization
-leaves it free. The marks across the page (superseded, void, on hold) are kept as they were.
+A stamp on a PDF holds legally: it says what a review decided. It is set in one place, the same for every document: the
+organization's card is every project's default, and a project changes its own where the organization leaves it free.
+The card says whether PDFs are stamped at all; when a review stamps (the revision it released, on; the one it returned,
+off unless chosen; released without a review, nothing to stamp); what the stamp shows (always its word, the grade that
+stands, who gave it and when; then, as chosen, every grade given with who and when, what it is released for, the
+document's number and revision, the review's number, and why, the comments on a last page); and the corner it sits in
+(top right by default). The marks across the page (superseded, void, on hold) are kept as they were.
 
 Document families group document types and help with recommendations; they decide nothing, so they carry no stamp
 rule and have no Settings page: they are a set in Types & sets, read on Help.
 
-**Depends on it:** `STAMP_SHOW:<what>`, `STAMP_COMMENTS`, `STAMP_PLACE`, `STAMP:SUPERSEDED|VOID|HELD`,
-`POLICY_PDF_STAMP` (Control room, release step; Defaults for new projects); `Stamping.FaceAsync` (worker);
+**Depends on it:** `POLICY_PDF_STAMP`, `STAMP:RELEASED|RETURNED|SUPERSEDED|VOID|HELD`, `STAMP_SHOW:<what>`,
+`STAMP_COMMENTS`, `STAMP_PLACE` (Settings → The stamp, both levels); `Stamping.StampChoices`, `FaceAsync` (worker);
 `DOC_FAMILIES` (Types & sets).

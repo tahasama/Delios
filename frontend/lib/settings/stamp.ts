@@ -1,20 +1,21 @@
-/** The stamp and the marks across the page: plain data, read by the screens and the server alike. */
-
 /**
- * The marks across the page, kept as they were (owner): superseded once a later revision is released, void, on hold.
- * Each on unless switched off (`STAMP:<kind>`, read by the backend's `StampChoices`).
+ * The stamp (owner: "an engagement that legally holds"), a Settings card of its own at both levels: the organization's
+ * answers are every project's default, a project's own stand over them where the organization leaves it free
+ * (switch POLICY_PDF_STAMP). Plain data, read by the screens and the server alike; the backend reads the same keys
+ * (`Stamping.StampChoices`).
  */
-export const STAMP_KINDS = [
-  { key: "STAMP:SUPERSEDED", label: "Superseded", text: "across the page, once a later revision is released" },
-  { key: "STAMP:VOID", label: "Void", text: "across the page, with why" },
-  { key: "STAMP:HELD", label: "On hold", text: "across the page, while it is not for use" },
+
+/** Stamped at all: on unless switched off. */
+export const STAMP_ON_KEY = "POLICY_PDF_STAMP";
+
+/** When a review stamps the PDF: released after it (on unless off), returned by it (off unless on). */
+export const STAMP_WHEN = [
+  { key: "STAMP:RELEASED", label: "Released after its review", text: "the revision a review released, stamped RELEASED in green", on: true },
+  { key: "STAMP:RETURNED", label: "Returned by its review", text: "the revision a review sent back, stamped RETURNED in red", on: false },
 ] as const;
 
 /**
- * The stamp (owner: "an engagement that legally holds"): one, the same on every document, put on a revision released
- * after it went for review (released without review, nothing to stamp). It always carries RELEASED, the grade that
- * stands, larger (the most severe of the deciders', usually the last's), who gave it and when. The project chooses the
- * rest (`STAMP_SHOW:<what>`), why (`STAMP_COMMENTS`, the comments on a last page) and where it sits (`STAMP_PLACE`).
+ * What the stamp shows besides what it always carries (its word, the grade that stands, larger, who gave it and when).
  */
 export const STAMP_SHOWS = [
   { key: "STAMP_SHOW:STEPS", label: "Every grade given", text: "each step of the route: its grade (advice or verdict), who gave it and when", on: true },
@@ -30,3 +31,47 @@ export const STAMP_PLACES = [
   { value: "BOTTOM_RIGHT", label: "Bottom right" },
   { value: "BOTTOM_LEFT", label: "Bottom left" },
 ] as const;
+
+/**
+ * The marks across the page, kept as they were (owner): superseded once a later revision is released, void, on hold.
+ * Each on unless switched off.
+ */
+export const STAMP_KINDS = [
+  { key: "STAMP:SUPERSEDED", label: "Superseded", text: "across the page, once a later revision is released" },
+  { key: "STAMP:VOID", label: "Void", text: "across the page, with why" },
+  { key: "STAMP:HELD", label: "On hold", text: "across the page, while it is not for use" },
+] as const;
+
+/** Every key of the card, in the order it is saved. */
+export const STAMP_KEYS = [STAMP_ON_KEY, ...STAMP_WHEN.map((one) => one.key), ...STAMP_SHOWS.map((one) => one.key),
+  STAMP_COMMENTS_KEY, STAMP_PLACE_KEY, ...STAMP_KINDS.map((one) => one.key)];
+
+/** The app's own answer to one key of the stamp. */
+export function stampDefault(key: string): string {
+  if (key === STAMP_PLACE_KEY) return "TOP_RIGHT";
+  if (key === STAMP_COMMENTS_KEY) return "OFF";
+  const flagged = [...STAMP_WHEN, ...STAMP_SHOWS].find((one) => one.key === key);
+  if (flagged) return flagged.on ? "ON" : "OFF";
+  return "ON";
+}
+
+/** What stands for one key: the project's own, else the organization's, else the app's. */
+export type StampAnswers = Record<string, string>;
+export function stampAnswers(organization: Map<string, string>, project?: Map<string, string>): StampAnswers {
+  return Object.fromEntries(STAMP_KEYS.map((key) => [key, project?.get(key) ?? organization.get(key) ?? stampDefault(key)]));
+}
+
+/** Whether the project keeps answers of its own about the stamp. */
+export function stampOwn(project: Map<string, string>): boolean {
+  return STAMP_KEYS.some((key) => project.has(key));
+}
+
+/** The stamp in one sentence, for whoever reads it (the Control room, the plan). */
+export function stampSaid(a: StampAnswers): string {
+  if (a[STAMP_ON_KEY] === "OFF") return "No PDF is stamped; where it stands is read in the app.";
+  const when = STAMP_WHEN.filter((one) => a[one.key] === "ON").map((one) => one.label.toLowerCase());
+  const shows = STAMP_SHOWS.filter((one) => a[one.key] === "ON").map((one) => one.label.charAt(0).toLowerCase() + one.label.slice(1));
+  const place = STAMP_PLACES.find((one) => one.value === a[STAMP_PLACE_KEY])?.label.toLowerCase() ?? "top right";
+  const marks = STAMP_KINDS.filter((one) => a[one.key] !== "OFF").map((one) => one.label.toLowerCase());
+  return `${when.length ? `Stamped when ${when.join(", or ")}, ${place}: the grade that stands, who gave it and when${shows.length ? `, ${shows.join(", ")}` : ""}${a[STAMP_COMMENTS_KEY] === "ON" ? ", and why on a last page" : ""}.` : "No review stamps the PDF."}${marks.length ? ` Marked across the page: ${marks.join(", ")}.` : ""}`;
+}

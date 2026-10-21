@@ -276,23 +276,7 @@ export const POLICIES: Policy[] = [
       },
     ],
   },
-  {
-    key: "POLICY_PDF_STAMP",
-    title: "Stamping the PDF",
-    text: "Whether the PDF people open carries the stamp of the review that released it, and the marks across the page (superseded, void, on hold), or stays as it was sent. The file as sent is kept either way.",
-    options: [
-      {
-        value: "ON",
-        label: "Stamp the PDF people open",
-        text: "A revision released after its review carries the stamp on every page; superseded, void and on hold are marked across the page. Whoever opens the file reads where it stands without the app.",
-      },
-      {
-        value: "OFF",
-        label: "Keep the PDF as it was sent",
-        text: "No stamp on any PDF. Where it stands is read in the app.",
-      },
-    ],
-  },
+
   {
     key: "POLICY_READY",
     title: "When an action has what it needs",
@@ -430,15 +414,11 @@ export function controlFrom(byKey: Map<string, string>, follows: boolean): Contr
  * What one stored answer amounts to, the app's own default standing in for no answer: so a project's answer and the
  * defaults it is compared with read the same when they mean the same.
  */
-export { STAMP_KINDS, STAMP_SHOWS, STAMP_COMMENTS_KEY, STAMP_PLACE_KEY, STAMP_PLACES } from "@/lib/settings/stamp";
-import { STAMP_SHOWS, STAMP_COMMENTS_KEY, STAMP_PLACE_KEY } from "@/lib/settings/stamp";
+import { STAMP_KEYS, stampDefault } from "@/lib/settings/stamp";
 
 export function effectiveAnswer(key: string, value: string | null | undefined): string {
   if (value) return value;
-  if (key.startsWith("STAMP:")) return "ON";
-  if (key.startsWith("STAMP_SHOW:")) return STAMP_SHOWS.find((one) => one.key === key)?.on ? "ON" : "OFF";
-  if (key === STAMP_PLACE_KEY) return "TOP_RIGHT";
-  if (key === STAMP_COMMENTS_KEY) return "OFF";
+  if (STAMP_KEYS.includes(key)) return stampDefault(key);
   const declared = POLICIES.find((one) => one.key === key);
   if (declared) return declared.options[0].value;
   if (key === ESCALATE_AFTER_KEY) return String(DEFAULT_ESCALATE_AFTER);

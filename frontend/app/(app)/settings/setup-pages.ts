@@ -99,6 +99,14 @@ export const SETUP_PAGES: SetupPage[] = [
     read: true,
   },
   {
+    href: "/settings/stamp",
+    title: "The stamp",
+    text: "What a review's decision puts on the PDF: whether it is stamped, when, what the stamp shows, where it sits.",
+    group: "How work flows",
+    control: true,
+    read: true,
+  },
+  {
     href: "/settings/workflow-templates",
     title: "Review routes",
     text: "Who reviews, and in which order: side by side, one after another, or gathered by a lead.",

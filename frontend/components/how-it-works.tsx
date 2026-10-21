@@ -4,7 +4,6 @@ import { SwitchControl } from "@/components/switch";
 import { ActionForm } from "@/components/form";
 import { ToneChip, inputCls } from "@/components/ui";
 import { cn } from "@/lib/core/utils";
-import { StampFields } from "@/components/stamp-fields";
 import {
   controlFrom,
   policiesFrom,
@@ -18,11 +17,6 @@ import {
   PROJECT_KEY,
   effectiveAnswer,
   PROJECT_MODE_LABEL,
-  STAMP_KINDS,
-  STAMP_COMMENTS_KEY,
-  STAMP_SHOWS,
-  STAMP_PLACE_KEY,
-  STAMP_PLACES,
   POLICIES,
   roomItemOf,
   type ControlMode,
@@ -101,48 +95,6 @@ export function PolicyChoice({ source, policyKey }: { source: AnswerSource; poli
   );
 }
 
-/** The stamp (one, for every document released after its review) and the marks across the page. */
-export function StampChoices({ source }: { source: AnswerSource }) {
-  const fixed = isFixedAnswer(source, "POLICY_PDF_STAMP");
-  const initial = {
-    shows: Object.fromEntries(STAMP_SHOWS.map((one) => [one.key, effectiveAnswer(one.key, source.answers.get(one.key)) === "ON"])),
-    comments: effectiveAnswer(STAMP_COMMENTS_KEY, source.answers.get(STAMP_COMMENTS_KEY)) === "ON",
-    place: effectiveAnswer(STAMP_PLACE_KEY, source.answers.get(STAMP_PLACE_KEY)),
-  };
-  return (
-    <fieldset disabled={fixed} className="min-w-0 space-y-3 disabled:opacity-70">
-      <input type="hidden" name="stamps" value="1" />
-      <p className="text-sm font-semibold text-slate-800">The stamp</p>
-      <p className="text-xs leading-5 text-slate-600">
-        Put on a revision released after it went for review, on every page: an engagement, the same on every document.
-      </p>
-      <StampFields initial={initial} disabled={fixed} />
-      <p className="pt-1 text-sm font-semibold text-slate-800">The marks across the page</p>
-      <div className="grid gap-2 md:grid-cols-3">
-        {STAMP_KINDS.map((kind) => (
-          <label key={kind.key} className="flex cursor-pointer items-start gap-2.5 rounded-md px-3 py-2 ring-1 ring-line hover:bg-tint-soft has-checked:bg-tint-soft">
-            <SwitchControl name={kind.key} defaultChecked={effectiveAnswer(kind.key, source.answers.get(kind.key)) === "ON"} className="mt-0.5" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-semibold text-slate-800">{kind.label}</span>
-              <span className="block text-xs text-slate-600">{kind.text}</span>
-            </span>
-            <AnswerFrom source={source} of={kind.key} />
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
-/** The stamp and the marks, in words, for whoever only reads. */
-export function stampsSaid(answers: Map<string, string>): string {
-  const shows = STAMP_SHOWS.filter((one) => effectiveAnswer(one.key, answers.get(one.key)) === "ON").map((one) => one.label.toLowerCase());
-  const comments = effectiveAnswer(STAMP_COMMENTS_KEY, answers.get(STAMP_COMMENTS_KEY)) === "ON";
-  const place = STAMP_PLACES.find((one) => one.value === effectiveAnswer(STAMP_PLACE_KEY, answers.get(STAMP_PLACE_KEY)))?.label.toLowerCase();
-  const marks = STAMP_KINDS.filter((kind) => effectiveAnswer(kind.key, answers.get(kind.key)) === "ON").map((kind) => kind.label.toLowerCase());
-  return `The stamp, ${place}: released, the grade that stands, who gave it and when${shows.length ? `, ${shows.join(", ")}` : ""}${comments ? ", and why on a last page" : ""}. ${marks.length ? `Marked across the page: ${marks.join(", ")}.` : "No marks across the page."}`;
-}
-
 /** The answer chosen to one question, in words, for whoever only reads. */
 export function policySaid(answers: Map<string, string>, policyKey: string): string {
   const row = policiesFrom(answers).find((one) => one.policy.key === policyKey);
@@ -173,7 +125,6 @@ export function HowItWorks({
   const defaults = target === "defaults";
   const hidden = { target };
   const policiesHere = POLICIES;
-  const stampsHere = true;
   const escalateAfter = answers.get(ESCALATE_AFTER_KEY) ?? String(DEFAULT_ESCALATE_AFTER);
   const whoFixed = isFixedAnswer(source, "WHO_DOES_WHAT");
 
@@ -226,7 +177,7 @@ export function HowItWorks({
             ))}
           </ul>
         </section>
-        {policiesHere.length || stampsHere ? (
+        {policiesHere.length ? (
           <section id="policies" className="register register-sheet register-sheet-open scroll-mt-24">
             {howHead}
             <ul className="divide-y divide-line">
@@ -235,7 +186,6 @@ export function HowItWorks({
                   <span className="font-semibold text-slate-800">{one.title}: </span>{policySaid(answers, one.key)}.
                 </li>
               ))}
-              {stampsHere ? <li className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6">{stampsSaid(answers)}</li> : null}
               <li className="px-5 py-2.5 text-xs leading-5 text-slate-600 sm:px-6">
                 <span className="font-semibold text-slate-800">When a discipline does not answer: </span>
                 everyone concerned is notified after {escalateAfter} working days.
@@ -345,7 +295,6 @@ export function HowItWorks({
             {policiesHere.map((one) => (
               <li key={one.key} className="px-5 py-4 sm:px-6"><PolicyChoice source={source} policyKey={one.key} /></li>
             ))}
-            {stampsHere ? <li className="px-5 py-4 sm:px-6"><StampChoices source={source} /></li> : null}
             <li className="px-5 py-4 sm:px-6">
               <fieldset disabled={isFixedAnswer(source, ESCALATE_AFTER_KEY)} className="min-w-0 space-y-2 disabled:opacity-70">
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">

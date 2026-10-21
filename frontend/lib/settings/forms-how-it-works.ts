@@ -19,11 +19,6 @@ import {
   effectiveAnswer,
   MODE_LABEL,
   POLICIES,
-  STAMP_KINDS,
-  STAMP_COMMENTS_KEY,
-  STAMP_SHOWS,
-  STAMP_PLACE_KEY,
-  STAMP_PLACES,
   PROJECT_KEY,
   PROJECT_MODE_LABEL,
   roomItemOf,
@@ -150,13 +145,6 @@ export async function setPolicyAction(_prev: State | undefined, formData: FormDa
     if (!one.options.some((option) => option.value === asked)) continue;
     wanted.push([one.key, asked]);
     said.push(one.options.find((option) => option.value === asked)!.label.toLowerCase());
-  }
-  // The stamp and the marks: ticked is on, unticked off (the section says it was on the form); where the stamp sits.
-  if (formData.has("stamps")) {
-    for (const kind of [...STAMP_KINDS, ...STAMP_SHOWS]) wanted.push([kind.key, formData.get(kind.key) === "on" ? "ON" : "OFF"]);
-    wanted.push([STAMP_COMMENTS_KEY, formData.get(STAMP_COMMENTS_KEY) === "on" ? "ON" : "OFF"]);
-    const place = String(formData.get(STAMP_PLACE_KEY) ?? "");
-    if (STAMP_PLACES.some((one) => one.value === place)) wanted.push([STAMP_PLACE_KEY, place]);
   }
   const escalate = String(formData.get(ESCALATE_AFTER_KEY) ?? "").trim();
   if (escalate) {
@@ -301,10 +289,6 @@ export async function setRoomAnswerAction(_prev: State | undefined, formData: Fo
       if (value !== "ON" && value !== "OFF") return { error: "Choose yes or no." };
       await save(formData, [[key, value]]);
       said = value === "ON" ? "Whoever holds Manage confirms it from now on." : "No confirmation from now on.";
-    } else if (STAMP_KINDS.some((one) => one.key === key)) {
-      if (value !== "ON" && value !== "OFF") return { error: "Choose on or off." };
-      await save(formData, [[key, value]]);
-      said = value === "ON" ? "That mark goes on the PDF from now on." : "That mark is left off from now on.";
     } else if (key === ESCALATE_AFTER_KEY) {
       const days = Number(value);
       if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Notify again after 1 to 60 working days." };
@@ -347,22 +331,39 @@ export async function setIntakeAction(_prev: State | undefined, formData: FormDa
 }
 
 /**
- * The stamp, saved as one (owner: "it is one thing"): what it shows besides what it always carries, why (the
- * comments), and where it sits. The same for every document the project releases after a review.
+ * The stamp, saved as one (owner: a card of its own). `level` = organization (an administrator, the default every
+ * project reads) or project (where the organization leaves it free): a project keeps only what differs from the
+ * organization's, so the rest goes on following it.
  */
 export async function setStampAction(_prev: State | undefined, formData: FormData): Promise<State> {
-  const place = String(formData.get(STAMP_PLACE_KEY) ?? "");
-  if (!STAMP_PLACES.some((one) => one.value === place)) return { error: "Choose where the stamp sits." };
-  const wanted: [string, string][] = [
-    ...STAMP_SHOWS.map((one): [string, string] => [one.key, formData.get(one.key) === "on" ? "ON" : "OFF"]),
-    [STAMP_COMMENTS_KEY, formData.get(STAMP_COMMENTS_KEY) === "on" ? "ON" : "OFF"],
-    [STAMP_PLACE_KEY, place],
-  ];
+  const { STAMP_KEYS, STAMP_PLACE_KEY: placeKey, STAMP_PLACES: places, stampAnswers } = await import("@/lib/settings/stamp");
+  const place = String(formData.get(placeKey) ?? "");
+  if (!places.some((one) => one.value === place)) return { error: "Choose where the stamp sits." };
+  const asked = Object.fromEntries(STAMP_KEYS.map((key) => [key, key === placeKey ? place : formData.get(key) === "on" ? "ON" : "OFF"]));
   try {
-    const changed = await save(formData, wanted);
+    const organization = await orgSettings();
+    if (String(formData.get("level")) === "organization") {
+      const { requireOrgAdmin } = await import("@/lib/core/org-scope");
+      await requireOrgAdmin();
+      const now = stampAnswers(organization);
+      for (const key of STAMP_KEYS) if (now[key] !== asked[key]) await setOrgSetting(key, asked[key]);
+      revalidatePath("/organization/settings/stamp");
+      return { ok: "Saved. Every project reading the organization's stamp uses it from now on." };
+    }
+    const ctx = await requireScope();
+    const theirs = stampAnswers(organization);
+    const own = await projectSettings(ctx.projectId);
+    let changed = 0;
+    for (const key of STAMP_KEYS) {
+      const value = asked[key] === theirs[key] ? null : asked[key];
+      if ((own.get(key) ?? null) === value) continue;
+      await setProjectSetting(ctx.projectId, key, value);
+      changed++;
+    }
+    revalidatePath("/settings/stamp");
     revalidatePath("/settings/flow");
     revalidatePath("/conformance/plan");
-    return { ok: changed ? "Saved. Revisions released from now on carry this stamp." : "Nothing changed." };
+    return { ok: changed ? "Saved. Revisions stamped from now on carry it." : "Nothing changed." };
   } catch (e) {
     return { error: refusal(e).message };
   }
