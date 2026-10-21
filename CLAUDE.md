@@ -1014,7 +1014,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A revision whose files are not through the virus check is refused in plain words by what happened (`FilesNotReady`):
   still being checked (about a minute; if it stays, the worker or scanner is not running), set aside (replace it), or
   no file yet.
-- One status chosen on the last step: every document the route accepts is released at it; several: the decider chooses.
+- One status chosen on the last step: every document the route accepts is released at it, shown fixed on the verdict
+  form ("the route releases at IFC, not IFA"), nothing to choose or confirm; several: the decider chooses. "It stays at
+  <status>" is asked only when what the revision carries is one the step may give (owner: a verdict was blocked by a
+  tick about IFA when only IFC was offered).
 - On the route form each step says what it does, "Advises · Decides" (a choice on the step opened), the last always
   "Decides" (a route always ends with a decision). "Which documents take it" reads "Deliverable type", never "Produced by".
 - Why a step another organization answers goes to them is never asked on a route (owner): set by itself from what the

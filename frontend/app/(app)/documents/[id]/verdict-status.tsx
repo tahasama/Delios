@@ -64,13 +64,16 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
   advice?: { code: string; comments: number; blocking: number } | null;
 }) {
   const [code, setCode] = useState("");
-  const [status, setStatus] = useState(carrying ?? "");
+  // It starts at what it carries only where the step may give that; a step allowed one status starts (and stays) on it.
+  const offered = (code: string | null | undefined) => !!code && statuses.some((one) => one.code === code);
+  const only = statuses.length === 1 ? statuses[0].code : null;
+  const [status, setStatus] = useState(only ?? (offered(carrying) ? carrying! : ""));
   const isAdvice = !deciding && !!advice;
   // On an advice step the choice starts at what was already written.
   const verdict = verdicts.find((one) => one.code === (isAdvice ? code || advice!.code : code));
   const proceeds = verdict?.proceeds === true;
   const chosen = statuses.find((one) => one.code === status);
-  const unchanged = !!carrying && status === carrying;
+  const unchanged = offered(carrying) && status === carrying && !only;
   // A verdict that says something is wrong has to say what. One that accepts
   // the revision outright has nothing to add, so it is not asked.
   const needsComment = verdict?.wantsComment === true;
@@ -130,12 +133,24 @@ export function VerdictDecision({ verdicts, statuses, deciding, carrying, laterS
           <Field
             label="Issued for"
             required
-            hint={carrying ? `it carries ${carrying} — confirm it, or change it` : "what the revision is issued for once this step is done"}
+            hint={only
+              ? `the route releases at ${only}${carrying && carrying !== only ? `, not ${carrying}` : ""}`
+              : carrying && offered(carrying) ? `it carries ${carrying} — confirm it, or change it` : "what the revision is issued for once this step is done"}
           >
-            <Select name="issuedFor" required value={status} onChange={(event) => setStatus(event.target.value)} className={inputCls}>
-              <option value="" disabled>Choose…</option>
-              {statuses.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
-            </Select>
+            {only ? (
+              <>
+                <input type="hidden" name="issuedFor" value={only} />
+                <p className="flex h-[var(--control-h)] items-center text-[13px] font-semibold text-slate-900">{only} — {chosen?.label}</p>
+              </>
+            ) : (
+              <Select name="issuedFor" required value={status} onChange={(event) => setStatus(event.target.value)} className={inputCls}>
+                <option value="" disabled>Choose…</option>
+                {statuses.map((one) => <option key={one.code} value={one.code}>{one.code} — {one.label}</option>)}
+              </Select>
+            )}
+            {carrying && !offered(carrying) && !only ? (
+              <span className="mt-1.5 block text-[11px] text-slate-500">It carries {carrying}, which this step may not release at: choose one the route allows.</span>
+            ) : null}
             {chosen ? (
               <span className={`mt-1.5 block text-[11px] ${chosen.allowsWork ? "font-semibold text-amber-700" : "text-slate-500"}`}>
                 {chosen.may
