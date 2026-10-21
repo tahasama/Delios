@@ -654,7 +654,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   column, each have their own hue, text, side colour and pill alike (`lib/core/state-look.ts` `STATE_LOOK`; a state
   meaning the same in both, in review or released, reads the same). A state in the register opens its own line on Help
   (`/guide#state-<code>`), lit (`.state-line:target`), with what it means and how it gets there: document states,
-  revision states (no revision yet included) and a supplier's stages.
+  revision states (no revision yet included) and a supplier's stages. The states stay where they are (owner, settled): fixed by the app, explained on
+  Help, named on the organization's States card; they are not a list of Types & sets.
   Outside registers every state is its pill in the app's tones (`Chip`, `TONE`; `ToneChip` draws a `Chip`, and keeps
   its round shape only inside a register's lines, `inRegister`: packages, package and delivery lines, report lines);
   no chip carries colours of its own (the old -100 / -300 fills were brought onto the tones).
