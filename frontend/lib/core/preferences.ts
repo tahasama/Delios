@@ -14,14 +14,16 @@ export const PREF = {
   reviewPane: "pane-review",
   /** The stamp card's preview, in pixels. */
   stampPane: "pane-stamp",
-  /** The calendar's day, in pixels high (dragged taller or shorter). */
+  /** The calendar's day, its side in pixels (the whole calendar dragged larger or smaller by its corner). */
   calendarDay: "calendar-day",
+  /** "0" when the names of the days off and the actions are not written inside the days. */
+  calendarNames: "calendar-names",
 } as const;
 
-/** How tall a calendar's day stands: 56 pixels unless dragged, between 28 and 120. */
+/** How large a calendar's day is drawn, its side in pixels: 56 unless dragged, between 28 and 120. */
 export const CALENDAR_DAY = { normal: 56, min: 28, max: 120 } as const;
 
-/** The calendar's day height left by the person, read on the server from its cookie. */
+/** The calendar's day size left by the person, read on the server from its cookie. */
 export function calendarDay(value: string | undefined): number {
   const h = Number.parseInt(value ?? "", 10);
   return Number.isFinite(h) ? Math.min(CALENDAR_DAY.max, Math.max(CALENDAR_DAY.min, h)) : CALENDAR_DAY.normal;

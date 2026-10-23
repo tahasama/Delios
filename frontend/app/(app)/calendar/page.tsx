@@ -54,7 +54,7 @@ export default async function CalendarPage() {
         </dl>
       </section>
       <section className="register register-sheet register-sheet-open px-5 py-4 sm:px-6">
-        <MonthsCalendar dayHeight={calendarDay((await cookies()).get(PREF.calendarDay)?.value)} from={calendar.from} to={calendar.to} weekend={calendar.place.weekendDays} today={calendar.today}
+        <MonthsCalendar daySize={calendarDay((await cookies()).get(PREF.calendarDay)?.value)} namesShown={(await cookies()).get(PREF.calendarNames)?.value !== "0"} from={calendar.from} to={calendar.to} weekend={calendar.place.weekendDays} today={calendar.today}
           daysOff={calendar.daysOff} actions={calendar.actions} />
       </section>
     </div>

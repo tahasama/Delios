@@ -74,7 +74,7 @@ export default async function ProjectCalendarPage() {
           {calendar.exception ? (
             <p className="text-xs text-slate-600"><ExceptionNote project={project} what="the calendar" exception={calendar.exception} /></p>
           ) : null}
-          <MonthsCalendar dayHeight={calendarDay((await cookies()).get(PREF.calendarDay)?.value)} from={calendar.from} to={calendar.to} weekend={calendar.place.weekendDays} today={calendar.today}
+          <MonthsCalendar daySize={calendarDay((await cookies()).get(PREF.calendarDay)?.value)} namesShown={(await cookies()).get(PREF.calendarNames)?.value !== "0"} from={calendar.from} to={calendar.to} weekend={calendar.place.weekendDays} today={calendar.today}
             daysOff={calendar.daysOff} actions={calendar.actions} claim={claims ? { level: "project" } : undefined} />
           <p className="text-[11px] text-slate-500">
             From the month {project} starts to the month it finishes (This project). Public holidays are the organization&rsquo;s, by country.

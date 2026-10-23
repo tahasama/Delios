@@ -56,7 +56,7 @@ export default async function OrganizationCalendarPage({ searchParams }: { searc
           </span>
         </div>
         <div className="px-5 py-4 sm:px-6">
-          <MonthsCalendar dayHeight={calendarDay((await cookies()).get(PREF.calendarDay)?.value)} from={`${year}-01-01`} to={`${year}-12-31`} weekend={calendar.place.weekendDays} daysOff={calendar.holidays}
+          <MonthsCalendar daySize={calendarDay((await cookies()).get(PREF.calendarDay)?.value)} namesShown={(await cookies()).get(PREF.calendarNames)?.value !== "0"} from={`${year}-01-01`} to={`${year}-12-31`} weekend={calendar.place.weekendDays} daysOff={calendar.holidays}
             claim={{ level: "organization", defaultCountry: calendar.place.country }} countries={COUNTRIES} />
         </div>
       </section>

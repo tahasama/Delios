@@ -26,10 +26,12 @@ const isoDay = (y: number, m: number, d: number) => ((new Date(Date.UTC(y, m, d)
  * action days are highlighted. A click on a day opens it under the months: what it holds, and, for whoever keeps this
  * calendar, claims it (a name, and for the organization its country) or unclaims it, asked first.
  */
-export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = [], claim, countries, dayHeight = CALENDAR_DAY.normal }: {
+export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = [], claim, countries, daySize = CALENDAR_DAY.normal, namesShown = true }: {
   from: string; to: string; weekend: number[]; today?: string; daysOff: DayOff[]; actions?: ActionDay[];
-  /** How tall a day stands, in pixels, as the person left it (cookie `calendar-day`, read by the server). */
-  dayHeight?: number;
+  /** How large a day is drawn (its side, in pixels), as the person left it (cookie `calendar-day`, read by the server). */
+  daySize?: number;
+  /** Whether the names of the days off and the actions are written inside the days (cookie `calendar-names`). */
+  namesShown?: boolean;
   /** Who keeps this calendar: the organization's holidays, or the project's own days off; none: read only. */
   claim?: { level: "organization" | "project"; defaultCountry?: string | null };
   /** The countries a holiday may be kept in (the organization's calendar). */
@@ -37,29 +39,36 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [country, setCountry] = useState<string>("");
-  // The days stand taller or shorter as the handle under the months is dragged; double-click puts them back.
-  const [height, setHeight] = useState(dayHeight);
+  // The whole calendar grows or shrinks as its corner is dragged: each day keeps its square, each month its seven
+  // columns, so it never reads out of proportion. Double-click puts it back.
+  const [size, setSize] = useState(daySize);
+  const [names, setNames] = useState(namesShown);
   const onResize = (e: React.PointerEvent) => {
     e.preventDefault();
-    const start = e.clientY;
-    const from = height;
-    // Dragging moves the bottom of the first row of months: a day grows by a sixth of the distance (six weeks a month).
-    let h = from;
+    const x = e.clientX, y = e.clientY;
+    const from = size;
+    let next = from;
     document.body.classList.add("dt-resizing");
     const move = (ev: PointerEvent) => {
-      h = Math.round(Math.min(CALENDAR_DAY.max, Math.max(CALENDAR_DAY.min, from + (ev.clientY - start) / 6)));
-      setHeight(h);
+      // A month is seven days wide and about six high: the corner moves by that much per pixel of a day.
+      const delta = ((ev.clientX - x) / 7 + (ev.clientY - y) / 6) / 2;
+      next = Math.round(Math.min(CALENDAR_DAY.max, Math.max(CALENDAR_DAY.min, from + delta)));
+      setSize(next);
     };
     const up = () => {
       document.body.classList.remove("dt-resizing");
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
-      savePreference(PREF.calendarDay, String(h));
+      savePreference(PREF.calendarDay, String(next));
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
-  const resetHeight = () => { setHeight(CALENDAR_DAY.normal); savePreference(PREF.calendarDay, ""); };
+  const resetSize = () => { setSize(CALENDAR_DAY.normal); savePreference(PREF.calendarDay, ""); };
+  const toggleNames = (on: boolean) => { setNames(on); savePreference(PREF.calendarNames, on ? "" : "0"); };
+  // A month as wide as its seven days and their gaps, with its own padding.
+  const monthWidth = size * 7 + 6 * 2 + 20;
+  const writes = names && size >= 44;
   // After a claim or an unclaim the page is drawn again; the day stays open.
   useEffect(() => { if (open && (open < from || open > to)) setOpen(null); }, [from, to, open]);
 
@@ -89,6 +98,9 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
           {actions.length ? <li className="flex items-center gap-1.5"><span className="h-1 w-3 rounded-full bg-sky-600" /> An action&rsquo;s days</li> : null}
           {today ? <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm ring-2 ring-brand-line" /> Today</li> : null}
         </ul>
+        <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-600">
+          <input type="checkbox" checked={names} onChange={(e) => toggleNames(e.target.checked)} /> Names in the days
+        </label>
         {countries ? (
           <div className="w-60">
             <Select value={country} onChange={(e) => setCountry(e.target.value)} aria-label="Whose holidays" className="plain w-full">
@@ -99,7 +111,8 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="relative">
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${monthWidth}px), ${monthWidth}px))` }}>
         {months.map(({ y, m }) => {
           const first = isoDay(y, m, 1);
           const length = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
@@ -126,17 +139,21 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
                   return (
                     <button key={day} type="button" onClick={() => setOpen(open === day ? null : day)}
                       title={words || undefined} aria-pressed={open === day} aria-label={`${fmtDate(day)}${words ? `: ${words.replace(/\n/g, ", ")}` : ""}`}
-                      style={{ height }}
-                      className={cn("relative flex items-start justify-end rounded-sm px-1 pt-0.5 text-[12px] tabular-nums transition-colors",
-                        height < 40 && "items-center justify-center p-0",
+                      style={{ height: size }}
+                      className={cn("relative flex flex-col items-end overflow-hidden rounded-sm px-1 pt-0.5 text-[12px] tabular-nums transition-colors",
+                        size < 40 && "items-center justify-center p-0",
                         holiday ? "bg-rose-100 font-semibold text-rose-800 ring-1 ring-rose-300"
                           : own ? "bg-amber-100 font-semibold text-amber-900 ring-1 ring-amber-300"
                           : resting ? "bg-tint text-slate-400" : "text-slate-700 hover:bg-tint-soft",
                         day === today && "ring-2 ring-brand-line",
                         open === day && "outline-2 outline-offset-1 outline-brand-line")}>
                       {i + 1}
-                      {height >= 72 && off.length ? (
-                        <span className="absolute inset-x-1 bottom-2 truncate text-left text-[10.5px] font-medium leading-tight">{off[0].name}</span>
+                      {writes && (off.length || busy.length) ? (
+                        <span className="mt-0.5 flex w-full min-w-0 flex-col items-start gap-px text-left text-[11px] font-medium leading-tight">
+                          {[...off.map((d) => ({ key: d.id, text: d.name, action: false })), ...busy.map((a) => ({ key: a.code, text: a.name, action: true }))]
+                            .slice(0, Math.max(1, Math.floor((size - 22) / 14)))
+                            .map((one) => <span key={one.key} className={cn("w-full truncate", one.action && "text-sky-800")}>{one.text}</span>)}
+                        </span>
                       ) : null}
                       {busy.length ? <span className="absolute inset-x-1.5 bottom-0.5 h-[3px] rounded-full bg-sky-600" aria-hidden /> : null}
                     </button>
@@ -148,10 +165,12 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
         })}
       </div>
 
-      <div role="separator" aria-orientation="horizontal" aria-label="Drag to make the days taller or shorter"
-        title="Drag to make the days taller or shorter. Double-click to put them back." onPointerDown={onResize} onDoubleClick={resetHeight}
-        className="group/rows -mt-2 flex h-3 cursor-row-resize items-center justify-center">
-        <span className="h-0.5 w-12 rounded bg-line transition group-hover/rows:w-20 group-hover/rows:bg-link/70" />
+      {/* The corner that makes the whole calendar larger or smaller. */}
+      <div role="separator" aria-label="Drag to make the calendar larger or smaller"
+        title="Drag to make the calendar larger or smaller. Double-click to put it back." onPointerDown={onResize} onDoubleClick={resetSize}
+        className="group/size absolute -right-1 -bottom-1 hidden h-4 w-4 cursor-nwse-resize md:block">
+        <span className="absolute right-0.5 bottom-0.5 h-2.5 w-2.5 rounded-br-sm border-r-2 border-b-2 border-line transition group-hover/size:border-link/70" />
+      </div>
       </div>
 
       {/* The day opened: what it holds, and claiming or unclaiming it. */}
