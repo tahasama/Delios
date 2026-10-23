@@ -297,7 +297,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   new projects no longer carry it. The PDF opened from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`), of its newest
   submission only. **The document's Preview follows the newest revision** (owner), whatever its state, named on its tab
   ("Preview · rev B"): just started, nothing until its PDF is in; prepared or in review, its own newest PDF; returned, its
-  returned copy; released, its stamped copy. The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
+  returned copy; released, its stamped copy. **The Preview shows the source file too where
+  the page can** (owner: "images, excel workbooks"; `components/file-preview.tsx`, `FilePreview`): a picture (JPG, PNG,
+  GIF, WebP, AVIF, BMP; SVG stays a download, it can carry code) as itself, an Excel workbook (.xlsx, .xlsm) as its sheets
+  (`components/workbook-view.tsx`; backend `Documents/WorkbookView.cs`, `GET /files/{id}/workbook`: each sheet's cells as
+  Excel shows them, last calculated values, bold, merged cells, widths; nothing in it runs; the first 2,000 rows and 100
+  columns of 30 sheets, said when cut); with a PDF too, "The PDF · The source file" above it, the PDF first. Other
+  sources (Word, drawings, models…) are downloaded; converting them is to discuss. The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
   the side cards going under it once there is no room beside it (owner; `ResizablePane`, cookie `pane-review`; a double-click puts it back).
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
   every project" (Default rules, tabs by area, `prevented.ts`), never checked.
@@ -1378,6 +1384,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
 ### Schedule & actions
 - The schedule (SCH), disciplines per action (DPA) and requirements (RQL) are
   register documents, revised and released on the document page.
+- The schedule is read from a Primavera P6 export (.xer) too (owner: "extract data from it directly in addition to the
+  excel upload"; backend `Actions/XerReader.cs`): its TASK table, the planner's ID its `task_code`, start and finish as P6
+  shows them (actual, else early, else remaining, else planned), WBS summaries left out; an export of several projects
+  is read for the one the schedule settings name where a workbook's sheet is named, else refused naming them. On upload
+  (`.xer` beside `.xlsx` and `.csv`, `SheetGuard` reading it as text) and on release (a revision's `.xlsx` first, then
+  `.xer`, then `.csv`). The disciplines and requirements lists stay Excel or CSV.
 - Their Excel is uploaded on Schedule & actions only by Document Control or a
   function with the Plan permission.
 - Released revision: "this file is rev X as released" is ticked by default;

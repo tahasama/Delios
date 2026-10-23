@@ -23,7 +23,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const type = stored.headers.get("content-type") || "application/octet-stream";
   // Only what a browser shows without running anything opens in the page: a PDF or a plain image. Anything else
   // (HTML, SVG, scripts) is a download, so a file somebody uploaded never runs as the person opening it.
-  const viewable = /^(application\/pdf|image\/(png|jpeg|gif|webp))\b/i.test(type);
+  const viewable = /^(application\/pdf|image\/(png|jpeg|gif|webp|avif|bmp))\b/i.test(type);
   const disposition = url.searchParams.get("dl") === "1" || !viewable ? "attachment" : "inline";
   const raw = stored.headers.get("content-disposition")?.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i)?.[1] ?? id;
   let decoded = raw;

@@ -94,12 +94,12 @@ public sealed class ScheduleImporter(
         var document = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == revision.DocumentId, cancellationToken);
         var label = $"{document.Number} rev {revision.Value}";
 
-        // The activity list is the export, not the printed PDF: Excel first, then CSV.
-        var file = revision.Files.Where(f => f.Submission == revision.Submission && f.Status == FileStatuses.Clean && ScheduleReader.CanRead(f.Name))
-            .OrderBy(f => f.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? 0 : 1).FirstOrDefault();
+        // The activity list is the export, not the printed PDF: Excel first, then a P6 export (.xer), then CSV.
+        var file = revision.Files.Where(f => f.Submission == revision.Submission && f.Status == FileStatuses.Clean && ScheduleReader.CanReadSchedule(f.Name))
+            .OrderBy(f => f.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? 0 : XerReader.IsXer(f.Name) ? 1 : 2).FirstOrDefault();
         if (file is null)
         {
-            Fail(record, "The released revision has no .xlsx or .csv file to read the activities from.");
+            Fail(record, "The released revision has no .xlsx, .xer or .csv file to read the activities from.");
             await audit.WriteAsync(Actor.System, "SCHEDULE_NOT_READ", "Revision", revision.Id, label, record.Error, revision.ProjectId, cancellationToken);
             return;
         }
@@ -132,7 +132,7 @@ public sealed class ScheduleImporter(
     public async Task<(string? Summary, string? Error)> ReadUploadAsync(Guid tenantId, Guid projectId, string fileName, byte[] bytes,
         Revision? revision, CancellationToken cancellationToken)
     {
-        if (!ScheduleReader.CanRead(fileName)) return (null, "The schedule must be an .xlsx or .csv export.");
+        if (!ScheduleReader.CanReadSchedule(fileName)) return (null, "The schedule must be an .xlsx or .csv export, or a Primavera P6 export (.xer).");
         var source = await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == projectId, cancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({"schedule:" + projectId}))", cancellationToken);
         IReadOnlyList<ParsedActivity>? parsed;

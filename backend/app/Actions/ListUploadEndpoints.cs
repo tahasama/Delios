@@ -122,7 +122,11 @@ public static class ListUploadEndpoints
         }
 
         List<string[]> rows;
-        using (var content = new MemoryStream(bytes)) rows = ScheduleReader.ReadRows(content, fileName);
+        // A P6 export holding several projects is read for the one the schedule settings name.
+        var named = XerReader.IsXer(fileName)
+            ? (await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == project.Id, cancellationToken))?.Columns.Sheet
+            : null;
+        using (var content = new MemoryStream(bytes)) rows = ScheduleReader.ReadRows(content, fileName, named);
         var now = clock.GetCurrentInstant();
         // Each upload keeps its own label, unique within its list: "rev B", then "rev B (2)" for the same
         // revision read again; "upload 1", "upload 2"… for lists with no document.

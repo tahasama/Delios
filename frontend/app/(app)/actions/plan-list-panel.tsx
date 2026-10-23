@@ -30,6 +30,9 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
   const type = list.types[0] ?? null;
   const inForce = list.documents.filter((one) => one.released);
   const only = inForce.length === 1 ? inForce[0] : null;
+  // The schedule is read from a Primavera P6 export (.xer) too, straight from P6 (owner).
+  const accepts = list.kind === "SCHEDULE" ? ".xlsx,.csv,.xer" : ".xlsx,.csv";
+  const kinds = list.kind === "SCHEDULE" ? ".xlsx, .csv or a P6 .xer" : ".xlsx or .csv";
   const template = <a href={list.template} className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-link hover:underline"><Download className="h-3.5 w-3.5" /> Template to fill (.csv)</a>;
 
   // The same way out wherever no revision is in force: no document yet, or none released.
@@ -41,8 +44,8 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
           <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>It is applied at once, with no review, and is not tied to a released document. Your name, the file and your reason are kept in the activity log.</span>
         </p>
-        <Field label="File" hint="the list as .xlsx or .csv" required>
-          <input type="file" name="file" required accept=".xlsx,.csv" className={fileInput} />
+        <Field label="File" hint={`the list as ${kinds}`} required>
+          <input type="file" name="file" required accept={accepts} className={fileInput} />
         </Field>
         <Field label="Why without a released document" required>
           <input name="reason" required className={inputCls} placeholder="e.g. Approver not available; or the organization approves on paper and a stamped scan follows" />
@@ -114,8 +117,8 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <input
-                  type="file" name="file" required accept=".xlsx,.csv"
-                  aria-label={only ? `Excel of rev ${only.released!.value} (.xlsx or .csv)` : "Excel of the released revision (.xlsx or .csv)"}
+                  type="file" name="file" required accept={accepts}
+                  aria-label={only ? `The list of rev ${only.released!.value} (${kinds})` : `The list of the released revision (${kinds})`}
                   className={`${fileInputInline} min-w-0 flex-1`}
                 />
               </div>

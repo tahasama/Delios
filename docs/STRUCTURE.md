@@ -34,13 +34,14 @@ backend/
 │   ├── Documents/        documents, revisions, files, the register; their numbers with other organizations (Equivalents.cs); the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
 │   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (the sets of Review outcomes, read by routes)
 │   │                     ProjectLists: the project's lists (own copy on first change, where each value is used, who changes them)
+│   │                     WorkbookView: an Excel source file read for the Preview (components/file-preview.tsx, workbook-view.tsx)
 │   │                     ListRules: groups, the app's lists, which set of a list serves a deliverable type; Catalog.IsOfferedFor checks it
 │   │                     SheetGuard: every spreadsheet checked before it is read (type, size unpacked, macros, viruses)
 │   ├── Reviews/          routes, steps, advice, verdicts, release
 │   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs); what a request asks and where it is decided (Asks.cs); matching what arrived
 │   │                     to one of ours and packages taking documents as they come (IncomingService.Taking.cs)
 │   ├── Packages/         delivery packages and supplier packages; how other organizations' documents come in (Intake.cs: by placeholder or as they come)
-│   ├── Actions/          the schedule, its actions, what each needs, notices; ScheduleDays (the days around an action, on two levels)
+│   ├── Actions/          the schedule, its actions, what each needs, notices; ScheduleDays (the days around an action, on two levels); XerReader (the schedule read from a P6 .xer)
 │   ├── Records/          assets, number ranges, readiness answers
 │   ├── Checks/           conformance checks
 │   ├── Reports/          reports

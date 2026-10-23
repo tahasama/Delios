@@ -47,18 +47,23 @@ public static class ScheduleReader
     public static bool CanRead(string fileName) =>
         fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>The schedule is read from those, or straight from a Primavera P6 export (.xer, <see cref="XerReader"/>).</summary>
+    public static bool CanReadSchedule(string fileName) => CanRead(fileName) || XerReader.IsXer(fileName);
+
     /// <summary>Discipline names or codes as a cell lists them: separated by commas, semicolons, bars or slashes.</summary>
     public static string[] SplitDepartments(string? cell) =>
         (cell ?? "").Split([',', ';', '|', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
     /// <summary>Every used row of a spreadsheet (its first sheet) or a CSV file, as text.</summary>
-    public static List<string[]> ReadRows(Stream content, string fileName) =>
-        fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? ReadExcel(content, null) : ReadCsv(content);
+    public static List<string[]> ReadRows(Stream content, string fileName, string? project = null) =>
+        XerReader.IsXer(fileName) ? XerReader.Rows(content, project)
+        : fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? ReadExcel(content, null) : ReadCsv(content);
 
     /// <summary>The activities, or why the file cannot be read; the error names the row.</summary>
     public static (IReadOnlyList<ParsedActivity>? Activities, string? Error) Read(Stream content, string fileName, ScheduleColumns columns)
     {
+        if (XerReader.IsXer(fileName)) return XerReader.Read(content, columns.Sheet);
         List<string[]> rows;
         try
         {

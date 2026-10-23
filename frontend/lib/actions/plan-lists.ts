@@ -106,7 +106,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
     {
       kind: "SCHEDULE",
       title: "Schedule",
-      says: "The planner's export (.xlsx or .csv): every action and its date.",
+      says: "The planner's export (.xlsx or .csv, or straight from Primavera P6 as .xer): every action and its date.",
       types: scheduleTypes,
       documents: named.length ? named : schedules,
       template: "/api/plan-template/SCHEDULE",

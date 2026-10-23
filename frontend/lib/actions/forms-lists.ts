@@ -35,8 +35,9 @@ export async function uploadPlanListAction(_prev: Result | undefined, formData: 
   if (!document) return { error: `Choose the ${list.title.toLowerCase()} that is released.` };
   const rev = document.released!.value;
   if (!confirmed && !reason) return { error: `Tick that this file is the list of rev ${rev} as released, or say why it differs.` };
-  const file = filesOf(formData, "file").find((one) => /\.(xlsx|csv)$/i.test(one.name)) ?? null;
-  if (!file) return { error: "Choose the list as .xlsx or .csv." };
+  // The schedule is read from a Primavera P6 export (.xer) too.
+  const file = filesOf(formData, "file").find((one) => (kind === "SCHEDULE" ? /\.(xlsx|csv|xer)$/i : /\.(xlsx|csv)$/i).test(one.name)) ?? null;
+  if (!file) return { error: kind === "SCHEDULE" ? "Choose the schedule as .xlsx, .csv or a P6 export (.xer)." : "Choose the list as .xlsx or .csv." };
   let summary = "";
   let registered: string[] = [];
   try {
@@ -62,8 +63,9 @@ export async function uploadLooseListAction(_prev: Result | undefined, formData:
   if (!mayUploadLists(ctx.user.verbs)) return { error: "Your function does not upload the schedule's lists. The control function, or a function given Plan, does." };
   const kind = String(formData.get("kind") ?? "") as PlanListKind;
   const reason = String(formData.get("reason") ?? "").trim();
-  const file = filesOf(formData, "file").find((one) => /\.(xlsx|csv)$/i.test(one.name)) ?? null;
-  if (!file) return { error: "Choose the list as .xlsx or .csv." };
+  // The schedule is read from a Primavera P6 export (.xer) too.
+  const file = filesOf(formData, "file").find((one) => (kind === "SCHEDULE" ? /\.(xlsx|csv|xer)$/i : /\.(xlsx|csv)$/i).test(one.name)) ?? null;
+  if (!file) return { error: kind === "SCHEDULE" ? "Choose the schedule as .xlsx, .csv or a P6 export (.xer)." : "Choose the list as .xlsx or .csv." };
   if (!reason) return { error: "Say why it is uploaded without a register document: it is kept with the upload." };
   let summary = "";
   let registered: string[] = [];

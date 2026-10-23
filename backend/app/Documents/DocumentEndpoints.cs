@@ -54,6 +54,7 @@ public static class DocumentEndpoints
         project.MapPost("/documents/{documentId:guid}/end", EndAsync);
         project.MapPost("/documents/{documentId:guid}/reinstate", ReinstateAsync);
         project.MapGet("/files/{fileId:guid}/download", DownloadAsync);
+        project.MapGet("/files/{fileId:guid}/workbook", WorkbookAsync);
     }
 
     /// <summary>
@@ -293,22 +294,8 @@ public static class DocumentEndpoints
         FileStorage storage, AuditLog audit, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!access.Holds(Verbs.Read)) return Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register.");
-        var file = await db.StoredFiles.AsNoTracking()
-            .SingleOrDefaultAsync(f => f.Id == fileId && f.ProjectId == access.Project.Id, cancellationToken);
-        // A file of a document is read by whoever reads the document; one that came on a transmittal and belongs to
-        // no document yet (an unplanned item, a covering letter), by whoever sees that transmittal.
-        var visible = file is not null && (file.DocumentId is { } documentId
-            ? await DocumentQueries.Visible(db, access)
-                .AnyAsync(d => d.Id == documentId, cancellationToken)
-            : await transmittals.Visible(access).AnyAsync(t => t.ProofFileId == file.Id
-                || t.Items.Any(i => i.Id == file.TransmittalItemId), cancellationToken));
-        if (file is null || !visible) return Problems.NotFound("FILE_NOT_FOUND", "No such file.");
-        if (file.Status != FileStatuses.Clean)
-        {
-            return Problems.Conflict("FILE_NOT_AVAILABLE", "The file can be downloaded only once it has passed scanning.",
-                new { status = file.Status });
-        }
+        var (file, refused) = await ReadableAsync(fileId, access, db, transmittals, cancellationToken);
+        if (file is null) return refused!;
 
         var (url, expires) = storage.PresignDownload(file.ObjectKey, file.Name);
         // Kept where the organization keeps reading (Settings.Tracking).
@@ -316,6 +303,47 @@ public static class DocumentEndpoints
             await audit.WriteAsync(http.User.Actor(), "DOWNLOAD", "StoredFile", file.Id, file.Name,
             projectId: access.Project.Id, cancellationToken: cancellationToken);
         return Results.Ok(new DownloadTicket(url, expires.ToDateTimeOffset()));
+    }
+
+    /// <summary>
+    /// The file this person may open, once it passed scanning, else why not. A file of a document is read by whoever
+    /// reads the document; one that came on a transmittal and belongs to no document yet (an unplanned item, a covering
+    /// letter), by whoever sees that transmittal.
+    /// </summary>
+    internal static async Task<(StoredFile? File, IResult? Refused)> ReadableAsync(Guid fileId, ProjectAccess access, DeliosDbContext db,
+        Transmittals.TransmittalService transmittals, CancellationToken cancellationToken)
+    {
+        if (!access.Holds(Verbs.Read)) return (null, Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register."));
+        var file = await db.StoredFiles.AsNoTracking()
+            .SingleOrDefaultAsync(f => f.Id == fileId && f.ProjectId == access.Project.Id, cancellationToken);
+        var visible = file is not null && (file.DocumentId is { } documentId
+            ? await DocumentQueries.Visible(db, access)
+                .AnyAsync(d => d.Id == documentId, cancellationToken)
+            : await transmittals.Visible(access).AnyAsync(t => t.ProofFileId == file.Id
+                || t.Items.Any(i => i.Id == file.TransmittalItemId), cancellationToken));
+        if (file is null || !visible) return (null, Problems.NotFound("FILE_NOT_FOUND", "No such file."));
+        if (file.Status != FileStatuses.Clean)
+            return (null, Problems.Conflict("FILE_NOT_AVAILABLE", "The file can be downloaded only once it has passed scanning.",
+                new { status = file.Status }));
+        return (file, null);
+    }
+
+    /// <summary>
+    /// <c>GET /files/{fileId}/workbook</c>: an Excel workbook (.xlsx, .xlsm) read for the screen (owner: "excel workbook
+    /// view"), every sheet as the text its cells show (<see cref="WorkbookView"/>). Nothing in it runs.
+    /// </summary>
+    private static async Task<IResult> WorkbookAsync(Guid fileId, HttpContext http, DeliosDbContext db, Transmittals.TransmittalService transmittals,
+        FileStorage storage, CancellationToken cancellationToken)
+    {
+        var (file, refused) = await ReadableAsync(fileId, ProjectAccessFilter.Of(http), db, transmittals, cancellationToken);
+        if (file is null) return refused!;
+        if (!WorkbookView.CanShow(file.Name))
+            return Problems.Invalid("NOT_A_WORKBOOK", $"{file.Name} is not an Excel workbook (.xlsx): download it to open it.");
+        if (file.Size > WorkbookView.MaxBytes)
+            return Problems.Invalid("WORKBOOK_TOO_LARGE", $"{file.Name} is larger than {WorkbookView.MaxBytes / 1024 / 1024} MB: download it to open it.");
+        await using var content = await storage.OpenReadAsync(file.ObjectKey, cancellationToken);
+        var (book, problem) = await WorkbookView.ReadAsync(content, cancellationToken);
+        return book is null ? Problems.Invalid("WORKBOOK_UNREADABLE", $"{file.Name}: {problem} Download it to open it.") : Results.Ok(book);
     }
 
     /// <summary>Turns a document entity (database row) into the shape the API returns.</summary>
