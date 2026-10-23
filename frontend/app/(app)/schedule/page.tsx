@@ -18,6 +18,10 @@ import { PlanPlate } from "@/app/(app)/actions/plan-plate";
 import { PlanTimeline } from "@/app/(app)/actions/plan-timeline";
 import { movedPhrase } from "@/app/(app)/actions/moved";
 import { PlanRegister, type PlanTableRow } from "@/app/(app)/actions/plan-register";
+import { cookies } from "next/headers";
+import { PREF, calendarDay } from "@/lib/core/preferences";
+import { MonthsCalendar } from "@/components/calendar";
+import { projectCalendar } from "@/lib/settings/calendar";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Schedule" };
@@ -77,7 +81,8 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const ctx = await requireScope();
   // Everyone reads this page; the backend narrows another organization's to the actions needing its documents.
   const sp = await searchParams;
-  const view = sp.view === "table" ? "table" : "plan";
+  // Three views of one answer (owner): the calendar, the plan (in the middle, the one shown first) and the table.
+  const view = sp.view === "table" ? "table" : sp.view === "calendar" ? "calendar" : "plan";
 
   const q = (sp.q ?? "").trim().slice(0, 200);
   const searches = readSearch(q);
@@ -250,7 +255,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const query = new URLSearchParams();
   // Which view is being read is part of the question: paging, sorting and
   // changing the row count must not drop somebody back onto the plan.
-  if (view === "table") query.set("view", "table");
+  if (view !== "plan") query.set("view", view);
   if (sp.all === "1" && view === "plan") query.set("all", "1");
   if (q) query.set("q", q);
   if (code) query.set("code", code);
@@ -273,7 +278,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     const params = new URLSearchParams(query);
     params.delete(key);
     if (key === "on") { params.delete("from"); params.delete("to"); }
-    if (view === "table") params.set("view", "table");
+    if (view !== "plan") params.set("view", view);
     params.delete("page");
     return `/schedule${params.size ? `?${params}` : ""}`;
   };
@@ -331,6 +336,11 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
 
   // Every set's values under its name (owner), and the filters this person keeps shown.
   const inSets = await setGrouping(ctx);
+  // The calendar draws the actions the filters leave (the backend already narrowed another organization's), on the
+  // project's months, with its days off; the days off are kept in Settings → Calendar.
+  const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+  const calendar = view === "calendar" ? await projectCalendar(ctx) : null;
+  const jar = await cookies();
   const shownFilters = await keptFilters("schedule", ["code", "state", "happened", "discipline", "docType", "supplier", "date"]);
   return (
     <div>
@@ -369,6 +379,11 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
             fit={PLAN_FIRST}
           />
         }
+        calendar={calendar ? (
+          <MonthsCalendar daySize={calendarDay(jar.get(PREF.calendarDay)?.value)} namesShown={jar.get(PREF.calendarNames)?.value !== "0"}
+            from={calendar.from} to={calendar.to} weekend={calendar.place.weekendDays} today={calendar.today} daysOff={calendar.daysOff}
+            actions={found.map((a) => ({ code: a.code, name: a.name, start: day(a.start), finish: day(a.finish) }))} />
+        ) : null}
         rows={tableRows}
         total={matching}
         filters={{ q, state, happened, discipline, docType, supplier, code, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }}

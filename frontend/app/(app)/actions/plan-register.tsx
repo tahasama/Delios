@@ -5,7 +5,7 @@ import Link from "next/link";
 import { TONE } from "./plan-timeline";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarDays, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { DateWindow } from "@/components/date-window";
 import { FilterMenu } from "@/components/filter-menu";
@@ -60,15 +60,17 @@ const FILTERS = [
 ];
 
 export function PlanRegister({
-  plate, uploads, view, plan, cardHeight, more, rows, total, filters, filterOptions, facets, paging, sort, exportHref, shownFilters,
+  plate, uploads, view, plan, calendar, cardHeight, more, rows, total, filters, filterOptions, facets, paging, sort, exportHref, shownFilters,
 }: {
   /** The filters this person keeps shown (Filters menu); one holding a value always shows. None kept: all. */
   shownFilters?: string[];
   plate: React.ReactNode;
   /** Where the dates come from, the pages behind the schedule, and uploading by hand for whoever plans. */
   uploads: React.ReactNode;
-  /** Which of the two views is showing. */
-  view: "plan" | "table";
+  /** Which of the three views is showing: the calendar, the plan (the first shown) or the table. */
+  view: "calendar" | "plan" | "table";
+  /** The calendar, drawn by the server component when it is the view shown. */
+  calendar?: React.ReactNode;
   /** The plan, drawn by the server component, shown under the question. */
   plan: React.ReactNode;
   /**
@@ -209,9 +211,9 @@ export function PlanRegister({
     params.delete("page");
     return here(params);
   };
-  const viewHref = (next: "plan" | "table") => {
+  const viewHref = (next: "calendar" | "plan" | "table") => {
     const params = new URLSearchParams(paging.query);
-    if (next === "table") params.set("view", "table");
+    if (next !== "plan") params.set("view", next);
     else params.delete("view");
     params.delete("page");
     return here(params);
@@ -255,7 +257,7 @@ export function PlanRegister({
           setDirty(false);
           const data = new FormData(event.currentTarget);
           const params = new URLSearchParams();
-          if (view === "table") params.set("view", "table");
+          if (view !== "plan") params.set("view", view);
           for (const [key, value] of data.entries()) if (value) params.set(key, String(value));
           go(here(params));
         }}
@@ -296,8 +298,9 @@ export function PlanRegister({
     {/* The two views stand on their own between the question and the answer.
         One frame, split down the middle: the chosen side is the lit one, and
         the other is drawn as the control it is rather than left as plain text. */}
-    <nav ref={tabs} className="mb-4 grid grid-cols-2 space overflow-hidden rounded-xl border border-line bg-surface" aria-label="How to look at the schedule">
+    <nav ref={tabs} className="mb-4 grid grid-cols-3 space overflow-hidden rounded-xl border border-line bg-surface" aria-label="How to look at the schedule">
       {([
+        { id: "calendar", label: "The calendar", hint: "month by month", icon: CalendarDays },
         { id: "plan", label: "The plan", hint: "drawn on a timeline", icon: CalendarRange },
         { id: "table", label: "The table", hint: "one line per action", icon: Rows3 },
       ] as const).map((tab, at) => {
@@ -309,7 +312,7 @@ export function PlanRegister({
             scroll={false}
             aria-current={on ? "page" : undefined}
             className={`group flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition ${
-              at === 0 ? "border-r border-line" : ""
+              at < 2 ? "border-r border-line" : ""
             } ${
               on
                 ? "bg-surface text-brand-ink shadow-[inset_0_-3px_0_0_var(--color-brand)]"
@@ -331,7 +334,7 @@ export function PlanRegister({
       ref={card}
       data-dt-frame
       className="register register-sheet flex flex-col"
-      style={{ height: fit }}
+      style={view === "calendar" ? undefined : { height: fit }}
     >
       {facets.length ? (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
@@ -345,7 +348,7 @@ export function PlanRegister({
           ))}
           <button
             type="button"
-            onClick={() => go(view === "table" ? "/schedule?view=table" : "/schedule")}
+            onClick={() => go(view === "plan" ? "/schedule" : `/schedule?view=${view}`)}
             className="ml-1 inline-flex items-center gap-1 rounded-sm bg-brand px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-brand-hover"
           >
             <X className="h-3 w-3" /> Clear all {facets.length}
@@ -354,7 +357,9 @@ export function PlanRegister({
         </div>
       ) : null}
 
-      {view === "plan" ? (
+      {view === "calendar" ? (
+        <div className={`px-5 py-4 sm:px-6 ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>{calendar}</div>
+      ) : view === "plan" ? (
         <div className={`flex min-h-0 flex-1 flex-col ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
           {/* What the plan covers, and what its colours mean: the two things a
               reader needs before the bars, at the two corners above them. */}

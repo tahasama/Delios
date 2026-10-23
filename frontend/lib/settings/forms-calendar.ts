@@ -12,7 +12,7 @@ const failed = (e: unknown): Result => refusalForForm(e);
 function refresh() {
   revalidatePath("/organization/settings/calendar");
   revalidatePath("/settings/calendar");
-  revalidatePath("/calendar");
+  revalidatePath("/schedule");
 }
 
 /** Claims a day: the organization's public holiday (with its country, or every country), or the project's own day off. */
