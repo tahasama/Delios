@@ -1403,8 +1403,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   "… A"). Achieved is the planner's word on the work, never ours on its documents ("achieved does not necessarily mean
   our done"): it changes no state, readiness or "Went ahead?", and reads "A" beside the date (plan, table, action page,
   "as the planner says"). Where the schedule has a WBS, the plan and the table follow the planner's order (sort `wbs`),
-  each WBS level written above its actions, indented, the bars as they are. Each plan row: our number, the planner's ID
-  beside it, the title under. The plan opens a month either side of today, today held inside the schedule's own span
+  each WBS level a band across the plan (owner: the P6 preview's look, "cleaner"; its code, name and how many actions it
+  holds, folded open or shut), indented, the bars as they are. Each plan row: our number, the planner's ID beside it,
+  muted, the title under; the names take 16rem and the bars the rest (owner: "give enough space for the bars"). An
+  action read before its WBS was kept has none until the schedule is read again. The plan opens a month either side of today, today held inside the schedule's own span
   (a schedule over opens on its last days, one not begun on its first; owner: "point at last month"), says "the schedule
   runs <first month> → <last month>", and draws today only when inside; a read says its months too. The calendar tab
   opens the same way. The Schedule's heading says the days around an action in force (a document needed N days before

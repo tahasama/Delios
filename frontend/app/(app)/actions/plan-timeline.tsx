@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { fmtDate } from "@/lib/core/utils";
 
@@ -78,6 +82,9 @@ export function PlanTimeline({ rows, window, fit }: {
    */
   fit?: number;
 }) {
+  // WBS bands folded shut by the reader (owner: as the P6 preview reads), by their path.
+  const [shut, setShut] = useState<Set<string>>(new Set());
+  const toggle = (key: string) => setShut((was) => { const now = new Set(was); if (now.has(key)) now.delete(key); else now.add(key); return now; });
   const dated = rows.filter((r) => r.start);
   // Every action here lacks a date: there is nothing to draw, and that is said.
   if (!dated.length) {
@@ -121,7 +128,7 @@ export function PlanTimeline({ rows, window, fit }: {
           drawn in — the names take 200px and the gap 8px on the left, the ready
           count 56px and its gap on the right. Any other figure and the dates
           line up with nothing. */}
-      <div className="relative ml-52 mr-16 h-4">
+      <div className="relative ml-66 mr-16 h-4">
         {ticks.map((t, index) => (
           <span key={`${index}-${t.label}`} className="absolute top-0 whitespace-nowrap text-[10px] leading-none text-slate-500" style={{ left: `${t.left}%`, marginLeft: "0.25rem" }}>
             {t.label}
@@ -145,7 +152,7 @@ export function PlanTimeline({ rows, window, fit }: {
             box is as tall as every bar there is, so today's line reaches the
             last one however far down it was loaded. */}
         <div className="relative min-h-full">
-          <div className="pointer-events-none absolute inset-y-0 left-52 right-16">
+          <div className="pointer-events-none absolute inset-y-0 left-66 right-16">
             {/* Each month a column, every other one lightly shaded, a plain line between them (owner: a planner's chart). */}
             {ticks.map((t, index) => {
               const next = ticks[index + 1]?.left ?? 100;
@@ -158,12 +165,16 @@ export function PlanTimeline({ rows, window, fit }: {
           </div>
           <ul className="relative pt-1">
           {dated.map((r, index) => {
-            // The planner's WBS, as P6 lays it out (owner: "keep the category/sub"): each level that changes from the
-            // row before is written above it, indented by its depth; the bars stay as they are.
+            // The planner's WBS, as P6 lays it out (owner: "keep the category/sub", the preview's look): each level that
+            // changes from the row before opens a band across the plan, its code, name and how many actions it holds,
+            // folded open or shut; the bars stay as they are.
             const before = index > 0 ? dated[index - 1].wbs ?? [] : [];
             const path = r.wbs ?? [];
             const same = path.findIndex((part, depth) => before[depth] !== part);
-            const heads = same < 0 ? [] : path.slice(same).map((part, i) => ({ part, depth: same + i }));
+            const keyOf = (depth: number) => path.slice(0, depth + 1).join("\u0001");
+            const hiddenAt = (depth: number) => path.slice(0, depth).some((_, d) => shut.has(keyOf(d)));
+            const heads = same < 0 ? [] : path.slice(same).map((part, i) => ({ part, depth: same + i })).filter((h) => !hiddenAt(h.depth));
+            const hidden = path.some((_, d) => shut.has(keyOf(d)));
             const start = (r.firstNeeded ?? r.start!).getTime();
             const end = r.start!.getTime();
             // A bar that starts before the window is drawn from its edge, not
@@ -175,21 +186,34 @@ export function PlanTimeline({ rows, window, fit }: {
             const fromBefore = rawLeft < 0;
             return (
               <li key={r.code}>
-                {heads.map((h) => (
-                  <p key={`${h.depth}-${h.part}`} className="truncate border-b border-line/60 bg-tint-soft/80 py-1 pr-2 text-[11px] font-semibold text-slate-700"
-                    style={{ paddingLeft: 4 + h.depth * 12 }} title={h.part}>{h.part}</p>
-                ))}
-                <div className="flex items-center gap-2 border-b border-line/60 py-1">
+                {heads.map((h) => {
+                  const key = keyOf(h.depth);
+                  const space = h.part.indexOf(" ");
+                  const [code, title] = space > 0 ? [h.part.slice(0, space), h.part.slice(space + 1)] : ["", h.part];
+                  const count = dated.filter((one) => (one.wbs ?? []).slice(0, h.depth + 1).join("\u0001") === key).length;
+                  return (
+                    <button key={key} type="button" onClick={() => toggle(key)} aria-expanded={!shut.has(key)} title={h.part}
+                      className="relative flex w-full items-center gap-1.5 border-b border-line bg-tint-soft py-1.5 pr-2 text-left text-xs hover:bg-tint"
+                      style={{ paddingLeft: 4 + h.depth * 14 }}>
+                      {shut.has(key) ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-500" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-500" />}
+                      {code ? <span className="shrink-0 font-mono text-[11px] font-semibold text-slate-500">{code}</span> : null}
+                      <span className="truncate font-semibold text-slate-800">{title}</span>
+                      <span className="shrink-0 text-[11px] text-slate-500">{count}</span>
+                    </button>
+                  );
+                })}
+                {hidden ? null : (
+                <div className="flex items-center gap-2 border-b border-line/60 py-1.5">
                 {/* Our number, the planner's ID beside it, the action's title under them (owner). */}
-                <Link href={`/actions/${r.code}`} className="w-50 shrink-0 text-xs leading-tight text-slate-600 hover:text-link"
-                  style={{ paddingLeft: path.length ? Math.min(path.length, 4) * 6 : 0 }}
+                <Link href={`/actions/${r.code}`} className="group w-64 shrink-0 text-xs leading-tight text-slate-800"
+                  style={{ paddingLeft: path.length ? 4 + Math.min(path.length, 5) * 14 : 0 }}
                   title={`${r.code}${r.plannerId ? ` · ${r.plannerId}` : ""} — ${r.name}${r.moved ? `\n${r.moved}` : ""}`}>
-                  <span className="flex items-center gap-1.5 truncate">
-                    <span className="font-mono font-semibold text-slate-700">{r.code}</span>
-                    {r.plannerId ? <span className="truncate font-mono text-[11px] text-slate-500">{r.plannerId}</span> : null}
-                    {r.moved ? <span className="stamp text-amber-700">moved</span> : null}
+                  <span className="flex items-center gap-1.5 truncate font-mono text-[11px] text-slate-500">
+                    <span className="font-semibold text-slate-600">{r.code}</span>
+                    {r.plannerId ? <span className="truncate">{r.plannerId}</span> : null}
+                    {r.moved ? <span className="stamp font-sans text-amber-700">moved</span> : null}
                   </span>
-                  <span className="block truncate">{r.name}</span>
+                  <span className="block truncate group-hover:text-link">{r.name}</span>
                 </Link>
                 <span className="relative h-5 flex-1">
                   {/* The lead-in, lighter; the work, solid; a day of work with no finish, a diamond (as a milestone is drawn). */}
@@ -239,6 +263,7 @@ export function PlanTimeline({ rows, window, fit }: {
                 </span>
                 <span className="w-14 shrink-0 text-right text-[11px] tabular-nums text-slate-500">{r.total ? `${r.ready}/${r.total}` : "—"}</span>
                 </div>
+                )}
               </li>
             );
           })}
