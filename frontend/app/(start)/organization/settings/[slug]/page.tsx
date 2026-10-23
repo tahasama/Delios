@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { ProjectSwitches } from "../switches";
 import { orgCard } from "../cards";
 
@@ -16,7 +16,7 @@ export default async function OrganizationCardPage({ params }: { params: Promise
   const card = orgCard(slug);
   if (!card) notFound();
   const scope = await requireOrgAdmin();
-  const switches = (await liberty()).filter((one) => one.area === card.area);
+  const switches = (await libertyOrFail()).filter((one) => one.area === card.area);
 
   return (
     <>

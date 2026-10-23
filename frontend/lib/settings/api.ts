@@ -11,8 +11,11 @@ export const projectSettings = cache(async (projectId: string): Promise<Map<stri
 });
 
 /** The organization's own answers (what states are called…), read once a request. */
-export const orgSettings = cache(async (): Promise<Map<string, string>> => {
-  const rows = await api<SettingRow[]>("/api/settings").catch(() => [] as SettingRow[]);
+export const orgSettings = cache(async (): Promise<Map<string, string>> => orgSettingsOrFail().catch(() => new Map<string, string>()));
+
+/** The same, throwing when the read fails: where "nothing set" would be read as a fact (the organization's Settings). */
+export const orgSettingsOrFail = cache(async (): Promise<Map<string, string>> => {
+  const rows = await api<SettingRow[]>("/api/settings");
   return new Map(rows.map((row) => [row.key, row.value]));
 });
 

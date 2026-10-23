@@ -3,7 +3,7 @@ import { keptCopies } from "@/lib/settings/api-admin";
 import { KeptCopies } from "../copies";
 import { ActionForm } from "@/components/form";
 import { inputCls } from "@/components/ui";
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { listCopies } from "@/lib/settings/api-admin";
 import { organizationSets } from "@/lib/settings/config";
 import { resetListAction } from "@/lib/organization/forms";
@@ -20,7 +20,7 @@ export const metadata = { title: "Types & sets" };
  */
 export default async function OrganizationTypesPage({ searchParams }: { searchParams: Promise<Params> }) {
   const sp = await searchParams;
-  const [switches, copies, sets] = await Promise.all([liberty(), listCopies(), organizationSets()]);
+  const [switches, copies, sets] = await Promise.all([libertyOrFail(), listCopies(), organizationSets()]);
   const titleOf = (key: string) => sets.find((one) => one.key === key)?.title ?? key;
 
   return (

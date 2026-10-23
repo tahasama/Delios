@@ -2,7 +2,7 @@ import { keptCopies } from "@/lib/settings/api-admin";
 import Link from "next/link";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { routeCopies } from "@/lib/settings/api-admin";
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { RoutesBoard } from "@/app/(app)/settings/workflow-templates/routes-board";
 import { ProjectCopies, KeptCopies } from "../copies";
 import { ProjectSwitches } from "../switches";
@@ -18,7 +18,7 @@ export const metadata = { title: "Review routes" };
 export default async function OrganizationRoutesPage({ searchParams }: { searchParams: Promise<{ edit?: string; new?: string }> }) {
   const params = await searchParams;
   const scope = await requireOrgAdmin();
-  const [switches, copies] = await Promise.all([liberty(), routeCopies()]);
+  const [switches, copies] = await Promise.all([libertyOrFail(), routeCopies()]);
   return (
     <>
         <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">

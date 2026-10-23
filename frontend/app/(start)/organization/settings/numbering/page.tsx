@@ -4,7 +4,7 @@ import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { organizationSets, getActiveSet, SET_KEY } from "@/lib/settings/config";
 import { orgSettings } from "@/lib/settings/api";
 import { numberingForEditor, numberingCopies, NUMBERING_SETS } from "@/lib/settings/api-admin";
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { NumberingBoard } from "@/app/(app)/settings/numbering/board";
 import { ProjectCopies, KeptCopies } from "../copies";
 import { ProjectSwitches } from "../switches";
@@ -21,7 +21,7 @@ export default async function OrganizationNumberingPage({ searchParams }: { sear
   const scope = await requireOrgAdmin();
   const params = await searchParams;
   const [numbering, all, settings, deliverables, switches, copies] = await Promise.all([
-    numberingForEditor("organization"), organizationSets(), orgSettings(), getActiveSet("DELIVERABLE_TYPES"), liberty(), numberingCopies(),
+    numberingForEditor("organization"), organizationSets(), orgSettings(), getActiveSet("DELIVERABLE_TYPES"), libertyOrFail(), numberingCopies(),
   ]);
   // A part reads one of the app's numbering lists, or one of the organization's own lists in Numbering & identity:
   // a list one project made alone cannot build every project's numbers.

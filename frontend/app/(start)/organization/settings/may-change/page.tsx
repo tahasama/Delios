@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { ProjectSwitches } from "../switches";
 import { ORG_CARDS } from "../cards";
 
@@ -14,7 +14,7 @@ export const metadata = { title: "What projects may change" };
  */
 export default async function MayChangePage() {
   const scope = await requireOrgAdmin();
-  const switches = await liberty();
+  const switches = await libertyOrFail();
   const areas = [...new Set(switches.map((one) => one.area))];
   const free = switches.filter((one) => one.free).length;
   const cardOf = (area: string) => ORG_CARDS.find((card) => card.area === area);

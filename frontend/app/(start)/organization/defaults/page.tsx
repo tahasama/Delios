@@ -20,7 +20,7 @@ export const metadata = { title: "Defaults for new projects" };
  */
 export default async function DefaultsPage() {
   await requireOrgAdmin();
-  const [defaults, projects] = await Promise.all([projectDefaults(), adminProjects().catch(() => [])]);
+  const [defaults, projects] = await Promise.all([projectDefaults({ orFail: true }), adminProjects().catch(() => [])]);
   const answers = new Map(Object.entries(defaults?.values ?? {}));
   const source = defaults
     ? defaults.fromProject ? `Taken from ${defaults.fromProject}${defaults.edited ? ", then changed here" : ""}` : "Set here"

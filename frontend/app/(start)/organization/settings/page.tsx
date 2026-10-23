@@ -2,9 +2,9 @@ import Link from "next/link";
 import { ArrowRight, BadgeCheck, FileClock, Route, SlidersHorizontal, Tags, ToggleRight } from "lucide-react";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { Chip } from "@/components/ui";
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { projectDefaults } from "@/lib/organization/defaults";
-import { numberingCopies, revisionCopies, routeCopies, listCopies, formCopies } from "@/lib/settings/api-admin";
+import { numberingCopies, revisionCopies, routeCopies, listCopies, formCopies, functionCopies } from "@/lib/settings/api-admin";
 import { SETUP_PAGES, SETUP_GROUPS } from "@/app/(app)/settings/setup-pages";
 import { SETUP_ICON } from "@/app/(app)/settings/icons";
 import { fmtDate } from "@/lib/core/utils";
@@ -22,21 +22,25 @@ export const metadata = { title: "The organization's Settings" };
  */
 export default async function OrganizationSettingsPage() {
   const scope = await requireOrgAdmin();
-  const [switches, defaults, numbering, revisions, routes, lists, forms] = await Promise.all([
-    liberty(), projectDefaults(), numberingCopies(), revisionCopies(), routeCopies(), listCopies(), formCopies(),
+  const [switches, defaults, numbering, revisions, routes, lists, forms, functions] = await Promise.all([
+    libertyOrFail(), projectDefaults({ orFail: true }), numberingCopies(), revisionCopies(), routeCopies(), listCopies(), formCopies(), functionCopies(),
   ]);
   const free = switches.filter((one) => one.free).length;
-  const copies = new Map([["Numbering", numbering.length], ["Revisions", revisions.length], ["Review routes", routes.length], ["Types & sets", lists.length], ["Forms & fields", forms.length]]);
-  const ownCopies = [...copies.values()].reduce((a, b) => a + b, 0);
+  const byCard: [string, { id: string }[]][] = [["Numbering", numbering], ["Revisions", revisions], ["Review routes", routes], ["Types & sets", lists], ["Forms & fields", forms], ["Functions & permissions", functions]];
+  const copies = new Map(byCard.map(([area, rows]) => [area, rows.length]));
+  // Each project once, whatever number of cards it keeps its own copy of.
+  const ownProjects = new Set(byCard.flatMap(([, rows]) => rows.map((row) => row.id))).size;
+  const ownCards = byCard.filter(([, rows]) => rows.length).length;
+  const settings = (n: number) => `${n} ${n === 1 ? "setting" : "settings"}`;
   const said = (area?: string): { text: string; free: boolean } | null => {
     if (!area) return null;
     const items = switches.filter((one) => one.area === area);
     if (!items.length) return null;
     const n = items.filter((one) => one.free).length;
-    const own = copies.get(area) ? ` · ${copies.get(area)} with their own` : "";
+    const own = copies.get(area) ? ` · ${copies.get(area)} ${copies.get(area) === 1 ? "project has" : "projects have"} their own` : "";
     if (items.length === 1) return { text: (items[0].free ? "Free · projects may change it" : "Fixed · the same on every project") + own, free: items[0].free };
     return {
-      text: (n === 0 ? `Fixed · all ${items.length}` : n === items.length ? `Free · all ${items.length}` : `${n} free · ${items.length - n} fixed`) + own,
+      text: (n === 0 ? `Fixed · all ${items.length} switches` : n === items.length ? `Free · all ${items.length} switches` : `${n} switches free · ${items.length - n} fixed`) + own,
       free: n > 0,
     };
   };
@@ -60,18 +64,20 @@ export default async function OrganizationSettingsPage() {
         <dl className="grid grid-cols-1 divide-y divide-line border-t border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           <div className="px-5 py-3 sm:px-6">
             <dt className="stencil text-slate-500">Fixed</dt>
-            <dd className="mt-1 text-[13px] font-medium text-slate-900">{switches.length - free} settings</dd>
+            <dd className="mt-1 text-[13px] font-medium text-slate-900">{settings(switches.length - free)}</dd>
             <dd className="text-[11px] text-slate-500">every project uses ours as it is</dd>
           </div>
           <div className="px-5 py-3 sm:px-6">
             <dt className="stencil text-slate-500">Free</dt>
-            <dd className="mt-1 text-[13px] font-medium text-slate-900">{free} settings</dd>
+            <dd className="mt-1 text-[13px] font-medium text-slate-900">{settings(free)}</dd>
             <dd className="text-[11px] text-slate-500">a project may take its own copy</dd>
           </div>
           <div className="px-5 py-3 sm:px-6">
             <dt className="stencil text-slate-500">Their own copy</dt>
-            <dd className="mt-1 text-[13px] font-medium text-slate-900">{ownCopies ? `${ownCopies} on projects` : "None"}</dd>
-            <dd className="text-[11px] text-slate-500">{ownCopies ? "listed on each card; changes here never touch them" : "every project uses ours"}</dd>
+            <dd className="mt-1 text-[13px] font-medium text-slate-900">
+              {ownProjects ? `${ownProjects} ${ownProjects === 1 ? "project" : "projects"}, on ${ownCards} ${ownCards === 1 ? "card" : "cards"}` : "None"}
+            </dd>
+            <dd className="text-[11px] text-slate-500">{ownProjects ? "listed on each card; changes here never touch them" : "every project uses ours"}</dd>
           </div>
         </dl>
       </header>
@@ -143,7 +149,7 @@ export default async function OrganizationSettingsPage() {
                           <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-500 transition group-hover:text-link" aria-hidden="true" />
                         </span>
                         <span className="mt-0.5 block text-xs leading-[1.45] text-slate-600">{card.text}</span>
-                        <Chip className="mt-2 bg-slate-100 text-slate-600 ring-slate-200">
+                        <Chip className="mt-2 whitespace-normal bg-slate-100 text-slate-600 ring-slate-200">
                           {card.project === "defaults"
                             ? defaults ? (defaults.fromProject ? `Taken from ${defaults.fromProject}` : `Changed ${fmtDate(defaults.at)}`) : "The app's own"
                             : card.project === "may-change" ? `${switches.length - free} fixed · ${free} free`

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { orgSettings } from "@/lib/settings/api";
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { projectDefaults } from "@/lib/organization/defaults";
 import { setRoomAnswerAction } from "@/lib/settings/forms-how-it-works";
 import { controlFrom, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES, SKIPPABLE, CONFIRMABLE, PEOPLE_KEY, PEOPLE_MODE_LABEL, roomItemOf } from "@/lib/settings/control-activities";
@@ -54,8 +54,8 @@ const SWITCH_OF: Record<string, string> = { DAYS: "RISK_WINDOW", INTAKE: "SUPPLI
 export default async function OrganizationControlRoomPage() {
   const scope = await requireOrgAdmin();
   const [defaults, switches, organization, names] = await Promise.all([
-    projectDefaults().catch(() => null),
-    liberty(),
+    projectDefaults({ orFail: true }),
+    libertyOrFail(),
     orgSettings().catch(() => new Map<string, string>()),
     stateNames(),
   ]);

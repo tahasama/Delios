@@ -12,7 +12,11 @@ export type LibertyItem = {
   changedAt: string | null; changedBy: string | null; locked: string | null;
 };
 
-export const liberty = cache(async (): Promise<LibertyItem[]> => api<LibertyItem[]>("/api/liberty").catch(() => []));
+/** Where every switch stands; a failed read throws, so the organization's Settings never read it as "nothing". */
+export const libertyOrFail = cache(async (): Promise<LibertyItem[]> => api<LibertyItem[]>("/api/liberty"));
+
+/** The same, read as "nothing" when it fails: for pages where a switch only narrows what is offered. */
+export const liberty = cache(async (): Promise<LibertyItem[]> => libertyOrFail().catch(() => []));
 
 /** Whether a project may change this setting (`NUMBERING`, `LIST:<key>`…). Unknown: free, as the backend reads it. */
 export async function isFree(key: string): Promise<boolean> {

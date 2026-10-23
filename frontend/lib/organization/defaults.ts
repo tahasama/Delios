@@ -1,5 +1,5 @@
 import "server-only";
-import { orgSettings, projectSettings, setProjectSetting } from "@/lib/settings/api";
+import { orgSettings, orgSettingsOrFail, projectSettings, setProjectSetting } from "@/lib/settings/api";
 
 /**
  * The configuration a new project of ours starts with (docs/ORGANIZATIONS.md, "Defaults"): who does what and how
@@ -15,8 +15,9 @@ export type ProjectDefaults = { fromProject: string | null; edited?: boolean; at
 /** What belongs to one project only, never a default: what it is, and checks ticked off on it. */
 export const isProjectOwn = (key: string) => key === "PROJECT_INFO" || key.startsWith("CHECK_OFF:");
 
-export async function projectDefaults(): Promise<ProjectDefaults | null> {
-  const raw = (await orgSettings()).get(DEFAULTS_KEY);
+/** Null: none set. With `orFail`, a failed read throws instead of reading as "none set". */
+export async function projectDefaults({ orFail = false } = {}): Promise<ProjectDefaults | null> {
+  const raw = (await (orFail ? orgSettingsOrFail() : orgSettings())).get(DEFAULTS_KEY);
   if (!raw) return null;
   try { return JSON.parse(raw) as ProjectDefaults; } catch { return null; }
 }

@@ -1,4 +1,4 @@
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { functionCopies, keptCopies } from "@/lib/settings/api-admin";
 import { FunctionsBoard } from "@/app/(app)/settings/functions/board";
 import { ProjectSwitches } from "../switches";
@@ -14,7 +14,7 @@ export const metadata = { title: "Functions & permissions" };
  */
 export default async function OrganizationFunctionsPage({ searchParams }: { searchParams: Promise<{ open?: string; new?: string }> }) {
   const { open, new: adding } = await searchParams;
-  const [switches, copies, kept] = await Promise.all([liberty(), functionCopies(), keptCopies("FUNCTIONS")]);
+  const [switches, copies, kept] = await Promise.all([libertyOrFail(), functionCopies(), keptCopies("FUNCTIONS")]);
   return (
     <>
       <FunctionsBoard level="organization" open={open} adding={adding === "1"} />

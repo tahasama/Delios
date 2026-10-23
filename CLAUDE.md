@@ -49,7 +49,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the organization's Settings; in a project's Settings they act as that project's admin (the control function's
   rights), nothing more, and nothing there changes the organization's. Each card of the organization's Settings carries
   its switch on the page itself (`ProjectSwitches`; backend `Settings/Liberty.cs`, `LIBERTY:<key>`; the separate
-  page `/organization/liberty` only redirects), and lists the projects with their own copy (`ProjectCopies`): there,
+  page `/organization/liberty` only redirects; pressed, a switch asks first, "From now on… Instead of…", as the Control
+  room's answers, `LibertyRow`, and a refusal is said under it), and lists the projects with their own copy (`ProjectCopies`): there,
   and only there, one may be put back to the organization's, for a mess, always with why, logged (SETTING_RESET), the
   project's control function told. No reset inside a project, ever. **What a project changed is never overridden by the
   organization** (owner): a switch made Fixed later leaves it as it is; only that reset touches it. **A reset keeps a
@@ -810,6 +811,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Document Control keeps it) are the project's. Who answers is optional and never blocks a save. Its code, name and
   how it works with us change once each (above). An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
+- **A failed read is never read as "nothing"** (owner, after the critique): on the organization's pages, where every
+  switch stands, the projects keeping their own copy and the defaults are read with `libertyOrFail`,
+  `orgSettingsOrFail` / `projectDefaults({ orFail: true })` and the copies readers, which throw; the page then says it
+  could not be read (`organization/error.tsx`), never "0 fixed", "None" or "the app's own". "Their own copy" counts each
+  project once, functions included ("3 projects, on 5 cards").
 - Layered settings: built as the two levels above (the switches). Being moved onto them card by card: the switches
   and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (done, per list), Forms & fields (done, per form), Functions & permissions (done, owner: "we should be able to change functions on a
   project level": the functions themselves, name, code, clearance, in use, are the organization's, created and changed on

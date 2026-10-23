@@ -322,7 +322,7 @@ export const projectRoutes = cache(async () => {
 
 /** The projects offering their own copy of the review routes, since when and by whom. */
 export const routeCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/routes/projects").catch(() => []));
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/routes/projects"));
 
 export async function routesForEditor(level: "organization" | "project" = "project") {
   const [routes, parties] = await Promise.all([level === "organization" ? adminRoutes() : projectRoutes().then((p) => p.routes), adminParties()]);
@@ -447,7 +447,7 @@ export async function scopeConfig(projectId?: string): Promise<ScopeConfig> {
 
 /** The projects numbering by their own copy (where numbering was free for projects), since when and by whom. */
 export const numberingCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/numbering/projects").catch(() => []));
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/numbering/projects"));
 
 /** The revision naming a project uses (its own copy, else the organization's), whether it is free for projects, and who may change it here. */
 type ProjectRevisions = Pick<AdminNumbering, "revisionSchemes" | "revisionRouting"> & { own: boolean; free: boolean; mayChange: boolean; mayChangeOrganization: boolean };
@@ -458,15 +458,15 @@ export const projectRevisions = cache(async () => {
 
 /** The projects naming revisions by their own copy, since when and by whom. */
 export const revisionCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/revisions/projects").catch(() => []));
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/revisions/projects"));
 
 /** The projects keeping their own copy of lists (the organization's Types & sets card), and which. */
 export const listCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; lists: string[] }[]>("/api/admin/lists/projects").catch(() => []));
+  api<{ id: string; code: string; name: string; lists: string[] }[]>("/api/admin/lists/projects"));
 
 /** The projects keeping their own copy of forms (the organization's Forms & fields card), and which. */
 export const formCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; forms: string[] }[]>("/api/admin/forms/projects").catch(() => []));
+  api<{ id: string; code: string; name: string; forms: string[] }[]>("/api/admin/forms/projects"));
 
 /** A project's own copy kept when it was put back to the organization's (backend `KeptCopies`). */
 export type KeptCopy = {
@@ -476,7 +476,7 @@ export type KeptCopy = {
 
 /** The kept copies of one card ("NUMBERING", "REVISIONS", "ROUTES"; "LIST:" or "FORM:" for every list or form). */
 export const keptCopies = cache(async (kind: string) =>
-  api<KeptCopy[]>("/api/admin/kept-copies", { query: { kind } }).catch(() => [] as KeptCopy[]));
+  api<KeptCopy[]>("/api/admin/kept-copies", { query: { kind } }));
 
 /** What each function may do on a project (its own copy where it keeps one), as the matrix reads it, with who may change it. */
 export async function projectFunctionsForMatrix(scope: { projectId: string }) {
@@ -486,4 +486,4 @@ export async function projectFunctionsForMatrix(scope: { projectId: string }) {
 
 /** The projects keeping their own rights. */
 export const functionCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/functions/projects").catch(() => []));
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/functions/projects"));

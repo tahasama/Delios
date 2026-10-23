@@ -3,7 +3,7 @@ import { keptCopies } from "@/lib/settings/api-admin";
 import { KeptCopies } from "../copies";
 import { ActionForm } from "@/components/form";
 import { inputCls } from "@/components/ui";
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { formCopies } from "@/lib/settings/api-admin";
 import { KIND_TAB, type FieldKind } from "@/lib/settings/field-policy";
 import { resetFormAction } from "@/lib/organization/forms";
@@ -21,7 +21,7 @@ export const metadata = { title: "Forms & fields" };
  */
 export default async function OrganizationFieldsPage({ searchParams }: { searchParams: Promise<Params> }) {
   const sp = await searchParams;
-  const [switches, copies] = await Promise.all([liberty(), formCopies()]);
+  const [switches, copies] = await Promise.all([libertyOrFail(), formCopies()]);
   const nameOf = (form: string) => KIND_TAB[form as FieldKind] ?? form;
 
   return (

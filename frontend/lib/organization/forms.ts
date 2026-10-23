@@ -292,12 +292,18 @@ export async function confirmClaimAction(_prev: { error?: string; done?: string 
 }
 
 /** An administrator moves one switch of what projects may change (Fixed or Free). Projects' copies already made stay. */
-export async function setLibertyAction(formData: FormData): Promise<void> {
+export async function setLibertyAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const key = text(formData, "key");
-  if (!key) return;
-  await api(`/api/liberty/${encodeURIComponent(key)}`, { method: "PUT", body: { free: text(formData, "free") === "1" } }).catch(() => undefined);
+  if (!key) return { error: "Nothing to switch." };
+  const free = text(formData, "free") === "1";
+  try {
+    await api(`/api/liberty/${encodeURIComponent(key)}`, { method: "PUT", body: { free } });
+  } catch (e) {
+    return failed(e);
+  }
   revalidatePath("/organization/settings", "layout");
   revalidatePath("/organization", "layout");
+  return { ok: free ? "Free: a project may now take its own copy." : "Fixed: every project now uses the organization's." };
 }
 
 /** The cards a project may have its own copy of, and their backend: what a reset puts back. */
