@@ -633,16 +633,22 @@ a screen only words it. A new rule goes in the backend, never in a page.
   days nobody counts are kept on it (`Settings/Calendar.cs`, table `days_off`): the organization's **public holidays**
   (each with its name and the country it is kept in, or every country) and a project's **own days off** (a site
   shutdown, a local holiday; where the switch `CALENDAR`, area "Calendar", Free by default, leaves it free, ROOM_FIXED
-  otherwise). Each month is drawn as a month (`components/calendar.tsx`, `MonthsCalendar`): days off each week shaded,
+  otherwise). **One month at a time** (owner: "dont add a calendar for each month, apply the regular calendar", the date
+  picker's way): ‹ month › stepping through the span, "This month" back to today's, the organization's arrows going on into the
+  year before or after (`components/calendar.tsx`, `MonthsCalendar`): days off each week shaded,
   holidays rose, a project's own amber, the schedule's action days highlighted (a bar under the day), today ringed; each
-  day is a square of 56 pixels (owner: "double the height", then "we forgot the width"), each month exactly its seven
-  days wide, the whole calendar made larger or smaller by "Size − +" beside "Names in the days" (owner: "i cant find the resize"; "Normal" puts it back) or dragged by its corner, a marked handle under the last month (cookie `calendar-day`, 28–120; double-click
+  day is a square (96 pixels by default, 40–200) (owner: "double the height", then "we forgot the width"), each month exactly its seven
+  days wide, the whole calendar made larger or smaller by "Size − +" beside "Names in the days" (owner: "i cant find the resize"; "Normal" puts it back) or dragged by its corner, a marked handle under the last month (cookie `calendar-day`; double-click
   puts it back); "Names in the days", a tick (cookie `calendar-names`, on by default), writes each day off's and each
   action's name inside its days, as many lines as the day holds; a
   click on a day opens it under the months (what it holds, each action linking its page) and, for whoever keeps that
   calendar, claims it (its name; the organization's also its country) or unclaims it, asked first (DAY_OFF_MARKED /
   DAY_OFF_UNMARKED). **The organization's Calendar card** (`/organization/settings/calendar`, administrators): its
-  holidays a year at a time (`?year=`), how dates read, where a new project's site starts, and its switch. **A project's
+  holidays a year at a time (`?year=`, `&month=`); **a country's public holidays filled in** (owner: "some recognise national
+  holidays"; the `date-holidays` package, `lib/settings/national-holidays.ts`, in English): a country chosen, its year's
+  public holidays listed first (those already marked said so), then "Add these N", asked first (`POST
+  /api/admin/calendar/days/many`, each logged DAY_OFF_MARKED, those already marked left); the organization's calendar
+  draws no actions (they are a project's); how dates read, where a new project's site starts, and its switch. **A project's
   Calendar card** (Settings → Calendar, read by everyone of ours, changed by the control function): where the site is
   (`PUT /calendar/place`), its country's holidays and its own days off. **The calendar is a tab of the Schedule** (owner:
   "make it a tab as the plan and the table"; `/schedule?view=calendar`, tabs The calendar · The plan · The table, the plan

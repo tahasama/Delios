@@ -21,7 +21,7 @@ export const PREF = {
 } as const;
 
 /** How large a calendar's day is drawn, its side in pixels: 56 unless dragged, between 28 and 120. */
-export const CALENDAR_DAY = { normal: 56, min: 28, max: 120 } as const;
+export const CALENDAR_DAY = { normal: 96, min: 40, max: 200 } as const;
 
 /** The calendar's day size left by the person, read on the server from its cookie. */
 export function calendarDay(value: string | undefined): number {

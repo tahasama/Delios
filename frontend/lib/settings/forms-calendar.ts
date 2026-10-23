@@ -56,3 +56,18 @@ export async function setSitePlaceAction(_prev: Result | undefined, formData: Fo
   revalidatePath("/settings/projects");
   return { ok: "Saved: due days are counted at the site from now on." };
 }
+
+/** Adds a country's public holidays for a year, as the list that knows them gives them; those already marked stay. */
+export async function fillHolidaysAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const country = text(formData, "country");
+  const year = Number(text(formData, "year"));
+  const { nationalHolidays } = await import("@/lib/settings/national-holidays");
+  const days = Number.isInteger(year) ? nationalHolidays(country, year) : [];
+  try {
+    const done = await api<{ added: number; alreadyThere: number }>("/api/admin/calendar/days/many", { body: { country, days } });
+    refresh();
+    return { ok: `${done.added} added${done.alreadyThere ? `, ${done.alreadyThere} already marked` : ""}: due days skip them.` };
+  } catch (e) {
+    return failed(e);
+  }
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Minus, MoveDiagonal2, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Minus, MoveDiagonal2, Plus, X } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { Field } from "@/components/ui";
 import { Select } from "@/components/select";
@@ -20,13 +20,16 @@ const key = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(
 /** 1 Monday … 7 Sunday, as the backend numbers days. */
 const isoDay = (y: number, m: number, d: number) => ((new Date(Date.UTC(y, m, d)).getUTCDay() + 6) % 7) + 1;
 
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
 /**
- * The calendar (owner): each month drawn as a month, Monday to Sunday, from `from` to `to`. Days off each week are
+ * The calendar (owner): one month at a time, Monday to Sunday, stepped through with its arrows as the date picker is
+ * (owner: "apply the regular calendar"), from `from` to `to`. Days off each week are
  * shaded; an organization's public holiday and a project's own day off are marked, each with its name; the schedule's
  * action days are highlighted. A click on a day opens it under the months: what it holds, and, for whoever keeps this
  * calendar, claims it (a name, and for the organization its country) or unclaims it, asked first.
  */
-export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = [], claim, countries, daySize = CALENDAR_DAY.normal, namesShown = true, aside }: {
+export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = [], claim, countries, daySize = CALENDAR_DAY.normal, namesShown = true, aside, month, before, after }: {
   from: string; to: string; weekend: number[]; today?: string; daysOff: DayOff[]; actions?: ActionDay[];
   /** How large a day is drawn (its side, in pixels), as the person left it (cookie `calendar-day`, read by the server). */
   daySize?: number;
@@ -34,6 +37,11 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
   namesShown?: boolean;
   /** Drawn at the end of the key's line: where the days off are kept, on the Schedule's calendar. */
   aside?: React.ReactNode;
+  /** The month it opens on ("yyyy-mm"); none: this month where it is on the calendar, else its first. */
+  month?: string;
+  /** Where the arrows go past its first and last months (the organization's calendar: the year before, the year after). */
+  before?: string;
+  after?: string;
   /** Who keeps this calendar: the organization's holidays, or the project's own days off; none: read only. */
   claim?: { level: "organization" | "project"; defaultCountry?: string | null };
   /** The countries a holiday may be kept in (the organization's calendar). */
@@ -92,6 +100,12 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
 
   const months: { y: number; m: number }[] = [];
   for (let y = +from.slice(0, 4), m = +from.slice(5, 7) - 1; key(y, m, 1) <= to; m === 11 ? (y++, m = 0) : m++) months.push({ y, m });
+  const indexOf = (ym: string | undefined) => (ym ? months.findIndex(({ y, m }) => key(y, m, 1).slice(0, 7) === ym) : -1);
+  const opening = Math.max(0, indexOf(month) >= 0 ? indexOf(month) : indexOf(today?.slice(0, 7)));
+  const [at, setAt] = useState(opening);
+  useEffect(() => { setAt(opening); }, [opening]);
+  const here = months[Math.min(at, months.length - 1)];
+  const onToday = indexOf(today?.slice(0, 7));
 
   const openDays = open ? byDay.get(open) ?? [] : [];
   const openActions = open ? actionsOn(open) : [];
@@ -112,8 +126,8 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
         </label>
         <span className="flex items-center gap-1 text-xs text-slate-600" title="Drag the corner of the calendar too. Double-click Size to put it back.">
           <span onDoubleClick={resetSize} className="select-none">Size</span>
-          <button type="button" onClick={() => stepSize(-8)} disabled={size <= CALENDAR_DAY.min} className={sizeBtn} title="Smaller" aria-label="Smaller"><Minus className="h-3.5 w-3.5" /></button>
-          <button type="button" onClick={() => stepSize(8)} disabled={size >= CALENDAR_DAY.max} className={sizeBtn} title="Larger" aria-label="Larger"><Plus className="h-3.5 w-3.5" /></button>
+          <button type="button" onClick={() => stepSize(-16)} disabled={size <= CALENDAR_DAY.min} className={sizeBtn} title="Smaller" aria-label="Smaller"><Minus className="h-3.5 w-3.5" /></button>
+          <button type="button" onClick={() => stepSize(16)} disabled={size >= CALENDAR_DAY.max} className={sizeBtn} title="Larger" aria-label="Larger"><Plus className="h-3.5 w-3.5" /></button>
           {size !== CALENDAR_DAY.normal ? <button type="button" onClick={resetSize} className="text-link hover:underline">Normal</button> : null}
         </span>
         {countries ? (
@@ -128,17 +142,22 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
       </div>
 
       <div className="relative mx-auto w-fit max-w-full pr-5 pb-5">
-      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${monthWidth}px), ${monthWidth}px))` }}>
-        {months.map(({ y, m }) => {
+      <div style={{ width: `min(100%, ${monthWidth}px)` }}>
+        {[here].filter(Boolean).map(({ y, m }) => {
           const first = isoDay(y, m, 1);
           const length = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
           const marked = Array.from({ length }, (_, i) => key(y, m, i + 1)).filter((d) => byDay.has(d)).length;
           return (
             <section key={`${y}-${m}`} className="rounded-md bg-surface p-2.5 ring-1 ring-line">
-              <h3 className="mb-1.5 flex items-baseline justify-between px-0.5 text-xs font-semibold text-slate-800">
-                {new Date(Date.UTC(y, m, 1)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}
-                {marked ? <span className="text-[11px] font-normal text-slate-500">{marked} off</span> : null}
-              </h3>
+              <div className="mb-2 flex items-center gap-1 px-0.5">
+                <Step to={at > 0 ? () => setAt(at - 1) : before} label="Previous month"><ChevronLeft className="h-4 w-4" aria-hidden /></Step>
+                <h3 className="min-w-36 text-center text-[13px] font-semibold text-slate-800">{MONTHS[m]} {y}</h3>
+                <Step to={at < months.length - 1 ? () => setAt(at + 1) : after} label="Next month"><ChevronRight className="h-4 w-4" aria-hidden /></Step>
+                {onToday >= 0 && onToday !== at ? (
+                  <button type="button" onClick={() => setAt(onToday)} className="ml-1 text-xs font-semibold text-link hover:underline">This month</button>
+                ) : null}
+                {marked ? <span className="ml-auto text-[11px] text-slate-500">{marked} off</span> : null}
+              </div>
               <div className="grid grid-cols-7 gap-0.5 text-center">
                 {WEEK.map((w, i) => (
                   <span key={w} className={cn("pb-0.5 text-[10.5px] font-medium", weekend.includes(i + 1) ? "text-slate-400" : "text-slate-500")}>{w.slice(0, 2)}</span>
@@ -255,4 +274,11 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
       ) : null}
     </div>
   );
+}
+
+/** An arrow of the month's head: a step within the calendar, a link past it, or nothing to go to. */
+function Step({ to, label, children }: { to?: (() => void) | string; label: string; children: React.ReactNode }) {
+  const cls = "inline-flex rounded-sm p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800";
+  if (typeof to === "string") return <Link href={to} scroll={false} title={label} aria-label={label} className={cls}>{children}</Link>;
+  return <button type="button" onClick={to} disabled={!to} title={label} aria-label={label} className={cn(cls, "disabled:opacity-30 disabled:hover:bg-transparent")}>{children}</button>;
 }

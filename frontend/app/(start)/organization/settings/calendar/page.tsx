@@ -9,6 +9,10 @@ import { PlaceFields } from "@/app/(app)/settings/projects/place-fields";
 import { organizationCalendar } from "@/lib/settings/calendar";
 import { libertyOrFail } from "@/lib/organization/liberty";
 import { setDateFormatAction, setProjectPlaceAction } from "@/lib/organization/forms";
+import { fillHolidaysAction } from "@/lib/settings/forms-calendar";
+import { nationalHolidays } from "@/lib/settings/national-holidays";
+import { Select } from "@/components/select";
+import { fmtDate } from "@/lib/core/utils";
 import { DATE_FORMATS } from "@/lib/core/date-format";
 import { COUNTRIES } from "@/lib/organization/countries";
 import { ProjectSwitches } from "../switches";
@@ -29,11 +33,18 @@ const band = (title: string, said: string) => (
  * dates read on every screen; where a new project's site starts. Its switch says whether a project may add its own days
  * off.
  */
-export default async function OrganizationCalendarPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
+export default async function OrganizationCalendarPage({ searchParams }: { searchParams: Promise<{ year?: string; month?: string; fill?: string }> }) {
   const scope = await requireOrgAdmin();
-  const asked = Number((await searchParams).year);
+  const sp = await searchParams;
+  const asked = Number(sp.year);
   const [calendar, switches] = await Promise.all([organizationCalendar(Number.isInteger(asked) ? asked : undefined), libertyOrFail()]);
   const year = calendar.year;
+  // A country's public holidays, proposed from a list that knows them (owner), read first, then added at once.
+  const fill = /^[A-Z]{2}$/.test(sp.fill ?? "") ? sp.fill! : null;
+  const proposed = fill ? nationalHolidays(fill, year) : [];
+  const marked = new Set(calendar.holidays.filter((h) => h.country === fill).map((h) => h.day));
+  const fresh = proposed.filter((h) => !marked.has(h.day));
+  const fillCountry = fill ?? calendar.place.country ?? "";
   const step = (y: number, Icon: typeof ChevronLeft, label: string) => (
     <Link href={`/organization/settings/calendar?year=${y}#holidays`} scroll={false} title={label} aria-label={label}
       className="inline-flex rounded-sm p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800">
@@ -57,7 +68,48 @@ export default async function OrganizationCalendarPage({ searchParams }: { searc
         </div>
         <div className="px-5 py-4 sm:px-6">
           <MonthsCalendar daySize={calendarDay((await cookies()).get(PREF.calendarDay)?.value)} namesShown={(await cookies()).get(PREF.calendarNames)?.value !== "0"} from={`${year}-01-01`} to={`${year}-12-31`} weekend={calendar.place.weekendDays} daysOff={calendar.holidays}
-            claim={{ level: "organization", defaultCountry: calendar.place.country }} countries={COUNTRIES} />
+            claim={{ level: "organization", defaultCountry: calendar.place.country }} countries={COUNTRIES}
+            month={/^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month : undefined}
+            before={`/organization/settings/calendar?year=${year - 1}&month=${year - 1}-12#holidays`}
+            after={`/organization/settings/calendar?year=${year + 1}&month=${year + 1}-01#holidays`} />
+        </div>
+      </section>
+
+      <section id="fill" className="register register-sheet register-sheet-open scroll-mt-24">
+        {band(`Fill in a country's public holidays for ${year}`, "from a list that knows each country's; read them first, then add them")}
+        <form action="/organization/settings/calendar#fill" className="flex flex-wrap items-end gap-3 px-5 pt-4 sm:px-6">
+          <input type="hidden" name="year" value={year} />
+          <label className="w-64">
+            <span className="sr-only">Country</span>
+            <Select name="fill" defaultValue={fillCountry} className="plain w-full" required>
+              <option value="">Choose a country</option>
+              {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+            </Select>
+          </label>
+          <button type="submit" className="ask">Show its holidays</button>
+        </form>
+        <div className="space-y-3 px-5 py-4 sm:px-6">
+          {fill ? (
+            proposed.length ? (
+              <>
+                <ul className="grid grid-cols-1 gap-x-6 gap-y-1 text-xs text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
+                  {proposed.map((h) => (
+                    <li key={h.day} className={marked.has(h.day) ? "text-slate-400" : undefined}>
+                      <span className="font-mono tabular-nums">{fmtDate(h.day)}</span> · <span className="font-semibold">{h.name}</span>
+                      {marked.has(h.day) ? " · already marked" : null}
+                    </li>
+                  ))}
+                </ul>
+                {fresh.length ? (
+                  <ActionForm action={fillHolidaysAction} hidden={{ country: fill, year: String(year) }}
+                    submitLabel={`Add these ${fresh.length}`}
+                    confirmText={`From now on: these ${fresh.length} days are public holidays in ${COUNTRIES.find((c) => c.code === fill)?.name ?? fill}, skipped by every project there when counting due days. Instead of: working days. Go ahead?`}
+                    className="space-y-0" />
+                ) : <p className="text-xs text-slate-500">Every one of them is already marked.</p>}
+                <p className="text-[11px] text-slate-500">Each is kept as one marked by hand: a click on its day takes it off. Check them: a list can miss a local or a moved holiday.</p>
+              </>
+            ) : <p className="text-xs text-slate-500">The list knows no public holidays for {COUNTRIES.find((c) => c.code === fill)?.name ?? fill} in {year}: mark them by a click on their days.</p>
+          ) : null}
         </div>
       </section>
 

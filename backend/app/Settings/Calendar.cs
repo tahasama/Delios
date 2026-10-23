@@ -63,6 +63,9 @@ public static class Calendar
     public sealed record DayView(Guid Id, DateOnly Day, string Name, string? Country, string Source, DateTimeOffset At, string By);
     public sealed record ActionDay(string Code, string Name, DateOnly? Start, DateOnly? Finish);
     public sealed record DayRequest(DateOnly? Day, string? Name, string? Country);
+    public sealed record OneDay(DateOnly Day, string Name);
+    /// <summary>A country's public holidays, filled in at once (owner: from a list that knows them).</summary>
+    public sealed record ManyRequest(string? Country, OneDay[]? Days);
 
     private static DayView View(DayOff d) =>
         new(d.Id, d.Day.ToDateOnly(), d.Name, d.Country, d.ProjectId is null ? "ORGANIZATION" : "PROJECT", d.CreatedAt.ToDateTimeOffset(), d.CreatedByName);
@@ -74,6 +77,7 @@ public static class Calendar
             .AddEndpointFilter(Keepers.Configurers("The organization's calendar is kept by an administrator."));
         org.MapGet("", OrganizationAsync);
         org.MapPost("/days", MarkHolidayAsync);
+        org.MapPost("/days/many", MarkManyAsync);
         org.MapDelete("/days/{dayId:guid}", (Guid dayId, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken c) =>
             UnmarkAsync(db, audit, http.User.Actor(), dayId, null, c));
 
@@ -225,6 +229,45 @@ public static class Calendar
         var country = string.IsNullOrWhiteSpace(request.Country) ? null : request.Country.Trim().ToUpperInvariant();
         if (ProjectPlace.CountryRefusal(country) is { } badCountry) return badCountry;
         return await MarkAsync(db, audit, clock, http, null, request.Day, request.Name, country, cancellationToken);
+    }
+
+    /// <summary>
+    /// A country's public holidays filled in at once (owner: "some recognise national holidays"): each day not marked yet
+    /// for that country is added under its name, each logged as one marked by hand; those already marked are left as
+    /// they are. Nothing is filled by itself: an administrator asks for it, having read the list.
+    /// </summary>
+    private static async Task<IResult> MarkManyAsync(ManyRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock,
+        CancellationToken cancellationToken)
+    {
+        var country = string.IsNullOrWhiteSpace(request.Country) ? null : request.Country.Trim().ToUpperInvariant();
+        if (country is null) return Problems.Invalid("COUNTRY_REQUIRED", "Choose the country whose holidays these are.", new { field = "country" });
+        if (ProjectPlace.CountryRefusal(country) is { } badCountry) return badCountry;
+        var days = (request.Days ?? []).Where(d => !string.IsNullOrWhiteSpace(d.Name)).DistinctBy(d => d.Day).Take(100).ToList();
+        if (days.Count == 0) return Problems.Invalid("DAYS_REQUIRED", "There is no day to add.");
+        var wanted = days.Select(d => LocalDate.FromDateOnly(d.Day)).ToList();
+        var there = (await db.Set<DayOff>().AsNoTracking()
+            .Where(d => d.ProjectId == null && d.Country == country && wanted.Contains(d.Day)).Select(d => d.Day).ToListAsync(cancellationToken)).ToHashSet();
+        var by = (await db.Users.AsNoTracking().SingleAsync(u => u.Id == http.User.UserId(), cancellationToken)).Name;
+        var added = new List<DayOff>();
+        foreach (var one in days)
+        {
+            var day = LocalDate.FromDateOnly(one.Day);
+            if (there.Contains(day)) continue;
+            var words = one.Name.Trim();
+            if (words.Length > 120) words = words[..120];
+            var row = new DayOff
+            {
+                TenantId = http.User.TenantId(), ProjectId = null, Day = day, Name = words, Country = country,
+                CreatedAt = clock.GetCurrentInstant(), CreatedByName = by,
+            };
+            db.Add(row);
+            added.Add(row);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        foreach (var row in added)
+            await audit.WriteAsync(http.User.Actor(), "DAY_OFF_MARKED", "Calendar", row.Id, row.Name, $"{row.Day:yyyy-MM-dd}, {country}",
+                cancellationToken: cancellationToken);
+        return Results.Ok(new { added = added.Count, alreadyThere = days.Count - added.Count });
     }
 
     /// <summary>A project's own day off, where the organization leaves the calendar free (ROOM_FIXED otherwise).</summary>
