@@ -95,6 +95,9 @@ public static class JoinRequests
 
         // Who may add directly, and whether this project asks whoever holds Manage first.
         var admin = await Keepers.ConfiguresAsync(http);
+        if (!admin && await Keepers.FunctionConfiguresAsync(db, function.Id, cancellationToken))
+            return Problems.Forbidden("ADMIN_ONLY", $"{function.Name} may configure: whoever holds it administers the organization. Only an administrator gives it.",
+                new { field = "functionId" });
         var mayAdd = admin || await MayAddAsync(db, access, cancellationToken);
         var confirms = await Settings.ProjectAnswers.NeedsConfirmationAsync(db, project.Id, "PROJECT_PEOPLE", cancellationToken);
         var held = !admin && (!mayAdd || confirms);

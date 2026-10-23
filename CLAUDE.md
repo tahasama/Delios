@@ -1149,7 +1149,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   work account elsewhere; its form only once set up or asked for ("Set it up", `?sso=1`), never filled by the browser
   (autoComplete off), the address the provider sends people back to given in it, for step 1; the organization's own account
   (single sign-on, OpenID Connect: name on the button, provider's address, client id and secret kept encrypted, email
-  domains, in use); "Everyone may sign in with a password", which may be limited to administrators only once that
+  domains, in use: with none, only an email the provider says it verified is trusted, its account names only at the
+  domains set; an account standing for another organization's person is never entered by it); "Everyone may sign in with a password", which may be limited to administrators only once that
   account is in use (backend SSO_NOT_CONFIGURED otherwise; turning the account off opens passwords again): until then the
   switch is not offered, the line says why; a new account's "In use" starts off. The sign-in
   page folds "Sign in with your organization's account": its short name (shown to the administrator), then the
@@ -1493,6 +1494,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Row-level security is forced, even for the table owner: a data backfill loops over
   `tenants` and sets `set_config('app.tenant_id', …)` for each.
 - Organization defaults are added through `DemoSeed.Ensure*SetupAsync`, which adds only what is missing.
+- **Only our own people keep the organization** (security review, Standard-changes §79): an account of another
+  organization never counts as administrator, control function or Manage holder for `/api/admin` and `/api/organization`
+  (`Keepers.OursAsync`); a function holding Configure is given by an administrator only (ADMIN_ONLY,
+  `Keepers.FunctionConfiguresAsync`: memberships and join requests); only an administrator sets someone's password.
+  Write a permission check with brackets around every `||` inside a rule's condition.
 - **Clearance is the one confidentiality rule** (owner): a document above a function's clearance is read by its people
   only if named on it, its registrar, or sent it; every function, the control function too. No level is "restricted"
   any more (the `restricted` prop is not read). The document page shows "Who may read this" when some function on the

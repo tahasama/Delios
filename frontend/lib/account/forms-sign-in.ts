@@ -77,7 +77,8 @@ export async function loginAction(_prev: LoginState | undefined, formData: FormD
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const wanted = String(formData.get("next") ?? "/");
-  const next = wanted.startsWith("/") && !wanted.startsWith("//") ? wanted : "/";
+  // Only a path on this site: "//x" and "/\x" both lead a browser elsewhere, and so may a control character.
+  const next = /^\/(?![/\\])/.test(wanted) && !/[\\\x00-\x1f]/.test(wanted) ? wanted : "/";
   if (formData.get("challenge")) return secondStep(formData, next);
   if (!email || !password) return { error: "Email and password are required." };
 

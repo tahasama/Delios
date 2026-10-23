@@ -225,17 +225,25 @@ public static class SsoEndpoints
         var claims = validation.Claims;
         if (!claims.TryGetValue("nonce", out var nonce) || nonce as string != payload.Nonce)
             return Fail("SSO_TOKEN_INVALID", "nonce does not match");
-        if (claims.TryGetValue("email_verified", out var verified) && verified is false or "false")
+        var verified = claims.TryGetValue("email_verified", out var said) && said is true or "true";
+        if (claims.ContainsKey("email_verified") && !verified)
             return Fail("SSO_EMAIL_NOT_VERIFIED", "the provider has not verified the email");
-        var email = new[] { "email", "preferred_username", "upn" }
-            .Select(c => claims.TryGetValue(c, out var v) ? v as string : null).FirstOrDefault(v => v?.Contains('@') == true);
-        if (email is null) return Fail("SSO_NO_EMAIL", "no email claim");
+        // Which email is trusted. With email domains set, the provider's account names are read too (its own directory
+        // only issues them at domains it holds, checked below). With none, only an email the provider says it verified:
+        // on a provider shared by many companies, anyone can give their account a name that is someone else's email.
+        var names = provider.AllowedDomains.Length > 0 ? new[] { "email", "preferred_username", "upn" } : verified ? ["email"] : [];
+        var email = names.Select(c => claims.TryGetValue(c, out var v) ? v as string : null).FirstOrDefault(v => v?.Contains('@') == true);
+        if (email is null)
+            return provider.AllowedDomains.Length == 0 && !verified
+                ? Fail("SSO_EMAIL_NOT_VERIFIED", "no verified email, and no email domains set to trust the provider's account names")
+                : Fail("SSO_NO_EMAIL", "no email claim");
         var domain = email[(email.LastIndexOf('@') + 1)..].ToLowerInvariant();
         if (provider.AllowedDomains.Length > 0 && !provider.AllowedDomains.Contains(domain, StringComparer.OrdinalIgnoreCase))
             return Fail("SSO_DOMAIN_NOT_ALLOWED", domain);
 
         var normalized = email.Trim().ToUpperInvariant();
-        var user = await db.Users.Include(u => u.Party).SingleOrDefaultAsync(u => u.NormalizedEmail == normalized, cancellationToken);
+        // An account standing for someone of another organization's DELIOS is entered from their home, never here.
+        var user = await db.Users.Include(u => u.Party).SingleOrDefaultAsync(u => u.NormalizedEmail == normalized && u.HomeTenantId == null, cancellationToken);
         if (user is null || !user.Active || user.Party is { Active: false })
             return Fail("SSO_NO_ACCOUNT", "no active account for that email");
 

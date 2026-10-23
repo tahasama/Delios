@@ -18,7 +18,7 @@ function LoginForm() {
   const params = useSearchParams();
   // Only same-site paths, or ?next becomes an open redirect.
   const raw = params.get("next") ?? "/";
-  const next = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+  const next = /^\/(?![/\\])/.test(raw) && !/[\\\x00-\x1f]/.test(raw) ? raw : "/";
 
   return (
     <AuthShell>

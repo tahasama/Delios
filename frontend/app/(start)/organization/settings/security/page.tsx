@@ -51,7 +51,7 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
         <Field label="Client secret" hint={security.sso ? "kept; type a new one only to change it" : "given by the provider"}>
           <input name="clientSecret" type="password" autoComplete="new-password" required={!security.sso} className={inputCls} />
         </Field>
-        <Field label="Email domains" hint="who may sign in this way, e.g. company.com; empty: any"><input name="domains" autoComplete="off" defaultValue={security.sso?.allowedDomains.join(", ") ?? ""} placeholder="company.com" className={inputCls} /></Field>
+        <Field label="Email domains" hint="who may sign in this way, e.g. company.com; empty: only an email the provider says it verified"><input name="domains" autoComplete="off" defaultValue={security.sso?.allowedDomains.join(", ") ?? ""} placeholder="company.com" className={inputCls} /></Field>
       </div>
       <div className="w-full"><SwitchField name="enabled" defaultChecked={security.sso?.enabled ?? false}>In use: offered on the sign-in page</SwitchField></div>
     </ActionForm>

@@ -268,6 +268,9 @@ public static class DirectoryEndpoints
     {
         // Invited: a password nobody knows until they choose their own from the link.
         var invite = request.Invite && string.IsNullOrEmpty(request.Password);
+        // A person is never given a password chosen by someone else, unless an administrator does it.
+        if (!string.IsNullOrEmpty(request.Password) && !await Keepers.ConfiguresAsync(http))
+            return Problems.Forbidden("ADMIN_ONLY", "Only an administrator sets someone's password: invite them, and they choose their own.");
         if (invite) request = request with { Password = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)) };
         var name = Blank(request.Name);
         var email = Blank(request.Email)?.ToLowerInvariant();
@@ -359,6 +362,9 @@ public static class DirectoryEndpoints
         if (request.IsAdmin is { } isAdmin && isAdmin != user.IsAdmin) { changes.Add(isAdmin ? "administrator" : "not an administrator"); user.IsAdmin = isAdmin; }
         if (!string.IsNullOrEmpty(request.Password))
         {
+            // A password chosen by someone else is set by an administrator only (the screens never ask one: people choose
+            // their own from a link).
+            if (!await Keepers.ConfiguresAsync(http)) return Problems.Forbidden("ADMIN_ONLY", "Only an administrator sets someone's password.");
             if (await http.RequestServices.GetRequiredService<PasswordPolicy>().RefusalAsync(request.Password, cancellationToken) is { } weak) return weak;
             user.PasswordHash = hasher.HashPassword(user, request.Password);
             user.FailedSignIns = 0;
@@ -608,6 +614,8 @@ public static class DirectoryEndpoints
         var withControl = await Settings.ProjectAnswers.ControlDoesAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken);
         if (!admin && !(await holds(Verbs.Control) || (!withControl && await holds(Verbs.Manage))))
             return Problems.Forbidden("PEOPLE_NOT_YOURS", $"On {project.Code} the control function keeps who is on the project.");
+        if (!admin && function is not null && function.Id != membership?.FunctionId && await Keepers.FunctionConfiguresAsync(db, function.Id, cancellationToken))
+            return Problems.Forbidden("ADMIN_ONLY", $"{function.Name} may configure: whoever holds it administers the organization. Only an administrator gives it.");
         // Joining waits for the confirmation of whoever holds Manage, where the project asks for it.
         var confirming = !admin && await Settings.ProjectAnswers.NeedsConfirmationAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken);
         var changes = new List<string>();
@@ -1121,6 +1129,7 @@ public static class Keepers
         if (http.User.IsAdmin()) return true;
         var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
         var me = http.User.UserId();
+        if (!await OursAsync(db, me, http.RequestAborted)) return false;
         return await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
             && db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Configure)), http.RequestAborted);
     }
@@ -1136,8 +1145,9 @@ public static class Keepers
         if (await ConfiguresAsync(http)) return await next(context);
         var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
         var me = http.User.UserId();
-        var keeps = await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
-            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control) || r.Verbs.Contains(Verbs.Manage))), http.RequestAborted);
+        var keeps = await OursAsync(db, me, http.RequestAborted) && await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
+            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null)
+                && (r.Verbs.Contains(Verbs.Control) || r.Verbs.Contains(Verbs.Manage)))), http.RequestAborted);
         return keeps
             ? await next(context)
             : Problems.Forbidden("ADMIN_OR_CONTROL", "An administrator, the control function or whoever holds Manage keeps the project's people.");
@@ -1149,10 +1159,25 @@ public static class Keepers
         if (await ConfiguresAsync(http)) return await next(context);
         var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
         var me = http.User.UserId();
-        var control = await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
+        var control = await OursAsync(db, me, http.RequestAborted) && await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
             && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control))), http.RequestAborted);
         return control
             ? await next(context)
             : Problems.Forbidden("ADMIN_OR_CONTROL", "An administrator, or the control function, keeps the organization's people and functions.");
     }
+
+    /// <summary>
+    /// One of our own people: not an account standing for someone of another organization's DELIOS, nor one we made
+    /// for another organization's people. Only ours keep the organization's people, organizations and settings, whatever
+    /// function they hold on a project.
+    /// </summary>
+    private static Task<bool> OursAsync(DeliosDbContext db, Guid userId, CancellationToken cancellationToken) =>
+        db.Users.AnyAsync(u => u.Id == userId && u.HomeTenantId == null && (u.Party == null || u.Party.IsInternal), cancellationToken);
+
+    /// <summary>
+    /// Whether a function may configure: on the organization's rules or on any project's own copy. Holding it makes its
+    /// holders administrators of the organization, so only an administrator gives it to someone.
+    /// </summary>
+    public static Task<bool> FunctionConfiguresAsync(DeliosDbContext db, Guid functionId, CancellationToken cancellationToken) =>
+        db.PermissionRules.IgnoreQueryFilters().AnyAsync(r => r.FunctionId == functionId && r.Verbs.Contains(Verbs.Configure), cancellationToken);
 }

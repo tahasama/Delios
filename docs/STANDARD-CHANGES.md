@@ -1459,3 +1459,22 @@ why, and may be put back, with why; what stands then is kept in its turn. Nothin
 **Depends on it:** `SCHEDULE_LEAD_DAYS`, `SCHEDULE_RISK_DAYS`, `LIBERTY:LEAD_DAYS`, `LIBERTY:RISK_WINDOW`
 (`Actions/ScheduleDays.cs`, `/api/admin/schedule-days`, `/api/projects/{id}/schedule/days`); `kept_copies` with no
 project, kind DEFAULTS (`Settings/OrganizationDefaults.cs`, `/api/admin/project-defaults`, migration KeptCopyOfTheOrganization).
+
+## 79 · Who keeps the organization, and what single sign-on trusts
+
+The Standard says who administers the system; it does not say what a project role may reach beyond its project. DELIOS now
+holds these, after a security review:
+
+- **The organization's people, organizations and settings are kept by our own people only.** An account standing for
+  someone of another organization's DELIOS, or one we made for another organization's people, never counts as an
+  administrator, the control function or a Manage holder for the organization's pages, whatever function it holds on a
+  project (`Keepers.OursAsync`).
+- **A function that may configure makes its holders administrators**, so only an administrator gives it: putting someone
+  on a project with it, changing their function to it, or asking for someone to join with it is refused otherwise
+  (ADMIN_ONLY, `Keepers.FunctionConfiguresAsync`).
+- **Nobody sets another person's password but an administrator** (creating an account or changing one); everyone else
+  invites, and the person chooses their own from the link.
+- **Single sign-on trusts an email only as far as it is proven:** with email domains set on the organization's account,
+  the provider's account names count, at those domains only; with none, only an email the provider says it verified.
+  An account standing for someone of another organization is never entered by single sign-on.
+- After signing in, the page asked for is only a path on this site (never `//…`, `/\…` or a control character).
