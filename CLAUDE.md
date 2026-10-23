@@ -634,7 +634,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (each with its name and the country it is kept in, or every country) and a project's **own days off** (a site
   shutdown, a local holiday; where the switch `CALENDAR`, area "Calendar", Free by default, leaves it free, ROOM_FIXED
   otherwise). Each month is drawn as a month (`components/calendar.tsx`, `MonthsCalendar`): days off each week shaded,
-  holidays rose, a project's own amber, the schedule's action days highlighted (a bar under the day), today ringed; a
+  holidays rose, a project's own amber, the schedule's action days highlighted (a bar under the day), today ringed; each
+  day stands 56 pixels high (owner: "double the height"), dragged taller or shorter by the handle under the months
+  (cookie `calendar-day`, 28–120; double-click puts it back; tall enough, a day off shows its name); a
   click on a day opens it under the months (what it holds, each action linking its page) and, for whoever keeps that
   calendar, claims it (its name; the organization's also its country) or unclaims it, asked first (DAY_OFF_MARKED /
   DAY_OFF_UNMARKED). **The organization's Calendar card** (`/organization/settings/calendar`, administrators): its

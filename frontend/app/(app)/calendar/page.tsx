@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { PREF, calendarDay } from "@/lib/core/preferences";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { MonthsCalendar } from "@/components/calendar";
@@ -52,7 +54,7 @@ export default async function CalendarPage() {
         </dl>
       </section>
       <section className="register register-sheet register-sheet-open px-5 py-4 sm:px-6">
-        <MonthsCalendar from={calendar.from} to={calendar.to} weekend={calendar.place.weekendDays} today={calendar.today}
+        <MonthsCalendar dayHeight={calendarDay((await cookies()).get(PREF.calendarDay)?.value)} from={calendar.from} to={calendar.to} weekend={calendar.place.weekendDays} today={calendar.today}
           daysOff={calendar.daysOff} actions={calendar.actions} />
       </section>
     </div>

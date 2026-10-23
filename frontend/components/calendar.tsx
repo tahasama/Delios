@@ -8,6 +8,7 @@ import { Field } from "@/components/ui";
 import { Select } from "@/components/select";
 import { cn, fmtDate } from "@/lib/core/utils";
 import { markDayAction, unmarkDayAction } from "@/lib/settings/forms-calendar";
+import { CALENDAR_DAY, PREF, savePreference } from "@/lib/core/preferences";
 
 type DayOff = { id: string; day: string; name: string; country: string | null; source: "ORGANIZATION" | "PROJECT" };
 type ActionDay = { code: string; name: string; start: string | null; finish: string | null };
@@ -25,8 +26,10 @@ const isoDay = (y: number, m: number, d: number) => ((new Date(Date.UTC(y, m, d)
  * action days are highlighted. A click on a day opens it under the months: what it holds, and, for whoever keeps this
  * calendar, claims it (a name, and for the organization its country) or unclaims it, asked first.
  */
-export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = [], claim, countries }: {
+export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = [], claim, countries, dayHeight = CALENDAR_DAY.normal }: {
   from: string; to: string; weekend: number[]; today?: string; daysOff: DayOff[]; actions?: ActionDay[];
+  /** How tall a day stands, in pixels, as the person left it (cookie `calendar-day`, read by the server). */
+  dayHeight?: number;
   /** Who keeps this calendar: the organization's holidays, or the project's own days off; none: read only. */
   claim?: { level: "organization" | "project"; defaultCountry?: string | null };
   /** The countries a holiday may be kept in (the organization's calendar). */
@@ -34,6 +37,29 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [country, setCountry] = useState<string>("");
+  // The days stand taller or shorter as the handle under the months is dragged; double-click puts them back.
+  const [height, setHeight] = useState(dayHeight);
+  const onResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const start = e.clientY;
+    const from = height;
+    // Dragging moves the bottom of the first row of months: a day grows by a sixth of the distance (six weeks a month).
+    let h = from;
+    document.body.classList.add("dt-resizing");
+    const move = (ev: PointerEvent) => {
+      h = Math.round(Math.min(CALENDAR_DAY.max, Math.max(CALENDAR_DAY.min, from + (ev.clientY - start) / 6)));
+      setHeight(h);
+    };
+    const up = () => {
+      document.body.classList.remove("dt-resizing");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      savePreference(PREF.calendarDay, String(h));
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  const resetHeight = () => { setHeight(CALENDAR_DAY.normal); savePreference(PREF.calendarDay, ""); };
   // After a claim or an unclaim the page is drawn again; the day stays open.
   useEffect(() => { if (open && (open < from || open > to)) setOpen(null); }, [from, to, open]);
 
@@ -100,13 +126,18 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
                   return (
                     <button key={day} type="button" onClick={() => setOpen(open === day ? null : day)}
                       title={words || undefined} aria-pressed={open === day} aria-label={`${fmtDate(day)}${words ? `: ${words.replace(/\n/g, ", ")}` : ""}`}
-                      className={cn("relative h-7 rounded-sm text-[12px] tabular-nums transition-colors",
+                      style={{ height }}
+                      className={cn("relative flex items-start justify-end rounded-sm px-1 pt-0.5 text-[12px] tabular-nums transition-colors",
+                        height < 40 && "items-center justify-center p-0",
                         holiday ? "bg-rose-100 font-semibold text-rose-800 ring-1 ring-rose-300"
                           : own ? "bg-amber-100 font-semibold text-amber-900 ring-1 ring-amber-300"
                           : resting ? "bg-tint text-slate-400" : "text-slate-700 hover:bg-tint-soft",
                         day === today && "ring-2 ring-brand-line",
                         open === day && "outline-2 outline-offset-1 outline-brand-line")}>
                       {i + 1}
+                      {height >= 72 && off.length ? (
+                        <span className="absolute inset-x-1 bottom-2 truncate text-left text-[10.5px] font-medium leading-tight">{off[0].name}</span>
+                      ) : null}
                       {busy.length ? <span className="absolute inset-x-1.5 bottom-0.5 h-[3px] rounded-full bg-sky-600" aria-hidden /> : null}
                     </button>
                   );
@@ -115,6 +146,12 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
             </section>
           );
         })}
+      </div>
+
+      <div role="separator" aria-orientation="horizontal" aria-label="Drag to make the days taller or shorter"
+        title="Drag to make the days taller or shorter. Double-click to put them back." onPointerDown={onResize} onDoubleClick={resetHeight}
+        className="group/rows -mt-2 flex h-3 cursor-row-resize items-center justify-center">
+        <span className="h-0.5 w-12 rounded bg-line transition group-hover/rows:w-20 group-hover/rows:bg-link/70" />
       </div>
 
       {/* The day opened: what it holds, and claiming or unclaiming it. */}

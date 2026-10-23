@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { PREF, calendarDay } from "@/lib/core/preferences";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
@@ -54,7 +56,7 @@ export default async function OrganizationCalendarPage({ searchParams }: { searc
           </span>
         </div>
         <div className="px-5 py-4 sm:px-6">
-          <MonthsCalendar from={`${year}-01-01`} to={`${year}-12-31`} weekend={calendar.place.weekendDays} daysOff={calendar.holidays}
+          <MonthsCalendar dayHeight={calendarDay((await cookies()).get(PREF.calendarDay)?.value)} from={`${year}-01-01`} to={`${year}-12-31`} weekend={calendar.place.weekendDays} daysOff={calendar.holidays}
             claim={{ level: "organization", defaultCountry: calendar.place.country }} countries={COUNTRIES} />
         </div>
       </section>
