@@ -52,6 +52,7 @@ public static class ProjectFunctions
         {
             Own = own,
             Free = await Liberty.IsFreeAsync(db, Liberty.Functions, access.Project.Id, cancellationToken),
+            Exception = await Liberty.ExceptionHereAsync(db, Liberty.Functions, access.Project.Id, cancellationToken),
             MayChange = await ProjectLists.MayChangeAsync(db, access, cancellationToken),
             Functions = functions.Select(f => new
             {

@@ -65,6 +65,7 @@ public static class RevisionSchemeEndpoints
                 RevisionSchemes = schemes.Select(s => new { s.Id, s.Name, s.IsDefault, s.ForwardOnly, s.Series }),
                 RevisionRouting = routing.Select(r => new { r.DeliverableType, r.SchemeId }),
                 Own = scope is not null, Free = free,
+                Exception = await Liberty.ExceptionHereAsync(db, Liberty.Revisions, access.Project.Id, c),
                 MayChange = free && await ProjectLists.MayChangeAsync(db, access, c),
                 MayChangeOrganization = await Keepers.ConfiguresAsync(h),
             });

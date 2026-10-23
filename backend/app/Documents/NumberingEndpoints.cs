@@ -54,6 +54,7 @@ public static class NumberingLevels
             return Results.Ok(new
             {
                 view.Schemes, view.Routing, Own = scope is not null, Free = free,
+                Exception = await Liberty.ExceptionHereAsync(db, Liberty.Numbering, access.Project.Id, c),
                 MayChange = free && await ProjectLists.MayChangeAsync(db, access, c),
                 MayChangeOrganization = await Keepers.ConfiguresAsync(h),
             });

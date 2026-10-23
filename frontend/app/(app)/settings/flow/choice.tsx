@@ -13,7 +13,7 @@ export type ChoiceOption = { value: string; label: string; text: string };
  * days), and what the one in force means. Choosing another does not save: it says plainly what will change and waits
  * to be confirmed. The same way for every answer on the page, whoever carries an act out or how the project works.
  */
-export function Choice({ title, options, value, action, hidden, field = "value", unit, min, max, readOnly = false, fixed = false }: {
+export function Choice({ title, options, value, action, hidden, field = "value", unit, min, max, readOnly = false, fixed = false, exception }: {
   title: string;
   /** The answers to choose among; none for a number of days. */
   options?: ChoiceOption[];
@@ -30,6 +30,8 @@ export function Choice({ title, options, value, action, hidden, field = "value",
   readOnly?: boolean;
   /** The organization keeps it the same on every project. */
   fixed?: boolean;
+  /** The organization keeps it the same on every other project, and leaves this one free: why. */
+  exception?: string;
 }) {
   const [asked, setAsked] = useState<string | null>(null);
   const [typed, setTyped] = useState(value);
@@ -67,6 +69,7 @@ export function Choice({ title, options, value, action, hidden, field = "value",
       </div>
       <p className="mt-1 text-xs leading-5 text-slate-600">
         {fixed ? <span className="mr-1.5 inline-flex items-center gap-1 font-medium text-slate-500"><Lock className="h-3 w-3" aria-hidden />The organization&rsquo;s, on every project.</span> : null}
+        {exception && !fixed ? <span className="mr-1.5 font-medium text-slate-500" title={exception}>Free here by an exception: every other project takes the organization&rsquo;s (&ldquo;{exception}&rdquo;).</span> : null}
         {current?.text}
       </p>
 

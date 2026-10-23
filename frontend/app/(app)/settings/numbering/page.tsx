@@ -1,3 +1,4 @@
+import { ExceptionNote } from "@/lib/settings/exception";
 import Link from "next/link";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
@@ -33,12 +34,17 @@ export default async function NumberingPage({ searchParams }: { searchParams: Pr
     getActiveSet("DELIVERABLE_TYPES"),
   ]);
   const project = ctx.project.code;
+  const exception = numbering.exception;
   const said = numbering.own
     ? numbering.free
-      ? `${project}'s own numbering, changed here${numbering.mayChange ? "" : " by whoever acts as the control function"}. The organization's later changes do not touch it.`
+      ? exception
+        ? <>{project}&rsquo;s own numbering, changed here. <ExceptionNote project={project} what="numbering" exception={exception} /></>
+        : `${project}'s own numbering, changed here${numbering.mayChange ? "" : " by whoever acts as the control function"}. The organization's later changes do not touch it.`
       : `${project}'s own numbering, changed here before the organization fixed numbering for every project: it stays as it is, and nothing more is changed here.`
     : numbering.free
-      ? `The organization's numbering. Projects may change it: a change here gives ${project} its own copy, which the organization's later changes never touch.`
+      ? exception
+        ? <>The organization&rsquo;s numbering. <ExceptionNote project={project} what="numbering" exception={exception} /> A change here gives {project} its own copy, which the organization&rsquo;s later changes never touch.</>
+        : `The organization's numbering. Projects may change it: a change here gives ${project} its own copy, which the organization's later changes never touch.`
       : "The organization's numbering, the same on every project.";
 
   return (

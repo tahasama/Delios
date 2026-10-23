@@ -71,6 +71,7 @@ public static class CatalogAdminEndpoints
             {
                 Routes = await RouteViewsAsync(db, await RouteScopeAsync(db, access.Project.Id, c), c),
                 Own = await RouteScopeAsync(db, access.Project.Id, c) is not null, Free = free,
+                Exception = await Liberty.ExceptionHereAsync(db, Liberty.Routes, access.Project.Id, c),
                 MayChange = free && await ProjectLists.MayChangeAsync(db, access, c),
                 MayChangeOrganization = await Keepers.ConfiguresAsync(h),
             });

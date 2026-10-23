@@ -167,12 +167,32 @@ public static class Liberty
     {
         if (key.StartsWith("LIST:") && (await NumberedListsAsync(db, cancellationToken)).Contains(key[5..]))
             return await IsFreeAsync(db, Numbering, projectId, cancellationToken);
+        return await SwitchFreeAsync(db, key, cancellationToken) || await ExceptedAsync(db, key, projectId, cancellationToken) is not null;
+    }
+
+    /// <summary>
+    /// The exception that leaves this project free to change a setting the organization keeps fixed (who, when, why),
+    /// or none: the switch is free, or the project is not an exception. The project's pages say it with its reason.
+    /// </summary>
+    public static async Task<LibertyException?> ExceptionHereAsync(DeliosDbContext db, string key, Guid projectId, CancellationToken cancellationToken)
+    {
+        if (key.StartsWith("LIST:") && (await NumberedListsAsync(db, cancellationToken)).Contains(key[5..]))
+            return await ExceptionHereAsync(db, Numbering, projectId, cancellationToken);
+        return await SwitchFreeAsync(db, key, cancellationToken) ? null : await ExceptedAsync(db, key, projectId, cancellationToken);
+    }
+
+    private static async Task<bool> SwitchFreeAsync(DeliosDbContext db, string key, CancellationToken cancellationToken)
+    {
         var value = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && s.Key == Prefix + key)
             .Select(s => s.Value).FirstOrDefaultAsync(cancellationToken);
-        if (value is not null ? value == Free : Items.FirstOrDefault(i => i.Key == key)?.FreeByDefault ?? true) return true;
+        return value is not null ? value == Free : Items.FirstOrDefault(i => i.Key == key)?.FreeByDefault ?? true;
+    }
+
+    private static async Task<LibertyException?> ExceptedAsync(DeliosDbContext db, string key, Guid projectId, CancellationToken cancellationToken)
+    {
         var except = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && s.Key == ExceptPrefix + key)
             .Select(s => s.Value).FirstOrDefaultAsync(cancellationToken);
-        return ReadExceptions(except).Any(e => e.ProjectId == projectId);
+        return ReadExceptions(except).FirstOrDefault(e => e.ProjectId == projectId);
     }
 
     /// <summary>The acts of "who carries each act out", stored one setting each (with <c>SKIP:</c> and <c>CONFIRM:</c> beside them).</summary>
@@ -254,7 +274,14 @@ public static class Liberty
     public static void MapLibertyEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/liberty").WithTags("Settings").RequireAuthorization().AddEndpointFilter<TransactionFilter>();
-        group.MapGet("", async (Guid? projectId, DeliosDbContext db, CancellationToken c) => Results.Ok(await ReadAsync(db, projectId, c)));
+        group.MapGet("", async (Guid? projectId, HttpContext http, DeliosDbContext db, CancellationToken c) =>
+        {
+            var views = await ReadAsync(db, projectId, c);
+            // Which projects are exceptions, and why, is an administrator's to read; anyone else reads only the
+            // project they asked about.
+            if (await Keepers.ConfiguresAsync(http)) return Results.Ok(views);
+            return Results.Ok(views.Select(v => v with { Except = v.Except.Where(e => e.ProjectId == projectId).ToList() }));
+        });
         group.MapPut("/{key}/except", ExceptAsync);
         group.MapPut("/{key}", async (string key, LibertyRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock,
             CancellationToken c) =>

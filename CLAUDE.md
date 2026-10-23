@@ -68,7 +68,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   LIBERTY_EXCEPTION, the project's control function told): only those projects may take their own copy; ended, what
   the project changed stays; counted only while fixed; every check reads it per project (`Liberty.IsFreeAsync(db, key,
   projectId)`, `RoomRefusalAsync(…, projectId)`, `GET /api/liberty?projectId=`, `projectLiberty`). Drawn under each
-  fixed switch (`LibertyRow`). **What a project changed** is read on the organization's Settings (`?project=<id>`,
+  fixed switch (`LibertyRow`). A project's pages say it, with its reason ("Free here by an exception: the organization
+  keeps … the same on every other project", `ExceptionNote`; each project endpoint's `exception`, `Liberty.ExceptionHereAsync`;
+  a Control room answer's `Choice` `exception`). Which projects are exceptions, and why, only an administrator reads;
+  anyone else reads only the project asked about. **What a project changed** is read on the organization's Settings (`?project=<id>`,
   `OneProject`, backend `ProjectDifferences`): its own copies, changed answers, exceptions, each opening its card; read
   only, changed in the project's Settings. Made stricter later, what a project
   already changed stays, read as changed before the rule. Where each starts, and why, is in `Liberty.Items`, chosen

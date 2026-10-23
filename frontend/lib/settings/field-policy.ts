@@ -183,7 +183,9 @@ type FormView = {
  * Every form at one level: a project's (the forms it keeps its own copy of, whether the organization leaves forms free,
  * whether this person may change them) or the organization's (its Settings).
  */
-export type FormsAnswer = { level: "project" | "organization"; forms: FormView[]; owned: string[]; free: boolean; mayChange: boolean };
+export type FormsAnswer = { level: "project" | "organization"; forms: FormView[]; owned: string[]; free: boolean; mayChange: boolean;
+  /** Free here only by an exception (who, when, why). */
+  exception?: { reason: string; by: string; at: string } | null };
 
 /** The project's forms, read once a request (`GET /api/projects/{id}/forms`). */
 export const projectForms = cache(async (projectId: string): Promise<FormsAnswer | null> =>

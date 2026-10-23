@@ -1,4 +1,5 @@
 import "server-only";
+import type { ExceptionHere } from "@/lib/settings/exception";
 import { cache } from "react";
 import { api, projectPath } from "@/lib/client";
 import { requireScope } from "@/lib/core/scope";
@@ -131,7 +132,7 @@ export const adminNumbering = cache(async () => api<AdminNumbering>("/api/admin/
  * The numbering a project uses (its own copy, else the organization's), whether numbering is free for projects
  * (What projects may change), and whether the person may change it here.
  */
-type ProjectNumbering = Pick<AdminNumbering, "schemes" | "routing"> & { own: boolean; free: boolean; mayChange: boolean; mayChangeOrganization: boolean };
+type ProjectNumbering = Pick<AdminNumbering, "schemes" | "routing"> & { own: boolean; free: boolean; exception?: ExceptionHere; mayChange: boolean; mayChangeOrganization: boolean };
 export const projectNumbering = cache(async () => {
   const ctx = await requireScope();
   return api<ProjectNumbering>(projectPath(ctx, "/numbering"));
@@ -199,7 +200,7 @@ export function backendField(label: string, valueSetKey: string, rule: string): 
  */
 export async function numberingForEditor(level: "organization" | "project" = "project") {
   const numbering = level === "organization"
-    ? { ...(await adminNumbering()), own: false, free: false, mayChange: true, mayChangeOrganization: true }
+    ? { ...(await adminNumbering()), own: false, free: false, exception: null, mayChange: true, mayChangeOrganization: true }
     : await projectNumbering();
   const schemes: EditorScheme[] = numbering.schemes.map((s) => ({
     id: s.id, name: s.name, delimiter: s.delimiter, active: s.active, notes: s.notes ?? null, used: !!s.used,
@@ -210,7 +211,7 @@ export async function numberingForEditor(level: "organization" | "project" = "pr
     deliverableType: kindOf[r.deliverableType] ?? r.deliverableType, schemeName: schemes.find((s) => s.id === r.schemeId)?.name ?? "",
     status: r.active ? "ACTIVE" : "INACTIVE",
   }));
-  return { schemes, routing, own: numbering.own, free: numbering.free, mayChange: numbering.mayChange, mayChangeOrganization: numbering.mayChangeOrganization };
+  return { schemes, routing, own: numbering.own, free: numbering.free, exception: numbering.exception, mayChange: numbering.mayChange, mayChangeOrganization: numbering.mayChangeOrganization };
 }
 
 // ── Functions, as the matrix screen reads them ───────────────────────────────
@@ -314,7 +315,7 @@ export type EditorRouteStep = {
 };
 
 /** The review routes a project offers (its own copy, else the organization's), whether they are free, and who may change them here. */
-type ProjectRoutes = { routes: AdminRoute[]; own: boolean; free: boolean; mayChange: boolean; mayChangeOrganization: boolean };
+type ProjectRoutes = { routes: AdminRoute[]; own: boolean; free: boolean; exception?: ExceptionHere; mayChange: boolean; mayChangeOrganization: boolean };
 export const projectRoutes = cache(async () => {
   const ctx = await requireScope();
   return api<ProjectRoutes>(projectPath(ctx, "/routes"));
@@ -450,7 +451,7 @@ export const numberingCopies = cache(async () =>
   api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/numbering/projects"));
 
 /** The revision naming a project uses (its own copy, else the organization's), whether it is free for projects, and who may change it here. */
-type ProjectRevisions = Pick<AdminNumbering, "revisionSchemes" | "revisionRouting"> & { own: boolean; free: boolean; mayChange: boolean; mayChangeOrganization: boolean };
+type ProjectRevisions = Pick<AdminNumbering, "revisionSchemes" | "revisionRouting"> & { own: boolean; free: boolean; exception?: ExceptionHere; mayChange: boolean; mayChangeOrganization: boolean };
 export const projectRevisions = cache(async () => {
   const ctx = await requireScope();
   return api<ProjectRevisions>(projectPath(ctx, "/revisions"));
@@ -480,7 +481,7 @@ export const keptCopies = cache(async (kind: string) =>
 
 /** What each function may do on a project (its own copy where it keeps one), as the matrix reads it, with who may change it. */
 export async function projectFunctionsForMatrix(scope: { projectId: string }) {
-  const view = await api<{ own: boolean; free: boolean; mayChange: boolean; functions: AdminFunction[] }>(projectPath(scope, "/functions"));
+  const view = await api<{ own: boolean; free: boolean; exception?: ExceptionHere; mayChange: boolean; functions: AdminFunction[] }>(projectPath(scope, "/functions"));
   return { ...view, functions: matrixOf(view.functions) };
 }
 

@@ -428,8 +428,15 @@ public static class ProjectLists
             .Append(ValueSets.Phases).Append(ValueSets.ProjectKinds).Distinct().Where(k => k != ValueSets.ProjectCodes).ToList();
         // Where each list stands for a project: its own copy, the organization's it may change (a copy on its first
         // change), or the organization's alone (fixed, or describing projects).
-        var switches = (await Liberty.ReadAsync(db, level.Project?.Id, cancellationToken)).ToDictionary(i => i.Key, i => i.Free);
-        bool Free(string key) => !OrganizationOnly.Contains(key) && (switches.TryGetValue(Liberty.ListKey(key), out var free) ? free : true);
+        var views = (await Liberty.ReadAsync(db, level.Project?.Id, cancellationToken)).ToDictionary(i => i.Key);
+        bool Free(string key) => !OrganizationOnly.Contains(key) && (views.TryGetValue(Liberty.ListKey(key), out var view) ? view.Free : true);
+        // Free here only by an exception (who, when, why): the list's own, or the numbering's for a list it reads.
+        LibertyExceptionView? ExceptionOf(string key)
+        {
+            if (level.Project is not { } here || !views.TryGetValue(Liberty.ListKey(key), out var view) || !view.ExceptHere) return null;
+            var from = view.Locked is null ? view : views[Liberty.Numbering];
+            return from.Except.FirstOrDefault(e => e.ProjectId == here.Id);
+        }
         var lists = keys.Select(key =>
         {
             var info = meta.GetValueOrDefault(key) ?? ListRules.ListMeta.Read(null);
@@ -450,6 +457,7 @@ public static class ProjectLists
                 count = counts.Where(c => c.SetKey == key).Sum(c => c.Active),
                 own = owned.Contains(key),
                 free = Free(key),
+                exception = ExceptionOf(key),
                 // A list filled before it had sets reads as its one default set, made on its first change.
                 sets = own.Count > 0
                     ? own.Select(s => new { Id = (Guid?)s.Id, s.Name, s.IsDefault, s.Active, s.DeliverableTypes, inUse = Count(s.Id, true), others = Count(s.Id, false) }).ToList()

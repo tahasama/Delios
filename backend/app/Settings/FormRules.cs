@@ -222,6 +222,7 @@ public static class FormRules
                 forms,
                 owned = await OwnedAsync(db, access.Project.Id, c),
                 free = await Liberty.IsFreeAsync(db, Liberty.Forms, access.Project.Id, c),
+                exception = await Liberty.ExceptionHereAsync(db, Liberty.Forms, access.Project.Id, c),
                 mayChange = await ProjectLists.MayChangeAsync(db, access, c),
             });
         });

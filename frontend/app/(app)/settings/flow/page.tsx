@@ -113,6 +113,11 @@ export default async function ControlRoomPage() {
   const fixedItems = new Set(switches.filter((one) => one.area === "Control room" && !one.free).map((one) => one.key));
   const isFixed = (key: string) => fixedItems.has(roomItemOf(key) ?? key);
   const riskFixed = switches.some((one) => one.key === "RISK_WINDOW" && !one.free);
+  // An answer the organization keeps fixed on every other project, free here by an exception: its reason.
+  const exceptionOf = (key: string) => {
+    const item = switches.find((one) => one.key === (roomItemOf(key) ?? key));
+    return item?.exceptHere ? item.except.find((e) => e.projectId === ctx.projectId)?.reason : undefined;
+  };
   const clean = (label: string) => label.replace(/ — recommended$/, "").replace(/ \(recommended\)$/, "");
   const names = holders.map((one) => one.name);
 
@@ -175,7 +180,7 @@ export default async function ControlRoomPage() {
         ...(SKIPPABLE[key] ? [{ value: "OFF", label: "Left out", text: SKIPPABLE[key].off }] : []),
       ];
       const value = row?.off ? "OFF" : row?.controlDoes ? "CONTROL" : "SELF";
-      return <Choice key={key} title={act.title} options={options} value={value} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
+      return <Choice key={key} title={act.title} options={options} value={value} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} exception={exceptionOf(key)} />;
     }
     if (key.startsWith("CONFIRM:")) {
       const of = key.slice(8);
@@ -183,7 +188,7 @@ export default async function ControlRoomPage() {
         { value: "ON", label: "Yes", text: CONFIRMABLE[of] ?? "" },
         { value: "OFF", label: "No", text: of === PEOPLE_KEY ? "Nobody confirms: they are on the project at once." : "Nobody confirms: the control function applies it." },
       ];
-      return <Choice key={key} title="Confirmed by whoever holds Manage" options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
+      return <Choice key={key} title="Confirmed by whoever holds Manage" options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} exception={exceptionOf(key)} />;
     }
     if (key === "DAYS") {
       const noSchedule = !schedule.source;
@@ -191,17 +196,17 @@ export default async function ControlRoomPage() {
         <Choice key="lead" title="A document is needed before the action's day" value={String(lead)} unit="days" min={0} max={365} field="leadDays"
           action={setScheduleDaysAction} hidden={{ riskDays: String(risk) }} readOnly={readOnly || noSchedule} />,
         <Choice key="risk" title="The action is at risk from" value={String(risk)} unit="days before" min={0} max={365} field="riskDays"
-          action={setScheduleDaysAction} hidden={{ leadDays: String(lead) }} readOnly={readOnly || noSchedule} fixed={riskFixed} />,
+          action={setScheduleDaysAction} hidden={{ leadDays: String(lead) }} readOnly={readOnly || noSchedule} fixed={riskFixed} exception={exceptionOf("RISK_WINDOW")} />,
       ];
     }
     if (key === "ESCALATE") {
       return <Choice key={key} title="A discipline still silent after the day is told again, with whoever holds Manage and the control function, after" value={escalate} unit="working days" min={1} max={60}
-        action={setRoomAnswerAction} hidden={{ key: ESCALATE_AFTER_KEY }} readOnly={readOnly} fixed={isFixed(ESCALATE_AFTER_KEY)} />;
+        action={setRoomAnswerAction} hidden={{ key: ESCALATE_AFTER_KEY }} readOnly={readOnly} fixed={isFixed(ESCALATE_AFTER_KEY)} exception={exceptionOf(ESCALATE_AFTER_KEY)} />;
     }
     const policy = POLICIES.find((one) => one.key === key);
     if (!policy) return null;
     const options = policy.options.map((one) => ({ value: one.value, label: clean(one.label), text: one.text }));
-    return <Choice key={key} title={policy.title} options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
+    return <Choice key={key} title={policy.title} options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} exception={exceptionOf(key)} />;
   };
 
   const extraCount: Record<Extra, string> = {
