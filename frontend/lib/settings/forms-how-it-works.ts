@@ -56,8 +56,8 @@ async function save(formData: FormData, wanted: [key: string, value: string | nu
   if (String(formData.get("target") ?? "") !== "defaults") {
     const ctx = await requireAdminScope();
     // An answer the organization keeps fixed is not the project's to change: it is left as it stands.
-    const { liberty } = await import("@/lib/organization/liberty");
-    const fixed = new Set((await liberty()).filter((one) => !one.free).map((one) => one.key));
+    const { projectLiberty } = await import("@/lib/organization/liberty");
+    const fixed = new Set((await projectLiberty(ctx.projectId)).filter((one) => !one.free).map((one) => one.key));
     let changed = 0;
     for (const [key, value] of wanted) {
       const item = roomItemOf(key);

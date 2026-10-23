@@ -487,3 +487,18 @@ export async function projectFunctionsForMatrix(scope: { projectId: string }) {
 /** The projects keeping their own rights. */
 export const functionCopies = cache(async () =>
   api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/functions/projects"));
+
+/** What one project changed from the organization's (backend `ProjectDifferences`), read on the organization's Settings. */
+export type ProjectDifferences = {
+  project: { id: string; code: string; name: string };
+  /** The cards it keeps its own copy of; `items` names the lists or forms, where they are copied one by one. */
+  copies: { area: string; since: string | null; by: string | null; items: string[] }[];
+  /** Control room and stamp answers it changed, counted under the switch that covers them. */
+  answers: { key: string; area: string; title: string; changed: number; free: boolean }[];
+  /** The fixed switches it is an exception to. */
+  exceptions: { key: string; area: string; title: string; reason: string; at: string; by: string }[];
+};
+
+/** A failed read throws: "it changed nothing" is never said of a project that could not be read. */
+export const projectDifferences = cache(async (projectId: string) =>
+  api<ProjectDifferences>(`/api/admin/projects/${projectId}/differences`));

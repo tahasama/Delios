@@ -41,7 +41,7 @@ public static partial class ScheduleEndpoints
         var source = await db.ScheduleSources.SingleOrDefaultAsync(s => s.ProjectId == access.Project.Id, cancellationToken);
         // The risk window is the organization's where it keeps it fixed: the project's stays as it was.
         if (request.RiskWindowDays is { } window && window != (source?.RiskWindowDays ?? 7)
-            && !await Settings.Liberty.IsFreeAsync(db, "RISK_WINDOW", cancellationToken))
+            && !await Settings.Liberty.IsFreeAsync(db, "RISK_WINDOW", access.Project.Id, cancellationToken))
             return Problems.Forbidden("ROOM_FIXED", "The risk window: the organization keeps it the same on every project. An administrator changes it in the organization's Settings.");
         if (source is null)
         {
@@ -75,7 +75,7 @@ public static partial class ScheduleEndpoints
         var source = await db.ScheduleSources.SingleOrDefaultAsync(s => s.ProjectId == access.Project.Id, cancellationToken);
         if (source is null) return Problems.Conflict("SCHEDULE_NOT_SET", "Name the project's schedule first (Schedule): the days apply to its actions.");
         if (request.RiskWindowDays is { } window && window != source.RiskWindowDays
-            && !await Settings.Liberty.IsFreeAsync(db, "RISK_WINDOW", cancellationToken))
+            && !await Settings.Liberty.IsFreeAsync(db, "RISK_WINDOW", access.Project.Id, cancellationToken))
             return Problems.Forbidden("ROOM_FIXED", "The risk window: the organization keeps it the same on every project. An administrator changes it in the organization's Settings.");
         var was = $"{source.DefaultLeadDays} / {source.RiskWindowDays}";
         source.DefaultLeadDays = request.DefaultLeadDays ?? source.DefaultLeadDays;

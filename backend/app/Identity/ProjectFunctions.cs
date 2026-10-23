@@ -51,7 +51,7 @@ public static class ProjectFunctions
         return Results.Ok(new
         {
             Own = own,
-            Free = await Liberty.IsFreeAsync(db, Liberty.Functions, cancellationToken),
+            Free = await Liberty.IsFreeAsync(db, Liberty.Functions, access.Project.Id, cancellationToken),
             MayChange = await ProjectLists.MayChangeAsync(db, access, cancellationToken),
             Functions = functions.Select(f => new
             {
@@ -73,7 +73,7 @@ public static class ProjectFunctions
         IClock clock, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!await Liberty.IsFreeAsync(db, Liberty.Functions, cancellationToken))
+        if (!await Liberty.IsFreeAsync(db, Liberty.Functions, access.Project.Id, cancellationToken))
             return Problems.Forbidden("FUNCTIONS_FIXED", "What each function may do is the organization's, the same on every project: an administrator changes it on the organization's page.");
         if (!await ProjectLists.MayChangeAsync(db, access, cancellationToken))
             return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes what each function may do here (on a project with none, whoever opened it).");

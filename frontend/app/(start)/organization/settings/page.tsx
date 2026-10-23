@@ -4,7 +4,9 @@ import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { Chip } from "@/components/ui";
 import { libertyOrFail } from "@/lib/organization/liberty";
 import { projectDefaults } from "@/lib/organization/defaults";
-import { numberingCopies, revisionCopies, routeCopies, listCopies, formCopies, functionCopies } from "@/lib/settings/api-admin";
+import { numberingCopies, revisionCopies, routeCopies, listCopies, formCopies, functionCopies, projectDifferences } from "@/lib/settings/api-admin";
+import { exceptable } from "./projects";
+import { OneProject } from "./one-project";
 import { SETUP_PAGES, SETUP_GROUPS } from "@/app/(app)/settings/setup-pages";
 import { SETUP_ICON } from "@/app/(app)/settings/icons";
 import { fmtDate } from "@/lib/core/utils";
@@ -20,11 +22,16 @@ export const metadata = { title: "The organization's Settings" };
  * many projects keep their own copy; the Control room stands above the cards, as on a project; each card says where its
  * switch stands. An administrator changes the organization's here only.
  */
-export default async function OrganizationSettingsPage() {
+export default async function OrganizationSettingsPage({ searchParams }: { searchParams: Promise<{ project?: string }> }) {
   const scope = await requireOrgAdmin();
-  const [switches, defaults, numbering, revisions, routes, lists, forms, functions] = await Promise.all([
+  const { project: wanted } = await searchParams;
+  const [switches, defaults, numbering, revisions, routes, lists, forms, functions, projects] = await Promise.all([
     libertyOrFail(), projectDefaults({ orFail: true }), numberingCopies(), revisionCopies(), routeCopies(), listCopies(), formCopies(), functionCopies(),
+    exceptable(),
   ]);
+  const chosen = projects.some((p) => p.id === wanted) ? wanted! : null;
+  const differences = chosen ? await projectDifferences(chosen) : null;
+  const excepted = switches.reduce((n, one) => n + one.except.length, 0);
   const free = switches.filter((one) => one.free).length;
   const byCard: [string, { id: string }[]][] = [["Numbering", numbering], ["Revisions", revisions], ["Review routes", routes], ["Types & sets", lists], ["Forms & fields", forms], ["Functions & permissions", functions]];
   const copies = new Map(byCard.map(([area, rows]) => [area, rows.length]));
@@ -37,7 +44,9 @@ export default async function OrganizationSettingsPage() {
     const items = switches.filter((one) => one.area === area);
     if (!items.length) return null;
     const n = items.filter((one) => one.free).length;
-    const own = copies.get(area) ? ` · ${copies.get(area)} ${copies.get(area) === 1 ? "project has" : "projects have"} their own` : "";
+    const except = [...new Set(items.flatMap((one) => one.except.map((e) => e.projectCode)))];
+    const own = (copies.get(area) ? ` · ${copies.get(area)} ${copies.get(area) === 1 ? "project has" : "projects have"} their own` : "")
+      + (except.length ? ` · except on ${except.join(", ")}` : "");
     if (items.length === 1) return { text: (items[0].free ? "Free · projects may change it" : "Fixed · the same on every project") + own, free: items[0].free };
     return {
       text: (n === 0 ? `Fixed · all ${items.length} switches` : n === items.length ? `Free · all ${items.length} switches` : `${n} switches free · ${items.length - n} fixed`) + own,
@@ -77,7 +86,10 @@ export default async function OrganizationSettingsPage() {
             <dd className="mt-1 text-[13px] font-medium text-slate-900">
               {ownProjects ? `${ownProjects} ${ownProjects === 1 ? "project" : "projects"}, on ${ownCards} ${ownCards === 1 ? "card" : "cards"}` : "None"}
             </dd>
-            <dd className="text-[11px] text-slate-500">{ownProjects ? "listed on each card; changes here never touch them" : "every project uses ours"}</dd>
+            <dd className="text-[11px] text-slate-500">
+              {ownProjects ? "listed on each card; changes here never touch them" : "every project uses ours"}
+              {excepted ? ` · ${excepted} ${excepted === 1 ? "exception" : "exceptions"} to what is fixed` : ""}
+            </dd>
           </div>
         </dl>
       </header>
@@ -125,6 +137,8 @@ export default async function OrganizationSettingsPage() {
           </div>
         </dl>
       </section>
+
+      <OneProject projects={projects} chosen={chosen} differences={differences} />
 
       <div className="space-y-5">
         {SETUP_GROUPS.map((group) => {

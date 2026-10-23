@@ -1425,3 +1425,21 @@ schedule's days, how its suppliers send) stays the project's.
 
 **Depends on it:** `PROJECT_DEFAULTS`, `LIBERTY:<key>` (`Settings/Liberty.cs`); `/organization/settings/flow`,
 `/organization/defaults`, `/organization/settings/may-change`.
+
+## 77 · Fixed, except on the projects named; what one project changed, read in one place
+
+A setting the organization keeps fixed may still be left free on one project, when that project needs something
+special (owner: both ways at once were dangerous or messy: freeing it for every project to help one, or changing a
+project's copy from two places). An administrator names the project on the setting's switch, always with why; the
+project's control function is told, and only that project may then take its own copy. Ending it is also with why:
+what the project changed stays, as when a setting is made fixed later. An exception counts only while the setting is
+fixed; the switch, the Control room's answers and every change a project makes read it the same way.
+
+The organization's Settings also read one project against the organization's: choose a project, and every card it
+keeps its own copy of (since when, by whom, which lists or forms), the Control room and stamp answers it changed, and
+the exceptions it holds are listed, each opening the organization's card where it is put back or ended. Nothing is
+changed there: a project's settings are changed in that project's Settings, by its control function.
+
+**Depends on it:** `LIBERTY_EXCEPT:<key>` (`Settings/Liberty.cs`, `PUT /api/liberty/{key}/except`, LIBERTY_EXCEPTION;
+`GET /api/liberty?projectId=`), `Settings/ProjectDifferences.cs` (`GET /api/admin/projects/{id}/differences`);
+`/organization/settings?project=<id>`.

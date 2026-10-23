@@ -57,7 +57,7 @@ public static class RevisionSchemeEndpoints
         {
             var access = ProjectAccessFilter.Of(h);
             var scope = await ScopeAsync(db, access.Project.Id, c);
-            var free = await Liberty.IsFreeAsync(db, Liberty.Revisions, c);
+            var free = await Liberty.IsFreeAsync(db, Liberty.Revisions, access.Project.Id, c);
             var schemes = await db.RevisionSchemes.AsNoTracking().Where(s => s.ProjectId == scope).OrderBy(s => s.Name).ToListAsync(c);
             var routing = await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.ProjectId == scope).ToListAsync(c);
             return Results.Ok(new
@@ -82,7 +82,7 @@ public static class RevisionSchemeEndpoints
         Func<Guid?, Task<IResult>> act, Guid? schemeId = null)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!await Liberty.IsFreeAsync(db, Liberty.Revisions, cancellationToken))
+        if (!await Liberty.IsFreeAsync(db, Liberty.Revisions, access.Project.Id, cancellationToken))
             return Problems.Forbidden("REVISIONS_FIXED", "Revision naming is the organization's, the same on every project: an administrator changes it in the organization's Settings.");
         if (!await ProjectLists.MayChangeAsync(db, access, cancellationToken))
             return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes its revision naming (on a project with none, whoever opened it).");

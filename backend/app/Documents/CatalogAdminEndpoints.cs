@@ -66,7 +66,7 @@ public static class CatalogAdminEndpoints
         project.MapGet("", async (HttpContext h, DeliosDbContext db, CancellationToken c) =>
         {
             var access = ProjectAccessFilter.Of(h);
-            var free = await Liberty.IsFreeAsync(db, Liberty.Routes, c);
+            var free = await Liberty.IsFreeAsync(db, Liberty.Routes, access.Project.Id, c);
             return Results.Ok(new
             {
                 Routes = await RouteViewsAsync(db, await RouteScopeAsync(db, access.Project.Id, c), c),
@@ -161,7 +161,7 @@ public static class CatalogAdminEndpoints
         Func<Guid?, Task<IResult>> act, Guid? routeId = null)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!await Liberty.IsFreeAsync(db, Liberty.Routes, cancellationToken))
+        if (!await Liberty.IsFreeAsync(db, Liberty.Routes, access.Project.Id, cancellationToken))
             return Problems.Forbidden("ROUTES_FIXED", "The review routes are the organization's, the same on every project: an administrator changes them in the organization's Settings.");
         if (!await ProjectLists.MayChangeAsync(db, access, cancellationToken))
             return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes its review routes (on a project with none, whoever opened it).");

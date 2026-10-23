@@ -201,6 +201,7 @@ const WORDS: Record<string, string> = {
   TENANT_CREATED: "Organization opened",
   SETTING_CHANGED: "Changed a setting",
   LIBERTY_CHANGED: "Changed what projects may change",
+  LIBERTY_EXCEPTION: "Changed which projects are an exception to what is fixed",
   SETTING_RESET: "Put a project back to the organization's",
   SETTING_PUT_BACK: "Put a project's own copy back",
   VALUE_CHANGED: "Changed a list value",

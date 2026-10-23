@@ -18,7 +18,7 @@ import { StepPanel } from "./step-panel";
 import { IntakeChoice } from "./intake-choice";
 import { projectIntake } from "@/lib/packages/api";
 import { Choice } from "./choice";
-import { liberty } from "@/lib/organization/liberty";
+import { projectLiberty } from "@/lib/organization/liberty";
 import { setRoomAnswerAction, setScheduleDaysAction } from "@/lib/settings/forms-how-it-works";
 import { setRouteVerdictsAction } from "@/lib/reviews/forms";
 import { adminFunctions, projectNumbering, partiesWithAnswers, routesForEditor } from "@/lib/settings/api-admin";
@@ -74,7 +74,7 @@ export default async function ControlRoomPage() {
       organizations: { id: string; kind: string }[];
       mayNameControl: boolean;
     }>(projectPath(ctx, "/people/directory")).catch(() => null),
-    liberty(),
+    projectLiberty(ctx.projectId),
     api<{ key: string; title: string; verdicts: { code: string; status: string }[] }[]>("/api/admin/verdict-lists").catch(() => null),
     // What is kept about people's activity is the organization's (What is kept), read here only.
     orgSettings().catch(() => null),

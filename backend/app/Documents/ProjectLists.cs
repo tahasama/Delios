@@ -228,7 +228,7 @@ public static class ProjectLists
     {
         if (db.ListsProject is not { } projectId) return null;
         if (!db.ListsOwnKeys.Contains(listKey)
-            && (OrganizationOnly.Contains(listKey) || !await Liberty.IsFreeAsync(db, Liberty.ListKey(listKey), cancellationToken))) return null;
+            && (OrganizationOnly.Contains(listKey) || !await Liberty.IsFreeAsync(db, Liberty.ListKey(listKey), projectId, cancellationToken))) return null;
         await EnsureOwnAsync(db, projectId, listKey, cancellationToken);
         return projectId;
     }
@@ -428,7 +428,7 @@ public static class ProjectLists
             .Append(ValueSets.Phases).Append(ValueSets.ProjectKinds).Distinct().Where(k => k != ValueSets.ProjectCodes).ToList();
         // Where each list stands for a project: its own copy, the organization's it may change (a copy on its first
         // change), or the organization's alone (fixed, or describing projects).
-        var switches = (await Liberty.ReadAsync(db, cancellationToken)).ToDictionary(i => i.Key, i => i.Free);
+        var switches = (await Liberty.ReadAsync(db, level.Project?.Id, cancellationToken)).ToDictionary(i => i.Key, i => i.Free);
         bool Free(string key) => !OrganizationOnly.Contains(key) && (switches.TryGetValue(Liberty.ListKey(key), out var free) ? free : true);
         var lists = keys.Select(key =>
         {
@@ -501,7 +501,7 @@ public static class ProjectLists
         const string where = "an administrator changes it in the organization's Settings, for every project";
         if (OrganizationOnly.Contains(set))
             return Problems.Forbidden("ORGANIZATIONS_LIST", $"This list describes the projects themselves: {where}.");
-        if (!await Liberty.IsFreeAsync(db, Liberty.ListKey(set), cancellationToken))
+        if (!await Liberty.IsFreeAsync(db, Liberty.ListKey(set), project.Id, cancellationToken))
             return Problems.Forbidden("LIST_FIXED", $"Every project uses the organization's list: {where}.");
         return null;
     }

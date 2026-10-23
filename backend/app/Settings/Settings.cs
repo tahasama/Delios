@@ -74,7 +74,7 @@ public static class SettingEndpoints
             if (!await Keepers.ConfiguresAsync(h) && !access.Holds(Verbs.Control))
                 return Problems.Forbidden("CONTROL_ONLY", "An administrator or the control function answers for the project.");
             // What the organization keeps fixed is the same on every project (owner: two levels of settings).
-            if (await Liberty.RoomRefusalAsync(db, key.Trim(), r.Value, c) is { } fixedHere) return fixedHere;
+            if (await Liberty.RoomRefusalAsync(db, key.Trim(), r.Value, access.Project.Id, c) is { } fixedHere) return fixedHere;
             // How documents come in has its own checks (one way or the other, its warning read): PUT /intake.
             if (key.Trim() is Packages.Intake.Key or Packages.Intake.FilingKey)
                 return Problems.Invalid("USE_INTAKE", "How other organizations' documents come in is chosen in the Control room.");

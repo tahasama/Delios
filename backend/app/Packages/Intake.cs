@@ -59,7 +59,7 @@ public static class Intake
             return Problems.Forbidden("CONTROL_ONLY", "An administrator or the control function sets how documents come in.");
         var mode = request.Mode?.Trim().ToUpperInvariant();
         if (mode is not (Placeholders or AsReceived)) return Problems.Invalid("MODE_UNKNOWN", "By placeholders, or as they come.", new { field = "mode" });
-        if (await Liberty.RoomRefusalAsync(db, Key, mode, cancellationToken) is { } fixedHere) return fixedHere;
+        if (await Liberty.RoomRefusalAsync(db, Key, mode, access.Project.Id, cancellationToken) is { } fixedHere) return fixedHere;
         var projectId = access.Project.Id;
         var now = await ReadAsync(db, projectId, cancellationToken);
         string? filing = null;

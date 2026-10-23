@@ -306,6 +306,27 @@ export async function setLibertyAction(_prev: Result | undefined, formData: Form
   return { ok: free ? "Free: a project may now take its own copy." : "Fixed: every project now uses the organization's." };
 }
 
+/**
+ * Leaves one project free to change what a fixed switch covers, or ends that (owner: "Fixed, except on these
+ * projects"). Always with why; the project's control function is told by the backend.
+ */
+export async function setLibertyExceptionAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const key = text(formData, "key");
+  const projectId = text(formData, "projectId");
+  const except = text(formData, "except") === "1";
+  const reason = text(formData, "reason");
+  if (!key) return { error: "Nothing to change." };
+  if (!projectId) return { error: "Choose the project.", fields: ["projectId"] };
+  if (!reason) return { error: except ? "Say why this project may change it." : "Say why the exception ends.", fields: ["reason"] };
+  try {
+    await api(`/api/liberty/${encodeURIComponent(key)}/except`, { method: "PUT", body: { projectId, except, reason } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization/settings", "layout");
+  return { ok: except ? "Done: that project may change it; the others still take the organization's." : "Done: the exception ended; what the project changed stays." };
+}
+
 /** The cards a project may have its own copy of, and their backend: what a reset puts back. */
 const RESETTABLE: Record<string, { path: string; words: string; pages: string[] }> = {
   numbering: { path: "/api/admin/numbering", words: "numbering", pages: ["/settings/numbering", "/organization/settings/numbering"] },

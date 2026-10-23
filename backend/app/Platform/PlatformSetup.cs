@@ -368,6 +368,7 @@ public static class PlatformSetup
             Documents.Equivalents.MapEquivalentEndpoints(app);
             Packages.Intake.MapIntakeEndpoints(app);
             Settings.KeptCopies.MapKeptCopyEndpoints(app);
+            Settings.ProjectDifferences.MapProjectDifferenceEndpoints(app);
             Identity.ProjectFunctions.MapProjectFunctionEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
 import { projectSettings, orgSettings } from "@/lib/settings/api";
-import { liberty } from "@/lib/organization/liberty";
+import { projectLiberty } from "@/lib/organization/liberty";
 import { stampAnswers, stampOwn } from "@/lib/settings/stamp";
 import { StampCard } from "@/components/stamp-card";
 import { SETUP_PAGES, maySetup, mayChangeControlRoom } from "../setup-pages";
@@ -21,7 +21,7 @@ export const metadata = { title: "The stamp" };
 export default async function StampPage() {
   const ctx = await requireScope();
   if (!maySetup(ctx.user, SETUP_PAGES.find((p) => p.href === "/settings/stamp")!)) return <NoAccess title="The stamp" who="control" />;
-  const [own, organization, switches, jar] = await Promise.all([projectSettings(ctx.projectId), orgSettings(), liberty(), cookies()]);
+  const [own, organization, switches, jar] = await Promise.all([projectSettings(ctx.projectId), orgSettings(), projectLiberty(ctx.projectId), cookies()]);
   const free = switches.find((one) => one.key === "POLICY_PDF_STAMP")?.free ?? true;
   const mine = stampOwn(own);
   const project = ctx.project.code;

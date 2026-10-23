@@ -63,7 +63,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   app's defaults, **keeping a copy of its own** (to build: put back like a project's kept copy, `docs/gaps/settings.md`);
   a project goes back to the organization's ("Back to the defaults", Control room). **Fixed** (every project uses
   the organization's; only an administrator changes it, for all) or **Free** (a project may take its own copy; the
-  organization's later changes never touch it). Two degrees only, never a third. Made stricter later, what a project
+  organization's later changes never touch it). Two degrees only, never a third, with one exception (owner, "both"):
+  **Fixed, except on the projects named** (`LIBERTY_EXCEPT:<key>`, `PUT /api/liberty/{key}/except`, always with why,
+  LIBERTY_EXCEPTION, the project's control function told): only those projects may take their own copy; ended, what
+  the project changed stays; counted only while fixed; every check reads it per project (`Liberty.IsFreeAsync(db, key,
+  projectId)`, `RoomRefusalAsync(…, projectId)`, `GET /api/liberty?projectId=`, `projectLiberty`). Drawn under each
+  fixed switch (`LibertyRow`). **What a project changed** is read on the organization's Settings (`?project=<id>`,
+  `OneProject`, backend `ProjectDifferences`): its own copies, changed answers, exceptions, each opening its card; read
+  only, changed in the project's Settings. Made stricter later, what a project
   already changed stays, read as changed before the rule. Where each starts, and why, is in `Liberty.Items`, chosen
   from what depends on it (numbering, revisions, cross-project search and reports, the meanings the app reads, the
   law, security), never from an example. Each list of Types & sets has its own switch; a list a number part reads

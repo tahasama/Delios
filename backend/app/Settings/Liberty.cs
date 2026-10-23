@@ -1,6 +1,7 @@
 using Delios.Host.Audit;
 using Delios.Host.Documents;
 using Delios.Host.Identity;
+using Delios.Host.Notifications;
 using Delios.Host.Platform;
 using Delios.Host.Reviews;
 using Delios.Host.Tenancy;
@@ -16,9 +17,16 @@ namespace Delios.Host.Settings;
 /// <param name="FreeByDefault">Where the switch stands until an administrator moves it.</param>
 public sealed record LibertyItem(string Key, string Area, string Title, string Why, bool FreeByDefault);
 
-/// <summary>A switch as the screens read it: where it stands, whether it was moved, and when it cannot be moved.</summary>
+/// <summary>
+/// A switch as the screens read it: where it stands, whether it was moved, when it cannot be moved, and the projects it
+/// leaves free although it is fixed (<see cref="Except"/>). Read for one project, <see cref="Free"/> says whether that
+/// project may change it, and <see cref="ExceptHere"/> that it may only by an exception.
+/// </summary>
 public sealed record LibertyView(string Key, string Area, string Title, string Why, bool Free, bool FreeByDefault,
-    DateTimeOffset? ChangedAt, string? ChangedBy, string? Locked);
+    DateTimeOffset? ChangedAt, string? ChangedBy, string? Locked, IReadOnlyList<LibertyExceptionView> Except, bool ExceptHere);
+
+/// <summary>One project a fixed switch leaves free (owner: "Fixed, except on these projects"): who decided it, when and why.</summary>
+public sealed record LibertyExceptionView(Guid ProjectId, string ProjectCode, string ProjectName, string Reason, DateTimeOffset At, string By);
 
 /// <summary>
 /// Two levels of settings (owner): the organization's is everything the app gives by default, adapted by its
@@ -33,6 +41,8 @@ public sealed record LibertyView(string Key, string Area, string Title, string W
 public static class Liberty
 {
     public const string Prefix = "LIBERTY:";
+    /// <summary>The projects a fixed switch leaves free, kept as <c>LIBERTY_EXCEPT:{Key}</c> in the organization's settings (a list).</summary>
+    public const string ExceptPrefix = "LIBERTY_EXCEPT:";
     public const string Free = "FREE";
     public const string Fixed = "FIXED";
 
@@ -96,11 +106,18 @@ public static class Liberty
         new("SUPPLIER_INTAKE", Room, "How other organizations' documents come in: by placeholder, or as they come", "The project's contract with its suppliers", true),
     ];
 
-    /// <summary>Every switch, the organization's own lists included, as it stands.</summary>
-    public static async Task<List<LibertyView>> ReadAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    /// <summary>
+    /// Every switch, the organization's own lists included, as it stands; read for one project (<paramref name="projectId"/>),
+    /// a fixed switch that project is an exception to reads free.
+    /// </summary>
+    public static async Task<List<LibertyView>> ReadAsync(DeliosDbContext db, Guid? projectId, CancellationToken cancellationToken)
     {
-        var rows = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && (s.Key.StartsWith(Prefix) || s.Key.StartsWith("SET:")))
+        var rows = await db.Set<Setting>().AsNoTracking()
+            .Where(s => s.ProjectId == null && (s.Key.StartsWith(Prefix) || s.Key.StartsWith(ExceptPrefix) || s.Key.StartsWith("SET:")))
             .ToListAsync(cancellationToken);
+        var exceptions = rows.Where(r => r.Key.StartsWith(ExceptPrefix)).ToDictionary(r => r.Key[ExceptPrefix.Length..], r => ReadExceptions(r.Value));
+        var ids = exceptions.Values.SelectMany(e => e.Select(one => one.ProjectId)).Distinct().ToList();
+        var projects = await db.Projects.AsNoTracking().Where(p => ids.Contains(p.Id)).Select(p => new { p.Id, p.Code, p.Name }).ToListAsync(cancellationToken);
         var items = Items.ToList();
         // The organization's own lists (document fields), after the app's: free unless numbering reads them.
         foreach (var row in rows.Where(r => r.Key.StartsWith("SET:")).OrderBy(r => r.Key))
@@ -111,26 +128,51 @@ public static class Liberty
             items.Add(new(ListKey(key), Lists, ListRules.TitleOf(key, meta), "A list of the organization's own", true));
         }
         var numbered = await NumberedListsAsync(db, cancellationToken);
-        return items.Select(item =>
+        var views = items.Select(item =>
         {
             var row = rows.FirstOrDefault(r => r.Key == Prefix + item.Key);
             var locked = item.Key.StartsWith("LIST:") && numbered.Contains(item.Key[5..]) ? "A number part reads it: it follows the numbering" : null;
             var free = locked is null && (row?.Value is { } value ? value == Free : item.FreeByDefault);
-            return new LibertyView(item.Key, item.Area, item.Title, item.Why, free, item.FreeByDefault,
-                row?.UpdatedAt.ToDateTimeOffset(), row?.UpdatedByName, locked);
+            // Exceptions count only while the switch is fixed; a project gone stays out of the list.
+            var except = locked is null && !free
+                ? exceptions.GetValueOrDefault(item.Key, []).Join(projects, e => e.ProjectId, p => p.Id,
+                    (e, p) => new LibertyExceptionView(p.Id, p.Code, p.Name, e.Reason, e.At, e.By)).OrderBy(e => e.ProjectCode).ToList()
+                : [];
+            var here = projectId is { } id && except.Any(e => e.ProjectId == id);
+            return new LibertyView(item.Key, item.Area, item.Title, item.Why, free || here, item.FreeByDefault,
+                row?.UpdatedAt.ToDateTimeOffset(), row?.UpdatedByName, locked, except, here);
         }).ToList();
+        // A list a number part reads follows the numbering, its exceptions included.
+        var numbering = views.First(v => v.Key == Numbering);
+        return views.Select(v => v.Locked is null ? v : v with { Free = numbering.Free, ExceptHere = numbering.ExceptHere }).ToList();
     }
 
+    /// <summary>One project left free by a fixed switch, as kept.</summary>
+    public sealed record LibertyException(Guid ProjectId, string Reason, DateTimeOffset At, string By);
+
+    private static List<LibertyException> ReadExceptions(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return [];
+        try { return System.Text.Json.JsonSerializer.Deserialize<List<LibertyException>>(value, Json) ?? []; }
+        catch (System.Text.Json.JsonException) { return []; }
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions Json = new(System.Text.Json.JsonSerializerDefaults.Web);
+
     /// <summary>
-    /// Whether a project may change this setting. A list a number part reads follows the numbering, whatever its switch.
+    /// Whether a project may change this setting: its switch is free, or fixed with this project as an exception. A list a
+    /// number part reads follows the numbering, whatever its switch.
     /// </summary>
-    public static async Task<bool> IsFreeAsync(DeliosDbContext db, string key, CancellationToken cancellationToken)
+    public static async Task<bool> IsFreeAsync(DeliosDbContext db, string key, Guid projectId, CancellationToken cancellationToken)
     {
         if (key.StartsWith("LIST:") && (await NumberedListsAsync(db, cancellationToken)).Contains(key[5..]))
-            return await IsFreeAsync(db, Numbering, cancellationToken);
+            return await IsFreeAsync(db, Numbering, projectId, cancellationToken);
         var value = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && s.Key == Prefix + key)
             .Select(s => s.Value).FirstOrDefaultAsync(cancellationToken);
-        return value is not null ? value == Free : Items.FirstOrDefault(i => i.Key == key)?.FreeByDefault ?? true;
+        if (value is not null ? value == Free : Items.FirstOrDefault(i => i.Key == key)?.FreeByDefault ?? true) return true;
+        var except = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && s.Key == ExceptPrefix + key)
+            .Select(s => s.Value).FirstOrDefaultAsync(cancellationToken);
+        return ReadExceptions(except).Any(e => e.ProjectId == projectId);
     }
 
     /// <summary>The acts of "who carries each act out", stored one setting each (with <c>SKIP:</c> and <c>CONFIRM:</c> beside them).</summary>
@@ -152,9 +194,9 @@ public static class Liberty
     /// Refuses a project's change of a Control room answer the organization keeps fixed (ROOM_FIXED), unless the answer
     /// is the organization's own default for new projects (putting the project back on it is always allowed).
     /// </summary>
-    public static async Task<IResult?> RoomRefusalAsync(DeliosDbContext db, string settingKey, string? value, CancellationToken cancellationToken)
+    public static async Task<IResult?> RoomRefusalAsync(DeliosDbContext db, string settingKey, string? value, Guid projectId, CancellationToken cancellationToken)
     {
-        if (RoomItemOf(settingKey) is not { } item || await IsFreeAsync(db, item, cancellationToken)) return null;
+        if (RoomItemOf(settingKey) is not { } item || await IsFreeAsync(db, item, projectId, cancellationToken)) return null;
         var defaults = await db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == null && s.Key == "PROJECT_DEFAULTS")
             .Select(s => s.Value).FirstOrDefaultAsync(cancellationToken);
         string? standard = null;
@@ -189,6 +231,22 @@ public static class Liberty
     /// <summary>Body of moving one switch.</summary>
     public sealed record LibertyRequest(bool Free);
 
+    /// <summary>Body of making a project an exception to a fixed switch, or ending it: always with why.</summary>
+    public sealed record ExceptionRequest(Guid ProjectId, bool Except, string? Reason);
+
+    /// <summary>Where a project changes what a switch covers, for the notice sent to its control function.</summary>
+    private static string PageOf(string area) => area switch
+    {
+        "Numbering" => "/settings/numbering",
+        "Revisions" => "/settings/revisions",
+        Lists => "/settings/config",
+        "Forms & fields" => "/settings/fields",
+        "Review routes" => "/settings/workflow-templates",
+        "Functions & permissions" => "/settings/functions",
+        Stamp => "/settings/stamp",
+        _ => "/settings/flow",
+    };
+
     /// <summary>
     /// <c>GET /api/liberty</c>: every switch, read by everyone of ours (a project's pages say what is the organization's);
     /// <c>PUT /api/liberty/{key}</c>: an administrator moves one. Moving it never changes a project's copy already made.
@@ -196,12 +254,13 @@ public static class Liberty
     public static void MapLibertyEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/liberty").WithTags("Settings").RequireAuthorization().AddEndpointFilter<TransactionFilter>();
-        group.MapGet("", async (DeliosDbContext db, CancellationToken c) => Results.Ok(await ReadAsync(db, c)));
+        group.MapGet("", async (Guid? projectId, DeliosDbContext db, CancellationToken c) => Results.Ok(await ReadAsync(db, projectId, c)));
+        group.MapPut("/{key}/except", ExceptAsync);
         group.MapPut("/{key}", async (string key, LibertyRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock,
             CancellationToken c) =>
         {
             if (!await Keepers.ConfiguresAsync(http)) return Problems.Forbidden("ADMIN_ONLY", "An administrator decides what projects may change.");
-            var item = (await ReadAsync(db, c)).FirstOrDefault(i => i.Key == key);
+            var item = (await ReadAsync(db, null, c)).FirstOrDefault(i => i.Key == key);
             if (item is null) return Problems.NotFound("SWITCH_NOT_FOUND", "No such setting.");
             if (item.Locked is { } why) return Problems.Invalid("LIBERTY_LOCKED", $"{item.Title}: {why}.");
             if (item.Free == request.Free) return Results.NoContent();
@@ -221,5 +280,53 @@ public static class Liberty
                 request.Free ? "Fixed → Free" : "Free → Fixed", cancellationToken: c);
             return Results.NoContent();
         });
+    }
+
+    /// <summary>
+    /// <c>PUT /api/liberty/{key}/except</c> (owner: "Fixed, except on these projects"): an administrator leaves one project
+    /// free to change what a fixed switch covers, or ends that, always with why; logged (LIBERTY_EXCEPTION), the project's
+    /// control function told. Ended, what the project already changed stays, as when a switch is made fixed later.
+    /// </summary>
+    private static async Task<IResult> ExceptAsync(string key, ExceptionRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        IClock clock, Notifier notifier, CancellationToken cancellationToken)
+    {
+        if (!await Keepers.ConfiguresAsync(http)) return Problems.Forbidden("ADMIN_ONLY", "An administrator decides what projects may change.");
+        var reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
+        if (reason is null) return Problems.Invalid("REASON_REQUIRED", "Say why.", new { field = "reason" });
+        var item = (await ReadAsync(db, null, cancellationToken)).FirstOrDefault(i => i.Key == key);
+        if (item is null) return Problems.NotFound("SWITCH_NOT_FOUND", "No such setting.");
+        if (item.Locked is { } why) return Problems.Invalid("LIBERTY_LOCKED", $"{item.Title}: {why}.");
+        var project = await db.Projects.AsNoTracking().SingleOrDefaultAsync(p => p.Id == request.ProjectId, cancellationToken);
+        if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
+        if (request.Except && item.Free)
+            return Problems.Invalid("ALREADY_FREE", $"{item.Title} is free: every project may already change it.");
+        var me = await db.Users.AsNoTracking().SingleAsync(u => u.Id == http.User.UserId(), cancellationToken);
+        var row = await db.Set<Setting>().SingleOrDefaultAsync(s => s.ProjectId == null && s.Key == ExceptPrefix + key, cancellationToken);
+        var list = ReadExceptions(row?.Value);
+        var had = list.Any(e => e.ProjectId == project.Id);
+        if (had == request.Except) return Results.NoContent();
+        list.RemoveAll(e => e.ProjectId == project.Id);
+        var now = clock.GetCurrentInstant();
+        if (request.Except) list.Add(new LibertyException(project.Id, reason, now.ToDateTimeOffset(), me.Name));
+        var value = System.Text.Json.JsonSerializer.Serialize(list, Json);
+        if (row is null)
+            db.Add(new Setting { TenantId = http.User.TenantId(), Key = ExceptPrefix + key, Value = value, UpdatedAt = now, UpdatedByName = me.Name });
+        else
+        {
+            row.Value = value;
+            row.UpdatedAt = now;
+            row.UpdatedByName = me.Name;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(new Actor(me.Id, me.Name), "LIBERTY_EXCEPTION", "Project", project.Id, $"{project.Code}: {item.Title}",
+            request.Except ? $"Fixed, except on {project.Code}: {reason}" : $"No longer an exception: {reason}", project.Id, cancellationToken);
+        await notifier.NotifyAsync(project.TenantId, project.Id, await Actions.NoticeLog.HoldersAsync(db, project.Id, Verbs.Control, cancellationToken),
+            NotificationKinds.General,
+            request.Except ? $"{project.Code} may change {item.Title}" : $"{project.Code} no longer changes {item.Title}",
+            request.Except
+                ? $"{me.Name} left {project.Code} free to change {item.Title}, which every other project takes as the organization's: {reason}."
+                : $"{me.Name} ended {project.Code}'s exception on {item.Title}: {reason}. What the project already changed stays as it is; nothing more can be changed.",
+            PageOf(item.Area), cancellationToken);
+        return Results.NoContent();
     }
 }

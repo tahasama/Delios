@@ -49,7 +49,7 @@ public static class NumberingLevels
         {
             var access = ProjectAccessFilter.Of(h);
             var scope = await ScopeAsync(db, access.Project.Id, c);
-            var free = await Liberty.IsFreeAsync(db, Liberty.Numbering, c);
+            var free = await Liberty.IsFreeAsync(db, Liberty.Numbering, access.Project.Id, c);
             var view = await ReadAsync(db, scope, c);
             return Results.Ok(new
             {
@@ -101,7 +101,7 @@ public static class NumberingLevels
         Func<Guid?, Task<IResult>> act, Guid? schemeId = null, bool routing = false)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!await Liberty.IsFreeAsync(db, Liberty.Numbering, cancellationToken))
+        if (!await Liberty.IsFreeAsync(db, Liberty.Numbering, access.Project.Id, cancellationToken))
             return Problems.Forbidden("NUMBERING_FIXED", "Numbering is the organization's, the same on every project: an administrator changes it on the organization's page.");
         if (!await ProjectLists.MayChangeAsync(db, access, cancellationToken))
             return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes its numbering (on a project with none, whoever opened it).");
