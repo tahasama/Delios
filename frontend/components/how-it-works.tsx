@@ -204,6 +204,7 @@ export function HowItWorks({
         <ActionForm action={setControlActivitiesAction} submitLabel="Save" hidden={hidden} className="space-y-0" footerClassName={footer}
           confirmText={defaults ? undefined : "Who carries out each act on this project changes as chosen here. Go ahead?"}>
           <fieldset disabled={whoFixed} className="min-w-0 disabled:opacity-70">
+            <input type="hidden" name="wasMode" value={checked} />
             {whoFixed ? <p className="px-5 pt-3 text-[11px] leading-5 text-slate-500 sm:px-6">{FIXED_NOTE}</p> : null}
             <div className="space-y-2 px-5 py-4 sm:px-6">
               {modes.map((mode) => (
@@ -222,8 +223,10 @@ export function HowItWorks({
               ))}
             </div>
 
-            {/* Each act decides only while the answer above is "it depends"; on the other answers it is kept as it
-                stands, ready for the day it is chosen again. */}
+            {/* Each act decides only while the answer above is "it depends"; changing one by hand makes it so. */}
+            <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
+              Each act below follows the answer above. Change one on its own and the answer becomes &ldquo;it depends on the act&rdquo;.
+            </p>
             <ul className="divide-y divide-line border-t border-line">
               {rows.map(({ activity, controlDoes, confirm, off }) => (
                 <li key={activity.key} className="space-y-2 px-5 py-3.5 sm:px-6">
@@ -238,6 +241,7 @@ export function HowItWorks({
                           <span className="font-semibold text-slate-700">{carrier(activity.key, controlDoes)}:</span> {controlDoes ? activity.control : activity.self}
                         </p>
                       </div>
+                      <input type="hidden" name={`was:${activity.key}`} value={controlDoes ? "CONTROL" : "SELF"} />
                       <Select
                         name={`mode:${activity.key}`}
                         defaultValue={controlDoes ? "CONTROL" : "SELF"}
@@ -281,9 +285,6 @@ export function HowItWorks({
                 </li>
               ))}
             </ul>
-            <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
-              The acts one by one are used when the answer is &ldquo;it depends on the act&rdquo;.
-            </p>
           </fieldset>
         </ActionForm>
       </section>

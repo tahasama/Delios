@@ -6,7 +6,7 @@ import { HowItWorks } from "@/components/how-it-works";
 import { projectDefaults } from "@/lib/organization/defaults";
 import { makeDefaultsAction, resetDefaultsAction } from "@/lib/organization/forms";
 import { adminProjects } from "@/lib/settings/api-admin";
-import { POLICIES, CONFIRMABLE, CONTROL_ACTIVITIES } from "@/lib/settings/control-activities";
+import { POLICIES, CONFIRMABLE, CONFIRM_KEY, CONTROL_ACTIVITIES, effectiveAnswer } from "@/lib/settings/control-activities";
 import { DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
 import { fmtDate } from "@/lib/core/utils";
 
@@ -66,10 +66,13 @@ export default async function DefaultsPage() {
             <section className="register register-sheet register-sheet-open">
               <div className="border-b border-line bg-tint-soft px-4 py-2.5">
                 <span className="stencil text-slate-500">Start from a project</span>
-                <p className="mt-0.5 text-[11px] leading-4 text-slate-500">its answers replace the defaults, all at once</p>
+                <p className="mt-0.5 text-[11px] leading-4 text-slate-500">its answers on this page replace the defaults, all at once; nothing else of it comes</p>
               </div>
               <div className="px-4 py-4">
-                <ActionForm action={makeDefaultsAction} submitLabel="Make its choices the defaults" size="sm">
+                <ActionForm action={makeDefaultsAction} submitLabel="Make its choices the defaults" size="sm"
+                  confirmText={defaults
+                    ? `From now on: new projects start with the chosen project's answers on this page, all at once. Instead of: the defaults as they stand now${defaults.fromProject ? `, taken from ${defaults.fromProject}${defaults.edited ? " and changed here" : ""}` : ", set here"} (${Object.keys(defaults.values).length} answers of our own). Projects already open keep theirs. Go ahead?`
+                    : "From now on: new projects start with the chosen project's answers on this page, instead of the app's own. Projects already open keep theirs. Go ahead?"}>
                   <Field label="Project" required>
                     <Select name="projectId" required defaultValue="" className={inputCls}>
                       <option value="" disabled>Choose…</option>
@@ -84,7 +87,7 @@ export default async function DefaultsPage() {
           <section className="register register-sheet register-sheet-open">
             <div className="border-b border-line bg-tint-soft px-4 py-2.5">
               <span className="stencil text-slate-500">The app&rsquo;s own defaults</span>
-              <p className="mt-0.5 text-[11px] leading-4 text-slate-500">what a project starts with when we say nothing; marked &ldquo;the app&rsquo;s&rdquo; beside</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-slate-500">what a project starts with when we say nothing; an answer we changed is marked &ldquo;ours&rdquo;</p>
             </div>
             <dl className="divide-y divide-line">
               <div className="px-4 py-2.5">
@@ -97,7 +100,10 @@ export default async function DefaultsPage() {
               <div className="px-4 py-2.5">
                 <dt className="text-[11.5px] font-semibold text-slate-800">Confirmation by whoever holds Manage</dt>
                 <dd className="text-[11.5px] leading-[1.45] text-slate-600">
-                  Not asked ({Object.keys(CONFIRMABLE).map((key) => CONTROL_ACTIVITIES.find((one) => one.key === key)?.title.toLowerCase() ?? key).join(", ")}).
+                  {Object.keys(CONFIRMABLE).map((key) => {
+                    const title = CONTROL_ACTIVITIES.find((one) => one.key === key)?.title ?? key;
+                    return `${title}: ${effectiveAnswer(CONFIRM_KEY(key), null) === "ON" ? "asked" : "not asked"}`;
+                  }).join(" · ")}.
                 </dd>
               </div>
               {POLICIES.map((one) => (

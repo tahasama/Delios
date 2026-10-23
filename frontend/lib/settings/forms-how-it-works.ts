@@ -106,8 +106,21 @@ export async function setControlActivitiesAction(_prev: State | undefined, formD
   const defaults = String(formData.get("target") ?? "") === "defaults";
   if (!PROJECT_MODES.includes(asked as ProjectMode) && !(defaults && asked === "FOLLOW")) return { error: "Choose who carries these acts out." };
 
-  const wanted: [string, string | null][] = [[PROJECT_KEY, asked === "FOLLOW" ? null : asked]];
-  if (asked === "CUSTOM") {
+  // The acts showed what each was when the page opened (`was:<act>`). One changed by hand while the answer above stays
+  // as it was means "it depends on the act", as the Control room reads it: the change is kept, never dropped. Changed
+  // together with another answer above, which would carry every act out the same way, it is asked, not guessed.
+  const touched = CONTROL_ACTIVITIES.filter((activity) => formData.has(`was:${activity.key}`)
+    && String(formData.get(`mode:${activity.key}`) ?? "") !== String(formData.get(`was:${activity.key}`)));
+  let mode: ProjectMode | "FOLLOW" = asked;
+  if (asked !== "CUSTOM" && touched.length) {
+    if (asked !== String(formData.get("wasMode") ?? "")) {
+      return { error: `You changed ${touched.map((a) => a.title.toLowerCase()).join(", ")} one by one, and also chose another answer above, which carries every act out the same way. Choose "${PROJECT_MODE_LABEL.CUSTOM}" to keep the acts as you set them, or put them back.` };
+    }
+    mode = "CUSTOM";
+  }
+
+  const wanted: [string, string | null][] = [[PROJECT_KEY, mode === "FOLLOW" ? null : mode]];
+  if (mode === "CUSTOM") {
     for (const activity of CONTROL_ACTIVITIES) {
       const value = String(formData.get(`mode:${activity.key}`) ?? "") as ControlMode;
       if (ACT_MODES.includes(value)) wanted.push([activity.key, value]);
@@ -127,11 +140,13 @@ export async function setControlActivitiesAction(_prev: State | undefined, formD
   }
   revalidateHowItWorks();
   if (!changed) return { ok: "Nothing changed." };
-  if (asked === "FOLLOW") return { ok: "Saved — each new project follows whether it has a control function." };
+  if (mode === "FOLLOW") return { ok: "Saved — each new project follows whether it has a control function." };
   return {
-    ok: asked === "CUSTOM"
-      ? `Saved — act by act. ${CONTROL_ACTIVITIES.length} acts, each with its own answer.`
-      : `Saved — ${PROJECT_MODE_LABEL[asked].toLowerCase()}.`,
+    ok: mode !== asked
+      ? `Saved — act by act, since you set ${touched.map((a) => a.title.toLowerCase()).join(", ")} on its own.`
+      : mode === "CUSTOM"
+        ? `Saved — act by act. ${CONTROL_ACTIVITIES.length} acts, each with its own answer.`
+        : `Saved — ${PROJECT_MODE_LABEL[mode].toLowerCase()}.`,
   };
 }
 

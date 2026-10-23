@@ -1,5 +1,6 @@
 import "server-only";
 import { orgSettings, orgSettingsOrFail, projectSettings, setProjectSetting } from "@/lib/settings/api";
+import { roomItemOf } from "@/lib/settings/control-activities";
 
 /**
  * The configuration a new project of ours starts with (docs/ORGANIZATIONS.md, "Defaults"): who does what and how
@@ -22,10 +23,22 @@ export async function projectDefaults({ orFail = false } = {}): Promise<ProjectD
   try { return JSON.parse(raw) as ProjectDefaults; } catch { return null; }
 }
 
-/** A project's own choices, as defaults would hold them. */
+/**
+ * What the defaults hold: the answers their page shows (who carries each act out, its confirmations and acts left out,
+ * how a project works, the days before a silent discipline is notified again), nothing else. Never the stamp (its own
+ * card), how other organizations' documents come in (a project's exception, never put on by itself), who answers for
+ * an organization, or anything else only a project knows.
+ */
+export function isDefaultsAnswer(key: string): boolean {
+  if (isProjectOwn(key)) return false;
+  const item = roomItemOf(key);
+  return item !== null && item !== "POLICY_PDF_STAMP";
+}
+
+/** A project's own choices, as defaults would hold them: only the answers the defaults show. */
 export async function defaultsFrom(projectId: string): Promise<Record<string, string>> {
   const values: Record<string, string> = {};
-  for (const [key, value] of await projectSettings(projectId)) if (!isProjectOwn(key) && value) values[key] = value;
+  for (const [key, value] of await projectSettings(projectId)) if (isDefaultsAnswer(key) && value) values[key] = value;
   return values;
 }
 
@@ -33,6 +46,8 @@ export async function defaultsFrom(projectId: string): Promise<Record<string, st
 export async function applyDefaults(projectId: string): Promise<number> {
   const defaults = await projectDefaults();
   if (!defaults) return 0;
-  for (const [key, value] of Object.entries(defaults.values)) await setProjectSetting(projectId, key, value);
-  return Object.keys(defaults.values).length;
+  // Only the answers the defaults show, even from defaults taken from a project before they were narrowed to them.
+  const values = Object.entries(defaults.values).filter(([key]) => isDefaultsAnswer(key));
+  for (const [key, value] of values) await setProjectSetting(projectId, key, value);
+  return values.length;
 }
