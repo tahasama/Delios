@@ -8,7 +8,7 @@ import { ActionForm } from "@/components/form";
 import { Switch, SwitchControl } from "@/components/switch";
 import { getActiveSet } from "@/lib/settings/config";
 import { adminUsers, adminFunctions, adminProjects } from "@/lib/settings/api-admin";
-import { setSignInAction, savePersonEverywhereAction } from "@/lib/organization/forms";
+import { setSignInAction, savePersonEverywhereAction, setPasswordAction } from "@/lib/organization/forms";
 import { cn, fmtDate, fmtDateTime, timeAgo } from "@/lib/core/utils";
 
 export const dynamic = "force-dynamic";
@@ -249,6 +249,21 @@ function PersonPanel({ user: u, me, functions, projects, disciplines, close }: {
           </div>
         ) : null}
       </ActionForm>
+      {!u.linked && !me ? (
+        <ActionForm action={setPasswordAction} hidden={{ userId: u.id }} submitLabel="Set password" resetOnSuccess
+          className="asking space-y-3 border-t border-line bg-surface px-5 py-4 sm:px-6">
+          <p className="stencil text-slate-500">Set a password</p>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+            <Field label="New password" hint="the organization's password rules apply">
+              <input type="password" name="password" autoComplete="new-password" className={field} />
+            </Field>
+            <Field label="Once more"><input type="password" name="again" autoComplete="new-password" className={field} /></Field>
+          </div>
+          <p className="text-[11px] leading-4 text-slate-500">
+            {u.name} is told at once, by email and on Notifications, and signed out everywhere. Give them the password yourself; they may choose their own with &ldquo;Forgot password&rdquo;.
+          </p>
+        </ActionForm>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
         <Link href={close} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Close</Link>
         <button type="submit" form={`person-form-${u.id}`} data-on="true" className="ask">Save</button>

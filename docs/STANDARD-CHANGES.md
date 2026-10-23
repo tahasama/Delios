@@ -1473,7 +1473,9 @@ holds these, after a security review:
   on a project with it, changing their function to it, or asking for someone to join with it is refused otherwise
   (ADMIN_ONLY, `Keepers.FunctionConfiguresAsync`).
 - **Nobody sets another person's password but an administrator** (creating an account or changing one); everyone else
-  invites, and the person chooses their own from the link.
+  invites, and the person chooses their own from the link. When an administrator sets one (the organization's People,
+  "Set a password"), the person is told at once by email and on Notifications and signed out everywhere; it is logged
+  (PASSWORD_SET). Never one's own: that goes by "Forgot password", which proves the email.
 - **Single sign-on trusts an email only as far as it is proven:** with email domains set on the organization's account,
   the provider's account names count, at those domains only; with none, only an email the provider says it verified.
   An account standing for someone of another organization is never entered by single sign-on.

@@ -21,6 +21,7 @@ const WORDS: Record<string, string> = {
   MFA_RESET: "Reset someone's second sign-in step",
   PASSWORD_RESET: "Chose a new password",
   PASSWORD_RESET_ASKED: "Asked for a new password",
+  PASSWORD_SET: "Was given a new password by an administrator",
   SSO_CONFIGURED: "Set up the organization's sign-in",
   SECURITY_POLICY_CHANGED: "Changed the sign-in rules",
   SWITCHED_IN: "Switched in from their own organization",

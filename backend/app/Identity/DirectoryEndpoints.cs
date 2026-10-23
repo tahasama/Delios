@@ -360,23 +360,38 @@ public static class DirectoryEndpoints
             user.Active = active;
         }
         if (request.IsAdmin is { } isAdmin && isAdmin != user.IsAdmin) { changes.Add(isAdmin ? "administrator" : "not an administrator"); user.IsAdmin = isAdmin; }
+        var passwordSet = false;
         if (!string.IsNullOrEmpty(request.Password))
         {
-            // A password chosen by someone else is set by an administrator only (the screens never ask one: people choose
-            // their own from a link).
+            // Set by an administrator only (owner: as apps of the kind do), the person told at once and signed out
+            // everywhere. Never one's own: that is "Forgot password", which proves the email.
             if (!await Keepers.ConfiguresAsync(http)) return Problems.Forbidden("ADMIN_ONLY", "Only an administrator sets someone's password.");
+            if (self) return Problems.Conflict("OWN_PASSWORD", "Your own password is changed from the sign-in page: Forgot password sends you a link.");
             if (await http.RequestServices.GetRequiredService<PasswordPolicy>().RefusalAsync(request.Password, cancellationToken) is { } weak) return weak;
             user.PasswordHash = hasher.HashPassword(user, request.Password);
             user.FailedSignIns = 0;
             user.LockedUntil = null;
-            changes.Add("new password");
+            changes.Add("new password set by an administrator");
+            passwordSet = true;
         }
         if (changes.Count == 0) return Results.NoContent();
         await db.SaveChangesAsync(cancellationToken);
         // Switched off, they are out at once; with other rights, their next request carries them.
-        await sessions.ForgetAllAsync(user.Id, revoke: !user.Active, cancellationToken);
-        await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "USER_UPDATED", "User", user.Id, user.Name,
+        // Switched off, or given a new password, they are out at once; with other rights, their next request carries them.
+        await sessions.ForgetAllAsync(user.Id, revoke: !user.Active || passwordSet, cancellationToken);
+        var by = await ActorAsync(http, db, cancellationToken);
+        await audit.WriteAsync(by, passwordSet ? "PASSWORD_SET" : "USER_UPDATED", "User", user.Id, user.Name,
             string.Join("; ", changes), cancellationToken: cancellationToken);
+        if (passwordSet)
+        {
+            // Told at once, by email and on Notifications (one act, so one email): never left to find out at the next sign-in.
+            await notifier.NotifyAsync(user.TenantId, null, [user.Id], NotificationKinds.General, "Your DELIOS password was changed",
+                $"{by.Name}, an administrator, set a new password on your account. To choose your own, use \"Forgot password\" on the sign-in page.",
+                null, cancellationToken, EmailKinds.Account,
+                $"{by.Name}, an administrator of your organization, set a new password on your DELIOS account ({user.Email}).\n\n" +
+                "You were signed out everywhere. Sign in with the password they give you; to choose your own instead, use " +
+                "\"Forgot password\" on the sign-in page.\n\nIf you did not expect this, tell your administrator.");
+        }
         await db.SaveChangesAsync(cancellationToken);
         // Switched off (or back on) here: the accounts standing for them in our partners' organizations follow.
         if (user.Active != wasActive && user.HomeTenantId is null) await organizations.FollowPersonAsync(user.Id, user.Active, cancellationToken);

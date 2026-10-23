@@ -461,6 +461,25 @@ export async function savePersonEverywhereAction(_prev: Result | undefined, form
   return { ok: `${text(formData, "name") || target.name} saved.${emailNote}` };
 }
 
+/**
+ * An administrator sets someone's password (owner: as apps of the kind do). The backend refuses anyone else, and one's
+ * own; the person is told at once, by email and on Notifications, and signed out everywhere.
+ */
+export async function setPasswordAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const userId = text(formData, "userId");
+  const password = String(formData.get("password") ?? "");
+  const again = String(formData.get("again") ?? "");
+  if (!password) return { error: "Type the new password.", fields: ["password"] };
+  if (password !== again) return { error: "The two passwords are not the same.", fields: ["again"] };
+  try {
+    await api(`/api/admin/users/${userId}`, { method: "PUT", body: { password } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization/people");
+  return { ok: "Password set. They were told by email and signed out everywhere: give them the password yourself." };
+}
+
 /** Puts one of a project's lists back to the organization's (its Settings only, for a mess): always with why. */
 export async function resetListAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const reason = text(formData, "reason");

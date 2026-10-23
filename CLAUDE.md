@@ -1163,8 +1163,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - A file is always checked first; the check writes nothing and uses the backend's own rules (`POST /documents/check`,
   the same as registering). Problems name the sheet and row the person sees. Writing names its count; rows with
   problems are left out only after it is said and agreed, and they download to fix and import again.
-- A person is never given a password chosen by someone else: Team list (and `POST /api/admin/users` with `invite`)
+- A person added is never given a password chosen by someone else: Team list (and `POST /api/admin/users` with `invite`)
   emails a link to choose their own (7 days, once); with email off, the link is handed back to whoever added them.
+  **An administrator may set someone's password** (owner: "as apps like this do"), on the organization's People, in the
+  person's opened panel ("Set a password", typed twice; `setPasswordAction`, `PUT /api/admin/users/{id}` `password`):
+  administrators only (ADMIN_ONLY), never one's own (OWN_PASSWORD: "Forgot password"), never a linked account; the person
+  is told at once by email and on Notifications, signed out everywhere, logged (PASSWORD_SET).
 - Import & export follows the Schedule look; exports are grouped (the register, Assurance, the record).
 - Each import kind offers two downloads: the list as it stands now (the register, the team, the matrix, every Settings
   list) and an empty template. A register taken out and brought back corrects only what changed; what the number is
@@ -1497,7 +1501,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Only our own people keep the organization** (security review, Standard-changes §79): an account of another
   organization never counts as administrator, control function or Manage holder for `/api/admin` and `/api/organization`
   (`Keepers.OursAsync`); a function holding Configure is given by an administrator only (ADMIN_ONLY,
-  `Keepers.FunctionConfiguresAsync`: memberships and join requests); only an administrator sets someone's password.
+  `Keepers.FunctionConfiguresAsync`: memberships and join requests); only an administrator sets someone's password (the person told, signed out).
   Write a permission check with brackets around every `||` inside a rule's condition.
 - **Clearance is the one confidentiality rule** (owner): a document above a function's clearance is read by its people
   only if named on it, its registrar, or sent it; every function, the control function too. No level is "restricted"
