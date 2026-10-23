@@ -120,7 +120,7 @@ public sealed class ScheduleImporter(
 
         var unmatched = await ApplyAsync(revision.TenantId, revision.ProjectId, parsed, revision.Id, $"rev {revision.Value}", record, cancellationToken);
         await audit.WriteAsync(Actor.System, "SCHEDULE_READ", "Revision", revision.Id, label,
-            $"{parsed.Count} activities from {file.Name}: {record.Added} new, {record.Moved} moved, {record.Changed} changed, {record.Removed} removed."
+            $"{parsed.Count} activities from {file.Name}{Span(parsed)}: {record.Added} new, {record.Moved} moved, {record.Changed} changed, {record.Removed} removed."
             + (unmatched.Count > 0 ? $" Not a discipline, left off: {string.Join(", ", unmatched)}." : ""),
             revision.ProjectId, cancellationToken);
         logger.LogInformation("Schedule {Label} read: {Count} activities", label, parsed.Count);
@@ -172,7 +172,7 @@ public sealed class ScheduleImporter(
             }
         }
         var unmatched = await ApplyAsync(tenantId, projectId, parsed, revision?.Id, revision is null ? "a direct upload" : $"rev {revision.Value}", tally, cancellationToken);
-        return ($"{parsed.Count} activities from {fileName}: {tally.Added} new, {tally.Moved} moved, {tally.Changed} changed, {tally.Removed} removed."
+        return ($"{parsed.Count} activities from {fileName}{Span(parsed)}: {tally.Added} new, {tally.Moved} moved, {tally.Changed} changed, {tally.Removed} removed."
             + (unmatched.Count > 0 ? $" Not a discipline, left off: {string.Join(", ", unmatched)}." : ""), null);
     }
 
@@ -218,6 +218,10 @@ public sealed class ScheduleImporter(
                     Finish = row.Finish,
                     Responsible = row.Responsible,
                     Departments = row.Departments ?? [],
+                    StartAchieved = row.StartAchieved,
+                    FinishAchieved = row.FinishAchieved,
+                    Wbs = row.Wbs ?? [],
+                    WbsOrder = row.WbsOrder,
                     SourceRevisionId = sourceRevisionId,
                     UpdatedAt = now,
                 });
@@ -252,6 +256,11 @@ public sealed class ScheduleImporter(
             activity.Start = row.Start;
             activity.Finish = row.Finish;
             activity.Responsible = row.Responsible;
+            // What the planner says happened, and where it sits in the WBS, follow each read as they are.
+            activity.StartAchieved = row.StartAchieved;
+            activity.FinishAchieved = row.FinishAchieved;
+            activity.Wbs = row.Wbs ?? [];
+            activity.WbsOrder = row.WbsOrder;
             // A schedule without a departments column leaves the planner's tags as they are.
             if (row.Departments is not null) activity.Departments = row.Departments;
             activity.State = ActivityStates.Active;
@@ -311,4 +320,13 @@ public sealed class ScheduleImporter(
         Sheet = sheet, Code = c.Code, Name = c.Name, Start = c.Start, Finish = c.Finish, Responsible = c.Responsible,
         Departments = c.Departments, DateOrder = c.DateOrder,
     };
+
+    /// <summary>The months the schedule runs, said with its read (owner: "deduce first month and last month"): ", Mar 2022 → Jun 2023".</summary>
+    private static string Span(IReadOnlyList<ParsedActivity> parsed)
+    {
+        var days = parsed.SelectMany(p => new[] { p.Start, p.Finish }).OfType<LocalDate>().ToList();
+        if (days.Count == 0) return "";
+        string Month(LocalDate d) => d.ToString("MMM yyyy", CultureInfo.InvariantCulture);
+        return $", {Month(days.Min())} → {Month(days.Max())}";
+    }
 }

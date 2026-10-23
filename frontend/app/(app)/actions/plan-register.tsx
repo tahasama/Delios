@@ -31,6 +31,9 @@ export type PlanTableRow = {
   date: string | null;
   /** The day the work ends, when the schedule gives one; how long it lasts is said in `when`. */
   finish: string | null;
+  /** The planner says its start, its finish, happened ("A", achieved): their word on the work, never our "done". */
+  startAchieved: boolean;
+  finishAchieved: boolean;
   when: string;
   late: boolean;
   readiness: "DONE" | "LATE_RECEIPT" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
@@ -88,6 +91,8 @@ export function PlanRegister({
     href: string | null;
     /** The days the plan is drawn across, and the address that widens or narrows it. */
     window: { label: string; href: string; wide: boolean; elsewhere: number } | null;
+    /** The schedule's own first and last months ("Mar 2022 → Jun 2023"). */
+    span?: string | null;
     /** Of those drawn, how many have no date from the schedule and so no bar. */
     undated: number;
     noNote?: { count: number; href: string };
@@ -366,6 +371,7 @@ export function PlanRegister({
           <div className="flex items-start justify-between gap-4 px-5 pt-4 sm:px-6">
             <span className="font-mono text-xs font-semibold tracking-tight text-slate-700 tabular-nums">
               {more?.window && !more.window.wide ? more.window.label : filters.from || filters.to ? `${filters.from || "…"} → ${filters.to || "…"}` : "Every date in the schedule"}
+              {more?.span ? <span className="ml-2 font-sans font-normal text-slate-500">· the schedule runs {more.span}</span> : null}
             </span>
             <span
               className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px] text-slate-500"
@@ -759,7 +765,9 @@ const COLUMNS: Column[] = [
     headClass: "text-right", cellClass: "whitespace-nowrap text-right text-xs tabular-nums",
     cell: (row) => row.date
       ? <>
-          <span className="text-xs font-medium text-slate-800">{row.date}{row.finish ? ` → ${row.finish}` : ""}</span>
+          <span className="text-xs font-medium text-slate-800" title={row.startAchieved || row.finishAchieved ? "A: achieved, as the planner says (their word on the work, not on its documents)" : undefined}>
+            {row.date}{row.startAchieved ? " A" : ""}{row.finish ? ` → ${row.finish}${row.finishAchieved ? " A" : ""}` : ""}
+          </span>
           <span className={`block font-sans text-[11px] ${row.late ? "text-red-600" : "text-slate-500"}`}>
             {row.when}
           </span>

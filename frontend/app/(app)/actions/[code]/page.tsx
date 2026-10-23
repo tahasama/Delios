@@ -246,9 +246,19 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               </p>
               <h1 className="plate-name mt-1 min-w-0">{action.name}</h1>
               <p className="plate-meta mt-2">
-                activity {fmtDate(action.start)} &middot; {readyCount} of {action.needs.length} documents ready
+                activity {fmtDate(action.start)}{action.startAchieved ? " A" : ""}
+                {action.finish && action.start && action.finish > action.start ? ` → ${fmtDate(action.finish)}${action.finishAchieved ? " A" : ""}` : ""}
+                {" "}&middot; {readyCount} of {action.needs.length} documents ready
                 {version ? ` \u00b7 schedule ${version}` : ""}
               </p>
+              {/* Where the planner files it, and what the planner says of it: their word on the work, never ours on its documents. */}
+              {action.wbs?.length ? <p className="mt-1 text-xs text-slate-500">{action.wbs.join(" › ")}</p> : null}
+              {action.startAchieved || action.finishAchieved ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  <span className="font-semibold text-slate-700">A</span> — {action.finishAchieved ? "achieved" : "started"}, as the planner says. That is the
+                  planner&rsquo;s word on the work, not on its documents: where they stand is below.
+                </p>
+              ) : null}
               {moved ? (
                 <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-amber-800">
                   <span className="stamp text-amber-700">moved</span> {moved}

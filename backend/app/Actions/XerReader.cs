@@ -123,8 +123,29 @@ public static class XerReader
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var a in read.Activities)
             if (!seen.Add(a.Code)) return new(outlines, null, $"Activity {a.Code} appears twice in the export.");
+        // Each activity keeps where it sits in the WBS (owner: "keep the category/sub"), from the top down, and its
+        // element's place in P6's order (the tree read top down, siblings by their sequence).
+        var nodes = read.Wbs.ToDictionary(w => w.Id);
+        var order = new Dictionary<string, int>();
+        void Walk(string? parent)
+        {
+            foreach (var w in read.Wbs.Where(w => w.Parent == parent).OrderBy(w => w.Order))
+            {
+                order[w.Id] = order.Count;
+                Walk(w.Id);
+            }
+        }
+        Walk(null);
+        string[] PathOf(string? id)
+        {
+            var path = new List<string>();
+            for (var at = id; at is not null && nodes.TryGetValue(at, out var node) && path.Count < 30; at = node.Parent)
+                path.Insert(0, string.IsNullOrWhiteSpace(node.Name) ? node.Code : $"{node.Code} {node.Name}");
+            return [.. path];
+        }
         return new(outlines, read.Activities.Select(a => new ParsedActivity(a.Code, a.Name,
-            a.Start is { } s ? LocalDate.FromDateOnly(s) : null, a.Finish is { } f ? LocalDate.FromDateOnly(f) : null, null, null)).ToList(), null);
+            a.Start is { } s ? LocalDate.FromDateOnly(s) : null, a.Finish is { } f ? LocalDate.FromDateOnly(f) : null, null, null,
+            a.Started, a.Finished, PathOf(a.Wbs), a.Wbs is not null && order.TryGetValue(a.Wbs, out var n) ? n : null)).ToList(), null);
     }
 
     /// <summary>P6's activity types in plain words.</summary>

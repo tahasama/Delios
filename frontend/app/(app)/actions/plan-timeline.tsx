@@ -14,6 +14,13 @@ type PlanRow = {
   readiness: "DONE" | "LATE_RECEIPT" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
   ready: number;
   total: number;
+  /** The planner's own ID, shown beside our number when it differs. */
+  plannerId?: string | null;
+  /** Where it sits in the planner's WBS, top down; the plan is grouped under it when the rows come in its order. */
+  wbs?: string[];
+  /** The planner says its start, its finish, happened (P6's "A"): the planner's word, never our "done". */
+  startAchieved?: boolean;
+  finishAchieved?: boolean;
 };
 
 /**
@@ -120,12 +127,14 @@ export function PlanTimeline({ rows, window, fit }: {
             {t.label}
           </span>
         ))}
-        <span
-          className="absolute top-0 whitespace-nowrap rounded bg-brand px-1 text-[10px] leading-4 font-semibold text-white"
-          style={{ left: `${at(now)}%`, marginLeft: "0.25rem" }}
-        >
-          today · {fmtDate(new Date(now))}
-        </span>
+        {at(now) >= 0 && at(now) <= 100 ? (
+          <span
+            className="absolute top-0 whitespace-nowrap rounded bg-brand px-1 text-[10px] leading-4 font-semibold text-white"
+            style={{ left: `${at(now)}%`, marginLeft: "0.25rem" }}
+          >
+            today · {fmtDate(new Date(now))}
+          </span>
+        ) : null}
       </div>
 
       {/* A plan is as long as the project. It keeps the height it opened at and
@@ -145,10 +154,16 @@ export function PlanTimeline({ rows, window, fit }: {
                   style={{ left: `${t.left}%`, width: `${next - t.left}%` }} />
               );
             })}
-            <div className="absolute top-0 h-full border-l-2 border-brand/60" style={{ left: `${at(now)}%` }} />
+            {at(now) >= 0 && at(now) <= 100 ? <div className="absolute top-0 h-full border-l-2 border-brand/60" style={{ left: `${at(now)}%` }} /> : null}
           </div>
           <ul className="relative pt-1">
-          {dated.map((r) => {
+          {dated.map((r, index) => {
+            // The planner's WBS, as P6 lays it out (owner: "keep the category/sub"): each level that changes from the
+            // row before is written above it, indented by its depth; the bars stay as they are.
+            const before = index > 0 ? dated[index - 1].wbs ?? [] : [];
+            const path = r.wbs ?? [];
+            const same = path.findIndex((part, depth) => before[depth] !== part);
+            const heads = same < 0 ? [] : path.slice(same).map((part, i) => ({ part, depth: same + i }));
             const start = (r.firstNeeded ?? r.start!).getTime();
             const end = r.start!.getTime();
             // A bar that starts before the window is drawn from its edge, not
@@ -159,11 +174,22 @@ export function PlanTimeline({ rows, window, fit }: {
             const width = Math.max(Math.min(rawRight, 100) - left, 0.6);
             const fromBefore = rawLeft < 0;
             return (
-              <li key={r.code} className="flex items-center gap-2 border-b border-line/60 py-1">
-                <Link href={`/actions/${r.code}`} className="w-50 shrink-0 truncate text-xs text-slate-600 hover:text-link" title={`${r.code} — ${r.name}${r.moved ? `\n${r.moved}` : ""}`}>
-                  <span className="font-mono font-semibold text-slate-700">{r.code}</span>
-                  {r.moved ? <span className="stamp mx-1.5 text-amber-700">moved</span> : " "}
-                  {r.name}
+              <li key={r.code}>
+                {heads.map((h) => (
+                  <p key={`${h.depth}-${h.part}`} className="truncate border-b border-line/60 bg-tint-soft/80 py-1 pr-2 text-[11px] font-semibold text-slate-700"
+                    style={{ paddingLeft: 4 + h.depth * 12 }} title={h.part}>{h.part}</p>
+                ))}
+                <div className="flex items-center gap-2 border-b border-line/60 py-1">
+                {/* Our number, the planner's ID beside it, the action's title under them (owner). */}
+                <Link href={`/actions/${r.code}`} className="w-50 shrink-0 text-xs leading-tight text-slate-600 hover:text-link"
+                  style={{ paddingLeft: path.length ? Math.min(path.length, 4) * 6 : 0 }}
+                  title={`${r.code}${r.plannerId ? ` · ${r.plannerId}` : ""} — ${r.name}${r.moved ? `\n${r.moved}` : ""}`}>
+                  <span className="flex items-center gap-1.5 truncate">
+                    <span className="font-mono font-semibold text-slate-700">{r.code}</span>
+                    {r.plannerId ? <span className="truncate font-mono text-[11px] text-slate-500">{r.plannerId}</span> : null}
+                    {r.moved ? <span className="stamp text-amber-700">moved</span> : null}
+                  </span>
+                  <span className="block truncate">{r.name}</span>
                 </Link>
                 <span className="relative h-5 flex-1">
                   {/* The lead-in, lighter; the work, solid; a day of work with no finish, a diamond (as a milestone is drawn). */}
@@ -185,8 +211,8 @@ export function PlanTimeline({ rows, window, fit }: {
                           className={`absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] ${TONE[r.readiness]}`}
                           style={{ left: `${from}%` }}
                           role="img"
-                          aria-label={`Work on ${fmtDate(r.start)}`}
-                          title={`Work on ${fmtDate(r.start)}`}
+                            aria-label={`Work on ${fmtDate(r.start)}${r.startAchieved ? ", achieved (the planner's word)" : ""}`}
+                          title={`Work on ${fmtDate(r.start)}${r.startAchieved ? " A — achieved, as the planner says" : ""}`}
                         />
                       );
                     }
@@ -195,13 +221,24 @@ export function PlanTimeline({ rows, window, fit }: {
                         className={`absolute top-1/2 h-3.5 -translate-y-1/2 rounded-[3px] ${TONE[r.readiness]}`}
                         style={{ left: `${from}%`, width: `max(4px, ${Math.max(to - from, 0)}%)` }}
                         role="img"
-                        aria-label={r.finish ? `Work from ${fmtDate(r.start)} to ${fmtDate(r.finish)}` : `Work on ${fmtDate(r.start)}`}
-                        title={r.finish ? `Work from ${fmtDate(r.start)} to ${fmtDate(r.finish)}` : `Work on ${fmtDate(r.start)}`}
+                        aria-label={`${r.finish ? `Work from ${fmtDate(r.start)} to ${fmtDate(r.finish)}` : `Work on ${fmtDate(r.start)}`}${achievedWords(r)}`}
+                        title={`${r.finish ? `Work from ${fmtDate(r.start)}${r.startAchieved ? " A" : ""} to ${fmtDate(r.finish)}${r.finishAchieved ? " A" : ""}` : `Work on ${fmtDate(r.start)}`}${achievedWords(r)}`}
                       />
                     );
                   })()}
+                  {/* "A" beside the work the planner says happened, as P6 writes it. */}
+                  {r.startAchieved || r.finishAchieved ? (() => {
+                    const mark = at(r.finish && r.finish.getTime() > end ? r.finish.getTime() : end);
+                    return mark >= 0 && mark <= 100 ? (
+                      <span className="absolute top-1/2 -translate-y-1/2 pl-1.5 text-[10px] font-semibold text-slate-600" style={{ left: `${mark}%` }}
+                        title={r.finishAchieved ? "Achieved, as the planner says: their word on the work, not on its documents" : "Started, as the planner says"}>
+                        A
+                      </span>
+                    ) : null;
+                  })() : null}
                 </span>
                 <span className="w-14 shrink-0 text-right text-[11px] tabular-nums text-slate-500">{r.total ? `${r.ready}/${r.total}` : "—"}</span>
+                </div>
               </li>
             );
           })}
@@ -210,4 +247,9 @@ export function PlanTimeline({ rows, window, fit }: {
       </div>
     </section>
   );
+}
+
+/** What the planner says happened, in words: their word on the work, never ours on its documents. */
+function achievedWords(r: PlanRow) {
+  return r.finishAchieved ? " · achieved, as the planner says" : r.startAchieved ? " · started, as the planner says" : "";
 }

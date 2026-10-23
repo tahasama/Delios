@@ -9,7 +9,8 @@ namespace Delios.Host.Actions;
 /// One activity as the schedule file states it; departments as the file names them, or null when the file has no
 /// departments column at all (they then come from the disciplines-per-action list and are left as they are).
 /// </summary>
-public sealed record ParsedActivity(string Code, string Name, LocalDate? Start, LocalDate? Finish, string? Responsible, string[]? Departments);
+public sealed record ParsedActivity(string Code, string Name, LocalDate? Start, LocalDate? Finish, string? Responsible, string[]? Departments,
+    bool StartAchieved = false, bool FinishAchieved = false, string[]? Wbs = null, int? WbsOrder = null);
 
 /// <summary>
 /// Reads activities from a schedule exported to Excel (.xlsx) or CSV, as Primavera
@@ -110,10 +111,11 @@ public static class ScheduleReader
                 var monthFirst = string.Equals(columns.DateOrder, "MDY", StringComparison.OrdinalIgnoreCase);
                 var (startDate, startOk) = ParseDate(Cell(start), monthFirst);
                 var (finishDate, finishOk) = ParseDate(Cell(finish), monthFirst);
+                // P6 writes " A" after a date that happened (owner: "Achieved").
                 if (!startOk) return (null, $"Row {r + 1}: '{Cell(start)}' is not a date.");
                 if (!finishOk) return (null, $"Row {r + 1}: '{Cell(finish)}' is not a date.");
                 activities.Add(new ParsedActivity(id, Cell(name) ?? id, startDate, finishDate, Cell(responsible),
-                    departments < 0 ? null : SplitDepartments(Cell(departments))));
+                    departments < 0 ? null : SplitDepartments(Cell(departments)), Achieved(Cell(start)), Achieved(Cell(finish))));
             }
             return activities.Count == 0 ? (null, "The file has headings but no activities.") : (activities, null);
         }
@@ -187,6 +189,9 @@ public static class ScheduleReader
         }
         return rows;
     }
+
+    /// <summary>A date P6 marks as having happened: " A" after it.</summary>
+    private static bool Achieved(string? text) => text is not null && text.TrimEnd('*', ' ').Trim().EndsWith(" A", StringComparison.Ordinal);
 
     /// <summary>Empty is fine (no date); anything else must be a date.</summary>
     private static (LocalDate? Date, bool Ok) ParseDate(string? text, bool monthFirst)

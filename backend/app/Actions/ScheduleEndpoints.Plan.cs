@@ -20,7 +20,8 @@ public sealed record PlanView(string? VersionInForce, IReadOnlyList<PlanAction> 
 public sealed record PlanAction(Guid Id, string Code, string? ExternalId, string Name, string? Responsible, IReadOnlyList<string> Departments,
     DateOnly? Start, DateOnly? Finish, int NeedCount, ActivityMove? Moved, DateTimeOffset? LastMetAt,
     IReadOnlyList<PlanNeed> Needs, IReadOnlyList<DecisionView> Decisions, IReadOnlyList<PlanConfirmation> Confirmations,
-    bool Passed, string State, DateOnly? RiskFrom, IReadOnlyDictionary<string, DateOnly?> DisciplineRiskFrom);
+    bool Passed, string State, DateOnly? RiskFrom, IReadOnlyDictionary<string, DateOnly?> DisciplineRiskFrom,
+    bool StartAchieved = false, bool FinishAchieved = false, IReadOnlyList<string>? Wbs = null, int? WbsOrder = null);
 
 /// <summary>
 /// One need: what it asks for (the statuses it names, or its purpose), by when (<c>ManualDate</c>: a date set by hand;
@@ -159,7 +160,7 @@ public static partial class ScheduleEndpoints
                     d.ConfirmedByName, d.ConfirmedAt?.ToDateTimeOffset(), d.ConfirmNote, d.ReversedByName, d.ReversedAt?.ToDateTimeOffset(), d.ReversedReason)).ToList(),
                 confirmations[a.Id].Select(c => new PlanConfirmation(c.Department, c.Available, c.Note, c.ConfirmedByName, c.ConfirmedAt.ToDateTimeOffset(),
                     c.Automatic, c.RevokedAt?.ToDateTimeOffset(), c.RevokedByName, c.RevokedReason)).ToList(),
-                passed, state, riskFrom?.ToDateOnly(), disciplineRisk);
+                passed, state, riskFrom?.ToDateOnly(), disciplineRisk, a.StartAchieved, a.FinishAchieved, a.Wbs, a.WbsOrder);
         }).ToList();
     }
 }

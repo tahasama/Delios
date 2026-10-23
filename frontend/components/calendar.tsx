@@ -122,7 +122,10 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
   const months: { y: number; m: number }[] = [];
   for (let y = +from.slice(0, 4), m = +from.slice(5, 7) - 1; key(y, m, 1) <= to; m === 11 ? (y++, m = 0) : m++) months.push({ y, m });
   const indexOf = (ym: string | undefined) => (ym ? months.findIndex(({ y, m }) => key(y, m, 1).slice(0, 7) === ym) : -1);
-  const opening = Math.max(0, indexOf(month) >= 0 ? indexOf(month) : indexOf(today?.slice(0, 7)));
+  // The month asked for, else today's; a calendar already over opens on its last month, one not begun on its first.
+  const opening = indexOf(month) >= 0 ? indexOf(month)
+    : indexOf(today?.slice(0, 7)) >= 0 ? indexOf(today?.slice(0, 7))
+    : today && today > to ? months.length - 1 : 0;
   const [at, setAt] = useState(opening);
   useEffect(() => { setAt(opening); }, [opening]);
   const here = months[Math.min(at, months.length - 1)];

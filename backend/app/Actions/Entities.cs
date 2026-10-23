@@ -114,6 +114,16 @@ public sealed class Activity
     public required string Name { get; set; }
     public LocalDate? Start { get; set; }
     public LocalDate? Finish { get; set; }
+    /// <summary>
+    /// The planner says its start, its finish, happened (P6's "A", owner: "Achieved"). The planner's word on the work,
+    /// never ours on its documents: an achieved activity is not one whose documents are there.
+    /// </summary>
+    public bool StartAchieved { get; set; }
+    public bool FinishAchieved { get; set; }
+    /// <summary>Where it sits in the planner's WBS, from the top down ("CIV Civil works", "FDN Foundations"); empty when none.</summary>
+    public string[] Wbs { get; set; } = [];
+    /// <summary>Its WBS element's place in the planner's order, so the plan reads as P6 lays it out; null when none.</summary>
+    public int? WbsOrder { get; set; }
     /// <summary>The manager named in the schedule as responsible for the activity; null when the file gives none.</summary>
     public string? Responsible { get; set; }
     /// <summary>The departments concerned. A department is a discipline: these are published discipline codes.</summary>

@@ -149,6 +149,15 @@ export type PlanAction = {
   /** …and the day it is at risk from: overall, and for each discipline (null when nothing is missing or there is no day). */
   riskFrom: Date | null;
   disciplineRiskFrom: Record<string, Date | null>;
+  /**
+   * The planner says its start, its finish, happened (P6's "A": "Achieved", owner). The planner's word on the work,
+   * never ours on its documents: an achieved action is not one whose documents are there.
+   */
+  startAchieved: boolean; finishAchieved: boolean;
+  /** Where it sits in the planner's WBS, from the top down ("CIV Civil works", "FDN Foundations"); empty when none. */
+  wbs: string[];
+  /** Its WBS element's place in the planner's order. */
+  wbsOrder: number | null;
 };
 
 type Plan = { versionInForce: string | null; actions: PlanAction[] };

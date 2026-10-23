@@ -52,6 +52,8 @@ const SORTS: Record<string, (a: PlanAction, b: PlanAction) => number> = {
   name: (a, b) => a.name.localeCompare(b.name),
   date: (a, b) => (a.start?.getTime() ?? Infinity) - (b.start?.getTime() ?? Infinity) || byCode(a, b),
   documents: (a, b) => a.needs.length - b.needs.length || byCode(a, b),
+  // The planner's own order: by WBS element as P6 lays them out, then by date.
+  wbs: (a, b) => (a.wbsOrder ?? Infinity) - (b.wbsOrder ?? Infinity) || SORTS.date(a, b),
 };
 
 /** The states, said once for the schedule and the action's own page alike. */
@@ -99,9 +101,6 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const fromDay = readDay(sp.from, false);
   const toDay = readDay(sp.to ?? sp.from, true);
 
-  const sortKey = sp.sort && SORTS[sp.sort] ? sp.sort : "date";
-  const dir = sp.dir === "desc" ? "desc" : "asc";
-  const orderBy = (a: PlanAction, b: PlanAction) => (dir === "desc" ? -1 : 1) * SORTS[sortKey](a, b);
 
   const perPage = PAGE_SIZES.includes(Number(sp.per)) ? Number(sp.per) : 50;
   const page = Math.max(1, Number(sp.page) || 1);
@@ -110,11 +109,31 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const shown = Math.min(Math.max(Number(sp.show) || PLAN_FIRST, PLAN_FIRST), 2000);
   const step = PLAN_STEPS.includes(Number(sp.step)) ? Number(sp.step) : DEFAULT_STEP;
 
-  // The plan is naturally long, so it opens on a window around today — one month
-  // either side, today in the middle — until somebody asks for another.
+  // What the window holds, and what the schedule holds: a plan that says "of
+  // 16" while the table says 33 is a page arguing with itself.
+  const [schedule, source, disciplineRows, typeRows, supplierRows] = await Promise.all([
+    planActions(ctx),
+    scheduleSource(ctx),
+    getSet("DISCIPLINES"),
+    getSet("DOCUMENT_TYPES"),
+    // Suppliers are the organizations the project deals with.
+    api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
+  ]);
+
+  // As the planner lays it out where the schedule carries a WBS (owner: "keep the category/sub"), else by date.
+  const sortKey = sp.sort && SORTS[sp.sort] ? sp.sort : schedule.some((a) => a.wbs?.length) ? "wbs" : "date";
+  const dir = sp.dir === "desc" ? "desc" : "asc";
+  const orderBy = (a: PlanAction, b: PlanAction) => (dir === "desc" ? -1 : 1) * SORTS[sortKey](a, b);
+  // Where the schedule runs: its first action's day to its last's (owner: "deduce first month and last month").
+  const dates = schedule.flatMap((a) => [a.start, a.finish]).filter((d): d is Date => !!d).map((d) => d.getTime());
+  const span = dates.length ? { from: new Date(Math.min(...dates)), to: new Date(Math.max(...dates)) } : null;
+  // The plan is naturally long, so it opens on a window around today — one month either side — until somebody asks
+  // for another. A schedule that is over, or not begun, opens on its own last or first days instead (owner: "if a
+  // project is over instead of pointing to today, point at last month").
   const windowed = !fromDay && !toDay && view === "plan" && sp.all !== "1";
-  const planFrom = fromDay ?? (windowed ? daysBefore(new Date(), PLAN_WINDOW_DAYS) : null);
-  const planTo = toDay ?? (windowed ? daysBefore(new Date(), -PLAN_WINDOW_DAYS) : null);
+  const centre = !span ? new Date() : Date.now() > span.to.getTime() ? span.to : Date.now() < span.from.getTime() ? span.from : new Date();
+  const planFrom = fromDay ?? (windowed ? daysBefore(centre, PLAN_WINDOW_DAYS) : null);
+  const planTo = toDay ?? (windowed ? daysBefore(centre, -PLAN_WINDOW_DAYS) : null);
 
   // Where each action stands is one rule, shared with the action's own page;
   // the schedule is read whole and filtered here.
@@ -159,16 +178,6 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
       || a.needs.some((e) => has(e.document.number, word) || has(e.document.title, word)))));
   const where = (a: PlanAction) => outsideWindow(a) && inWindow(a);
 
-  // What the window holds, and what the schedule holds: a plan that says "of
-  // 16" while the table says 33 is a page arguing with itself.
-  const [schedule, source, disciplineRows, typeRows, supplierRows] = await Promise.all([
-    planActions(ctx),
-    scheduleSource(ctx),
-    getSet("DISCIPLINES"),
-    getSet("DOCUMENT_TYPES"),
-    // Suppliers are the organizations the project deals with.
-    api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
-  ]);
   // How near a missing document's date must be to put its action at risk is the
   // project's setting, the same one the late warnings use.
   const found = schedule.filter(where).sort(orderBy);
@@ -225,6 +234,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
       departments: departmentsOf(row).map((one) => deptLabel.get(one) ?? one),
       date: row.start ? fmtDate(row.start) : null,
       finish: row.finish && row.start && row.finish > row.start ? fmtDate(row.finish) : null,
+      startAchieved: row.startAchieved, finishAchieved: row.finishAchieved,
       // When, and how long: start and finish both count, so work on the 12th and 13th lasts two days. Said once.
       when: datePhrase(row.daysUntil, row.finish && row.start ? Math.round((row.finish.getTime() - row.start.getTime()) / 86_400_000) + 1 : null),
       late: row.daysUntil !== null && row.daysUntil < 0,
@@ -354,6 +364,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
             inForce={publishedVersion ? { since: publishedVersion.publishedAt ? fmtDate(publishedVersion.publishedAt) : null } : null}
             plans={mayUploadLists(ctx.user.verbs)}
             failed={source.imports[0]?.status === "FAILED" ? { revision: source.imports[0].revisionValue, error: source.imports[0].error } : null}
+            days={ctx.user.isInternal ? { lead: source.days.lead, risk: source.days.risk, own: source.days.ownLead || source.days.ownRisk } : null}
           />
         }
         uploads={<PlanCards from={dateOn === "date" ? fromDay : null} to={dateOn === "date" ? toDay : null} />}
@@ -368,6 +379,8 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
                 steps: PLAN_STEPS.map((by) => ({ by, href: deeper(by) })),
                 href: matching > rows.length ? deeper(step) : null,
                 window: planWindow,
+                // The schedule's own first and last months, said beside the window.
+                span: span ? `${span.from.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" })} → ${span.to.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" })}` : null,
                 undated: undatedAll,
                 undatedHref: "/schedule?view=table&nodate=1",
                 // Went ahead with documents missing, across every date, opened on every date.
@@ -377,7 +390,9 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         }
         plan={
           <PlanTimeline
-            rows={rows.map((row) => ({ code: row.code, name: row.name, moved: movedPhrase(row.moved, row.start, row.finish), start: row.start, finish: row.finish, firstNeeded: row.firstNeeded, readiness: row.readiness, ready: row.ready, total: row.total }))}
+            rows={rows.map((row) => ({ code: row.code, name: row.name, moved: movedPhrase(row.moved, row.start, row.finish), start: row.start, finish: row.finish, firstNeeded: row.firstNeeded, readiness: row.readiness, ready: row.ready, total: row.total,
+              plannerId: row.externalId && row.externalId !== row.code ? row.externalId : null, wbs: sortKey === "wbs" ? row.wbs ?? [] : [],
+              startAchieved: row.startAchieved, finishAchieved: row.finishAchieved }))}
             window={planFrom && planTo ? { from: planFrom, to: planTo } : undefined}
             fit={PLAN_FIRST}
           />

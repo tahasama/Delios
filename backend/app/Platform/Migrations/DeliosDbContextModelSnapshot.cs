@@ -50,6 +50,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("date")
                         .HasColumnName("finish");
 
+                    b.Property<bool>("FinishAchieved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("finish_achieved");
+
                     b.Property<int>("MetCount")
                         .HasColumnType("integer")
                         .HasColumnName("met_count");
@@ -98,6 +102,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("date")
                         .HasColumnName("start");
 
+                    b.Property<bool>("StartAchieved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("start_achieved");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -123,6 +131,15 @@ namespace Delios.Host.Platform.Migrations
                     b.Property<LocalDate?>("WasStart")
                         .HasColumnType("date")
                         .HasColumnName("was_start");
+
+                    b.PrimitiveCollection<string[]>("Wbs")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("wbs");
+
+                    b.Property<int?>("WbsOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("wbs_order");
 
                     b.HasKey("Id")
                         .HasName("pk_activities");

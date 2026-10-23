@@ -1397,6 +1397,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`lib/actions/xer.ts`), so a large export fits (server actions take 100 MB). On upload
   (`.xer` beside `.xlsx` and `.csv`, `SheetGuard` reading it as text) and on release (a revision's `.xlsx` first, then
   `.xer`, then `.csv`). The disciplines and requirements lists stay Excel or CSV.
+- **What the planner's file says is kept as the planner's word** (owner): each action keeps where it sits in the WBS
+  (`Activity.Wbs`, top down, and `WbsOrder`, P6's order; from an .xer) and whether its start and finish happened
+  (`StartAchieved` / `FinishAchieved`: P6's "A", "Achieved", from an .xer's actual dates or an Excel date written
+  "… A"). Achieved is the planner's word on the work, never ours on its documents ("achieved does not necessarily mean
+  our done"): it changes no state, readiness or "Went ahead?", and reads "A" beside the date (plan, table, action page,
+  "as the planner says"). Where the schedule has a WBS, the plan and the table follow the planner's order (sort `wbs`),
+  each WBS level written above its actions, indented, the bars as they are. Each plan row: our number, the planner's ID
+  beside it, the title under. The plan opens a month either side of today, today held inside the schedule's own span
+  (a schedule over opens on its last days, one not begun on its first; owner: "point at last month"), says "the schedule
+  runs <first month> → <last month>", and draws today only when inside; a read says its months too. The calendar tab
+  opens the same way. The Schedule's heading says the days around an action in force (a document needed N days before
+  its action's day, at risk from M), linking the Control room where they are set.
 - Their Excel is uploaded on Schedule & actions only by Document Control or a
   function with the Plan permission.
 - Released revision: "this file is rev X as released" is ticked by default;
