@@ -15,9 +15,9 @@ import { getMe } from "@/lib/account/api";
 import { SETUP_PAGES, maySetup } from "@/app/(app)/settings/setup-pages";
 import { cn } from "@/lib/core/utils";
 import { Chip } from "@/components/ui";
-import { stateNames, stateName, supplierStageName, SUPPLIER_STAGES, SUPPLIER_STAGE_MEANING } from "@/lib/core/state-names";
+import { stateNames, stateName, supplierStageName, docStateName, SUPPLIER_STAGES, SUPPLIER_STAGE_MEANING } from "@/lib/core/state-names";
 import { stateLook } from "@/lib/core/state-look";
-import { DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_MEANING } from "@/lib/core/standard";
+import { DOC_STATES, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_MEANING } from "@/lib/core/standard";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Help & orientation" };
@@ -163,10 +163,10 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
         </div>
         <div className="space-y-5 px-5 py-4 sm:px-6">
           <States title="Document state" said="the document as a whole"
-            rows={DOC_STATES.map((s) => ({ key: s, name: DOC_STATE_LABEL[s], tone: DOC_STATE_COLOR[s], ...DOC_MEANING[s] }))} />
+            rows={DOC_STATES.map((s) => ({ key: s, name: docStateName(names, s), tone: DOC_STATE_COLOR[s], ...DOC_MEANING[s] }))} />
           <States title="Revision state" said="its latest revision, A, B, C…"
             rows={[
-              { key: "NONE", name: "No revision yet", tone: stateLook("NONE").pill, means: "The number is reserved; nothing has been written under it yet.", how: "A document registered without a file, or asked of a supplier." },
+              { key: "NONE", name: names.NONE, tone: stateLook("NONE").pill, means: "The number is reserved; nothing has been written under it yet.", how: "A document registered without a file, or asked of a supplier." },
               ...REV_STATES.map((s) => ({ key: s, name: stateName(names, s), tone: stateLook(s).pill, ...REV_MEANING[s] })),
             ]} />
           <States title="A supplier's document" said="asked of a supplier from its package: read in its own stages, in the same column"

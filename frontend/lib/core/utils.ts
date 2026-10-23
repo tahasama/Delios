@@ -11,7 +11,7 @@ export function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
   if (Number.isNaN(date.getTime())) return "—";
-  return formatDay(date);
+  return formatDay(date, undefined, typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d));
 }
 
 /** A day as the organization reads it, with its time (24 hours). */

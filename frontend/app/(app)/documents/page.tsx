@@ -7,7 +7,7 @@ import { api, projectPath } from "@/lib/client";
 import { getMe } from "@/lib/account/api";
 import type { ActivitySummary, RegisterPage } from "@/lib/types";
 import { RegisterPlate } from "./register-plate";
-import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState } from "@/lib/core/standard";
+import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_MEANING, REV_STATES, REV_MEANING } from "@/lib/core/standard";
 import { getSet } from "@/lib/settings/config";
 import { DocumentRegister } from "./document-register";
 import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
@@ -81,7 +81,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const { policy } = await import("@/lib/settings/control-activities");
   const together = (await policy(scope, "POLICY_RELEASE")) === "TOGETHER";
   // What this organization calls each state; the states themselves are fixed.
-  const { stateNames, stateName, supplierStageName, supplierStamp, SUPPLIER_STAGES } = await import("@/lib/core/state-names");
+  const { stateNames, stateName, supplierStageName, docStateName, supplierStamp, SUPPLIER_STAGES } = await import("@/lib/core/state-names");
   const names = await stateNames(scope);
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
@@ -196,7 +196,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       asReceived: !!doc.asReceived,
       supplierStamp: doc.supplier && (SUPPLIER_STAGES as readonly string[]).includes(doc.supplier)
         ? supplierStamp(doc.supplier as SupplierStage, user.isInternal ? "ours" : "theirs", doc.withSupplier) : null,
-      docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,
+      docState: doc.state, docStateLabel: docStateName(names, doc.state),
       revision: doc.revision,
       revState: latestState,
       // The stage a supplier's document reads in (its own colour and line on Help), else none.
@@ -206,7 +206,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         ? supplierStageName(names, doc.supplier as SupplierStage, { together, held: false })
         : latestState
         ? stateName(names, latestState, { together, held: false })
-        : "No revision yet",
+        : names.NONE,
       onHold: null as string | null,
       // A code is printed only when the organization publishes it. Records made
       // before the list existed carry the Standard's own consequence names,
@@ -259,7 +259,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   }
   // A list's code opens its page in Types & sets for our people (who read Settings); another organization's read no Settings.
   if (user.isInternal) codes["@lists"] = "1";
-  for (const code of DOC_STATES) codes[`DOC_STATE|${code}`] = `${DOC_STATE_LABEL[code]} — ${DOC_MEANING[code].means}`;
+  for (const code of DOC_STATES) codes[`DOC_STATE|${code}`] = `${docStateName(names, code)} — ${DOC_MEANING[code].means}`;
   for (const code of REV_STATES) codes[`REV_STATE|${code}`] = `${stateName(names, code)} — ${REV_MEANING[code].means}`;
   // A supplier's stages, read in the same column (in review and released mean what ours do).
   const { SUPPLIER_STAGE_MEANING } = await import("@/lib/core/state-names");
@@ -333,8 +333,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       mayAddToAction={scope.can("CONTROL")}
       shownFilters={shownFilters}
       own={ownColumns}
-      userCanAct={!isReadOnly(user)} filters={{ pick: pickKey, q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
-      { code: "NONE", label: "No revision yet" },
+      userCanAct={!isReadOnly(user)} filters={{ pick: pickKey, q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: docStateName(names, code) })), revStates: [
+      { code: "NONE", label: names.NONE },
       { code: "IN_PREPARATION", label: names.IN_PREPARATION },
       { code: "IN_REVIEW", label: names.IN_REVIEW },
       { code: "NOT_RELEASED", label: names.NOT_RELEASED },

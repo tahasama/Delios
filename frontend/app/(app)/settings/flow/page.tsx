@@ -155,7 +155,7 @@ export default async function ControlRoomPage() {
     }
     if (key === "TRACKING") {
       // The organization's choice for every project; changed on its Settings by an administrator.
-      const where = isAdmin(me) ? "/organization/settings/tracking" : undefined;
+      const where = isAdmin(me) ? "/organization/settings/security#tracking" : undefined;
       if (!organization) return fact(key, "What is kept about people's activity", "The organization's choice");
       return [
         fact("track-acts", "What people do to documents", "Always kept"),

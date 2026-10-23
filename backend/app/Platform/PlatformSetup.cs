@@ -376,6 +376,7 @@ public static class PlatformSetup
             Actions.ScheduleDays.MapScheduleDaysEndpoints(app);
             Settings.OrganizationDefaults.MapOrganizationDefaultsEndpoints(app);
             Settings.ProjectPlace.MapProjectPlaceEndpoints(app);
+            Settings.Calendar.MapCalendarEndpoints(app);
             Identity.ProjectFunctions.MapProjectFunctionEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);

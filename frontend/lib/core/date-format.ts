@@ -40,11 +40,13 @@ export function dateFormat(): DateFormatCode {
 }
 
 /** A day as the organization reads it. */
-export function formatDay(date: Date, format: DateFormatCode = dateFormat()): string {
+export function formatDay(date: Date, format: DateFormatCode = dateFormat(), utc = false): string {
+  // A bare day (2026-03-05) is a day, not a moment: read in UTC, it never slips to the day before.
+  const zone = utc ? { timeZone: "UTC" } : {};
   switch (format) {
-    case "DMY": return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
-    case "MDY": return date.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
-    case "ISO": return date.toLocaleDateString("en-CA", { day: "2-digit", month: "2-digit", year: "numeric" });
-    default: return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    case "DMY": return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", ...zone });
+    case "MDY": return date.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric", ...zone });
+    case "ISO": return date.toLocaleDateString("en-CA", { day: "2-digit", month: "2-digit", year: "numeric", ...zone });
+    default: return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", ...zone });
   }
 }

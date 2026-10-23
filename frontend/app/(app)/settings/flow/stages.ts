@@ -58,7 +58,7 @@ export const STAGES: Stage[] = [
     text: "The route the document matches sends it to its reviewers, and each answers with a verdict or advice.",
     who: ["REVIEW_ISSUE", { title: "Answering", by: "The people on each step of the route" }, "DELEGATE"],
     answers: ["POLICY_MATRIX", "POLICY_MATRIX_DETAIL", "STATE:IN_REVIEW", "ROUTE_VERDICTS"],
-    sets: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES", "HOLIDAYS"],
+    sets: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES"],
     extras: ["routes", "distribution", "form:REVIEW"],
   },
   {

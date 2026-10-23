@@ -5346,6 +5346,57 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("search_watermarks", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Settings.DayOff", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("country");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_name");
+
+                    b.Property<LocalDate>("Day")
+                        .HasColumnType("date")
+                        .HasColumnName("day");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_days_off");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_days_off_tenant_id");
+
+                    b.HasIndex("ProjectId", "Day")
+                        .HasDatabaseName("ix_days_off_project_id_day");
+
+                    b.ToTable("days_off", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Settings.KeptCopy", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7550,6 +7601,16 @@ namespace Delios.Host.Platform.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_search_watermarks_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Delios.Host.Settings.DayOff", b =>
+                {
+                    b.HasOne("Delios.Host.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_days_off_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Delios.Host.Settings.KeptCopy", b =>

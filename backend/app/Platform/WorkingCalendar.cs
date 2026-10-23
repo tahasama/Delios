@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using NodaTime;
 
 namespace Delios.Host.Platform;
@@ -52,32 +51,12 @@ public static class WorkingCalendar
         return date;
     }
 
-    /// <summary>The list of public holidays (Types &amp; sets, group Schedule).</summary>
-    public const string HolidaysList = "HOLIDAYS";
-
     /// <summary>
-    /// The public holidays a project's working days skip (owner): each value of the Public holidays list whose code starts
-    /// with its day (2026-12-25, or 2026-12-25-FR where two countries share a day), in use, and kept for the project's
-    /// country or for every country (no country said). Read from the project's own copy of the list where it has one,
-    /// else the organization's, whichever project the request is about.
+    /// The days a project's working days skip besides its days off each week: the organization's public holidays for its
+    /// country or for every country, and the project's own days off (the calendar, <see cref="Settings.Calendar"/>).
     /// </summary>
-    public static async Task<IReadOnlySet<LocalDate>> HolidaysAsync(DeliosDbContext db, Identity.Project project, CancellationToken cancellationToken)
-    {
-        Guid? owner = project.OwnListKeys.Contains(HolidaysList) ? project.Id : null;
-        var values = await db.ValueEntries.IgnoreQueryFilters().AsNoTracking()
-            .Where(v => v.SetKey == HolidaysList && v.ProjectId == owner && v.Status == Documents.ValueStatus.Active)
-            .Select(v => new { v.Code, v.Props }).ToListAsync(cancellationToken);
-        var days = new HashSet<LocalDate>();
-        foreach (var value in values)
-        {
-            if (value.Code.Length < 10 || !DateOnly.TryParseExact(value.Code[..10], "yyyy-MM-dd", out var day)) continue;
-            var country = value.Props?.RootElement is { ValueKind: System.Text.Json.JsonValueKind.Object } props
-                && props.TryGetProperty("country", out var c) && c.ValueKind == System.Text.Json.JsonValueKind.String ? c.GetString() : null;
-            if (string.IsNullOrEmpty(country) || string.Equals(country, project.Country, StringComparison.OrdinalIgnoreCase))
-                days.Add(LocalDate.FromDateOnly(day));
-        }
-        return days;
-    }
+    public static Task<IReadOnlySet<LocalDate>> HolidaysAsync(DeliosDbContext db, Identity.Project project, CancellationToken cancellationToken) =>
+        Settings.Calendar.DaysOffAsync(db, project, cancellationToken);
 
     /// <summary>Today at the site.</summary>
     public static LocalDate Today(IClock clock, string timeZone) =>

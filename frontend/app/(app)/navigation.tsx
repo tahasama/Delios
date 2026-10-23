@@ -7,6 +7,7 @@ import {
   ArrowLeftRight,
   BookOpen,
   Boxes,
+  CalendarDays,
   CalendarRange,
   ClipboardCheck,
   FilePlus2,
@@ -75,6 +76,7 @@ function primaryNav(p: NavPermissions): NavItem[] {
       { href: "/documents", label: "Documents", description: "The register", icon: FileText, when: p.canRead },
       // The same entry and the same page for everyone, narrowed to what is theirs.
       { href: "/schedule", label: "Schedule", description: "What is needed, and when", icon: CalendarRange, also: ["/needed", "/actions"] },
+      { href: "/calendar", label: "Calendar", description: "Working days, days off and action days", icon: CalendarDays },
       {
         href: "/transmittals",
         label: "Transmittals",

@@ -35,7 +35,7 @@ const GROUPS: { title: string; keys: string[] }[] = [
   { title: "Review & issue", keys: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES", "STATUSES", "REASONS_FOR_ISSUE", "RETURN_REASONS", "ISSUE_CODES", "CONTROL_OUTCOMES"] },
   { title: "Classification & keeping", keys: ["CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES", "PHASES"] },
   { title: "File formats", keys: ["NATIVE_FORMATS", "RENDITION_FORMATS", "PRESERVATION_FORMATS"] },
-  { title: "Schedule", keys: ["ACTIVITY_DECISIONS", "HOLIDAYS"] },
+  { title: "Schedule", keys: ["ACTIVITY_DECISIONS"] },
 ];
 
 /**

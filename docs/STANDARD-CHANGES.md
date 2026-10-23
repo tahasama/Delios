@@ -1487,9 +1487,10 @@ The Standard counts review and answer periods in working days without saying who
 
 - **Each project says where its site is:** its country, its time zone and its days off each week. Today and every due
   day are counted in the site's time zone; due days skip its days off.
-- **Public holidays are the organization's list** (Types & sets, Public holidays), each kept for a country or for every
-  country; a project skips those of its country. A project may keep its own copy where the organization leaves it free
-  (a site shutdown, a local holiday).
+- **Public holidays are on the organization's calendar**, each kept for a country or for every country, claimed by a
+  click on its day; a project skips those of its country, and may mark its own days off (a site shutdown, a local
+  holiday) where the organization leaves it free. A project's calendar runs from the month it starts to the month it
+  finishes, with the schedule's action days on it, read by everyone on the project.
 - **A new project starts with the organization's place** (Defaults for new projects), then keeps its own.
 - **Dates read one way across the organization** (its choice of four), on every screen, so a date means the same to
   everyone reading it.

@@ -4,7 +4,7 @@ import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
 import { Field, inputCls, DataTable, Th, Td, ToneChip } from "@/components/ui";
 import { ActionForm } from "@/components/form";
-import { DOC_STATE_LABEL, type DocState } from "@/lib/core/standard";
+import { stateNames, docStateName } from "@/lib/core/state-names";
 import { updateAssetAction, removeAssetAction } from "@/lib/settings/forms-admin";
 import { ArrowLeft, Pencil, Plus } from "lucide-react";
 
@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function AssetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireScope();
   const { id } = await params;
+  const names = await stateNames();
   const found = await projectAsset(ctx, id);
   if (!found) notFound();
   const { asset, documents } = found;
@@ -64,7 +65,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
                 <Td className="font-mono text-xs">{d.docType}</Td>
                 <Td className="font-mono text-xs">{d.discipline}</Td>
                 <Td className="whitespace-nowrap text-xs">{d.current ? <>rev {d.current.value}{d.current.statusCode ? ` · ${d.current.statusCode}` : ""}</> : <span className="text-slate-400">not yet</span>}</Td>
-                <Td><ToneChip tone={d.current ? "done" : "idle"}>{DOC_STATE_LABEL[d.state as DocState] ?? d.state}</ToneChip></Td>
+                <Td><ToneChip tone={d.current ? "done" : "idle"}>{docStateName(names, d.state)}</ToneChip></Td>
               </tr>
             ))}
           </DataTable>

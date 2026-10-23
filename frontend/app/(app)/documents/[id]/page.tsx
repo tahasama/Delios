@@ -15,8 +15,8 @@ import { isController, isAdmin, mayContributeToDocument, standsInForControl } fr
 import { ToneChip, StateChip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
-import { DOC_STATE_LABEL, DOC_STATE_COLOR, revStateColor, type DocState } from "@/lib/core/standard";
-import { stateNames, stateName, supplierStage, supplierStageName, supplierStamp } from "@/lib/core/state-names";
+import { DOC_STATE_COLOR, revStateColor, type DocState } from "@/lib/core/standard";
+import { stateNames, stateName, supplierStage, supplierStageName, docStateName, supplierStamp } from "@/lib/core/state-names";
 import { revisionGround } from "@/lib/documents/revision-ground";
 import { ownFields, readExtras, formPolicy } from "@/lib/settings/field-policy";
 import { fmtDate, timeAgo, plain } from "@/lib/core/utils";
@@ -650,7 +650,7 @@ export default async function DocumentDetailPage({
     ? supplierStageName(names, stage, { together, held: onHold })
     : shown
     ? stateName(names, shown.state, { together, held: onHold })
-    : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
+    : docStateName(names, doc.state);
   const stateColor = onHold ? "bg-red-50/40 text-red-800 ring-red-300" : shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
 
   return (

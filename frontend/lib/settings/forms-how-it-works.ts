@@ -144,10 +144,13 @@ export async function setStateNamesAction(_prev: State | undefined, formData: Fo
   });
   for (const { one, label } of wanted) {
     if (label.length > STATE_NAME_MAX) return { error: `Keep “${label}” under ${STATE_NAME_MAX} characters.` };
-    // Two states read the same would make the register lie about one of them.
-    const clash = taken.get(label.toLowerCase());
+    // Two states of the same column read the same would make the register lie about one of them (the app's own words
+    // may share one: a supplier's document is "Returned" by the check and by the review alike).
+    if (label === one.default) continue;
+    const word = `${one.group}:${label.toLowerCase()}`;
+    const clash = taken.get(word) ?? wanted.find((w) => w.one.group === one.group && w.one.code !== one.code && w.label.toLowerCase() === label.toLowerCase())?.one.default;
     if (clash) return { error: `“${label}” is used twice — ${clash} and ${one.default} must read differently.` };
-    taken.set(label.toLowerCase(), one.default);
+    taken.set(word, one.default);
   }
   try {
     for (const { one, label } of wanted) {

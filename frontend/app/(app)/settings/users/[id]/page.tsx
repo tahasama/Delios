@@ -69,7 +69,7 @@ export default async function PersonActivityPage({ params, searchParams }: { par
           {activity.first ? `First act ${fmtDate(activity.first)}. ` : "Nothing recorded yet. "}
           What {user.name} did in the app, day by day: their acts on documents
           {activity.keepsReading ? ", what they opened and downloaded" : ""}{activity.showsSignIns ? ", and their sign-ins" : ""}, as the organization chose to keep them
-          {isAdmin(me) ? <> (<Link href="/organization/settings/tracking" className="font-semibold text-link hover:underline">change it</Link>)</> : null}.
+          {isAdmin(me) ? <> (<Link href="/organization/settings/security#tracking" className="font-semibold text-link hover:underline">change it</Link>)</> : null}.
           Only an administrator or the control function reads this, and reading it is recorded too.
         </p>
       ) : <p>Their activity could not be read just now. Try again in a moment.</p>}

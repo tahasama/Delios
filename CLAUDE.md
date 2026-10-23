@@ -626,21 +626,25 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Where a project's site is** (owner): each project keeps its **country** (`Project.Country`, ISO two letters, or none),
   its **time zone** and its **days off each week** (`WeekendDays`), asked when it opens and on its line (organization's
   Projects, This project; `PlaceFields`, `readPlace`); a new project starts with the organization's (Defaults for new
-  projects, "Where a new project's site is"; `Settings/ProjectPlace.cs`, org settings `PROJECT_TIME_ZONE` /
+  projects' place is on the Calendar card; `Settings/ProjectPlace.cs`, org settings `PROJECT_TIME_ZONE` /
   `PROJECT_WEEKEND` / `PROJECT_COUNTRY`, `GET`/`PUT /api/admin/project-place`, PROJECT_PLACE_SET), never changing one already
-  open. Nothing set: UTC, Saturday and Sunday, no country.
-- **Public holidays** (owner) are a list of Types & sets, group Schedule (`HOLIDAYS`, "Public holidays", its switch Free):
-  each value's code starts with its day (2026-12-25, or 2026-12-25-FR where two countries share one), its name is the
-  holiday's, its prop `country` the country it is kept in (none: every country). Every count of working days (review
-  steps, an answer's due day, warnings, a discipline notified again) skips the weekend and the holidays of the project's
-  country (`WorkingCalendar.HolidaysAsync`, the project's own copy of the list where it has one). The organization fills
-  it; nothing is offered ready-made.
-- **How dates read is the organization's** (owner; card "How dates read", `/organization/settings/dates`, administrators,
-  no switch): `DATE_FORMAT` = DMY_SHORT (05 Mar 2026, the app's), DMY (05/03/2026), MDY (03/05/2026), ISO (2026-03-05)
-  (`Settings/DateFormat.cs`, refused otherwise: DATE_FORMAT_UNKNOWN). Every answer of the backend carries it
-  (`X-Delios-Date-Format`); the screens keep it for the request (`lib/core/date-format.ts`, `keepRequestDateFormat` in
-  `apiFetch`) and the page (`DateFormatKeeper` in the layouts), and `fmtDate` / `fmtDateTime` draw every day with it (a
-  time on 24 hours). Exports and the stamp keep their own.
+  open (on the organization's Calendar card, "Where a new project's site is"). Nothing set: UTC, Saturday and Sunday, no country.
+- **The calendar** (owner: "how about we create a calendar"; holidays are a calendar, never a list of Types & sets):
+  days nobody counts are kept on it (`Settings/Calendar.cs`, table `days_off`): the organization's **public holidays**
+  (each with its name and the country it is kept in, or every country) and a project's **own days off** (a site
+  shutdown, a local holiday; where the switch `CALENDAR`, area "Calendar", Free by default, leaves it free, ROOM_FIXED
+  otherwise). Each month is drawn as a month (`components/calendar.tsx`, `MonthsCalendar`): days off each week shaded,
+  holidays rose, a project's own amber, the schedule's action days highlighted (a bar under the day), today ringed; a
+  click on a day opens it under the months (what it holds, each action linking its page) and, for whoever keeps that
+  calendar, claims it (its name; the organization's also its country) or unclaims it, asked first (DAY_OFF_MARKED /
+  DAY_OFF_UNMARKED). **The organization's Calendar card** (`/organization/settings/calendar`, administrators): its
+  holidays a year at a time (`?year=`), how dates read, where a new project's site starts, and its switch. **A project's
+  Calendar card** (Settings → Calendar, read by everyone of ours, changed by the control function): where the site is
+  (`PUT /calendar/place`), its country's holidays and its own days off. **The Calendar page** (`/calendar`, in the menu
+  for everyone; action days for our own people only): read only. A project's calendar spans **from the month it starts
+  to the month it finishes** (owner; This project's dates, `PROJECT_INFO`; no end: twelve months on, or its last
+  action's month). Every count of working days (review steps, an answer's due day, warnings, a discipline notified
+  again) skips the days off each week and these (`WorkingCalendar.HolidaysAsync` → `Calendar.DaysOffAsync`).
 - **The app speaks English only**: every word is written in place; another language means moving each sentence into a
   file of words per language, screens and backend alike (owner asked, not decided).
 - **A new email counts once its owner opens the link sent to it** (owner): an administrator changing someone's email
@@ -998,7 +1002,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the Control room and read as written sentences in the plan (the masthead's "Read it all as the plan"). Under the
   console sit what holds for the whole project (`flow/project-wide.tsx`): "Who acts as the control function"
   (`#control-people`, named there) and "Back to the defaults". What the states are called is the organization's card
-  (`/organization/settings/states`, administrators), read on a project.
+  (`/organization/settings/states`, administrators), read on a project: every state Help shows, by group (`STATE_GROUPS`):
+  the document's (planned, active, withdrawn, cancelled, archived), its latest revision's ("No revision yet" included)
+  and a supplier's stages (`docStateName`, `stateName`, `supplierStageName` read them everywhere); two of one group never
+  read the same, the app's own words aside.
 - **A person's activity** (owner): in People & access, a name opens `/settings/users/<id>`, and so do the clock icon on
   each line and "See what <name> did" in the opened line (owner: "I didn't know this page existed"): who they are, then everything
   they did in the app with its day and time (signed in, opened a document, downloaded, reviewed, released, sent…), read
@@ -1161,7 +1168,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   often as needed, each name kept its own. "How they work with us" changes once. The **contract** is between two
   organizations: the one signing it (the project's) is known by the project's code, the other by its contract number
   (`ProjectParty.ContractNumber`, Organizations, "On <project>"), unique on DELIOS, changed once.
-- **Sign-in & security** (administrators) is the organization's, on its Settings (`/organization/settings/security`; owner,
+- **Security & privacy** (administrators; owner: what is kept about activity "does not deserve an entire card": it is the
+  same card, its sheet under the sign-in's, `/organization/settings/tracking` only redirects there) is the organization's, on its Settings (`/organization/settings/security`; owner,
   after the critique; `/settings/security` only redirects there, and a project's Settings carry no such card):
   two-step sign-in asked of everyone or not; the organization's own account (owner: "explain the work with a progress
   diagram", then "look like what we have in the app") drawn as the app's own stage path (`StagePath`, as under a
