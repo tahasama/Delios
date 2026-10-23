@@ -573,14 +573,20 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Defaults for new projects** and **What projects may change** are pages of their own (owner: "I did not say remove
   them… not reduced to 2 buttons no one sees"), each a card of the organization's Settings, group Organization, with its
   figure (where the defaults come from; n fixed · n free). Defaults (`/organization/defaults`, `PROJECT_DEFAULTS`):
-  the whole form of how a new project works (`components/how-it-works.tsx`), start from a project, the app's own
-  defaults, reset; the Projects plate's "Defaults for new projects" opens it. The defaults hold only the answers that
+  every answer a new project starts with on one page, in the app's one way of answering (owner: "rework… as the app's
+  styling"): each a `Choice` (`setRoomAnswerAction`, `target=defaults`, the same as the organization's Control room),
+  saved one at a time after "From now on… Instead of…"; an answer we changed carries "ours" with the app's own beside
+  it, one projects may not change "the same on every project". The plate (Projects' way): its line linking the Control
+  room and What projects may change, its two acts on its right, each opening a sheet under it that is its question
+  ("Start from a project", `?open=from`; "Back to the app's own", `?open=reset`, saying nothing of ours is kept), and
+  four figures (where they come from, answers of our own, who carries the acts out, projects may change n of m). The
+  side panel listing the app's own answers is gone: each answer says it where we changed it. The Projects plate's
+  "Defaults for new projects" opens it. The defaults hold only the answers that
   page shows (`isDefaultsAnswer`: who carries each act out with its confirmations and acts left out, how a project
   works, the days before a silent discipline is notified again): never the stamp, how other organizations' documents
   come in, who answers for an organization; "Start from a project" takes only those, asked first ("From now on…
-  Instead of…"), and a new project is given only those. An act changed on its own while the answer above stays as it
-  was makes it "it depends on the act" (`was:<act>`, `wasMode`), as the Control room; changed with another answer
-  above, the form asks instead of dropping it. What projects may change
+  Instead of…"), and a new project is given only those. An act changed on its own makes the answer for every act "it
+  depends on the act", the others written down as they stood (nothing moves by itself). What projects may change
   (`/organization/settings/may-change`): every switch in one list, by card, each card's link above its switches (the
   same switches sit on each card too). The defaults keep only what differs from the app's own; copied when a project
   opens, never changing one already open; a joined project follows its owner. A project marks only an answer "changed

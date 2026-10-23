@@ -15,7 +15,6 @@ import {
   SKIPPABLE,
   SKIP_KEY,
   CONFIRMABLE,
-  CONFIRM_KEY,
   actIsOff,
   effectiveAnswer,
   MODE_LABEL,
@@ -94,92 +93,6 @@ function revalidateHowItWorks() {
   revalidatePath("/organization/settings");
   revalidatePath("/organization/settings/flow");
   revalidatePath("/organization/defaults");
-}
-
-/**
- * The screen, saved in one go: the project's answer, and — when that answer is
- * "it depends" — each act's own. For the defaults, "as each project is set up"
- * (FOLLOW) forgets the answer.
- */
-export async function setControlActivitiesAction(_prev: State | undefined, formData: FormData): Promise<State> {
-  const asked = String(formData.get("projectMode") ?? "") as ProjectMode | "FOLLOW";
-  const defaults = String(formData.get("target") ?? "") === "defaults";
-  if (!PROJECT_MODES.includes(asked as ProjectMode) && !(defaults && asked === "FOLLOW")) return { error: "Choose who carries these acts out." };
-
-  // The acts showed what each was when the page opened (`was:<act>`). One changed by hand while the answer above stays
-  // as it was means "it depends on the act", as the Control room reads it: the change is kept, never dropped. Changed
-  // together with another answer above, which would carry every act out the same way, it is asked, not guessed.
-  const touched = CONTROL_ACTIVITIES.filter((activity) => formData.has(`was:${activity.key}`)
-    && String(formData.get(`mode:${activity.key}`) ?? "") !== String(formData.get(`was:${activity.key}`)));
-  let mode: ProjectMode | "FOLLOW" = asked;
-  if (asked !== "CUSTOM" && touched.length) {
-    if (asked !== String(formData.get("wasMode") ?? "")) {
-      return { error: `You changed ${touched.map((a) => a.title.toLowerCase()).join(", ")} one by one, and also chose another answer above, which carries every act out the same way. Choose "${PROJECT_MODE_LABEL.CUSTOM}" to keep the acts as you set them, or put them back.` };
-    }
-    mode = "CUSTOM";
-  }
-
-  const wanted: [string, string | null][] = [[PROJECT_KEY, mode === "FOLLOW" ? null : mode]];
-  if (mode === "CUSTOM") {
-    for (const activity of CONTROL_ACTIVITIES) {
-      const value = String(formData.get(`mode:${activity.key}`) ?? "") as ControlMode;
-      if (ACT_MODES.includes(value)) wanted.push([activity.key, value]);
-    }
-  }
-
-  // An act that may be left out says so with its own answer, kept whichever way the acts are carried out: who would
-  // carry it out stays as it was, for the day it is used again.
-  for (const key of Object.keys(SKIPPABLE)) if (formData.has(`skipping:${key}`)) wanted.push([SKIP_KEY(key), formData.get(`use:${key}`) === "on" ? "ON" : "OFF"]);
-  // The confirmation by whoever holds Manage is its own answer, kept whichever way the acts are carried out.
-  for (const key of Object.keys(CONFIRMABLE)) wanted.push([CONFIRM_KEY(key), formData.get(`confirm:${key}`) === "on" ? "ON" : "OFF"]);
-  let changed: number;
-  try {
-    changed = await save(formData, wanted);
-  } catch (e) {
-    return { error: refusal(e).message };
-  }
-  revalidateHowItWorks();
-  if (!changed) return { ok: "Nothing changed." };
-  if (mode === "FOLLOW") return { ok: "Saved — each new project follows whether it has a control function." };
-  return {
-    ok: mode !== asked
-      ? `Saved — act by act, since you set ${touched.map((a) => a.title.toLowerCase()).join(", ")} on its own.`
-      : mode === "CUSTOM"
-        ? `Saved — act by act. ${CONTROL_ACTIVITIES.length} acts, each with its own answer.`
-        : `Saved — ${PROJECT_MODE_LABEL[mode].toLowerCase()}.`,
-  };
-}
-
-/**
- * How this organization works, as against who does what: what releasing a
- * revision means, and what makes an action's document count as delivered.
- * Both are genuine choices, and the app holds an opinion rather than a rule.
- */
-export async function setPolicyAction(_prev: State | undefined, formData: FormData): Promise<State> {
-  const wanted: [string, string | null][] = [];
-  const said: string[] = [];
-  for (const one of POLICIES) {
-    const asked = String(formData.get(one.key) ?? "");
-    if (!one.options.some((option) => option.value === asked)) continue;
-    wanted.push([one.key, asked]);
-    said.push(one.options.find((option) => option.value === asked)!.label.toLowerCase());
-  }
-  const escalate = String(formData.get(ESCALATE_AFTER_KEY) ?? "").trim();
-  if (escalate) {
-    const days = Number(escalate);
-    if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Notify again after 1 to 60 working days." };
-    wanted.push([ESCALATE_AFTER_KEY, String(days)]);
-    said.push(`notified again after ${days} working days`);
-  }
-  let changed: number;
-  try {
-    changed = await save(formData, wanted);
-  } catch (e) {
-    return { error: refusal(e).message };
-  }
-  revalidateHowItWorks();
-  if (!changed) return { ok: "Nothing changed." };
-  return { ok: `Saved: ${said.join("; ")}.` };
 }
 
 /**
@@ -284,7 +197,21 @@ export async function setRoomAnswerAction(_prev: State | undefined, formData: Fo
   const activity = CONTROL_ACTIVITIES.find((one) => one.key === key);
   let said: string;
   try {
-    if (activity && String(formData.get("target") ?? "") === "defaults") {
+    if (key === PROJECT_KEY) {
+      // Who carries out every act at once; "as each project is set up" (the defaults only) forgets the answer. Moving to
+      // "it depends on the act" writes each act down as it stands, so that nothing moves by itself.
+      const defaults = String(formData.get("target") ?? "") === "defaults";
+      if (!PROJECT_MODES.includes(value as ProjectMode) && !(defaults && value === "FOLLOW")) return { error: "Choose who carries these acts out." };
+      const wanted: [string, string | null][] = [[PROJECT_KEY, value === "FOLLOW" ? null : value]];
+      if (value === "CUSTOM") {
+        const now = defaults
+          ? controlFrom(new Map(Object.entries((await (await import("@/lib/organization/defaults")).projectDefaults())?.values ?? {})), true)
+          : await controlSettings(await requireAdminScope());
+        for (const row of now.rows) wanted.push([row.activity.key, row.controlDoes ? "CONTROL" : "SELF"]);
+      }
+      await save(formData, wanted);
+      said = value === "FOLLOW" ? "Each new project reads whether somebody holds the control function." : `${PROJECT_MODE_LABEL[value as ProjectMode]}.`;
+    } else if (activity && String(formData.get("target") ?? "") === "defaults") {
       // The organization's defaults: the act answers for itself, the others written down as they stand, so that
       // moving this one never moves another.
       if (value === "OFF") {

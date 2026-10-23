@@ -13,7 +13,7 @@ export type ChoiceOption = { value: string; label: string; text: string };
  * days), and what the one in force means. Choosing another does not save: it says plainly what will change and waits
  * to be confirmed. The same way for every answer on the page, whoever carries an act out or how the project works.
  */
-export function Choice({ title, options, value, action, hidden, field = "value", unit, min, max, readOnly = false, fixed = false, exception }: {
+export function Choice({ title, options, value, action, hidden, field = "value", unit, min, max, readOnly = false, fixed = false, exception, mark }: {
   title: string;
   /** The answers to choose among; none for a number of days. */
   options?: ChoiceOption[];
@@ -32,6 +32,8 @@ export function Choice({ title, options, value, action, hidden, field = "value",
   fixed?: boolean;
   /** The organization keeps it the same on every other project, and leaves this one free: why. */
   exception?: string;
+  /** Said beside the title: where the answer comes from ("ours", the app's own…). */
+  mark?: React.ReactNode;
 }) {
   const [asked, setAsked] = useState<string | null>(null);
   const [typed, setTyped] = useState(value);
@@ -44,7 +46,7 @@ export function Choice({ title, options, value, action, hidden, field = "value",
   return (
     <li className="py-3 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <p className="min-w-0 text-[13px] font-medium text-slate-900">{title}</p>
+        <p className="min-w-0 text-[13px] font-medium text-slate-900">{title}{mark ? <> {mark}</> : null}</p>
         {options ? (
           <span className="choice" role="group" aria-label={title}>
             {options.map((one) => (
