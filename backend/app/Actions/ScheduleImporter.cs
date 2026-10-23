@@ -108,7 +108,8 @@ public sealed class ScheduleImporter(
         string? error;
         await using (var content = await storage.OpenReadAsync(file.ObjectKey, cancellationToken))
         {
-            (parsed, error) = ScheduleReader.Read(content, file.Name, source.Columns);
+            var code = await db.Projects.AsNoTracking().Where(p => p.Id == revision.ProjectId).Select(p => p.Code).SingleAsync(cancellationToken);
+            (parsed, error) = ScheduleReader.Read(content, file.Name, source.Columns, code);
         }
         if (parsed is null)
         {
@@ -137,7 +138,8 @@ public sealed class ScheduleImporter(
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({"schedule:" + projectId}))", cancellationToken);
         IReadOnlyList<ParsedActivity>? parsed;
         string? error;
-        using (var content = new MemoryStream(bytes)) (parsed, error) = ScheduleReader.Read(content, fileName, source?.Columns ?? new ScheduleColumns());
+        var code = await db.Projects.AsNoTracking().Where(p => p.Id == projectId).Select(p => p.Code).SingleAsync(cancellationToken);
+        using (var content = new MemoryStream(bytes)) (parsed, error) = ScheduleReader.Read(content, fileName, source?.Columns ?? new ScheduleColumns(), code);
         if (parsed is null) return (null, $"{fileName}: {error}");
         // Counted the way a released revision's read is counted. The released revision the file belongs to keeps the read
         // as its own, the first time; a file with no revision, or read again, is kept among the uploaded lists instead.

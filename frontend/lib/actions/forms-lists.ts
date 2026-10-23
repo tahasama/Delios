@@ -1,5 +1,6 @@
 "use server";
 
+import { trimXer } from "@/lib/actions/xer";
 import { revalidatePath } from "next/cache";
 import { mayUploadLists } from "@/lib/core/permissions";
 import { requireScope } from "@/lib/core/scope";
@@ -41,7 +42,9 @@ export async function uploadPlanListAction(_prev: Result | undefined, formData: 
   let summary = "";
   let registered: string[] = [];
   try {
-    const bytes = Buffer.from(await file.arrayBuffer());
+    const raw = Buffer.from(await file.arrayBuffer());
+    // A P6 export is sent with only the tables the schedule reads.
+    const bytes = /\.xer$/i.test(file.name) ? trimXer(raw) : raw;
     ({ summary, registered } = await api<{ summary: string; registered: string[] }>(projectPath(ctx, "/schedule/lists"), {
       body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), revisionId, confirmed, reason: reason || null },
     }));
@@ -70,7 +73,9 @@ export async function uploadLooseListAction(_prev: Result | undefined, formData:
   let summary = "";
   let registered: string[] = [];
   try {
-    const bytes = Buffer.from(await file.arrayBuffer());
+    const raw = Buffer.from(await file.arrayBuffer());
+    // A P6 export is sent with only the tables the schedule reads.
+    const bytes = /\.xer$/i.test(file.name) ? trimXer(raw) : raw;
     ({ summary, registered } = await api<{ summary: string; registered: string[] }>(projectPath(ctx, "/schedule/lists"), {
       body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), aware: true, reason },
     }));

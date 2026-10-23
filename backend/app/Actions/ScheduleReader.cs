@@ -61,9 +61,11 @@ public static class ScheduleReader
         : fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? ReadExcel(content, null) : ReadCsv(content);
 
     /// <summary>The activities, or why the file cannot be read; the error names the row.</summary>
-    public static (IReadOnlyList<ParsedActivity>? Activities, string? Error) Read(Stream content, string fileName, ScheduleColumns columns)
+    public static (IReadOnlyList<ParsedActivity>? Activities, string? Error) Read(Stream content, string fileName, ScheduleColumns columns,
+        string? projectCode = null)
     {
-        if (XerReader.IsXer(fileName)) return XerReader.Read(content, columns.Sheet);
+        // A P6 export holding several projects is read for ours, by its code.
+        if (XerReader.IsXer(fileName)) return XerReader.Read(content, columns.Sheet ?? projectCode);
         List<string[]> rows;
         try
         {

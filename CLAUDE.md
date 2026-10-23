@@ -302,7 +302,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   GIF, WebP, AVIF, BMP; SVG stays a download, it can carry code) as itself, an Excel workbook (.xlsx, .xlsm) as its sheets
   (`components/workbook-view.tsx`; backend `Documents/WorkbookView.cs`, `GET /files/{id}/workbook`: each sheet's cells as
   Excel shows them, last calculated values, bold, merged cells, widths; nothing in it runs; the first 2,000 rows and 100
-  columns of 30 sheets, said when cut); with a PDF too, "The PDF · The source file" above it, the PDF first. Other
+  columns of 30 sheets, said when cut), a Primavera P6 export (.xer) as P6 lays it out (`components/schedule-file-view.tsx`;
+  `GET /files/{id}/schedule`, the same reading as the schedule's: each project on its tab, its activities under their
+  WBS, each folded open or shut, ID · name · type · start · finish, "A" once it happened; what the schedule would make
+  of it said above when it would not read it); with a PDF too, "The PDF · The source file" above it, the PDF first. Other
   sources (Word, drawings, models…) are downloaded; converting them is to discuss. The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
   the side cards going under it once there is no room beside it (owner; `ResizablePane`, cookie `pane-review`; a double-click puts it back).
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
@@ -1386,8 +1389,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   register documents, revised and released on the document page.
 - The schedule is read from a Primavera P6 export (.xer) too (owner: "extract data from it directly in addition to the
   excel upload"; backend `Actions/XerReader.cs`): its TASK table, the planner's ID its `task_code`, start and finish as P6
-  shows them (actual, else early, else remaining, else planned), WBS summaries left out; an export of several projects
-  is read for the one the schedule settings name where a workbook's sheet is named, else refused naming them. On upload
+  shows them (actual, else early, else remaining, else planned), WBS summaries left out; no column is chosen (P6 names
+  its fields the same in every export); an export of several projects is read for the one whose P6 ID is our project's
+  code, else refused naming them. Only the tables read (PROJECT, PROJWBS, TASK) are sent on from the screens
+  (`lib/actions/xer.ts`), so a large export fits (server actions take 100 MB). On upload
   (`.xer` beside `.xlsx` and `.csv`, `SheetGuard` reading it as text) and on release (a revision's `.xlsx` first, then
   `.xer`, then `.csv`). The disciplines and requirements lists stay Excel or CSV.
 - Their Excel is uploaded on Schedule & actions only by Document Control or a

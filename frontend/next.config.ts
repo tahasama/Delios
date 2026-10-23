@@ -5,7 +5,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   experimental: {
-    serverActions: { bodySizeLimit: "25mb" },
+    // A Primavera P6 export (.xer) can be large; only its schedule tables are sent on to be read (lib/actions/xer.ts).
+    serverActions: { bodySizeLimit: "100mb" },
   },
   // Settings used to live under /admin, which named the person rather than the
   // thing. Anything bookmarked or linked there still arrives.

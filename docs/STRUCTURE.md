@@ -34,7 +34,7 @@ backend/
 │   ├── Documents/        documents, revisions, files, the register; their numbers with other organizations (Equivalents.cs); the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
 │   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (the sets of Review outcomes, read by routes)
 │   │                     ProjectLists: the project's lists (own copy on first change, where each value is used, who changes them)
-│   │                     WorkbookView: an Excel source file read for the Preview (components/file-preview.tsx, workbook-view.tsx)
+│   │                     WorkbookView: an Excel source file read for the Preview (components/file-preview.tsx, workbook-view.tsx; a P6 .xer, schedule-file-view.tsx)
 │   │                     ListRules: groups, the app's lists, which set of a list serves a deliverable type; Catalog.IsOfferedFor checks it
 │   │                     SheetGuard: every spreadsheet checked before it is read (type, size unpacked, macros, viruses)
 │   ├── Reviews/          routes, steps, advice, verdicts, release

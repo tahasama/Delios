@@ -122,9 +122,9 @@ public static class ListUploadEndpoints
         }
 
         List<string[]> rows;
-        // A P6 export holding several projects is read for the one the schedule settings name.
+        // A P6 export holding several projects is read for ours, by its code.
         var named = XerReader.IsXer(fileName)
-            ? (await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == project.Id, cancellationToken))?.Columns.Sheet
+            ? (await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == project.Id, cancellationToken))?.Columns.Sheet ?? project.Code
             : null;
         using (var content = new MemoryStream(bytes)) rows = ScheduleReader.ReadRows(content, fileName, named);
         var now = clock.GetCurrentInstant();
