@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { Minus, MoveDiagonal2, Plus, X } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { Field } from "@/components/ui";
 import { Select } from "@/components/select";
@@ -65,6 +65,13 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
     window.addEventListener("pointerup", up);
   };
   const resetSize = () => { setSize(CALENDAR_DAY.normal); savePreference(PREF.calendarDay, ""); };
+  // The same by a step, from the buttons beside "Names in the days".
+  const stepSize = (by: number) => {
+    const next = Math.min(CALENDAR_DAY.max, Math.max(CALENDAR_DAY.min, size + by));
+    setSize(next);
+    savePreference(PREF.calendarDay, next === CALENDAR_DAY.normal ? "" : String(next));
+  };
+  const sizeBtn = "inline-flex h-6 w-6 items-center justify-center rounded text-slate-600 hover:bg-tint disabled:opacity-40";
   const toggleNames = (on: boolean) => { setNames(on); savePreference(PREF.calendarNames, on ? "" : "0"); };
   // A month as wide as its seven days and their gaps, with its own padding.
   const monthWidth = size * 7 + 6 * 2 + 20;
@@ -101,6 +108,12 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
         <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={names} onChange={(e) => toggleNames(e.target.checked)} /> Names in the days
         </label>
+        <span className="flex items-center gap-1 text-xs text-slate-600" title="Drag the corner of the calendar too. Double-click Size to put it back.">
+          <span onDoubleClick={resetSize} className="select-none">Size</span>
+          <button type="button" onClick={() => stepSize(-8)} disabled={size <= CALENDAR_DAY.min} className={sizeBtn} title="Smaller" aria-label="Smaller"><Minus className="h-3.5 w-3.5" /></button>
+          <button type="button" onClick={() => stepSize(8)} disabled={size >= CALENDAR_DAY.max} className={sizeBtn} title="Larger" aria-label="Larger"><Plus className="h-3.5 w-3.5" /></button>
+          {size !== CALENDAR_DAY.normal ? <button type="button" onClick={resetSize} className="text-link hover:underline">Normal</button> : null}
+        </span>
         {countries ? (
           <div className="w-60">
             <Select value={country} onChange={(e) => setCountry(e.target.value)} aria-label="Whose holidays" className="plain w-full">
@@ -111,7 +124,7 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
         ) : null}
       </div>
 
-      <div className="relative">
+      <div className="relative w-fit max-w-full pr-5 pb-5">
       <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${monthWidth}px), ${monthWidth}px))` }}>
         {months.map(({ y, m }) => {
           const first = isoDay(y, m, 1);
@@ -168,8 +181,8 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
       {/* The corner that makes the whole calendar larger or smaller. */}
       <div role="separator" aria-label="Drag to make the calendar larger or smaller"
         title="Drag to make the calendar larger or smaller. Double-click to put it back." onPointerDown={onResize} onDoubleClick={resetSize}
-        className="group/size absolute -right-1 -bottom-1 hidden h-4 w-4 cursor-nwse-resize md:block">
-        <span className="absolute right-0.5 bottom-0.5 h-2.5 w-2.5 rounded-br-sm border-r-2 border-b-2 border-line transition group-hover/size:border-link/70" />
+        className="absolute right-0 bottom-0 flex h-5 w-5 cursor-nwse-resize touch-none items-center justify-center rounded text-slate-500 ring-1 ring-line hover:text-link hover:ring-link/50">
+        <MoveDiagonal2 className="h-3.5 w-3.5" />
       </div>
       </div>
 

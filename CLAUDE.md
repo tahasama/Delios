@@ -636,7 +636,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   otherwise). Each month is drawn as a month (`components/calendar.tsx`, `MonthsCalendar`): days off each week shaded,
   holidays rose, a project's own amber, the schedule's action days highlighted (a bar under the day), today ringed; each
   day is a square of 56 pixels (owner: "double the height", then "we forgot the width"), each month exactly its seven
-  days wide, the whole calendar dragged larger or smaller by its corner (cookie `calendar-day`, 28–120; double-click
+  days wide, the whole calendar made larger or smaller by "Size − +" beside "Names in the days" (owner: "i cant find the resize"; "Normal" puts it back) or dragged by its corner, a marked handle under the last month (cookie `calendar-day`, 28–120; double-click
   puts it back); "Names in the days", a tick (cookie `calendar-names`, on by default), writes each day off's and each
   action's name inside its days, as many lines as the day holds; a
   click on a day opens it under the months (what it holds, each action linking its page) and, for whoever keeps that
