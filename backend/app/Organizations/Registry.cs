@@ -477,6 +477,16 @@ public static class Registry
         number = number?.Trim();
         if (string.IsNullOrEmpty(number))
         {
+            // The country alone is kept too (owner: "i can choose the country, and save but choice do not keep showing"),
+            // while no identifier fixes it; once one is given, the country is the identifier's.
+            if (!string.IsNullOrEmpty(country) && identity.IdentifierNumber is null)
+            {
+                if (country.Length != 2 || !country.All(char.IsAsciiLetterUpper))
+                    return Problems.Invalid("COUNTRY_UNKNOWN", $"{country} is not a country code (two letters, such as FR or AE).", new { field = "country" });
+                if (identity.TenantId is { } mine && mine != tenantId)
+                    return Problems.Forbidden("THEIR_OWN", $"{identity.Name} is on DELIOS: only {identity.Name} gives its own country.");
+                if (identity.Country != country) { changes.Add($"country {identity.Country ?? "none"} → {country}"); identity.Country = country; }
+            }
             if (string.IsNullOrWhiteSpace(noReason) || identity.IdentifierNumber is not null) return null;
             if (identity.NoIdentifierReason != noReason.Trim()) { identity.NoIdentifierReason = noReason.Trim(); changes.Add($"no identifier: {noReason.Trim()}"); }
             return null;

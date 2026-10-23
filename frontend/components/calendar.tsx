@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Minus, MoveDiagonal2, Plus, X } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { Field } from "@/components/ui";
@@ -29,7 +30,7 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
  * action days are highlighted. A click on a day opens it under the months: what it holds, and, for whoever keeps this
  * calendar, claims it (a name, and for the organization its country) or unclaims it, asked first.
  */
-export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = [], claim, countries, daySize = CALENDAR_DAY.normal, namesShown = true, aside, month, before, after }: {
+export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = [], claim, countries, daySize = CALENDAR_DAY.normal, namesShown = true, aside, month, before, after, country: chosen = "", known = [] }: {
   from: string; to: string; weekend: number[]; today?: string; daysOff: DayOff[]; actions?: ActionDay[];
   /** How large a day is drawn (its side, in pixels), as the person left it (cookie `calendar-day`, read by the server). */
   daySize?: number;
@@ -46,9 +47,23 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
   claim?: { level: "organization" | "project"; defaultCountry?: string | null };
   /** The countries a holiday may be kept in (the organization's calendar). */
   countries?: { code: string; name: string }[];
+  /** Whose holidays are shown (the organization's calendar), kept in the address (`?country=`, ALL for every country). */
+  country?: string;
+  /** The chosen country's public holidays as a list that knows them gives them (owner): drawn until marked, each marked by a click. */
+  known?: { day: string; name: string }[];
 }) {
   const [open, setOpen] = useState<string | null>(null);
-  const [country, setCountry] = useState<string>("");
+  const [country, setCountry] = useState<string>(chosen);
+  useEffect(() => { setCountry(chosen); }, [chosen]);
+  const router = useRouter();
+  const path = usePathname();
+  const params = useSearchParams();
+  const chooseCountry = (code: string) => {
+    setCountry(code);
+    const next = new URLSearchParams(params.toString());
+    next.set("country", code || "ALL");
+    router.replace(`${path}?${next}`, { scroll: false });
+  };
   // The whole calendar grows or shrinks as its corner is dragged: each day keeps its square, each month its seven
   // columns, so it never reads out of proportion. Double-click puts it back.
   const [size, setSize] = useState(daySize);
@@ -95,6 +110,12 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
     for (const d of shown) map.set(d.day, [...(map.get(d.day) ?? []), d]);
     return map;
   }, [shown]);
+  // The known holidays not marked yet for that country (once marked, the day itself says it).
+  const knownOn = useMemo(() => {
+    const map = new Map<string, string>();
+    if (country) for (const k of known) if (!(byDay.get(k.day) ?? []).some((d) => d.country === country)) map.set(k.day, k.name);
+    return map;
+  }, [known, byDay, country]);
   const actionsOn = (day: string) => actions.filter((a) => a.start && a.start <= day && (a.finish ?? a.start) >= day);
   const nameOf = (code: string | null) => (code ? countries?.find((c) => c.code === code)?.name ?? code : "every country");
 
@@ -117,6 +138,7 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
         <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-600">
           <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-tint ring-1 ring-line" /> Day off each week</li>
           <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-rose-100 ring-1 ring-rose-300" /> Public holiday</li>
+          {knownOn.size ? <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border border-dashed border-rose-400" /> Known holiday, not marked yet</li> : null}
           {claim?.level !== "organization" ? <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-amber-100 ring-1 ring-amber-300" /> The project&rsquo;s own day off</li> : null}
           {actions.length ? <li className="flex items-center gap-1.5"><span className="h-1 w-3 rounded-full bg-sky-600" /> An action&rsquo;s days</li> : null}
           {today ? <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm ring-2 ring-brand-line" /> Today</li> : null}
@@ -132,7 +154,7 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
         </span>
         {countries ? (
           <div className="w-60">
-            <Select value={country} onChange={(e) => setCountry(e.target.value)} aria-label="Whose holidays" className="plain w-full">
+            <Select value={country} onChange={(e) => chooseCountry(e.target.value)} aria-label="Whose holidays" className="plain w-full">
               <option value="">Every country&rsquo;s holidays</option>
               {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
             </Select>
@@ -141,8 +163,8 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
         {aside}
       </div>
 
-      <div className="relative mx-auto w-fit max-w-full pr-5 pb-5">
-      <div style={{ width: `min(100%, ${monthWidth}px)` }}>
+      <div className="relative mx-auto pr-6 pb-6" style={{ width: `min(100%, ${monthWidth + 24}px)` }}>
+      <div>
         {[here].filter(Boolean).map(({ y, m }) => {
           const first = isoDay(y, m, 1);
           const length = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
@@ -170,7 +192,8 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
                   const own = off.some((d) => d.source === "PROJECT");
                   const busy = actionsOn(day);
                   const resting = weekend.includes(isoDay(y, m, i + 1));
-                  const words = [...off.map((d) => d.name), ...busy.map((a) => `${a.code} · ${a.name}`)].join("\n");
+                  const hint = knownOn.get(day);
+                  const words = [...off.map((d) => d.name), ...(hint ? [`${hint} (known, not marked)`] : []), ...busy.map((a) => `${a.code} · ${a.name}`)].join("\n");
                   return (
                     // A day is opened by a click; an action's name written in it opens the action itself (owner), so the day
                     // is not a button (a link may not sit inside one) but answers the keys as one.
@@ -182,13 +205,14 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
                         size < 40 && "items-center justify-center p-0",
                         holiday ? "bg-rose-100 font-semibold text-rose-800 ring-1 ring-rose-300"
                           : own ? "bg-amber-100 font-semibold text-amber-900 ring-1 ring-amber-300"
+                          : hint ? "border border-dashed border-rose-400 text-rose-800 hover:bg-rose-50"
                           : resting ? "bg-tint text-slate-400" : "text-slate-700 hover:bg-tint-soft",
                         day === today && "ring-2 ring-brand-line",
                         open === day && "outline-2 outline-offset-1 outline-brand-line")}>
                       {i + 1}
-                      {writes && (off.length || busy.length) ? (
+                      {writes && (off.length || busy.length || hint) ? (
                         <span className="mt-0.5 flex w-full min-w-0 flex-col items-start gap-px text-left text-[11px] font-medium leading-tight">
-                          {[...off.map((d) => ({ key: d.id, text: d.name, action: false })), ...busy.map((a) => ({ key: a.code, text: a.name, action: true }))]
+                          {[...off.map((d) => ({ key: d.id, text: d.name, action: false })), ...(hint ? [{ key: `known-${day}`, text: hint, action: false }] : []), ...busy.map((a) => ({ key: a.code, text: a.name, action: true }))]
                             .slice(0, Math.max(1, Math.floor((size - 22) / 14)))
                             .map((one) => one.action ? (
                               <Link key={one.key} href={`/actions/${one.key}`} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}
@@ -227,8 +251,14 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
             </button>
           </div>
           <div className="space-y-3 px-5 py-4 sm:px-6">
-            {openDays.length || openActions.length ? (
+            {openDays.length || openActions.length || knownOn.has(open) ? (
               <ul className="space-y-1 text-xs text-slate-700">
+                {knownOn.has(open) ? (
+                  <li>
+                    <span className="font-semibold">{knownOn.get(open)}</span>
+                    <span className="text-slate-500"> · a public holiday in {nameOf(country)}, as the list of holidays gives it; not marked yet, so due days still count it</span>
+                  </li>
+                ) : null}
                 {openDays.map((d) => (
                   <li key={d.id}>
                     <span className="font-semibold">{d.name}</span>
@@ -254,7 +284,7 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
                 className="asking space-y-3">
                 <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                   <Field label="What it is" required hint={claim.level === "organization" ? "Christmas Day, Eid al-Fitr…" : "site shutdown, local holiday…"}>
-                    <input name="name" required maxLength={120} autoFocus autoComplete="off" className="plain w-full" />
+                    <input name="name" required maxLength={120} autoFocus autoComplete="off" defaultValue={knownOn.get(open) ?? ""} className="plain w-full" />
                   </Field>
                   {claim.level === "organization" && countries ? (
                     <Field label="Kept in" hint="only projects in that country skip it; none: every project">
@@ -266,7 +296,7 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
                   ) : null}
                 </div>
               </ActionForm>
-            ) : !openDays.length && !openActions.length ? (
+            ) : !openDays.length && !openActions.length && !knownOn.has(open) ? (
               <p className="text-xs text-slate-500">Nothing on this day.</p>
             ) : null}
           </div>

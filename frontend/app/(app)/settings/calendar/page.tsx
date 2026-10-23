@@ -6,6 +6,7 @@ import { ActionForm } from "@/components/form";
 import { MonthsCalendar } from "@/components/calendar";
 import { PlaceFields } from "../projects/place-fields";
 import { projectCalendar } from "@/lib/settings/calendar";
+import { knownBetween } from "@/lib/settings/national-holidays";
 import { setSitePlaceAction } from "@/lib/settings/forms-calendar";
 import { ExceptionNote } from "@/lib/settings/exception";
 import { countryName } from "@/lib/organization/countries";
@@ -75,7 +76,8 @@ export default async function ProjectCalendarPage() {
             <p className="text-xs text-slate-600"><ExceptionNote project={project} what="the calendar" exception={calendar.exception} /></p>
           ) : null}
           <MonthsCalendar daySize={calendarDay((await cookies()).get(PREF.calendarDay)?.value)} namesShown={(await cookies()).get(PREF.calendarNames)?.value !== "0"} from={calendar.from} to={calendar.to} weekend={calendar.place.weekendDays} today={calendar.today}
-            daysOff={calendar.daysOff} actions={calendar.actions} claim={claims ? { level: "project" } : undefined} />
+            daysOff={calendar.daysOff} actions={calendar.actions} claim={claims ? { level: "project" } : undefined}
+            country={calendar.place.country ?? ""} known={knownBetween(calendar.place.country, calendar.from, calendar.to)} />
           <p className="text-[11px] text-slate-500">
             From the month {project} starts to the month it finishes (This project). Public holidays are the organization&rsquo;s, by country.
           </p>

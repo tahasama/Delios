@@ -638,16 +638,19 @@ a screen only words it. A new rule goes in the backend, never in a page.
   year before or after (`components/calendar.tsx`, `MonthsCalendar`): days off each week shaded,
   holidays rose, a project's own amber, the schedule's action days highlighted (a bar under the day), today ringed; each
   day is a square (96 pixels by default, 40–200) (owner: "double the height", then "we forgot the width"), each month exactly its seven
-  days wide, the whole calendar made larger or smaller by "Size − +" beside "Names in the days" (owner: "i cant find the resize"; "Normal" puts it back) or dragged by its corner, a marked handle under the last month (cookie `calendar-day`; double-click
+  days wide, the whole calendar made larger or smaller by "Size − +" beside "Names in the days" (owner: "i cant find the resize"; "Normal" puts it back) or dragged by its corner, a marked handle at the month's own corner (cookie `calendar-day`; double-click
   puts it back); "Names in the days", a tick (cookie `calendar-names`, on by default), writes each day off's and each
   action's name inside its days, as many lines as the day holds; a
   click on a day opens it under the months (what it holds, each action linking its page) and, for whoever keeps that
   calendar, claims it (its name; the organization's also its country) or unclaims it, asked first (DAY_OFF_MARKED /
   DAY_OFF_UNMARKED). **The organization's Calendar card** (`/organization/settings/calendar`, administrators): its
   holidays a year at a time (`?year=`, `&month=`); **a country's public holidays filled in** (owner: "some recognise national
-  holidays"; the `date-holidays` package, `lib/settings/national-holidays.ts`, in English): a country chosen, its year's
-  public holidays listed first (those already marked said so), then "Add these N", asked first (`POST
-  /api/admin/calendar/days/many`, each logged DAY_OFF_MARKED, those already marked left); the organization's calendar
+  holidays"; the `date-holidays` package, `lib/settings/national-holidays.ts`, in English): the country chosen on the
+  calendar (kept in the address, `?country=`, ALL for every country; none: where a new project's site starts), its
+  year's public holidays are drawn dashed on the calendar until marked (a click on one opens it with its name filled in)
+  and listed under it with "Mark these N", asked first (`POST /api/admin/calendar/days/many`, each logged
+  DAY_OFF_MARKED, those already marked left); a project's calendar draws its country's the same way (`knownBetween`),
+  counted only once marked; the organization's calendar
   draws no actions (they are a project's); how dates read, where a new project's site starts, and its switch. **A project's
   Calendar card** (Settings → Calendar, read by everyone of ours, changed by the control function): where the site is
   (`PUT /calendar/place`), its country's holidays and its own days off. **The calendar is a tab of the Schedule** (owner:

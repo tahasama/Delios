@@ -20,3 +20,10 @@ export function nationalHolidays(country: string, year: number): NationalHoliday
     return [];
   }
 }
+
+/** The same, for every year a project's calendar spans (its country's; none without a country). */
+export function knownBetween(country: string | null | undefined, from: string, to: string): NationalHoliday[] {
+  if (!country) return [];
+  const years = Array.from({ length: +to.slice(0, 4) - +from.slice(0, 4) + 1 }, (_, i) => +from.slice(0, 4) + i);
+  return years.flatMap((y) => nationalHolidays(country, y)).filter((h) => h.day >= from && h.day <= to);
+}
