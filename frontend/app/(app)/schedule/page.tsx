@@ -22,6 +22,8 @@ import { cookies } from "next/headers";
 import { PREF, calendarDay } from "@/lib/core/preferences";
 import { MonthsCalendar } from "@/components/calendar";
 import { projectCalendar } from "@/lib/settings/calendar";
+import Link from "next/link";
+import { SETUP_PAGES, maySetup } from "@/app/(app)/settings/setup-pages";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Schedule" };
@@ -382,7 +384,12 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
         calendar={calendar ? (
           <MonthsCalendar daySize={calendarDay(jar.get(PREF.calendarDay)?.value)} namesShown={jar.get(PREF.calendarNames)?.value !== "0"}
             from={calendar.from} to={calendar.to} weekend={calendar.place.weekendDays} today={calendar.today} daysOff={calendar.daysOff}
-            actions={found.map((a) => ({ code: a.code, name: a.name, start: day(a.start), finish: day(a.finish) }))} />
+            actions={found.map((a) => ({ code: a.code, name: a.name, start: day(a.start), finish: day(a.finish) }))}
+            aside={maySetup(ctx.user, SETUP_PAGES.find((p) => p.href === "/settings/calendar")!) ? (
+              <Link href="/settings/calendar" className="text-xs font-semibold text-link hover:underline">
+                {calendar.mayChange ? "Change the days off" : "The days off"} in Settings → Calendar
+              </Link>
+            ) : null} />
         ) : null}
         rows={tableRows}
         total={matching}

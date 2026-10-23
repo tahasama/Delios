@@ -647,7 +647,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`PUT /calendar/place`), its country's holidays and its own days off. **The calendar is a tab of the Schedule** (owner:
   "make it a tab as the plan and the table"; `/schedule?view=calendar`, tabs The calendar · The plan · The table, the plan
   in the middle and shown first; `/calendar` only redirects there, no menu item): read only, drawing the actions the
-  Schedule's filters leave (another organization's people see only theirs, as on the Schedule). A project's calendar spans **from the month it starts
+  Schedule's filters leave (another organization's people see only theirs, as on the Schedule), the months centred,
+  its key ending with "… in Settings → Calendar" for whoever opens that card. A project's calendar spans **from the month it starts
   to the month it finishes** (owner; This project's dates, `PROJECT_INFO`; no end: twelve months on, or its last
   action's month). Every count of working days (review steps, an answer's due day, warnings, a discipline notified
   again) skips the days off each week and these (`WorkingCalendar.HolidaysAsync` → `Calendar.DaysOffAsync`).

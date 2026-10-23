@@ -26,12 +26,14 @@ const isoDay = (y: number, m: number, d: number) => ((new Date(Date.UTC(y, m, d)
  * action days are highlighted. A click on a day opens it under the months: what it holds, and, for whoever keeps this
  * calendar, claims it (a name, and for the organization its country) or unclaims it, asked first.
  */
-export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = [], claim, countries, daySize = CALENDAR_DAY.normal, namesShown = true }: {
+export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = [], claim, countries, daySize = CALENDAR_DAY.normal, namesShown = true, aside }: {
   from: string; to: string; weekend: number[]; today?: string; daysOff: DayOff[]; actions?: ActionDay[];
   /** How large a day is drawn (its side, in pixels), as the person left it (cookie `calendar-day`, read by the server). */
   daySize?: number;
   /** Whether the names of the days off and the actions are written inside the days (cookie `calendar-names`). */
   namesShown?: boolean;
+  /** Drawn at the end of the key's line: where the days off are kept, on the Schedule's calendar. */
+  aside?: React.ReactNode;
   /** Who keeps this calendar: the organization's holidays, or the project's own days off; none: read only. */
   claim?: { level: "organization" | "project"; defaultCountry?: string | null };
   /** The countries a holiday may be kept in (the organization's calendar). */
@@ -122,9 +124,10 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
             </Select>
           </div>
         ) : null}
+        {aside}
       </div>
 
-      <div className="relative w-fit max-w-full pr-5 pb-5">
+      <div className="relative mx-auto w-fit max-w-full pr-5 pb-5">
       <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${monthWidth}px), ${monthWidth}px))` }}>
         {months.map(({ y, m }) => {
           const first = isoDay(y, m, 1);
