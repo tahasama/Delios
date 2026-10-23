@@ -959,7 +959,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (tiles: each list with how many values in use, or "not set up yet" in amber, the pages it reads and the form it asks; a tile only
   its keepers open is shown unlinked, never hidden). One method for every answer (`flow/choice.tsx`): its answers
   side by side, what the one in force means under it, another chosen asks "From now on… Instead of…" before saving
-  (`setRoomAnswerAction`, `setScheduleDaysAction`); read only for whoever may not change it, locked where the
+  (`setRoomAnswerAction`, `setScheduleDaysAction`); a number of days is its field on the same line with Save beside it
+  (owner: "no need for a full form for working days"), Save lit only once it differs; read only for whoever may not change it, locked where the
   organization keeps it. The masthead names who acts as the control function. **No second page of answers** (owner:
   "How this project works" is gone, `/settings/control` only redirects to the Control room): every answer is changed in
   the Control room and read as written sentences in the plan (the masthead's "Read it all as the plan"). Under the
