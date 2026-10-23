@@ -360,7 +360,8 @@ public static class DocumentEndpoints
         if (!Actions.XerReader.IsXer(file.Name))
             return Problems.Invalid("NOT_A_SCHEDULE", $"{file.Name} is not a Primavera P6 export (.xer): download it to open it.");
         await using var content = await storage.OpenReadAsync(file.ObjectKey, cancellationToken);
-        var reading = Actions.XerReader.Outline(content, access.Project.Code);
+        var chosen = (await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == access.Project.Id, cancellationToken))?.Columns.Sheet;
+        var reading = Actions.XerReader.Outline(content, chosen ?? access.Project.Code);
         if (reading.Projects.Length == 0) return Problems.Invalid("SCHEDULE_UNREADABLE", $"{file.Name}: {reading.Error} Download it to open it.");
         const int most = 20_000;
         var shown = reading.Projects.Select(p => p.Activities.Length > most ? p with { Activities = p.Activities[..most] } : p).ToArray();

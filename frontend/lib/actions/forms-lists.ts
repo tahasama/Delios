@@ -46,7 +46,8 @@ export async function uploadPlanListAction(_prev: Result | undefined, formData: 
     // A P6 export is sent with only the tables the schedule reads.
     const bytes = /\.xer$/i.test(file.name) ? trimXer(raw) : raw;
     ({ summary, registered } = await api<{ summary: string; registered: string[] }>(projectPath(ctx, "/schedule/lists"), {
-      body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), revisionId, confirmed, reason: reason || null },
+      body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), revisionId, confirmed, reason: reason || null,
+        p6Project: String(formData.get("p6Project") ?? "").trim() || null },
     }));
   } catch (e) {
     return { error: refusal(e).message };
@@ -77,7 +78,8 @@ export async function uploadLooseListAction(_prev: Result | undefined, formData:
     // A P6 export is sent with only the tables the schedule reads.
     const bytes = /\.xer$/i.test(file.name) ? trimXer(raw) : raw;
     ({ summary, registered } = await api<{ summary: string; registered: string[] }>(projectPath(ctx, "/schedule/lists"), {
-      body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), aware: true, reason },
+      body: { kind, fileName: file.name, contentBase64: bytes.toString("base64"), aware: true, reason,
+        p6Project: String(formData.get("p6Project") ?? "").trim() || null },
     }));
   } catch (e) {
     return { error: refusal(e).message };

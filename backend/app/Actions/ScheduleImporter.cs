@@ -131,7 +131,7 @@ public sealed class ScheduleImporter(
     /// once. Returns what changed, or why the file cannot be read. The caller records who did it and why.
     /// </summary>
     public async Task<(string? Summary, string? Error)> ReadUploadAsync(Guid tenantId, Guid projectId, string fileName, byte[] bytes,
-        Revision? revision, CancellationToken cancellationToken)
+        Revision? revision, CancellationToken cancellationToken, string? p6Project = null)
     {
         if (!ScheduleReader.CanReadSchedule(fileName)) return (null, "The schedule must be an .xlsx or .csv export, or a Primavera P6 export (.xer).");
         var source = await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == projectId, cancellationToken);
@@ -139,8 +139,17 @@ public sealed class ScheduleImporter(
         IReadOnlyList<ParsedActivity>? parsed;
         string? error;
         var code = await db.Projects.AsNoTracking().Where(p => p.Id == projectId).Select(p => p.Code).SingleAsync(cancellationToken);
-        using (var content = new MemoryStream(bytes)) (parsed, error) = ScheduleReader.Read(content, fileName, source?.Columns ?? new ScheduleColumns(), code);
+        // The P6 project chosen on the upload is read, and kept for the schedule's next revisions (owner: an export of
+        // several projects, its baseline among them).
+        var columns = source?.Columns ?? new ScheduleColumns();
+        if (p6Project is not null) columns = Copy(columns, p6Project);
+        using (var content = new MemoryStream(bytes)) (parsed, error) = ScheduleReader.Read(content, fileName, columns, code);
         if (parsed is null) return (null, $"{fileName}: {error}");
+        if (p6Project is not null && source is not null && source.Columns.Sheet != p6Project && XerReader.IsXer(fileName))
+        {
+            var kept = await db.ScheduleSources.SingleAsync(s => s.Id == source.Id, cancellationToken);
+            kept.Columns = Copy(kept.Columns, p6Project);
+        }
         // Counted the way a released revision's read is counted. The released revision the file belongs to keeps the read
         // as its own, the first time; a file with no revision, or read again, is kept among the uploaded lists instead.
         var tally = new ScheduleImport { TenantId = tenantId, ProjectId = projectId, RevisionValue = "-", ImportedAt = clock.GetCurrentInstant() };
@@ -294,5 +303,12 @@ public sealed class ScheduleImporter(
         OldFinish = before?.Finish,
         NewStart = after.Start,
         NewFinish = after.Finish,
+    };
+
+    /// <summary>The same columns, reading another sheet or P6 project.</summary>
+    private static ScheduleColumns Copy(ScheduleColumns c, string sheet) => new()
+    {
+        Sheet = sheet, Code = c.Code, Name = c.Name, Start = c.Start, Finish = c.Finish, Responsible = c.Responsible,
+        Departments = c.Departments, DateOrder = c.DateOrder,
     };
 }

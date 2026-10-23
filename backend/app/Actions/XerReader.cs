@@ -119,7 +119,7 @@ public static class XerReader
             : outlines.FirstOrDefault(o => projectCode is not null && string.Equals(o.Code, projectCode.Trim(), StringComparison.OrdinalIgnoreCase));
         if (read is null)
             return new(outlines, null,
-                $"The export holds {outlines.Length} projects ({string.Join(", ", outlines.Select(o => o.Code))}) and none is named {projectCode}. Export the project alone from P6, or give it {projectCode} as its ID there.");
+                $"The export holds {outlines.Length} projects ({string.Join(", ", outlines.Select(o => o.Code))}) and none is named {projectCode}. Choose the one to read when uploading it on the Schedule (the choice is kept for the schedule's next revisions), or export it alone from P6.");
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var a in read.Activities)
             if (!seen.Add(a.Code)) return new(outlines, null, $"Activity {a.Code} appears twice in the export.");

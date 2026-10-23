@@ -62,7 +62,7 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
   // Whoever plans the project opens each list's upload from its own stage.
   const STAGE: Record<string, number> = { SCHEDULE: 0, DEPARTMENTS: 1, REQUIREMENTS: 2 };
   const panels = plans
-    ? lists.map((list) => ({ stage: STAGE[list.kind], kind: list.kind, panel: <PlanListPanel list={list} control /> }))
+    ? lists.map((list) => ({ stage: STAGE[list.kind], kind: list.kind, panel: <PlanListPanel list={list} control projectCode={ctx.project.code} /> }))
     : [];
   return <UploadSwitch stages={PLAN_STAGES} at={progress.at} under={keyed} panels={panels} />;
 }

@@ -15,7 +15,8 @@ namespace Delios.Host.Actions;
 /// A schedule list's file uploaded on Schedule &amp; actions: which list, the file, and either the released revision
 /// it is the list of, or the uploader's word that there is no such document.
 /// </summary>
-public sealed record ListUploadRequest(string Kind, string FileName, string ContentBase64, Guid? RevisionId = null, bool Aware = false, string? Reason = null, bool Confirmed = false);
+public sealed record ListUploadRequest(string Kind, string FileName, string ContentBase64, Guid? RevisionId = null, bool Aware = false, string? Reason = null, bool Confirmed = false,
+    string? P6Project = null);
 
 /// <summary>
 /// The schedule's three lists — the schedule, the disciplines per action, the document requirements — are documents
@@ -103,7 +104,8 @@ public static class ListUploadEndpoints
         switch (list.Kind)
         {
             case "SCHEDULE":
-                var (applied, error) = await schedules.ReadUploadAsync(project.TenantId, project.Id, fileName, bytes, revision, cancellationToken);
+                var (applied, error) = await schedules.ReadUploadAsync(project.TenantId, project.Id, fileName, bytes, revision, cancellationToken,
+                    string.IsNullOrWhiteSpace(request.P6Project) ? null : request.P6Project.Trim());
                 (summary, problems) = (applied, error is null ? [] : [error]);
                 break;
             case DepartmentsImporter.Kind:
@@ -124,7 +126,8 @@ public static class ListUploadEndpoints
         List<string[]> rows;
         // A P6 export holding several projects is read for ours, by its code.
         var named = XerReader.IsXer(fileName)
-            ? (await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == project.Id, cancellationToken))?.Columns.Sheet ?? project.Code
+            ? (string.IsNullOrWhiteSpace(request.P6Project) ? null : request.P6Project.Trim())
+                ?? (await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == project.Id, cancellationToken))?.Columns.Sheet ?? project.Code
             : null;
         using (var content = new MemoryStream(bytes)) rows = ScheduleReader.ReadRows(content, fileName, named);
         var now = clock.GetCurrentInstant();

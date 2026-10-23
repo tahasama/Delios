@@ -1390,8 +1390,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - The schedule is read from a Primavera P6 export (.xer) too (owner: "extract data from it directly in addition to the
   excel upload"; backend `Actions/XerReader.cs`): its TASK table, the planner's ID its `task_code`, start and finish as P6
   shows them (actual, else early, else remaining, else planned), WBS summaries left out; no column is chosen (P6 names
-  its fields the same in every export); an export of several projects is read for the one whose P6 ID is our project's
-  code, else refused naming them. Only the tables read (PROJECT, PROJWBS, TASK) are sent on from the screens
+  its fields the same in every export); an export of several projects (a baseline among them) is read for the one chosen
+  on the upload ("Which P6 project is the schedule", offered once the .xer is picked, with each one's activities,
+  `app/(app)/actions/schedule-file.tsx`; ours by its code chosen first), the choice kept for the schedule's next
+  revisions (`ScheduleColumns.Sheet`), else the one whose P6 ID is our project's code, else refused naming them. Only the tables read (PROJECT, PROJWBS, TASK) are sent on from the screens
   (`lib/actions/xer.ts`), so a large export fits (server actions take 100 MB). On upload
   (`.xer` beside `.xlsx` and `.csv`, `SheetGuard` reading it as text) and on release (a revision's `.xlsx` first, then
   `.xer`, then `.csv`). The disciplines and requirements lists stay Excel or CSV.

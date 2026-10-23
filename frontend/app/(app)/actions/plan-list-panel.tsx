@@ -6,6 +6,7 @@ import { Field, inputCls } from "@/components/ui";
 import { uploadPlanListAction, uploadLooseListAction } from "@/lib/actions/forms-lists";
 import type { PlanList } from "@/lib/actions/plan-lists";
 import { ConfirmOrWhy } from "./confirm-or-why";
+import { ScheduleFile } from "./schedule-file";
 import { Download, TriangleAlert } from "lucide-react";
 
 const STATE: Record<string, string> = {
@@ -26,7 +27,7 @@ const fileInputInline = "w-full";
  * way to register one, already filled in — or, knowingly and with a reason, to
  * upload the list without one.
  */
-export function PlanListPanel({ list, control }: { list: PlanList; control: boolean }) {
+export function PlanListPanel({ list, control, projectCode }: { list: PlanList; control: boolean; projectCode: string }) {
   const type = list.types[0] ?? null;
   const inForce = list.documents.filter((one) => one.released);
   const only = inForce.length === 1 ? inForce[0] : null;
@@ -45,7 +46,9 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
           <span>It is applied at once, with no review, and is not tied to a released document. Your name, the file and your reason are kept in the activity log.</span>
         </p>
         <Field label="File" hint={`the list as ${kinds}`} required>
-          <input type="file" name="file" required accept={accepts} className={fileInput} />
+          {list.kind === "SCHEDULE"
+            ? <ScheduleFile accept={accepts} label={`The schedule (${kinds})`} projectCode={projectCode} className={fileInput} />
+            : <input type="file" name="file" required accept={accepts} className={fileInput} />}
         </Field>
         <Field label="Why without a released document" required>
           <input name="reason" required className={inputCls} placeholder="e.g. Approver not available; or the organization approves on paper and a stamped scan follows" />
@@ -115,13 +118,18 @@ export function PlanListPanel({ list, control }: { list: PlanList; control: bool
                   </Select>
                 </Field>
               )}
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="file" name="file" required accept={accepts}
-                  aria-label={only ? `The list of rev ${only.released!.value} (${kinds})` : `The list of the released revision (${kinds})`}
-                  className={`${fileInputInline} min-w-0 flex-1`}
-                />
-              </div>
+              {list.kind === "SCHEDULE" ? (
+                <ScheduleFile accept={accepts} projectCode={projectCode} className={fileInputInline}
+                  label={only ? `The schedule of rev ${only.released!.value} (${kinds})` : `The schedule of the released revision (${kinds})`} />
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="file" name="file" required accept={accepts}
+                    aria-label={only ? `The list of rev ${only.released!.value} (${kinds})` : `The list of the released revision (${kinds})`}
+                    className={`${fileInputInline} min-w-0 flex-1`}
+                  />
+                </div>
+              )}
               {/* The uploader vouches for the file, or says why it differs. */}
               <ConfirmOrWhy revision={only ? `rev ${only.released!.value}` : "the released revision"} />
               <button className="ask" data-on="true">Upload and read</button>
