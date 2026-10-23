@@ -153,10 +153,13 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
                   const resting = weekend.includes(isoDay(y, m, i + 1));
                   const words = [...off.map((d) => d.name), ...busy.map((a) => `${a.code} · ${a.name}`)].join("\n");
                   return (
-                    <button key={day} type="button" onClick={() => setOpen(open === day ? null : day)}
+                    // A day is opened by a click; an action's name written in it opens the action itself (owner), so the day
+                    // is not a button (a link may not sit inside one) but answers the keys as one.
+                    <div key={day} role="button" tabIndex={0} onClick={() => setOpen(open === day ? null : day)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(open === day ? null : day); } }}
                       title={words || undefined} aria-pressed={open === day} aria-label={`${fmtDate(day)}${words ? `: ${words.replace(/\n/g, ", ")}` : ""}`}
                       style={{ height: size }}
-                      className={cn("relative flex flex-col items-end overflow-hidden rounded-sm px-1 pt-0.5 text-[12px] tabular-nums transition-colors",
+                      className={cn("relative flex cursor-pointer flex-col items-end overflow-hidden rounded-sm px-1 pt-0.5 text-[12px] tabular-nums transition-colors",
                         size < 40 && "items-center justify-center p-0",
                         holiday ? "bg-rose-100 font-semibold text-rose-800 ring-1 ring-rose-300"
                           : own ? "bg-amber-100 font-semibold text-amber-900 ring-1 ring-amber-300"
@@ -168,11 +171,14 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
                         <span className="mt-0.5 flex w-full min-w-0 flex-col items-start gap-px text-left text-[11px] font-medium leading-tight">
                           {[...off.map((d) => ({ key: d.id, text: d.name, action: false })), ...busy.map((a) => ({ key: a.code, text: a.name, action: true }))]
                             .slice(0, Math.max(1, Math.floor((size - 22) / 14)))
-                            .map((one) => <span key={one.key} className={cn("w-full truncate", one.action && "text-sky-800")}>{one.text}</span>)}
+                            .map((one) => one.action ? (
+                              <Link key={one.key} href={`/actions/${one.key}`} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}
+                                title={`Open ${one.key} · ${one.text}`} className="w-full truncate text-sky-800 hover:underline">{one.text}</Link>
+                            ) : <span key={one.key} className="w-full truncate">{one.text}</span>)}
                         </span>
                       ) : null}
                       {busy.length ? <span className="absolute inset-x-1.5 bottom-0.5 h-[3px] rounded-full bg-sky-600" aria-hidden /> : null}
-                    </button>
+                    </div>
                   );
                 })}
               </div>

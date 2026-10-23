@@ -649,8 +649,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   in the middle and shown first; `/calendar` only redirects there, no menu item): read only, drawing the actions the
   Schedule's filters leave (another organization's people see only theirs, as on the Schedule), the months centred,
   its key ending with "… in Settings → Calendar" for whoever opens that card. A project's calendar spans **from the month it starts
-  to the month it finishes** (owner; This project's dates, `PROJECT_INFO`; no end: twelve months on, or its last
-  action's month). Every count of working days (review steps, an answer's due day, warnings, a discipline notified
+  to the month it finishes** (owner; This project's dates, `PROJECT_INFO`; no end: twelve months on), widened to the
+  months of its first and last actions (owner: "show more months"); an action's name written in a day opens the action. Every count of working days (review steps, an answer's due day, warnings, a discipline notified
   again) skips the days off each week and these (`WorkingCalendar.HolidaysAsync` → `Calendar.DaysOffAsync`).
 - **The app speaks English only**: every word is written in place; another language means moving each sentence into a
   file of words per language, screens and backend alike (owner asked, not decided).

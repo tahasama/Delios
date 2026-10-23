@@ -116,7 +116,7 @@ public static class Calendar
     /// <summary>
     /// The months a project's calendar spans (owner: "from the month a project starts to the month it finishes"): from the
     /// first day of its start's month (as it says it, else the month it was opened) to the last day of its planned end's
-    /// month; no end said, to twelve months from today, or the month of its last action's day if later.
+    /// month; no end said, to twelve months from today; widened to the months of its first and last actions.
     /// </summary>
     private static async Task<(LocalDate From, LocalDate To)> SpanAsync(DeliosDbContext db, Project project, IClock clock, CancellationToken cancellationToken)
     {
@@ -134,15 +134,13 @@ public static class Calendar
         }
         var start = Read("startDate") ?? project.CreatedAt.InUtc().Date;
         var today = WorkingCalendar.Today(clock, project.TimeZone);
-        LocalDate end;
-        if (Read("endDate") is { } said && said >= start) end = said;
-        else
-        {
-            end = today.PlusMonths(12);
-            var last = await db.Activities.AsNoTracking().Where(a => a.ProjectId == project.Id && a.State == Actions.ActivityStates.Active)
-                .MaxAsync(a => a.Finish ?? a.Start, cancellationToken);
-            if (last is { } l && l > end) end = l;
-        }
+        LocalDate end = Read("endDate") is { } said && said >= start ? said : today.PlusMonths(12);
+        // Every action of the schedule is on it (owner: "show more months"), even one its dates leave out.
+        var actions = db.Activities.AsNoTracking().Where(a => a.ProjectId == project.Id && a.State == Actions.ActivityStates.Active && a.Start != null);
+        var first = await actions.MinAsync(a => a.Start, cancellationToken);
+        var last = await actions.MaxAsync(a => a.Finish ?? a.Start, cancellationToken);
+        if (first is { } f && f < start) start = f;
+        if (last is { } l && l > end) end = l;
         var from = new LocalDate(start.Year, start.Month, 1);
         var to = new LocalDate(end.Year, end.Month, 1).PlusMonths(1).PlusDays(-1);
         return (from, to);
