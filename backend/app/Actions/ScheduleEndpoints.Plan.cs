@@ -21,7 +21,8 @@ public sealed record PlanAction(Guid Id, string Code, string? ExternalId, string
     DateOnly? Start, DateOnly? Finish, int NeedCount, ActivityMove? Moved, DateTimeOffset? LastMetAt,
     IReadOnlyList<PlanNeed> Needs, IReadOnlyList<DecisionView> Decisions, IReadOnlyList<PlanConfirmation> Confirmations,
     bool Passed, string State, DateOnly? RiskFrom, IReadOnlyDictionary<string, DateOnly?> DisciplineRiskFrom,
-    bool StartAchieved = false, bool FinishAchieved = false, IReadOnlyList<string>? Wbs = null, int? WbsOrder = null);
+    bool StartAchieved = false, bool FinishAchieved = false, IReadOnlyList<string>? Wbs = null, int? WbsOrder = null,
+    DateOnly? NeededFrom = null);
 
 /// <summary>
 /// One need: what it asks for (the statuses it names, or its purpose), by when (<c>ManualDate</c>: a date set by hand;
@@ -103,7 +104,8 @@ public static partial class ScheduleEndpoints
     {
         var projectId = project.Id;
         var today = WorkingCalendar.Today(clock, project.TimeZone);
-        var window = (await ScheduleDays.ForProjectAsync(db, projectId, cancellationToken)).Risk;
+        var days = await ScheduleDays.ForProjectAsync(db, projectId, cancellationToken);
+        var window = days.Risk;
         var ids = activities.Select(a => a.Id).ToList();
         var documentIds = activities.SelectMany(a => a.Requirements).Select(r => r.DocumentId).Distinct().ToList();
         var documents = await db.Documents.AsNoTracking().Where(d => documentIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);
@@ -160,7 +162,10 @@ public static partial class ScheduleEndpoints
                     d.ConfirmedByName, d.ConfirmedAt?.ToDateTimeOffset(), d.ConfirmNote, d.ReversedByName, d.ReversedAt?.ToDateTimeOffset(), d.ReversedReason)).ToList(),
                 confirmations[a.Id].Select(c => new PlanConfirmation(c.Department, c.Available, c.Note, c.ConfirmedByName, c.ConfirmedAt.ToDateTimeOffset(),
                     c.Automatic, c.RevokedAt?.ToDateTimeOffset(), c.RevokedByName, c.RevokedReason)).ToList(),
-                passed, state, riskFrom?.ToDateOnly(), disciplineRisk, a.StartAchieved, a.FinishAchieved, a.Wbs, a.WbsOrder);
+                passed, state, riskFrom?.ToDateOnly(), disciplineRisk, a.StartAchieved, a.FinishAchieved, a.Wbs, a.WbsOrder,
+                // From when its documents are needed (owner: the plan's lead-in): the earliest a listed document is due,
+                // else the project's lead before its day, as a document added by hand would be due.
+                (a.Requirements.Select(n => Readiness.NeededBy(a, n)).Where(d => d is not null).Min() ?? a.Start?.PlusDays(-days.Lead))?.ToDateOnly());
         }).ToList();
     }
 }

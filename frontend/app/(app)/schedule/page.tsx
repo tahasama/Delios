@@ -205,7 +205,9 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     const missing = action.needs.filter((entry) => entry.state !== "MET");
     const ready = total - missing.length;
     const daysUntil = action.start ? Math.ceil((action.start.getTime() - Date.now()) / 86_400_000) : null;
-    const firstNeeded = action.needs.map((one) => one.neededBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
+    // The plan's lead-in (owner): from when its documents are needed, even with none listed yet (the project's lead).
+    const firstNeeded = action.neededFrom
+      ?? action.needs.map((one) => one.neededBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
     // The next document still owed — what a controller chases first.
     const nextNeeded = missing.map((one) => one.neededBy).filter(Boolean).sort((a, b) => a!.getTime() - b!.getTime())[0] ?? null;
     const readiness: Readiness = action.state;

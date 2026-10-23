@@ -1554,7 +1554,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   directly" (with the day) when a direct upload is newer, "Not released yet",
   or "None yet".
 - The plan is drawn as a planner's chart (owner): each month a column, every other one lightly shaded, a plain line
-  between them and between actions; each action's lead-in (from the day documents are needed) a lighter bar, its work
+  between them and between actions; each action's lead-in (from the day documents are needed: the earliest listed document's due day, else the project's
+  lead before its day, so it shows before any document is listed; backend `PlanAction.NeededFrom`) a lighter bar, its work
   (start → finish) a solid one in the same hue, a day of work with no finish a diamond; corners barely rounded.
 - An action whose dates the latest schedule read moved carries a "moved" stamp
   in the table and on the plan; its page says "Moved by rev C: was … , now …".

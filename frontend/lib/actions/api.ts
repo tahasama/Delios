@@ -158,6 +158,8 @@ export type PlanAction = {
   wbs: string[];
   /** Its WBS element's place in the planner's order. */
   wbsOrder: number | null;
+  /** From when its documents are needed: the earliest listed one's due day, else the project's lead before its day. */
+  neededFrom: Date | null;
 };
 
 type Plan = { versionInForce: string | null; actions: PlanAction[] };
@@ -174,7 +176,7 @@ function datesOf(raw: Plan): Plan {
       return {
         ...r,
         start: day(r.start as unknown as string), finish: day(r.finish as unknown as string), lastMetAt: at(r.lastMetAt as unknown as string),
-        riskFrom: day(r.riskFrom as unknown as string),
+        riskFrom: day(r.riskFrom as unknown as string), neededFrom: day(r.neededFrom as unknown as string),
         disciplineRiskFrom: Object.fromEntries(Object.entries(r.disciplineRiskFrom).map(([k, v]) => [k, day(v as unknown as string)])),
         moved: r.moved ? { ...r.moved, wasStart: day(r.moved.wasStart as unknown as string), wasFinish: day(r.moved.wasFinish as unknown as string) } : null,
         needs: r.needs.map((n) => ({ ...n, neededBy: day(n.neededBy as unknown as string)! })),
