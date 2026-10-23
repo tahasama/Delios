@@ -95,6 +95,8 @@ export function PlanRegister({
     span?: string | null;
     /** Of those drawn, how many have no date from the schedule and so no bar. */
     undated: number;
+    /** No WBS bands: none read yet (the schedule came from Excel, or before the WBS was kept), or sorted another way. */
+    wbs?: { none: boolean; href?: string } | null;
     noNote?: { count: number; href: string };
     undatedHref?: string;
   };
@@ -372,6 +374,15 @@ export function PlanRegister({
             <span className="font-mono text-xs font-semibold tracking-tight text-slate-700 tabular-nums">
               {more?.window && !more.window.wide ? more.window.label : filters.from || filters.to ? `${filters.from || "…"} → ${filters.to || "…"}` : "Every date in the schedule"}
               {more?.span ? <span className="ml-2 font-sans font-normal text-slate-500">· the schedule runs {more.span}</span> : null}
+              {more?.wbs?.none ? (
+                <span className="mt-1 block font-sans text-[11px] font-normal text-slate-500">
+                  No WBS in the schedule read: it is kept from a P6 export (.xer). Read the .xer again to group the actions by WBS.
+                </span>
+              ) : more?.wbs?.href ? (
+                <span className="mt-1 block font-sans text-[11px] font-normal text-slate-500">
+                  Sorted another way, so not grouped by WBS. <Link href={more.wbs.href} className="font-semibold text-link hover:underline">Group by WBS</Link>
+                </span>
+              ) : null}
             </span>
             <span
               className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px] text-slate-500"

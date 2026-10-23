@@ -1395,8 +1395,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `app/(app)/actions/schedule-file.tsx`; ours by its code chosen first), the choice kept for the schedule's next
   revisions (`ScheduleColumns.Sheet`), else the one whose P6 ID is our project's code, else refused naming them. Only the tables read (PROJECT, PROJWBS, TASK) are sent on from the screens
   (`lib/actions/xer.ts`), so a large export fits (server actions take 100 MB). On upload
-  (`.xer` beside `.xlsx` and `.csv`, `SheetGuard` reading it as text) and on release (a revision's `.xlsx` first, then
-  `.xer`, then `.csv`). The disciplines and requirements lists stay Excel or CSV.
+  (`.xer` beside `.xlsx` and `.csv`, `SheetGuard` reading it as text) and on release (a revision's `.xer` first, as only it
+  carries the WBS and what happened, then `.xlsx`, then `.csv`). The disciplines and requirements lists stay Excel or CSV.
 - **What the planner's file says is kept as the planner's word** (owner): each action keeps where it sits in the WBS
   (`Activity.Wbs`, top down, and `WbsOrder`, P6's order; from an .xer) and whether its start and finish happened
   (`StartAchieved` / `FinishAchieved`: P6's "A", "Achieved", from an .xer's actual dates or an Excel date written
@@ -1406,7 +1406,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   each WBS level a band across the plan (owner: the P6 preview's look, "cleaner"; its code, name and how many actions it
   holds, folded open or shut), indented, the bars as they are. Each plan row: our number, the planner's ID beside it,
   muted, the title under; the names take 16rem and the bars the rest (owner: "give enough space for the bars"). An
-  action read before its WBS was kept has none until the schedule is read again. The plan opens a month either side of today, today held inside the schedule's own span
+  action read before its WBS was kept has none until the schedule is read again; the plan says so when no action has a
+  WBS, and offers "Group by WBS" when sorted another way. The plan opens a month either side of today, today held inside the schedule's own span
   (a schedule over opens on its last days, one not begun on its first; owner: "point at last month"), says "the schedule
   runs <first month> → <last month>", and draws today only when inside; a read says its months too. The calendar tab
   opens the same way. The Schedule's heading says the days around an action in force (a document needed N days before

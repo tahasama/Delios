@@ -94,9 +94,10 @@ public sealed class ScheduleImporter(
         var document = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == revision.DocumentId, cancellationToken);
         var label = $"{document.Number} rev {revision.Value}";
 
-        // The activity list is the export, not the printed PDF: Excel first, then a P6 export (.xer), then CSV.
+        // The activity list is the export, not the printed PDF: a P6 export (.xer) first, since only it carries the WBS
+        // and what happened, then Excel, then CSV.
         var file = revision.Files.Where(f => f.Submission == revision.Submission && f.Status == FileStatuses.Clean && ScheduleReader.CanReadSchedule(f.Name))
-            .OrderBy(f => f.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? 0 : XerReader.IsXer(f.Name) ? 1 : 2).FirstOrDefault();
+            .OrderBy(f => XerReader.IsXer(f.Name) ? 0 : f.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? 1 : 2).FirstOrDefault();
         if (file is null)
         {
             Fail(record, "The released revision has no .xlsx, .xer or .csv file to read the activities from.");
