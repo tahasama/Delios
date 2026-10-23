@@ -100,6 +100,7 @@ const WORDS: Record<string, string> = {
   SHORTFALL_ACCEPTED: "Accepted a package short",
   // Schedule
   SCHEDULE_READ: "Read the schedule",
+  SCHEDULE_READ_AGAIN: "Read the schedule again",
   SCHEDULE_NOT_READ: "Schedule could not be read",
   SCHEDULE_SOURCE_SET: "Chose the project's schedule",
   SCHEDULE_DAYS_SET: "Set the days around an action",

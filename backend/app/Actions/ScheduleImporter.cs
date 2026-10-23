@@ -75,14 +75,29 @@ public sealed class ScheduleImporter(
     }
 
     /// <summary>
+    /// Reads the schedule's released revision again (owner: a schedule read before its WBS and what happened were kept,
+    /// "both images are literally from the same xer"): the same file, the same reading, its read counted afresh.
+    /// Returns what it says, or why it could not be read.
+    /// </summary>
+    public async Task<(string? Summary, string? Error)> ReadAgainAsync(ScheduleSource source, Revision revision, CancellationToken cancellationToken)
+    {
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({"schedule:" + revision.ProjectId}))", cancellationToken);
+        var earlier = await db.ScheduleImports.SingleOrDefaultAsync(i => i.RevisionId == revision.Id, cancellationToken);
+        await ReadAsync(source, revision, cancellationToken, earlier);
+        var record = earlier ?? db.ScheduleImports.Local.Single(i => i.RevisionId == revision.Id);
+        return record.Status == ScheduleImportStatuses.Failed ? (null, record.Error)
+            : ($"{record.Added} new, {record.Moved} moved, {record.Changed} changed, {record.Removed} removed, {record.Unchanged} unchanged.", null);
+    }
+
+    /// <summary>
     /// Reads one schedule revision: picks its .xlsx or .csv file, parses the activities, maps department names to discipline codes,
     /// then adds new activities, updates existing ones, marks missing ones removed, and records the changes in a <see cref="ScheduleImport"/>.
     /// Ends by recomputing the readiness of every activity of the project, since moved dates move the needs.
     /// </summary>
-    private async Task ReadAsync(ScheduleSource source, Revision revision, CancellationToken cancellationToken)
+    private async Task ReadAsync(ScheduleSource source, Revision revision, CancellationToken cancellationToken, ScheduleImport? earlier = null)
     {
         var now = clock.GetCurrentInstant();
-        var record = new ScheduleImport
+        var record = earlier ?? new ScheduleImport
         {
             TenantId = revision.TenantId,
             ProjectId = revision.ProjectId,
@@ -90,7 +105,17 @@ public sealed class ScheduleImporter(
             RevisionValue = revision.Value,
             ImportedAt = now,
         };
-        db.ScheduleImports.Add(record);
+        if (earlier is null) db.ScheduleImports.Add(record);
+        else
+        {
+            // Read again: the read of the same revision is counted afresh, from what it says now.
+            record.ImportedAt = now;
+            record.Status = ScheduleImportStatuses.Done;
+            record.Error = null;
+            record.Added = record.Moved = record.Changed = record.Removed = record.Unchanged = 0;
+            record.Changes = [];
+            record.UnmatchedDepartments = [];
+        }
         var document = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == revision.DocumentId, cancellationToken);
         var label = $"{document.Number} rev {revision.Value}";
 
