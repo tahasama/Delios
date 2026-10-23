@@ -59,8 +59,7 @@ public static class Readiness
         var there = new Dictionary<Guid, Dictionary<Guid, (string? Status, Instant At)>>();
         foreach (var projectId in projectIds)
             there[projectId] = await ThereAsync(db, projectId, documentIds, cancellationToken);
-        var windows = await db.ScheduleSources.AsNoTracking().Where(s => projectIds.Contains(s.ProjectId))
-            .ToDictionaryAsync(s => s.ProjectId, s => s.RiskWindowDays, cancellationToken);
+        var windows = await ScheduleDays.RiskByProjectAsync(db, projectIds, cancellationToken);
 
         foreach (var activity in activities)
         {

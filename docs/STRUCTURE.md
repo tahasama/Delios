@@ -40,7 +40,7 @@ backend/
 │   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs); what a request asks and where it is decided (Asks.cs); matching what arrived
 │   │                     to one of ours and packages taking documents as they come (IncomingService.Taking.cs)
 │   ├── Packages/         delivery packages and supplier packages; how other organizations' documents come in (Intake.cs: by placeholder or as they come)
-│   ├── Actions/          the schedule, its actions, what each needs, notices
+│   ├── Actions/          the schedule, its actions, what each needs, notices; ScheduleDays (the days around an action, on two levels)
 │   ├── Records/          assets, number ranges, readiness answers
 │   ├── Checks/           conformance checks
 │   ├── Reports/          reports
@@ -50,7 +50,7 @@ backend/
 │   │                     unique across DELIOS: codes, names, identifiers, contract numbers; changed once;
 │   │                     look-alikes, claims, merges), RegistryEndpoints (on DELIOS, our identity and domain,
 │   │                     claims, merges; command merge-organizations)
-│   ├── Settings/         the organization's and the project's settings and lists; KeptCopies (a project's own copy kept when reset, put back from the organization's card); FormRules (Forms & fields: what each form asks, checked on save); Liberty (what projects may change: Fixed or Free per setting, and the projects a fixed one leaves free); ProjectDifferences (what one project changed, for the organization's Settings)
+│   ├── Settings/         the organization's and the project's settings and lists; KeptCopies (a project's own copy kept when reset, put back from the organization's card); FormRules (Forms & fields: what each form asks, checked on save); Liberty (what projects may change: Fixed or Free per setting, and the projects a fixed one leaves free); ProjectDifferences (what one project changed, for the organization's Settings); OrganizationDefaults (the defaults for new projects replaced as a whole, a copy kept)
 │   ├── Notifications/    notifications, email, pop-ups
 │   ├── Audit/            the audit trail
 │   ├── Extraction/       reading text out of files

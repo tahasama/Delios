@@ -88,7 +88,7 @@ async function save(formData: FormData, wanted: [key: string, value: string | nu
 
 function revalidateHowItWorks() {
   revalidatePath("/settings/flow");
-  revalidatePath("/settings/flow");
+  revalidatePath("/schedule");
   revalidatePath("/organization");
   revalidatePath("/organization/settings");
   revalidatePath("/organization/settings/flow");
@@ -118,6 +118,8 @@ export async function resetProjectToDefaultsAction(_prev: State | undefined, _fo
       await setProjectSetting(ctx.projectId, key, value);
       changed++;
     }
+    // The days around an action follow the organization's again too.
+    await api(projectPath(ctx, "/schedule/days"), { method: "PUT", body: { followOrganization: true } });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -170,6 +172,17 @@ export async function setStateNamesAction(_prev: State | undefined, formData: Fo
  */
 export async function setScheduleDaysAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
+  // Back on the organization's days: the project's own are forgotten.
+  if (formData.get("follow") === "1") {
+    try {
+      await api(projectPath(ctx, "/schedule/days"), { method: "PUT", body: { followOrganization: true } });
+    } catch (e) {
+      return { error: refusal(e).message };
+    }
+    revalidatePath("/settings/flow");
+    revalidatePath("/schedule");
+    return { ok: "The project follows the organization's days around an action again." };
+  }
   const lead = Number(formData.get("leadDays"));
   const risk = Number(formData.get("riskDays"));
   if (!Number.isInteger(lead) || !Number.isInteger(risk) || lead < 0 || risk < 0 || lead > 365 || risk > 365)
@@ -184,6 +197,31 @@ export async function setScheduleDaysAction(_prev: State | undefined, formData: 
   return { ok: `Saved: needed ${lead} days before an action, at risk from ${risk} days before.` };
 }
 
+
+/**
+ * The organization's days around an action (its Control room and the defaults for new projects): the default of every
+ * project, read live; a project that changed its own keeps them. The backend reads every project's actions again.
+ */
+export async function setOrgScheduleDaysAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const { requireOrgAdmin } = await import("@/lib/core/org-scope");
+  await requireOrgAdmin();
+  const lead = formData.get("leadDays");
+  const risk = formData.get("riskDays");
+  const body: Record<string, number> = {};
+  for (const [name, value] of [["defaultLeadDays", lead], ["riskWindowDays", risk]] as const) {
+    if (value === null || String(value).trim() === "") continue;
+    const days = Number(value);
+    if (!Number.isInteger(days) || days < 0 || days > 365) return { error: "Write whole days, from 0 to 365." };
+    body[name] = days;
+  }
+  try {
+    await api("/api/admin/schedule-days", { method: "PUT", body });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidateHowItWorks();
+  return { ok: "Saved: every project following the organization's days reads them from now on." };
+}
 
 /**
  * One answer of the Control room, changed where it is shown (a step's panel): who carries out an act (CONTROL /

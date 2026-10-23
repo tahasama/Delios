@@ -14,7 +14,6 @@ namespace Delios.Host.Actions;
 
 /// <summary>Request body for PUT /schedule: which document is the schedule, how to read its columns, and the default lead and risk-window days. Null fields keep their current value.</summary>
 /// <summary>Body of setting the days around an action: how long before its day a document is needed, and from when it is at risk.</summary>
-public sealed record ScheduleDaysRequest(int? DefaultLeadDays = null, int? RiskWindowDays = null);
 
 public sealed record SourceRequest(Guid DocumentId, ScheduleColumns? Columns = null, int? DefaultLeadDays = null, int? RiskWindowDays = null);
 
@@ -127,7 +126,7 @@ public static partial class ScheduleEndpoints
         everyone.MapGet("/activities/{activityId:guid}/lateness", LatenessAsync);
         project.MapGet("/schedule", SourceAsync);
         project.MapPut("/schedule", SetSourceAsync);
-        project.MapPut("/schedule/days", SetDaysAsync);
+        project.MapPut("/schedule/days", ScheduleDays.ProjectPutAsync);
         project.MapPost("/schedule/import", ImportAsync);
         project.MapGet("/activities", ActivitiesAsync);
         project.MapGet("/activities/{activityId:guid}", ActivityAsync);

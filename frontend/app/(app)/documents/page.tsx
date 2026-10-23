@@ -173,7 +173,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const supplierView = !user.isInternal && !!user.partyCode;
   const hostName = supplierView ? (await getMe())?.tenant.name ?? "Our client" : null;
   // The project's risk window: from it, a planned date not met yet reads "at risk".
-  const riskDays = user.isInternal ? (await scheduleSource(scope)).source?.riskWindowDays ?? DEFAULT_RISK_DAYS : DEFAULT_RISK_DAYS;
+  const riskDays = user.isInternal ? (await scheduleSource(scope)).days.risk : DEFAULT_RISK_DAYS;
   const all = register.rows.map((doc) => {
     // A revision whose review is decided and not yet released reads as not released.
     const latestState = doc.revisionState === "IN_REVIEW" && doc.verdict ? "NOT_RELEASED" : doc.revisionState;

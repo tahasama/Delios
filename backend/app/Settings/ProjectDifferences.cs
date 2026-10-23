@@ -68,6 +68,15 @@ public static class ProjectDifferences
             })
             .OrderBy(a => a.Area).ThenBy(a => a.Title).ToList();
 
+        // The days around an action: the project's own where it changed them, against the organization's.
+        var days = await Actions.ScheduleDays.ForProjectAsync(db, projectId, cancellationToken);
+        foreach (var (own, key) in new[] { (days.OwnLead, Actions.ScheduleDays.LeadSwitch), (days.OwnRisk, Actions.ScheduleDays.RiskSwitch) })
+        {
+            if (!own) continue;
+            var item = switches.FirstOrDefault(s => s.Key == key);
+            answers.Add(new ChangedAnswers(key, item?.Area ?? "Control room", item?.Title ?? key, 1, item?.Free ?? true));
+        }
+
         var exceptions = switches.Where(s => s.ExceptHere)
             .Select(s => new { s.Key, s.Area, s.Title, Exception = s.Except.First(e => e.ProjectId == projectId) })
             .Select(s => new { s.Key, s.Area, s.Title, s.Exception.Reason, s.Exception.At, s.Exception.By }).ToList();

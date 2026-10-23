@@ -347,7 +347,7 @@ public sealed partial class ReportBuilder(IClock clock)
             .Where(a => a.ProjectId == _project.Id && a.State == ActivityStates.Active && a.Start != null && a.Start <= horizon
                 && (a.Finish ?? a.Start) >= _today)
             .OrderBy(a => a.Start).ThenBy(a => a.Code).ToListAsync(cancellationToken);
-        var window = await db.ScheduleSources.Where(s => s.ProjectId == _project.Id).Select(s => (int?)s.RiskWindowDays).SingleOrDefaultAsync(cancellationToken) ?? 14;
+        var window = (await ScheduleDays.ForProjectAsync(db, _project.Id, cancellationToken)).Risk;
         var documentIds = activities.SelectMany(a => a.Requirements).Select(n => n.DocumentId).Distinct().ToList();
         var documents = await db.Documents.AsNoTracking().Where(d => documentIds.Contains(d.Id))
             .ToDictionaryAsync(d => d.Id, d => d.Number, cancellationToken);

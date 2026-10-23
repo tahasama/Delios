@@ -60,7 +60,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   defaults (with what it fixes) → the organization's (the app's, as its administrator changed them; with what it
   fixes) → the project's (the organization's, as the project changed them where free). Nothing changed: both read the
   app's; the organization changed something: the project reads the organization's. The organization may reset to the
-  app's defaults, **keeping a copy of its own** (to build: put back like a project's kept copy, `docs/gaps/settings.md`);
+  app's defaults, **keeping a copy of its own** (built: replacing the defaults for new projects, from a project or back to
+  the app's own, asks why and keeps what they held first, `Settings/OrganizationDefaults.cs`, `PUT /api/admin/project-defaults`,
+  a kept copy with no project, kind DEFAULTS; listed on the defaults' page, "Kept when replaced", and put back with why,
+  which keeps what stands in its turn);
   a project goes back to the organization's ("Back to the defaults", Control room). **Fixed** (every project uses
   the organization's; only an administrator changes it, for all) or **Free** (a project may take its own copy; the
   organization's later changes never touch it). Two degrees only, never a third, with one exception (owner, "both"):
@@ -894,6 +897,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   its state, set here, if it happens, ends here, shown below. Under it, "The days
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
+  **The days around an action on two levels** (owner: "need both org and proj levels"; `Actions/ScheduleDays.cs`): the
+  organization's ("needed before the action's day", "at risk from"; org settings `SCHEDULE_LEAD_DAYS` / `SCHEDULE_RISK_DAYS`,
+  `GET`/`PUT /api/admin/schedule-days`, on its Control room and on Defaults for new projects) are every project's
+  default, read live (as the stamp's); a project keeps only what it changed (the same keys on the project), where its
+  switch leaves it free (`LEAD_DAYS`, new, and `RISK_WINDOW`, Free by default; an exception counting), set before its
+  schedule is named too, "changed here · the organization's: N" beside each, and "Follow the organization's days
+  again" (also done by "Back to the defaults"). Nothing set anywhere: the app's 7. Every reader goes through
+  `ScheduleDays.ForProjectAsync` (the 14 two screens fell back to is gone); numbers other than 7 kept on a schedule before
+  read as the project's own until it next sets its days.
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
   of the hub (`CONTROL_ROOM`), drawn as the console itself (owner: navy, `scene-deck`, to stand out): what it is, the
   four facts that say how the project works (control function, who does what, releasing, adding people), and "Open the

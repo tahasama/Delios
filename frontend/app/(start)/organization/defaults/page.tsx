@@ -7,9 +7,9 @@ import { Field, ToneChip, inputCls } from "@/components/ui";
 import { Choice } from "@/app/(app)/settings/flow/choice";
 import { projectDefaults, isDefaultsAnswer } from "@/lib/organization/defaults";
 import { libertyOrFail } from "@/lib/organization/liberty";
-import { makeDefaultsAction, resetDefaultsAction } from "@/lib/organization/forms";
-import { setRoomAnswerAction } from "@/lib/settings/forms-how-it-works";
-import { adminProjects } from "@/lib/settings/api-admin";
+import { makeDefaultsAction, putBackDefaultsAction, resetDefaultsAction } from "@/lib/organization/forms";
+import { setOrgScheduleDaysAction, setRoomAnswerAction } from "@/lib/settings/forms-how-it-works";
+import { adminProjects, keptCopies, organizationDays } from "@/lib/settings/api-admin";
 import {
   controlFrom, effectiveAnswer, roomItemOf, CONTROL_ACTIVITIES, CONFIRMABLE, CONFIRM_KEY, POLICIES, PEOPLE_KEY,
   PEOPLE_MODE_LABEL, PROJECT_KEY, PROJECT_MODE_LABEL, SKIPPABLE,
@@ -22,6 +22,9 @@ export const metadata = { title: "Defaults for new projects" };
 
 const clean = (label: string) => label.replace(/ — recommended$/, "").replace(/ \(recommended\)$/, "");
 const FOLLOW_LABEL = "As each project is set up";
+/** The kind a copy of the defaults is kept under (backend `OrganizationDefaults.Kind`). */
+const KEPT = "DEFAULTS";
+const APP_DAYS = 7;
 
 /**
  * What a new project of ours starts with (docs/ORGANIZATIONS.md, "Defaults"), the whole of it on one page, in the app's
@@ -34,7 +37,9 @@ export default async function DefaultsPage({ searchParams }: { searchParams: Pro
   await requireOrgAdmin();
   const { open: opening } = await searchParams;
   // A failed read is said by the page (organization/error.tsx), never read as "no projects" or "the app's own".
-  const [defaults, projects, switches] = await Promise.all([projectDefaults({ orFail: true }), adminProjects(), libertyOrFail()]);
+  const [defaults, projects, switches, days, kept] = await Promise.all([
+    projectDefaults({ orFail: true }), adminProjects(), libertyOrFail(), organizationDays(), keptCopies(KEPT),
+  ]);
   const answers = new Map(Object.entries(defaults?.values ?? {}));
   const reading = controlFrom(answers, true);
   const app = controlFrom(new Map(), true);
@@ -140,6 +145,9 @@ export default async function DefaultsPage({ searchParams }: { searchParams: Pro
                       {open.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
                     </Select>
                   </Field>
+                  <Field label="Why" required hint="kept with the defaults it replaces">
+                    <input name="reason" required maxLength={300} autoComplete="off" className={inputCls} />
+                  </Field>
                 </div>
                 <div className="choice-confirm space-y-1 rounded-md px-3 py-2.5">
                   <p className="text-xs leading-5 text-slate-700">
@@ -147,7 +155,7 @@ export default async function DefaultsPage({ searchParams }: { searchParams: Pro
                     new projects start with that project&rsquo;s answers to every question below.
                   </p>
                   <p className="text-xs leading-5 text-slate-500">
-                    Instead of: {defaults ? `the defaults as they stand, ${source.toLowerCase()}, ${ours} ${ours === 1 ? "answer" : "answers"} of our own` : "the app's own answers"}.
+                    Instead of: {defaults ? `the defaults as they stand, ${source.toLowerCase()}, ${ours} ${ours === 1 ? "answer" : "answers"} of our own, kept below and may be put back` : "the app's own answers"}.
                     Projects already open keep theirs.
                   </p>
                 </div>
@@ -165,16 +173,21 @@ export default async function DefaultsPage({ searchParams }: { searchParams: Pro
         <section id="reset" className="register register-sheet register-sheet-open scroll-mt-24" aria-labelledby="reset-head">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <h2 id="reset-head" className="stencil mr-1 text-slate-500">Back to the app&rsquo;s own</h2>
-            <span className="text-[11px] text-slate-500">every answer below goes back to the app&rsquo;s own</span>
+            <span className="text-[11px] text-slate-500">every answer below goes back to the app&rsquo;s own; ours are kept</span>
           </div>
-          <ActionForm id="defaults-reset" action={resetDefaultsAction} hideSubmit className="asking px-5 py-5 sm:px-6">
+          <ActionForm id="defaults-reset" action={resetDefaultsAction} hideSubmit className="asking space-y-4 px-5 py-5 sm:px-6">
+            <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+              <Field label="Why" required hint="kept with the defaults it puts away">
+                <input name="reason" required maxLength={300} autoComplete="off" className={inputCls} />
+              </Field>
+            </div>
             <div className="choice-confirm space-y-1 rounded-md px-3 py-2.5">
               <p className="text-xs leading-5 text-slate-700">
                 <span className="font-semibold text-slate-900">From now on: </span>new projects start with the app&rsquo;s own answers.
               </p>
               <p className="text-xs leading-5 text-slate-500">
-                Instead of: ours, {source.toLowerCase()}, {ours} {ours === 1 ? "answer" : "answers"} of our own. They are not kept: to have them
-                again, they are set again. Projects already open keep theirs.
+                Instead of: ours, {source.toLowerCase()}, {ours} {ours === 1 ? "answer" : "answers"} of our own. They are kept below, and may be
+                put back. Projects already open keep theirs.
               </p>
             </div>
           </ActionForm>
@@ -241,6 +254,52 @@ export default async function DefaultsPage({ searchParams }: { searchParams: Pro
             mark={mark(ESCALATE_AFTER_KEY, !!answers.get(ESCALATE_AFTER_KEY) && answers.get(ESCALATE_AFTER_KEY) !== String(DEFAULT_ESCALATE_AFTER), `${DEFAULT_ESCALATE_AFTER} working days`)} />
         </ul>
       </section>
+
+      {/* The days around an action: the organization's, read live by every project that did not change its own. */}
+      <section id="days" className="register register-sheet register-sheet-open scroll-mt-24">
+        {band("The days around an action", "every project reads these as they stand, unless it changed its own where free; changing them reads each project's actions again")}
+        <ul className="divide-y divide-line px-5 py-4 sm:px-6">
+          <Choice title="A document is needed before the action's day" value={String(days.lead)} unit="days" min={0} max={365} field="leadDays"
+            action={setOrgScheduleDaysAction} hidden={{}} mark={mark("LEAD_DAYS", days.lead !== APP_DAYS, `${APP_DAYS} days`)} />
+          <Choice title="The action is at risk from" value={String(days.risk)} unit="days before" min={0} max={365} field="riskDays"
+            action={setOrgScheduleDaysAction} hidden={{}} mark={mark("RISK_WINDOW", days.risk !== APP_DAYS, `${APP_DAYS} days`)} />
+        </ul>
+        <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
+          Unless the requirements list gives a document its own. A project&rsquo;s own days are on its Control room; here they are the organization&rsquo;s.
+        </p>
+      </section>
+
+      {/* What replacing the defaults kept (owner: a reset keeps a copy): each as it was, when, by whom, why, and its way back. */}
+      {kept.length ? (
+        <section id="kept" className="register register-sheet register-sheet-open scroll-mt-24">
+          {band("Kept when replaced", "the defaults as they were before each was replaced; one may be put back")}
+          <ul className="divide-y divide-line">
+            {kept.map((one) => (
+              <li key={one.id} className="grid grid-cols-1 items-start gap-x-6 gap-y-2 px-5 py-3 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:px-6">
+                <div>
+                  <p className="text-[13px] font-semibold text-slate-800">Kept {fmtDate(one.keptAt)}</p>
+                  <p className="text-xs leading-5 text-slate-600">by {one.keptByName}: {one.reason}</p>
+                </div>
+                {one.putBackAt ? (
+                  <p className="text-xs leading-5 text-slate-600">Put back {fmtDate(one.putBackAt)}, by {one.putBackByName}: {one.putBackReason}</p>
+                ) : (
+                  <details className="group">
+                    <summary className="ask w-fit cursor-pointer list-none">Put these back as the defaults</summary>
+                    <ActionForm action={putBackDefaultsAction} submitLabel="Put them back" size="sm" hidden={{ copyId: one.id }}
+                      confirmText={`From now on: new projects start with the defaults as they were on ${fmtDate(one.keptAt)}. Instead of: the defaults as they stand, which are kept in their turn. Go ahead?`}
+                      className="mt-2 flex flex-wrap items-end gap-2 space-y-0">
+                      <label className="min-w-64 flex-1">
+                        <span className="sr-only">Why</span>
+                        <input name="reason" required maxLength={300} placeholder="Why they come back" className={inputCls} />
+                      </label>
+                    </ActionForm>
+                  </details>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

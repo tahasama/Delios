@@ -101,6 +101,7 @@ public static class Liberty
         new("POLICY_READY", Room, "When an action has what it needs", "The project's way of planning", true),
         new("POLICY_MATRIX", Room, "Who may be put on a review", "The project's team", true),
         new("POLICY_MATRIX_DETAIL", Room, "How fine the distribution matrix is cut", "The project's team", true),
+        new("LEAD_DAYS", Room, "Days a document is needed before an action", "The project's way of planning", true),
         new("RISK_WINDOW", Room, "The risk window", "The project's way of planning", true),
         new("ESCALATE_AFTER_DAYS", Room, "Days before a silent discipline is notified again", "The project's way of planning", true),
         new("SUPPLIER_INTAKE", Room, "How other organizations' documents come in: by placeholder, or as they come", "The project's contract with its suppliers", true),

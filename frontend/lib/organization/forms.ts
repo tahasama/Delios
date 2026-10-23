@@ -132,26 +132,39 @@ export async function switchOrganizationAction(formData: FormData): Promise<void
   redirect("/");
 }
 
-/** The administrator makes one of our projects' choices (who does what, how it works) the defaults for projects opened afterwards. */
+/**
+ * The administrator makes one of our projects' choices (who does what, how it works) the defaults for projects opened
+ * afterwards. Always with why; the defaults as they stood are kept first (backend `OrganizationDefaults`), and may be
+ * put back from the defaults' page.
+ */
 export async function makeDefaultsAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const { requireOrgAdmin } = await import("@/lib/core/org-scope");
-  const { defaultsFrom, DEFAULTS_KEY } = await import("@/lib/organization/defaults");
-  const { setOrgSetting } = await import("@/lib/settings/api");
+  const { defaultsFrom } = await import("@/lib/organization/defaults");
   const { adminProjects } = await import("@/lib/settings/api-admin");
   const scope = await requireOrgAdmin();
   const projectId = text(formData, "projectId");
+  const reason = text(formData, "reason");
   const project = (await adminProjects().catch(() => [])).find((one) => one.id === projectId);
-  if (!project) return { error: "Choose one of our projects." };
+  if (!project) return { error: "Choose one of our projects.", fields: ["projectId"] };
+  if (!reason) return { error: "Say why the defaults are replaced.", fields: ["reason"] };
   try {
     const values = await defaultsFrom(projectId);
-    await setOrgSetting(DEFAULTS_KEY, JSON.stringify({ fromProject: project.code, at: new Date().toISOString(), by: scope.user.name, values }));
+    await api("/api/admin/project-defaults", {
+      method: "PUT",
+      body: { defaults: { fromProject: project.code, at: new Date().toISOString(), by: scope.user.name, values }, reason },
+    });
   } catch (e) {
     return failed(e);
   }
+  revalidateDefaults();
+  return { ok: `New projects now start with ${project.code}'s choices. The defaults as they stood are kept below. Projects already open keep theirs.` };
+}
+
+/** Everywhere the defaults for new projects are read. */
+function revalidateDefaults() {
   revalidatePath("/organization", "layout");
   revalidatePath("/organization/defaults");
   revalidatePath("/organization/settings/flow");
-  return { ok: `New projects now start with ${project.code}'s choices. Projects already open keep theirs.` };
 }
 
 /** A guest account another organization made for one of our people becomes theirs here: same email, same password. */
@@ -165,21 +178,33 @@ export async function bringOverAction(_prev: Result | undefined, formData: FormD
   return { ok: "Brought over. They sign in here from now on, with the same password, and keep their projects there." };
 }
 
-/** The defaults for new projects are forgotten: a project opened afterwards starts with the app's own. */
-export async function resetDefaultsAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
+/** The defaults go back to the app's own, with why; what they held is kept first, and may be put back. */
+export async function resetDefaultsAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const { requireOrgAdmin } = await import("@/lib/core/org-scope");
-  const { DEFAULTS_KEY } = await import("@/lib/organization/defaults");
-  const { setOrgSetting } = await import("@/lib/settings/api");
   await requireOrgAdmin();
+  const reason = text(formData, "reason");
+  if (!reason) return { error: "Say why the defaults go back to the app's own.", fields: ["reason"] };
   try {
-    await setOrgSetting(DEFAULTS_KEY, null);
+    await api("/api/admin/project-defaults", { method: "PUT", body: { defaults: null, reason } });
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization", "layout");
-  revalidatePath("/organization/defaults");
-  revalidatePath("/organization/settings/flow");
-  return { ok: "Back on the app's own defaults. Projects already open keep theirs." };
+  revalidateDefaults();
+  return { ok: "Back on the app's own defaults; ours are kept below. Projects already open keep theirs." };
+}
+
+/** A copy of the defaults kept when they were replaced becomes the defaults again, with why; what stands is kept in turn. */
+export async function putBackDefaultsAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const id = text(formData, "copyId");
+  const reason = text(formData, "reason");
+  if (!reason) return { error: "Say why these defaults come back.", fields: ["reason"] };
+  try {
+    await api(`/api/admin/kept-copies/${id}/put-back`, { body: { reason } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidateDefaults();
+  return { ok: "These are the defaults again; the ones they replace are kept below." };
 }
 
 /**

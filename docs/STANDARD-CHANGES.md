@@ -1443,3 +1443,19 @@ changed there: a project's settings are changed in that project's Settings, by i
 **Depends on it:** `LIBERTY_EXCEPT:<key>` (`Settings/Liberty.cs`, `PUT /api/liberty/{key}/except`, LIBERTY_EXCEPTION;
 `GET /api/liberty?projectId=`), `Settings/ProjectDifferences.cs` (`GET /api/admin/projects/{id}/differences`);
 `/organization/settings?project=<id>`.
+
+## 78 · The days around an action on two levels; the organization's defaults keep a copy when replaced
+
+How many days before an action's day a document is needed, and from how many days before it a missing document puts
+the action at risk, are the organization's first: every project reads them as they stand, and keeps its own only where
+the organization leaves it free (one switch each). A project may set its own before its schedule is named, sees the
+organization's beside its own, and may follow the organization's again. The requirements list may still give a document
+its own window.
+
+Replacing the organization's defaults for new projects as a whole, taken from a project or back to the app's own, asks
+why and keeps what they held first, as a project's reset keeps its copy. Each kept copy is listed with when, by whom and
+why, and may be put back, with why; what stands then is kept in its turn. Nothing of the defaults is lost.
+
+**Depends on it:** `SCHEDULE_LEAD_DAYS`, `SCHEDULE_RISK_DAYS`, `LIBERTY:LEAD_DAYS`, `LIBERTY:RISK_WINDOW`
+(`Actions/ScheduleDays.cs`, `/api/admin/schedule-days`, `/api/projects/{id}/schedule/days`); `kept_copies` with no
+project, kind DEFAULTS (`Settings/OrganizationDefaults.cs`, `/api/admin/project-defaults`, migration KeptCopyOfTheOrganization).

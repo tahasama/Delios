@@ -102,7 +102,7 @@ public static partial class ScheduleEndpoints
             Purpose = purpose,
             RequiredStatuses = statuses,
             Anchor = anchor,
-            OffsetDays = request.OffsetDays ?? -(source?.DefaultLeadDays ?? 7),
+            OffsetDays = request.OffsetDays ?? -(await ScheduleDays.ForProjectAsync(db, access.Project.Id, cancellationToken)).Lead,
             FixedDate = request.FixedDate is { } fixedDate ? LocalDate.FromDateOnly(fixedDate) : null,
             Department = department,
             CreatedByName = access.UserName,

@@ -54,7 +54,14 @@ type ScheduleImportView = {
   changes: { code: string; name: string; type: "NEW" | "MOVED" | "CHANGED" | "REMOVED"; oldStart: LocalDateJson; newStart: LocalDateJson; oldFinish: LocalDateJson; newFinish: LocalDateJson }[];
 };
 
-type ScheduleSourceView = { id: string; documentId: string; defaultLeadDays: number; riskWindowDays: number };
+type ScheduleSourceView = { id: string; documentId: string };
+
+/**
+ * The days around an action in force on the project (backend `ScheduleDays`): its own where it changed them, else the
+ * organization's (else the app's 7), with the organization's beside them.
+ */
+export type ScheduleDaysView = { lead: number; risk: number; ownLead: boolean; ownRisk: boolean; organizationLead: number; organizationRisk: number };
+const APP_DAYS: ScheduleDaysView = { lead: 7, risk: 7, ownLead: false, ownRisk: false, organizationLead: 7, organizationRisk: 7 };
 
 /** Another organization's people do not read the schedule: for them it is empty. */
 function orNothing<T>(fallback: T) {
@@ -66,8 +73,8 @@ function orNothing<T>(fallback: T) {
 
 /** The project's schedule document and its latest reads, newest first. */
 export const scheduleSource = cache(async (scope: Scope) =>
-  api<{ source: ScheduleSourceView | null; imports: ScheduleImportView[] }>(projectPath(scope, "/schedule"))
-    .catch(orNothing({ source: null as ScheduleSourceView | null, imports: [] as ScheduleImportView[] })));
+  api<{ source: ScheduleSourceView | null; imports: ScheduleImportView[]; days: ScheduleDaysView }>(projectPath(scope, "/schedule"))
+    .catch(orNothing({ source: null as ScheduleSourceView | null, imports: [] as ScheduleImportView[], days: APP_DAYS })));
 
 /** The schedule's activities in force, by start date. */
 export const activityList = cache(async (scope: Scope): Promise<ActivitySummary[]> =>

@@ -102,7 +102,7 @@ public static partial class ScheduleEndpoints
     {
         var projectId = project.Id;
         var today = WorkingCalendar.Today(clock, project.TimeZone);
-        var window = await db.ScheduleSources.Where(s => s.ProjectId == projectId).Select(s => (int?)s.RiskWindowDays).SingleOrDefaultAsync(cancellationToken) ?? 7;
+        var window = (await ScheduleDays.ForProjectAsync(db, projectId, cancellationToken)).Risk;
         var ids = activities.Select(a => a.Id).ToList();
         var documentIds = activities.SelectMany(a => a.Requirements).Select(r => r.DocumentId).Distinct().ToList();
         var documents = await db.Documents.AsNoTracking().Where(d => documentIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);

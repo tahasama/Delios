@@ -22,8 +22,9 @@ public sealed class KeptCopy
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }
-    public Guid ProjectId { get; set; }
-    /// <summary>What it is a copy of: NUMBERING, REVISIONS, ROUTES, LIST:&lt;key&gt;, FORM:&lt;key&gt;.</summary>
+    /// <summary>The project it is a copy of; none for the organization's own (its defaults for new projects).</summary>
+    public Guid? ProjectId { get; set; }
+    /// <summary>What it is a copy of: NUMBERING, REVISIONS, ROUTES, LIST:&lt;key&gt;, FORM:&lt;key&gt;; DEFAULTS, the organization's.</summary>
     public required string Kind { get; set; }
     /// <summary>The card's words for it ("numbering", "Disciplines"), as it read when kept.</summary>
     public required string Title { get; set; }
@@ -64,7 +65,7 @@ public sealed record KeptSetting(string Key, string Value);
 public sealed record PutBackRequest(string? Reason);
 
 /// <summary>A kept copy as the organization's card reads it.</summary>
-public sealed record KeptCopyView(Guid Id, Guid ProjectId, string ProjectCode, string ProjectName, string Kind, string Title,
+public sealed record KeptCopyView(Guid Id, Guid? ProjectId, string? ProjectCode, string? ProjectName, string Kind, string Title,
     DateTimeOffset KeptAt, string KeptByName, string Reason, DateTimeOffset? PutBackAt, string? PutBackByName, string? PutBackReason);
 
 /// <summary>Keeping a project's copy when it is put back to the organization's, and putting it back again.</summary>
@@ -78,7 +79,7 @@ public static class KeptCopies
     };
 
     /// <summary>Keeps what the project held before it is put back to the organization's.</summary>
-    public static void Keep(DeliosDbContext db, IClock clock, Guid tenantId, Guid projectId, string kind, string title, object payload,
+    public static void Keep(DeliosDbContext db, IClock clock, Guid tenantId, Guid? projectId, string kind, string title, object payload,
         string by, string reason) =>
         db.Add(new KeptCopy
         {
@@ -116,10 +117,16 @@ public static class KeptCopies
             var k = kind.Trim().ToUpperInvariant();
             query = k.EndsWith(':') ? query.Where(c => c.Kind.StartsWith(k)) : query.Where(c => c.Kind == k);
         }
-        var rows = await query.Join(db.Projects.AsNoTracking(), c => c.ProjectId, p => p.Id, (c, p) => new { c, p.Code, p.Name })
-            .OrderByDescending(x => x.c.KeptAt).ToListAsync(cancellationToken);
-        return Results.Ok(rows.Select(x => new KeptCopyView(x.c.Id, x.c.ProjectId, x.Code, x.Name, x.c.Kind, x.c.Title, x.c.KeptAt.ToDateTimeOffset(),
-            x.c.KeptByName, x.c.Reason, x.c.PutBackAt?.ToDateTimeOffset(), x.c.PutBackByName, x.c.PutBackReason)));
+        var rows = await query.OrderByDescending(c => c.KeptAt).ToListAsync(cancellationToken);
+        var ids = rows.Where(c => c.ProjectId != null).Select(c => c.ProjectId!.Value).Distinct().ToList();
+        var projects = await db.Projects.AsNoTracking().Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
+        // The organization's own copies have no project; a project's whose project is gone stays out, as before.
+        return Results.Ok(rows.Where(c => c.ProjectId is null || projects.ContainsKey(c.ProjectId.Value)).Select(c =>
+        {
+            var project = c.ProjectId is { } id ? projects[id] : null;
+            return new KeptCopyView(c.Id, c.ProjectId, project?.Code, project?.Name, c.Kind, c.Title, c.KeptAt.ToDateTimeOffset(),
+                c.KeptByName, c.Reason, c.PutBackAt?.ToDateTimeOffset(), c.PutBackByName, c.PutBackReason);
+        }));
     }
 
     /// <summary>
@@ -135,6 +142,10 @@ public static class KeptCopies
         var copy = await db.Set<KeptCopy>().SingleOrDefaultAsync(c => c.Id == id, cancellationToken);
         if (copy is null) return Problems.NotFound("COPY_NOT_FOUND", "No such kept copy.");
         if (copy.PutBackAt is not null) return Problems.Conflict("ALREADY_PUT_BACK", "It was put back already.");
+        if (copy.ProjectId is null)
+            return copy.Kind == OrganizationDefaults.Kind
+                ? await OrganizationDefaults.PutBackAsync(copy, reason, http, db, audit, clock, cancellationToken)
+                : Problems.Invalid("KIND_UNKNOWN", "This copy cannot be put back.");
         var project = await db.Projects.SingleOrDefaultAsync(p => p.Id == copy.ProjectId, cancellationToken);
         if (project is null) return Problems.NotFound("PROJECT_NOT_FOUND", "No such project.");
         var by = await db.Users.AsNoTracking().Where(u => u.Id == http.User.UserId()).Select(u => u.Name).SingleAsync(cancellationToken);

@@ -18,6 +18,7 @@ import { StepPanel } from "./step-panel";
 import { IntakeChoice } from "./intake-choice";
 import { projectIntake } from "@/lib/packages/api";
 import { Choice } from "./choice";
+import { FollowOrganizationDays } from "./follow-days";
 import { projectLiberty } from "@/lib/organization/liberty";
 import { setRoomAnswerAction, setScheduleDaysAction } from "@/lib/settings/forms-how-it-works";
 import { setRouteVerdictsAction } from "@/lib/reviews/forms";
@@ -94,8 +95,7 @@ export default async function ControlRoomPage() {
   const actRow = new Map(settings.rows.map((row) => [row.activity.key, row]));
   const setTitle = new Map(sets.map((one) => [one.key, one.title]));
   const inUse = (key: string) => values.filter((one) => one.setKey === key && one.status === "ACTIVE").length;
-  const lead = schedule.source?.defaultLeadDays ?? DEFAULT_LEAD_DAYS;
-  const risk = schedule.source?.riskWindowDays ?? DEFAULT_RISK_DAYS;
+  const { lead, risk } = schedule.days;
   const escalate = answers.get(ESCALATE_AFTER_KEY) ?? String(DEFAULT_ESCALATE_AFTER);
   const receives = functions?.reduce((n, f) => n + f.rules.filter((r) => r.verbs.includes("RECEIVE")).length, 0) ?? null;
   const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
@@ -113,6 +113,11 @@ export default async function ControlRoomPage() {
   const fixedItems = new Set(switches.filter((one) => one.area === "Control room" && !one.free).map((one) => one.key));
   const isFixed = (key: string) => fixedItems.has(roomItemOf(key) ?? key);
   const riskFixed = switches.some((one) => one.key === "RISK_WINDOW" && !one.free);
+  const leadFixed = switches.some((one) => one.key === "LEAD_DAYS" && !one.free);
+  /** Whose a number of days is: the project's own, with the organization's beside it, or the organization's. */
+  const daysMark = (own: boolean, organization: number) => (
+    <span className="text-[11px] font-normal text-slate-500">{own ? `changed here · the organization's: ${organization}` : "the organization's"}</span>
+  );
   // An answer the organization keeps fixed on every other project, free here by an exception: its reason.
   const exceptionOf = (key: string) => {
     const item = switches.find((one) => one.key === (roomItemOf(key) ?? key));
@@ -191,12 +196,15 @@ export default async function ControlRoomPage() {
       return <Choice key={key} title="Confirmed by whoever holds Manage" options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} exception={exceptionOf(key)} />;
     }
     if (key === "DAYS") {
-      const noSchedule = !schedule.source;
+      const days = schedule.days;
       return [
         <Choice key="lead" title="A document is needed before the action's day" value={String(lead)} unit="days" min={0} max={365} field="leadDays"
-          action={setScheduleDaysAction} hidden={{ riskDays: String(risk) }} readOnly={readOnly || noSchedule} />,
+          action={setScheduleDaysAction} hidden={{ riskDays: String(risk) }} readOnly={readOnly} fixed={leadFixed} exception={exceptionOf("LEAD_DAYS")}
+          mark={daysMark(days.ownLead, days.organizationLead)} />,
         <Choice key="risk" title="The action is at risk from" value={String(risk)} unit="days before" min={0} max={365} field="riskDays"
-          action={setScheduleDaysAction} hidden={{ leadDays: String(lead) }} readOnly={readOnly || noSchedule} fixed={riskFixed} exception={exceptionOf("RISK_WINDOW")} />,
+          action={setScheduleDaysAction} hidden={{ leadDays: String(lead) }} readOnly={readOnly} fixed={riskFixed} exception={exceptionOf("RISK_WINDOW")}
+          mark={daysMark(days.ownRisk, days.organizationRisk)} />,
+        ...(!readOnly && (days.ownLead || days.ownRisk) ? [<FollowOrganizationDays key="follow" lead={days.organizationLead} risk={days.organizationRisk} />] : []),
       ];
     }
     if (key === "ESCALATE") {

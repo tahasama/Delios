@@ -471,7 +471,8 @@ export const formCopies = cache(async () =>
 
 /** A project's own copy kept when it was put back to the organization's (backend `KeptCopies`). */
 export type KeptCopy = {
-  id: string; projectId: string; projectCode: string; projectName: string; kind: string; title: string;
+  /** None: the organization's own copy (its defaults for new projects). */
+  id: string; projectId: string | null; projectCode: string | null; projectName: string | null; kind: string; title: string;
   keptAt: string; keptByName: string; reason: string; putBackAt: string | null; putBackByName: string | null; putBackReason: string | null;
 };
 
@@ -503,3 +504,6 @@ export type ProjectDifferences = {
 /** A failed read throws: "it changed nothing" is never said of a project that could not be read. */
 export const projectDifferences = cache(async (projectId: string) =>
   api<ProjectDifferences>(`/api/admin/projects/${projectId}/differences`));
+
+/** The organization's days around an action, the default of every project (backend `ScheduleDays`). A failed read throws. */
+export const organizationDays = cache(async () => api<{ lead: number; risk: number }>("/api/admin/schedule-days"));

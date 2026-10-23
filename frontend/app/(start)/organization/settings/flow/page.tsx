@@ -3,10 +3,10 @@ import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { orgSettings } from "@/lib/settings/api";
 import { libertyOrFail } from "@/lib/organization/liberty";
 import { projectDefaults } from "@/lib/organization/defaults";
-import { setRoomAnswerAction } from "@/lib/settings/forms-how-it-works";
+import { setRoomAnswerAction, setOrgScheduleDaysAction } from "@/lib/settings/forms-how-it-works";
+import { organizationDays } from "@/lib/settings/api-admin";
 import { controlFrom, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES, SKIPPABLE, CONFIRMABLE, PEOPLE_KEY, PEOPLE_MODE_LABEL, roomItemOf } from "@/lib/settings/control-activities";
 import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
-import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
 import { stateNames } from "@/lib/core/state-names";
 import { stampAnswers, stampSaid } from "@/lib/settings/stamp";
 import { fmtDate } from "@/lib/core/utils";
@@ -49,15 +49,16 @@ const ORG_EXTRA: Partial<Record<Extra, string>> = {
 };
 
 /** The switch an answer of a step belongs to, beyond the answers' own keys. */
-const SWITCH_OF: Record<string, string> = { DAYS: "RISK_WINDOW", INTAKE: "SUPPLIER_INTAKE", ESCALATE: ESCALATE_AFTER_KEY };
+const SWITCH_OF: Record<string, string[]> = { DAYS: ["LEAD_DAYS", "RISK_WINDOW"], INTAKE: ["SUPPLIER_INTAKE"], ESCALATE: [ESCALATE_AFTER_KEY] };
 
 export default async function OrganizationControlRoomPage() {
   const scope = await requireOrgAdmin();
-  const [defaults, switches, organization, names] = await Promise.all([
+  const [defaults, switches, organization, names, days] = await Promise.all([
     projectDefaults({ orFail: true }),
     libertyOrFail(),
     orgSettings().catch(() => new Map<string, string>()),
     stateNames(),
+    organizationDays(),
   ]);
   const sets = await organizationSets().catch(() => []);
   const setTitle = new Map(sets.map((one) => [one.key, one.title]));
@@ -70,7 +71,7 @@ export default async function OrganizationControlRoomPage() {
   const together = effectiveAnswer("POLICY_RELEASE", answers.get("POLICY_RELEASE")) === "TOGETHER";
   const confirmJoin = effectiveAnswer(`CONFIRM:${PEOPLE_KEY}`, answers.get(`CONFIRM:${PEOPLE_KEY}`)) === "ON";
   const room = switches.filter((one) => one.area === "Control room");
-  const switchOf = (key: string) => room.find((one) => one.key === (SWITCH_OF[key] ?? roomItemOf(key) ?? key));
+  const switchesOf = (key: string) => room.filter((one) => (SWITCH_OF[key] ?? [roomItemOf(key) ?? key]).includes(one.key));
   const clean = (label: string) => label.replace(/ — recommended$/, "").replace(/ \(recommended\)$/, "");
   const hidden = (key: string) => ({ key, target: "defaults" });
 
@@ -123,9 +124,12 @@ export default async function OrganizationControlRoomPage() {
       return <Choice key={key} title="Confirmed by whoever holds Manage" options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={hidden(key)} />;
     }
     if (key === "DAYS") {
+      // The organization's days, the default of every project, read live; a project changes its own where free.
       return [
-        fact("lead", "A document is needed before the action's day", "Set with each project's schedule"),
-        fact("risk", "The action is at risk from", `${DEFAULT_RISK_DAYS} days before, unless a project changes it where free`),
+        <Choice key="lead" title="A document is needed before the action's day" value={String(days.lead)} unit="days" min={0} max={365} field="leadDays"
+          action={setOrgScheduleDaysAction} hidden={{}} />,
+        <Choice key="risk" title="The action is at risk from" value={String(days.risk)} unit="days before" min={0} max={365} field="riskDays"
+          action={setOrgScheduleDaysAction} hidden={{}} />,
       ];
     }
     if (key === "ESCALATE") {
@@ -158,7 +162,7 @@ export default async function OrganizationControlRoomPage() {
     ];
     const acts = stage.who.filter((one): one is string => typeof one === "string");
     const keys = [...acts, ...(stage.answers ?? [])];
-    const covered = [...new Map(keys.map(switchOf).filter((one) => !!one).map((one) => [one!.key, one!])).values()];
+    const covered = [...new Map(keys.flatMap(switchesOf).map((one) => [one.key, one])).values()];
     return [stage.key, (
       <StepPanel key={stage.key} stage={stage} warn={false} acts={acts.map(answer)} answers={(stage.answers ?? []).flatMap((key) => answer(key))}
         tiles={tiles} below={<RoomSwitches items={covered} />} />

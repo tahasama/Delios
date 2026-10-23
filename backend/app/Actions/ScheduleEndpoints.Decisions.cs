@@ -88,7 +88,7 @@ public static partial class ScheduleEndpoints
             .Select(m => m.Department!).Distinct().ToListAsync(cancellationToken);
         if (mine.Count > 0)
         {
-            var window = await db.ScheduleSources.Where(x => x.ProjectId == projectId).Select(x => (int?)x.RiskWindowDays).SingleOrDefaultAsync(cancellationToken) ?? 7;
+            var window = (await ScheduleDays.ForProjectAsync(db, projectId, cancellationToken)).Risk;
             var activities = await db.Activities.AsNoTracking().Include(a => a.Requirements)
                 .Where(a => a.ProjectId == projectId && a.State == ActivityStates.Active && a.Start != null && a.Departments.Any(d => mine.Contains(d)))
                 .ToListAsync(cancellationToken);

@@ -369,6 +369,8 @@ public static class PlatformSetup
             Packages.Intake.MapIntakeEndpoints(app);
             Settings.KeptCopies.MapKeptCopyEndpoints(app);
             Settings.ProjectDifferences.MapProjectDifferenceEndpoints(app);
+            Actions.ScheduleDays.MapScheduleDaysEndpoints(app);
+            Settings.OrganizationDefaults.MapOrganizationDefaultsEndpoints(app);
             Identity.ProjectFunctions.MapProjectFunctionEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);

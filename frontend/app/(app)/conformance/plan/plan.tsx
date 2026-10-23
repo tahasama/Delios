@@ -167,8 +167,8 @@ export async function DocumentManagementPlan() {
   const strictMatrix = answer("POLICY_MATRIX") === "STRICT";
   const readyMeans = answer("POLICY_READY") === "STATUS" ? "carrying the status the action needs" : "released and issued at the status the action needs";
   const escalateAfter = Number(answer(ESCALATE_AFTER_KEY));
-  const riskWindow = schedule.source?.riskWindowDays ?? 7;
-  const leadDays = schedule.source?.defaultLeadDays ?? DEFAULT_LEAD_DAYS;
+  const riskWindow = schedule.days.risk;
+  const leadDays = schedule.days.lead;
   const peopleRow = reading.rows.find((r) => r.activity.key === "PROJECT_PEOPLE");
   /** Who carries an act out on this project, as the Control room answers it. */
   const whoDoes = (key: string) => {

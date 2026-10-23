@@ -294,7 +294,7 @@ export default async function DocumentDetailPage({
     // The planned date, with what it says today: ready, submitted, overdue, at risk, or days left.
     ["Planned submission", doc.plannedDate ? [fmtDate(doc.plannedDate), plannedState(doc.plannedDate,
       plannedProgress(doc.revisions.some((r) => r.state === "RELEASED"), doc.revisions[0]?.backend.state ?? null),
-      user.isInternal ? (await scheduleSource(ctx)).source?.riskWindowDays ?? DEFAULT_RISK_DAYS : DEFAULT_RISK_DAYS)?.word].filter(Boolean).join(" · ") : null],
+      user.isInternal ? (await scheduleSource(ctx)).days.risk : DEFAULT_RISK_DAYS)?.word].filter(Boolean).join(" · ") : null],
     ["Created", fmtDate(doc.createdDate)],
     ["Previous number", doc.previousId],
     // Whatever this organization asks for itself, read back under its own name.

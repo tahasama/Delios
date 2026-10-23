@@ -300,7 +300,7 @@ public sealed class RequirementsImporter(
         var supplied = deliverables.FirstOrDefault(AsksOriginator)?.Code ?? "SUP";
         var ours = deliverables.Any(v => v.Code == "ENG") ? "ENG" : deliverables.FirstOrDefault(v => !AsksOriginator(v))?.Code ?? "ENG";
         var source = await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == project.Id, cancellationToken);
-        var lead = source?.DefaultLeadDays ?? 7;
+        var lead = (await ScheduleDays.ForProjectAsync(db, project.Id, cancellationToken)).Lead;
         var activities = await db.Activities.Where(a => a.ProjectId == project.Id).ToDictionaryAsync(a => a.Code, cancellationToken);
         var register = await db.Documents.AsNoTracking().Where(d => d.ProjectId == project.Id).ToDictionaryAsync(d => d.Number, d => d.Id, cancellationToken);
         var access = await RegistrarAsync(project, cancellationToken);
