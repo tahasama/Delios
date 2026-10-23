@@ -73,7 +73,7 @@ public sealed class ReviewWarnings(IServiceScopeFactory scopes, ILogger<ReviewWa
         await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({"review-warnings:" + projectId}))", cancellationToken);
         var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == projectId, cancellationToken);
         var today = WorkingCalendar.Today(clock, project.TimeZone);
-        var until = WorkingCalendar.AddWorkingDays(today, 1, project.WeekendDays);
+        var until = WorkingCalendar.AddWorkingDays(today, 1, project.WeekendDays, await WorkingCalendar.HolidaysAsync(db, project, cancellationToken));
         var steps = await (from s in db.ReviewSteps.Include(s => s.Participants)
                            join r in db.Reviews on s.ReviewId equals r.Id
                            where r.ProjectId == projectId && r.State == ReviewStates.InProgress && s.State == StepStates.Open

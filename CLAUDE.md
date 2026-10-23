@@ -623,6 +623,26 @@ a screen only words it. A new rule goes in the backend, never in a page.
   carries a real figure, and what still needs doing reads "To do · …" in amber (an empty essential list, a
   deliverable type with no numbering, no revision scheme, a verdict without a meaning, only you on the project).
   Group icons take one neutral tint.
+- **Where a project's site is** (owner): each project keeps its **country** (`Project.Country`, ISO two letters, or none),
+  its **time zone** and its **days off each week** (`WeekendDays`), asked when it opens and on its line (organization's
+  Projects, This project; `PlaceFields`, `readPlace`); a new project starts with the organization's (Defaults for new
+  projects, "Where a new project's site is"; `Settings/ProjectPlace.cs`, org settings `PROJECT_TIME_ZONE` /
+  `PROJECT_WEEKEND` / `PROJECT_COUNTRY`, `GET`/`PUT /api/admin/project-place`, PROJECT_PLACE_SET), never changing one already
+  open. Nothing set: UTC, Saturday and Sunday, no country.
+- **Public holidays** (owner) are a list of Types & sets, group Schedule (`HOLIDAYS`, "Public holidays", its switch Free):
+  each value's code starts with its day (2026-12-25, or 2026-12-25-FR where two countries share one), its name is the
+  holiday's, its prop `country` the country it is kept in (none: every country). Every count of working days (review
+  steps, an answer's due day, warnings, a discipline notified again) skips the weekend and the holidays of the project's
+  country (`WorkingCalendar.HolidaysAsync`, the project's own copy of the list where it has one). The organization fills
+  it; nothing is offered ready-made.
+- **How dates read is the organization's** (owner; card "How dates read", `/organization/settings/dates`, administrators,
+  no switch): `DATE_FORMAT` = DMY_SHORT (05 Mar 2026, the app's), DMY (05/03/2026), MDY (03/05/2026), ISO (2026-03-05)
+  (`Settings/DateFormat.cs`, refused otherwise: DATE_FORMAT_UNKNOWN). Every answer of the backend carries it
+  (`X-Delios-Date-Format`); the screens keep it for the request (`lib/core/date-format.ts`, `keepRequestDateFormat` in
+  `apiFetch`) and the page (`DateFormatKeeper` in the layouts), and `fmtDate` / `fmtDateTime` draw every day with it (a
+  time on 24 hours). Exports and the stamp keep their own.
+- **The app speaks English only**: every word is written in place; another language means moving each sentence into a
+  file of words per language, screens and backend alike (owner asked, not decided).
 - **A new email counts once its owner opens the link sent to it** (owner): an administrator changing someone's email
   (organization's People, a project's People & access) sends a link to the new address and a word to the old one; the
   account keeps its email until the link is opened (`EmailConfirmation.SendChange`, the same `/confirm-email` page,

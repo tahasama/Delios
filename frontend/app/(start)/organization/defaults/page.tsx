@@ -7,9 +7,10 @@ import { Field, ToneChip, inputCls } from "@/components/ui";
 import { Choice } from "@/app/(app)/settings/flow/choice";
 import { projectDefaults, isDefaultsAnswer } from "@/lib/organization/defaults";
 import { libertyOrFail } from "@/lib/organization/liberty";
-import { makeDefaultsAction, putBackDefaultsAction, resetDefaultsAction } from "@/lib/organization/forms";
+import { makeDefaultsAction, putBackDefaultsAction, resetDefaultsAction, setProjectPlaceAction } from "@/lib/organization/forms";
+import { PlaceFields } from "@/app/(app)/settings/projects/place-fields";
 import { setOrgScheduleDaysAction, setRoomAnswerAction } from "@/lib/settings/forms-how-it-works";
-import { adminProjects, keptCopies, organizationDays } from "@/lib/settings/api-admin";
+import { adminProjects, keptCopies, organizationDays, projectPlace } from "@/lib/settings/api-admin";
 import {
   controlFrom, effectiveAnswer, roomItemOf, CONTROL_ACTIVITIES, CONFIRMABLE, CONFIRM_KEY, POLICIES, PEOPLE_KEY,
   PEOPLE_MODE_LABEL, PROJECT_KEY, PROJECT_MODE_LABEL, SKIPPABLE,
@@ -37,8 +38,8 @@ export default async function DefaultsPage({ searchParams }: { searchParams: Pro
   await requireOrgAdmin();
   const { open: opening } = await searchParams;
   // A failed read is said by the page (organization/error.tsx), never read as "no projects" or "the app's own".
-  const [defaults, projects, switches, days, kept] = await Promise.all([
-    projectDefaults({ orFail: true }), adminProjects(), libertyOrFail(), organizationDays(), keptCopies(KEPT),
+  const [defaults, projects, switches, days, kept, place] = await Promise.all([
+    projectDefaults({ orFail: true }), adminProjects(), libertyOrFail(), organizationDays(), keptCopies(KEPT), projectPlace(),
   ]);
   const answers = new Map(Object.entries(defaults?.values ?? {}));
   const reading = controlFrom(answers, true);
@@ -267,6 +268,16 @@ export default async function DefaultsPage({ searchParams }: { searchParams: Pro
         <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
           Unless the requirements list gives a document its own. A project&rsquo;s own days are on its Control room; here they are the organization&rsquo;s.
         </p>
+      </section>
+
+      {/* Where a new project's site is: copied when it opens, then the project's own (changed on its line). */}
+      <section id="place" className="register register-sheet register-sheet-open scroll-mt-24">
+        {band("Where a new project's site is", "a new project starts with these, then keeps its own; projects already open keep theirs")}
+        <ActionForm action={setProjectPlaceAction} submitLabel="Save" className="asking space-y-4 px-5 py-4 sm:px-6">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            <PlaceFields place={place} />
+          </div>
+        </ActionForm>
       </section>
 
       {/* What replacing the defaults kept (owner: a reset keeps a copy): each as it was, when, by whom, why, and its way back. */}

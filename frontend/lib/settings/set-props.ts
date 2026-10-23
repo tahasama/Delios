@@ -1,3 +1,4 @@
+import { COUNTRIES } from "@/lib/organization/countries";
 /**
  * Which properties each published value set carries, and how to edit them in
  * plain controls. Behaviour across the app reads these — never code constants.
@@ -32,7 +33,7 @@ export type PropField =
   | { key: string; label: string; type: "bool"; hint?: string }
   | { key: string; label: string; type: "int"; hint?: string }
   | { key: string; label: string; type: "text"; hint?: string }
-  | { key: string; label: string; type: "select"; options: string[]; hint?: string }
+  | { key: string; label: string; type: "select"; options: string[]; labels?: Record<string, string>; hint?: string }
   /** One value of another published list, offered from that list. */
   | { key: string; label: string; type: "set"; setKey: string; hint?: string }
   /** Several values of another published list, kept as a list of codes. */
@@ -129,6 +130,12 @@ export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   CONTRACT_ROLES: [
     { key: "approval", label: "Where approval sits", type: "text", hint: "one line, read by whoever opens a project under this role" },
     { key: "description", label: "What the role is", type: "text", hint: "" },
+  ],
+  // A public holiday: its code starts with its day (2026-12-25; 2026-12-25-FR where two countries share it), its name is
+  // its label. Due days skip it on every project in that country, or on every project when no country is said.
+  HOLIDAYS: [
+    { key: "country", label: "Country", type: "select", options: COUNTRIES.map((c) => c.code),
+      labels: Object.fromEntries(COUNTRIES.map((c) => [c.code, c.name])), hint: "none: every project skips it" },
   ],
   RETENTION_CLASSES: [
  { key: "basis", label: "Kept because", type: "text", hint: "" },

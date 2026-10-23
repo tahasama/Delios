@@ -35,7 +35,7 @@ const GROUPS: { title: string; keys: string[] }[] = [
   { title: "Review & issue", keys: ["REVIEW_OUTCOMES", "REVIEW_ADVICE", "COMMENT_CLASSES", "STATUSES", "REASONS_FOR_ISSUE", "RETURN_REASONS", "ISSUE_CODES", "CONTROL_OUTCOMES"] },
   { title: "Classification & keeping", keys: ["CRITICALITY", "CONFIDENTIALITY", "RETENTION_CLASSES", "PHASES"] },
   { title: "File formats", keys: ["NATIVE_FORMATS", "RENDITION_FORMATS", "PRESERVATION_FORMATS"] },
-  { title: "Schedule", keys: ["ACTIVITY_DECISIONS"] },
+  { title: "Schedule", keys: ["ACTIVITY_DECISIONS", "HOLIDAYS"] },
 ];
 
 /**
@@ -552,7 +552,7 @@ function PropInput({ field, value, lists, unset = false }: {
       <Field label={field.label} hint={field.hint}>
         <Select name={`prop_${field.key}`} defaultValue={typeof value === "string" ? value : ""} className="plain w-full">
           <option value="">—</option>
-          {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
+          {field.options.map((o) => <option key={o} value={o}>{field.labels?.[o] ?? o}</option>)}
         </Select>
       </Field>
     );

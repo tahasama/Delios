@@ -22,13 +22,13 @@ public sealed record UpdateUserRequest(
 
 /// <summary>Body of creating a project.</summary>
 public sealed record CreateProjectRequest(string? Code, string? Name, string? ContractRole = null, string? TimeZone = null, string? Kind = null,
-    DateOnly? StartDate = null, DateOnly? EndDate = null, string? ScopeStatement = null);
+    DateOnly? StartDate = null, DateOnly? EndDate = null, string? ScopeStatement = null, int[]? WeekendDays = null, string? Country = null);
 
 /// <summary>Body of changing a project. A null field is left as it is.</summary>
 /// <remarks>A new <c>Code</c> shapes new numbers only; numbers already given keep the old one.</remarks>
 public sealed record UpdateProjectRequest(
     string? Code = null, string? Name = null, string? ContractRole = null, string? Status = null, string? TimeZone = null, int[]? WeekendDays = null,
-    string? Kind = null, string? Reason = null);
+    string? Kind = null, string? Reason = null, string? Country = null);
 
 /// <summary>Body of putting a person on a project, or changing their place on it: one function per person per project.</summary>
 public sealed record MembershipRequest(Guid UserId, Guid? FunctionId, string? Department = null, bool Active = true, Guid? ConfirmerId = null);
@@ -425,6 +425,7 @@ public static class DirectoryEndpoints
             CodeChangedAt = p.CodeChangedAt?.ToDateTimeOffset(),
             p.TimeZone,
             p.WeekendDays,
+            p.Country,
             p.ContentExtraction,
             CreatedAt = p.CreatedAt.ToDateTimeOffset(),
             Members = counts.FirstOrDefault(c => c.Key == p.Id)?.Count ?? 0,
@@ -452,8 +453,14 @@ public static class DirectoryEndpoints
         var name = Blank(request.Name);
         if (code is null || name is null) return Problems.Invalid("CODE_AND_NAME_REQUIRED", "A project has a code and a name.");
         if (code.Length > 32) return Problems.Invalid("CODE_TOO_LONG", "A project code has at most 32 characters.");
-        var zone = Blank(request.TimeZone) ?? "UTC";
-        if (DateTimeZoneProviders.Tzdb.GetZoneOrNull(zone) is null) return Problems.Invalid("TIME_ZONE_UNKNOWN", $"{zone} is not a time zone.");
+        // Where the site is: what was said, else the organization's defaults for new projects, else the app's.
+        var place = await Settings.ProjectPlace.OrganizationAsync(db, cancellationToken);
+        var zone = Blank(request.TimeZone) ?? place.TimeZone;
+        if (DateTimeZoneProviders.Tzdb.GetZoneOrNull(zone) is null) return Problems.Invalid("TIME_ZONE_UNKNOWN", $"{zone} is not a time zone.", new { field = "timeZone" });
+        var weekend = request.WeekendDays ?? place.WeekendDays;
+        if (Settings.ProjectPlace.WeekendRefusal(weekend) is { } badWeekend) return badWeekend;
+        var country = request.Country is null ? place.Country : Blank(request.Country)?.ToUpperInvariant();
+        if (Settings.ProjectPlace.CountryRefusal(country) is { } badCountry) return badCountry;
         if (await KindRefusedAsync(db, request.Kind, cancellationToken) is { } refusedKind) return refusedKind;
         // What the organization's form for opening a project insists on (Settings, Forms & fields).
         if (await Settings.FormRules.CheckAsync(db, null, "PROJECT", new Dictionary<string, bool>
@@ -469,6 +476,8 @@ public static class DirectoryEndpoints
             ContractRole = Blank(request.ContractRole)?.ToUpperInvariant() ?? "GENERIC",
             Kind = Blank(request.Kind)?.ToUpperInvariant() ?? "GENERIC",
             TimeZone = zone,
+            WeekendDays = weekend.Distinct().Order().ToArray(),
+            Country = country,
             OpenedById = http.User.UserId(),
         };
         // A project's code and name are its own across DELIOS, for good: never given to another.
@@ -563,11 +572,18 @@ public static class DirectoryEndpoints
             changes.Add($"time zone → {zone}");
             project.TimeZone = zone;
         }
-        if (request.WeekendDays is { } days && !days.SequenceEqual(project.WeekendDays))
+        if (request.WeekendDays is { } days && !days.Distinct().Order().SequenceEqual(project.WeekendDays))
         {
-            if (days.Any(d => d is < 1 or > 7)) return Problems.Invalid("WEEKEND_INVALID", "Weekend days are numbered 1 (Monday) to 7 (Sunday).");
-            changes.Add($"weekend → {string.Join(",", days)}");
+            if (Settings.ProjectPlace.WeekendRefusal(days) is { } badWeekend) return badWeekend;
             project.WeekendDays = days.Distinct().Order().ToArray();
+            changes.Add($"weekend → {Settings.ProjectPlace.WeekendWords(project.WeekendDays)}");
+        }
+        // An empty country takes it off: the project then skips only the holidays kept for every country.
+        if (request.Country is { } said && (Blank(said)?.ToUpperInvariant() ?? null) is var country && country != project.Country)
+        {
+            if (Settings.ProjectPlace.CountryRefusal(country) is { } badCountry) return badCountry;
+            changes.Add($"country → {country ?? "none"}");
+            project.Country = country;
         }
         if (changes.Count == 0) return Results.NoContent();
         await db.SaveChangesAsync(cancellationToken);

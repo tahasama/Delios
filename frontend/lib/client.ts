@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
+import { keepRequestDateFormat } from "@/lib/core/date-format";
 
 /**
  * The one door to the backend. Every screen and action reaches the .NET API
@@ -77,6 +78,8 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
     cache: "no-store",
   });
   if (TRACE) console.log(`[api] ${response.status} ${Math.round(performance.now() - started)}ms ${options.method ?? "GET"} ${path}`);
+  // How dates read: the organization's, on every answer; kept for the page being drawn.
+  keepRequestDateFormat(response.headers.get("x-delios-date-format"));
   return response;
 }
 

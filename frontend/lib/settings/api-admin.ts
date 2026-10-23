@@ -31,7 +31,7 @@ type AdminUser = {
 };
 
 type AdminProject = {
-  id: string; code: string; name: string; contractRole: string; kind?: string; status: string; timeZone: string; weekendDays: number[];
+  id: string; code: string; name: string; contractRole: string; kind?: string; status: string; timeZone: string; weekendDays: number[]; country: string | null;
   contentExtraction: string; createdAt: string; members: number; documents: number;
   /** Why it was last archived or reopened, by whom, when. */
   statusReason?: string | null; statusChangedByName?: string | null; statusChangedAt?: string | null;
@@ -507,3 +507,6 @@ export const projectDifferences = cache(async (projectId: string) =>
 
 /** The organization's days around an action, the default of every project (backend `ScheduleDays`). A failed read throws. */
 export const organizationDays = cache(async () => api<{ lead: number; risk: number }>("/api/admin/schedule-days"));
+
+/** Where every new project starts: time zone, days off each week and country (Defaults for new projects). */
+export const projectPlace = cache(async () => api<import("@/lib/settings/place").Place>("/api/admin/project-place"));

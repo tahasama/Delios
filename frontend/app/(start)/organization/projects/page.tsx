@@ -12,7 +12,8 @@ import { switchProjectAction } from "@/lib/settings/forms-project-switch";
 import { cn, fmtDate } from "@/lib/core/utils";
 import { projectKinds } from "@/lib/settings/project-kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
-import { adminProjects, adminUsers } from "@/lib/settings/api-admin";
+import { adminProjects, adminUsers, projectPlace } from "@/lib/settings/api-admin";
+import { PlaceFields } from "@/app/(app)/settings/projects/place-fields";
 import { projectSettings } from "@/lib/settings/api";
 import { ProjectFields } from "@/app/(app)/settings/projects/project-fields";
 import { joinedProjects } from "@/lib/organization/api";
@@ -44,8 +45,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const scope = await requireOrgAdmin();
   const sp = await searchParams;
   const joined = await joinedProjects();
-  const [policy, roleOptions, all, users] = await Promise.all([
+  const [policy, roleOptions, all, users, place] = await Promise.all([
     formPolicy({ orgId: scope.orgId, projectId: "" }, "PROJECT"), contractRoleOptions(), adminProjects().catch(() => []), adminUsers().catch(() => []),
+    projectPlace().catch(() => ({ timeZone: "UTC", weekendDays: [6, 7], country: null })),
   ]);
   /** I am on this project: its code and name open it. */
   const onIt = (id: string) => users.some((one) => one.id === scope.user.id && one.memberships.some((m) => m.active && m.projectId === id));
@@ -133,6 +135,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 <Asked policy={policy} field="role" hint="decides where approval sits, and the matrix it starts from">{({ required }) => roleSelect("GENERIC", required)}</Asked>
                 <Asked policy={policy} field="startDate">{({ required }) => <input type="date" name="startDate" required={required} className={field} />}</Asked>
                 <Asked policy={policy} field="endDate" hint="planned completion">{({ required }) => <input type="date" name="endDate" required={required} className={field} />}</Asked>
+                {/* Where the site is starts as the organization's defaults for new projects. */}
+                <PlaceFields place={place} />
                 <Asked policy={policy} field="scopeStatement" hint="what it controls" className="sm:col-span-2">
                   {({ required }) => <input name="scopeStatement" required={required} className={field} placeholder="Leave blank for the standard wording" />}
                 </Asked>

@@ -1480,3 +1480,16 @@ holds these, after a security review:
   the provider's account names count, at those domains only; with none, only an email the provider says it verified.
   An account standing for someone of another organization is never entered by single sign-on.
 - After signing in, the page asked for is only a path on this site (never `//…`, `/\…` or a control character).
+
+## 80 · Where a project's site is, its holidays, and how dates read
+
+The Standard counts review and answer periods in working days without saying whose. DELIOS counts them at the site:
+
+- **Each project says where its site is:** its country, its time zone and its days off each week. Today and every due
+  day are counted in the site's time zone; due days skip its days off.
+- **Public holidays are the organization's list** (Types & sets, Public holidays), each kept for a country or for every
+  country; a project skips those of its country. A project may keep its own copy where the organization leaves it free
+  (a site shutdown, a local holiday).
+- **A new project starts with the organization's place** (Defaults for new projects), then keeps its own.
+- **Dates read one way across the organization** (its choice of four), on every screen, so a date means the same to
+  everyone reading it.

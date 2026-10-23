@@ -1,3 +1,5 @@
+import { DateFormatKeeper } from "@/components/date-format";
+import { dateFormat } from "@/lib/core/date-format";
 import Link from "next/link";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { ActionForm } from "@/components/form";
@@ -22,6 +24,7 @@ export default async function OrganizationLayout({ children }: { children: React
 
   return (
     <div className="min-h-screen bg-canvas">
+      <DateFormatKeeper value={dateFormat()} />
       <OrgHeader scope={scope} />
       <OrgTabs />
       <main className="mx-auto max-w-7xl space-y-4 px-4 py-5 sm:px-6">

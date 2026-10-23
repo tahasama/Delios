@@ -90,6 +90,7 @@ public static class Liberty
         new(ListKey("RENDITION_FORMATS"), Lists, "Rendition formats", "They follow the software each project uses", true),
         new(ListKey("PRESERVATION_FORMATS"), Lists, "Preservation formats", "What is kept for the long term is the law's", false),
         new(ListKey(Actions.ScheduleSets.Decisions), Lists, "Activity decisions", "\"Postponed\" is read from what they mean, and the reports read them", false),
+        new(ListKey(Platform.WorkingCalendar.HolidaysList), Lists, "Public holidays", "A site may add its own days off (a shutdown, a local holiday); due days skip them", true),
 
         new(Forms, "Forms & fields", "Forms & fields", "A client may ask fields of its own; a field a number part reads follows the numbering", true),
         new(Routes, "Review routes", "Review routes", "Each project has its own reviewers and steps", true),

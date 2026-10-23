@@ -461,6 +461,30 @@ export async function savePersonEverywhereAction(_prev: Result | undefined, form
   return { ok: `${text(formData, "name") || target.name} saved.${emailNote}` };
 }
 
+/** How dates read: the organization's one way of writing a day, on every screen of every project. */
+export async function setDateFormatAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const format = text(formData, "format");
+  try {
+    await api("/api/settings/DATE_FORMAT", { method: "PUT", body: { value: format === "DMY_SHORT" ? "" : format } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/", "layout");
+  return { ok: "Saved: every date reads this way from now on, on every project." };
+}
+
+/** Where every new project's site starts: its time zone, days off each week and country. Projects already open keep theirs. */
+export async function setProjectPlaceAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const { readPlace } = await import("@/lib/settings/place");
+  try {
+    await api("/api/admin/project-place", { method: "PUT", body: { timeZone: "UTC", weekendDays: [], country: null, ...readPlace(formData) } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization", "layout");
+  return { ok: "Saved. New projects start with these; projects already open keep their own." };
+}
+
 /**
  * An administrator sets someone's password (owner: as apps of the kind do). The backend refuses anyone else, and one's
  * own; the person is told at once, by email and on Notifications, and signed out everywhere.

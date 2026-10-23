@@ -322,8 +322,12 @@ public static class PlatformSetup
                         .Where(m => m.UserId == http.User.UserId() && m.Active && m.Project!.Status == "ACTIVE" && m.Function!.Active)
                         .OrderBy(m => m.Project!.Code).Select(m => new { m.Project!.Id, m.Project.OwnListKeys, m.Project.OwnFunctions })
                         .FirstOrDefaultAsync(http.RequestAborted);
+                // How dates read: the organization's, carried on every answer for the screens to draw them so.
+                var dates = await db.Set<Settings.Setting>().AsNoTracking()
+                    .Where(s => s.ProjectId == null && s.Key == Settings.DateFormat.Key).Select(s => s.Value).FirstOrDefaultAsync(http.RequestAborted);
                 await look.CommitAsync(http.RequestAborted);
                 if (project is not null) db.UseListsOf(project.Id, project.OwnListKeys, project.OwnFunctions);
+                http.Response.Headers[Settings.DateFormat.Header] = Settings.DateFormat.Codes.Contains(dates) ? dates : Settings.DateFormat.Default;
             }
             await next(http);
         });
@@ -371,6 +375,7 @@ public static class PlatformSetup
             Settings.ProjectDifferences.MapProjectDifferenceEndpoints(app);
             Actions.ScheduleDays.MapScheduleDaysEndpoints(app);
             Settings.OrganizationDefaults.MapOrganizationDefaultsEndpoints(app);
+            Settings.ProjectPlace.MapProjectPlaceEndpoints(app);
             Identity.ProjectFunctions.MapProjectFunctionEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);

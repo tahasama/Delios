@@ -101,6 +101,7 @@ internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         b.Property(x => x.Kind).HasMaxLength(32).HasDefaultValue("GENERIC");
         b.Property(x => x.Status).HasMaxLength(16);
         b.Property(x => x.TimeZone).HasMaxLength(64);
+        b.Property(x => x.Country).HasMaxLength(2);
         b.Property(x => x.ContentExtraction).HasMaxLength(16);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
         b.Property(x => x.PreviousCode).HasMaxLength(32);

@@ -226,7 +226,7 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
                 {
                     // Told when the day passed, and still no answer some working days later: the discipline, whoever holds Manage
                     // and the control function are all told, once.
-                    if (passed && WorkingCalendar.AddWorkingDays(day, escalateAfter, project.WeekendDays) <= today)
+                    if (passed && WorkingCalendar.AddWorkingDays(day, escalateAfter, project.WeekendDays, await WorkingCalendar.HolidaysAsync(db, project, cancellationToken)) <= today)
                         told += await EscalateAsync(db, notifier, clock, project, activity, department, missing[department], escalateAfter, cancellationToken);
                     continue;
                 }

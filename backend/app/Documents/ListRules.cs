@@ -49,7 +49,7 @@ public static class ListRules
         ],
         [Classification] = [ValueSets.Criticality, ValueSets.Confidentiality, ValueSets.RetentionClasses, ValueSets.Phases],
         [Formats] = ["NATIVE_FORMATS", "RENDITION_FORMATS", "PRESERVATION_FORMATS"],
-        [Schedule] = [Actions.ScheduleSets.Decisions],
+        [Schedule] = [Actions.ScheduleSets.Decisions, Platform.WorkingCalendar.HolidaysList],
     };
 
     /// <summary>Lists that hold one set only: what the sets are chosen by, what the app fills, and what describes the project.</summary>
@@ -101,6 +101,7 @@ public static class ListRules
     {
         if (!string.IsNullOrWhiteSpace(meta.Title)) return meta.Title!;
         if (key == ValueSets.ProjectKinds) return "Project types";
+        if (key == Platform.WorkingCalendar.HolidaysList) return "Public holidays";
         var words = key.Replace('_', ' ').ToLowerInvariant();
         return char.ToUpperInvariant(words[0]) + words[1..];
     }

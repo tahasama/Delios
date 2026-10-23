@@ -61,6 +61,8 @@ public static class SettingEndpoints
         {
             var me = await db.Users.AsNoTracking().SingleAsync(u => u.Id == h.User.UserId(), c);
             if (!await Keepers.ConfiguresAsync(h)) return Problems.Forbidden("ADMIN_ONLY", "An administrator answers for the organization.");
+            if (key.Trim() == DateFormat.Key && !string.IsNullOrWhiteSpace(r.Value) && !DateFormat.Codes.Contains(r.Value.Trim()))
+                return Problems.Invalid("DATE_FORMAT_UNKNOWN", $"Dates read as one of {string.Join(", ", DateFormat.Codes)}.");
             return await SetAsync(db, audit, clock, h.User.TenantId(), null, key, r.Value, me.Id, me.Name, c);
         });
 

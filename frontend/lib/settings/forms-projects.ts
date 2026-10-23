@@ -8,6 +8,7 @@ import { contractRoleOptions } from "@/lib/settings/contract-roles";
 import { api, refusal } from "@/lib/client";
 import { projectSettings, setProjectSetting } from "@/lib/settings/api";
 import { adminProjects, adminUsers } from "@/lib/settings/api-admin";
+import { readPlace } from "@/lib/settings/place";
 
 type ProjectState = { error?: string; ok?: string };
 
@@ -49,7 +50,7 @@ export async function createProjectAction(_prev: ProjectState | undefined, formD
   let carried = 0;
   try {
     const project = await api<{ id: string }>("/api/admin/projects", {
-      body: { code, name, contractRole: role, kind, startDate: startDate || null, endDate: endDate || null, scopeStatement: scopeStatement || null },
+      body: { code, name, contractRole: role, kind, startDate: startDate || null, endDate: endDate || null, scopeStatement: scopeStatement || null, ...readPlace(formData) },
     });
     // §1.6 — a project is measured against the scope it states for itself.
     await setProjectSetting(project.id, PROJECT_INFO, JSON.stringify({
@@ -124,7 +125,7 @@ export async function saveProjectAction(_prev: ProjectState | undefined, formDat
   if (!(await contractRoleOptions()).some((r) => r.code === role)) return { error: "Choose what this organization does on the project." };
   if (startDate && endDate && endDate < startDate) return { error: "The end date cannot fall before the start date." };
   try {
-    await api(`/api/admin/projects/${projectId}`, { method: "PUT", body: { code, name, contractRole: role, kind } });
+    await api(`/api/admin/projects/${projectId}`, { method: "PUT", body: { code, name, contractRole: role, kind, ...readPlace(formData) } });
     let info: Record<string, unknown> = {};
     try { info = JSON.parse((await projectSettings(projectId)).get(PROJECT_INFO) ?? "{}"); } catch { info = {}; }
     await setProjectSetting(projectId, PROJECT_INFO, JSON.stringify({

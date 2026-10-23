@@ -1,3 +1,5 @@
+import { DateFormatKeeper } from "@/components/date-format";
+import { dateFormat } from "@/lib/core/date-format";
 import { mayCreateDocument, isAdmin } from "@/lib/core/auth";
 import { requireScope } from "@/lib/core/scope";
 import { unreadNotifications } from "@/lib/account/api";
@@ -40,6 +42,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-canvas">
+      <DateFormatKeeper value={dateFormat()} />
       <Sidebar perms={perms} />
       {/* The content starts where the sidebar ends, whatever width it has been
           dragged or collapsed to. One class: --sidebar-w defaults to 268px in

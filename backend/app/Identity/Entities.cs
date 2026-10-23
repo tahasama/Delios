@@ -191,6 +191,8 @@ public sealed class Project
     public string TimeZone { get; set; } = "UTC";
     /// <summary>The days the site does not work, ISO numbers (1 Monday … 7 Sunday). Due dates skip them.</summary>
     public int[] WeekendDays { get; set; } = [6, 7];
+    /// <summary>The country the site is in (ISO 3166, two letters): which public holidays its working days skip. None: only those for every country.</summary>
+    public string? Country { get; set; }
     /// <summary>
     /// Whether the system may read inside this project's files to search them:
     /// OFF (the default; nothing is read), ON_DEMAND (only what somebody asks for),

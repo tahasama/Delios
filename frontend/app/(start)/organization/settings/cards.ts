@@ -21,6 +21,7 @@ export type OrgCard = {
 export const ORG_CARDS: OrgCard[] = [
   { project: "identity", title: "Who we are on DELIOS", text: "Our code and name everywhere, our identifier and email domain; claims and merges asked of us.", slug: "identity", group: "Organization" },
   { project: "defaults", title: "Defaults for new projects", text: "What a project of ours starts with: who carries each act out, and how it works. Copied when it opens.", elsewhere: "/organization/defaults", group: "Organization" },
+  { project: "dates", title: "How dates read", text: "One way of writing a day, on every screen of every project: 05 Mar 2026, 05/03/2026, 03/05/2026 or 2026-03-05.", slug: "dates", group: "Organization" },
   { project: "may-change", title: "What projects may change", text: "Every setting in one list: fixed, the same on every project, or free, a project may take its own copy.", slug: "may-change", group: "Organization" },
   { project: "/settings/config", title: "Types & sets", text: "The lists every document is described with, and which of them a project may change.", slug: "types", area: "Types & sets" },
   { project: "/settings/fields", title: "Forms & fields", text: "What each form asks and insists on, for every project.", slug: "fields", area: "Forms & fields" },
