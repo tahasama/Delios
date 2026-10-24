@@ -167,6 +167,9 @@ export type ReviewListRow = {
   warnedAt?: string | null;
   /** Why it was withdrawn or sent back, in the words recorded. */
   note?: string | null;
+  /** The revision it reviews, and who its open step still waits on (read with the row). */
+  revisionId?: string;
+  waitingOn?: string[] | null;
 };
 
 /** GET /reviews/{id} (ReviewEndpoints ReviewView). */

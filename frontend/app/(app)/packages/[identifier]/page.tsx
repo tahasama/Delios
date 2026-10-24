@@ -7,8 +7,7 @@ import { DeliveryLines } from "./delivery-lines";
 import { ActionForm } from "@/components/form";
 import { setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction, acceptPackageAction } from "@/lib/packages/forms";
 import { ruleFilter, ruleWords, statusList, reasonsOf, shortfallOf } from "@/lib/packages/package-rule";
-import { packageByNumber, ourPeople, packageParties } from "@/lib/packages/api";
-import { documentPage } from "@/lib/documents/api";
+import { packageByNumber, ourPeople, packageParties, packageLines } from "@/lib/packages/api";
 import { isAdmin } from "@/lib/core/auth";
 import { RuleFields } from "../rule-fields";
 import { manageItems } from "../manage-items";
@@ -51,13 +50,10 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   const letters = pkg.transmittals.filter((one) => one.items === 0);
   // Each document's latest revision and what its reviews said — the comments
   // column shows those, and nothing from older revisions.
-  const latestRevs = (await Promise.all(pkg.members.map((m) => documentPage(ctx, m.documentId).catch(() => null))))
-    .flatMap((doc) => (doc?.revisions[0] ? [{ documentId: doc.id, value: doc.revisions[0].value, cycles: doc.revisions[0].cycles }] : []));
-  const latestComments = new Map<string, { rev: string; comments: { by: string; text: string; blocking: boolean; settled: boolean }[] }>();
-  for (const one of latestRevs) {
-    if (latestComments.has(one.documentId)) continue;
-    latestComments.set(one.documentId, { rev: one.value, comments: one.cycles.flatMap((cy) => cy.comments.map((c) => ({ by: c.authorName, text: c.text, blocking: c.progressionPreventing, settled: c.status === "CLOSED" }))) });
-  }
+  // Every line read at once (it was document by document: three calls or more each).
+  const latestComments = new Map((await packageLines(ctx, pkg.id).catch(() => []))
+    .filter((one) => one.revision)
+    .map((one) => [one.documentId, { rev: one.revision!, comments: one.comments.map((c) => ({ by: c.by, text: c.text, blocking: c.blocking, settled: c.settled })) }] as const));
   const shortfall = shortfallOf(pkg);
   const isAcceptor = pkg.acceptorIds.includes(user.id);
   const rule = await ruleWords(pkg);

@@ -73,3 +73,19 @@ export type Intake = { mode: "PLACEHOLDERS" | "AS_RECEIVED"; deliverableType: st
 
 export const projectIntake = cache(async (scope: Scope): Promise<Intake> =>
   api<Intake>(projectPath(scope, "/intake")).catch(() => ({ mode: "PLACEHOLDERS", deliverableType: null, docType: null, discipline: null })));
+
+/** One document of a package with what its page shows beside it (PackageEndpoints.cs PackageLineView). */
+export type PackageLine = {
+  documentId: string; number: string; title: string; isPlaceholder: boolean;
+  revisionId: string | null; revision: string | null; revisionState: string | null; submittedAt: string | null; statusCode: string | null;
+  returnedReason: string | null; returnedAt: string | null; resentAt: string | null; releasedAt: string | null; issuedAt: string | null;
+  submissions: number; outcome: string | null; outcomeNote: string | null; incomingId: string | null; incomingNumber: string | null;
+  comments: { by: string; text: string; blocking: boolean; settled: boolean; review: string; rev: string }[];
+};
+
+/**
+ * Every document of a package with what its page shows beside it, read at once by the backend (it was read document
+ * by document: the document, its context and each of its reviews). Reading it records nothing in anyone's activity.
+ */
+export const packageLines = cache(async (scope: Scope, packageId: string): Promise<PackageLine[]> =>
+  api<PackageLine[]>(projectPath(scope, `/packages/${packageId}/lines`)));

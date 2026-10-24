@@ -9,6 +9,20 @@ public sealed record PackageSummary(Guid Id, string Number, string Title, string
     bool HasRule, DateOnly? CompletionDate, DateTimeOffset CreatedAt, string Kind, string? Supplier, string? PurchaseOrder,
     Guid? ParentId = null);
 
+/// <summary>A comment written in a review of a line's newest revision, as its package page shows it.</summary>
+public sealed record LineComment(string By, string Text, bool Blocking, bool Settled, string Review, string Rev);
+
+/// <summary>
+/// One document of a package with what its package page shows beside it, read for every document at once (owner: the
+/// heaviest computing found was each package page reading its documents one by one): its newest revision and where it
+/// stands, when it was first sent in and first issued, how many revisions were sent in, the last review's outcome and
+/// note, the transmittal it last came in on, and the comments its reviews hold.
+/// </summary>
+public sealed record PackageLineView(Guid DocumentId, string Number, string Title, bool IsPlaceholder,
+    Guid? RevisionId, string? Revision, string? RevisionState, DateTimeOffset? SubmittedAt, string? StatusCode,
+    string? ReturnedReason, DateTimeOffset? ReturnedAt, DateTimeOffset? ResentAt, DateTimeOffset? ReleasedAt, DateTimeOffset? IssuedAt,
+    int Submissions, string? Outcome, string? OutcomeNote, Guid? IncomingId, string? IncomingNumber, IReadOnlyList<LineComment> Comments);
+
 /// <summary>A package named in a path: its number and title, to open it.</summary>
 public sealed record PackageLink(Guid Id, string Number, string Title);
 
@@ -81,6 +95,8 @@ public static class PackageEndpoints
         project.MapGet("/{packageId:guid}", GetAsync);
         project.MapGet("/views", ViewsAsync);
         project.MapGet("/by-number/{number}", ByNumberAsync);
+        project.MapGet("/{packageId:guid}/lines", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
+            await s.LinesAsync(ProjectAccessFilter.Of(h), packageId, c) is { } lines ? Results.Ok(lines) : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package."));
         project.MapPost("/{packageId:guid}/members", (Guid packageId, MembersRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.AddAsync(a, packageId, r, c)));
         project.MapPost("/{packageId:guid}/members/remove", (Guid packageId, MembersRequest r, HttpContext h, PackageService s, CancellationToken c) =>

@@ -113,7 +113,8 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const cycles = found.rows;
   // Whoever a late review still waits on, so a reminder can be addressed to them.
   const lateOnes = cycles.filter((c) => c.open && c.dueDate && dueState(dueDay(c.dueDate), false) !== "on time");
-  const waiting = new Map(await Promise.all(lateOnes.map(async (c) => [c.id, await waitingOn(ctx, c.id)] as const)));
+  // Read with the row itself (it was one call per late review).
+  const waiting = new Map(lateOnes.map((c) => [c.id, { revisionId: c.revisionId ?? "", userIds: c.waitingOn ?? [] }] as const));
 
   const disciplineLabel = new Map(disciplines.map((one) => [one.code, one.label]));
   const typeLabel = new Map(types.map((one) => [one.code, one.label]));

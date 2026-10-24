@@ -1667,6 +1667,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   of today, or the dates the user filtered on. Never the whole schedule.
 
 ### Backend — limits and steps that bit before
+- **A page never reads its lines one by one** (owner: "check every aspect for computing time, target the heaviest"): a
+  list's lines come from the backend in one read, worked out in a few queries whatever their number. A package's
+  documents with what its pages show (`GET /packages/{id}/lines`, `PackageService.LinesAsync`, `packageLines`), never
+  each document, its context and its reviews (it was three calls or more a document, and recorded every one as opened
+  by the reader); who a review still waits on comes with its row in the reviews list (`ReviewRow.WaitingOn`). A package
+  in no tree reads no other package (`PlaceAsync`, `SharingAsync`, `HandDownAsync` look once for packages under it).
 - **Never hardcode a function or a job title** (owner): no "Document Control", "management", "project manager" in
   backend code, messages or comments. Functions are the organization's data. Say **the control function** (whoever
   holds CONTROL on the project) and **whoever holds Manage** (or another verb); a name shown is read from the data

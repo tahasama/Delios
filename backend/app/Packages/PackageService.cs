@@ -503,6 +503,65 @@ public sealed class PackageService(
         return null;
     }
 
+    // ── Its lines, read at once ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Every document of the package with what its page shows beside it, in a handful of queries whatever its size (it
+    /// was read document by document, three calls or more each). Only what the reader may see: the documents within their
+    /// clearance, and for another organization only what was asked of it (or, taken as they come, what it sent).
+    /// Reading it records nothing: opening a package is not opening each of its documents.
+    /// </summary>
+    public async Task<IReadOnlyList<PackageLineView>?> LinesAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
+    {
+        var package = await LoadAsync(access, id, cancellationToken);
+        if (package is null) return null;
+        var members = package.Members.AsEnumerable();
+        if (!access.IsInternal && !(package.Kind == PackageKinds.Supply && (await IntakeAsync(package.ProjectId, cancellationToken)).Mode == Intake.AsReceived))
+            members = members.Where(m => m.RequestedAt is not null);
+        var wanted = members.Select(m => m.DocumentId).ToList();
+        var docs = await DocumentQueries.Visible(db, access).AsNoTracking().Where(d => wanted.Contains(d.Id))
+            .Select(d => new { d.Id, d.Number, d.Title, d.IsPlaceholder }).ToListAsync(cancellationToken);
+        var ids = docs.Select(d => d.Id).ToList();
+        var revisions = await db.Revisions.AsNoTracking().Where(r => ids.Contains(r.DocumentId)).ToListAsync(cancellationToken);
+        var newest = revisions.GroupBy(r => r.DocumentId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.CreatedAt).First());
+        var newestIds = newest.Values.Select(r => r.Id).ToList();
+        var reviews = await db.Reviews.AsNoTracking().Include(r => r.Comments).Where(r => newestIds.Contains(r.RevisionId) && r.Steps.Any())
+            .ToListAsync(cancellationToken);
+        var decided = await db.Reviews.AsNoTracking().Where(r => newestIds.Contains(r.RevisionId) && r.State == Reviews.ReviewStates.Decided)
+            .Select(r => new { r.RevisionId, r.GrantedStatus }).ToListAsync(cancellationToken);
+        var issued = await (from i in db.TransmittalItems
+                            join t in db.Transmittals on i.TransmittalId equals t.Id
+                            where i.RevisionId != null && newestIds.Contains(i.RevisionId!.Value)
+                                && t.Direction == TransmittalDirections.Outgoing && t.ReviewStepId == null
+                            group t by i.RevisionId into g
+                            select new { RevisionId = g.Key!.Value, First = g.Min(t => t.IssuedAt) }).ToDictionaryAsync(x => x.RevisionId, x => x.First, cancellationToken);
+        var incoming = (await (from i in db.TransmittalItems
+                               join t in db.Transmittals on i.TransmittalId equals t.Id
+                               where i.RevisionId != null && newestIds.Contains(i.RevisionId!.Value) && t.Direction == TransmittalDirections.Incoming
+                               select new { RevisionId = i.RevisionId!.Value, t.Id, t.Number, t.IssuedAt }).ToListAsync(cancellationToken))
+            .GroupBy(x => x.RevisionId).ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.IssuedAt).First());
+        return docs.OrderBy(d => d.Number).Select(d =>
+        {
+            if (!newest.TryGetValue(d.Id, out var rev))
+                return new PackageLineView(d.Id, d.Number, d.Title, d.IsPlaceholder, null, null, null, null, null, null, null, null, null, null,
+                    0, null, null, null, null, []);
+            var mine = reviews.Where(r => r.RevisionId == rev.Id).OrderBy(r => r.StartedAt).ToList();
+            var last = mine.LastOrDefault();
+            var ruling = decided.FirstOrDefault(x => x.RevisionId == rev.Id);
+            // What the decider granted, while it waits for release (as the document page reads it).
+            var status = (ruling is not null && rev.State == RevisionStates.InReview ? ruling.GrantedStatus : null) ?? rev.StatusCode;
+            var came = incoming.GetValueOrDefault(rev.Id);
+            return new PackageLineView(d.Id, d.Number, d.Title, d.IsPlaceholder, rev.Id, rev.Value, rev.State,
+                rev.Submissions.OrderBy(x => x.Number).FirstOrDefault()?.SubmittedAt.ToDateTimeOffset(), status,
+                rev.ReturnedReason, rev.ReturnedAt?.ToDateTimeOffset(), rev.ResentAt?.ToDateTimeOffset(), rev.ReleasedAt?.ToDateTimeOffset(),
+                issued.TryGetValue(rev.Id, out var first) ? first.ToDateTimeOffset() : null,
+                revisions.Count(r => r.DocumentId == d.Id && r.Submissions.Count > 0),
+                last?.Verdict, last?.ReturnNote, came?.Id, came?.Number,
+                mine.SelectMany(r => r.Comments.Where(c => c.Status != Reviews.CommentStatuses.Withdrawn).OrderBy(c => c.CreatedAt)
+                    .Select(c => new LineComment(c.AuthorName, c.Text, c.Blocking, c.Status == Reviews.CommentStatuses.Closed, r.Number, rev.Value))).ToList());
+        }).ToList();
+    }
+
     // ── The arborescence ──────────────────────────────────────────────────────
 
     /// <summary>
@@ -580,6 +639,18 @@ public sealed class PackageService(
     /// </summary>
     public async Task<PackagePlace> PlaceAsync(ProjectAccess access, Package package, CancellationToken cancellationToken)
     {
+        // A package in no tree (most): its own documents only, with no other package read.
+        if (package.ParentId is null && !await db.Packages.AnyAsync(p => p.ParentId == package.Id, cancellationToken))
+        {
+            var own = package.Members.Where(m => access.IsInternal || m.RequestedAt != null).ToList();
+            var ownIds = own.Select(m => m.DocumentId).Distinct().ToList();
+            var at = (await db.Revisions.AsNoTracking().Where(r => ownIds.Contains(r.DocumentId) && r.State == RevisionStates.Released)
+                .Select(r => new { r.DocumentId, r.StatusCode }).ToListAsync(cancellationToken))
+                .GroupBy(r => r.DocumentId).ToDictionary(g => g.Key, g => g.First().StatusCode);
+            var ready = own.Count(m => at.TryGetValue(m.DocumentId, out var status) && status is not null
+                && (m.RequiredStatuses.Length > 0 ? m.RequiredStatuses : package.RequiredStatuses).Contains(status));
+            return new PackagePlace(null, [], [], new PackageTally(0, 0, ownIds.Count, ready, ownIds.Count(at.ContainsKey)));
+        }
         var all = await Visible(access).AsNoTracking().Where(p => p.Kind == package.Kind)
             .Select(p => new { p.Id, p.ParentId, p.Number, p.Title, p.State, p.RequiredStatuses })
             .ToDictionaryAsync(p => p.Id, cancellationToken);
@@ -948,6 +1019,8 @@ public sealed class PackageService(
     private async Task<bool> HandDownAsync(Package package, CancellationToken cancellationToken)
     {
         if (package.State != PackageStates.Open || package.Members.Count == 0) return false;
+        // Most packages hold no package: one indexed look, and nothing more is read.
+        if (!await db.Packages.AnyAsync(p => p.ParentId == package.Id, cancellationToken)) return false;
         var all = await db.Packages.AsNoTracking().Where(p => p.ProjectId == package.ProjectId && p.Kind == package.Kind)
             .Select(p => new { p.Id, p.ParentId, p.Number }).ToListAsync(cancellationToken);
         var children = all.Where(p => p.ParentId is not null).GroupBy(p => p.ParentId!.Value).ToDictionary(g => g.Key, g => g.Select(p => p.Id).ToList());
@@ -1073,6 +1146,8 @@ public sealed class PackageService(
         if (package.Kind == PackageKinds.Supply)
             return await db.Packages.AsNoTracking().Where(p => p.ProjectId == package.ProjectId && p.Kind == PackageKinds.Supply
                 && p.SupplierPartyId == package.SupplierPartyId && p.Id != package.Id).Select(p => p.Id).ToListAsync(cancellationToken);
+        // A package in no tree (none above, none in it) shares with nobody: two indexed looks, and nothing more is read.
+        if (package.ParentId is null && !await db.Packages.AnyAsync(p => p.ParentId == package.Id, cancellationToken)) return [];
         var all = await db.Packages.AsNoTracking().Where(p => p.ProjectId == package.ProjectId && p.Kind == package.Kind)
             .Select(p => new { p.Id, p.ParentId }).ToListAsync(cancellationToken);
         var parents = all.ToDictionary(p => p.Id, p => p.ParentId);
