@@ -65,6 +65,10 @@ x-backend: &backend
     # organization's files are read is still its own switch (docs/ACTIVATION.md).
     Extraction__Url: ${EXTRACTION_URL:-}
     Extraction__OcrLanguages: ${OCR_LANGUAGES:-eng}
+    # The Preview's converters (docs/gaps/previews.md): office files to PDF, DWG drawings to DXF. Empty: those files
+    # are offered to download instead.
+    Previews__OfficeUrl: ${PREVIEW_OFFICE_URL:-http://gotenberg:3000}
+    Previews__DwgUrl: ${PREVIEW_DWG_URL:-http://dwg:8080}
 
 services:
   # Postgres with continuous WAL archiving and scheduled backups (deploy/postgres).
@@ -336,6 +340,19 @@ services:
   # ── Content extraction and OCR (installed when a client asks for it) ─────────
   # Apache Tika with Tesseract: reads the text layer of PDFs and Office files, and
   # OCRs pages that are only images. Reached by the worker alone.
+
+  # Word, PowerPoint and their kin turned into a PDF for the Preview (LibreOffice inside), made once per file.
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    profiles: [app]
+    restart: unless-stopped
+
+  # DWG drawings turned into DXF for the Preview (LibreDWG, the free route; deploy/dwg).
+  dwg:
+    build: ./deploy/dwg
+    image: delios-dwg
+    profiles: [app]
+    restart: unless-stopped
 
   tika:
     image: apache/tika:3.2.3.0-full

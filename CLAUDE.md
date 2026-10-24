@@ -319,8 +319,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
   of it said above when it would not read it); with a PDF too, "The PDF · The source file · <its kind>" above it, the PDF first, offered whenever both are
   there (owner: "i have no way to visualize one or the other"): a source the page cannot draw says so with its download.
   The bar above carries the file's name, a zoom (owner: "some control like a zoom"; − 50…300% +, the percentage back to
-  100%: the PDF opened at it, a picture, a workbook or a schedule scaled) and its download. Other
-  sources (Word, drawings, models…) are downloaded; converting them is to discuss. The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
+  100%: the PDF opened at it, a picture, a workbook or a schedule scaled) and its download. **Every
+  other kind the owner asked for** (`docs/gaps/previews.md`): an old Excel .xls as its sheets (values only, ExcelDataReader);
+  plain text (.txt, .log, .json, .xml, .md, .yaml…) as text, its first 2 MB (`GET /files/{id}/text`); Word, PowerPoint
+  and their kin (.doc/.docx, .ppt/.pptx, .odt, .rtf, .vsdx…) as the PDF LibreOffice makes of them (Gotenberg service,
+  `GET /files/{id}/as-pdf`); drawings: DXF drawn in the page, DWG turned into DXF first (LibreDWG, the free route,
+  `deploy/dwg`, `GET /files/{id}/as-dxf`), its layers switched on and off, text in DejaVu Sans; 3D models: IFC (web-ifc
+  in the browser, its kinds of element as parts, spaces and openings hidden at first), glTF/GLB, OBJ, STL (three.js),
+  turned, moved, zoomed, each part shown or hidden. A conversion is made once, the first time the file is opened, and
+  kept in storage beside it (`previews/…`); converters not installed or failing, the file is offered to download with
+  why (`Documents/Previews.cs`, `Previews__OfficeUrl` / `Previews__DwgUrl`). The viewers' WebAssembly and font are
+  copied from their packages at build (`scripts/copy-vendor.mjs` → `public/vendor`, not committed). The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
   the side cards going under it once there is no room beside it (owner; `ResizablePane`, cookie `pane-review`; a double-click puts it back).
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
   every project" (Default rules, tabs by area, `prevented.ts`), never checked.

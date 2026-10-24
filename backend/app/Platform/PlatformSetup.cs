@@ -150,6 +150,9 @@ public static class PlatformSetup
         services.AddOptions<Search.SearchOptions>().BindConfiguration(Search.SearchOptions.Section);
         services.AddScoped<Search.SearchService>();
         services.AddOptions<Extraction.ExtractionOptions>().BindConfiguration(Extraction.ExtractionOptions.Section);
+        services.AddOptions<Documents.PreviewOptions>().BindConfiguration(Documents.PreviewOptions.Section);
+        services.AddHttpClient(Documents.Previews.HttpClientName, (sp, c) =>
+            c.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<IOptions<Documents.PreviewOptions>>().Value.TimeoutSeconds));
         services.AddScoped<Extraction.ExtractionProcessor>();
         services.AddScoped<Checks.CheckEngine>();
         services.AddScoped<Actions.ScheduleImporter>();

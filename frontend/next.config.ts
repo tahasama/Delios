@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   experimental: {
-    // A Primavera P6 export (.xer) can be large; only its schedule tables are sent on to be read (lib/actions/xer.ts).
+    // A Primavera P6 export (.xer) can be large, and is sent whole: it is kept as it came.
     serverActions: { bodySizeLimit: "100mb" },
   },
   // Settings used to live under /admin, which named the person rather than the

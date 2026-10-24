@@ -4,20 +4,38 @@ import { useState } from "react";
 import { Download, Minus, Plus } from "lucide-react";
 import { WorkbookView } from "@/components/workbook-view";
 import { ScheduleFileView } from "@/components/schedule-file-view";
+import { TextView } from "@/components/text-view";
+import { OfficeView } from "@/components/office-view";
+import { DrawingView } from "@/components/drawing-view";
+import { ModelView } from "@/components/model-view";
 
 type PreviewFile = { id: string; name: string; mime?: string };
 
 /** What the browser shows by itself: the pictures it reads (SVG, which can carry code, stays a download). */
 const IMAGE = /\.(jpe?g|png|gif|webp|avif|bmp)$/i;
-const WORKBOOK = /\.(xlsx|xlsm|csv)$/i;
+const WORKBOOK = /\.(xlsx|xlsm|xls|csv)$/i;
 const SCHEDULE = /\.xer$/i;
+const TEXT = /\.(txt|log|json|xml|md|ini|cfg|conf|ya?ml|tsv)$/i;
+const OFFICE = /\.(docx?|docm|odt|rtf|pptx?|pptm|ppsx?|odp|vsdx?|odg)$/i;
+const DRAWING = /\.(dwg|dxf)$/i;
+const MODEL = /\.(ifc|glb|gltf|obj|stl)$/i;
 
-/** How a source file is shown in the page, if it can be: a picture, a workbook (a CSV as one sheet), a P6 schedule, or not at all. */
-export function sourceView(file: PreviewFile | null | undefined): "image" | "workbook" | "schedule" | null {
+type SourceKind = "image" | "workbook" | "schedule" | "text" | "office" | "drawing" | "model";
+
+/**
+ * How a source file is shown in the page, if it can be: a picture, a workbook (an old .xls and a CSV too), a P6
+ * schedule, text, an office file (as the PDF made of it), a drawing (DXF, a DWG converted), a 3D model (IFC, glTF,
+ * OBJ, STL), or not at all.
+ */
+export function sourceView(file: PreviewFile | null | undefined): SourceKind | null {
   if (!file) return null;
   if (IMAGE.test(file.name) || /^image\/(png|jpeg|gif|webp|avif|bmp)$/i.test(file.mime ?? "")) return "image";
   if (WORKBOOK.test(file.name)) return "workbook";
   if (SCHEDULE.test(file.name)) return "schedule";
+  if (TEXT.test(file.name)) return "text";
+  if (OFFICE.test(file.name)) return "office";
+  if (DRAWING.test(file.name)) return "drawing";
+  if (MODEL.test(file.name)) return "model";
   return null;
 }
 
@@ -27,6 +45,10 @@ function kindWords(file: PreviewFile): string {
   if (kind === "workbook") return /\.csv$/i.test(file.name) ? "table" : "workbook";
   if (kind === "schedule") return "P6 schedule";
   if (kind === "image") return "picture";
+  if (kind === "text") return "text";
+  if (kind === "office") return /\.(pptx?|pptm|ppsx?|odp)$/i.test(file.name) ? "slides" : /\.(vsdx?|odg)$/i.test(file.name) ? "diagram" : "document";
+  if (kind === "drawing") return "drawing";
+  if (kind === "model") return /\.ifc$/i.test(file.name) ? "BIM model" : "3D model";
   const ext = file.name.match(/\.([a-z0-9]+)$/i)?.[1];
   return ext ? `.${ext.toLowerCase()}` : "file";
 }
@@ -99,11 +121,19 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
         <ScheduleFileView fileId={source!.id} name={source!.name} zoom={zoom} />
       ) : kind === "workbook" ? (
         <WorkbookView fileId={source!.id} name={source!.name} zoom={zoom} />
+      ) : kind === "text" ? (
+        <TextView fileId={source!.id} name={source!.name} zoom={zoom} />
+      ) : kind === "office" ? (
+        <OfficeView fileId={source!.id} name={source!.name} zoom={zoom} height={height} />
+      ) : kind === "drawing" ? (
+        <DrawingView fileId={source!.id} name={source!.name} zoom={zoom} height={height} />
+      ) : kind === "model" ? (
+        <ModelView fileId={source!.id} name={source!.name} zoom={zoom} height={height} />
       ) : (
         <div className={`grid w-full place-items-center bg-slate-100 p-6 text-center ${height}`}>
           <div>
             <p className="text-sm font-semibold text-slate-700">{source!.name} cannot be shown here</p>
-            <p className="mt-1 text-xs text-slate-500">The page shows PDFs, pictures, Excel workbooks (.xlsx), CSV files and P6 exports (.xer).</p>
+            <p className="mt-1 text-xs text-slate-500">The page shows PDFs, pictures, Excel and CSV, P6 exports, text, Word and PowerPoint, drawings (DWG, DXF) and 3D models (IFC, glTF, OBJ, STL).</p>
             <a href={`/api/files/${source!.id}?dl=1`} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline">
               <Download className="h-3.5 w-3.5" /> Download it to open it
             </a>

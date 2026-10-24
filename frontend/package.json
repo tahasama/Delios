@@ -2,9 +2,11 @@
   "name": "delios-edms",
   "version": "1.0.0",
   "private": true,
-  "description": "Internal EDMS implementing the Document Management Standard (Rules · Routes · Checks), multi-project",
+  "description": "Internal EDMS implementing the Document Management Standard (Rules \u00b7 Routes \u00b7 Checks), multi-project",
   "scripts": {
+    "predev": "node scripts/copy-vendor.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-vendor.mjs",
     "build": "next build",
     "start": "next start",
     "demo:schedule": "node scripts/demo-schedule.mjs"
@@ -12,19 +14,24 @@
   "dependencies": {
     "clsx": "^2.1.1",
     "date-holidays": "3.37.0",
+    "dejavu-fonts-ttf": "2.37.3",
+    "dxf-viewer": "1.0.50",
     "exceljs": "^4.4.0",
     "lucide-react": "^0.474.0",
     "next": "^16.4.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "server-only": "^0.0.1",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "three": "0.186.1",
+    "web-ifc": "0.0.78"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/three": "0.186.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.3"
   }

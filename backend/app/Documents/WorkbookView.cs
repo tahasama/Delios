@@ -22,9 +22,68 @@ public static class WorkbookView
     public sealed record Book(Sheet[] Sheets, int SheetCount);
 
     public static bool CanShow(string fileName) =>
-        fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".xlsm", StringComparison.OrdinalIgnoreCase) || IsCsv(fileName);
+        fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".xlsm", StringComparison.OrdinalIgnoreCase) || IsCsv(fileName) || fileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsCsv(string fileName) => fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// An old Excel workbook (.xls, before 2007) read for the screen (owner: "xls"): every sheet as the values its cells
+    /// hold (no formatting, no bold or merges: the old format is read for its values only). Nothing in it runs.
+    /// </summary>
+    public static (Book? Book, string? Problem) ReadXls(Stream content)
+    {
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        try
+        {
+            using var copy = new MemoryStream();
+            content.CopyTo(copy);
+            copy.Position = 0;
+            using var reader = ExcelDataReader.ExcelReaderFactory.CreateBinaryReader(copy);
+            var sheets = new List<Sheet>();
+            var count = 0;
+            do
+            {
+                count++;
+                if (sheets.Count >= MaxSheets) continue;
+                var rows = new List<string?[]>();
+                var lastRow = 0;
+                var lastColumn = 0;
+                while (reader.Read())
+                {
+                    lastRow++;
+                    lastColumn = Math.Max(lastColumn, reader.FieldCount);
+                    if (rows.Count >= MaxRows) continue;
+                    var row = new string?[Math.Min(reader.FieldCount, MaxColumns)];
+                    for (var c = 0; c < row.Length; c++)
+                    {
+                        var value = reader.GetValue(c);
+                        row[c] = value switch
+                        {
+                            null => null,
+                            DateTime d => d.TimeOfDay == TimeSpan.Zero ? d.ToString("dd MMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : d.ToString("dd MMM yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+                            double n => n.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                            _ => value.ToString(),
+                        };
+                    }
+                    rows.Add(row);
+                }
+                // From A1 to the last cell holding something.
+                while (rows.Count > 0 && rows[^1].All(string.IsNullOrEmpty)) rows.RemoveAt(rows.Count - 1);
+                var columns = rows.Count == 0 ? 0 : Math.Min(MaxColumns, rows.Max(r => Array.FindLastIndex(r, v => !string.IsNullOrEmpty(v)) + 1));
+                var cells = rows.Select(r => Enumerable.Range(0, columns).Select(c => c < r.Length && !string.IsNullOrEmpty(r[c])
+                    ? new Cell(r[c]!.Length > 2000 ? r[c]![..2000] + "…" : r[c]!, false, double.TryParse(r[c], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+                    : null).ToArray()).ToArray();
+                var widths = Enumerable.Range(0, columns).Select(c => (double)Math.Clamp(cells.Max(r => r[c]?.V.Length ?? 0) + 2, 8, 60)).ToArray();
+                var hidden = !string.Equals(reader.VisibleState, "visible", StringComparison.OrdinalIgnoreCase);
+                sheets.Add(new Sheet(reader.Name, hidden, lastRow, lastColumn, lastRow > MaxRows || lastColumn > MaxColumns, widths, cells, []));
+            } while (reader.NextResult());
+            return (new Book([.. sheets], count), null);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            return (null, "The old Excel workbook could not be opened (it may be damaged or protected by a password).");
+        }
+    }
 
     /// <summary>A CSV file shown as one sheet (owner: "i uploaded a csv file didnt preview it"): its cells as text, nothing in it run.</summary>
     public static Book ReadCsv(Stream content, string fileName)
