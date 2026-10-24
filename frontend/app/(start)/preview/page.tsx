@@ -25,7 +25,7 @@ export default async function FullPreviewPage({ searchParams }: {
     <main className="flex h-screen flex-col bg-surface">
       <h1 className="sr-only">{q.title ?? "Preview"}</h1>
       <FilePreview pdf={pdf} source={source} title={q.title ?? "Preview"} height="h-[calc(100vh-2.6rem)]" full show={q.show === "source" ? "source" : "pdf"}
-        admin={isAdmin(ctx.user)} readers={await readersOn(ctx)} viewingNote={jar.get(PREF.viewingNote)?.value !== "0"}
+        admin={isAdmin(ctx.user)} readers={await readersOn(ctx)} viewingNote={jar.get(PREF.viewingNote)?.value !== "0"} pdfDark={jar.get(PREF.pdfDark)?.value === "1"}
         empty={<p className="p-6 text-center text-sm text-slate-500">Nothing to show.</p>} />
     </main>
   );

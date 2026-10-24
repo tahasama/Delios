@@ -766,7 +766,7 @@ export default async function DocumentDetailPage({
             content: (<>
               {pdf && stampWaited ? <StampPending /> : null}
               {previewed && checking(previewed.files).length ? <FilesChecking names={checking(previewed.files)} /> : null}
-              <FilePreview pdf={pdf} source={shownSource} title={`${doc.docNumber} rev ${previewed?.value ?? ""}`} admin={isAdmin(user)} readers={await readersOn(ctx)} viewingNote={(await cookies()).get(PREF.viewingNote)?.value !== "0"}
+              <FilePreview pdf={pdf} source={shownSource} title={`${doc.docNumber} rev ${previewed?.value ?? ""}`} admin={isAdmin(user)} readers={await readersOn(ctx)} viewingNote={(await cookies()).get(PREF.viewingNote)?.value !== "0"} pdfDark={(await cookies()).get(PREF.pdfDark)?.value === "1"}
                 empty={(
                   <div className="grid h-48 place-items-center p-6 text-center">
                     <div>

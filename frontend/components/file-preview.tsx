@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Maximize2, Minus, Plus, Printer } from "lucide-react";
-import { useDark } from "@/components/use-dark";
-import { DARK_PDF_FILTER, printPdf, readerUrl } from "@/lib/documents/pdf-dark";
+import { Download, Maximize2, Minus, Plus } from "lucide-react";
 import { WorkbookView } from "@/components/workbook-view";
 import { ScheduleFileView } from "@/components/schedule-file-view";
 import { TextView } from "@/components/text-view";
 import { OfficeView } from "@/components/office-view";
 import { DrawingView } from "@/components/drawing-view";
 import { ModelView } from "@/components/model-view";
+import { Switch } from "@/components/switch";
+import { PdfDarkView } from "@/components/pdf-dark-view";
 
 
 type PreviewFile = { id: string; name: string; mime?: string };
@@ -72,7 +72,7 @@ const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
  * or the other"); a source the page cannot draw is offered to download. A zoom for whatever is shown (owner: "some
  * control like a zoom"): − percentage + (the percentage puts it back to 100%).
  */
-export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-h-120", admin = false, readers, viewingNote = true, full = false, show }: {
+export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-h-120", admin = false, readers, viewingNote = true, pdfDark = false, full = false, show }: {
   pdf: PreviewFile | null; source: PreviewFile | null; title: string; empty: React.ReactNode; height?: string;
   /** An administrator: a drawing the free reader cannot open points them to Settings → Viewing files. */
   admin?: boolean;
@@ -80,6 +80,8 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
   readers?: string[];
   /** "For viewing only" above a drawing, until closed. */
   viewingNote?: boolean;
+  /** "Dark page" on the PDF, as the person left it (cookie `pdf-dark`). */
+  pdfDark?: boolean;
   /** Shown on a page of its own (the whole window): no "Full page" icon. */
   full?: boolean;
   /** What it opens on, when not the PDF first. */
@@ -90,7 +92,12 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
   const kind = switchedOff ? null : sourceView(source);
   const [showing, setShowing] = useState<"pdf" | "source">(show === "source" && source ? "source" : pdf ? "pdf" : "source");
   const [zoom, setZoom] = useState(1);
-  const dark = useDark();
+  const [darkPage, setDarkPage] = useState(pdfDark);
+  const toggleDark = () => {
+    const next = !darkPage;
+    setDarkPage(next);
+    try { document.cookie = `pdf-dark=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`; } catch { /* for this visit only */ }
+  };
   if (!pdf && !source) return <>{empty}</>;
   // The choice made is kept while the files change under it (a new one uploaded, another still being checked): the
   // source shown only while there is one, else the PDF.
@@ -111,6 +118,9 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
         ) : null}
         <span className="min-w-0 truncate text-[11px] text-slate-500" title={shown.name}>{shown.name}</span>
         <span className="ml-auto flex items-center gap-1">
+          {!onSource || kind === "office" ? (
+            <span className="mr-2"><Switch on={darkPage} words={["Dark page", "Dark page"]} label={darkPage ? "Show the page as it is" : "Show the page dark, its text light"} onToggle={toggleDark} /></span>
+          ) : null}
           {zoomable ? (
             <span className="flex items-center rounded-md ring-1 ring-line" role="group" aria-label="Zoom">
               <button type="button" onClick={() => setZoom(ZOOMS[Math.max(0, at - 1)])} disabled={at <= 0}
@@ -126,13 +136,6 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </span>
-          ) : null}
-          {dark && (!onSource || kind === "office") ? (
-            // In dark mode the reader's own bar is hidden: its printing is here (the PDF as it is).
-            <button type="button" onClick={() => printPdf(onSource ? `/api/files/${source!.id}/as-pdf` : `/api/files/${pdf!.id}`)} title="Print the PDF" aria-label="Print the PDF"
-              className="grid h-6 w-6 place-items-center text-slate-600 hover:text-brand-ink">
-              <Printer className="h-3.5 w-3.5" />
-            </button>
           ) : null}
           {!full ? (
             // The same Preview over the whole window, in a new tab (owner: "full page"): what is shown now opens first.
@@ -150,8 +153,8 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
       </div>
       {!onSource ? (
         // The browser's own PDF viewer, opened at the zoom chosen.
-        <iframe key={`${zoom}-${dark}`} src={readerUrl(`/api/files/${pdf!.id}`, zoom, dark)} title={title} className={`block w-full bg-slate-100 ${height}`}
-          style={dark ? { filter: DARK_PDF_FILTER } : undefined} />
+        darkPage ? <PdfDarkView fileId={pdf!.id} name={pdf!.name} zoom={zoom} height={height} />
+          : <iframe key={zoom} src={`/api/files/${pdf!.id}#zoom=${Math.round(zoom * 100)}`} title={title} className={`block w-full bg-slate-100 ${height}`} />
       ) : kind === "image" ? (
         <div className={`grid w-full place-items-center overflow-auto bg-slate-100 p-4 ${height}`}>
           {/* A picture uploaded as the source, served by the app's own file route (no outside address). */}
@@ -166,7 +169,7 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
       ) : kind === "text" ? (
         <TextView fileId={source!.id} name={source!.name} zoom={zoom} />
       ) : kind === "office" ? (
-        <OfficeView fileId={source!.id} name={source!.name} zoom={zoom} height={height} />
+        <OfficeView fileId={source!.id} name={source!.name} zoom={zoom} height={height} dark={darkPage} />
       ) : kind === "drawing" ? (
         <DrawingView fileId={source!.id} name={source!.name} zoom={zoom} height={height} admin={admin} note={viewingNote} />
       ) : kind === "model" ? (
