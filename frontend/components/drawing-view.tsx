@@ -18,6 +18,7 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false, not
   const [noted, setNoted] = useState(note);
   // 3D parts the reader leaves out (owner: "a 3d dwg returned a 2d visual"), counted in the DXF before it is drawn.
   const [left, setLeft] = useState(0);
+  const [leftClosed, setLeftClosed] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const viewer = useRef<DxfViewer | null>(null);
   const base = useRef(1);
@@ -102,11 +103,15 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false, not
           </button>
         </p>
       ) : null}
-      {left > 0 && state === "ready" ? (
-        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-1 text-[11px] text-amber-900">
-          <span className="font-semibold">{left} 3D {left === 1 ? "part is" : "parts are"} not shown</span> · this reader draws a drawing flat,
+      {left > 0 && state === "ready" && !leftClosed ? (
+        <p className="flex shrink-0 items-start gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1 text-[11px] text-amber-900">
+          <span><span className="font-semibold">{left} 3D {left === 1 ? "part is" : "parts are"} not shown</span> · this reader draws a drawing flat,
           seen from above, and cannot read 3D solids, surfaces or meshes. To see the model in 3D, attach it as IFC, glTF (.glb),
-          OBJ or STL: those turn in the page.
+          OBJ or STL: those turn in the page.</span>
+          <button type="button" title="Close" aria-label="Close" onClick={() => setLeftClosed(true)}
+            className="ml-auto grid h-5 w-5 shrink-0 place-items-center rounded text-amber-900/70 hover:text-amber-950">
+            <X className="h-3.5 w-3.5" />
+          </button>
         </p>
       ) : null}
       <div className="relative flex min-h-0 w-full flex-1">
