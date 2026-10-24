@@ -79,14 +79,16 @@ public static class Previews
 
     /// <summary><c>GET /files/{fileId}/as-dxf</c>: a drawing as DXF, the page's drawing viewer reads it: a DXF as it is, a DWG converted once.</summary>
     private static async Task<IResult> AsDxfAsync(Guid fileId, HttpContext http, DeliosDbContext db, Transmittals.TransmittalService transmittals,
-        FileStorage storage, IHttpClientFactory clients, IOptions<PreviewOptions> options, CancellationToken cancellationToken)
+        FileStorage storage, IHttpClientFactory clients, IOptions<PreviewOptions> options, CancellationToken cancellationToken,
+        bool minimal = false)
     {
         var (file, refused) = await DocumentEndpoints.ReadableAsync(fileId, ProjectAccessFilter.Of(http), db, transmittals, cancellationToken);
         if (file is null) return refused!;
         var extension = Path.GetExtension(file.Name).ToLowerInvariant();
         if (extension == ".dxf") return Results.File(await storage.OpenReadAsync(file.ObjectKey, cancellationToken), "application/dxf", file.Name);
         if (extension != ".dwg") return Problems.Invalid("NOT_A_DRAWING", $"{file.Name} is not a DWG or DXF drawing: download it to open it.");
-        var key = KeyOf(file, ".dxf");
+        // Minimal: only the drawing's entities, asked when the viewer could not draw the full DXF (each kept apart).
+        var key = KeyOf(file, minimal ? ".min.dxf" : ".dxf");
         if (await storage.SizeAsync(key, cancellationToken) is null)
         {
             if (string.IsNullOrWhiteSpace(options.Value.DwgUrl))
@@ -102,7 +104,7 @@ public static class Previews
                 using var body = new ByteArrayContent(drawing.ToArray());
                 body.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
                 using var client = clients.CreateClient(HttpClientName);
-                using var answer = await client.PostAsync($"{options.Value.DwgUrl!.TrimEnd('/')}/convert", body, cancellationToken);
+                using var answer = await client.PostAsync($"{options.Value.DwgUrl!.TrimEnd('/')}/convert{(minimal ? "?minimal=1" : "")}", body, cancellationToken);
                 if (!answer.IsSuccessStatusCode)
                     return Problems.Invalid("PREVIEW_FAILED", $"{file.Name} could not be read (a DWG version or content the free reader does not know): download it to open it.");
                 dxf = await answer.Content.ReadAsByteArrayAsync(cancellationToken);

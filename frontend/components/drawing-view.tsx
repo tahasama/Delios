@@ -18,33 +18,43 @@ export function DrawingView({ fileId, name, zoom = 1, height }: { fileId: string
   useEffect(() => {
     let gone = false;
     (async () => {
-      // Asked first, so a refusal (not a drawing, the converter missing or failing) is said in its own words.
-      const answer = await fetch(`/api/files/${fileId}/as-dxf`).catch(() => null);
-      if (gone) return;
-      if (!answer?.ok) {
-        const body = answer ? await answer.json().catch(() => ({})) : {};
-        setState(body.error ?? "The drawing could not be shown.");
-        return;
-      }
-      const url = URL.createObjectURL(await answer.blob());
+      const dwg = /\.dwg$/i.test(name);
+      // The DXF asked of the backend (a refusal said in its own words), then drawn; a DWG whose full DXF the viewer
+      // cannot draw is asked again in its minimal form (only its entities), once, before saying why it failed.
+      const fetchDxf = async (minimal: boolean): Promise<string | { error: string }> => {
+        const answer = await fetch(`/api/files/${fileId}/as-dxf${minimal ? "?minimal=1" : ""}`).catch(() => null);
+        if (!answer?.ok) {
+          const body = answer ? await answer.json().catch(() => ({})) : {};
+          return { error: body.error ?? "The drawing could not be shown." };
+        }
+        return URL.createObjectURL(await answer.blob());
+      };
       const [{ DxfViewer: Viewer }, three] = await Promise.all([import("dxf-viewer"), import("three")]);
-      if (gone || !box.current) { URL.revokeObjectURL(url); return; }
+      if (gone || !box.current) return;
       const made = new Viewer(box.current, { clearColor: new three.Color("#ffffff"), autoResize: true, colorCorrection: true });
       viewer.current = made;
-      try {
-        await made.Load({ url, fonts: ["/vendor/fonts/DejaVuSans.ttf"] });
+      let failure = "";
+      for (const minimal of dwg ? [false, true] : [false]) {
+        const url = await fetchDxf(minimal);
         if (gone) return;
-        base.current = made.GetCamera().zoom;
-        setLayers([...made.GetLayers(true)].sort((a, b) => a.displayName.localeCompare(b.displayName)));
-        setState("ready");
-      } catch {
-        if (!gone) setState("The drawing could not be read: download it to open it.");
-      } finally {
-        URL.revokeObjectURL(url);
+        if (typeof url !== "string") { setState(url.error); return; }
+        try {
+          await made.Load({ url, fonts: ["/vendor/fonts/DejaVuSans.ttf"] });
+          if (gone) return;
+          base.current = made.GetCamera().zoom;
+          setLayers([...made.GetLayers(true)].sort((a, b) => a.displayName.localeCompare(b.displayName)));
+          setState("ready");
+          return;
+        } catch (e) {
+          failure = e instanceof Error ? e.message : String(e);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
       }
+      if (!gone) setState(`The drawing could not be drawn${failure ? ` (${failure})` : ""}: download it to open it.`);
     })();
     return () => { gone = true; viewer.current?.Destroy(); viewer.current = null; };
-  }, [fileId]);
+  }, [fileId, name]);
 
   // The bar's zoom scales the view the drawing opened on.
   useEffect(() => {

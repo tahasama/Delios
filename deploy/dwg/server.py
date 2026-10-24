@@ -28,9 +28,12 @@ class Handler(BaseHTTPRequestHandler):
             self._answer(404, b"not found")
 
     def do_POST(self):
-        if self.path != "/convert":
+        route, _, query = self.path.partition("?")
+        if route != "/convert":
             self._answer(404, b"not found")
             return
+        # ?minimal=1: only the entities (dwg2dxf -m), which viewers read more easily than the full file.
+        minimal = "minimal=1" in query.split("&")
         size = int(self.headers.get("Content-Length") or 0)
         if size <= 0 or size > MAX_BYTES:
             self._answer(413, b"the drawing is empty or too large")
@@ -48,7 +51,7 @@ class Handler(BaseHTTPRequestHandler):
                     out.write(chunk)
                     left -= len(chunk)
             try:
-                subprocess.run(["dwg2dxf", "-y", "-o", target, source], cwd=folder, timeout=TIMEOUT,
+                subprocess.run(["dwg2dxf", "-y"] + (["-m"] if minimal else []) + ["-o", target, source], cwd=folder, timeout=TIMEOUT,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
             except subprocess.TimeoutExpired:
                 self._answer(422, b"the drawing took too long to read")

@@ -324,7 +324,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   plain text (.txt, .log, .json, .xml, .md, .yaml…) as text, its first 2 MB (`GET /files/{id}/text`); Word, PowerPoint
   and their kin (.doc/.docx, .ppt/.pptx, .odt, .rtf, .vsdx…) as the PDF LibreOffice makes of them (Gotenberg service,
   `GET /files/{id}/as-pdf`); drawings: DXF drawn in the page, DWG turned into DXF first (LibreDWG, the free route,
-  `deploy/dwg`, `GET /files/{id}/as-dxf`), its layers switched on and off, text in DejaVu Sans; 3D models: IFC (web-ifc
+  `deploy/dwg`, `GET /files/{id}/as-dxf`; a full DXF the viewer cannot draw is asked again once in its minimal form,
+  `?minimal=1`, `dwg2dxf -m`, kept apart; still failing, the viewer's own reason is said), its layers switched on and off, text in DejaVu Sans; 3D models: IFC (web-ifc
   in the browser, its kinds of element as parts, spaces and openings hidden at first), glTF/GLB, OBJ, STL (three.js),
   turned, moved, zoomed, each part shown or hidden. A conversion is made once, the first time the file is opened, and
   kept in storage beside it (`previews/…`); converters not installed or failing, the file is offered to download with
