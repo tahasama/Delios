@@ -104,7 +104,9 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false, not
       ) : null}
       {left > 0 && state === "ready" ? (
         <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-1 text-[11px] text-amber-900">
-          <span className="font-semibold">{left} 3D {left === 1 ? "part is" : "parts are"} not shown</span> · this reader draws a drawing flat, seen from above.
+          <span className="font-semibold">{left} 3D {left === 1 ? "part is" : "parts are"} not shown</span> · this reader draws a drawing flat,
+          seen from above, and cannot read 3D solids, surfaces or meshes. To see the model in 3D, attach it as IFC, glTF (.glb),
+          OBJ or STL: those turn in the page.
         </p>
       ) : null}
       <div className="relative flex min-h-0 w-full flex-1">
