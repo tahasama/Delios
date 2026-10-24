@@ -82,6 +82,7 @@ const PLAN_WINDOW_DAYS = 30;
 const PLAN_STEPS = [5, 10, 25, 50, 100];
 /** How many more the plan draws at a press, unless the reader chose another step. */
 const DEFAULT_STEP = 25;
+const PLAN_ALL = 2000;
 
 export default async function ActionsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -107,7 +108,9 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const page = Math.max(1, Number(sp.page) || 1);
   // Never more than asked for, and never a page that loads the whole schedule
   // because somebody typed a number into the address.
-  const shown = Math.min(Math.max(Number(sp.show) || PLAN_FIRST, PLAN_FIRST), 2000);
+  // Every action is drawn (owner: the WBS bands must hold the whole schedule, not its first 25), up to 2,000; beyond
+  // that the rest load on asking.
+  const shown = Math.min(Math.max(Number(sp.show) || PLAN_ALL, PLAN_FIRST), PLAN_ALL);
   const step = PLAN_STEPS.includes(Number(sp.step)) ? Number(sp.step) : DEFAULT_STEP;
 
   // What the window holds, and what the schedule holds: a plan that says "of

@@ -486,10 +486,10 @@ export function PlanRegister({
                   {pending ? "Loading…" : `Load ${Math.min(more.step, more.total - more.shown)} more`}
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
-              ) : <span className="text-[11px] text-slate-500">all of them drawn</span>}
+              ) : <span />}
 
-              {/* How many more each press draws. */}
-              <label className="flex items-center justify-end gap-1.5 leading-none">
+              {/* How many more each press draws: only while some are left to load. */}
+              {more.href ? <label className="flex items-center justify-end gap-1.5 leading-none">
                 <span className="sr-only">How many actions to load at a time</span>
                 <Select
                   className="plain"
@@ -502,7 +502,7 @@ export function PlanRegister({
                   {more.steps.map((one) => <option key={one.by} value={one.by}>{one.by}</option>)}
                 </Select>
                 <span className="stencil text-slate-500">at a time</span>
-              </label>
+              </label> : <span />}
             </div>
           ) : null}
         </div>

@@ -1435,6 +1435,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   an upload icon) only for whoever may upload; "open" is an underline, the fill
   stays "where it stands". Everyone else sees the plain row.
 - Actions get our own number (A00001…) and keep the planner's ID beside it.
+- The plan draws every action in its days (owner: the WBS bands hold the whole schedule, not its first 25), up to
+  2,000; only beyond that do "Load more" and "at a time" show.
 - Actions with no date are always counted on the plan ("N with no date — in the
   table"), never silently left out of the window.
 - No "Responsible" on actions: the people concerned are those of the disciplines
