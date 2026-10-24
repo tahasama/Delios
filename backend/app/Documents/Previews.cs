@@ -32,6 +32,8 @@ public static class Previews
     /// <summary>Plain text, shown as it is.</summary>
     private static readonly string[] Text = [".txt", ".log", ".json", ".xml", ".md", ".ini", ".cfg", ".conf", ".yaml", ".yml", ".tsv"];
     private const long MaxText = 2 * 1024 * 1024;
+    /// <summary>Raised whenever the DWG converter reads drawings better (v2: multi-line texts mended, deploy/dwg/server.py).</summary>
+    private const string DxfVersion = "v2";
 
     private static bool Is(string name, string[] extensions) => extensions.Contains(Path.GetExtension(name).ToLowerInvariant());
     private static string KeyOf(StoredFile file, string extension) => $"previews/{file.TenantId}/{file.ProjectId}/{file.Id}{extension}";
@@ -88,7 +90,8 @@ public static class Previews
         if (extension == ".dxf") return Results.File(await storage.OpenReadAsync(file.ObjectKey, cancellationToken), "application/dxf", file.Name);
         if (extension != ".dwg") return Problems.Invalid("NOT_A_DRAWING", $"{file.Name} is not a DWG or DXF drawing: download it to open it.");
         // Minimal: only the drawing's entities, asked when the viewer could not draw the full DXF (each kept apart).
-        var key = KeyOf(file, minimal ? ".min.dxf" : ".dxf");
+        // The converter's version is in the name, so a drawing read before it mended broken texts is read again.
+        var key = KeyOf(file, minimal ? $".{DxfVersion}.min.dxf" : $".{DxfVersion}.dxf");
         if (await storage.SizeAsync(key, cancellationToken) is null)
         {
             if (string.IsNullOrWhiteSpace(options.Value.DwgUrl))
