@@ -15,7 +15,7 @@ import { ArrowLeft } from "lucide-react";
 import { getActiveSet } from "@/lib/settings/config";
 import { api } from "@/lib/client";
 import { holders } from "@/lib/settings/api";
-import { planActionByCode, planVersion, noticesAbout, noticeHistory } from "@/lib/actions/api";
+import { planActionRead, noticesAbout, noticeHistory } from "@/lib/actions/api";
 import { movedPhrase } from "../moved";
 import { stateLabel, isPostponed, type ActionState } from "@/lib/actions/action-state";
 import { mayUploadLists } from "@/lib/core/permissions";
@@ -38,7 +38,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const { dept, decide, as: chosen } = await searchParams;
   // Opened from a request transmittal (`Asks`): the decision it names is open, its choice made.
   const refusing = (key: string) => decide === key && chosen === "refuse";
-  const [action, version] = await Promise.all([planActionByCode(ctx, code), planVersion(ctx)]);
+  const { action, version } = await planActionRead(ctx, code);
   if (!action) notFound();
 
   const [disciplines, parties] = await Promise.all([

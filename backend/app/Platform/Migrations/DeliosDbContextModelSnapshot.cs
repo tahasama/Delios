@@ -646,6 +646,9 @@ namespace Delios.Host.Platform.Migrations
                     b.HasIndex("ProjectId")
                         .HasDatabaseName("ix_audit_events_project_id");
 
+                    b.HasIndex("Action", "Id")
+                        .HasDatabaseName("ix_audit_events_action_id");
+
                     b.HasIndex("ActorId", "Id")
                         .HasDatabaseName("ix_audit_events_actor_id_id");
 
@@ -654,6 +657,9 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasIndex("TenantId", "Id")
                         .HasDatabaseName("ix_audit_events_tenant_id_id");
+
+                    b.HasIndex("ActorId", "EntityId", "At")
+                        .HasDatabaseName("ix_audit_events_actor_id_entity_id_at");
 
                     b.ToTable("audit_events", (string)null);
                 });

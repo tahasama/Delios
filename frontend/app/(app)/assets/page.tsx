@@ -19,6 +19,9 @@ export const metadata = { title: "Assets & tags" };
  * and the filters, the table, and what is added folded under it. Each tag opens its own page, where the documents
  * describing it are chosen in the register, as for an action.
  */
+/** The most tags the table draws at once. */
+const ASSETS_DRAWN = 500;
+
 export default async function AssetsPage({ searchParams }: { searchParams: Promise<{ q?: string; area?: string; system?: string }> }) {
   const ctx = await requireScope();
   const policy = await formPolicy(ctx, "ASSET");
@@ -32,6 +35,8 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
   const assets = all.filter((a) => (!sp.area || a.area === sp.area) && (!sp.system || a.system === sp.system));
   const linked = assets.reduce((n, a) => n + a.documents, 0);
   const bare = assets.filter((a) => a.documents === 0).length;
+  // A plant runs to thousands of tags: the counts are of all of them, the table draws the first ones, said so.
+  const drawn = assets.slice(0, ASSETS_DRAWN);
 
   return (
     <div className="space-y-4">
@@ -71,7 +76,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
         {assets.length ? (
           <DataTable className="rounded-none border-0 shadow-none" id="assets" exportName="assets"
             head={<tr><Th>Tag</Th><Th>Name</Th><Th>Area</Th><Th>System</Th><Th>Unit</Th><Th className="text-right">Documents</Th></tr>}>
-            {assets.map((a) => (
+            {drawn.map((a) => (
               <tr key={a.id}>
                 <Td className={`rail ${a.documents ? "rail-released" : "rail-none"}`}><Link href={`/assets/${a.id}`} className="doc-number">{a.code}</Link></Td>
                 <Td className="text-[13px] text-slate-800">{a.name}</Td>
@@ -82,7 +87,11 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
               </tr>
             ))}
           </DataTable>
-        ) : (
+        ) : null}
+        {assets.length > drawn.length ? (
+          <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">{`The first ${drawn.length} of ${assets.length} tags, by tag. Find a tag, or choose an area or a system, to narrow them.`}</p>
+        ) : null}
+        {assets.length ? null : (
           <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">
             {q || sp.area || sp.system ? "Nothing matches that." : keeper ? "No tags yet. Add the first one below." : "No tags yet. The control function keeps the asset list."}
           </p>

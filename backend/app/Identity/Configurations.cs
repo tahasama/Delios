@@ -185,6 +185,10 @@ internal sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEv
         b.HasIndex(x => x.ProjectId);
         // A person's own record (Settings, People & access), newest first.
         b.HasIndex(x => new { x.ActorId, x.Id });
+        // Whether someone opened this document in the last half hour, asked on every opening: never a scan of all they did.
+        b.HasIndex(x => new { x.ActorId, x.EntityId, x.At });
+        // The audit trail and the log narrowed to one kind of act, newest first.
+        b.HasIndex(x => new { x.Action, x.Id });
         b.Property(x => x.Action).HasMaxLength(64);
         b.Property(x => x.EntityType).HasMaxLength(64);
     }

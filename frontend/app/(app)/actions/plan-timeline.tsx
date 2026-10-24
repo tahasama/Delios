@@ -98,8 +98,8 @@ export function PlanTimeline({ rows, window, fit }: {
   const ends = dated.map((r) => (r.finish ?? r.start!).getTime());
   const now = Date.now();
   // Every date: the actions' own days, never stretched to reach today (a schedule over years ago stays on its days).
-  const min = window ? window.from.getTime() : Math.min(...starts) - 3 * DAY;
-  const max = window ? window.to.getTime() : Math.max(...ends) + 3 * DAY;
+  const min = window ? window.from.getTime() : starts.reduce((a, b) => Math.min(a, b)) - 3 * DAY;
+  const max = window ? window.to.getTime() : ends.reduce((a, b) => Math.max(a, b)) + 3 * DAY;
   const span = Math.max(max - min, DAY);
   const at = (t: number) => ((t - min) / span) * 100;
 

@@ -33,7 +33,7 @@ public sealed partial class PackageService
         if (access.IsInternal && (access.Holds(Verbs.Control) || await StandIns.NoControlAsync(db, access.Project.Id, cancellationToken)))
             await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken);
         var packages = await Visible(access).Where(p => kind == null || p.Kind == kind)
-            .OrderByDescending(p => p.CreatedAt).Take(500).Include(p => p.Members).AsSplitQuery().ToListAsync(cancellationToken);
+            .OrderByDescending(p => p.CreatedAt).Take(5000).Include(p => p.Members).AsSplitQuery().ToListAsync(cancellationToken);
         if (packages.Count == 0) return [];
 
         // Which sit in a tree: one look for the whole project.

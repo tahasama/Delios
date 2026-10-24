@@ -8,7 +8,8 @@ using NodaTime;
 namespace Delios.Host.Actions;
 
 /// <summary>The schedule as its screens show it: the actions in force, each with everything its rows and page need.</summary>
-public sealed record PlanView(string? VersionInForce, IReadOnlyList<PlanAction> Actions);
+/// <param name="Total">Every action in force, when more than are sent (<see cref="ScheduleEndpoints.MaxActions"/>); null when all are.</param>
+public sealed record PlanView(string? VersionInForce, IReadOnlyList<PlanAction> Actions, int? Total = null);
 
 /// <summary>
 /// An action with its needs (each with its document and where it stands), the decisions about it (newest first), and each
@@ -58,14 +59,19 @@ public static partial class ScheduleEndpoints
 {
     // ── The plan, as its screens show it ──────────────────────────────────────
 
+    /// <summary>The most actions one answer carries (a large P6 schedule runs to thousands); past it, the plan says how many in all.</summary>
+    public const int MaxActions = 20_000;
+
     /// <summary>GET /plan: every action in force, in one answer (the schedule list, its exports and its upkeep).</summary>
     private static async Task<IResult> PlanAsync(HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        var activities = await db.Activities.AsNoTracking().Include(a => a.Requirements)
-            .Where(a => a.ProjectId == access.Project.Id && a.State == ActivityStates.Active)
-            .OrderBy(a => a.Start).ThenBy(a => a.Code).Take(2000).ToListAsync(cancellationToken);
-        return Results.Ok(await ViewAsync(db, clock, access, activities, cancellationToken));
+        var inForce = db.Activities.AsNoTracking().Where(a => a.ProjectId == access.Project.Id && a.State == ActivityStates.Active);
+        var activities = await inForce.Include(a => a.Requirements).AsSplitQuery()
+            .OrderBy(a => a.Start).ThenBy(a => a.Code).Take(MaxActions).ToListAsync(cancellationToken);
+        var view = await ViewAsync(db, clock, access, activities, cancellationToken);
+        // Never cut without saying so: past the limit, how many there are in all.
+        return Results.Ok(activities.Count < MaxActions || !access.IsInternal ? view : view with { Total = await inForce.CountAsync(cancellationToken) });
     }
 
     /// <summary>GET /plan/{code}: one action by its code, also one the schedule has since dropped.</summary>

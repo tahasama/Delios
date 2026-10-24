@@ -111,6 +111,13 @@ export const backendDocument = cache(async (scope: Scope, id: string): Promise<D
   }
 });
 
+/** Several reviews in full at once (a document's page): one read, never one a review. */
+export async function backendReviews(scope: Scope, ids: string[]): Promise<ReviewView[]> {
+  const wanted = [...new Set(ids.filter(Boolean))];
+  if (!wanted.length) return [];
+  return api<ReviewView[]>(projectPath(scope, `/reviews/many?ids=${wanted.map(encodeURIComponent).join(",")}`));
+}
+
 /** Several documents at once, those the reader may see (a form enclosing them): one read, never one a document. */
 export async function backendDocuments(scope: Scope, ids: string[]): Promise<DocumentView[]> {
   const wanted = [...new Set(ids.filter(Boolean))];
@@ -204,7 +211,8 @@ export const documentPage = cache(async (scope: Scope, id: string): Promise<Page
   const doc = await backendDocument(scope, id);
   if (!doc) return null;
   const context = await documentContext(scope, id);
-  const reviews = await Promise.all(context.reviews.map((one) => backendReview(scope, one.id)));
+  const read = new Map((await backendReviews(scope, context.reviews.map((one) => one.id))).map((one) => [one.id, one]));
+  const reviews = context.reviews.map((one) => read.get(one.id)).filter((one): one is ReviewView => !!one);
   return {
     id: doc.id, extras: doc.extras ? JSON.stringify(doc.extras) : null, projectId: scope.projectId, docNumber: doc.number, title: doc.title, deliverableType: doc.deliverableType,
     docType: doc.docType, discipline: doc.discipline, originator: doc.originator, subProject: doc.subproject, phase: doc.phase ?? null, contractRef: doc.contractRef,

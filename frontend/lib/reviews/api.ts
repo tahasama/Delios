@@ -1,7 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { api, apiFetch, ApiProblem, projectPath, type Query } from "@/lib/client";
-import { backendDocument, backendRevision, backendReview, documentPage, type PageDocument, type PageRevision } from "@/lib/documents/api";
+import { backendDocument, backendDocuments, backendRevision, backendReview, documentPage, type PageDocument, type PageRevision } from "@/lib/documents/api";
+import type { DocumentView } from "@/lib/types";
 import type { RegisterPage, ReviewsPage, ReviewView, TransmittalView } from "@/lib/types";
 import type { RunData, WfRuntimeStep } from "@/lib/reviews/workflow";
 import { getMe } from "@/lib/account/api";
@@ -223,8 +224,7 @@ type SendableRevision = {
 };
 
 /** A revision being prepared, with the files of its current submission; null when it is not one. */
-async function sendable(scope: Scope, documentId: string, id: string): Promise<SendableRevision | null> {
-  const doc = await backendDocument(scope, documentId);
+function sendable(doc: DocumentView | null | undefined, id: string): SendableRevision | null {
   const revision = doc?.revisions.find((one) => one.id === id);
   if (!doc || !revision || revision.state !== "IN_PREPARATION") return null;
   const current = revision.files.filter((one) => one.submission === revision.submission);
@@ -235,13 +235,11 @@ async function sendable(scope: Scope, documentId: string, id: string): Promise<S
   };
 }
 
-/** The revisions asked for that are still being prepared, with their documents. */
+/** The revisions asked for that are still being prepared, with their documents (read at once). */
 export async function preparingRevisions(scope: Scope, ids: string[]): Promise<SendableRevision[]> {
-  const found = await Promise.all(ids.map(async (id) => {
-    const revision = await backendRevision(scope, id).catch(() => null);
-    return revision ? sendable(scope, revision.documentId, id) : null;
-  }));
-  return found.filter((one): one is SendableRevision => !!one);
+  const revisions = (await Promise.all(ids.map((id) => backendRevision(scope, id).catch(() => null)))).filter((one) => !!one);
+  const docs = new Map((await backendDocuments(scope, revisions.map((one) => one!.documentId))).map((one) => [one.id, one]));
+  return revisions.map((one) => sendable(docs.get(one!.documentId), one!.id)).filter((one): one is SendableRevision => !!one);
 }
 
 /**
@@ -249,14 +247,14 @@ export async function preparingRevisions(scope: Scope, ids: string[]): Promise<S
  * (nothing being prepared) are named, by number.
  */
 export async function preparingOf(scope: Scope, documentIds: string[]): Promise<{ ready: SendableRevision[]; not: string[] }> {
-  const found = await Promise.all(documentIds.map(async (id) => {
-    const doc = await backendDocument(scope, id).catch(() => null);
-    const preparing = doc?.revisions.find((one) => one.state === "IN_PREPARATION");
-    return { number: doc?.number ?? null, revision: doc && preparing ? await sendable(scope, doc.id, preparing.id) : null };
-  }));
+  const docs = await backendDocuments(scope, documentIds).catch(() => [] as DocumentView[]);
+  const found = docs.map((doc) => {
+    const preparing = doc.revisions.find((one) => one.state === "IN_PREPARATION");
+    return { number: doc.number, revision: preparing ? sendable(doc, preparing.id) : null };
+  });
   return {
     ready: found.flatMap((one) => (one.revision ? [one.revision] : [])),
-    not: found.filter((one) => one.number && !one.revision).map((one) => one.number!),
+    not: found.filter((one) => !one.revision).map((one) => one.number),
   };
 }
 

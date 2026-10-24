@@ -82,11 +82,10 @@ export async function addDocumentToActionAction(_prev: State | undefined, formDa
   const { purpose, status } = needDefaults(reasons, statuses);
   try {
     // The request is answered by the first document added for it.
-    for (const [i, documentId] of fresh.entries()) {
-      await api(projectPath(ctx, `/activities/${actionId}/needs`), {
-        body: { documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department: forOf(documentId), transmittalId: i === 0 ? transmittalId : null },
-      });
-    }
+    // All at once: the action's readiness is worked out once, not once a document.
+    await api(projectPath(ctx, `/activities/${actionId}/needs/many`), {
+      body: { add: fresh.map((documentId, i) => ({ documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department: forOf(documentId), transmittalId: i === 0 ? transmittalId : null })) },
+    });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -124,12 +123,14 @@ export async function setActionDocumentsAction(_prev: State | undefined, formDat
   const [reasons, statuses] = await Promise.all([getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES")]);
   const { purpose, status } = needDefaults(reasons, statuses);
   try {
-    for (const documentId of adding) {
-      await api(projectPath(ctx, `/activities/${actionId}/needs`), {
-        body: { documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department: disciplineOf.get(documentId) },
+    // All at once, all or none: the action's readiness is worked out once, not once a document.
+    if (adding.length || leaving.length)
+      await api(projectPath(ctx, `/activities/${actionId}/needs/many`), {
+        body: {
+          add: adding.map((documentId) => ({ documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department: disciplineOf.get(documentId) })),
+          remove: leaving.map((need) => need.id),
+        },
       });
-    }
-    for (const need of leaving) await api(projectPath(ctx, `/activities/${actionId}/needs/${need.id}`), { method: "DELETE" });
   } catch (e) {
     return { error: refusal(e).message };
   }

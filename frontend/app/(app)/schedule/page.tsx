@@ -12,7 +12,7 @@ import { fmtDate } from "@/lib/core/utils";
 import { getSet } from "@/lib/settings/config";
 import { api } from "@/lib/client";
 import { backendDocument } from "@/lib/documents/api";
-import { planActions, scheduleSource, type PlanAction } from "@/lib/actions/api";
+import { planActions, planTotal, scheduleSource, type PlanAction } from "@/lib/actions/api";
 import { PlanCards } from "@/app/(app)/actions/plan-cards";
 import { PlanPlate } from "@/app/(app)/actions/plan-plate";
 import { PlanTimeline } from "@/app/(app)/actions/plan-timeline";
@@ -112,13 +112,14 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
 
   // What the window holds, and what the schedule holds: a plan that says "of
   // 16" while the table says 33 is a page arguing with itself.
-  const [schedule, source, disciplineRows, typeRows, supplierRows] = await Promise.all([
+  const [schedule, source, disciplineRows, typeRows, supplierRows, total] = await Promise.all([
     planActions(ctx),
     scheduleSource(ctx),
     getSet("DISCIPLINES"),
     getSet("DOCUMENT_TYPES"),
     // Suppliers are the organizations the project deals with.
     api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
+    planTotal(ctx),
   ]);
 
   // As the planner lays it out where the schedule carries a WBS (owner: "keep the category/sub"), else by date.
@@ -127,7 +128,8 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const orderBy = (a: PlanAction, b: PlanAction) => (dir === "desc" ? -1 : 1) * SORTS[sortKey](a, b);
   // Where the schedule runs: its first action's day to its last's (owner: "deduce first month and last month").
   const dates = schedule.flatMap((a) => [a.start, a.finish]).filter((d): d is Date => !!d).map((d) => d.getTime());
-  const span = dates.length ? { from: new Date(Math.min(...dates)), to: new Date(Math.max(...dates)) } : null;
+  // Folded, never spread: a schedule of thousands of actions would overflow the call.
+  const span = dates.length ? { from: new Date(dates.reduce((a, b) => Math.min(a, b))), to: new Date(dates.reduce((a, b) => Math.max(a, b))) } : null;
   // The plan is naturally long, so it opens on a window around today — one month either side — until somebody asks
   // for another. A schedule that is over, or not begun, opens on its own last or first days instead (owner: "if a
   // project is over instead of pointing to today, point at last month").
@@ -380,6 +382,11 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const shownFilters = await keptFilters("schedule", ["code", "state", "happened", "discipline", "docType", "supplier", "date"]);
   return (
     <div>
+      {total ? (
+        <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {`This schedule holds ${total.toLocaleString("en-GB")} actions: the first ${schedule.length.toLocaleString("en-GB")} by date are shown here, and the counts are theirs.`}
+        </p>
+      ) : null}
       <PlanRegister
         shownFilters={shownFilters}
         plate={

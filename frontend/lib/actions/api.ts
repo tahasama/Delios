@@ -162,7 +162,8 @@ export type PlanAction = {
   neededFrom: Date | null;
 };
 
-type Plan = { versionInForce: string | null; actions: PlanAction[] };
+/** `total`: every action in force, when more than the backend sends at once; absent when all came. */
+type Plan = { versionInForce: string | null; actions: PlanAction[]; total?: number | null };
 
 /** The backend sends days and moments as text; the screens count with dates. Nothing else changes. */
 function datesOf(raw: Plan): Plan {
@@ -171,6 +172,7 @@ function datesOf(raw: Plan): Plan {
   type Raw = Record<string, unknown> & { [key: string]: never };
   return {
     versionInForce: raw.versionInForce,
+    total: raw.total ?? null,
     actions: raw.actions.map((a) => {
       const r = a as unknown as Raw & PlanAction;
       return {
@@ -201,10 +203,17 @@ export const planActions = cache(async (scope: Scope): Promise<PlanAction[]> => 
 export const planVersion = cache(async (scope: Scope): Promise<string | null> => (await plan(scope)).versionInForce);
 
 /** One action by its code, also one the schedule has since dropped; null when there is none. */
-export const planActionByCode = cache(async (scope: Scope, code: string): Promise<PlanAction | null> => {
+export const planActionByCode = cache(async (scope: Scope, code: string): Promise<PlanAction | null> =>
+  (await planActionRead(scope, code)).action);
+
+/** One action by its code with the schedule read in force: its page, without reading the whole plan for the label. */
+export const planActionRead = cache(async (scope: Scope, code: string): Promise<{ action: PlanAction | null; version: string | null }> => {
   const one = await api<Plan>(projectPath(scope, `/plan/${encodeURIComponent(code)}`)).catch(orNothing(null as Plan | null));
-  return one ? datesOf(one).actions[0] ?? null : null;
+  return one ? { action: datesOf(one).actions[0] ?? null, version: one.versionInForce } : { action: null, version: null };
 });
+
+/** How many actions are in force when the plan holds more than one answer carries; null when every one came. */
+export const planTotal = cache(async (scope: Scope): Promise<number | null> => (await plan(scope)).total ?? null);
 
 // ── Schedule versions ────────────────────────────────────────────────────────
 // ── Notices ──────────────────────────────────────────────────────────────────

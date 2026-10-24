@@ -66,6 +66,7 @@ public static class ReviewEndpoints
         project.MapGet("/documents/{documentId:guid}/routes", RoutesAsync);
         project.MapPost("/revisions/{revisionId:guid}/reviews", StartAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapGet("/reviews/{reviewId:guid}", GetAsync);
+        project.MapGet("/reviews/many", ManyAsync);
         project.MapGet("/reviews/{reviewId:guid}/me", MeAsync);
         project.MapPost("/reviews/{reviewId:guid}/comments", CommentAsync);
         project.MapPost("/reviews/{reviewId:guid}/comments/{commentId:guid}/close", CloseCommentAsync);
@@ -129,36 +130,60 @@ public static class ReviewEndpoints
     {
         var review = await reviews.ReadAsync(ProjectAccessFilter.Of(http), reviewId, cancellationToken);
         if (review is null) return Problems.NotFound("REVIEW_NOT_FOUND", "No such review.");
-        // A step not yet open has nobody seated: say who it will go to, from the people
-        // named on it and the function that answers it.
-        var ids = review.Steps.SelectMany(s => s.UserIds).Distinct().ToList();
-        var codes = review.Steps.Select(s => s.FunctionCode).OfType<string>().Distinct().ToList();
+        return Results.Ok((await ViewsAsync([review], db, cancellationToken))[0]);
+    }
+
+    /// <summary>
+    /// GET <c>/reviews/many?ids=…</c>: several reviews in full at once (a document's page lists every review of it), those
+    /// the caller may see, at most 200; read in a few queries whatever their number.
+    /// </summary>
+    private static async Task<IResult> ManyAsync(string? ids, HttpContext http, ReviewService reviews, DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var wanted = (ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(one => Guid.TryParse(one, out var id) ? id : Guid.Empty).Where(id => id != Guid.Empty).Distinct().Take(200).ToList();
+        if (wanted.Count == 0) return Results.Ok(Array.Empty<object>());
+        return Results.Ok(await ViewsAsync(await reviews.ReadManyAsync(ProjectAccessFilter.Of(http), wanted, cancellationToken), db, cancellationToken));
+    }
+
+    /// <summary>
+    /// Reviews as their page reads them. A step not yet open has nobody seated: it says who it will go to, from the people
+    /// named on it and the function that answers it.
+    /// </summary>
+    private static async Task<List<ReviewView>> ViewsAsync(List<Review> found, DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        if (found.Count == 0) return [];
+        var ids = found.SelectMany(r => r.Steps).SelectMany(s => s.UserIds).Distinct().ToList();
+        var codes = found.SelectMany(r => r.Steps).Select(s => s.FunctionCode).OfType<string>().Distinct().ToList();
+        var projects = found.Select(r => r.ProjectId).Distinct().ToList();
         var people = await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, cancellationToken);
         var functions = await db.Functions.AsNoTracking().Where(f => codes.Contains(f.Code)).ToDictionaryAsync(f => f.Code, f => f.Name, cancellationToken);
-        var holders = (await (from m in db.Memberships.AsNoTracking()
+        var holders = codes.Count == 0 ? [] : (await (from m in db.Memberships.AsNoTracking()
                               join u in db.Users.AsNoTracking() on m.UserId equals u.Id
-                              where m.ProjectId == review.ProjectId && m.Active && m.Function!.Active && u.Active && codes.Contains(m.Function.Code)
-                              select new { m.Function!.Code, u.Name }).ToListAsync(cancellationToken))
-            .GroupBy(h => h.Code).ToDictionary(g => g.Key, g => g.Select(h => h.Name).Distinct().Order().ToList());
-        var view = View(review);
+                              where projects.Contains(m.ProjectId) && m.Active && m.Function!.Active && u.Active && codes.Contains(m.Function.Code)
+                              select new { m.ProjectId, m.Function!.Code, u.Name }).ToListAsync(cancellationToken))
+            .GroupBy(h => (h.ProjectId, h.Code)).ToDictionary(g => g.Key, g => g.Select(h => h.Name).Distinct().Order().ToList());
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
-        return Results.Ok(view with
+        return found.Select(review =>
         {
-            VerdictCodes = catalog.ActiveIn(review.VerdictSet, review.Verdicts),
-            AdviceCodes = catalog.ActiveIn(ReviewSets.Advice, review.Advice),
-            Steps = view.Steps.Select(step =>
+            var view = View(review);
+            return view with
             {
-                var s = review.Steps.Single(one => one.Index == step.Number - 1);
-                if (step.Participants.Count > 0) return step;
-                List<string> goesTo = s.PartyName is { } party ? [party]
-                    : [.. s.UserIds.Select(id => people.GetValueOrDefault(id)).OfType<string>(),
-                       .. s.FunctionCode is { } code
-                           ? holders.GetValueOrDefault(code) is { Count: > 0 } names ? names : [$"nobody holds {functions.GetValueOrDefault(code) ?? code} yet"]
-                           : []];
-                goesTo = goesTo.Distinct().ToList();
-                return step with { GoesTo = goesTo };
-            }).ToList(),
-        });
+                VerdictCodes = catalog.ActiveIn(review.VerdictSet, review.Verdicts),
+                AdviceCodes = catalog.ActiveIn(ReviewSets.Advice, review.Advice),
+                Steps = view.Steps.Select(step =>
+                {
+                    var s = review.Steps.Single(one => one.Index == step.Number - 1);
+                    if (step.Participants.Count > 0) return step;
+                    List<string> goesTo = s.PartyName is { } party ? [party]
+                        : [.. s.UserIds.Select(id => people.GetValueOrDefault(id)).OfType<string>(),
+                           .. s.FunctionCode is { } code
+                               ? holders.GetValueOrDefault((review.ProjectId, code)) is { Count: > 0 } names ? names : [$"nobody holds {functions.GetValueOrDefault(code) ?? code} yet"]
+                               : []];
+                    goesTo = goesTo.Distinct().ToList();
+                    return step with { GoesTo = goesTo };
+                }).ToList(),
+            };
+        }).ToList();
     }
 
     /// <summary>POST <c>/reviews/{reviewId}/comments</c>: adds a comment to the current step of a review.</summary>

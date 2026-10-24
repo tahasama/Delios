@@ -1677,6 +1677,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   only a package in a tree reads its tree). Several documents a form starts with come in one read (`GET /documents/many?ids=`,
   `backendDocuments`, not recorded as opened): New transmittal, Send for review, a supplier's sending, an action's links;
   who may review is asked once per kind of document (`eligiblePeople`).
+  The same everywhere a page holds many of a thing: a document's reviews (`GET /reviews/many?ids=`, `backendReviews`), the
+  Schedule's list documents (`planLists`), Start a review (`preparingOf` / `preparingRevisions`), where a document got late
+  on an action (`LatenessAsync`, every need at once), the transmittal page's "one of ours?" (every loose number at once);
+  documents added to and taken off an action are one call, all or none, readiness worked out once
+  (`POST /activities/{id}/needs/many`). An action's page reads only its own action (`planActionRead`), never the whole plan.
+  Every check run on each opening has its index (whether someone opened a document in the last half hour: `audit_events`
+  actor · entity · at; the audit trail by act: action · id).
+- **Never cut a list without saying so** (owner: "we do not want any surprises"): the Schedule carries up to 20,000
+  actions in one answer (`ScheduleEndpoints.MaxActions`; a P6 schedule runs to thousands) and past that says how many
+  there are in all (`PlanView.Total`, `planTotal`, a line above the Schedule); Assets & tags counts up to 20,000 tags
+  and draws the first 500, saying so; the Packages list reads up to 5,000. Never `Math.min(...list)` over a list that
+  grows (it overflows on thousands): fold it.
 - **Never hardcode a function or a job title** (owner): no "Document Control", "management", "project manager" in
   backend code, messages or comments. Functions are the organization's data. Say **the control function** (whoever
   holds CONTROL on the project) and **whoever holds Manage** (or another verb); a name shown is read from the data

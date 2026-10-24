@@ -30,6 +30,19 @@ public sealed partial class ReviewService
             ? review : null;
     }
 
+    /// <summary>Several reviews for display at once (a document's page), those whose document the caller may see.</summary>
+    public async Task<List<Review>> ReadManyAsync(ProjectAccess access, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
+    {
+        var found = await db.Reviews.AsNoTracking()
+            .Include(r => r.Steps.OrderBy(s => s.Index)).ThenInclude(s => s.Participants)
+            .Include(r => r.Comments)
+            .AsSplitQuery()
+            .Where(r => ids.Contains(r.Id) && r.ProjectId == access.Project.Id).ToListAsync(cancellationToken);
+        var documents = found.Select(r => r.DocumentId).Distinct().ToList();
+        var visible = (await DocumentQueries.Visible(db, access).Where(d => documents.Contains(d.Id)).Select(d => d.Id).ToListAsync(cancellationToken)).ToHashSet();
+        return found.Where(r => visible.Contains(r.DocumentId)).ToList();
+    }
+
     /// <summary>The document if the caller may see it (within their function's clearance, or named on it), otherwise null.</summary>
     private async Task<Document?> VisibleDocumentAsync(ProjectAccess access, Guid documentId, CancellationToken cancellationToken)
     {

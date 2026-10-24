@@ -23,6 +23,9 @@ public sealed record NeedRequest(
     Guid DocumentId, string? Purpose, string[]? RequiredStatuses = null, string? Anchor = null, int? OffsetDays = null,
     DateOnly? FixedDate = null, string? Department = null, Guid? TransmittalId = null, bool FromList = false);
 
+/// <summary>Several needs added and taken off an action at once (the register opened for it): all or none.</summary>
+public sealed record NeedsChange(NeedRequest[]? Add, Guid[]? Remove);
+
 /// <summary>The control function's answer to a request to add a document to an action, when nothing is added: why.</summary>
 public sealed record ActivityAskAnswer(string? Note);
 
@@ -131,6 +134,7 @@ public static partial class ScheduleEndpoints
         project.MapGet("/activities", ActivitiesAsync);
         project.MapGet("/activities/{activityId:guid}", ActivityAsync);
         project.MapPost("/activities/{activityId:guid}/needs", AddNeedAsync);
+        project.MapPost("/activities/{activityId:guid}/needs/many", ChangeNeedsAsync);
         project.MapDelete("/activities/{activityId:guid}/needs/{needId:guid}", RemoveNeedAsync);
         project.MapPost("/activities/{activityId:guid}/needs/{needId:guid}/waive", WaiveAsync);
         project.MapDelete("/activities/{activityId:guid}/needs/{needId:guid}/waive", UnwaiveAsync);

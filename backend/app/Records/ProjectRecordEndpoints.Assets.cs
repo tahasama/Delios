@@ -31,7 +31,7 @@ public static partial class ProjectRecordEndpoints
             query = query.Where(a => EF.Functions.ILike(a.Code, like) || EF.Functions.ILike(a.Name, like)
                 || (a.Area != null && EF.Functions.ILike(a.Area, like)) || (a.System != null && EF.Functions.ILike(a.System, like)));
         }
-        var rows = await query.OrderBy(a => a.Code).Take(2000)
+        var rows = await query.OrderBy(a => a.Code).Take(20_000)
             .Select(a => new { a, Documents = db.Set<DocumentAsset>().Count(l => l.AssetId == a.Id) }).ToListAsync(c);
         return Results.Ok(rows.Select(x => View(x.a, x.Documents)));
     }

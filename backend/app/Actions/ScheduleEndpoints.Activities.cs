@@ -17,7 +17,7 @@ public static partial class ScheduleEndpoints
     // ── Activities ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// GET /activities: lists the project's activities by start date, at most 2000, filtered by readiness, start date range, department or a text search on code and name.
+    /// GET /activities: lists the project's activities by start date, at most <see cref="MaxActions"/>, filtered by readiness, start date range, department or a text search on code and name.
     /// Removed activities are left out unless <paramref name="includeRemoved"/> is true.
     /// </summary>
     private static async Task<IResult> ActivitiesAsync(
@@ -41,7 +41,7 @@ public static partial class ScheduleEndpoints
             var pattern = "%" + q.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
             query = query.Where(a => EF.Functions.ILike(a.Code, pattern) || EF.Functions.ILike(a.Name, pattern));
         }
-        var rows = await query.OrderBy(a => a.Start).ThenBy(a => a.Code).Take(2000).ToListAsync(cancellationToken);
+        var rows = await query.OrderBy(a => a.Start).ThenBy(a => a.Code).Take(MaxActions).ToListAsync(cancellationToken);
         var views = rows.Select(a => Summary(a, today, window));
         if (readiness is not null) views = views.Where(v => v.Readiness == readiness);
         return Results.Ok(views.ToList());

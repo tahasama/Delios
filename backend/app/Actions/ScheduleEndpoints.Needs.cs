@@ -63,6 +63,70 @@ public static partial class ScheduleEndpoints
     }
 
     /// <summary>
+    /// Several needs added and taken off at once (the register opened for the action): each checked as one alone would
+    /// be, nothing saved unless all pass, the action's readiness worked out once. Added in answer to a request, the first
+    /// answers it, as one by one did.
+    /// </summary>
+    private static async Task<IResult> ChangeNeedsAsync(
+        Guid activityId, NeedsChange request, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit,
+        Notifications.Notifier notifier, TransmittalService transmittals, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        var activity = await db.Activities.SingleOrDefaultAsync(a => a.Id == activityId && a.ProjectId == access.Project.Id, cancellationToken);
+        if (activity is null) return NotFound();
+        var adds = (request.Add ?? []).DistinctBy(a => (a.DocumentId, a.Purpose)).ToList();
+        var removeIds = (request.Remove ?? []).Distinct().ToList();
+        Transmittal? ask = null;
+        if (adds.Select(a => a.TransmittalId).OfType<Guid>().FirstOrDefault() is var askId && askId != Guid.Empty)
+        {
+            ask = await db.Transmittals.SingleOrDefaultAsync(t => t.Id == askId && t.ProjectId == access.Project.Id && t.ActivityId == activityId, cancellationToken);
+            if (ask is null) return Problems.NotFound("REQUEST_NOT_FOUND", $"No request to add a document to {activity.Code} by that number.");
+            if (ask.ActivityAnsweredAt is not null) return Problems.Conflict("ALREADY_ANSWERED", $"{ask.ActivityAnsweredByName} already answered {ask.Number}.");
+            if (ask.ActivityConfirm)
+                return Problems.Conflict("NEEDS_CONFIRMATION", $"{ask.Number} needs confirming by whoever holds Manage: check it and send it on; it is applied once confirmed.");
+        }
+        var self = adds.Count > 0 && !access.Holds(Verbs.Control) && !adds.All(a => a.FromList && access.Holds(Verbs.Plan));
+        string? own = null;
+        if (self)
+        {
+            if (await Delios.Host.Settings.ProjectAnswers.ControlDoesAsync(db, access.Project.Id, "ACTION_LINKS", cancellationToken))
+                return Problems.Forbidden("CONTROL_ONLY", "On this project the control function adds documents to actions: ask them.");
+            own = await OwnDepartmentAsync(db, access, cancellationToken);
+        }
+        var added = new List<(Requirement Need, Document Document)>();
+        foreach (var one in adds)
+        {
+            var (need, document, problem) = await NewNeedAsync(db, clock, access, activity, one, cancellationToken);
+            if (problem is not null) return problem;
+            if (self && (own is null || need!.Department != own))
+                return Problems.Forbidden("OWN_DISCIPLINE_ONLY", "You add documents for your own discipline only.");
+            added.Add((need!, document!));
+        }
+        var removing = removeIds.Count == 0 ? [] : await db.Requirements
+            .Where(r => removeIds.Contains(r.Id) && r.ActivityId == activityId && r.ProjectId == access.Project.Id).ToListAsync(cancellationToken);
+        if (removing.Count != removeIds.Count) return NotFound();
+        if (!access.Holds(Verbs.Control) && removing.Any(r => r.CreatedByName != access.UserName))
+            return Problems.Forbidden("CONTROL_ONLY", "Whoever added a need, or the control function, removes it.");
+        foreach (var (need, _) in added) db.Requirements.Add(need);
+        db.Requirements.RemoveRange(removing);
+        await db.SaveChangesAsync(cancellationToken);
+        await Readiness.RestateAsync(db, clock, [activity.Id], cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        if (ask is not null && added.Count > 0)
+            await AnswerAsync(db, transmittals, clock, access, ask, activity, $"{added[0].Document.Number} added to {activity.Code}.", cancellationToken);
+        if (self && added.Count > 0)
+            await TellPlannersAsync(db, notifier, access, activity, $"{access.UserName} added {string.Join(", ", added.Select(a => a.Document.Number))}",
+                $"{activity.Code} now needs {string.Join(", ", added.Select(a => a.Document.Number))} for {own}.", cancellationToken);
+        foreach (var (need, document) in added)
+            await audit.WriteAsync(http.User.Actor(), "NEED_ADDED", "Activity", activity.Id, activity.Code,
+                $"Needs {document.Number} for {need.Purpose}, by {need.NeededBy?.ToString() ?? "a date not yet known"}"
+                + (ask is null ? "." : $", as {ask.Number} asked."), access.Project.Id, cancellationToken);
+        foreach (var need in removing)
+            await audit.WriteAsync(http.User.Actor(), "NEED_REMOVED", "Activity", activityId, need.Purpose, null, access.Project.Id, cancellationToken);
+        return Results.NoContent();
+    }
+
+    /// <summary>
     /// A need checked and made, not yet saved: the document is this project's, the purpose, statuses and discipline
     /// are published, and the action does not need it already for that purpose.
     /// </summary>

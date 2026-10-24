@@ -135,11 +135,21 @@ public sealed partial class TransmittalService
         var matchedBefore = new Dictionary<Guid, MatchedBefore>();
         var fromParty = incoming && access.IsInternal
             ? await db.Transmittals.Where(x => x.Id == t.Id).Select(x => x.FromPartyId).SingleOrDefaultAsync(cancellationToken) : null;
-        if (fromParty is { } from)
-            foreach (var loose in t.Items.Where(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt is null && i.DocumentNumber.Length > 0))
-                if (await Equivalents.FindAsync(db, access.Project.Id, from, loose.DocumentNumber, cancellationToken) is { } ours)
-                    matchedBefore[loose.Id] = await db.Documents.Where(d => d.Id == ours)
-                        .Select(d => new MatchedBefore(d.Id, d.Number, d.Title, d.LatestRevisionValue)).SingleAsync(cancellationToken);
+        // Every loose item's number looked up at once, and the documents they point to.
+        var loose = fromParty is null ? [] : t.Items.Where(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt is null && i.DocumentNumber.Length > 0).ToList();
+        if (fromParty is { } from && loose.Count > 0)
+        {
+            var numbers = loose.Select(i => i.DocumentNumber.Trim()).Distinct().ToList();
+            var known = (await db.NumberEquivalents.AsNoTracking()
+                    .Where(e => e.ProjectId == access.Project.Id && e.PartyId == from && numbers.Contains(e.Number) && e.TakenBackAt == null)
+                    .Select(e => new { e.Number, e.DocumentId }).ToListAsync(cancellationToken))
+                .GroupBy(e => e.Number).ToDictionary(g => g.Key, g => g.First().DocumentId);
+            var ids = known.Values.Distinct().ToList();
+            var ours = await db.Documents.Where(d => ids.Contains(d.Id))
+                .Select(d => new MatchedBefore(d.Id, d.Number, d.Title, d.LatestRevisionValue)).ToDictionaryAsync(d => d.Id, cancellationToken);
+            foreach (var item in loose)
+                if (known.TryGetValue(item.DocumentNumber.Trim(), out var id) && ours.TryGetValue(id, out var match)) matchedBefore[item.Id] = match;
+        }
 
         return new TransmittalPage(t, status, incoming ? t.From ?? t.IssuedBy : await OurNameAsync(access, cancellationToken),
             check?.By, check?.At, status == TransmittalStatuses.Rejected ? returned?.Note ?? returnedLoose?.ReturnedReason : null, carried, files, requests,

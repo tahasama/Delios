@@ -2,7 +2,7 @@ import "server-only";
 import { api, projectPath } from "@/lib/client";
 import { getActiveSet } from "@/lib/settings/config";
 import { scheduleSource } from "@/lib/actions/api";
-import { backendDocument } from "@/lib/documents/api";
+import { backendDocuments } from "@/lib/documents/api";
 import { controlledSets } from "@/lib/settings/api-admin";
 
 /**
@@ -49,8 +49,10 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
   const ofTypes = async (codes: string[]): Promise<PlanListDocument[]> => {
     const pages = await Promise.all(codes.map((docType) =>
       api<{ items: Summary[] }>(projectPath(scope, "/documents"), { query: { docType, limit: 50 } }).then((page) => page.items).catch(() => [] as Summary[])));
-    return Promise.all(pages.flat().map(async (one) => {
-      const view = await backendDocument(scope, one.id);
+    // Every document of these types in one read, not recorded as opened (nobody opened them).
+    const views = new Map((await backendDocuments(scope, pages.flat().map((one) => one.id)).catch(() => [])).map((one) => [one.id, one]));
+    return pages.flat().map((one) => {
+      const view = views.get(one.id);
       const revisions = view?.revisions ?? [];
       const released = [...revisions].reverse().find((r) => r.state === "RELEASED") ?? null;
       const last = revisions.at(-1) ?? null;
@@ -61,7 +63,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
         differs: null,
         pending: last && last !== released && !["SUPERSEDED", "VOID"].includes(last.state) ? { value: last.value, state: last.state } : null,
       };
-    }));
+    });
   };
   const pick = (flag: string | null, code: string) => types
     .filter((one) => (flag ? flagged(one.props, flag) : one.code === code))
