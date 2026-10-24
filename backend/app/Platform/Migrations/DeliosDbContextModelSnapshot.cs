@@ -482,6 +482,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("project_id");
 
+                    b.Property<int>("ReadWith")
+                        .HasColumnType("integer")
+                        .HasColumnName("read_with");
+
                     b.Property<int>("Removed")
                         .HasColumnType("integer")
                         .HasColumnName("removed");

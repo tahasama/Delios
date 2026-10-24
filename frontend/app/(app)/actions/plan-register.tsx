@@ -2,7 +2,6 @@
 import { Select } from "@/components/select";
 
 import Link from "next/link";
-import { ReadAgain } from "./read-again";
 import { TONE } from "./plan-timeline";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -97,7 +96,7 @@ export function PlanRegister({
     /** Of those drawn, how many have no date from the schedule and so no bar. */
     undated: number;
     /** No WBS bands: none read yet (the schedule came from Excel, or before the WBS was kept), or sorted another way. */
-    wbs?: { none: boolean; href?: string; readAgain?: string | null } | null;
+    wbs?: { none: boolean; href?: string } | null;
     noNote?: { count: number; href: string };
     undatedHref?: string;
   };
@@ -377,9 +376,7 @@ export function PlanRegister({
               {more?.span ? <span className="ml-2 font-sans font-normal text-slate-500">· the schedule runs {more.span}</span> : null}
               {more?.wbs?.none ? (
                 <span className="mt-1 block font-sans text-[11px] font-normal text-slate-500">
-                  No WBS in the schedule as read: it was read before the WBS was kept, or from Excel. The WBS comes from a P6 export (.xer).
-                  {more.wbs.readAgain ? " Read the released revision again to group the actions by it." : " Upload the .xer again to group the actions by it."}
-                  {more.wbs.readAgain ? <ReadAgain revision={more.wbs.readAgain} /> : null}
+                  No WBS in the schedule as read: the WBS comes from a P6 export (.xer); an Excel schedule carries none.
                 </span>
               ) : more?.wbs?.href ? (
                 <span className="mt-1 block font-sans text-[11px] font-normal text-slate-500">

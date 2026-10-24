@@ -87,19 +87,3 @@ export async function uploadLooseListAction(_prev: Result | undefined, formData:
   revalidatePath("/schedule");
   return { ok: `Applied. ${summary}`, link: placeholders(registered) };
 }
-
-/**
- * Reads the schedule's released revision again (backend `POST /schedule/import?again=true`): its file as released, read
- * the way the app reads it now, for a schedule read before its WBS and what happened were kept.
- */
-export async function readScheduleAgainAction(_prev: Result | undefined): Promise<Result> {
-  const ctx = await requireScope();
-  if (!mayUploadLists(ctx.user.verbs)) return { error: "The control function, or a function given Plan, reads the schedule again." };
-  try {
-    const read = await api<{ revision: string; summary: string }>(projectPath(ctx, "/schedule/import"), { method: "POST", query: { again: "true" } });
-    revalidatePath("/schedule");
-    return { ok: `Rev ${read.revision} read again: ${read.summary}` };
-  } catch (e) {
-    return { error: refusal(e).message };
-  }
-}

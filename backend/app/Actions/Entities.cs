@@ -63,6 +63,8 @@ public sealed class ScheduleImport
     /// <summary>Why the import failed, when it did; null otherwise.</summary>
     public string? Error { get; set; }
     public Instant ImportedAt { get; set; }
+    /// <summary>Which version of the reading made it (<see cref="ScheduleImporter.ReaderVersion"/>); 0 before it was kept.</summary>
+    public int ReadWith { get; set; }
     /// <summary>How many activities were new in this revision. The next four counts work the same way for moved, changed, removed and unchanged ones.</summary>
     public int Added { get; set; }
     public int Moved { get; set; }

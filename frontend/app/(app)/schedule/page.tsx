@@ -385,8 +385,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
                 span: span ? `${span.from.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" })} → ${span.to.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" })}` : null,
                 undated: undatedAll,
                 // Why there are no WBS bands, when there are none: no WBS read yet, or another order chosen.
-                wbs: !schedule.some((a) => a.wbs?.length)
-                  ? { none: true, readAgain: mayUploadLists(ctx.user.verbs) && source.source ? source.imports.find((one) => one.revisionValue !== "-")?.revisionValue ?? null : null }
+                wbs: !schedule.some((a) => a.wbs?.length) ? { none: true }
                   : sortKey !== "wbs" ? { none: false, href: (() => { const p = new URLSearchParams(query); p.delete("sort"); p.delete("dir"); return `/schedule${p.size ? `?${p}` : ""}`; })() }
                   : null,
                 undatedHref: "/schedule?view=table&nodate=1",

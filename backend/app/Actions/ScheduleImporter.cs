@@ -26,6 +26,13 @@ public sealed class ScheduleImporter(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, AuditLog audit, IClock clock, ILogger<ScheduleImporter> logger)
 {
     /// <summary>
+    /// The version of the reading. Raised whenever reading a file keeps more than before (1: the WBS and what happened,
+    /// from a P6 export): a released revision read by an older version is read again by itself (<see cref="CatchUpAsync"/>),
+    /// nobody asked to do it (owner: "users shouldn't have to do that").
+    /// </summary>
+    public const int ReaderVersion = 1;
+
+    /// <summary>
     /// After any release: activities needing that document are restated; a release of
     /// the project's schedule asks for it to be read, on the checks queue, so reading a
     /// large export never holds up scanning and stamping.
@@ -75,18 +82,36 @@ public sealed class ScheduleImporter(
     }
 
     /// <summary>
-    /// Reads the schedule's released revision again (owner: a schedule read before its WBS and what happened were kept,
-    /// "both images are literally from the same xer"): the same file, the same reading, its read counted afresh.
-    /// Returns what it says, or why it could not be read.
+    /// In the worker: the schedule's released revision read by an older version of the reading (<see cref="ReaderVersion"/>)
+    /// is read again, the same file read as the app reads it now, so what the reading keeps since (the WBS, what happened)
+    /// comes in by itself. Only a P6 export is read again (the only file the reading keeps more of), only when that read is
+    /// what the activities stand on (no upload since), and never one that failed. Returns whether it read it.
     /// </summary>
-    public async Task<(string? Summary, string? Error)> ReadAgainAsync(ScheduleSource source, Revision revision, CancellationToken cancellationToken)
+    public async Task<bool> CatchUpAsync(Guid projectId, CancellationToken cancellationToken)
     {
-        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({"schedule:" + revision.ProjectId}))", cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({"schedule:" + projectId}))", cancellationToken);
+        var source = await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == projectId, cancellationToken);
+        if (source is null) return false;
+        var revision = await db.Revisions.AsNoTracking().Include(r => r.Files)
+            .SingleOrDefaultAsync(r => r.DocumentId == source.DocumentId && r.State == RevisionStates.Released, cancellationToken);
+        if (revision is null) return false;
         var earlier = await db.ScheduleImports.SingleOrDefaultAsync(i => i.RevisionId == revision.Id, cancellationToken);
-        await ReadAsync(source, revision, cancellationToken, earlier);
-        var record = earlier ?? db.ScheduleImports.Local.Single(i => i.RevisionId == revision.Id);
-        return record.Status == ScheduleImportStatuses.Failed ? (null, record.Error)
-            : ($"{record.Added} new, {record.Moved} moved, {record.Changed} changed, {record.Removed} removed, {record.Unchanged} unchanged.", null);
+        if (earlier is null || earlier.ReadWith >= ReaderVersion || earlier.Status != ScheduleImportStatuses.Done) return false;
+        if (!revision.Files.Any(f => f.Submission == revision.Submission && f.Status == FileStatuses.Clean && XerReader.IsXer(f.Name))) return false;
+        // A list uploaded since stands: the activities are no longer this read's.
+        if (await db.Set<Records.ControlledVersion>().AnyAsync(v => v.ProjectId == projectId && v.Kind == "SCHEDULE" && v.CreatedAt > earlier.ImportedAt, cancellationToken))
+        {
+            earlier.ReadWith = ReaderVersion;
+        }
+        else
+        {
+            await ReadAsync(source, revision, cancellationToken, earlier);
+            logger.LogInformation("Schedule rev {Value} of project {Project} read again by the newer reading", revision.Value, projectId);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     /// <summary>
@@ -105,6 +130,7 @@ public sealed class ScheduleImporter(
             RevisionValue = revision.Value,
             ImportedAt = now,
         };
+        record.ReadWith = ReaderVersion;
         if (earlier is null) db.ScheduleImports.Add(record);
         else
         {
@@ -178,7 +204,7 @@ public sealed class ScheduleImporter(
         }
         // Counted the way a released revision's read is counted. The released revision the file belongs to keeps the read
         // as its own, the first time; a file with no revision, or read again, is kept among the uploaded lists instead.
-        var tally = new ScheduleImport { TenantId = tenantId, ProjectId = projectId, RevisionValue = "-", ImportedAt = clock.GetCurrentInstant() };
+        var tally = new ScheduleImport { TenantId = tenantId, ProjectId = projectId, RevisionValue = "-", ImportedAt = clock.GetCurrentInstant(), ReadWith = ReaderVersion };
         if (revision is not null)
         {
             // Released with no spreadsheet, its read failed: this file is that read, done now.
@@ -194,6 +220,7 @@ public sealed class ScheduleImporter(
                 earlier.Status = ScheduleImportStatuses.Done;
                 earlier.Error = null;
                 earlier.ImportedAt = tally.ImportedAt;
+                earlier.ReadWith = ReaderVersion;
                 tally = earlier;
             }
         }

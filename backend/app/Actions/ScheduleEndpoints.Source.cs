@@ -63,31 +63,16 @@ public static partial class ScheduleEndpoints
         return Results.Ok(source);
     }
 
-    /// <summary>
-    /// Reads the schedule's current released revision now: for a schedule named after its release. With
-    /// <c>again=true</c>, a revision already read is read again at once (its file as released, read as the app reads it
-    /// now), by the control function or whoever may upload the schedule.
-    /// </summary>
-    private static async Task<IResult> ImportAsync(HttpContext http, DeliosDbContext db, ScheduleImporter importer, AuditLog audit,
-        CancellationToken cancellationToken, bool again = false)
+    /// <summary>Reads the schedule's current released revision now: for a schedule named after its release.</summary>
+    private static async Task<IResult> ImportAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (again ? !(access.Holds(Verbs.Control) || access.Holds(Verbs.Plan)) : !access.Holds(Verbs.Control))
-            return Problems.Forbidden("CONTROL_ONLY", again ? "The control function, or a function given Plan, reads the schedule again." : "The control function reads the schedule in.");
+        if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function reads the schedule in.");
         var source = await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == access.Project.Id, cancellationToken);
         if (source is null) return Problems.Conflict("SCHEDULE_NOT_SET", "Name the schedule document first.");
-        var revision = await db.Revisions.AsNoTracking().Include(r => r.Files)
+        var revision = await db.Revisions.AsNoTracking()
             .SingleOrDefaultAsync(r => r.DocumentId == source.DocumentId && r.State == RevisionStates.Released, cancellationToken);
         if (revision is null) return Problems.Conflict("SCHEDULE_NOT_RELEASED", "The schedule has no released revision: it is read once one is released.");
-        if (again)
-        {
-            var (summary, error) = await importer.ReadAgainAsync(source, revision, cancellationToken);
-            if (error is not null) return Problems.Invalid("SCHEDULE_NOT_READ", error);
-            var number = await db.Documents.AsNoTracking().Where(d => d.Id == revision.DocumentId).Select(d => d.Number).SingleAsync(cancellationToken);
-            await audit.WriteAsync(http.User.Actor(), "SCHEDULE_READ_AGAIN", "Revision", revision.Id, $"{number} rev {revision.Value}",
-                $"Read again by {access.UserName}: {summary}", access.Project.Id, cancellationToken);
-            return Results.Ok(new { revision = revision.Value, summary });
-        }
         if (await db.ScheduleImports.AnyAsync(i => i.RevisionId == revision.Id, cancellationToken))
             return Problems.Conflict("SCHEDULE_ALREADY_READ", $"Revision {revision.Value} has already been read.");
         db.Enqueue(ScheduleImportRequested.RoutingKey, new ScheduleImportRequested(revision.TenantId, revision.Id));

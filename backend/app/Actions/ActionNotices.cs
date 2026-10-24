@@ -132,6 +132,18 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
             }
             foreach (var projectId in projects)
             {
+                // A schedule read by an older reading is read again first, by itself.
+                try
+                {
+                    await using var catchUp = scopes.CreateAsyncScope();
+                    catchUp.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
+                    await catchUp.ServiceProvider.GetRequiredService<ScheduleImporter>().CatchUpAsync(projectId, cancellationToken);
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    await using var logs = scopes.CreateAsyncScope();
+                    logs.ServiceProvider.GetRequiredService<ILogger<ScheduleImporter>>().LogWarning(e, "Reading the schedule of project {Project} again failed; trying again later", projectId);
+                }
                 await using var scope = scopes.CreateAsyncScope();
                 scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
                 told += await ProjectAsync(scope.ServiceProvider, projectId, cancellationToken);
