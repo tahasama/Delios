@@ -158,6 +158,10 @@ public sealed class ControlledVersion
     public string? SourceName { get; set; }
     public long? SourceSize { get; set; }
     public string? SourceHash { get; set; }
+    /// <summary>An uploaded list's file, kept exactly as it came, to be downloaded as it is; its name ends the key.</summary>
+    public string? ObjectKey { get; set; }
+    /// <summary>A released revision's file the list was read from.</summary>
+    public Guid? FileId { get; set; }
     public string? Notes { get; set; }
     public Guid CreatedById { get; set; }
     public required string CreatedByName { get; set; }
@@ -271,6 +275,7 @@ internal sealed class RecordsConfiguration :
         b.Property(x => x.Diff).HasColumnType("jsonb");
         b.Property(x => x.SourceName).HasMaxLength(300);
         b.Property(x => x.SourceHash).HasMaxLength(64);
+        b.Property(x => x.ObjectKey).HasMaxLength(500);
         b.Property(x => x.Notes).HasMaxLength(2000);
         b.Property(x => x.CreatedByName).HasMaxLength(200);
         b.Property(x => x.SubmittedByName).HasMaxLength(200);

@@ -44,12 +44,78 @@ public static class ListUploadEndpoints
         app.MapGroup("/api/projects/{projectId:guid}").WithTags("Schedule")
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter<ProjectAccessFilter>()
-            .MapPost("/schedule/lists", UploadAsync);
+            .MapGet("/schedule/lists/{kind}/source", SourceAsync);
+        app.MapGroup("/api/projects/{projectId:guid}").WithTags("Schedule")
+            .AddEndpointFilter<ProjectAccessFilter>()
+            .MapGet("/schedule/lists/{kind}/source/file", SourceFileAsync);
+        app.MapGroup("/api/projects/{projectId:guid}").WithTags("Schedule")
+            .AddEndpointFilter<TransactionFilter>()
+            .AddEndpointFilter<ProjectAccessFilter>()
+            .MapPost("/schedule/lists", UploadAsync)
+            // A P6 export is sent whole (kept as it came): up to the screens' 100 MB, in base64.
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(140_000_000));
     }
+
+    /// <summary>
+    /// The file a list in force was read from, whichever came last (owner): a released revision's file of the register
+    /// document (its <c>fileId</c>, opened as any file), or a file uploaded here (served as it came). Our people only.
+    /// </summary>
+    private static async Task<IResult> SourceAsync(string kind, HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.IsInternal || !Lists.ContainsKey(kind)) return Results.NotFound();
+        var read = await LatestAsync(db, access.Project.Id, kind, cancellationToken);
+        return read is null ? Results.NotFound() : Results.Ok(new { read.Value.Name, read.Value.FileId, uploaded = read.Value.ObjectKey is not null });
+    }
+
+    private static async Task<IResult> SourceFileAsync(string kind, HttpContext http, DeliosDbContext db, Documents.FileStorage storage, AuditLog audit,
+        CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.IsInternal || !Lists.ContainsKey(kind)) return Results.NotFound();
+        var read = await LatestAsync(db, access.Project.Id, kind, cancellationToken);
+        if (read?.ObjectKey is not { } key) return Results.NotFound();
+        await audit.WriteAsync(http.User.Actor(), "DOWNLOAD", "Project", access.Project.Id, read.Value.Name,
+            $"{Lists[kind].Title}: the file uploaded, as it came.", access.Project.Id, cancellationToken);
+        var content = await storage.OpenReadAsync(key, cancellationToken);
+        return Results.File(content, ContentTypeOf(read.Value.Name), read.Value.Name);
+    }
+
+    /// <summary>The latest read of a list that stands: an upload kept here, or a released revision's file.</summary>
+    private static async Task<(string Name, Guid? FileId, string? ObjectKey)?> LatestAsync(DeliosDbContext db, Guid projectId, string kind,
+        CancellationToken cancellationToken)
+    {
+        var listKind = Lists[kind].Kind;
+        var versions = await db.Set<ControlledVersion>().AsNoTracking()
+            .Where(v => v.ProjectId == projectId && v.Kind == listKind && v.State == "APPROVED" && (v.ObjectKey != null || v.FileId != null))
+            .OrderByDescending(v => v.CreatedAt).Select(v => new { v.CreatedAt, v.ObjectKey, v.FileId }).FirstOrDefaultAsync(cancellationToken);
+        var candidates = new List<(Instant At, string? ObjectKey, Guid? FileId)>();
+        if (versions is not null) candidates.Add((versions.CreatedAt, versions.ObjectKey, versions.FileId));
+        if (listKind == "SCHEDULE")
+        {
+            var import = await db.ScheduleImports.AsNoTracking()
+                .Where(i => i.ProjectId == projectId && i.Status == ScheduleImportStatuses.Done && i.FileId != null)
+                .OrderByDescending(i => i.ImportedAt).Select(i => new { i.ImportedAt, i.FileId }).FirstOrDefaultAsync(cancellationToken);
+            if (import is not null) candidates.Add((import.ImportedAt, null, import.FileId));
+        }
+        if (candidates.Count == 0) return null;
+        var latest = candidates.MaxBy(c => c.At);
+        if (latest.ObjectKey is { } key) return (Path.GetFileName(key), null, key);
+        var name = await db.StoredFiles.AsNoTracking().Where(f => f.Id == latest.FileId).Select(f => f.Name).SingleOrDefaultAsync(cancellationToken);
+        return name is null ? null : (name, latest.FileId, null);
+    }
+
+    /// <summary>What a list's file is, as it is served back.</summary>
+    internal static string ContentTypeOf(string fileName) => Path.GetExtension(fileName).ToLowerInvariant() switch
+    {
+        ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".csv" => "text/csv",
+        _ => "application/octet-stream",
+    };
 
     private static async Task<IResult> UploadAsync(
         ListUploadRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock, Documents.IVirusScanner scanner,
-        ScheduleImporter schedules, DepartmentsImporter departments, RequirementsImporter requirements, CancellationToken cancellationToken)
+        ScheduleImporter schedules, Documents.FileStorage storage, DepartmentsImporter departments, RequirementsImporter requirements, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.IsInternal || !(access.Holds(Verbs.Control) || access.Holds(Verbs.Plan)))
@@ -141,7 +207,8 @@ public static class ListUploadEndpoints
         for (var n = 2; taken.Contains(versionLabel); n++) versionLabel = revision is null ? $"upload {n}" : $"{stem} ({n})";
         if (versionLabel.Length > 16) versionLabel = $"upload {taken.Count + 1}";
         var note = summary is { Length: > 2000 } ? summary[..2000] : summary;
-        db.Add(new ControlledVersion
+        // The file read is kept exactly as it came, to be downloaded as it is.
+        var kept = new ControlledVersion
         {
             TenantId = project.TenantId,
             ProjectId = project.Id,
@@ -165,7 +232,10 @@ public static class ListUploadEndpoints
             DecisionReason = reason.Length == 0 ? null : reason,
             AppliedAt = now,
             AppliedSummary = note,
-        });
+        };
+        kept.ObjectKey = $"lists/{project.Id}/{kept.Id}/{fileName}";
+        await storage.PutAsync(kept.ObjectKey, bytes, ContentTypeOf(fileName), cancellationToken);
+        db.Add(kept);
         await db.SaveChangesAsync(cancellationToken);
         var said = revision is null
             ? $"{list.Title} uploaded without a register document. {access.UserName} confirmed they know it is not a controlled document. Why: {reason} {summary}"

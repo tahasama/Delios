@@ -131,9 +131,19 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   // for another. A schedule that is over, or not begun, opens on its own last or first days instead (owner: "if a
   // project is over instead of pointing to today, point at last month").
   const windowed = !fromDay && !toDay && view === "plan" && sp.all !== "1";
-  const centre = !span ? new Date() : Date.now() > span.to.getTime() ? span.to : Date.now() < span.from.getTime() ? span.from : new Date();
-  const planFrom = fromDay ?? (windowed ? daysBefore(centre, PLAN_WINDOW_DAYS) : null);
-  const planTo = toDay ?? (windowed ? daysBefore(centre, -PLAN_WINDOW_DAYS) : null);
+  // The window is two months, around today, held inside the schedule's span (owner, "that applies as general"): near or
+  // past its end it ends on the last action's day, near or before its start it starts on the first's.
+  const around = (() => {
+    const width = 2 * PLAN_WINDOW_DAYS * 86_400_000;
+    let from = Date.now() - width / 2;
+    if (span) {
+      from = Math.min(from, span.to.getTime() - width);
+      from = Math.max(from, span.from.getTime());
+    }
+    return { from: new Date(from), to: new Date(span ? Math.min(from + width, Math.max(span.to.getTime(), from)) : from + width) };
+  })();
+  const planFrom = fromDay ?? (windowed ? around.from : null);
+  const planTo = toDay ?? (windowed ? around.to : null);
 
   // Where each action stands is one rule, shared with the action's own page;
   // the schedule is read whole and filtered here.

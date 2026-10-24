@@ -376,11 +376,11 @@ export function PlanRegister({
               {more?.span ? <span className="ml-2 font-sans font-normal text-slate-500">· the schedule runs {more.span}</span> : null}
               {more?.wbs?.none ? (
                 <span className="mt-1 block font-sans text-[11px] font-normal text-slate-500">
-                  No WBS in the schedule as read: the WBS comes from a P6 export (.xer); an Excel schedule carries none.
+                  No WBS: it comes only from a P6 export (.xer).
                 </span>
               ) : more?.wbs?.href ? (
                 <span className="mt-1 block font-sans text-[11px] font-normal text-slate-500">
-                  Sorted another way, so not grouped by WBS. <Link href={more.wbs.href} className="font-semibold text-link hover:underline">Group by WBS</Link>
+                  <Link href={more.wbs.href} className="font-semibold text-link hover:underline">Group by WBS</Link>
                 </span>
               ) : null}
             </span>

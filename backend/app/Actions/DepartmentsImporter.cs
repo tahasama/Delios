@@ -187,6 +187,7 @@ public sealed class DepartmentsImporter(
             SourceName = label,
             SourceSize = file?.Size,
             SourceHash = file?.Sha256,
+            FileId = file?.Id,
             Notes = failed ? null : summary,
             CreatedById = revision.AuthoredById,
             CreatedByName = "Released revision",

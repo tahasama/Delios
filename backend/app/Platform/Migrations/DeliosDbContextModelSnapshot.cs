@@ -4225,6 +4225,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("diff");
 
+                    b.Property<Guid?>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -4241,6 +4245,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("notes");
+
+                    b.Property<string>("ObjectKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("object_key");
 
                     b.Property<string>("Payload")
                         .IsRequired()

@@ -1393,10 +1393,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   its fields the same in every export); an export of several projects (a baseline among them) is read for the one chosen
   on the upload ("Which P6 project is the schedule", offered once the .xer is picked, with each one's activities,
   `app/(app)/actions/schedule-file.tsx`; ours by its code chosen first), the choice kept for the schedule's next
-  revisions (`ScheduleColumns.Sheet`), else the one whose P6 ID is our project's code, else refused naming them. Only the tables read (PROJECT, PROJWBS, TASK) are sent on from the screens
-  (`lib/actions/xer.ts`), so a large export fits (server actions take 100 MB). On upload
+  revisions (`ScheduleColumns.Sheet`), else the one whose P6 ID is our project's code, else refused naming them. The file is sent whole (server actions take 100 MB,
+  the upload endpoint 140 MB in base64). On upload
   (`.xer` beside `.xlsx` and `.csv`, `SheetGuard` reading it as text) and on release (a revision's `.xer` first, as only it
   carries the WBS and what happened, then `.xlsx`, then `.csv`). The disciplines and requirements lists stay Excel or CSV.
+  **The latest read stands** (owner: "the later is always the higher hand"): a list is read from its register document's
+  file (the native file of its released revision) or from a file uploaded on the Schedule, whichever came last. **The file
+  it was read from is downloadable as it is** (owner): an upload is kept exactly as it came (`ControlledVersion.ObjectKey`,
+  `lists/<project>/<version>/<name>`), a release read names its revision's file (`FileId`, `ScheduleImport.FileId`); a
+  download icon beside what is in force under each stage (`GET /schedule/lists/{kind}/source`, `…/source/file`, our people,
+  logged DOWNLOAD; screens `app/api/schedule/lists/[kind]/route.ts`).
 - **What the planner's file says is kept as the planner's word** (owner): each action keeps where it sits in the WBS
   (`Activity.Wbs`, top down, and `WbsOrder`, P6's order; from an .xer) and whether its start and finish happened
   (`StartAchieved` / `FinishAchieved`: P6's "A", "Achieved", from an .xer's actual dates or an Excel date written
@@ -1410,8 +1416,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   each read keeps the version of the reading that made it (`ScheduleImport.ReadWith`, `ScheduleImporter.ReaderVersion`,
   raised whenever the reading keeps more), and the worker reads again the released revision's .xer read by an older one
   (`CatchUpAsync`, in the actions' job), unless a list was uploaded since. The plan says when no action has a WBS (an
-  Excel schedule carries none), and offers "Group by WBS" when sorted another way. The plan opens a month either side of today, today held inside the schedule's own span
-  (a schedule over opens on its last days, one not begun on its first; owner: "point at last month"), says "the schedule
+  Excel schedule carries none), and offers "Group by WBS" when sorted another way. The plan opens on two months around today, held inside the schedule's own span
+  (owner, "that applies as general": near or past its end, the window ends on the last action's day; near or before its
+  start, it starts on the first's), and "Show every date" draws the actions' own days only, never stretched to today; says "the schedule
   runs <first month> → <last month>", and draws today only when inside; a read says its months too. The calendar tab
   opens the same way. The Schedule's heading says the days around an action in force (a document needed N days before
   its action's day, at risk from M), linking the Control room where they are set.
