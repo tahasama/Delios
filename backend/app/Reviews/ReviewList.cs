@@ -107,7 +107,8 @@ public static class ReviewListEndpoints
     {
         var documents = DocumentQueries.Visible(db, access).Select(d => d.Id);
         // A revision of a type that is not reviewed is released through a review with no steps: not a review to list.
-        return db.Reviews.AsNoTracking().Where(r => r.ProjectId == access.Project.Id && documents.Contains(r.DocumentId) && r.Steps.Any());
+        return OutsideReading.Reviews(db, access, db.Reviews.AsNoTracking())
+            .Where(r => r.ProjectId == access.Project.Id && documents.Contains(r.DocumentId) && r.Steps.Any());
     }
 
     /// <summary>Applies every filter given. Each narrows; none widens.</summary>

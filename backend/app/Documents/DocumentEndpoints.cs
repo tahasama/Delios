@@ -40,8 +40,10 @@ public static class DocumentEndpoints
             // A revision on its own, with the document it belongs to: for screens that hold only a revision's id.
             var access = ProjectAccessFilter.Of(h);
             var revision = await db.Revisions.AsNoTracking().SingleOrDefaultAsync(r => r.Id == revisionId && r.ProjectId == access.Project.Id, c);
-            var visible = revision is not null && await DocumentQueries.Visible(db, access)
-                .AnyAsync(d => d.Id == revision.DocumentId, c);
+            var originator = revision is null ? null : await DocumentQueries.Visible(db, access)
+                .Where(d => d.Id == revision.DocumentId).Select(d => new { d.Originator }).SingleOrDefaultAsync(c);
+            var visible = originator is not null && (OutsideReading.Whole(access, originator.Originator)
+                || await OutsideReading.SentRevisions(db, access).AnyAsync(id => id == revision!.Id, c));
             return visible
                 ? Results.Ok(new { revision!.Id, revision.DocumentId, revision.Value, revision.State, revision.StatusCode, revision.AuthoredById, revision.AuthoredByName })
                 : Problems.NotFound("REVISION_NOT_FOUND", "No such revision.");
@@ -141,10 +143,12 @@ public static class DocumentEndpoints
             var ranks = clearances.Count == 0 ? null : await Identity.Clearance.RanksAsync(db, cancellationToken);
             aboveSome = ranks is not null && clearances.Any(c => !Identity.Clearance.Reaches(ranks, c, document.Confidentiality));
         }
+        // Another organization reads, of one of our documents, only the revisions sent to it (OutsideReading).
+        var readable = await OutsideReading.RevisionsAsync(db, access, document.Id, document.Originator, cancellationToken);
         return Results.Ok(view with
         {
             AboveSomeClearance = aboveSome,
-            Revisions = view.Revisions.Select(r =>
+            Revisions = view.Revisions.Where(r => readable is null || readable.Contains(r.Id)).Select(r =>
             {
                 var ruling = decided.FirstOrDefault(d => d.RevisionId == r.Id);
                 return r with
@@ -174,7 +178,9 @@ public static class DocumentEndpoints
         var found = await DocumentQueries.Visible(db, access).AsNoTracking().Where(d => wanted.Contains(d.Id))
             .Include(d => d.Revisions.OrderBy(r => r.CreatedAt)).ThenInclude(r => r.Files.OrderBy(f => f.Name))
             .AsSplitQuery().ToListAsync(cancellationToken);
-        return Results.Ok(found.Select(View).ToList());
+        var sent = access.IsInternal ? null : (await OutsideReading.SentRevisions(db, access).Distinct().ToListAsync(cancellationToken)).ToHashSet();
+        return Results.Ok(found.Select(View).Select(v => sent is null || OutsideReading.Whole(access, v.Originator) ? v
+            : v with { Revisions = v.Revisions.Where(r => sent.Contains(r.Id)).ToList() }).ToList());
     }
 
     /// <summary>
@@ -337,8 +343,10 @@ public static class DocumentEndpoints
         var file = await db.StoredFiles.AsNoTracking()
             .SingleOrDefaultAsync(f => f.Id == fileId && f.ProjectId == access.Project.Id, cancellationToken);
         var visible = file is not null && (file.DocumentId is { } documentId
-            ? await DocumentQueries.Visible(db, access)
-                .AnyAsync(d => d.Id == documentId, cancellationToken)
+            ? await DocumentQueries.Visible(db, access).Where(d => d.Id == documentId).Select(d => d.Originator).ToListAsync(cancellationToken) is [var originator]
+                // Another organization opens, of one of our documents, only the files of a revision sent to it.
+                && (OutsideReading.Whole(access, originator)
+                    || (file.RevisionId is { } revisionId && await OutsideReading.SentRevisions(db, access).AnyAsync(id => id == revisionId, cancellationToken)))
             : await transmittals.Visible(access).AnyAsync(t => t.ProofFileId == file.Id
                 || t.Items.Any(i => i.Id == file.TransmittalItemId), cancellationToken));
         if (file is null || !visible) return (null, Problems.NotFound("FILE_NOT_FOUND", "No such file."));

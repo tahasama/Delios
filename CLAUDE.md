@@ -1710,3 +1710,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   project has a lower clearance (`aboveSomeClearance`, backend).
 - A function's clearance limits what its holders read (Standard §46); visibility always goes
   through `DocumentQueries.Visible`.
+- **What another organization reads of a document** (security review, Standard-changes §82): `DocumentQueries.Visible` says
+  which documents; `Documents/OutsideReading.cs` says what of them. Of one of ours, only the revisions a transmittal
+  carried to them (`SentRevisions`): the document's view, `/documents/many`, `/revisions/{id}`, every file and preview
+  (`ReadableAsync`), and its context (no review, history only of those revisions, only the transmittals they may open,
+  only supplier packages shared with them). Of their own (originator), everything. A review only of their own document
+  or with a step they answer (`OutsideReading.Reviews`: the review, `/reviews/many`, the reviews list); hand-overs are
+  ours only. `/api/parties` gives them only their own organization. The organization's controlled lists
+  (`/api/controlled`, no project) are an administrator's only. Any new reader of a document's parts goes through these.
+- **The notices job reads once a pass** (`ActionNotices.ProjectAsync`): what was already sent, and the days off, once per
+  project, never one query per action and discipline (it runs every half hour, over every action of every project).

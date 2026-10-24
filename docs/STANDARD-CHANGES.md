@@ -1513,3 +1513,18 @@ parts, each into smaller parts). DELIOS keeps it as it is asked:
   separate delivery trees may still share a document.
 - **Two ways to read it, one page each package:** drilling down from a package into the packages in it, or the whole tree
   on Packages; both open the same package page.
+
+## 82 · What another organization reads of a document it was sent
+
+The Standard lets a recipient read what was transmitted to it; it does not say what else of the document comes with it.
+
+- **Of a document of ours, another organization reads only the revisions a transmittal carried to its people**: never a
+  revision in preparation, never one sent to someone else, and only those revisions' files. Our reviews of it, our
+  exchanges about it with others and the packages it sits in are ours; it reads the transmittals it may open and the
+  supplier packages shared with it.
+- **Of its own documents** (it is their originator) it reads everything it read before.
+- **A review is read by another organization** when the document is its own or when it answers one of the review's
+  steps; a hand-over of a step (delegation) is ours alone.
+- **Who else we work with is ours**: another organization's people read, of the organizations we deal with, only their own.
+- **The organization's own lists are an administrator's**: the control function of one project does not upload or
+  approve them for every project.

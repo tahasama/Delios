@@ -179,6 +179,11 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
         var escalateAfter = int.TryParse(await Settings.ProjectAnswers.PolicyAsync(db, projectId, EscalateAfterKey, cancellationToken), out var days) && days > 0
             ? days : DefaultEscalateAfter;
         var told = 0;
+        // What was already sent about the actions, and the days off, read once a pass: never once an action and discipline
+        // (a project late in its life has thousands of actions behind it, looked at every half hour).
+        var sent = (await db.Notices.AsNoTracking().Where(n => n.ProjectId == projectId && n.Subject.StartsWith("activity:"))
+            .Select(n => n.Subject).Distinct().ToListAsync(cancellationToken)).ToHashSet();
+        var holidays = await WorkingCalendar.HolidaysAsync(db, project, cancellationToken);
         foreach (var activity in activities)
         {
             if (postponed.Contains(activity.Id)) continue;
@@ -219,9 +224,10 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
                 var listed = activity.Requirements.Count(r => r.Department == null || string.Equals(r.Department, department, StringComparison.OrdinalIgnoreCase));
                 if (listed == 0) continue;
                 var subject = $"activity:{activity.Id}:ready:{department}";
-                if (await NoticeLog.SentAsync(db, projectId, subject, cancellationToken)) continue;
+                if (sent.Contains(subject)) continue;
                 var people = await NoticeLog.DepartmentMembersAsync(db, projectId, department, cancellationToken);
                 if (people.Count == 0) continue;
+                sent.Add(subject);
                 await NoticeLog.SendAsync(db, notifier, clock, project.TenantId, projectId, subject, true, "Automatic",
                     $"{activity.Code} on {day:yyyy-MM-dd}: all of {department}'s documents are ready",
                     $"{activity.Name}. Every one of {department}'s {listed} document{(listed == 1 ? " is" : "s are")} released at the status the action needs, "
@@ -234,14 +240,15 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
             foreach (var department in activity.Departments.Where(d => missing[d] > 0 && !Confirmed(d)))
             {
                 var subject = $"activity:{activity.Id}:{(passed ? "passed" : "risk")}:{department}";
-                if (await NoticeLog.SentAsync(db, projectId, subject, cancellationToken))
+                if (sent.Contains(subject))
                 {
                     // Told when the day passed, and still no answer some working days later: the discipline, whoever holds Manage
                     // and the control function are all told, once.
-                    if (passed && WorkingCalendar.AddWorkingDays(day, escalateAfter, project.WeekendDays, await WorkingCalendar.HolidaysAsync(db, project, cancellationToken)) <= today)
-                        told += await EscalateAsync(db, notifier, clock, project, activity, department, missing[department], escalateAfter, cancellationToken);
+                    if (passed && WorkingCalendar.AddWorkingDays(day, escalateAfter, project.WeekendDays, holidays) <= today)
+                        told += await EscalateAsync(db, notifier, clock, project, activity, department, missing[department], escalateAfter, sent, cancellationToken);
                     continue;
                 }
+                sent.Add(subject);
                 var people = await NoticeLog.DepartmentMembersAsync(db, projectId, department, cancellationToken);
                 var title = passed
                     ? $"{activity.Code}: its day ({day:yyyy-MM-dd}) passed with {missing[department]} of {department}'s documents missing"
@@ -269,10 +276,10 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
     /// whoever holds Manage, and the control function are told, once. Nothing on the action is marked; the notice is the record.
     /// </summary>
     private static async Task<int> EscalateAsync(DeliosDbContext db, Notifications.Notifier notifier, IClock clock, Identity.Project project,
-        Activity activity, string department, int missing, int after, CancellationToken cancellationToken)
+        Activity activity, string department, int missing, int after, HashSet<string> sent, CancellationToken cancellationToken)
     {
         var subject = $"activity:{activity.Id}:escalated:{department}";
-        if (await NoticeLog.SentAsync(db, project.Id, subject, cancellationToken)) return 0;
+        if (!sent.Add(subject)) return 0;
         var people = await NoticeLog.DepartmentMembersAsync(db, project.Id, department, cancellationToken);
         people.AddRange(await NoticeLog.HoldersAsync(db, project.Id, Identity.Verbs.Manage, cancellationToken));
         people.AddRange(await NoticeLog.HoldersAsync(db, project.Id, Identity.Verbs.Control, cancellationToken));

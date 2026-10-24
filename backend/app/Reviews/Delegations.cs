@@ -55,7 +55,10 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
     /// <summary>The hand-overs raised on a review, newest first.</summary>
     public async Task<IReadOnlyList<DelegationView>?> ListAsync(ProjectAccess access, Guid reviewId, CancellationToken cancellationToken)
     {
-        if (!await db.Reviews.AnyAsync(r => r.Id == reviewId && r.ProjectId == access.Project.Id, cancellationToken)) return null;
+        // Hand-overs are ours (another organization reads none), on a review whose document the reader may see.
+        var documents = Documents.DocumentQueries.Visible(db, access).Select(d => d.Id);
+        if (!access.IsInternal || !await db.Reviews.AnyAsync(r => r.Id == reviewId && r.ProjectId == access.Project.Id
+                && documents.Contains(r.DocumentId), cancellationToken)) return null;
         var rows = await db.Set<ReviewDelegation>().AsNoTracking().Where(d => d.ReviewId == reviewId)
             .OrderByDescending(d => d.CreatedAt).ToListAsync(cancellationToken);
         return rows.Select(View).ToList();

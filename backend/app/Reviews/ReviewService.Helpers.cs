@@ -27,13 +27,15 @@ public sealed partial class ReviewService
     {
         var review = await LoadAsync(access, reviewId, cancellationToken);
         return review is not null && await VisibleDocumentAsync(access, review.DocumentId, cancellationToken) is not null
+            // Another organization reads a review of its own document, or one with a step it answers (OutsideReading).
+            && (access.IsInternal || await OutsideReading.Reviews(db, access, db.Reviews.Where(r => r.Id == review.Id)).AnyAsync(cancellationToken))
             ? review : null;
     }
 
     /// <summary>Several reviews for display at once (a document's page), those whose document the caller may see.</summary>
     public async Task<List<Review>> ReadManyAsync(ProjectAccess access, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
     {
-        var found = await db.Reviews.AsNoTracking()
+        var found = await OutsideReading.Reviews(db, access, db.Reviews.AsNoTracking())
             .Include(r => r.Steps.OrderBy(s => s.Index)).ThenInclude(s => s.Participants)
             .Include(r => r.Comments)
             .AsSplitQuery()

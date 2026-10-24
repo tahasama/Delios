@@ -1,3 +1,4 @@
+using Delios.Host.Identity;
 using Delios.Host.Platform;
 using Delios.Host.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -19,9 +20,18 @@ public static class ValueEndpoints
     }
 
     /// <summary><c>GET /api/parties</c>: the organization's active outside parties (suppliers, client…), for pickers.</summary>
-    private static async Task<IResult> PartiesAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
-        Results.Ok(await db.Parties.AsNoTracking().Where(p => p.Active && !p.IsInternal).OrderBy(p => p.Name)
-            .Select(p => new { p.Code, p.Name, p.Participation }).ToListAsync(cancellationToken));
+    /// Another organization's people (a guest, or an account standing for a collaborator's) read only their own: who else
+    /// we work with is ours.
+    private static async Task<IResult> PartiesAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var me = http.User.UserId();
+        var mine = await db.Users.AsNoTracking().Where(u => u.Id == me)
+            .Select(u => new { u.HomeTenantId, u.PartyId, Outside = u.Party != null && !u.Party.IsInternal }).SingleOrDefaultAsync(cancellationToken);
+        var query = db.Parties.AsNoTracking().Where(p => p.Active && !p.IsInternal);
+        if (mine is null) return Results.Ok(Array.Empty<object>());
+        if (mine.HomeTenantId is not null || mine.Outside) query = query.Where(p => p.Id == mine.PartyId);
+        return Results.Ok(await query.OrderBy(p => p.Name).Select(p => new { p.Code, p.Name, p.Participation }).ToListAsync(cancellationToken));
+    }
 
     /// <summary>
     /// <c>GET /api/values/serving?sets=CRITICALITY,…</c>: for each list named, the set serving each deliverable type
