@@ -30,13 +30,40 @@ export async function delegateReviewAction(_prev: State | undefined, formData: F
   let row: Delegation;
   try {
     row = await api<Delegation>(projectPath(ctx, `/reviews/${cycleId}/delegations`), {
-      body: { toUserId, endDate, reason: text(formData, "reason") || null },
+      body: { toUserId, endDate, reason: text(formData, "reason") || null, fromUserId: text(formData, "fromUserId") || null },
     });
   } catch (e) {
     return { error: refusal(e).message };
   }
   revalidatePath(`/reviews/${cycleId}`);
-  return { message: row.status === "OPEN" ? "Asked. It starts once the control function lets it." : `${row.toName} answers it in your place.` };
+  const forOther = Boolean(text(formData, "fromUserId"));
+  if (row.status === "OPEN") return { message: "Asked. It starts once the control function lets it." };
+  return { message: forOther ? `${row.toName} answers it in ${row.fromName}'s place; both are told.` : `${row.toName} answers it in your place.` };
+}
+
+/**
+ * Adding people to a review in flow (the control function, whoever holds Manage): to the open step or one still to
+ * come, or copied in; always with why. Steps already answered never change; nobody is taken off.
+ */
+export async function addReviewPeopleAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const cycleId = text(formData, "cycleId");
+  const userIds = formData.getAll("userIds").map(String).filter(Boolean);
+  const copyUserIds = formData.getAll("copyUserIds").map(String).filter(Boolean);
+  const reason = text(formData, "reason");
+  if (!userIds.length && !copyUserIds.length) return { error: "Choose who is added to the step, or copied in." };
+  if (!reason) return { error: "Say why they are added: they, and the record, read it." };
+  let done: { seated: number; copied: number };
+  try {
+    done = await api<{ seated: number; copied: number }>(projectPath(ctx, `/reviews/${cycleId}/people`), {
+      body: { step: Number(text(formData, "step")) || null, userIds, copyUserIds, reason },
+    });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath(`/reviews/${cycleId}`);
+  const said = [done.seated ? `${done.seated} added to the step` : null, done.copied ? `${done.copied} copied in` : null].filter(Boolean).join(", ");
+  return { message: `${said}; each is told.` };
 }
 
 /** One act on a hand-over already made, by its id. */

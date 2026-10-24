@@ -64,10 +64,26 @@ export async function delegationsOn(t: Tenant, cycleId: string): Promise<Delegat
   }));
 }
 
+type Options = {
+  candidates: { id: string; name: string; functionName: string; inMatrix: boolean }[];
+  /** For the control function and whoever holds Manage: whose seat on the open step they may hand over for them. */
+  seats: { id: string; name: string }[];
+  throughControl: boolean;
+};
+
 /** Who may take the open step of a review, as the backend offers them for the person asking. */
-const options = cache(async (t: Tenant, cycleId: string) =>
-  api<{ candidates: { id: string; name: string; functionName: string; inMatrix: boolean }[] }>(projectPath(t, `/reviews/${cycleId}/delegation-options`))
-    .then((one) => one.candidates).catch(() => []));
+const allOptions = cache(async (t: Tenant, cycleId: string): Promise<Options> =>
+  api<Options>(projectPath(t, `/reviews/${cycleId}/delegation-options`))
+    .then((one) => ({ ...one, seats: one.seats ?? [] })).catch(() => ({ candidates: [], seats: [], throughControl: false })));
+const options = cache(async (t: Tenant, cycleId: string) => (await allOptions(t, cycleId)).candidates);
+
+/**
+ * Handing somebody else's seat over (the control function, whoever holds Manage): the people on the open step not yet
+ * answered, and who may take it. Empty for anyone else.
+ */
+export async function handOverForOthers(t: Tenant, cycleId: string): Promise<Options> {
+  return allOptions(t, cycleId);
+}
 
 /**
  * Who this person may hand a step of this kind to: those the matrix names,
@@ -92,4 +108,16 @@ export async function delegationFlag(
   { toUserId }: { target: Target; verb: Verb; toUserId: string; toName: string },
 ): Promise<string | null> {
   return flags().get(toUserId) ?? null;
+}
+
+/** What adding people in flow offers: the steps not done yet, who is on each, and the project's people. Closed for anyone else. */
+export type StepPeopleOptions = {
+  open: boolean;
+  steps?: { number: number; title: string; state: string; on: string[] }[];
+  people?: { id: string; name: string }[];
+  copied?: string[];
+};
+
+export async function stepPeopleOptions(t: Tenant, cycleId: string): Promise<StepPeopleOptions> {
+  return api<StepPeopleOptions>(projectPath(t, `/reviews/${cycleId}/people`)).catch(() => ({ open: false }));
 }

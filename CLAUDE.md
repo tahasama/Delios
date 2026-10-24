@@ -131,6 +131,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   including steps not yet reached.
 - The sender may change the people on each step for that review; that choice
   is what the review uses, and the record says so.
+- **Who answers, changed in flow** (owner: "control function and Manage should be able to delegate a step… or add someone
+  forgotten or cc, a modification mid-flow that touches only steps not done yet"): on the review's page, "Who answers"
+  (`change-people.tsx`), for the control function and whoever holds Manage, of ours: **Hand over someone's step** (a seat
+  on the open step not answered yet, to someone else until a date, always with why; the control function's in force at
+  once, Manage's waits for the control function where it carries out DELEGATE; both people told; `DelegateRequest.FromUserId`,
+  CONTROL_OR_MANAGE, REASON_REQUIRED) and **Add someone or copy in** (to the open step, seated at once, or a step still to
+  come; copied in like "Copy to (cc)"; always with why, each told; `Reviews/StepPeople.cs`, `GET`/`POST /reviews/{id}/people`,
+  REVIEW_PEOPLE_ADDED; STEP_DONE, PARTY_STEP). A step answered never changes; nobody is taken off (their step is handed
+  over instead). Whoever sits on the open step still hands their own over from the answer card's "Delegate" (asking the
+  control function where it carries out DELEGATE).
 - Sending for review opens the new review's page.
 - A review is only ever started from the Send for review form (route, people
   per step, copies). No "create and send" shortcut on the new-document or

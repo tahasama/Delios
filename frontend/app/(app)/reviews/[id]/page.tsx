@@ -19,7 +19,8 @@ import { rewindRouteAction } from "@/lib/reviews/forms";
 import { requestChoices, authorOf, issuePolicy, decisionLetsItOut } from "@/lib/transmittals/issue-requests";
 import { DelegatePanel, DelegateForm, type DelegationRow } from "./delegate-panel";
 import { AnswerCard } from "./answer-card";
-import { delegateCandidates, delegationFlag, delegationsOn } from "@/lib/reviews/delegation";
+import { delegateCandidates, delegationFlag, delegationsOn, handOverForOthers, stepPeopleOptions } from "@/lib/reviews/delegation";
+import { ChangePeople } from "./change-people";
 import { controlDoes, actIsOff, matrixBinds } from "@/lib/settings/control-activities";
 import { RequestIssue } from "@/app/(app)/documents/[id]/request-issue";
 import { Timeline } from "@/components/timeline";
@@ -130,6 +131,10 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   // — is what may be handed over; the matrix recommends who (or decides, if
   // the project makes it the only rule).
   const handVerb: "REVIEW" | "APPROVE" = cycle.binding ? "APPROVE" : "REVIEW";
+  // The control function and whoever holds Manage change who answers in flow (the backend says whether this person may).
+  const [forOthers, peopleOptions] = cycle.status === "OPEN" && !cycle.withdrawn
+    ? await Promise.all([handOverForOthers(ctx, cycle.id), stepPeopleOptions(ctx, cycle.id)])
+    : [null, null];
   const [handCandidates, handThroughControl, handRows, handOff, handStrict] = await Promise.all([
     assigned && cycle.status === "OPEN" ? delegateCandidates(ctx, { target: doc, verb: handVerb, fromUserId: user.id }) : Promise.resolve([]),
     controlDoes(ctx, "DELEGATE"),
@@ -506,6 +511,11 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
 
           {cycle.status === "OPEN" ? (
             <DelegatePanel rows={handOvers} controller={controller} off={handOff} />
+          ) : null}
+
+          {forOthers && peopleOptions ? (
+            <ChangePeople cycleId={cycle.id} seats={forOthers.seats} candidates={forOthers.candidates}
+              throughControl={forOthers.throughControl} people={peopleOptions} />
           ) : null}
 
           {/* A withdrawn review is closed: nothing more is answered on it. */}

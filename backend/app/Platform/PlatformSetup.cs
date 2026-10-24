@@ -387,6 +387,7 @@ public static class PlatformSetup
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
             Reviews.StampPlaceEndpoints.MapStampPlaceEndpoints(app);
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);
+            Reviews.StepPeople.MapStepPeopleEndpoints(app);
             Documents.KeepingEndpoints.MapKeepingEndpoints(app);
             Documents.SnapshotEndpoints.MapSnapshotEndpoints(app);
             Documents.GovernanceEndpoints.MapGovernanceEndpoints(app);
