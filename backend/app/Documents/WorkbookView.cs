@@ -22,7 +22,26 @@ public static class WorkbookView
     public sealed record Book(Sheet[] Sheets, int SheetCount);
 
     public static bool CanShow(string fileName) =>
-        fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".xlsm", StringComparison.OrdinalIgnoreCase);
+        fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".xlsm", StringComparison.OrdinalIgnoreCase) || IsCsv(fileName);
+
+    private static bool IsCsv(string fileName) => fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A CSV file shown as one sheet (owner: "i uploaded a csv file didnt preview it"): its cells as text, nothing in it run.</summary>
+    public static Book ReadCsv(Stream content, string fileName)
+    {
+        var rows = Actions.ScheduleReader.ReadCsv(content);
+        int lastRow = rows.Count, lastColumn = rows.Count == 0 ? 0 : rows.Max(r => r.Length);
+        int shownRows = Math.Min(lastRow, MaxRows), shownColumns = Math.Min(lastColumn, MaxColumns);
+        var cells = rows.Take(shownRows).Select(r => Enumerable.Range(0, shownColumns)
+            .Select(c => c < r.Length && r[c].Length > 0
+                ? new Cell(r[c].Length > 2000 ? r[c][..2000] + "…" : r[c], false, double.TryParse(r[c], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _))
+                : null).ToArray()).ToArray();
+        // Each column as wide as its longest cell shown, within Excel's own bounds.
+        var widths = Enumerable.Range(0, shownColumns)
+            .Select(c => (double)Math.Clamp(cells.Max(r => r[c]?.V.Length ?? 0) + 2, 8, 60)).ToArray();
+        var name = Path.GetFileNameWithoutExtension(fileName);
+        return new Book([new Sheet(name, false, lastRow, lastColumn, lastRow > shownRows || lastColumn > shownColumns, widths, cells, [])], 1);
+    }
 
     /// <summary>The workbook, or why it cannot be shown.</summary>
     public static async Task<(Book? Book, string? Problem)> ReadAsync(Stream content, CancellationToken cancellationToken)

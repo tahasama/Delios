@@ -339,10 +339,11 @@ public static class DocumentEndpoints
         var (file, refused) = await ReadableAsync(fileId, ProjectAccessFilter.Of(http), db, transmittals, cancellationToken);
         if (file is null) return refused!;
         if (!WorkbookView.CanShow(file.Name))
-            return Problems.Invalid("NOT_A_WORKBOOK", $"{file.Name} is not an Excel workbook (.xlsx): download it to open it.");
+            return Problems.Invalid("NOT_A_WORKBOOK", $"{file.Name} is not an Excel workbook (.xlsx) or a CSV file: download it to open it.");
         if (file.Size > WorkbookView.MaxBytes)
             return Problems.Invalid("WORKBOOK_TOO_LARGE", $"{file.Name} is larger than {WorkbookView.MaxBytes / 1024 / 1024} MB: download it to open it.");
         await using var content = await storage.OpenReadAsync(file.ObjectKey, cancellationToken);
+        if (file.Name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)) return Results.Ok(WorkbookView.ReadCsv(content, file.Name));
         var (book, problem) = await WorkbookView.ReadAsync(content, cancellationToken);
         return book is null ? Problems.Invalid("WORKBOOK_UNREADABLE", $"{file.Name}: {problem} Download it to open it.") : Results.Ok(book);
     }

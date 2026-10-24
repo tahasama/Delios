@@ -7,9 +7,9 @@ import { revalidatePath } from "next/cache";
 import { mayCreateDocument } from "@/lib/core/auth";
 import { getActiveSet } from "@/lib/settings/config";
 import { ownFields, takeExtras } from "@/lib/settings/field-policy";
-import { api, refusalForForm, projectPath, refusal } from "@/lib/client";
+import { api, ApiProblem, refusalForForm, projectPath, refusal } from "@/lib/client";
 import { backendDocument } from "@/lib/documents/api";
-import { upload, filesOf } from "@/lib/documents/api-uploads";
+import { filesOf, uploadRevisionFiles } from "@/lib/documents/api-uploads";
 import type { TransmittalView } from "@/lib/types";
 
 // G.1 — Creating a new document. "No controlled information shall be produced
@@ -104,16 +104,18 @@ export async function createDocumentAction(_prev: { error?: string; fields?: str
   // Initial files create the first revision immediately: the PDF people read
   // and the editable native file, either or both.
   const files = kind === "DOCUMENT" ? filesOf(formData, "renditionFile", "nativeFile") : [];
+  let filesRefused: string | null = null;
   if (files.length) {
     try {
-      const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId: doc.id }, file)));
+      const fileIds = await uploadRevisionFiles(ctx, doc.id, formData);
       // The review is sent from the document's page, where the route and its people are chosen.
       await api(projectPath(ctx, `/documents/${doc.id}/revisions`), { body: { fileIds } });
-    } catch {
-      // file failure must not lose the register entry — the author can attach from the page
+    } catch (e) {
+      // A file refused must not lose the register entry: the page says why, and the files are attached from it.
+      filesRefused = e instanceof ApiProblem ? e.message : "The files could not be attached.";
     }
   }
-  redirect(`/documents/${doc.id}?created=1`);
+  redirect(`/documents/${doc.id}?created=1${filesRefused ? `&filesRefused=${encodeURIComponent(filesRefused)}` : ""}`);
 }
 
 const EDITABLE_FIELDS = [

@@ -466,6 +466,14 @@ public sealed class DocumentService(
         var (declared, invalid) = Uploads.Check(request, storageOptions.Value.MaxFileBytes);
         if (invalid is not null) return (null, invalid);
         var (name, contentType, sha256, isPdf) = declared!;
+        // The box it was put in says what it is (owner: say why, simply): a PDF is what people read, the source file
+        // the editable original.
+        if (string.Equals(request.Slot, "SOURCE", StringComparison.OrdinalIgnoreCase) && isPdf)
+            return (null, Problems.Invalid("SOURCE_IS_PDF",
+                $"{name} is a PDF: put it in the PDF box. The source file is the editable original (.docx, .dwg, .xlsx…).", new { field = "nativeFile" }));
+        if (string.Equals(request.Slot, "PDF", StringComparison.OrdinalIgnoreCase) && !isPdf)
+            return (null, Problems.Invalid("NOT_A_PDF",
+                $"{name} is not a PDF: put it in the source file box. The PDF box takes the PDF people read.", new { field = "renditionFile" }));
         var file = new StoredFile
         {
             TenantId = access.Project.TenantId,

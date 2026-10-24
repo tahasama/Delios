@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Download, Minus, Plus } from "lucide-react";
 import { WorkbookView } from "@/components/workbook-view";
 import { ScheduleFileView } from "@/components/schedule-file-view";
 
@@ -8,10 +9,10 @@ type PreviewFile = { id: string; name: string; mime?: string };
 
 /** What the browser shows by itself: the pictures it reads (SVG, which can carry code, stays a download). */
 const IMAGE = /\.(jpe?g|png|gif|webp|avif|bmp)$/i;
-const WORKBOOK = /\.(xlsx|xlsm)$/i;
+const WORKBOOK = /\.(xlsx|xlsm|csv)$/i;
 const SCHEDULE = /\.xer$/i;
 
-/** How a source file is shown in the page, if it can be: a picture, a workbook, or not at all (download it). */
+/** How a source file is shown in the page, if it can be: a picture, a workbook (a CSV as one sheet), a P6 schedule, or not at all. */
 export function sourceView(file: PreviewFile | null | undefined): "image" | "workbook" | "schedule" | null {
   if (!file) return null;
   if (IMAGE.test(file.name) || /^image\/(png|jpeg|gif|webp|avif|bmp)$/i.test(file.mime ?? "")) return "image";
@@ -20,42 +21,94 @@ export function sourceView(file: PreviewFile | null | undefined): "image" | "wor
   return null;
 }
 
+/** What the source file is, in words, on the choice above the preview. */
+function kindWords(file: PreviewFile): string {
+  const kind = sourceView(file);
+  if (kind === "workbook") return /\.csv$/i.test(file.name) ? "table" : "workbook";
+  if (kind === "schedule") return "P6 schedule";
+  if (kind === "image") return "picture";
+  const ext = file.name.match(/\.([a-z0-9]+)$/i)?.[1];
+  return ext ? `.${ext.toLowerCase()}` : "file";
+}
+
+const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+
 /**
- * The Preview (owner: images, Excel workbooks and P6 exports too): the revision's PDF as it stands (stamped, returned…), and its
- * source file where the page can show it, a picture or a workbook. With both, a choice above them, the PDF first.
+ * The Preview (owner: images, Excel workbooks, CSV and P6 exports too): the revision's PDF as it stands (stamped,
+ * returned…), and its source file. With both, a choice above them, the PDF first (owner: "i have no way to visualize one
+ * or the other"); a source the page cannot draw is offered to download. A zoom for whatever is shown (owner: "some
+ * control like a zoom"): − percentage + (the percentage puts it back to 100%).
  */
 export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-h-120" }: {
   pdf: PreviewFile | null; source: PreviewFile | null; title: string; empty: React.ReactNode; height?: string;
 }) {
   const kind = sourceView(source);
   const [showing, setShowing] = useState<"pdf" | "source">(pdf ? "pdf" : "source");
-  if (!pdf && !kind) return <>{empty}</>;
-  const both = !!pdf && !!kind;
+  const [zoom, setZoom] = useState(1);
+  if (!pdf && !source) return <>{empty}</>;
+  const onSource = !pdf || showing === "source";
+  const shown = onSource ? source! : pdf!;
+  const at = ZOOMS.indexOf(zoom);
+  const zoomable = !onSource || !!kind;
   return (
     <>
-      {both ? (
-        <div className="flex items-center gap-2 border-b border-line bg-tint-soft px-3 py-1.5">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-tint-soft px-3 py-1.5">
+        {pdf && source ? (
           <div className="seg w-fit" role="group" aria-label="What is shown">
-            <button type="button" className="segment" aria-pressed={showing === "pdf"} onClick={() => setShowing("pdf")}>The PDF</button>
-            <button type="button" className="segment" aria-pressed={showing === "source"} onClick={() => setShowing("source")}>
-              The source file · {kind === "workbook" ? "workbook" : kind === "schedule" ? "P6 schedule" : "picture"}
+            <button type="button" className="segment" aria-pressed={!onSource} onClick={() => setShowing("pdf")}>The PDF</button>
+            <button type="button" className="segment" aria-pressed={onSource} onClick={() => setShowing("source")}>
+              The source file · {kindWords(source)}
             </button>
           </div>
-          <span className="truncate text-[11px] text-slate-500">{showing === "source" ? source!.name : pdf!.name}</span>
-        </div>
-      ) : null}
-      {pdf && (showing === "pdf" || !kind) ? (
-        <iframe src={`/api/files/${pdf.id}`} title={title} className={`block w-full bg-slate-100 ${height}`} />
+        ) : null}
+        <span className="min-w-0 truncate text-[11px] text-slate-500" title={shown.name}>{shown.name}</span>
+        <span className="ml-auto flex items-center gap-1">
+          {zoomable ? (
+            <span className="flex items-center rounded-md ring-1 ring-line" role="group" aria-label="Zoom">
+              <button type="button" onClick={() => setZoom(ZOOMS[Math.max(0, at - 1)])} disabled={at <= 0}
+                title="Zoom out" aria-label="Zoom out" className="grid h-6 w-6 place-items-center text-slate-600 hover:text-brand-ink disabled:opacity-40">
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" onClick={() => setZoom(1)} title="Back to 100%"
+                className="min-w-11 border-x border-line px-1 text-[11px] font-semibold text-slate-700 tabular-nums hover:text-brand-ink">
+                {Math.round(zoom * 100)}%
+              </button>
+              <button type="button" onClick={() => setZoom(ZOOMS[Math.min(ZOOMS.length - 1, at + 1)])} disabled={at >= ZOOMS.length - 1}
+                title="Zoom in" aria-label="Zoom in" className="grid h-6 w-6 place-items-center text-slate-600 hover:text-brand-ink disabled:opacity-40">
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          ) : null}
+          <a href={`/api/files/${shown.id}?dl=1`} title={`Download ${shown.name}`} aria-label={`Download ${shown.name}`}
+            className="grid h-6 w-6 place-items-center text-slate-600 hover:text-brand-ink">
+            <Download className="h-3.5 w-3.5" />
+          </a>
+        </span>
+      </div>
+      {!onSource ? (
+        // The browser's own PDF viewer, opened at the zoom chosen.
+        <iframe key={zoom} src={`/api/files/${pdf!.id}#zoom=${Math.round(zoom * 100)}`} title={title} className={`block w-full bg-slate-100 ${height}`} />
       ) : kind === "image" ? (
         <div className={`grid w-full place-items-center overflow-auto bg-slate-100 p-4 ${height}`}>
           {/* A picture uploaded as the source, served by the app's own file route (no outside address). */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/api/files/${source!.id}`} alt={`${title} — ${source!.name}`} className="max-h-full max-w-full object-contain shadow-sm" />
+          <img src={`/api/files/${source!.id}`} alt={`${title} — ${source!.name}`} style={zoom === 1 ? undefined : { width: `${zoom * 100}%`, maxWidth: "none", maxHeight: "none" }}
+            className="max-h-full max-w-full object-contain shadow-sm" />
         </div>
       ) : kind === "schedule" ? (
-        <ScheduleFileView fileId={source!.id} name={source!.name} />
+        <ScheduleFileView fileId={source!.id} name={source!.name} zoom={zoom} />
+      ) : kind === "workbook" ? (
+        <WorkbookView fileId={source!.id} name={source!.name} zoom={zoom} />
       ) : (
-        <WorkbookView fileId={source!.id} name={source!.name} />
+        <div className={`grid w-full place-items-center bg-slate-100 p-6 text-center ${height}`}>
+          <div>
+            <p className="text-sm font-semibold text-slate-700">{source!.name} cannot be shown here</p>
+            <p className="mt-1 text-xs text-slate-500">The page shows PDFs, pictures, Excel workbooks (.xlsx), CSV files and P6 exports (.xer).</p>
+            <a href={`/api/files/${source!.id}?dl=1`} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline">
+              <Download className="h-3.5 w-3.5" /> Download it to open it
+            </a>
+          </div>
+        </div>
       )}
     </>
   );

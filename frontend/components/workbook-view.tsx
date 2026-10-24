@@ -22,7 +22,7 @@ const letters = (n: number) => {
  * (their last calculated values), bold kept, merged cells merged, numbers set right, with the column letters and row
  * numbers around them. Read by the backend; nothing in the file runs.
  */
-export function WorkbookView({ fileId, name }: { fileId: string; name: string }) {
+export function WorkbookView({ fileId, name, zoom = 1 }: { fileId: string; name: string; zoom?: number }) {
   const [book, setBook] = useState<Book | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [at, setAt] = useState(0);
@@ -62,7 +62,7 @@ export function WorkbookView({ fileId, name }: { fileId: string; name: string })
     <div className="flex h-[70vh] min-h-120 flex-col bg-surface">
       <div className="min-h-0 flex-1 overflow-auto">
         {sheet && sheet.rows > 0 ? (
-          <table className="border-separate border-spacing-0 text-[12px] text-slate-800">
+          <table style={zoom === 1 ? undefined : { zoom }} className="border-separate border-spacing-0 text-[12px] text-slate-800">
             <thead className="sticky top-0 z-10">
               <tr>
                 <th className="sticky left-0 z-20 h-6 w-10 min-w-10 border-r border-b border-line bg-tint" />

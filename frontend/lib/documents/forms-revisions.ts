@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getActiveSet } from "@/lib/settings/config";
 import { api, projectPath, refusal } from "@/lib/client";
 import { backendRevision, backendReview, reviewOfRevision } from "@/lib/documents/api";
-import { upload, filesOf } from "@/lib/documents/api-uploads";
+import { upload, filesOf, uploadRevisionFiles } from "@/lib/documents/api-uploads";
 import { requestFromForm, issueAsk } from "@/lib/transmittals/issue-requests";
 
 /**
@@ -28,8 +28,7 @@ export async function prepareRevisionAction(_prev: Result | undefined, formData:
   const changeDescription = text(formData, "changeDescription");
   if (!changeDescription) return { error: "Say what changes in this revision, and why." };
   try {
-    const files = filesOf(formData, "renditionFile", "nativeFile");
-    const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
+    const fileIds = await uploadRevisionFiles(ctx, documentId, formData);
     await api(projectPath(ctx, `/documents/${documentId}/revisions`), {
       body: { fileIds, reasonForRevision: text(formData, "reasonForRevision") || changeDescription, changeDescription, filesLater: fileIds.length === 0, purpose: text(formData, "purpose") || null, phase: text(formData, "phase") || null },
     });
@@ -55,7 +54,7 @@ export async function editRevisionAction(_prev: Result | undefined, formData: Fo
   try {
     documentId = (await backendRevision(ctx, revisionId)).documentId;
     if (files.length) {
-      const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
+      const fileIds = await uploadRevisionFiles(ctx, documentId, formData);
       const path = text(formData, "hasFiles") === "yes" ? "update" : "files";
       await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/${path}`), { body: { fileIds } });
     }

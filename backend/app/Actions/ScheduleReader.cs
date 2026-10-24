@@ -149,7 +149,7 @@ public static class ScheduleReader
     /// Comma, semicolon or tab separated (whichever the heading line uses most), with
     /// quoted fields. A quoted field may hold the separator, doubled quotes and line breaks.
     /// </summary>
-    private static List<string[]> ReadCsv(Stream content)
+    internal static List<string[]> ReadCsv(Stream content)
     {
         using var reader = new StreamReader(content, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         var text = reader.ReadToEnd();

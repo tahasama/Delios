@@ -254,6 +254,11 @@ export default async function DocumentDetailPage({
   // step, and the organization says what counts as one.
   const returnReasons = await getActiveSet("RETURN_REASONS");
   const workingHasPdf = !!working?.files.some((f) => f.kind === "RENDITION");
+  // What each box of Edit rev holds now (owner: "under upload input it should indicate if i have an already uploaded
+  // file"): the newest submission's PDF and source file.
+  const workingNewest = working ? Math.max(0, ...working.files.map((f) => f.submission ?? 0)) : 0;
+  const workingPdf = working?.files.find((f) => f.kind === "RENDITION" && (f.submission ?? 0) === workingNewest) ?? null;
+  const workingSource = working?.files.find((f) => f.kind === "NATIVE" && (f.submission ?? 0) === workingNewest) ?? null;
   const run = working ? await getRunForRevision(ctx, working.id) : null;
   // The steps of its route, for choosing where a revision goes back to.
   const routeSteps = (run?.steps ?? []).map((step, index) => ({ number: index + 1, title: step.title ?? `Step ${index + 1}` }));
@@ -353,11 +358,15 @@ export default async function DocumentDetailPage({
             {askedOf ? (
               <p className="text-xs text-slate-500">It is with {askedOf}: its files are theirs to change, until they send it or hand it back.</p>
             ) : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="PDF" hint={workingHasPdf ? "replaces the one there" : "what people will read — needed before it is sent"}>
+              <Field label="PDF" hint={workingPdf ? "a new one replaces it" : "what people will read — needed before it is sent"}>
                 <input type="file" name="renditionFile" accept=".pdf" className="w-full" />
+                <NowHeld file={workingPdf} />
               </Field>
-              <Field label="Source file" hint="the editable original; for a schedule or a list, its .xlsx or .csv (a schedule also a P6 .xer) — read on release">
+              <Field label="Source file" hint={listKind
+                ? `the editable original: the ${listKind === "SCHEDULE" ? "schedule's .xlsx, .csv or P6 .xer" : "list's .xlsx or .csv"}, read on release`
+                : workingSource ? "a new one replaces it" : "optional — the editable original (.docx, .dwg, .xlsx…)"}>
                 <input type="file" name="nativeFile" className="w-full" />
+                <NowHeld file={workingSource} withType />
                 {listTemplate}
               </Field>
             </div>}
@@ -669,6 +678,11 @@ export default async function DocumentDetailPage({
       {(doc.state === "CANCELLED" || doc.state === "WITHDRAWN") && doc.ended ? (
         <Banner tone="danger" title={`${doc.state === "CANCELLED" ? "Cancelled" : "Withdrawn"} ${fmtDate(doc.ended.at)} — ${doc.ended.by}`}>
           <span className="whitespace-pre-line">{doc.ended.reason}</span>
+        </Banner>
+      ) : null}
+      {sp.filesRefused ? (
+        <Banner tone="warn" title="Registered, without its files">
+          {sp.filesRefused} Attach them with its first revision below.
         </Banner>
       ) : null}
       {sp.released ? (
@@ -1079,5 +1093,21 @@ export default async function DocumentDetailPage({
         ]}
       />
     </div>
+  );
+}
+
+/** What a file box of a revision holds now, under it: its name (and, for the source file, what kind of file it is), or that it holds none. */
+function NowHeld({ file, withType = false }: { file: { name: string } | null; withType?: boolean }) {
+  if (!file) return <p className="mt-1 text-[11px] text-slate-500">None yet</p>;
+  const ext = file.name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? "";
+  const KINDS: Record<string, string> = {
+    xlsx: "Excel workbook", xlsm: "Excel workbook", xls: "Excel workbook (old format)", csv: "CSV table", xer: "P6 schedule",
+    docx: "Word document", doc: "Word document (old format)", dwg: "AutoCAD drawing", dxf: "drawing exchange file", pptx: "PowerPoint",
+    jpg: "picture", jpeg: "picture", png: "picture", gif: "picture", webp: "picture", zip: "zip archive", ifc: "IFC model",
+  };
+  return (
+    <p className="mt-1 truncate text-[11px] text-slate-600" title={file.name}>
+      Now: <span className="font-semibold">{file.name}</span>{withType ? <span className="text-slate-500"> · {KINDS[ext] ?? (ext ? `.${ext} file` : "file")}</span> : null}
+    </p>
   );
 }

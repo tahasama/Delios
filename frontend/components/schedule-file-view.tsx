@@ -17,7 +17,7 @@ type Row = { kind: "wbs"; node: Wbs; depth: number; count: number } | { kind: "a
  * start and finish as P6 shows them ("A" once it happened). Read by the backend the way the schedule reads it; nothing
  * is recalculated.
  */
-export function ScheduleFileView({ fileId, name }: { fileId: string; name: string }) {
+export function ScheduleFileView({ fileId, name, zoom = 1 }: { fileId: string; name: string; zoom?: number }) {
   const [outline, setOutline] = useState<Outline | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [at, setAt] = useState(0);
@@ -80,7 +80,7 @@ export function ScheduleFileView({ fileId, name }: { fileId: string; name: strin
         <p className="border-b border-line bg-amber-50 px-3 py-1.5 text-[11px] text-amber-900">As the schedule: {outline.read}</p>
       ) : null}
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full border-separate border-spacing-0 text-[12px] text-slate-800">
+        <table style={zoom === 1 ? undefined : { zoom }} className="w-full border-separate border-spacing-0 text-[12px] text-slate-800">
           <thead className="sticky top-0 z-10 bg-tint text-left text-[11px] font-medium text-slate-500">
             <tr>
               <th className="border-b border-line px-2 py-1.5">Activity ID</th>

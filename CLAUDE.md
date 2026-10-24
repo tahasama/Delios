@@ -178,6 +178,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   reason and comments; everyone on the route is told. The revision can then be
   sent again.
 - Revisions are never skipped, and an upload elsewhere never creates one.
+- **The box decides what a file is** (owner: "it should instead show user why simply"): the PDF box takes a PDF, the
+  source file box the editable original; a PDF in the source box, or a source file in the PDF box, is refused in plain
+  words naming the right box (`UploadRequest.Slot`, SOURCE_IS_PDF / NOT_A_PDF, the box outlined). On a new document the
+  register entry stays and its page says why the files were not attached ("Registered, without its files"). Under each
+  box of Edit rev, what it holds now ("Now: <name>", the source file with its kind) or "None yet" (owner).
+- A fault of ours (a 5xx with no refusal code) never shows the server's own words: "Something went wrong on our side and
+  nothing was saved…" (`problemOf`, `lib/client.ts`).
 - Starting a revision asks one text, "What changed, and why" (never two fields
   saying the same), plus a PDF and a native file, both optional at start.
 - A withdrawn review is closed: no advice, verdict or comment can be given on
@@ -302,11 +309,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   GIF, WebP, AVIF, BMP; SVG stays a download, it can carry code) as itself, an Excel workbook (.xlsx, .xlsm) as its sheets
   (`components/workbook-view.tsx`; backend `Documents/WorkbookView.cs`, `GET /files/{id}/workbook`: each sheet's cells as
   Excel shows them, last calculated values, bold, merged cells, widths; nothing in it runs; the first 2,000 rows and 100
-  columns of 30 sheets, said when cut), a Primavera P6 export (.xer) as P6 lays it out (`components/schedule-file-view.tsx`;
+  columns of 30 sheets, said when cut), a CSV file as one sheet (`WorkbookView.ReadCsv`), a Primavera P6 export (.xer) as P6 lays it out (`components/schedule-file-view.tsx`;
   `GET /files/{id}/schedule`, the same reading as the schedule's: each project on its tab, opened on the one the schedule reads (marked "the schedule"
   when there are several, so it counts what the plan counts), its activities under their
   WBS, each folded open or shut, ID · name · type · start · finish, "A" once it happened; what the schedule would make
-  of it said above when it would not read it); with a PDF too, "The PDF · The source file" above it, the PDF first. Other
+  of it said above when it would not read it); with a PDF too, "The PDF · The source file · <its kind>" above it, the PDF first, offered whenever both are
+  there (owner: "i have no way to visualize one or the other"): a source the page cannot draw says so with its download.
+  The bar above carries the file's name, a zoom (owner: "some control like a zoom"; − 50…300% +, the percentage back to
+  100%: the PDF opened at it, a picture, a workbook or a schedule scaled) and its download. Other
   sources (Word, drawings, models…) are downloaded; converting them is to discuss. The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
   the side cards going under it once there is no room beside it (owner; `ResizablePane`, cookie `pane-review`; a double-click puts it back).
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on

@@ -94,7 +94,12 @@ export async function problemOf(response: Response): Promise<ApiProblem> {
   } catch {
     // Not JSON (a proxy error page, an empty 401): the status says enough.
   }
-  const message = body.title ?? body.detail ?? (response.status === 401 ? "Please sign in again." : `The server answered ${response.status}.`);
+  // A fault of ours (no refusal code, a 5xx) is never shown in the server's own words ("An error occurred while
+  // processing your request."): it says plainly what happened and what to do.
+  const fault = response.status >= 500 && !body.code;
+  const message = fault
+    ? "Something went wrong on our side and nothing was saved. Try again; if it happens again, tell your administrator what you were doing."
+    : body.title ?? body.detail ?? (response.status === 401 ? "Please sign in again." : `The server answered ${response.status}.`);
   return new ApiProblem(response.status, body.code ?? null, message, body.params ?? null);
 }
 

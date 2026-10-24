@@ -15,13 +15,15 @@ type Ticket = { fileId: string; method: string; url: string; headers: Record<str
 type UploadTarget = { documentId: string } | { reviewId: string } | { transmittalId: string } | { loose: true; proof?: boolean };
 
 /** Uploads one file and returns its id; throws the backend's refusal. */
-export async function upload(scope: { projectId: string }, target: UploadTarget, file: File): Promise<string> {
+export async function upload(scope: { projectId: string }, target: UploadTarget, file: File, slot?: "PDF" | "SOURCE"): Promise<string> {
   const bytes = Buffer.from(await file.arrayBuffer());
   const body = {
     fileName: file.name,
     size: bytes.length,
     contentType: file.type || "application/octet-stream",
     sha256: createHash("sha256").update(bytes).digest("hex"),
+    // The box it was put in on a revision: the backend refuses a PDF as the source file, or a source file as the PDF.
+    ...(slot ? { slot } : {}),
   };
   const path = "documentId" in target ? `/documents/${target.documentId}/uploads`
     : "reviewId" in target ? `/reviews/${target.reviewId}/evidence`
@@ -38,4 +40,17 @@ export async function upload(scope: { projectId: string }, target: UploadTarget,
 /** The files a form holds under these names, leaving out empty inputs. */
 export function filesOf(formData: FormData, ...names: string[]): File[] {
   return names.flatMap((name) => formData.getAll(name)).filter((one): one is File => one instanceof File && one.size > 0);
+}
+
+/** A revision's two boxes: the PDF people read, and the source file (the editable original). */
+export function revisionFiles(formData: FormData): { file: File; slot: "PDF" | "SOURCE" }[] {
+  return [
+    ...filesOf(formData, "renditionFile").map((file) => ({ file, slot: "PDF" as const })),
+    ...filesOf(formData, "nativeFile").map((file) => ({ file, slot: "SOURCE" as const })),
+  ];
+}
+
+/** Uploads a revision's files, each told which box it came in; throws the backend's refusal. */
+export function uploadRevisionFiles(scope: { projectId: string }, documentId: string, formData: FormData): Promise<string[]> {
+  return Promise.all(revisionFiles(formData).map(({ file, slot }) => upload(scope, { documentId }, file, slot)));
 }
