@@ -6,7 +6,8 @@ import os
 import shutil
 import subprocess
 import tempfile
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
 
 MAX_BYTES = 300 * 1024 * 1024
 TIMEOUT = 110
@@ -64,5 +65,10 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+class Server(ThreadingMixIn, HTTPServer):
+    """One thread per drawing (written this way so the Python openSUSE ships, 3.6, runs it)."""
+    daemon_threads = True
+
+
 if __name__ == "__main__":
-    ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+    Server(("0.0.0.0", 8080), Handler).serve_forever()

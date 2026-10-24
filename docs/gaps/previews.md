@@ -20,5 +20,5 @@ No good free reader. Paid, certified: the Open Design Alliance's SDK (yearly mem
 tier or above), or Autodesk Platform Services (the Viewer free, each conversion paid in Flex tokens past a free monthly
 allowance). Free route: convert to DXF or PDF on our side, mixed quality. DXF itself can be drawn free in the page.
 
-Built: LibreDWG behind a small service (`deploy/dwg`), the DXF drawn in the page (dxf-viewer). If its reading falls short
+Built: LibreDWG behind a small service (`deploy/dwg`, openSUSE's ready-made libredwg-tools: building it from source failed), the DXF drawn in the page (dxf-viewer). If its reading falls short
 on the project's drawings, the certified routes above stay open.
