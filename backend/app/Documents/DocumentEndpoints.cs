@@ -67,7 +67,7 @@ public static class DocumentEndpoints
     /// Pages are keyed on the document number (<c>after</c>), so later pages are as fast as the first. Runs on the read replica when there is one.
     /// </summary>
     private static async Task<IResult> ListAsync(
-        HttpContext http, ReadDatabase reads, DocumentService documents, CancellationToken cancellationToken,
+        HttpContext http, ReadDatabase reads, DocumentService documents, DeliosDbContext db, CancellationToken cancellationToken,
         string? after = null, int? limit = null, string? q = null,
         string? discipline = null, string? docType = null, string? state = null, string? originator = null)
     {
@@ -99,7 +99,19 @@ public static class DocumentEndpoints
                 .ToListAsync(cancellationToken);
         }, cancellationToken);
         var next = rows.Count > size ? rows[size - 1].Number : null;
-        return Results.Ok(new DocumentPage(rows.Take(size).ToList(), next));
+        var page = rows.Take(size).ToList();
+        if (!access.IsInternal)
+        {
+            // Another organization reads, of one of our documents, only the newest revision sent to it (OutsideReading).
+            var ours = page.Where(r => !OutsideReading.Whole(access, r.Originator)).Select(r => r.Id).ToList();
+            var sent = ours.Count == 0 ? [] : (await db.Revisions.AsNoTracking()
+                    .Where(v => ours.Contains(v.DocumentId) && OutsideReading.SentRevisions(db, access).Contains(v.Id))
+                    .Select(v => new { v.DocumentId, v.Value, v.State, v.CreatedAt }).ToListAsync(cancellationToken))
+                .GroupBy(v => v.DocumentId).ToDictionary(g => g.Key, g => g.MaxBy(v => v.CreatedAt)!);
+            page = page.Select(r => !ours.Contains(r.Id) ? r : sent.TryGetValue(r.Id, out var v)
+                ? r with { LatestRevision = v.Value, LatestRevisionState = v.State } : r with { LatestRevision = null, LatestRevisionState = null }).ToList();
+        }
+        return Results.Ok(new DocumentPage(page, next));
     }
 
     /// <summary>GET /documents/{documentId}: one document with all its revisions, submissions and files, if the caller may see it.</summary>

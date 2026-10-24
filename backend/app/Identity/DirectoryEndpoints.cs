@@ -1197,6 +1197,20 @@ public static class Keepers
             : Problems.Forbidden("ADMIN_OR_CONTROL", "An administrator, or the control function, keeps the organization's people and functions.");
     }
 
+    /// <summary>Whether the person signed in is one of our own people (not another organization's).</summary>
+    public static Task<bool> IsOursAsync(HttpContext http) =>
+        OursAsync(http.RequestServices.GetRequiredService<DeliosDbContext>(), http.User.UserId(), http.RequestAborted);
+
+    /// <summary>One of ours who keeps a project: acts as its control function, or holds Control or Manage there.</summary>
+    public static async Task<bool> KeepsAProjectAsync(HttpContext http)
+    {
+        var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
+        var me = http.User.UserId();
+        return await OursAsync(db, me, http.RequestAborted) && await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
+            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null)
+                && (r.Verbs.Contains(Verbs.Control) || r.Verbs.Contains(Verbs.Manage)))), http.RequestAborted);
+    }
+
     /// <summary>
     /// One of our own people: not an account standing for someone of another organization's DELIOS, nor one we made
     /// for another organization's people. Only ours keep the organization's people, organizations and settings, whatever

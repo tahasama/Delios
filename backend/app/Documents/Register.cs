@@ -144,7 +144,7 @@ public static class RegisterEndpoints
             var pages = Math.Max(1, (int)Math.Ceiling(total / (double)per));
             page = Math.Clamp(page, 1, pages);
             var ids = await Sort(db, query, filter).Skip((page - 1) * per).Take(per).Select(d => d.Id).ToListAsync(cancellationToken);
-            var rows = await RowsAsync(db, ids, cancellationToken);
+            var rows = await RowsAsync(db, ids, cancellationToken, access);
             return new
             {
                 total,
@@ -169,7 +169,7 @@ public static class RegisterEndpoints
         {
             var ids = await Sort(db, Filter(db, Visible(db, access), filter), filter).Take(ExportLimit)
                 .Select(d => d.Id).ToListAsync(cancellationToken);
-            return await RowsAsync(db, ids, cancellationToken);
+            return await RowsAsync(db, ids, cancellationToken, access);
         }, cancellationToken);
         static string Day(DateTimeOffset? at) => at?.ToString("yyyy-MM-dd") ?? "";
         var report = new Report("register", "Document register", "", "", [], new Chart("", [], []),
@@ -391,12 +391,20 @@ public static class RegisterEndpoints
     }
 
     /// <summary>Every fact the rows show, for the documents given, in their order.</summary>
-    public static async Task<List<RegisterRow>> RowsAsync(DeliosDbContext db, List<Guid> ids, CancellationToken cancellationToken)
+    /// Read by another organization (<paramref name="access"/> not ours), a document of ours shows only what was sent to it
+    /// (owner: "guests or external may only see what was shared with them"): its newest revision sent, released only if
+    /// that was sent, no verdict, decider or packages of ours (OutsideReading).
+    public static async Task<List<RegisterRow>> RowsAsync(DeliosDbContext db, List<Guid> ids, CancellationToken cancellationToken,
+        ProjectAccess? access = null)
     {
         if (ids.Count == 0) return [];
         var docs = await db.Documents.AsNoTracking().Where(d => ids.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);
-        var revisions = await db.Revisions.AsNoTracking().Where(r => ids.Contains(r.DocumentId))
+        var allRevisions = await db.Revisions.AsNoTracking().Where(r => ids.Contains(r.DocumentId))
             .Select(r => new { r.Id, r.DocumentId, r.Value, r.State, r.StatusCode, r.ReleasedAt, r.CreatedAt, r.ResentAt, r.ReturnedAt }).ToListAsync(cancellationToken);
+        var outside = access is { IsInternal: false } reader ? reader : null;
+        var sent = outside is null ? null : (await OutsideReading.SentRevisions(db, outside).Distinct().ToListAsync(cancellationToken)).ToHashSet();
+        bool Narrowed(Guid documentId) => outside is not null && !OutsideReading.Whole(outside, docs[documentId].Originator);
+        var revisions = allRevisions.Where(r => !Narrowed(r.DocumentId) || sent!.Contains(r.Id)).ToList();
         // Asked of a supplier: a placeholder went out to them. Where it stands is read in the supplier's own words.
         var asked = (await db.TransmittalItems.AsNoTracking()
             .Where(i => i.DocumentId != null && ids.Contains(i.DocumentId.Value) && i.Kind == TransmittalItemKinds.Placeholder)
@@ -432,18 +440,20 @@ public static class RegisterEndpoints
         return ids.Where(docs.ContainsKey).Select(id =>
         {
             var d = docs[id];
+            var narrowed = Narrowed(id);
             var mine = revisions.Where(r => r.DocumentId == id).ToList();
-            var latest = mine.FirstOrDefault(r => r.Id == d.LatestRevisionId);
+            var latest = narrowed ? mine.MaxBy(r => r.CreatedAt) : mine.FirstOrDefault(r => r.Id == d.LatestRevisionId);
             var released = mine.FirstOrDefault(r => r.State == RevisionStates.Released);
-            var verdict = decided.FirstOrDefault(v => v.RevisionId == d.LatestRevisionId);
+            var verdict = narrowed ? null : decided.FirstOrDefault(v => v.RevisionId == d.LatestRevisionId);
             var decider = verdict?.Decider is { } who ? functions.GetValueOrDefault(who, who) : null;
             return new RegisterRow(
                 d.Id, d.Number, d.Title, d.DeliverableType, d.DocType, d.Discipline, d.Originator, d.Subproject, d.ContractRef, d.Criticality,
-                d.Confidentiality, d.RetentionClass, d.IsPlaceholder, d.State, d.LatestRevisionValue, d.LatestRevisionState, d.LatestRevisionId,
+                d.Confidentiality, d.RetentionClass, d.IsPlaceholder, d.State,
+                narrowed ? latest?.Value : d.LatestRevisionValue, narrowed ? latest?.State : d.LatestRevisionState, narrowed ? latest?.Id : d.LatestRevisionId,
                 released?.Id, released?.Value, released is null ? latest?.StatusCode : null, released?.StatusCode, released?.ReleasedAt?.ToDateTimeOffset(),
                 verdict?.Verdict, decider, d.PlannedDate?.ToDateOnly(), issued.TryGetValue(id, out var at) ? at.ToDateTimeOffset() : null,
                 d.CreatedAt.ToDateTimeOffset(), d.UpdatedAt.ToDateTimeOffset(), latest?.CreatedAt.ToDateTimeOffset(),
-                files.TryGetValue(id, out var added) ? added.ToDateTimeOffset() : null, packages.GetValueOrDefault(id),
+                !narrowed && files.TryGetValue(id, out var added) ? added.ToDateTimeOffset() : null, narrowed ? 0 : packages.GetValueOrDefault(id),
                 activities.GetValueOrDefault(id) ?? [], SupplierStage(asked.Contains(id), latest?.State, latest?.ResentAt, latest?.ReturnedAt), d.WithSupplier, d.Phase,
                 d.Extras is null ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(d.Extras), d.AsReceived);
         }).ToList();

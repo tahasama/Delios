@@ -56,7 +56,12 @@ public static class SettingEndpoints
     public static void MapSettingEndpoints(this IEndpointRouteBuilder app)
     {
         var org = app.MapGroup("/api/settings").WithTags("Settings").RequireAuthorization().AddEndpointFilter<TransactionFilter>();
-        org.MapGet("", (HttpContext h, DeliosDbContext db, CancellationToken c, string? prefix) => ListAsync(db, null, prefix, c));
+        // The organization's settings (owner): an administrator and those of ours who keep a project read them whole; the
+        // rest of ours read what applies on their projects, never what is the organization's alone; another organization's
+        // people read only the words the screens show (Readers).
+        org.MapGet("", async (HttpContext h, DeliosDbContext db, CancellationToken c, string? prefix) =>
+            await ListAsync(db, null, prefix, c, await Keepers.ConfiguresAsync(h) || await Keepers.KeepsAProjectAsync(h) ? Readers.Whole
+                : await Keepers.IsOursAsync(h) ? Readers.OnProjects : Readers.Words));
         org.MapPut("/{key}", async (string key, SettingRequest r, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken c) =>
         {
             var me = await db.Users.AsNoTracking().SingleAsync(u => u.Id == h.User.UserId(), c);
@@ -68,8 +73,9 @@ public static class SettingEndpoints
 
         var project = app.MapGroup("/api/projects/{projectId:guid}/settings").WithTags("Settings")
             .AddEndpointFilter<TransactionFilter>().AddEndpointFilter<ProjectAccessFilter>();
+        // Another organization's people read only the words the screens show; how the project works is ours.
         project.MapGet("", (HttpContext h, DeliosDbContext db, CancellationToken c, string? prefix) =>
-            ListAsync(db, ProjectAccessFilter.Of(h).Project.Id, prefix, c));
+            ListAsync(db, ProjectAccessFilter.Of(h).Project.Id, prefix, c, ProjectAccessFilter.Of(h).IsInternal ? Readers.Whole : Readers.Words));
         project.MapPut("/{key}", async (string key, SettingRequest r, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken c) =>
         {
             var access = ProjectAccessFilter.Of(h);
@@ -91,11 +97,27 @@ public static class SettingEndpoints
         });
     }
 
-    private static async Task<IResult> ListAsync(DeliosDbContext db, Guid? projectId, string? prefix, CancellationToken cancellationToken)
+    /// <summary>How much of the settings a reader gets.</summary>
+    private enum Readers { Whole, OnProjects, Words }
+
+    /// <summary>What every screen shows anyone: the names of states and lists, how dates read, whether a PDF is stamped.</summary>
+    private static readonly string[] WordKeys = ["STATE_NAME:", "SET:", DateFormat.Key, "POLICY_PDF_STAMP", "STAMP"];
+
+    /// <summary>The organization's alone, never a project's: its defaults for new projects and what projects may change.</summary>
+    private static readonly string[] OrganizationOnly = ["PROJECT_DEFAULTS", "LIBERTY", "PROJECT_TIME_ZONE", "PROJECT_WEEKEND", "PROJECT_COUNTRY"];
+
+    private static async Task<IResult> ListAsync(DeliosDbContext db, Guid? projectId, string? prefix, CancellationToken cancellationToken,
+        Readers readers = Readers.Whole)
     {
         var query = db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == projectId);
         if (!string.IsNullOrEmpty(prefix)) query = query.Where(s => s.Key.StartsWith(prefix));
-        var rows = await query.OrderBy(s => s.Key).ToListAsync(cancellationToken);
+        var rows = (await query.OrderBy(s => s.Key).ToListAsync(cancellationToken))
+            .Where(s => readers switch
+            {
+                Readers.Words => WordKeys.Any(k => s.Key.StartsWith(k, StringComparison.Ordinal)),
+                Readers.OnProjects => !OrganizationOnly.Any(k => s.Key.StartsWith(k, StringComparison.Ordinal)),
+                _ => true,
+            }).ToList();
         return Results.Ok(rows.Select(s => new SettingView(s.Key, s.Value, s.UpdatedAt.ToDateTimeOffset(), s.UpdatedByName)));
     }
 

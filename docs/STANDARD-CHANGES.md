@@ -1523,8 +1523,18 @@ The Standard lets a recipient read what was transmitted to it; it does not say w
   exchanges about it with others and the packages it sits in are ours; it reads the transmittals it may open and the
   supplier packages shared with it.
 - **Of its own documents** (it is their originator) it reads everything it read before.
-- **A review is read by another organization** when the document is its own or when it answers one of the review's
-  steps; a hand-over of a step (delegation) is ours alone.
+- **A review is read by another organization** once it decided, of its own document (owner: "they see only decided
+  reviews"; never one still running, its advice and drafts ours), or when it answers one of the review's steps; a
+  hand-over of a step (delegation) is ours alone.
+- **Guests and other organizations see only what was shared with them** (owner): in the register too, one of our
+  documents reads at the newest revision sent to them, with no verdict, decider or package of ours.
+- **The organization's settings are an administrator's and a few authorized people's** (owner): administrators and
+  those of ours who keep a project (its control function, whoever holds Manage) read them whole; the rest of ours read
+  what applies on their projects, never the organization's defaults or switches; another organization's people read
+  only the words screens show (names of states and lists, how dates read, whether a PDF is stamped), and none of the
+  organization's switches or controlled lists.
+- **A forged sender's address is the real world's to settle** (owner): a reply by email is taken in only from the
+  organization's address and waits for the control function to record it by hand; nothing more is built against forgery.
 - **Who else we work with is ours**: another organization's people read, of the organizations we deal with, only their own.
 - **The organization's own lists are an administrator's**: the control function of one project does not upload or
   approve them for every project.

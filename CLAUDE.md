@@ -1715,8 +1715,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   carried to them (`SentRevisions`): the document's view, `/documents/many`, `/revisions/{id}`, every file and preview
   (`ReadableAsync`), and its context (no review, history only of those revisions, only the transmittals they may open,
   only supplier packages shared with them). Of their own (originator), everything. A review only of their own document
-  or with a step they answer (`OutsideReading.Reviews`: the review, `/reviews/many`, the reviews list); hand-overs are
-  ours only. `/api/parties` gives them only their own organization. The organization's controlled lists
+  once decided, or with a step they answer (`OutsideReading.Reviews`: the review, `/reviews/many`, the reviews list);
+  hand-overs are ours only. The register and `/documents` read one of ours at its newest revision sent to them, no
+  verdict, decider or packages (`Register.RowsAsync(…, access)`). `/api/parties` gives them only their own organization.
+  Settings (`Settings.cs` `Readers`): `/api/settings` whole for an administrator and whoever keeps a project
+  (`Keepers.KeepsAProjectAsync`: control function, Manage), what applies on projects for the rest of ours (never
+  `PROJECT_DEFAULTS`, `LIBERTY…`, the new projects' place), only the words (`STATE_NAME:`, `SET:`, `DATE_FORMAT`, the
+  stamp's) for another organization's people, the same on a project's settings; `/api/liberty` none to them. The organization's controlled lists
   (`/api/controlled`, no project) are an administrator's only. Any new reader of a document's parts goes through these.
 - **The notices job reads once a pass** (`ActionNotices.ProjectAsync`): what was already sent, and the days off, once per
   project, never one query per action and discipline (it runs every half hour, over every action of every project).

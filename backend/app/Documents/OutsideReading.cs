@@ -9,7 +9,7 @@ namespace Delios.Host.Documents;
 /// What another organization's people read of a document they may see (security review, owner: "loopholes"). Of a
 /// document that is theirs (its originator), everything, as before. Of one of ours, only what was sent to them: the
 /// revisions a transmittal carried to them, never a draft, our reviews or our own exchanges about it. A review is theirs
-/// to read when the document is theirs or they answer one of its steps.
+/// to read once it decided, of their own document, or when they answer one of its steps.
 /// </summary>
 public static class OutsideReading
 {
@@ -36,7 +36,8 @@ public static class OutsideReading
         if (access.IsInternal) return reviews;
         var code = access.PartyCode ?? "\u0000";
         var me = access.UserId;
-        return reviews.Where(r => db.Documents.Any(d => d.Id == r.DocumentId && d.Originator == code)
+        // Of its own documents, only a review that decided (owner): never one still running, its advice and drafts ours.
+        return reviews.Where(r => (r.DecidedAt != null && db.Documents.Any(d => d.Id == r.DocumentId && d.Originator == code))
             || r.Steps.Any(s => s.Participants.Any(p => p.UserId == me)
                 || (s.PartyId != null && db.Parties.Any(x => x.Id == s.PartyId && x.Code == code))));
     }

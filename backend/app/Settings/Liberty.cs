@@ -279,6 +279,8 @@ public static class Liberty
         var group = app.MapGroup("/api/liberty").WithTags("Settings").RequireAuthorization().AddEndpointFilter<TransactionFilter>();
         group.MapGet("", async (Guid? projectId, HttpContext http, DeliosDbContext db, CancellationToken c) =>
         {
+            // The organization's switches are ours: another organization's people read none.
+            if (!await Keepers.IsOursAsync(http)) return Results.Ok(Array.Empty<object>());
             var views = await ReadAsync(db, projectId, c);
             // Which projects are exceptions, and why, is an administrator's to read; anyone else reads only the
             // project they asked about.
