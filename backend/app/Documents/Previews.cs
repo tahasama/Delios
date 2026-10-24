@@ -56,7 +56,7 @@ public static class Previews
         if (await storage.SizeAsync(key, cancellationToken) is null)
         {
             if (string.IsNullOrWhiteSpace(options.Value.OfficeUrl))
-                return Problems.Invalid("PREVIEW_NOT_INSTALLED", $"Office files are not shown here yet (the converter is not installed): download {file.Name} to open it.");
+                return Problems.Invalid("PREVIEW_NOT_INSTALLED", $"Word and PowerPoint files are not shown in the page here: their PDF is the revision's; download {file.Name} to open it.");
             byte[] pdf;
             try
             {

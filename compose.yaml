@@ -67,7 +67,9 @@ x-backend: &backend
     Extraction__OcrLanguages: ${OCR_LANGUAGES:-eng}
     # The Preview's converters (docs/gaps/previews.md): office files to PDF, DWG drawings to DXF. Empty: those files
     # are offered to download instead.
-    Previews__OfficeUrl: ${PREVIEW_OFFICE_URL:-http://gotenberg:3000}
+    # Office on standby (owner): empty unless switched on, with COMPOSE_PROFILES=app,office and
+    # PREVIEW_OFFICE_URL=http://gotenberg:3000 in .env.
+    Previews__OfficeUrl: ${PREVIEW_OFFICE_URL:-}
     Previews__DwgUrl: ${PREVIEW_DWG_URL:-http://dwg:8080}
 
 services:
@@ -341,10 +343,12 @@ services:
   # Apache Tika with Tesseract: reads the text layer of PDFs and Office files, and
   # OCRs pages that are only images. Reached by the worker alone.
 
-  # Word, PowerPoint and their kin turned into a PDF for the Preview (LibreOffice inside), made once per file.
+  # Word, PowerPoint and their kin turned into a PDF for the Preview (LibreOffice inside), made once per file. On
+  # standby (owner): about 1.5 GB and up to 1 GB of memory, for what the revision's PDF already shows. Switched on with
+  # the profile office and PREVIEW_OFFICE_URL (above).
   gotenberg:
     image: gotenberg/gotenberg:8
-    profiles: [app]
+    profiles: [office]
     restart: unless-stopped
 
   # DWG drawings turned into DXF for the Preview (LibreDWG, the free route; deploy/dwg).

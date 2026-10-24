@@ -22,3 +22,12 @@ allowance). Free route: convert to DXF or PDF on our side, mixed quality. DXF it
 
 Built: LibreDWG behind a small service (`deploy/dwg`, openSUSE's ready-made libredwg-tools: building it from source failed), the DXF drawn in the page (dxf-viewer). If its reading falls short
 on the project's drawings, the certified routes above stay open.
+
+## Decided after trying them (owner)
+- **Office → PDF on standby**: out of the default services (compose profile `office`, `PREVIEW_OFFICE_URL` empty).
+  About 1.5 GB to download and up to 1 GB of memory, for what the revision's own PDF already shows; nobody edits Word
+  in the app. Word and PowerPoint files are offered to download, saying why. To switch it on: `COMPOSE_PROFILES=app,office`
+  and `PREVIEW_OFFICE_URL=http://gotenberg:3000` in `.env`.
+- **DWG, the free route kept**: light, and good on Autodesk's samples once its multi-line texts were mended (v2).
+- **A certified DWG reader stays an option, not built**: added the day a client asks for one (Autodesk Platform Services
+  for pay per use, ODA for volume or files that must not leave our servers).
