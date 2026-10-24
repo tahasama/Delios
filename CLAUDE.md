@@ -760,7 +760,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   The bottom bar for ticked values: Retire, Bring back, and for those never used, Move to another set and Delete.
 - **Every dropdown is the app's** (owner: "all drawers, lists of choices adopt this styling", the numbering's): `Select`
   (`components/select.tsx`) replaces every `<select>`: the chosen one ticked and bold, the one under the keys shaded,
-  groups under their names, a field to narrow a list longer than 12. The native select stays hidden in the form holding
+  groups under their names, a field to narrow a list longer than 12, opening upward when there is no room under it (the
+  window's edge or a card cutting what overflows it, `roomBelow`). The native select stays hidden in the form holding
   the value (name, `form`, `required`, `defaultValue`, `value`, `onChange` work as before; a pointer pick applies a
   filter at once, a keyboard one on leaving). Never a bare `<select>` again. The search fields' lists (`SearchPick`,
   `JumpPick`, the recipient picker, "One of ours?") take the same look, and every one lists on a click and narrows as
@@ -1435,6 +1436,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   an upload icon) only for whoever may upload; "open" is an underline, the fill
   stays "where it stands". Everyone else sees the plain row.
 - Actions get our own number (A00001…) and keep the planner's ID beside it.
+- The plan's foot counts what is drawn in garnet, of what there is ("50 of 159 actions in these days").
 - Actions with no date are always counted on the plan ("N with no date — in the
   table"), never silently left out of the window.
 - No "Responsible" on actions: the people concerned are those of the disciplines

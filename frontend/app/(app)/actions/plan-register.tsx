@@ -448,7 +448,9 @@ export function PlanRegister({
                   the window — one line, on the left where counts are read. */}
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
                 <span className="font-mono tabular-nums">
-                  {more.shown < more.total ? <>{more.shown.toLocaleString("en-GB")}<span className="mx-1 font-sans text-slate-500">of</span></> : null}
+                  {/* How many are drawn, in garnet, of how many there are (owner: "50 on 159, the 50 is the colored one"). */}
+                  <span className="font-semibold text-rose-800">{more.shown.toLocaleString("en-GB")}</span>
+                  <span className="mx-1 font-sans text-slate-500">of</span>
                   {more.total.toLocaleString("en-GB")}
                   <span className="ml-1 font-sans text-slate-500">{more.total === 1 ? "action" : "actions"}{more.window ? " in these days" : ""}</span>
                 </span>

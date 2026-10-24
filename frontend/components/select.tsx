@@ -35,6 +35,18 @@ function optionsOf(children: React.ReactNode, group: string | null = null, into:
   return into;
 }
 
+/** The room under a box before the window's edge or the first box around it that cuts what overflows it, whichever comes first. */
+function roomBelow(el: HTMLElement | null): number {
+  if (!el) return Infinity;
+  const bottom = el.getBoundingClientRect().bottom;
+  let limit = window.innerHeight;
+  for (let at = el.parentElement; at; at = at.parentElement) {
+    const style = getComputedStyle(at);
+    if (/(hidden|auto|scroll|clip)/.test(style.overflowY + style.overflow)) { limit = Math.min(limit, at.getBoundingClientRect().bottom); break; }
+  }
+  return limit - bottom;
+}
+
 type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement> & { children?: React.ReactNode };
 
 /**
@@ -52,6 +64,8 @@ export function Select({ children, className, style, disabled, title, id, ...res
   const list = useId();
   const [value, setValue] = useState<string>(String(rest.value ?? rest.defaultValue ?? options[0]?.value ?? ""));
   const [open, setOpen] = useState(false);
+  // Opens upward when there is not room under it (the window's edge, or a card that cuts what overflows it).
+  const [up, setUp] = useState(false);
   const [active, setActive] = useState(0);
   const [words, setWords] = useState("");
   const chosen = options.find((one) => one.value === value);
@@ -86,6 +100,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
     if (disabled) return;
     setWords("");
     setActive(Math.max(0, options.findIndex((one) => one.value === value && !one.disabled)));
+    setUp(roomBelow(box.current) < Math.min(320, options.length * 32 + (long ? 44 : 12)));
     setOpen(true);
   }
   /** Chooses as the browser would: the select takes the value and says so (a filter applies at once with the pointer). */
@@ -144,7 +159,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
         {plain ? null : <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform duration-150", open && "rotate-180")} aria-hidden="true" />}
       </button>
       {open ? (
-        <div className="absolute left-0 z-40 mt-1 min-w-full max-w-[28rem] rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
+        <div className={cn("absolute left-0 z-40 min-w-full max-w-[28rem] rounded-md bg-surface py-1 shadow-lg ring-1 ring-line", up ? "bottom-full mb-1" : "mt-1")}>
           {long ? (
             <div className="relative border-b border-line px-2 pb-1">
               <Search className="pointer-events-none absolute top-1/2 left-3.5 h-3.5 w-3.5 -translate-y-[60%] text-slate-400" aria-hidden />
