@@ -132,12 +132,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - The sender may change the people on each step for that review; that choice
   is what the review uses, and the record says so.
 - **Who answers, changed in flow** (owner: "control function and Manage should be able to delegate a step… or add someone
-  forgotten or cc, a modification mid-flow that touches only steps not done yet"): on the review's page, "Who answers"
-  (`change-people.tsx`), for the control function and whoever holds Manage, of ours: **Hand over someone's step** (a seat
+  forgotten or cc, a modification mid-flow that touches only steps not done yet"): on the review's page, as Withdraw and
+  Notify (owner: "the same way… then forms are at the bottom"), links in the title, "Delegate?", "Add someone?", "Inform?"
+  (`?open=delegate|add|inform`), each opening its folded form under the document (`change-people.tsx`), for the control
+  function and whoever holds Manage, of ours: **Delegate** someone's step (a seat
   on the open step not answered yet, to someone else until a date, always with why; the control function's in force at
   once, Manage's waits for the control function where it carries out DELEGATE; both people told; `DelegateRequest.FromUserId`,
-  CONTROL_OR_MANAGE, REASON_REQUIRED) and **Add someone or copy in** (to the open step, seated at once, or a step still to
-  come; copied in like "Copy to (cc)"; always with why, each told; `Reviews/StepPeople.cs`, `GET`/`POST /reviews/{id}/people`,
+  CONTROL_OR_MANAGE, REASON_REQUIRED), **Add someone** (to the open step, seated at once, or a step still to
+  come) and **Inform** (copied in like "Copy to (cc)"); always with why, each told; `Reviews/StepPeople.cs`, `GET`/`POST /reviews/{id}/people`,
   REVIEW_PEOPLE_ADDED; STEP_DONE, PARTY_STEP). A step answered never changes; nobody is taken off (their step is handed
   over instead). Whoever sits on the open step still hands their own over from the answer card's "Delegate" (asking the
   control function where it carries out DELEGATE).

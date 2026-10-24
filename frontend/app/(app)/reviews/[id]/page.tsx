@@ -20,7 +20,7 @@ import { requestChoices, authorOf, issuePolicy, decisionLetsItOut } from "@/lib/
 import { DelegatePanel, DelegateForm, type DelegationRow } from "./delegate-panel";
 import { AnswerCard } from "./answer-card";
 import { delegateCandidates, delegationFlag, delegationsOn, handOverForOthers, stepPeopleOptions } from "@/lib/reviews/delegation";
-import { ChangePeople } from "./change-people";
+import { HandOverForm, AddToStepForm, CopyInForm } from "./change-people";
 import { controlDoes, actIsOff, matrixBinds } from "@/lib/settings/control-activities";
 import { RequestIssue } from "@/app/(app)/documents/[id]/request-issue";
 import { Timeline } from "@/components/timeline";
@@ -45,7 +45,7 @@ import { ArrowLeft, Bell, ExternalLink, FileText, Pencil } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function ReviewCyclePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ open?: string }> }) {
-  // A link in the title opens one of the forms below the document: ?open=withdraw or ?open=notify.
+  // A link in the title opens one of the forms below the document: ?open=withdraw, notify, delegate, add or inform.
   const opened = (await searchParams).open ?? null;
   const ctx = await requireScope();
   const { user } = ctx;
@@ -135,6 +135,9 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   const [forOthers, peopleOptions] = cycle.status === "OPEN" && !cycle.withdrawn
     ? await Promise.all([handOverForOthers(ctx, cycle.id), stepPeopleOptions(ctx, cycle.id)])
     : [null, null];
+  const mayHandOver = Boolean(forOthers && forOthers.seats.length && forOthers.candidates.length);
+  const mayAddToStep = Boolean(peopleOptions?.open && peopleOptions.steps?.length && peopleOptions.people?.length);
+  const mayInform = Boolean(peopleOptions?.open && peopleOptions.people?.length);
   const [handCandidates, handThroughControl, handRows, handOff, handStrict] = await Promise.all([
     assigned && cycle.status === "OPEN" ? delegateCandidates(ctx, { target: doc, verb: handVerb, fromUserId: user.id }) : Promise.resolve([]),
     controlDoes(ctx, "DELEGATE"),
@@ -306,6 +309,9 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             {/* Each opens its folded section under the document. */}
             {mayWithdraw ? <Link href="?open=withdraw#withdraw" className="text-xs font-semibold text-red-700 hover:underline">Withdraw?</Link> : null}
             {notify ? <Link href="?open=notify#notify" className="text-xs font-semibold text-link hover:underline">Notify?</Link> : null}
+            {mayHandOver ? <Link href="?open=delegate#delegate" className="text-xs font-semibold text-link hover:underline">Delegate?</Link> : null}
+            {mayAddToStep ? <Link href="?open=add#add" className="text-xs font-semibold text-link hover:underline">Add someone?</Link> : null}
+            {mayInform ? <Link href="?open=inform#inform" className="text-xs font-semibold text-link hover:underline">Inform?</Link> : null}
           </div>
         </div>
       </section>
@@ -391,6 +397,42 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
                   history={notify.history}
                   bare
                 />
+              </div>
+            </details>
+          ) : null}
+
+          {mayHandOver ? (
+            <details id="delegate" open={opened === "delegate"} className="register register-sheet register-sheet-open scroll-mt-24">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
+                <span className="text-[13px] text-slate-600">Someone on the open step cannot answer?</span>
+                <span className="ask">Delegate their step</span>
+              </summary>
+              <div className="border-t border-line px-5 py-4 sm:px-6">
+                <HandOverForm cycleId={cycle.id} seats={forOthers!.seats} candidates={forOthers!.candidates} throughControl={forOthers!.throughControl} />
+              </div>
+            </details>
+          ) : null}
+
+          {mayAddToStep ? (
+            <details id="add" open={opened === "add"} className="register register-sheet register-sheet-open scroll-mt-24">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
+                <span className="text-[13px] text-slate-600">Was someone forgotten on a step not done yet?</span>
+                <span className="ask">Add someone</span>
+              </summary>
+              <div className="border-t border-line px-5 py-4 sm:px-6">
+                <AddToStepForm cycleId={cycle.id} people={peopleOptions!} />
+              </div>
+            </details>
+          ) : null}
+
+          {mayInform ? (
+            <details id="inform" open={opened === "inform"} className="register register-sheet register-sheet-open scroll-mt-24">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
+                <span className="text-[13px] text-slate-600">Should someone be told what comes of it?</span>
+                <span className="ask">Copy them in</span>
+              </summary>
+              <div className="border-t border-line px-5 py-4 sm:px-6">
+                <CopyInForm cycleId={cycle.id} people={peopleOptions!} />
               </div>
             </details>
           ) : null}
@@ -513,10 +555,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             <DelegatePanel rows={handOvers} controller={controller} off={handOff} />
           ) : null}
 
-          {forOthers && peopleOptions ? (
-            <ChangePeople cycleId={cycle.id} seats={forOthers.seats} candidates={forOthers.candidates}
-              throughControl={forOthers.throughControl} people={peopleOptions} />
-          ) : null}
+
 
           {/* A withdrawn review is closed: nothing more is answered on it. */}
           {cycle.withdrawn ? null : (
