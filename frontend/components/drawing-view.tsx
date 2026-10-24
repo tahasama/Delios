@@ -72,7 +72,16 @@ export function DrawingView({ fileId, name, zoom = 1, height }: { fileId: string
   };
 
   return (
-    <div className={`relative flex w-full bg-white ${height}`}>
+    <div className={`flex w-full flex-col bg-white ${height}`}>
+      {/* Said above every drawing (owner: "a warning that the current might not be working that well and is only for
+          view"): what the free reader leaves out, and that the revision's PDF is the reference. */}
+      <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-900">
+        <span className="font-semibold">For viewing only.</span>{" "}
+        {/\.dwg$/i.test(name) ? "Read by a free DWG reader: " : "Drawn in the page: "}
+        paper layouts, linked drawings and pictures are not shown, lettering is approximate, and some drawings may not open.
+        The revision&apos;s PDF is the reference.
+      </p>
+      <div className="relative flex min-h-0 w-full flex-1">
       <div ref={box} className="min-w-0 flex-1" />
       {state === "ready" && layers.length > 1 ? (
         <aside className="scroll-thin w-52 shrink-0 overflow-y-auto border-l border-line bg-tint-soft p-2 text-[11px]">
@@ -91,6 +100,7 @@ export function DrawingView({ fileId, name, zoom = 1, height }: { fileId: string
           {state === "loading" ? `Opening ${name}… (a DWG is read the first time it is opened)` : state}
         </p>
       ) : null}
+      </div>
     </div>
   );
 }
