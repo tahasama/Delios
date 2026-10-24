@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
+import { useDark } from "@/components/use-dark";
 import type { DxfViewer, LayerInfo } from "dxf-viewer";
+
+/** The app's surface colour in each theme (theme.css `--color-surface`): the drawing's background. */
+const SURFACE = { light: "#ffffff", dark: "#111823" } as const;
 
 /**
  * A drawing shown in the page (owner: "the dwg workaround"): a DXF as it is, a DWG once the backend turned it into DXF
@@ -16,6 +20,8 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false, not
   note?: boolean;
 }) {
   const [noted, setNoted] = useState(note);
+  // The page's own surface behind the drawing, light or dark as the app is; the reader corrects lines too close to it.
+  const dark = useDark();
   // 3D parts the reader leaves out (owner: "a 3d dwg returned a 2d visual"), counted in the DXF before it is drawn.
   const [left, setLeft] = useState(0);
   const [leftClosed, setLeftClosed] = useState(false);
@@ -43,7 +49,7 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false, not
       };
       const [{ DxfViewer: Viewer }, three] = await Promise.all([import("dxf-viewer"), import("three")]);
       if (gone || !box.current) return;
-      const made = new Viewer(box.current, { clearColor: new three.Color("#ffffff"), autoResize: true, colorCorrection: true });
+      const made = new Viewer(box.current, { clearColor: new three.Color(document.documentElement.classList.contains("dark") ? SURFACE.dark : SURFACE.light), autoResize: true, colorCorrection: true });
       viewer.current = made;
       let failure = "";
       for (const minimal of dwg ? [false, true] : [false]) {
@@ -73,6 +79,11 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false, not
     return () => { gone = true; viewer.current?.Destroy(); viewer.current = null; };
   }, [fileId, name]);
 
+  // The theme changed while the drawing is open: drawn again on the new background.
+  useEffect(() => {
+    viewer.current?.SetClearColor(dark ? SURFACE.dark : SURFACE.light);
+  }, [dark]);
+
   // The bar's zoom scales the view the drawing opened on.
   useEffect(() => {
     const v = viewer.current;
@@ -89,7 +100,7 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false, not
   };
 
   return (
-    <div className={`flex w-full flex-col bg-white ${height}`}>
+    <div className={`flex w-full flex-col bg-surface ${height}`}>
       {/* Said above every drawing (owner: a warning that it is only for viewing; then "too long"). */}
       {noted ? (
         <p className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1 text-[11px] text-amber-900">

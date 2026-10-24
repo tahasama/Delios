@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type * as THREE from "three";
+import { useDark } from "@/components/use-dark";
+
+/** Behind a model: the app's slate-100 in each theme (theme.css). */
+const BACKDROP = { light: "#f1f5f9", dark: "#1d2636" } as const;
 
 type Part = { key: string; label: string; count: number; visible: boolean };
 
@@ -37,6 +41,8 @@ export function ModelView({ fileId, name, zoom = 1, height }: { fileId: string; 
   const draw = useRef<() => void>(() => {});
   const [parts, setParts] = useState<Part[]>([]);
   const [state, setState] = useState<"loading" | "ready" | string>("loading");
+  const dark = useDark();
+  const sceneRef = useRef<THREE.Scene | null>(null);
 
   useEffect(() => {
     let gone = false;
@@ -53,7 +59,8 @@ export function ModelView({ fileId, name, zoom = 1, height }: { fileId: string; 
       if (gone || !box.current) return;
 
       const scene = new three.Scene();
-      scene.background = new three.Color("#f1f5f9");
+      scene.background = new three.Color(document.documentElement.classList.contains("dark") ? BACKDROP.dark : BACKDROP.light);
+      sceneRef.current = scene;
       scene.add(new three.HemisphereLight(0xffffff, 0x8899aa, 2.2));
       const sun = new three.DirectionalLight(0xffffff, 1.6);
       sun.position.set(1, 2, 1.5);
@@ -184,6 +191,14 @@ export function ModelView({ fileId, name, zoom = 1, height }: { fileId: string; 
     return () => { gone = true; dispose(); };
   }, [fileId, name]);
 
+  // The theme changed while the model is open: its backdrop follows.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !(scene.background && "set" in scene.background)) return;
+    (scene.background as THREE.Color).set(dark ? BACKDROP.dark : BACKDROP.light);
+    draw.current();
+  }, [dark]);
+
   // The bar's zoom: the camera's own zoom over the view the model opened on.
   useEffect(() => {
     const view = camera.current;
@@ -220,7 +235,7 @@ export function ModelView({ fileId, name, zoom = 1, height }: { fileId: string; 
           {state === "loading" ? `Opening ${name}…` : state}
         </p>
       ) : (
-        <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-white/80 px-2 py-0.5 text-[11px] text-slate-500">
+        <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-surface/80 px-2 py-0.5 text-[11px] text-slate-500">
           Drag to turn · right-drag to move · wheel to zoom
         </p>
       )}
