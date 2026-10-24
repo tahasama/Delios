@@ -94,9 +94,15 @@ public static class Previews
             byte[] dxf;
             try
             {
-                await using var source = await storage.OpenReadAsync(file.ObjectKey, cancellationToken);
+                // Sent whole, with its length: the converter reads exactly as many bytes as it is told (a stream from
+                // storage went without one, and every drawing arrived empty).
+                using var drawing = new MemoryStream();
+                await using (var source = await storage.OpenReadAsync(file.ObjectKey, cancellationToken))
+                    await source.CopyToAsync(drawing, cancellationToken);
+                using var body = new ByteArrayContent(drawing.ToArray());
+                body.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
                 using var client = clients.CreateClient(HttpClientName);
-                using var answer = await client.PostAsync($"{options.Value.DwgUrl!.TrimEnd('/')}/convert", new StreamContent(source), cancellationToken);
+                using var answer = await client.PostAsync($"{options.Value.DwgUrl!.TrimEnd('/')}/convert", body, cancellationToken);
                 if (!answer.IsSuccessStatusCode)
                     return Problems.Invalid("PREVIEW_FAILED", $"{file.Name} could not be read (a DWG version or content the free reader does not know): download it to open it.");
                 dxf = await answer.Content.ReadAsByteArrayAsync(cancellationToken);
