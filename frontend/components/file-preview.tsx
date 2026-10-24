@@ -9,12 +9,8 @@ import { OfficeView } from "@/components/office-view";
 import { DrawingView } from "@/components/drawing-view";
 import { ModelView } from "@/components/model-view";
 import { Switch } from "@/components/switch";
+import { PdfDarkView } from "@/components/pdf-dark-view";
 
-/**
- * "Dark page" (owner, off by default): the PDF's page shown dark, its text light, its colours' hues kept (a stamp stays
- * green or red, only darker). Drawn over the browser's reader, the file is never changed; kept in a cookie.
- */
-const DARK_PAGE = "invert(0.9) hue-rotate(180deg)";
 
 type PreviewFile = { id: string; name: string; mime?: string };
 
@@ -157,8 +153,8 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
       </div>
       {!onSource ? (
         // The browser's own PDF viewer, opened at the zoom chosen.
-        <iframe key={zoom} src={`/api/files/${pdf!.id}#zoom=${Math.round(zoom * 100)}`} title={title} className={`block w-full bg-slate-100 ${height}`}
-          style={darkPage ? { filter: DARK_PAGE } : undefined} />
+        darkPage ? <PdfDarkView fileId={pdf!.id} name={pdf!.name} zoom={zoom} height={height} />
+          : <iframe key={zoom} src={`/api/files/${pdf!.id}#zoom=${Math.round(zoom * 100)}`} title={title} className={`block w-full bg-slate-100 ${height}`} />
       ) : kind === "image" ? (
         <div className={`grid w-full place-items-center overflow-auto bg-slate-100 p-4 ${height}`}>
           {/* A picture uploaded as the source, served by the app's own file route (no outside address). */}

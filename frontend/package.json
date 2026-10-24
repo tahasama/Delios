@@ -2,7 +2,7 @@
   "name": "delios-edms",
   "version": "1.0.0",
   "private": true,
-  "description": "Internal EDMS implementing the Document Management Standard (Rules \u00b7 Routes \u00b7 Checks), multi-project",
+  "description": "Internal EDMS implementing the Document Management Standard (Rules · Routes · Checks), multi-project",
   "scripts": {
     "predev": "node scripts/copy-vendor.mjs",
     "dev": "next dev",
@@ -19,6 +19,7 @@
     "exceljs": "^4.4.0",
     "lucide-react": "^0.474.0",
     "next": "^16.4.2",
+    "pdfjs-dist": "^4.10.38",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "server-only": "^0.0.1",

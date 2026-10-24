@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PdfDarkView } from "@/components/pdf-dark-view";
 
 /**
  * A Word, PowerPoint or other office file shown as the PDF the backend made of it (owner: "word", "powerpoint";
@@ -28,6 +29,6 @@ export function OfficeView({ fileId, name, zoom = 1, height, dark = false }: { f
   }, [fileId]);
   if (error) return <p className="p-6 text-center text-xs text-slate-500">{error}</p>;
   if (!url) return <p className="p-6 text-center text-xs text-slate-500">Turning {name} into a page to read… (the first time takes a few seconds)</p>;
-  return <iframe key={zoom} src={`${url}#zoom=${Math.round(zoom * 100)}`} title={name} className={`block w-full bg-slate-100 ${height}`}
-    style={dark ? { filter: "invert(0.9) hue-rotate(180deg)" } : undefined} />;
+  if (dark) return <PdfDarkView fileId={fileId} name={name} zoom={zoom} height={height} src={`/api/files/${fileId}/as-pdf`} />;
+  return <iframe key={zoom} src={`${url}#zoom=${Math.round(zoom * 100)}`} title={name} className={`block w-full bg-slate-100 ${height}`} />;
 }
