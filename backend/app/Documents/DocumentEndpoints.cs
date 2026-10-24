@@ -31,6 +31,7 @@ public static class DocumentEndpoints
 
         project.MapGet("/documents", ListAsync);
         project.MapGet("/documents/{documentId:guid}", GetAsync);
+        project.MapGet("/documents/many", ManyAsync);
         project.MapPost("/documents", RegisterAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/documents/check", CheckRegisterAsync);
         project.MapPost("/documents/{documentId:guid}/uploads", RequestUploadAsync);
@@ -157,6 +158,23 @@ public static class DocumentEndpoints
                 };
             }).ToList(),
         });
+    }
+
+    /// <summary>
+    /// GET /documents/many?ids=…: several documents at once with their revisions and files (a form enclosing them), those
+    /// the caller may see, at most 200. In one read, whatever their number; not recorded as opened, nobody opened them.
+    /// </summary>
+    private static async Task<IResult> ManyAsync(string? ids, HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.Holds(Verbs.Read)) return Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register.");
+        var wanted = (ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(one => Guid.TryParse(one, out var id) ? id : Guid.Empty).Where(id => id != Guid.Empty).Distinct().Take(200).ToList();
+        if (wanted.Count == 0) return Results.Ok(Array.Empty<object>());
+        var found = await DocumentQueries.Visible(db, access).AsNoTracking().Where(d => wanted.Contains(d.Id))
+            .Include(d => d.Revisions.OrderBy(r => r.CreatedAt)).ThenInclude(r => r.Files.OrderBy(f => f.Name))
+            .AsSplitQuery().ToListAsync(cancellationToken);
+        return Results.Ok(found.Select(View).ToList());
     }
 
     /// <summary>

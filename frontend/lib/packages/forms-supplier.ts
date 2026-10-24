@@ -8,7 +8,7 @@ import { isController, isAdmin, hasVerb } from "@/lib/core/auth";
 import { supplyReason, submittedFor } from "@/lib/packages/supplier-status";
 import { api, projectPath, refusal } from "@/lib/client";
 import { upload } from "@/lib/documents/api-uploads";
-import { backendDocument, backendRevision } from "@/lib/documents/api";
+import { backendDocument, backendDocuments, backendRevision } from "@/lib/documents/api";
 import { addressees, packageView } from "@/lib/packages/api";
 import type { PackageView, TransmittalView } from "@/lib/types";
 
@@ -164,7 +164,8 @@ async function sendSupplierDocumentsAction(_prev: { error?: string; ok?: string 
   const ids = [...new Set(formData.getAll("revisionId").map(String).filter(Boolean))];
   const revs = (await Promise.all(ids.map((id) => backendRevision(ctx, id).catch(() => null))))
     .filter((r): r is NonNullable<typeof r> => !!r && r.state === "IN_PREPARATION");
-  const docs = await Promise.all(revs.map((r) => backendDocument(ctx, r.documentId)));
+  const read = new Map((await backendDocuments(ctx, revs.map((r) => r.documentId))).map((d) => [d.id, d]));
+  const docs = revs.map((r) => read.get(r.documentId) ?? null);
   // Only what has a file and is not yet on its way.
   const ready = revs.map((r, i) => ({ r, doc: docs[i], files: docs[i]?.revisions.find((one) => one.id === r.id)?.files.length ?? 0 }))
     .filter((one) => one.doc && one.files > 0);

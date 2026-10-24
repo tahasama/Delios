@@ -111,6 +111,13 @@ export const backendDocument = cache(async (scope: Scope, id: string): Promise<D
   }
 });
 
+/** Several documents at once, those the reader may see (a form enclosing them): one read, never one a document. */
+export async function backendDocuments(scope: Scope, ids: string[]): Promise<DocumentView[]> {
+  const wanted = [...new Set(ids.filter(Boolean))];
+  if (!wanted.length) return [];
+  return api<DocumentView[]>(projectPath(scope, `/documents/many?ids=${wanted.map(encodeURIComponent).join(",")}`));
+}
+
 /** Reviews, transmittals, packages, activities and history around one document. */
 export const documentContext = cache(async (scope: Scope, id: string): Promise<BackendContext> =>
   api<BackendContext>(projectPath(scope, `/documents/${id}/context`)));

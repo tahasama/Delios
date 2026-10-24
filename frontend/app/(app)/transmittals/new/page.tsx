@@ -7,7 +7,7 @@ import { holdersOf } from "@/lib/core/permissions";
 import { recipientCompanies } from "@/lib/transmittals/recipients";
 import { NewTransmittalForm } from "./new-transmittal-form";
 import { api, projectPath } from "@/lib/client";
-import { backendDocument } from "@/lib/documents/api";
+import { backendDocuments } from "@/lib/documents/api";
 import { addressees, backendTransmittal, ourOrganizationName } from "@/lib/transmittals/api";
 import type { RegisterPage } from "@/lib/types";
 
@@ -84,7 +84,11 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   // Asking for a document to be added to a schedule action.
   const asked = sp.activity ? await activityDetail(ctx, sp.activity).catch(() => null) : null;
   const selectedDocumentIds = [...new Set([...(sp.docs ?? "").split(","), ...(sp.doc ? [sp.doc] : [])].map((value) => value.trim()).filter(Boolean))];
-  const selectedDocuments = await Promise.all(selectedDocumentIds.map((one) => backendDocument(ctx, one)));
+  const askedIds = ctx.can("CONTROL") ? [...new Set((sp.placeholders ?? "").split(",").map((one) => one.trim()).filter(Boolean))] : [];
+  const backIds = ctx.can("CONTROL") && !askedIds.length ? [...new Set((sp.askBack ?? "").split(",").map((one) => one.trim()).filter(Boolean))] : [];
+  // Every document the form starts with, in one read.
+  const read = new Map((await backendDocuments(ctx, [...selectedDocumentIds, ...askedIds, ...backIds])).map((one) => [one.id, one]));
+  const selectedDocuments = selectedDocumentIds.map((one) => read.get(one) ?? null);
   // Sent out, a document goes at its released revision; recorded as received, at its newest one.
   const incoming = sp.direction === "INCOMING";
   const going = selectedDocuments.map((document) => {
@@ -102,12 +106,10 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
 
   // A supplier's documents with nothing released, asked of them as placeholders: the one exception to "only released
   // revisions travel". Only the control function asks; only one supplier's at a time, sent to that supplier.
-  const askedIds = ctx.can("CONTROL") ? [...new Set((sp.placeholders ?? "").split(",").map((one) => one.trim()).filter(Boolean))] : [];
-  const askedDocs = (await Promise.all(askedIds.map((one) => backendDocument(ctx, one))))
+  const askedDocs = askedIds.map((one) => read.get(one))
     .filter((d): d is NonNullable<typeof d> => !!d && !d.revisions.some((r) => r.state === "RELEASED" || r.state === "SUPERSEDED"));
   // A supplier's documents it holds, asked back for an update: the ask goes on this transmittal, to that supplier.
-  const backIds = ctx.can("CONTROL") && !askedIds.length ? [...new Set((sp.askBack ?? "").split(",").map((one) => one.trim()).filter(Boolean))] : [];
-  const backDocs = (await Promise.all(backIds.map((one) => backendDocument(ctx, one))))
+  const backDocs = backIds.map((one) => read.get(one))
     .filter((d): d is NonNullable<typeof d> => !!d && d.withSupplier === true);
   const owners = [...new Set([...askedDocs, ...backDocs].map((d) => d.originator))];
   const supplier = owners.length === 1 ? found.parties.find((p) => p.code === owners[0]) ?? null : null;

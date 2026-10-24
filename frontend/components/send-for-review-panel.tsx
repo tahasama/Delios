@@ -2,7 +2,7 @@ import { requireScope } from "@/lib/core/scope";
 import { formPolicy } from "@/lib/settings/field-policy";
 import { eligiblePeople } from "@/lib/reviews/workflow";
 import { api, projectPath } from "@/lib/client";
-import { backendDocument, backendRevision } from "@/lib/documents/api";
+import { backendDocuments, backendRevision } from "@/lib/documents/api";
 import type { Distribution, RouteView } from "@/lib/types";
 import { SendForReviewForm, type SendRoute } from "./send-for-review";
 import { getActiveSet } from "@/lib/settings/config";
@@ -17,11 +17,13 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
   const ctx = await requireScope();
   const policy = await formPolicy(ctx, "REVIEW");
   // The documents, and the routes the backend offers for every one of them.
-  const revisions = (await Promise.all(revisionIds.map(async (id) => {
-    const revision = await backendRevision(ctx, id).catch(() => null);
-    const document = revision ? await backendDocument(ctx, revision.documentId) : null;
-    return revision && document ? { id: revision.id, document } : null;
-  }))).filter((one): one is NonNullable<typeof one> => !!one);
+  const found = (await Promise.all(revisionIds.map((id) => backendRevision(ctx, id).catch(() => null))))
+    .filter((one): one is NonNullable<typeof one> => !!one);
+  const read = new Map((await backendDocuments(ctx, found.map((r) => r.documentId))).map((d) => [d.id, d]));
+  const revisions = found.flatMap((revision) => {
+    const document = read.get(revision.documentId);
+    return document ? [{ id: revision.id, document }] : [];
+  });
   const docs = revisions.map((r) => r.document);
   if (!docs.length) return null;
 

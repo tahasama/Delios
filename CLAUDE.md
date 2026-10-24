@@ -1672,7 +1672,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   documents with what its pages show (`GET /packages/{id}/lines`, `PackageService.LinesAsync`, `packageLines`), never
   each document, its context and its reviews (it was three calls or more a document, and recorded every one as opened
   by the reader); who a review still waits on comes with its row in the reviews list (`ReviewRow.WaitingOn`). A package
-  in no tree reads no other package (`PlaceAsync`, `SharingAsync`, `HandDownAsync` look once for packages under it).
+  in no tree reads no other package (`PlaceAsync`, `SharingAsync`, `HandDownAsync` look once for packages under it). The
+  Packages list reads every package with what its view shows in a few reads (`PackageService.ListedAsync`, `Packages/PackageViews.cs`;
+  only a package in a tree reads its tree). Several documents a form starts with come in one read (`GET /documents/many?ids=`,
+  `backendDocuments`, not recorded as opened): New transmittal, Send for review, a supplier's sending, an action's links;
+  who may review is asked once per kind of document (`eligiblePeople`).
 - **Never hardcode a function or a job title** (owner): no "Document Control", "management", "project manager" in
   backend code, messages or comments. Functions are the organization's data. Say **the control function** (whoever
   holds CONTROL on the project) and **whoever holds Manage** (or another verb); a name shown is read from the data

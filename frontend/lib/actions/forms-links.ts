@@ -8,12 +8,12 @@ import { getActiveSet } from "@/lib/settings/config";
 import { needDefaults } from "@/lib/actions/schedule";
 import { activityDetail } from "@/lib/actions/api";
 import { controlDoes } from "@/lib/settings/control-activities";
-import { backendDocument } from "@/lib/documents/api";
+import { backendDocuments } from "@/lib/documents/api";
 
 /** Each document's own discipline: an action needs a document for that discipline, never another. */
 async function disciplinesOf(ctx: Awaited<ReturnType<typeof requireScope>>, ids: string[]): Promise<Map<string, string>> {
-  const docs = await Promise.all(ids.map((id) => backendDocument(ctx, id).catch(() => null)));
-  return new Map(docs.filter((d): d is NonNullable<typeof d> => !!d).map((d) => [d.id, d.discipline] as const));
+  const docs = await backendDocuments(ctx, ids).catch(() => []);
+  return new Map(docs.map((d) => [d.id, d.discipline] as const));
 }
 
 type State = { error?: string; ok?: string };

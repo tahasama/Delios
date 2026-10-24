@@ -152,10 +152,8 @@ public static class PackageEndpoints
     private static async Task<IResult> ViewsAsync(string? kind, HttpContext http, PackageService packages, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        var views = new List<PackageView>();
-        foreach (var row in (await packages.ListAsync(access, cancellationToken)).Where(r => kind is null || r.Kind == kind))
-            if (await packages.ReadAsync(access, row.Id, cancellationToken) is { } package)
-                views.Add(await ViewAsync(packages, package, cancellationToken, outside: !access.IsInternal, access: access));
+        var views = (await packages.ListedAsync(access, kind, cancellationToken))
+            .Select(x => ViewOf(x.Package, x.Parts, outside: !access.IsInternal)).ToList();
         return Results.Ok(views.OrderBy(v => v.CompletionDate is null).ThenBy(v => v.CompletionDate).ToList());
     }
 
@@ -191,15 +189,16 @@ public static class PackageEndpoints
     /// Builds the full package view, working out each member's readiness and looking up the transmittal numbers.
     /// </summary>
     private static async Task<PackageView> ViewAsync(PackageService packages, Package p, CancellationToken cancellationToken, bool outside = false,
-        ProjectAccess? access = null)
+        ProjectAccess? access = null) =>
+        ViewOf(p, await packages.PartsAsync(p, outside, access, cancellationToken), outside);
+
+    /// <summary>The package view from its parts.</summary>
+    private static PackageView ViewOf(Package p, PackageParts parts, bool outside)
     {
-        var readiness = await packages.ReadinessAsync(p, cancellationToken);
-        var transmittals = await packages.TransmittalsAsync(p, cancellationToken);
-        // Its supplier sees what was asked of it on a transmittal, and nothing else.
-        // Theirs to see: what was asked of them, and in a package taking documents as they come, what they sent.
-        var intake = p.Kind == PackageKinds.Supply ? await packages.IntakeAsync(p.ProjectId, cancellationToken) : null;
+        var intake = parts.Intake;
         var asReceived = intake?.Mode == Intake.AsReceived;
-        if (outside) readiness = readiness.Where(r => r.Member.RequestedAt is not null || asReceived).ToList();
+        // Its supplier sees what was asked of it on a transmittal, and in a package taking documents as they come, what they sent.
+        var readiness = outside ? parts.Readiness.Where(r => r.Member.RequestedAt is not null || asReceived).ToList() : parts.Readiness;
         return new PackageView(p.Id, p.Number, p.Title, p.Description, p.Reason, p.RequiredStatuses, p.CompletionDate?.ToDateOnly(),
             p.Rule, p.Excluded, p.RecipientPartyIds, p.OwnerIds, p.AcceptorIds, p.State, p.AssessedAt?.ToDateTimeOffset(), p.Shortfall,
             p.ShortfallIssuedAt?.ToDateTimeOffset(), p.ShortfallAcceptedAt?.ToDateTimeOffset(), p.ShortfallAcceptedByName,
@@ -208,13 +207,11 @@ public static class PackageEndpoints
             readiness.Select(r => new MemberView(r.Member.DocumentId, r.DocumentNumber, r.Title, r.Revision, r.Status, r.Required,
                 r.Ready, r.Member.ByRule, r.Member.RequestedAt?.ToDateTimeOffset(), r.LatestRevision, r.LatestState,
                 r.DueDate?.ToDateOnly())).ToList(),
-            transmittals, p.Kind, p.SupplierPartyId,
-            await packages.SupplierNameAsync(p, cancellationToken), p.PurchaseOrder, [p.Reason, .. p.OtherReasons],
+            parts.Transmittals, p.Kind, p.SupplierPartyId, parts.SupplierName, p.PurchaseOrder, [p.Reason, .. p.OtherReasons],
             p.Extras is null ? null : System.Text.Json.JsonDocument.Parse(p.Extras).RootElement.Clone(), p.AcceptNote,
             p.SharedAt?.ToDateTimeOffset(), p.SharedByName, p.AutoCreated,
-            outside ? null : (await packages.SupplierPeopleAsync(p, cancellationToken)).Select(x => x.Name).ToList(),
-            await packages.NamesAsync(p, transmittals, cancellationToken),
+            outside ? null : parts.SupplierPeople, parts.Names,
             asReceived ? new AsReceivedView(intake!.DeliverableType ?? "", intake.DocType ?? "", intake.Discipline ?? "") : null,
-            access is null ? null : await packages.PlaceAsync(access, p, cancellationToken));
+            parts.Place);
     }
 }

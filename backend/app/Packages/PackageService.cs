@@ -50,7 +50,7 @@ public sealed record NoteRequest(string? Note = null);
 /// the status it needs, the shortfall the acceptance authority accepts or not,
 /// delivery on transmittals, and acceptance. Delivering fixes the contents.
 /// </summary>
-public sealed class PackageService(
+public sealed partial class PackageService(
     DeliosDbContext db, Numbering numbering, TransmittalService transmittals, AuditLog audit, IClock clock, SupplyFiling filing,
     Notifications.Notifier notifier)
 {
@@ -716,23 +716,37 @@ public sealed class PackageService(
     /// <summary>Each member against the status it needs: its released revision, if any, at one of them.</summary>
     public async Task<List<Readiness>> ReadinessAsync(Package package, CancellationToken cancellationToken)
     {
-        var ids = package.Members.Select(m => m.DocumentId).ToList();
+        var (documents, released) = await ReadinessFactsAsync(package.Members.Select(m => m.DocumentId).ToList(), cancellationToken);
+        return ReadinessOf(package, documents, released);
+    }
+
+    /// <summary>What readiness reads of documents, for any number of packages at once.</summary>
+    private async Task<(Dictionary<Guid, ReadinessDocument> Documents, Dictionary<Guid, ReleasedRevision> Released)> ReadinessFactsAsync(
+        List<Guid> ids, CancellationToken cancellationToken)
+    {
         var documents = await db.Documents.AsNoTracking().Where(d => ids.Contains(d.Id))
-            .Select(d => new { d.Id, d.Number, d.Title, d.LatestRevisionValue, d.LatestRevisionState, d.PlannedDate })
+            .Select(d => new ReadinessDocument(d.Id, d.Number, d.Title, d.LatestRevisionValue, d.LatestRevisionState, d.PlannedDate))
             .ToDictionaryAsync(d => d.Id, cancellationToken);
-        var released = await db.Revisions.AsNoTracking()
+        var released = (await db.Revisions.AsNoTracking()
             .Where(r => ids.Contains(r.DocumentId) && r.State == RevisionStates.Released)
-            .Select(r => new { r.Id, r.DocumentId, r.Value, r.StatusCode }).ToListAsync(cancellationToken);
-        return package.Members.Select(m =>
+            .Select(r => new ReleasedRevision(r.Id, r.DocumentId, r.Value, r.StatusCode)).ToListAsync(cancellationToken))
+            .GroupBy(r => r.DocumentId).ToDictionary(g => g.Key, g => g.First());
+        return (documents, released);
+    }
+
+    private sealed record ReadinessDocument(Guid Id, string Number, string Title, string? LatestRevisionValue, string? LatestRevisionState, LocalDate? PlannedDate);
+    private sealed record ReleasedRevision(Guid Id, Guid DocumentId, string Value, string? StatusCode);
+
+    private static List<Readiness> ReadinessOf(Package package, Dictionary<Guid, ReadinessDocument> documents, Dictionary<Guid, ReleasedRevision> released) =>
+        package.Members.Select(m =>
         {
-            var current = released.FirstOrDefault(r => r.DocumentId == m.DocumentId);
+            var current = released.GetValueOrDefault(m.DocumentId);
             var required = m.RequiredStatuses.Length > 0 ? m.RequiredStatuses : package.RequiredStatuses;
             var ready = current?.StatusCode is { } status && required.Contains(status);
             var d = documents[m.DocumentId];
             return new Readiness(m, d.Number, d.Title, current?.Value, current?.StatusCode, required, ready, current?.Id,
                 d.LatestRevisionValue, d.LatestRevisionState, d.PlannedDate ?? package.CompletionDate);
         }).OrderBy(r => r.DocumentNumber).ToList();
-    }
 
     /// <summary>Check every member; what is not ready is the shortfall.</summary>
     public async Task<(Package? Package, IResult? Problem)> AssessAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
@@ -1088,10 +1102,16 @@ public sealed class PackageService(
     {
         var people = package.OwnerIds.Concat(package.AcceptorIds).ToList();
         var names = await db.Users.AsNoTracking().Where(u => people.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, cancellationToken);
-        string Names(IEnumerable<Guid> ids) => string.Join(", ", ids.Select(id => names.GetValueOrDefault(id)).OfType<string>());
         var partyIds = package.RecipientPartyIds.Append(package.SupplierPartyId ?? Guid.Empty).ToList();
         var parties = await db.Parties.AsNoTracking().Where(p => partyIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
         var us = await db.Tenants.AsNoTracking().Where(t => t.Id == package.TenantId).Select(t => t.Name).FirstOrDefaultAsync(cancellationToken) ?? "us";
+        return NamesOf(package, transmittals, names, parties, us);
+    }
+
+    private static PackageNames NamesOf(Package package, IReadOnlyList<PackageTransmittal> transmittals, IReadOnlyDictionary<Guid, string> names,
+        IReadOnlyDictionary<Guid, Party> parties, string us)
+    {
+        string Names(IEnumerable<Guid> ids) => string.Join(", ", ids.Select(id => names.GetValueOrDefault(id)).OfType<string>());
         var supplier = package.SupplierPartyId is { } s ? parties.GetValueOrDefault(s) : null;
         var to = package.Kind == PackageKinds.Supply ? supplier?.Name ?? ""
             : string.Join(", ", package.RecipientPartyIds.Select(id => parties.GetValueOrDefault(id) is { IsInternal: false } p ? p.Name : us));
