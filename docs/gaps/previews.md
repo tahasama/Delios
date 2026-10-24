@@ -50,3 +50,5 @@ on the project's drawings, the certified routes above stay open.
   text and the frame around pictures take the theme's palette; a drawing is drawn on the theme's surface (lines too
   close to it corrected by the reader), a 3D model on its slate backdrop, both changing at once when the theme does
   (`components/use-dark.ts`). The PDF stays as the browser's reader draws it: its page and stamp are never recoloured.
+- **Full page** (owner): an icon in the Preview's bar opens the same Preview, with its bar, over the whole window in a
+  new tab (`/preview`), on the document's and the review's pages.

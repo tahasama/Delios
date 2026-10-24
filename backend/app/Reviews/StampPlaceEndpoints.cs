@@ -11,12 +11,12 @@ namespace Delios.Host.Reviews;
 /// <summary>
 /// Placing a decided review's stamp by hand (owner: the usual corner may be filled; "the stamp is automatic to prevent
 /// falsification"): the app finds a clear spot by itself (<see cref="StampPlacement"/>); before the release or the
-/// send-back, the control function may move it elsewhere on the page. Only the place is chosen, never what the stamp
+/// send-back, the control function may move it elsewhere on the page, and make it larger or smaller. Only the place is chosen, never what the stamp
 /// says; each move is recorded; once the stamp is made, it is fixed.
 /// </summary>
 public static class StampPlaceEndpoints
 {
-    public sealed record PlaceRequest(double? X, double? Y);
+    public sealed record PlaceRequest(double? X, double? Y, double? Scale);
 
     public static void MapStampPlaceEndpoints(this IEndpointRouteBuilder app)
     {
@@ -59,10 +59,11 @@ public static class StampPlaceEndpoints
             plan.FileId,
             Page = new { W = plan.PageW, H = plan.PageH },
             Stamp = new { W = plan.StampW, H = plan.StampH },
-            Found = plan.Found is { } f ? new { f.X, f.Y } : null,
+            Found = new { plan.Found.X, plan.Found.Y, Scale = plan.FoundScale },
+            plan.ProjectScale,
             plan.Returned,
             Placed = read.Revision.StampX is { } x && read.Revision.StampY is { } y
-                ? new { X = x, Y = y, By = read.Revision.StampPlacedByName, At = read.Revision.StampPlacedAt } : null,
+                ? new { X = x, Y = y, Scale = read.Revision.StampScale ?? plan.ProjectScale, By = read.Revision.StampPlacedByName, At = read.Revision.StampPlacedAt } : null,
         });
     }
 
@@ -76,26 +77,29 @@ public static class StampPlaceEndpoints
         if (!read.Open)
             return Problems.Conflict("STAMP_FIXED", "The stamp is already made, or the review is not decided: its place no longer changes.");
         var revision = read.Revision;
-        string Words(double? x, double? y) => x is { } a && y is { } b ? $"{a * 100:0}% across, {b * 100:0}% down the page" : "the app's place";
-        var was = Words(revision.StampX, revision.StampY);
+        string Words(double? x, double? y, double? size) => x is { } a && y is { } b
+            ? $"{a * 100:0}% across, {b * 100:0}% down the page{(size is { } z ? $", {z * 100:0}% of its size" : "")}" : "the app's place and size";
+        var was = Words(revision.StampX, revision.StampY, revision.StampScale);
         if (request.X is { } nx && request.Y is { } ny)
         {
             if (nx is < 0 or > 1 || ny is < 0 or > 1) return Problems.Invalid("OFF_THE_PAGE", "The stamp has to sit on the page.");
+            if (request.Scale is < 0.5 or > 2) return Problems.Invalid("STAMP_SIZE", "The stamp may be from half to twice its size.");
             revision.StampX = Math.Round(nx, 4);
             revision.StampY = Math.Round(ny, 4);
+            revision.StampScale = request.Scale is { } size ? Math.Round(size, 3) : null;
             revision.StampPlacedByName = (await db.Users.AsNoTracking().SingleAsync(u => u.Id == http.User.UserId(), cancellationToken)).Name;
             revision.StampPlacedAt = clock.GetCurrentInstant();
         }
         else
         {
-            revision.StampX = revision.StampY = null;
+            revision.StampX = revision.StampY = revision.StampScale = null;
             revision.StampPlacedByName = null;
             revision.StampPlacedAt = null;
         }
         await db.SaveChangesAsync(cancellationToken);
         var document = await db.Documents.AsNoTracking().Where(d => d.Id == revision.DocumentId).Select(d => d.Number).SingleAsync(cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "STAMP_PLACED", "Revision", revision.Id, $"{document} rev {revision.Value}",
-            $"Where the stamp goes: {was} → {Words(revision.StampX, revision.StampY)}.", access.Project.Id, cancellationToken);
+            $"Where the stamp goes: {was} → {Words(revision.StampX, revision.StampY, revision.StampScale)}.", access.Project.Id, cancellationToken);
         return Results.NoContent();
     }
 }

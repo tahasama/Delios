@@ -1696,6 +1696,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("stamp_placed_by_name");
 
+                    b.Property<double?>("StampScale")
+                        .HasColumnType("double precision")
+                        .HasColumnName("stamp_scale");
+
                     b.Property<double?>("StampX")
                         .HasColumnType("double precision")
                         .HasColumnName("stamp_x");

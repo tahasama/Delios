@@ -240,12 +240,12 @@ export async function placeStampAction(_prev: { error?: string; ok?: string } | 
   const ctx = await requireScope();
   const reviewId = String(formData.get("reviewId") ?? "");
   const back = formData.get("back") === "1";
-  const x = Number(formData.get("x")), y = Number(formData.get("y"));
+  const x = Number(formData.get("x")), y = Number(formData.get("y")), scale = Number(formData.get("scale"));
   try {
-    await api(projectPath(ctx, `/reviews/${reviewId}/stamp-place`), { method: "PUT", body: back ? { x: null, y: null } : { x, y } });
+    await api(projectPath(ctx, `/reviews/${reviewId}/stamp-place`), { method: "PUT", body: back ? { x: null, y: null, scale: null } : { x, y, scale } });
   } catch (e) {
     return { error: refusal(e).message };
   }
   revalidatePath(`/reviews/${reviewId}`);
-  return { ok: back ? "The app places the stamp again." : "The stamp goes there." };
+  return { ok: back ? "The app places the stamp again." : "The stamp goes there, at that size." };
 }

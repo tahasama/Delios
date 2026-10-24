@@ -337,6 +337,8 @@ public sealed class Revision
     /// </summary>
     public double? StampX { get; set; }
     public double? StampY { get; set; }
+    /// <summary>The size chosen with it, 0.5 to 2 times the stamp's normal size; none: the project's.</summary>
+    public double? StampScale { get; set; }
     public string? StampPlacedByName { get; set; }
     public Instant? StampPlacedAt { get; set; }
     /// <summary>Voided: released in error, or never reviewed. Who decided it, why, and what was found of the work done from it.</summary>

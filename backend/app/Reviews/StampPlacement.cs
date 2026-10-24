@@ -7,8 +7,8 @@ namespace Delios.Host.Reviews;
 /// <summary>
 /// Where the stamp goes on a page (owner: the usual corner may be filled, and the stamp stays the app's): each page is
 /// looked at as a picture (PDFium, read only) and the stamp put on the first clear spot: the chosen corner, then the
-/// others, then along the edges. A page with no clear spot gets a small mark, the stamp itself on a page added at the
-/// end. Nothing here changes a file; the stamp is drawn by <see cref="Stamping.Stamp"/>.
+/// others, then along the edges; a step smaller when there is none, down to S; still none, where the least is drawn.
+/// The stamp always stays on its page. Nothing here changes a file; the stamp is drawn by <see cref="Stamping.Stamp"/>.
 /// </summary>
 public static class StampPlacement
 {
@@ -86,8 +86,20 @@ public static class StampPlacement
     /// </summary>
     public static (double X, double Y)? Find(Ink ink, double pageW, double pageH, double w, double h, string place)
     {
+        if (pageW - w - 2 * Margin < 0 || pageH - h - 2 * Margin < 0) return null;
+        foreach (var (x, y) in Candidates(pageW, pageH, w, h, place))
+        {
+            // Clear: next to nothing drawn there, the stamp's surroundings included (a speck of dust is not a drawing).
+            if (ink.Inked(x - Breathing, y - Breathing, w + 2 * Breathing, h + 2 * Breathing) <= 0.002) return (x, y);
+        }
+        return null;
+    }
+
+    /// <summary>The places tried, in order: the chosen corner, the others, then along the edges nearest it first.</summary>
+    private static List<(double X, double Y)> Candidates(double pageW, double pageH, double w, double h, string place)
+    {
         double left = Margin, right = pageW - w - Margin, top = Margin, bottom = pageH - h - Margin;
-        if (right < left || bottom < top) return null;
+        if (right < left || bottom < top) return [(Math.Max(0, (pageW - w) / 2), Math.Max(0, (pageH - h) / 2))];
         var startX = place.EndsWith("LEFT") ? left : right;
         var startY = place.StartsWith("BOTTOM") ? bottom : top;
         var otherX = startX == left ? right : left;
@@ -98,12 +110,30 @@ public static class StampPlacement
         for (var x = left; x <= right; x += step) { along.Add((x, top)); along.Add((x, bottom)); }
         for (var y = top; y <= bottom; y += step) { along.Add((left, y)); along.Add((right, y)); }
         candidates.AddRange(along.OrderBy(p => Math.Abs(p.X - startX) + Math.Abs(p.Y - startY)));
-        foreach (var (x, y) in candidates)
+        return candidates;
+    }
+
+    /// <summary>The smallest the app makes a stamp to find room for it: the stamp card's S.</summary>
+    public const double Smallest = 0.8;
+
+    /// <summary>
+    /// Where the stamp goes on a page, and at what size (owner: "the stamp would definitely find a room", never a page of
+    /// its own): the first clear spot at the project's size; none, the same search a step smaller each time down to S;
+    /// still none, the spot with the least drawing under it, at S (its white ground keeps it readable).
+    /// </summary>
+    public static (double X, double Y, double Scale) Choose(Ink ink, double pageW, double pageH, double baseW, double baseH, double scale, string place)
+    {
+        var tried = scale;
+        while (true)
         {
-            // Clear: next to nothing drawn there, the stamp's surroundings included (a speck of dust is not a drawing).
-            if (ink.Inked(x - Breathing, y - Breathing, w + 2 * Breathing, h + 2 * Breathing) <= 0.002) return (x, y);
+            if (Find(ink, pageW, pageH, baseW * tried, baseH * tried, place) is { } clear) return (clear.X, clear.Y, tried);
+            if (tried <= Smallest) break;
+            tried = Math.Max(Smallest, Math.Round(tried * 0.9, 3));
         }
-        return null;
+        var small = Math.Min(scale, Smallest);
+        var best = Candidates(pageW, pageH, baseW * small, baseH * small, place)
+            .MinBy(c => ink.Inked(c.X, c.Y, baseW * small, baseH * small));
+        return (best.X, best.Y, small);
     }
 
     /// <summary>The first page as a PNG picture, for placing the stamp by hand; null if it cannot be drawn.</summary>

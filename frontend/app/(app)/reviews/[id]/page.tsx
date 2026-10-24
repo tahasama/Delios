@@ -319,13 +319,13 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
       ) : null}
 
       {/* Where the stamp goes, before it is made: the app's clear spot, or put elsewhere by the control function. */}
-      {waitsRelease && placing?.open && placing.fileId && placing.page && placing.stamp ? (
+      {waitsRelease && placing?.open && placing.fileId && placing.page && placing.stamp && placing.found ? (
         <section className="register register-sheet register-sheet-open" aria-labelledby="stamp-place-head">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <h2 id="stamp-place-head" className="stencil mr-1 text-slate-500">Where the stamp goes</h2>
             <span className="text-[11px] text-slate-500">on rev {rev.value}&rsquo;s PDF, once it is {letsItOut ? "released" : "sent back"}</span>
           </div>
-          <StampPlacer reviewId={cycle.id} plan={{ ...placing, fileId: placing.fileId, page: placing.page, stamp: placing.stamp }} />
+          <StampPlacer reviewId={cycle.id} plan={{ ...placing, fileId: placing.fileId, page: placing.page, stamp: placing.stamp, found: placing.found }} />
         </section>
       ) : null}
 

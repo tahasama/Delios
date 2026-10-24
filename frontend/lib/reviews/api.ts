@@ -266,11 +266,13 @@ export type StampPlan = {
   open: boolean;
   fileId?: string;
   page?: { w: number; h: number };
+  /** The stamp at its normal size, in points. */
   stamp?: { w: number; h: number };
-  /** The app's clear spot, its top left as a share of the page; null: no room, a stamp page is added. */
-  found?: { x: number; y: number } | null;
+  /** The app's spot (its top left as a share of the page) and the size it found room at. */
+  found?: { x: number; y: number; scale: number };
+  projectScale?: number;
   returned?: boolean;
-  placed?: { x: number; y: number; by: string | null; at: string | null } | null;
+  placed?: { x: number; y: number; scale: number; by: string | null; at: string | null } | null;
 };
 
 export async function stampPlan(t: { projectId: string }, reviewId: string): Promise<StampPlan | null> {

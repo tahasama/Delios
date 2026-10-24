@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Minus, Plus } from "lucide-react";
+import { Download, Maximize2, Minus, Plus } from "lucide-react";
 import { WorkbookView } from "@/components/workbook-view";
 import { ScheduleFileView } from "@/components/schedule-file-view";
 import { TextView } from "@/components/text-view";
@@ -76,7 +76,7 @@ const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
  * or the other"); a source the page cannot draw is offered to download. A zoom for whatever is shown (owner: "some
  * control like a zoom"): − percentage + (the percentage puts it back to 100%).
  */
-export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-h-120", admin = false, readers, viewingNote = true, pdfDark = false }: {
+export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-h-120", admin = false, readers, viewingNote = true, pdfDark = false, full = false, show }: {
   pdf: PreviewFile | null; source: PreviewFile | null; title: string; empty: React.ReactNode; height?: string;
   /** An administrator: a drawing the free reader cannot open points them to Settings → Viewing files. */
   admin?: boolean;
@@ -86,11 +86,15 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
   viewingNote?: boolean;
   /** "Dark page" on the PDF, as the person left it (cookie `pdf-dark`). */
   pdfDark?: boolean;
+  /** Shown on a page of its own (the whole window): no "Full page" icon. */
+  full?: boolean;
+  /** What it opens on, when not the PDF first. */
+  show?: "pdf" | "source";
 }) {
   const reader = readerOf(source);
   const switchedOff = !!reader && !!readers && !readers.includes(reader);
   const kind = switchedOff ? null : sourceView(source);
-  const [showing, setShowing] = useState<"pdf" | "source">(pdf ? "pdf" : "source");
+  const [showing, setShowing] = useState<"pdf" | "source">(show === "source" && source ? "source" : pdf ? "pdf" : "source");
   const [zoom, setZoom] = useState(1);
   const [darkPage, setDarkPage] = useState(pdfDark);
   const toggleDark = () => {
@@ -136,6 +140,14 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </span>
+          ) : null}
+          {!full ? (
+            // The same Preview over the whole window, in a new tab (owner: "full page"): what is shown now opens first.
+            <a href={`/preview?${new URLSearchParams({ ...(pdf ? { pdf: pdf.id, pdfName: pdf.name } : {}), ...(source ? { source: source.id, sourceName: source.name } : {}),
+              title, show: onSource ? "source" : "pdf" })}`} target="_blank" rel="noopener" title="Full page, in a new tab" aria-label="Full page, in a new tab"
+              className="grid h-6 w-6 place-items-center text-slate-600 hover:text-brand-ink">
+              <Maximize2 className="h-3.5 w-3.5" />
+            </a>
           ) : null}
           <a href={`/api/files/${shown.id}?dl=1`} title={`Download ${shown.name}`} aria-label={`Download ${shown.name}`}
             className="grid h-6 w-6 place-items-center text-slate-600 hover:text-brand-ink">

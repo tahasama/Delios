@@ -302,12 +302,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   · 1.5, Normal by default): frame and words grow or shrink together. **Where it sits** (`STAMP_PLACE`,
   top right by default, or another corner). **Never over the drawing** (owner: "the usual placement might be filled"; "the stamp is automatic to prevent
   falsification"): each page is looked at as a picture (PDFium, `Docnet.Core`, read only; `Reviews/StampPlacement.cs`)
-  and the stamp put on the first clear spot: the chosen corner, the others, then along the edges; a page with no room
-  gets a small mark ("Reviewed · the stamp is on page N") and the stamp itself goes on a page added at the end. Before
-  the release or the send-back, the control function may move it by hand on the review's page ("Where the stamp goes",
-  the first page with the stamp's frame, dragged; `stamp-placer.tsx`, `GET`/`PUT /reviews/{id}/stamp-place`,
-  `Revision.StampX/StampY`, STAMP_PLACED with from → to; "Back to the app's place"): only its place, never what it says;
-  fixed once the stamp is made (STAMP_FIXED). No verification code on it (owner: it adds no authenticity). **The marks across the page**, as they were (owner): superseded, void, on
+  and the stamp put on the first clear spot: the chosen corner, the others, then along the edges; none, the same search a
+  step smaller each time down to S; still none, the spot with the least drawing under it, at S. **Always on its page**
+  (owner: "the stamp would definitely find a room… no need to add a page"; `StampPlacement.Choose`). Before the release
+  or the send-back, the control function may move it and resize it by hand on the review's page ("Where the stamp
+  goes", the first page with the stamp's frame where and at the size the app found room; dragged, its corner dragged
+  for the size, half to twice its size; `stamp-placer.tsx`, `GET`/`PUT /reviews/{id}/stamp-place`,
+  `Revision.StampX/StampY/StampScale`, STAMP_PLACED with from → to; "Back to the app's place"): only its place and
+  size, never what it says; fixed once the stamp is made (STAMP_FIXED). No verification code on it (owner: it adds no authenticity). **The marks across the page**, as they were (owner): superseded, void, on
   hold (`STAMP:SUPERSEDED|VOID|HELD`, on). Beside the form, the stamp drawn on a page as it will read (22.5rem wide by default, owner: "50% wider"), dragged larger by its left edge (owner: "give more by making it
   resizable"; `ResizablePane`, cookie `pane-stamp`; the stamp drawn to the page's scale) (`Stamping.Stamp`,
   `StampFace`; a code with no name reads as words, "No comment", never the app's code). The Control room only reads it, one line on each step that stamps, with "change" to the card; the Defaults for
@@ -326,7 +328,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   of it said above when it would not read it); with a PDF too, "The PDF · The source file · <its kind>" above it, the PDF first, offered whenever both are
   there (owner: "i have no way to visualize one or the other"): a source the page cannot draw says so with its download.
   The bar above carries the file's name, a zoom (owner: "some control like a zoom"; − 50…300% +, the percentage back to
-  100%: the PDF opened at it, a picture, a workbook or a schedule scaled), its download, and over a PDF (an office file's too) the switch **Dark page** (owner, off by default: the page dark, its text light, hues kept so a stamp stays green or red; drawn over the browser's reader, the file never changed; cookie `pdf-dark`). The PDF is never darkened by the theme alone. **Every
+  100%: the PDF opened at it, a picture, a workbook or a schedule scaled), its download, the **Full page** icon (owner: the same Preview, its bar and all, over the whole window in a new tab,
+  `/preview?pdf=…&source=…&show=…`, `app/(start)/preview`; the backend still checks every file), and over a PDF (an office file's too) the switch **Dark page** (owner, off by default: the page dark, its text light, hues kept so a stamp stays green or red; drawn over the browser's reader, the file never changed; cookie `pdf-dark`). The PDF is never darkened by the theme alone. **Every
   other kind the owner asked for** (`docs/gaps/previews.md`): an old Excel .xls as its sheets (values only, ExcelDataReader);
   plain text (.txt, .log, .json, .xml, .md, .yaml…) as text, its first 2 MB (`GET /files/{id}/text`); Word, PowerPoint
   and their kin (.doc/.docx, .ppt/.pptx, .odt, .rtf, .vsdx…) as the PDF LibreOffice makes of them (Gotenberg service,
