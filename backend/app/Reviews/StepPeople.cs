@@ -47,26 +47,26 @@ public static class StepPeople
         Notifications.Notifier notifier, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!Keeper(access)) return Problems.Forbidden("CONTROL_OR_MANAGE", "The control function or whoever holds Manage cc's people on a review in flow.");
+        if (!Keeper(access)) return Problems.Forbidden("CONTROL_OR_MANAGE", "The control function or whoever holds Manage adds people in copy on a review in flow.");
         var review = await db.Reviews.SingleOrDefaultAsync(r => r.Id == reviewId && r.ProjectId == access.Project.Id, cancellationToken);
         if (review is null) return Problems.NotFound("REVIEW_NOT_FOUND", "No such review.");
         if (review.State != ReviewStates.InProgress)
-            return Problems.Conflict("REVIEW_CLOSED", "The review is no longer in flow: nobody is cc'd now.");
+            return Problems.Conflict("REVIEW_CLOSED", "The review is no longer in flow: nobody is added in copy now.");
         var why = request.Reason?.Trim() is { Length: > 0 } said ? said : null;
         var copies = (request.CopyUserIds ?? []).Distinct().ToList();
-        if (copies.Count == 0) return Problems.Invalid("NOBODY_CHOSEN", "Choose who to cc.");
+        if (copies.Count == 0) return Problems.Invalid("NOBODY_CHOSEN", "Choose who is added in copy.");
         var people = (await PeopleAsync(db, access, cancellationToken)).ToDictionary(p => p.Id, p => p.Name);
-        if (copies.Any(id => !people.ContainsKey(id))) return Problems.Invalid("NOT_ON_PROJECT", "Only people active on the project are cc'd.");
+        if (copies.Any(id => !people.ContainsKey(id))) return Problems.Invalid("NOT_ON_PROJECT", "Only people active on the project are added in copy.");
         var copied = copies.Where(id => !review.CopyUserIds.Contains(id)).ToList();
-        if (copied.Count == 0) return Problems.Conflict("ALREADY_COPIED", "They are cc'd already.");
+        if (copied.Count == 0) return Problems.Conflict("ALREADY_COPIED", "They are in copy already.");
         review.CopyUserIds = [.. review.CopyUserIds.Concat(copied)];
         await db.SaveChangesAsync(cancellationToken);
 
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "REVIEW_PEOPLE_ADDED", "Review", review.Id, review.Number,
-            $"Cc'd: {string.Join(", ", copied.Select(id => people[id]))}.{(why is null ? "" : $" {why}")}", review.ProjectId, cancellationToken);
+            $"Added in copy: {string.Join(", ", copied.Select(id => people[id]))}.{(why is null ? "" : $" {why}")}", review.ProjectId, cancellationToken);
         await notifier.NotifyAsync(review.TenantId, review.ProjectId, copied, Notifications.NotificationKinds.General,
-            $"You are cc'd on review {review.Number}",
-            $"{access.UserName} cc'd you{(why is null ? "." : $": {why}")} You are told what comes of it; nothing is asked of you.", $"/reviews/{review.Id}",
+            $"You are in copy of review {review.Number}",
+            $"{access.UserName} added you in copy{(why is null ? "." : $": {why}")} You are told what comes of it; nothing is asked of you.", $"/reviews/{review.Id}",
             cancellationToken, Notifications.EmailKinds.Review);
         await db.SaveChangesAsync(cancellationToken);
         return Results.Ok(new { Copied = copied.Count });

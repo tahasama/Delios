@@ -131,16 +131,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   including steps not yet reached.
 - The sender may change the people on each step for that review; that choice
   is what the review uses, and the record says so.
-- **Delegate and cc, in flow** (owner: "delegate existed already but was only visible to the person that has the step…
+- **Delegate and add in copy, in flow** (owner: "delegate existed already but was only visible to the person that has the step…
   we could use the already existing one that appears in the verdict card"; "people need to understand they are not
   delegating, just adding as cc… write cc'd"): **Delegate** is the answer card's one button, opened to the control
   function and whoever holds Manage, of ours, too, who choose **whose step** (a seat on the open step not answered yet,
   their own first when they sit there; `DelegateRequest.FromUserId`, CONTROL_OR_MANAGE) and hand it to anyone of ours on
   the project, the control function included (the matrix's people first, anyone else flagged; nobody already on that
   step, who answers their own seat), until a date, why optional; the control function's in force at once, Manage's
-  waiting for the control function where it carries out DELEGATE; both people told. **Cc** is a link in the review's
-  title, "Cc?", as Withdraw and Notify, its form folded under the document (`?open=cc`, `change-people.tsx`): people
-  cc'd like "Copy to (cc)" (`Reviews/StepPeople.cs`, `GET`/`POST /reviews/{id}/people`, REVIEW_PEOPLE_ADDED), told now
+  waiting for the control function where it carries out DELEGATE; both people told. **Add in copy** is a link in the
+  review's title, "Add in copy?", as Withdraw and Notify, its form folded under the document (`?open=copy`,
+  `change-people.tsx`; owner: "be smart", never "cc'd" on a screen): people added in copy like "Copy to (cc)" (`Reviews/StepPeople.cs`, `GET`/`POST /reviews/{id}/people`, REVIEW_PEOPLE_ADDED), told now
   and of what comes of it, never asked to review, why optional. Adding someone to a step was built and taken out (owner:
   "the same as delegate"): who answers a step changes only by a hand-over. The reviews register has no "Kind" column
   (owner: it always read "decision"; every line is a whole review, which ends in its decision).

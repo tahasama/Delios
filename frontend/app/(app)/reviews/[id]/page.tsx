@@ -45,7 +45,7 @@ import { ArrowLeft, Bell, ExternalLink, FileText, Pencil } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function ReviewCyclePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ open?: string }> }) {
-  // A link in the title opens one of the forms below the document: ?open=withdraw, notify or cc.
+  // A link in the title opens one of the forms below the document: ?open=withdraw, notify or copy.
   const opened = (await searchParams).open ?? null;
   const ctx = await requireScope();
   const { user } = ctx;
@@ -311,7 +311,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             {/* Each opens its folded section under the document. */}
             {mayWithdraw ? <Link href="?open=withdraw#withdraw" className="text-xs font-semibold text-red-700 hover:underline">Withdraw?</Link> : null}
             {notify ? <Link href="?open=notify#notify" className="text-xs font-semibold text-link hover:underline">Notify?</Link> : null}
-            {mayInform ? <Link href="?open=cc#cc" className="text-xs font-semibold text-link hover:underline">Cc?</Link> : null}
+            {mayInform ? <Link href="?open=copy#copy" className="text-xs font-semibold text-link hover:underline">Add in copy?</Link> : null}
           </div>
         </div>
       </section>
@@ -404,10 +404,10 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
 
 
           {mayInform ? (
-            <details id="cc" open={opened === "cc"} className="register register-sheet register-sheet-open scroll-mt-24">
+            <details id="copy" open={opened === "copy"} className="register register-sheet register-sheet-open scroll-mt-24">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
-                <span className="text-[13px] text-slate-600">Forgot to cc someone? They are kept informed, never asked to review</span>
-                <span className="ask">Cc them</span>
+                <span className="text-[13px] text-slate-600">Someone left out? Add them in copy: kept informed of what comes of it, never asked to review</span>
+                <span className="ask">Add in copy</span>
               </summary>
               <div className="border-t border-line px-5 py-4 sm:px-6">
                 <CopyInForm cycleId={cycle.id} people={peopleOptions!} />

@@ -42,14 +42,14 @@ export async function delegateReviewAction(_prev: State | undefined, formData: F
 }
 
 /**
- * Cc people on a review in flow (the control function, whoever holds Manage): told now and of what comes of it, never
+ * Adds people in copy on a review in flow (the control function, whoever holds Manage): told now and of what comes of it, never
  * asked to answer. Why is optional.
  */
 export async function informReviewAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
   const cycleId = text(formData, "cycleId");
   const copyUserIds = formData.getAll("copyUserIds").map(String).filter(Boolean);
-  if (!copyUserIds.length) return { error: "Choose who to cc." };
+  if (!copyUserIds.length) return { error: "Choose who is added in copy." };
   let done: { copied: number };
   try {
     done = await api<{ copied: number }>(projectPath(ctx, `/reviews/${cycleId}/people`), {
@@ -59,7 +59,7 @@ export async function informReviewAction(_prev: State | undefined, formData: For
     return { error: refusal(e).message };
   }
   revalidatePath(`/reviews/${cycleId}`);
-  return { message: `${done.copied} cc'd; each is told.` };
+  return { message: `${done.copied} added in copy; each is told.` };
 }
 
 /** One act on a hand-over already made, by its id. */

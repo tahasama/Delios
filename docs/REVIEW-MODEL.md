@@ -604,15 +604,15 @@ queue with its age, and the reports that measure each step's duration.
    require one, and the system's own stamp on the rendition at publication stays
    on regardless.
 
-## Delegate and cc, in flow
+## Delegate and add in copy, in flow
 
 - **Delegate** is the one button on the verdict card. Whoever sits on the open step hands their own seat over; the
   control function and whoever holds Manage (of ours) open the same button and choose whose seat on the open step, not
   answered yet, they hand over, to anyone of ours on the project (the control function included; the matrix's people
   first, anyone else flagged), until a date. The control function's hand-over is in force at once; Manage's waits for
   the control function where it carries out hand-overs. Both people are told. Why is optional.
-- **Cc** ("Cc?" in the review's title): the control function and whoever holds Manage cc people, told now and of what
-  comes of it, never asked to review. Why is optional.
+- **Add in copy** ("Add in copy?" in the review's title): the control function and whoever holds Manage add people in
+  copy, told now and of what comes of it, never asked to review. Why is optional.
 
 Who answers a step changes only by a hand-over: adding someone to a step was tried and taken out, as it is the same as
 delegating.
