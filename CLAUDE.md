@@ -1209,7 +1209,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   step does, "For approval" when it decides, "For review" when it advises (`ReviewSets.StepReason`, the codes APPROVAL /
   REVIEW), refused only when neither is published (STEP_REASON_REQUIRED).
 - **Every search field lists on a click and narrows as one types** (owner, everywhere): `SearchPick` (its `browse` no
-  longer differs) and the transmittal recipient picker; "Choose, or type to narrow".
+  longer differs) and the transmittal recipient picker; "Choose, or type to narrow". `SearchPick`'s list is drawn over the page
+  (a portal on the page's body, placed under its field, or above it when the window has no room), so no card or
+  scrolling row cuts it (owner: "drawer is blocked by card", the steps of Send for review).
 - A route's step is answered by all its people (any order) or by whoever gets to it first (`StepModes` ALL / ANY): no
   other kind is offered. A step another organization answers goes to them on a transmittal whose reason is set by itself
   (above). "Offer this route first" puts it first among

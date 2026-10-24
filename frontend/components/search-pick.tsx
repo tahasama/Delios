@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 
@@ -43,6 +44,28 @@ export function SearchPick({
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
   const box = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  // Where the list stands: drawn over the page (owner: "drawer is blocked by card"), so no card, scrolling row or
+  // sheet cuts it; under the field, or above it when the window has no room under it.
+  const [at, setAt] = useState<React.CSSProperties | null>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = field.current?.getBoundingClientRect();
+      if (!r) return;
+      const below = window.innerHeight - r.bottom - 8, above = r.top - 8;
+      const up = below < 200 && above > below;
+      setAt({
+        position: "fixed", left: r.left, width: r.width, maxHeight: Math.min(320, up ? above : below),
+        ...(up ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }),
+      });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => { window.removeEventListener("scroll", place, true); window.removeEventListener("resize", place); };
+  }, [open]);
   useEffect(() => { onCount?.(chosen.length); }, [chosen.length, onCount]);
   // Told after the choice settles, so a parent can follow it without owning it.
   const told = useRef(onChange);
@@ -51,7 +74,10 @@ export function SearchPick({
 
   // Clicking anywhere else closes the list.
   useEffect(() => {
-    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
+    const away = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!box.current?.contains(target) && !list.current?.contains(target)) setOpen(false);
+    };
     document.addEventListener("mousedown", away);
     return () => document.removeEventListener("mousedown", away);
   }, []);
@@ -84,7 +110,7 @@ export function SearchPick({
 
       <div className="relative">
         {/* The magnifier sits inside the field, so its line starts where every other field's does. */}
-        <div className="relative">
+        <div ref={field} className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             value={query}
@@ -108,8 +134,8 @@ export function SearchPick({
         </div>
 
         {/* Every list opens on a click and narrows as one types (owner, everywhere). */}
-        {open ? (
-          <ul role="listbox" className="scroll-thin absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
+        {open && at ? createPortal(
+          <ul ref={list} role="listbox" style={at} className="scroll-thin z-[60] overflow-y-auto rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
             {options.length === 0 ? (
               <li className="px-3 py-2 text-xs text-slate-400">{query ? "Nobody matches that." : "Nobody left to choose."}</li>
             ) : options.map((one, i) => (
@@ -127,7 +153,7 @@ export function SearchPick({
                 </span>
               </li>
             ))}
-          </ul>
+          </ul>, document.body,
         ) : null}
       </div>
 
