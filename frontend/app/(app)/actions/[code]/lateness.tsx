@@ -8,11 +8,12 @@ import type { PlanDecision } from "@/lib/actions/api";
 type Note = PlanDecision;
 
 /** The answer to "Went ahead?", the same as the schedule's column says it. */
-export type WentAhead = "NOT_YET" | "WITH_DOCUMENTS" | "MISSING_DOCUMENTS" | "POSTPONED";
+export type WentAhead = "NOT_YET" | "WITH_DOCUMENTS" | "NOTHING_LISTED" | "MISSING_DOCUMENTS" | "POSTPONED";
 
 const ANSWER: Record<WentAhead, { word: string; tone: string }> = {
   NOT_YET: { word: "Answered after the day", tone: "text-slate-600 ring-line-strong" },
   WITH_DOCUMENTS: { word: "With documents", tone: "text-emerald-800 ring-emerald-300 bg-emerald-50" },
+  NOTHING_LISTED: { word: "Went ahead", tone: "text-slate-700 ring-slate-300 bg-slate-100" },
   MISSING_DOCUMENTS: { word: "Missing documents", tone: "text-amber-900 ring-amber-300 bg-amber-50" },
   POSTPONED: { word: "Postponed", tone: "text-slate-700 ring-slate-300 bg-slate-100" },
 };
@@ -54,6 +55,8 @@ export function ActionNotes({ notes, actionId, mayNote, mayPlan, mayControl, ans
     ? `Nothing to fill in now. ${day ? `After ${day}` : "After its day"} this says whether it went ahead, from its documents.`
     : answer === "WITH_DOCUMENTS"
       ? `Every document was there on ${day ?? "the day"}.`
+      : answer === "NOTHING_LISTED"
+        ? `${day ?? "The day"} passed with no document listed for it, so nothing says what it had.`
       : answer === "MISSING_DOCUMENTS"
         ? `${day ?? "The day"} passed with ${missing} of ${total} document${total === 1 ? "" : "s"} missing. Each discipline short of documents says why it went ahead without them, under Disciplines concerned; or write down here that it was postponed.`
         : active?.confirmedAt

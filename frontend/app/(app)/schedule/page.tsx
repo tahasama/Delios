@@ -32,7 +32,7 @@ export const metadata = { title: "Schedule" };
 type Readiness = PlanTableRow["readiness"];
 
 /** What became of the work, as against whether its documents arrived. */
-type Happened = "POSTPONED" | "CARRIED" | "DONE" | "AHEAD";
+type Happened = "POSTPONED" | "CARRIED" | "DONE" | "NONE" | "AHEAD";
 
 type Search = {
   view?: string; all?: string; q?: string; state?: string; happened?: string; nodate?: string; untagged?: string; discipline?: string; docType?: string; supplier?: string;
@@ -72,6 +72,7 @@ const HAPPENED = [
   { code: "WITH", label: "With documents" },
   { code: "WITHOUT", label: "Missing documents" },
   { code: "STOPPED", label: "Postponed" },
+  { code: "NONE", label: "Went ahead, nothing listed" },
 ];
 
 /** How many days either side of today the plan shows when nobody says otherwise. */
@@ -164,6 +165,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     WITH: (a) => a.needs.length > 0 && a.passed && !shortOnTheDay(a) && !postponed(a),
     WITHOUT: (a) => shortOnTheDay(a) && !postponed(a),
     STOPPED: (a) => postponed(a),
+    NONE: (a) => a.needs.length === 0 && a.passed && !postponed(a),
   };
 
   const has = (text: string | null | undefined, word: string) => !!text && text.toLowerCase().includes(word.toLowerCase());
@@ -231,7 +233,8 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
       ? "POSTPONED"
       : !passed
         ? "AHEAD"
-        : shortOnTheDay ? "CARRIED" : "DONE";
+        // Nothing listed: it went ahead, but nothing says it had what it needed (never "with documents").
+        : action.needs.length === 0 ? "NONE" : shortOnTheDay ? "CARRIED" : "DONE";
     return { ...action, total, ready, missing, daysUntil, readiness, firstNeeded, nextNeeded, happened };
   });
 

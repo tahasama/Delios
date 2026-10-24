@@ -45,7 +45,7 @@ export type PlanTableRow = {
   confirmed: string;
   confirmedTone: "good" | "bad" | "plain";
   /** What became of the work itself, and what its documents were on the day. */
-  happened: "POSTPONED" | "CARRIED" | "DONE" | "AHEAD";
+  happened: "POSTPONED" | "CARRIED" | "DONE" | "NONE" | "AHEAD";
   happenedNote: string;
 };
 
@@ -743,6 +743,7 @@ const HAPPENED: Record<PlanTableRow["happened"], { label: string; chip: string }
   POSTPONED: { label: "Postponed", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
   CARRIED: { label: "Missing documents", chip: "bg-amber-100 text-amber-900 ring-amber-300" },
   DONE: { label: "With documents", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
+  NONE: { label: "Went ahead", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
   AHEAD: { label: "Not yet", chip: "bg-sky-50 text-sky-800 ring-sky-200" },
 };
 
@@ -763,7 +764,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "happened", label: "Went ahead?",
-    note: "Once the day has passed: With documents — it had everything it needed, in time. Missing documents — it went ahead without all of them; each discipline that confirmed going ahead said why. Postponed — the control function wrote down that it did not happen. Before the day: not yet.",
+    note: "Once the day has passed: With documents — it had everything it needed, in time. Missing documents — it went ahead without all of them; each discipline that confirmed going ahead said why. Postponed — the control function wrote down that it did not happen. Went ahead — its day passed with no document listed, so nothing says what it had. Before the day: not yet.",
     cellClass: "whitespace-nowrap",
     // Before the day there is nothing to say: the column stays quiet.
     cell: (row) => row.happened === "AHEAD" ? <span className="text-xs text-slate-400">—</span> : (

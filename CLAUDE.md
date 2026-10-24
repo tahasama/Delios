@@ -1441,8 +1441,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the action is tagged with, found through the distribution matrix (adjust the
   disciplines in the Excel before upload). Description shows only on the
   action's own page, not in the table.
-- "Went ahead?" (after the day): With documents / Missing documents / Postponed;
-  "not yet" before the day. Going ahead needs the concerned disciplines to
+- "Went ahead?" (after the day): With documents / Missing documents / Postponed, or "Went ahead" (nothing
+  listed: no document is listed for it, so nothing says what it had; never "With documents"); "not yet" before the day. Going ahead needs the concerned disciplines to
   confirm; confirming with any of that discipline's documents missing always
   needs an explanation (backend refuses otherwise).
 - Risk window: the requirements list may give each document "Risk window (days)";

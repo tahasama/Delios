@@ -160,7 +160,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const happened = !postponed && action.passed;
   // Went ahead? Not yet before the day; after it, read from the documents unless postponed.
   const missingCount = action.needs.length - readyCount;
-  const wentAhead: WentAhead = postponed ? "POSTPONED" : !action.passed ? "NOT_YET" : missingCount > 0 ? "MISSING_DOCUMENTS" : "WITH_DOCUMENTS";
+  const wentAhead: WentAhead = postponed ? "POSTPONED" : !action.passed ? "NOT_YET" : action.needs.length === 0 ? "NOTHING_LISTED" : missingCount > 0 ? "MISSING_DOCUMENTS" : "WITH_DOCUMENTS";
 
   // One row per required document: what it is, whether it is there, and the
   // step where its time went. Dates are written here so the table stays a
