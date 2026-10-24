@@ -340,6 +340,14 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     else params.delete("step");
     return `/schedule?${params}`;
   };
+  /** The same plan, drawn as it is, the next presses of "Load more" drawing this many: choosing it loads nothing. */
+  const stepping = (by: number) => {
+    const params = new URLSearchParams(query);
+    if (shown !== PLAN_FIRST) params.set("show", String(shown));
+    if (by !== DEFAULT_STEP) params.set("step", String(by));
+    else params.delete("step");
+    return `/schedule?${params}`;
+  };
 
   /**
    * The window the plan opens on. It is not a filter — Clear all must not be
@@ -391,7 +399,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
                 shown: rows.length,
                 total: matching,
                 step,
-                steps: PLAN_STEPS.map((by) => ({ by, href: deeper(by) })),
+                steps: PLAN_STEPS.map((by) => ({ by, href: stepping(by) })),
                 href: matching > rows.length ? deeper(step) : null,
                 window: planWindow,
                 // The schedule's own first and last months, said beside the window.
