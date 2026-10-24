@@ -319,7 +319,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   of it said above when it would not read it); with a PDF too, "The PDF · The source file · <its kind>" above it, the PDF first, offered whenever both are
   there (owner: "i have no way to visualize one or the other"): a source the page cannot draw says so with its download.
   The bar above carries the file's name, a zoom (owner: "some control like a zoom"; − 50…300% +, the percentage back to
-  100%: the PDF opened at it, a picture, a workbook or a schedule scaled) and its download. **Every
+  100%: the PDF opened at it, a picture, a workbook or a schedule scaled), its download, and over a PDF (an office file's too) the switch **Dark page** (owner, off by default: the page dark, its text light, hues kept so a stamp stays green or red; drawn over the browser's reader, the file never changed; cookie `pdf-dark`). The PDF is never darkened by the theme alone. **Every
   other kind the owner asked for** (`docs/gaps/previews.md`): an old Excel .xls as its sheets (values only, ExcelDataReader);
   plain text (.txt, .log, .json, .xml, .md, .yaml…) as text, its first 2 MB (`GET /files/{id}/text`); Word, PowerPoint
   and their kin (.doc/.docx, .ppt/.pptx, .odt, .rtf, .vsdx…) as the PDF LibreOffice makes of them (Gotenberg service,
