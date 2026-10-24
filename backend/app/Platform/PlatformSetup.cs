@@ -385,6 +385,7 @@ public static class PlatformSetup
             Settings.Calendar.MapCalendarEndpoints(app);
             Identity.ProjectFunctions.MapProjectFunctionEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
+            Reviews.StampPlaceEndpoints.MapStampPlaceEndpoints(app);
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);
             Documents.KeepingEndpoints.MapKeepingEndpoints(app);
             Documents.SnapshotEndpoints.MapSnapshotEndpoints(app);

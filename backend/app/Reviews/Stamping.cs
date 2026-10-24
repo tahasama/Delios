@@ -59,7 +59,7 @@ public sealed class Stamping(
                 && f.Submission == revision.Submission).ToList())
             {
                 if (revision.Files.Any(f => f.DerivedFromId == rendition.Id && f.Kind == FileKinds.Stamped)) continue;
-                await DeriveAsync(rendition, FileKinds.Stamped, document, revision, bytes => Stamp(bytes, face, choices.Place, scale: choices.Scale, comments: comments,
+                await DeriveAsync(rendition, FileKinds.Stamped, document, revision, bytes => Stamp(bytes, face, choices.Place, scale: choices.Scale, placed: PlacedOf(revision), comments: comments,
                     commentsTitle: $"{document.Number} rev {revision.Value}: why, the comments of review {review.Number}"), cancellationToken);
             }
         }
@@ -135,9 +135,66 @@ public sealed class Stamping(
         foreach (var source in revision.Files.Where(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission).ToList())
         {
             if (revision.Files.Any(f => f.DerivedFromId == source.Id && f.Kind == FileKinds.Returned)) continue;
-            await DeriveAsync(source, FileKinds.Returned, document, revision, bytes => Stamp(bytes, face, choices.Place, scale: choices.Scale, comments: comments,
+            await DeriveAsync(source, FileKinds.Returned, document, revision, bytes => Stamp(bytes, face, choices.Place, scale: choices.Scale, placed: PlacedOf(revision), comments: comments,
                 commentsTitle: $"{document.Number} rev {revision.Value}: why, the comments of review {review.Number}"), cancellationToken);
         }
+    }
+
+    /// <summary>Where the control function put the stamp by hand before it was made, as a share of the page; none: found.</summary>
+    private static (double X, double Y)? PlacedOf(Revision revision) =>
+        revision.StampX is { } x && revision.StampY is { } y ? (x, y) : null;
+
+    /// <summary>
+    /// Where the stamp of a decided review will go, to place it by hand before the release (owner): its size, the first
+    /// page's, and the spot the app would find (null: no room, a stamp page is added). Null when nothing is stamped
+    /// (switched off, no PDF, released without a review).
+    /// </summary>
+    public async Task<StampPlan?> PlanAsync(Review review, Revision revision, CancellationToken cancellationToken)
+    {
+        if (review.Verdict is null) return null;
+        var choices = await StampChoices.ReadAsync(db, revision.ProjectId, cancellationToken);
+        var returned = review.VerdictSet is null || !ReviewSets.Proceeds(await Catalog.LoadAsync(db, cancellationToken), review.VerdictSet, review.Verdict);
+        if (!choices.On(returned ? FileKinds.Returned : "RELEASED")) return null;
+        var rendition = revision.Files.FirstOrDefault(f => f.Kind == FileKinds.Rendition && f.Status == FileStatuses.Clean && f.Submission == revision.Submission);
+        if (rendition is null) return null;
+        var document = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == revision.DocumentId, cancellationToken);
+        var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == revision.ProjectId, cancellationToken);
+        var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(project.TimeZone) ?? DateTimeZone.Utc;
+        var full = await db.Reviews.AsNoTracking().Include(r => r.Steps).ThenInclude(s => s.Participants).SingleAsync(r => r.Id == review.Id, cancellationToken);
+        var face = await FaceAsync(full, document, revision, zone, choices, returned, cancellationToken);
+        var comments = choices.Comments ? (await CommentsAsync(review.Id, cancellationToken)).Count : 0;
+        var (w, h) = Size(face, comments, choices.Scale);
+        byte[] pdf;
+        await using (var stream = await storage.OpenReadAsync(rendition.ObjectKey, cancellationToken))
+        using (var buffer = new MemoryStream())
+        {
+            await stream.CopyToAsync(buffer, cancellationToken);
+            pdf = buffer.ToArray();
+        }
+        double pageW = 595, pageH = 842;
+        (double X, double Y)? found = null;
+        var drawn = false;
+        try
+        {
+            using var input = new MemoryStream(pdf);
+            using var read = PdfReader.Open(input, PdfDocumentOpenMode.Import);
+            pageW = read.Pages[0].Width.Point;
+            pageH = read.Pages[0].Height.Point;
+            if (StampPlacement.Read(pdf) is [{ } ink, ..])
+            {
+                drawn = true;
+                found = StampPlacement.Find(ink, pageW, pageH, w, h, choices.Place);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Could not read {File} to place its stamp", rendition.Name);
+        }
+        // A PDF that could not be looked at keeps the chosen corner, as the stamp does.
+        if (!drawn)
+            found = (choices.Place.EndsWith("LEFT") ? StampPlacement.Margin : pageW - w - StampPlacement.Margin,
+                choices.Place.StartsWith("BOTTOM") ? pageH - h - StampPlacement.Margin : StampPlacement.Margin);
+        return new StampPlan(rendition.Id, pageW, pageH, w, h, found is { } f ? (f.X / pageW, f.Y / pageH) : null, returned);
     }
 
     /// <summary>
@@ -267,7 +324,7 @@ public sealed class Stamping(
     /// chose to add; the organization's words at its foot. In a corner of every page (<paramref name="place"/>).
     /// </summary>
     public static byte[] Stamp(byte[] pdf, StampFace face, string place = StampChoices.TopRight, IReadOnlyList<string>? comments = null,
-        string? commentsTitle = null, double scale = 1)
+        string? commentsTitle = null, double scale = 1, (double X, double Y)? placed = null)
     {
         using var input = new MemoryStream(pdf);
         using var document = PdfReader.Open(input, PdfDocumentOpenMode.Modify);
@@ -293,37 +350,44 @@ public sealed class Stamping(
         // Step · grade · by · on; "on" takes more room when it carries the time as well.
         double[] cols = face.Rows.Any(r => r.On.Contains(':')) ? [0.25, 0.24, 0.22, 0.29] : [0.29, 0.26, 0.24, 0.21];
 
-        foreach (var page in document.Pages.Cast<PdfPage>().ToList())
+        // Where each page takes it: placed by hand before the release (the same spot, as a share of the page, on every
+        // page), else the first clear spot (StampPlacement); a page whose drawing leaves no room gets a small mark, the
+        // stamp itself going on a page added at the end. A PDF PDFium cannot draw keeps the chosen corner, as before.
+        List<StampPlacement.Ink?>? inks = null;
+        if (placed is null)
         {
-            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
-            string Fit(string s, XFont font, double room)
-            {
-                if (gfx.MeasureString(s, font).Width <= room) return s;
-                while (s.Length > 1 && gfx.MeasureString(s + "…", font).Width > room) s = s[..^1];
-                return s.TrimEnd() + "…";
-            }
-            List<string> Wrap(string s, XFont font, double room)
-            {
-                var lines = new List<string>();
-                var current = "";
-                foreach (var word in s.Replace("\r", "").Split(' ', '\n'))
-                {
-                    var candidate = current.Length == 0 ? word : $"{current} {word}";
-                    if (gfx.MeasureString(candidate, font).Width > room && current.Length > 0) { lines.Add(current); current = word; }
-                    else current = candidate;
-                }
-                if (current.Length > 0) lines.Add(current);
-                return lines.Take(4).ToList();
-            }
-            var room = width - 2 * pad;
-            var footLines = face.Note is { Length: > 0 } note ? Wrap(note, foot, room) : [];
-            var height = pad + 8 + 6 + badgeH + (fields.Count > 0 ? 4 + fields.Count * fieldH : 0)
-                + (face.Rows.Count > 0 ? 6 + 7 + face.Rows.Count * rowH : 0)
-                + (footLines.Count > 0 ? 6 + footLines.Count * footH : 0) + pad;
+            try { inks = StampPlacement.Read(pdf); } catch (Exception) { inks = null; }
+        }
+        var pages = document.Pages.Cast<PdfPage>().ToList();
+        var stampPage = pages.Count + 1;
+        var lacking = new List<int>();
 
-            // The stamp is drawn at its own size, then scaled as the project chose (frame and words together).
-            var atX = place.EndsWith("LEFT") ? 18 : page.Width.Point - width * scale - 18;
-            var atY = place.StartsWith("BOTTOM") ? page.Height.Point - height * scale - 18 : 18;
+        string Fit(XGraphics gfx, string s, XFont font, double room)
+        {
+            if (gfx.MeasureString(s, font).Width <= room) return s;
+            while (s.Length > 1 && gfx.MeasureString(s + "…", font).Width > room) s = s[..^1];
+            return s.TrimEnd() + "…";
+        }
+        List<string> Wrap(XGraphics gfx, string s, XFont font, double room)
+        {
+            var lines = new List<string>();
+            var current = "";
+            foreach (var word in s.Replace("\r", "").Split(' ', '\n'))
+            {
+                var candidate = current.Length == 0 ? word : $"{current} {word}";
+                if (gfx.MeasureString(candidate, font).Width > room && current.Length > 0) { lines.Add(current); current = word; }
+                else current = candidate;
+            }
+            if (current.Length > 0) lines.Add(current);
+            return lines.Take(4).ToList();
+        }
+        const double room = width - 2 * pad;
+        double HeightOf(XGraphics gfx) => Size(face, comments?.Count ?? 0, 1).H;
+
+        // The stamp, drawn at its own size then scaled as the project chose (frame and words together).
+        void DrawAt(XGraphics gfx, double atX, double atY, double height)
+        {
+            var footLines = face.Note is { Length: > 0 } note ? Wrap(gfx, note, foot, room) : [];
             var state = gfx.Save();
             gfx.TranslateTransform(atX, atY);
             gfx.ScaleTransform(scale);
@@ -334,14 +398,14 @@ public sealed class Stamping(
             // Who reviewed, on what.
             var y = top + pad + 6;
             var who = face.Project.Length > 0 ? $"{face.Organization} · {face.Project}" : face.Organization;
-            gfx.DrawString(Fit(who, heading, room), heading, text, left, y);
+            gfx.DrawString(Fit(gfx, who, heading, room), heading, text, left, y);
 
             // The outcome alone, in its badge.
             y += 6;
             var badge = new XRect(left, y, room, badgeH);
             gfx.DrawRoundedRectangle(new XSolidBrush(tint), badge, new XSize(5, 5));
             var said = face.Code is { } c ? $"{c} — {face.Outcome}" : face.Outcome;
-            gfx.DrawString(Fit(said, outcome, room - 12), outcome, ink, new XRect(badge.X + 6, badge.Y, room - 12, badge.Height), XStringFormats.CenterLeft);
+            gfx.DrawString(Fit(gfx, said, outcome, room - 12), outcome, ink, new XRect(badge.X + 6, badge.Y, room - 12, badge.Height), XStringFormats.CenterLeft);
             y = badge.Bottom;
 
             if (fields.Count > 0)
@@ -351,7 +415,7 @@ public sealed class Stamping(
                 {
                     y += fieldH;
                     gfx.DrawString(one.Label.ToUpperInvariant(), caps, muted, left, y);
-                    gfx.DrawString(Fit(one.Value, value, room - 52), value, text, left + 52, y);
+                    gfx.DrawString(Fit(gfx, one.Value, value, room - 52), value, text, left + 52, y);
                 }
             }
             if (face.Rows.Count > 0)
@@ -367,7 +431,7 @@ public sealed class Stamping(
                     y += rowH;
                     string[] cells = [row.Step, row.Grade, row.Who, row.On];
                     cx = left;
-                    for (var i = 0; i < 4; i++) { gfx.DrawString(Fit(cells[i], cell, cols[i] * room - 3), cell, text, cx, y); cx += cols[i] * room; }
+                    for (var i = 0; i < 4; i++) { gfx.DrawString(Fit(gfx, cells[i], cell, cols[i] * room - 3), cell, text, cx, y); cx += cols[i] * room; }
                 }
             }
             if (footLines.Count > 0)
@@ -379,10 +443,90 @@ public sealed class Stamping(
             }
             gfx.Restore(state);
         }
+
+        for (var index = 0; index < pages.Count; index++)
+        {
+            var page = pages[index];
+            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            double pageW = page.Width.Point, pageH = page.Height.Point;
+            var height = HeightOf(gfx);
+            double w = width * scale, h = height * scale;
+            double atX = place.EndsWith("LEFT") ? StampPlacement.Margin : pageW - w - StampPlacement.Margin;
+            double atY = place.StartsWith("BOTTOM") ? pageH - h - StampPlacement.Margin : StampPlacement.Margin;
+            if (placed is { } spot)
+            {
+                atX = Math.Clamp(spot.X * pageW, 0, Math.Max(0, pageW - w));
+                atY = Math.Clamp(spot.Y * pageH, 0, Math.Max(0, pageH - h));
+            }
+            else if (inks is not null && index < inks.Count && inks[index] is { } pageInk)
+            {
+                if (StampPlacement.Find(pageInk, pageW, pageH, w, h, place) is { } clear)
+                    (atX, atY) = clear;
+                else
+                {
+                    // No room on this page: a small mark saying where the stamp is.
+                    lacking.Add(index + 1);
+                    var words = $"Reviewed · the stamp is on page {stampPage}";
+                    var markW = gfx.MeasureString(words, value).Width + 14;
+                    const double markH = 14;
+                    var (mx, my) = StampPlacement.Find(pageInk, pageW, pageH, markW, markH, place)
+                        ?? (place.EndsWith("LEFT") ? StampPlacement.Margin : pageW - markW - StampPlacement.Margin,
+                            place.StartsWith("BOTTOM") ? pageH - markH - StampPlacement.Margin : StampPlacement.Margin);
+                    gfx.DrawRoundedRectangle(border, paper, new XRect(mx, my, markW, markH), new XSize(5, 5));
+                    gfx.DrawString(words, value, ink, new XRect(mx + 7, my, markW - 14, markH), XStringFormats.CenterLeft);
+                    continue;
+                }
+            }
+            DrawAt(gfx, atX, atY, height);
+        }
+
+        if (lacking.Count > 0)
+        {
+            // The stamp page: the stamp itself, for the pages that had no room for it.
+            var added = document.AddPage();
+            added.Width = XUnit.FromPoint(595);
+            added.Height = XUnit.FromPoint(842);
+            using var gfx = XGraphics.FromPdfPage(added);
+            var said = lacking.Count == pages.Count
+                ? "The review's stamp: the drawing left no room for it on its pages."
+                : $"The review's stamp for page{(lacking.Count == 1 ? "" : "s")} {string.Join(", ", lacking)}: the drawing left no room for it there.";
+            gfx.DrawString(said, value, muted, new XRect(40, 40, 515, 14), XStringFormats.TopLeft);
+            DrawAt(gfx, 40, 64, HeightOf(gfx));
+        }
         if (withComments) AppendComments(document, commentsTitle ?? "Comments", comments!);
         using var output = new MemoryStream();
         document.Save(output);
         return output.ToArray();
+    }
+
+    /// <summary>
+    /// How large the stamp is, in points, at the project's size: always 250 wide before scaling, as tall as what it
+    /// carries (its fields, the grades given, the organization's words). Read to place it by hand before it is made.
+    /// </summary>
+    public static (double W, double H) Size(StampFace face, int comments, double scale)
+    {
+        const double width = 250, pad = 8, fieldH = 9, rowH = 8.6, footH = 6.8, badgeH = 14;
+        var fields = face.Fields.Count + (comments > 0 ? 1 : 0);
+        var footLines = 0;
+        if (face.Note is { Length: > 0 } note)
+        {
+            var gfx = XGraphics.CreateMeasureContext(new XSize(595, 842), XGraphicsUnit.Point, XPageDirection.Downwards);
+            var foot = new XFont(EmbeddedFonts.Family, 5.6, XFontStyleEx.Regular);
+            var lines = 0;
+            var current = "";
+            foreach (var word in note.Replace("\r", "").Split(' ', '\n'))
+            {
+                var candidate = current.Length == 0 ? word : $"{current} {word}";
+                if (gfx.MeasureString(candidate, foot).Width > width - 2 * pad && current.Length > 0) { lines++; current = word; }
+                else current = candidate;
+            }
+            if (current.Length > 0) lines++;
+            footLines = Math.Min(lines, 4);
+        }
+        var height = pad + 8 + 6 + badgeH + (fields > 0 ? 4 + fields * fieldH : 0)
+            + (face.Rows.Count > 0 ? 6 + 7 + face.Rows.Count * rowH : 0)
+            + (footLines > 0 ? 6 + footLines * footH : 0) + pad;
+        return (width * scale, height * scale);
     }
 
     /// <summary>SUPERSEDED (or another word) across every page, with a note under it.</summary>
@@ -473,6 +617,9 @@ public sealed record StampFace(string Organization, string Project, string? Code
 
 /// <summary>A field of the stamp: what it is, and what it says.</summary>
 public sealed record StampField(string Label, string Value);
+
+/// <summary>Where a decided review's stamp will go: on which PDF, the page and the stamp in points, the app's spot as a share of the page (null: no room).</summary>
+public sealed record StampPlan(Guid FileId, double PageW, double PageH, double StampW, double StampH, (double X, double Y)? Found, bool Returned);
 
 /// <summary>One grade given on the stamp: the step, the grade, who gave it, the day.</summary>
 public sealed record StampRow(string Step, string Grade, string Who, string On);

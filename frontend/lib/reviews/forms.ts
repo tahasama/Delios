@@ -234,3 +234,18 @@ export async function setRouteVerdictsAction(_prev: { error?: string; ok?: strin
   revalidatePath("/settings/flow");
   return { ok: "Saved: the route decides with that set from now on." };
 }
+
+/** Puts a decided review's stamp at a spot by hand (its top left as a share of the page), or back to the app's place. */
+export async function placeStampAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const ctx = await requireScope();
+  const reviewId = String(formData.get("reviewId") ?? "");
+  const back = formData.get("back") === "1";
+  const x = Number(formData.get("x")), y = Number(formData.get("y"));
+  try {
+    await api(projectPath(ctx, `/reviews/${reviewId}/stamp-place`), { method: "PUT", body: back ? { x: null, y: null } : { x, y } });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath(`/reviews/${reviewId}`);
+  return { ok: back ? "The app places the stamp again." : "The stamp goes there." };
+}

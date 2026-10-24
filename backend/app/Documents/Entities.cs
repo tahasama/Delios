@@ -330,6 +330,15 @@ public sealed class Revision
     public Instant? HeldAt { get; set; }
     public string? HeldReason { get; set; }
     public string? HeldByName { get; set; }
+    /// <summary>
+    /// Where the control function put the review's stamp by hand before the release (owner: the usual corner may be
+    /// filled), its top left as a share of the page's width and height; none: the app finds a clear spot. Only the
+    /// place is chosen, never what the stamp says; fixed once the stamp is made.
+    /// </summary>
+    public double? StampX { get; set; }
+    public double? StampY { get; set; }
+    public string? StampPlacedByName { get; set; }
+    public Instant? StampPlacedAt { get; set; }
     /// <summary>Voided: released in error, or never reviewed. Who decided it, why, and what was found of the work done from it.</summary>
     public Instant? VoidedAt { get; set; }
     public string? VoidReason { get; set; }

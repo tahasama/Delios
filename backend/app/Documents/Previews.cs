@@ -43,6 +43,7 @@ public static class Previews
         project.MapGet("/files/{fileId:guid}/as-pdf", AsPdfAsync);
         project.MapGet("/files/{fileId:guid}/as-dxf", AsDxfAsync);
         project.MapGet("/files/{fileId:guid}/text", TextAsync);
+        project.MapGet("/files/{fileId:guid}/page.png", FirstPageAsync);
     }
 
     /// <summary><c>GET /files/{fileId}/as-pdf</c>: a Word, PowerPoint or other office file as a PDF, made once.</summary>
@@ -146,6 +147,36 @@ public static class Previews
         try { text = new UTF8Encoding(false, true).GetString(buffer, 0, read); }
         catch (DecoderFallbackException) { text = Encoding.Latin1.GetString(buffer, 0, read); }
         return Results.Ok(new { text = text.TrimStart('﻿'), cut = file.Size > MaxText });
+    }
+
+    /// <summary>
+    /// <c>GET /files/{fileId}/page.png</c>: a PDF's first page as a picture, about 1,400 pixels on its longest side, to
+    /// place the review's stamp on it by hand. Drawn by PDFium, nothing in the file runs.
+    /// </summary>
+    private static async Task<IResult> FirstPageAsync(Guid fileId, HttpContext http, DeliosDbContext db, Transmittals.TransmittalService transmittals,
+        FileStorage storage, CancellationToken cancellationToken)
+    {
+        var (file, refused) = await DocumentEndpoints.ReadableAsync(fileId, ProjectAccessFilter.Of(http), db, transmittals, cancellationToken);
+        if (file is null) return refused!;
+        if (!file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && file.ContentType != "application/pdf")
+            return Problems.Invalid("NOT_A_PDF", $"{file.Name} is not a PDF.");
+        byte[] pdf;
+        await using (var source = await storage.OpenReadAsync(file.ObjectKey, cancellationToken))
+        using (var buffer = new MemoryStream())
+        {
+            await source.CopyToAsync(buffer, cancellationToken);
+            pdf = buffer.ToArray();
+        }
+        try
+        {
+            using var input = new MemoryStream(pdf);
+            using var read = PdfSharp.Pdf.IO.PdfReader.Open(input, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+            var longest = Math.Max(read.Pages[0].Width.Point, read.Pages[0].Height.Point);
+            if (Reviews.StampPlacement.FirstPage(pdf, Math.Min(2, 1400 / Math.Max(1, longest))) is { } page)
+                return Results.File(page.Png, "image/png");
+        }
+        catch (Exception e) when (e is not OperationCanceledException) { }
+        return Problems.Invalid("PAGE_NOT_DRAWN", $"The first page of {file.Name} could not be drawn.");
     }
 
     /// <summary>A name the converter takes: its letters kept, anything else that could upset a form replaced.</summary>

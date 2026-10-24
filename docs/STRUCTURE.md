@@ -38,7 +38,7 @@ backend/
 │   │                     Previews: office files to PDF, DWG to DXF, text (components text-, office-, drawing-, model-view.tsx; deploy/dwg)
 │   │                     ListRules: groups, the app's lists, which set of a list serves a deliverable type; Catalog.IsOfferedFor checks it
 │   │                     SheetGuard: every spreadsheet checked before it is read (type, size unpacked, macros, viruses)
-│   ├── Reviews/          routes, steps, advice, verdicts, release
+│   ├── Reviews/          routes, steps, advice, verdicts, release; the stamp (Stamping, where it goes: StampPlacement, StampPlaceEndpoints)
 │   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs); what a request asks and where it is decided (Asks.cs); matching what arrived
 │   │                     to one of ours and packages taking documents as they come (IncomingService.Taking.cs)
 │   ├── Packages/         delivery packages and supplier packages; how other organizations' documents come in (Intake.cs: by placeholder or as they come)

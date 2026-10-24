@@ -1688,6 +1688,22 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("series");
 
+                    b.Property<Instant?>("StampPlacedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("stamp_placed_at");
+
+                    b.Property<string>("StampPlacedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("stamp_placed_by_name");
+
+                    b.Property<double?>("StampX")
+                        .HasColumnType("double precision")
+                        .HasColumnName("stamp_x");
+
+                    b.Property<double?>("StampY")
+                        .HasColumnType("double precision")
+                        .HasColumnName("stamp_y");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasMaxLength(16)

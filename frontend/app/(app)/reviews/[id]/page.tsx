@@ -35,6 +35,8 @@ import { cookies } from "next/headers";
 import { PREF, paneWidth } from "@/lib/core/preferences";
 import { readersOn } from "@/lib/settings/viewers";
 import { FilesChecking } from "@/components/files-checking";
+import { stampPlan } from "@/lib/reviews/api";
+import { StampPlacer } from "./stamp-placer";
 import { checking } from "@/lib/documents/checking";
 import { ResizablePane } from "@/components/resizable-pane";
 import { ArrowLeft, Bell, ExternalLink, FileText, Pencil } from "lucide-react";
@@ -250,6 +252,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   // own release form, as from the document page (owner: "release do not appear in the review detail").
   const waitsRelease = controller && rev.state === "NOT_RELEASED";
   const letsItOut = waitsRelease ? await decisionLetsItOut(ctx, rev.id) : false;
+  const placing = waitsRelease ? await stampPlan(ctx, cycle.id) : null;
 
   const outcomeCheckRun = cycle.outcome ? null : await preflight("RECORD_OUTCOME", { cycleId: cycle.id });
   const outcomeChecks = outcomeCheckRun ? { ...outcomeCheckRun, warnings: outcomeCheckRun.warnings.filter((one) => one.id !== "OUT-SET") } : null;
@@ -312,6 +315,17 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             </p>
             <Link href={`/documents/${doc.id}#step-release`} data-on="true" className="ask">{letsItOut ? `Release rev ${rev.value}` : `Send rev ${rev.value} back`}</Link>
           </div>
+        </section>
+      ) : null}
+
+      {/* Where the stamp goes, before it is made: the app's clear spot, or put elsewhere by the control function. */}
+      {waitsRelease && placing?.open && placing.fileId && placing.page && placing.stamp ? (
+        <section className="register register-sheet register-sheet-open" aria-labelledby="stamp-place-head">
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+            <h2 id="stamp-place-head" className="stencil mr-1 text-slate-500">Where the stamp goes</h2>
+            <span className="text-[11px] text-slate-500">on rev {rev.value}&rsquo;s PDF, once it is {letsItOut ? "released" : "sent back"}</span>
+          </div>
+          <StampPlacer reviewId={cycle.id} plan={{ ...placing, fileId: placing.fileId, page: placing.page, stamp: placing.stamp }} />
         </section>
       ) : null}
 

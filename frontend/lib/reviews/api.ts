@@ -260,3 +260,19 @@ export async function preparingOf(scope: Scope, documentIds: string[]): Promise<
   };
 }
 
+
+/** Where a decided review's stamp will go (the control function only; backend `StampPlaceEndpoints`). */
+export type StampPlan = {
+  open: boolean;
+  fileId?: string;
+  page?: { w: number; h: number };
+  stamp?: { w: number; h: number };
+  /** The app's clear spot, its top left as a share of the page; null: no room, a stamp page is added. */
+  found?: { x: number; y: number } | null;
+  returned?: boolean;
+  placed?: { x: number; y: number; by: string | null; at: string | null } | null;
+};
+
+export async function stampPlan(t: { projectId: string }, reviewId: string): Promise<StampPlan | null> {
+  return api<StampPlan>(projectPath(t, `/reviews/${reviewId}/stamp-place`)).catch(() => null);
+}

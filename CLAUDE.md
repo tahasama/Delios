@@ -300,7 +300,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   off); and the organization's words at its foot (`STAMP_NOTE`, what the review does not relieve the sender of, as its
   contracts say it; none unless written, 240 characters). **How large** (`STAMP_SIZE`, S · M · L · XL = 0.8 · 1 · 1.25
   · 1.5, Normal by default): frame and words grow or shrink together. **Where it sits** (`STAMP_PLACE`,
-  top right by default, or another corner). **The marks across the page**, as they were (owner): superseded, void, on
+  top right by default, or another corner). **Never over the drawing** (owner: "the usual placement might be filled"; "the stamp is automatic to prevent
+  falsification"): each page is looked at as a picture (PDFium, `Docnet.Core`, read only; `Reviews/StampPlacement.cs`)
+  and the stamp put on the first clear spot: the chosen corner, the others, then along the edges; a page with no room
+  gets a small mark ("Reviewed · the stamp is on page N") and the stamp itself goes on a page added at the end. Before
+  the release or the send-back, the control function may move it by hand on the review's page ("Where the stamp goes",
+  the first page with the stamp's frame, dragged; `stamp-placer.tsx`, `GET`/`PUT /reviews/{id}/stamp-place`,
+  `Revision.StampX/StampY`, STAMP_PLACED with from → to; "Back to the app's place"): only its place, never what it says;
+  fixed once the stamp is made (STAMP_FIXED). No verification code on it (owner: it adds no authenticity). **The marks across the page**, as they were (owner): superseded, void, on
   hold (`STAMP:SUPERSEDED|VOID|HELD`, on). Beside the form, the stamp drawn on a page as it will read (22.5rem wide by default, owner: "50% wider"), dragged larger by its left edge (owner: "give more by making it
   resizable"; `ResizablePane`, cookie `pane-stamp`; the stamp drawn to the page's scale) (`Stamping.Stamp`,
   `StampFace`; a code with no name reads as words, "No comment", never the app's code). The Control room only reads it, one line on each step that stamps, with "change" to the card; the Defaults for
