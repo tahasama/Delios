@@ -16,6 +16,8 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false, not
   note?: boolean;
 }) {
   const [noted, setNoted] = useState(note);
+  // 3D parts the reader leaves out (owner: "a 3d dwg returned a 2d visual"), counted in the DXF before it is drawn.
+  const [left, setLeft] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const viewer = useRef<DxfViewer | null>(null);
   const base = useRef(1);
@@ -34,7 +36,9 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false, not
           const body = answer ? await answer.json().catch(() => ({})) : {};
           return { error: body.error ?? "The drawing could not be shown." };
         }
-        return URL.createObjectURL(await answer.blob());
+        const text = await answer.text();
+        setLeft((text.match(/\n[ \t]*0\r?\n(?:3DSOLID|BODY|SURFACE|PLANESURFACE|EXTRUDEDSURFACE|LOFTEDSURFACE|REVOLVEDSURFACE|SWEPTSURFACE|NURBSURFACE|MESH|REGION)\r?\n/g) ?? []).length);
+        return URL.createObjectURL(new Blob([text], { type: "application/dxf" }));
       };
       const [{ DxfViewer: Viewer }, three] = await Promise.all([import("dxf-viewer"), import("three")]);
       if (gone || !box.current) return;
@@ -96,6 +100,11 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false, not
             }}>
             <X className="h-3.5 w-3.5" />
           </button>
+        </p>
+      ) : null}
+      {left > 0 && state === "ready" ? (
+        <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-1 text-[11px] text-amber-900">
+          <span className="font-semibold">{left} 3D {left === 1 ? "part is" : "parts are"} not shown</span> · this reader draws a drawing flat, seen from above.
         </p>
       ) : null}
       <div className="relative flex min-h-0 w-full flex-1">

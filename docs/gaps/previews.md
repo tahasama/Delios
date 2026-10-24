@@ -42,3 +42,7 @@ on the project's drawings, the certified routes above stay open.
 - **A drawing with nothing the reader draws** (owner's "Visualization - Sun and Sky Demo": 15 3D solids, ACIS bodies,
   nothing else) is said in words ("Nothing in … can be drawn here: it holds only 3D solids…"), never a blank page. No
   free reader draws 3D solids; a certified reader does.
+- **3D parts of a drawing** (owner: "a 3d dwg returned a 2d visual"): the drawing reader draws flat, seen from above;
+  3D solids, surfaces, meshes and regions are left out, counted in the DXF and said above it ("N 3D parts are not
+  shown"). A drawing coloured by its own lines rather than its layers (the owner's multi-family demo: 381 lines set to
+  one brown, 420 = 8867329) is drawn as the file says, as AutoCAD does; the Layers list shows the layers' own colours.
