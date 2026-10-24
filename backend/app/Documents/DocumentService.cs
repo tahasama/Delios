@@ -692,13 +692,16 @@ public sealed class DocumentService(
         revision.FilesState = FilesStates.Processing;
         foreach (var old in kept)
         {
-            db.StoredFiles.Add(new StoredFile
+            // The file carried over is a record of its own, with its own copy: a key belongs to one record only (it was
+            // shared before, and the second record broke the unique key: "an error occurred" on adding a PDF beside a
+            // source file, or the other way round).
+            var carried = new StoredFile
             {
                 TenantId = old.TenantId,
                 ProjectId = old.ProjectId,
                 DocumentId = old.DocumentId,
                 RevisionId = revision.Id,
-                ObjectKey = old.ObjectKey,
+                ObjectKey = "",
                 Name = old.Name,
                 ContentType = old.ContentType,
                 Size = old.Size,
@@ -712,7 +715,10 @@ public sealed class DocumentService(
                 UploadedByName = old.UploadedByName,
                 CreatedAt = old.CreatedAt,
                 ScannedAt = old.ScannedAt,
-            });
+            };
+            carried.ObjectKey = FileStorage.KeyFor(carried.TenantId, carried.ProjectId, carried.Id);
+            await storage.CopyAsync(old.ObjectKey, carried.ObjectKey, cancellationToken);
+            db.StoredFiles.Add(carried);
         }
         Bind(files, revision);
         document!.UpdatedAt = now;

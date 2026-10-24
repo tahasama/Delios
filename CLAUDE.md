@@ -183,6 +183,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   words naming the right box (`UploadRequest.Slot`, SOURCE_IS_PDF / NOT_A_PDF, the box outlined). On a new document the
   register entry stays and its page says why the files were not attached ("Registered, without its files"). Under each
   box of Edit rev, what it holds now ("Now: <name>", the source file with its kind) or "None yet" (owner).
+- A new file replaces the one of its kind as a new submission; the other file is carried into it as a record of its own,
+  with its own copy in storage (`FileStorage.CopyAsync`): a storage key belongs to one record only (the shared key broke
+  adding a PDF beside a source file).
 - A fault of ours (a 5xx with no refusal code) never shows the server's own words: "Something went wrong on our side and
   nothing was saved…" (`problemOf`, `lib/client.ts`).
 - Starting a revision asks one text, "What changed, and why" (never two fields

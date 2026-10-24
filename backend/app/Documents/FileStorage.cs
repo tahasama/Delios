@@ -101,6 +101,9 @@ public sealed class FileStorage(IObjectStore store, IClock clock)
     /// <summary>Opens the stored bytes for reading. Used by the worker to scan and check a file.</summary>
     public Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken) => store.OpenReadAsync(key, cancellationToken);
 
+    /// <summary>A stored file copied under another key: each file record owns its own object (keys are unique).</summary>
+    public Task CopyAsync(string from, string to, CancellationToken cancellationToken) => store.CopyAsync(from, to, cancellationToken);
+
     /// <summary>
     /// The <c>Content-Disposition</c> header value that makes the browser save the file under its own name
     /// (UTF-8 encoded, so any characters work).
