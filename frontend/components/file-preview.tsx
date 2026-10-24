@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Maximize2, Minus, Plus } from "lucide-react";
+import { Download, Maximize2, Minus, Plus, Printer } from "lucide-react";
+import { useDark } from "@/components/use-dark";
+import { DARK_PDF_FILTER, printPdf, readerUrl } from "@/lib/documents/pdf-dark";
 import { WorkbookView } from "@/components/workbook-view";
 import { ScheduleFileView } from "@/components/schedule-file-view";
 import { TextView } from "@/components/text-view";
@@ -88,6 +90,7 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
   const kind = switchedOff ? null : sourceView(source);
   const [showing, setShowing] = useState<"pdf" | "source">(show === "source" && source ? "source" : pdf ? "pdf" : "source");
   const [zoom, setZoom] = useState(1);
+  const dark = useDark();
   if (!pdf && !source) return <>{empty}</>;
   // The choice made is kept while the files change under it (a new one uploaded, another still being checked): the
   // source shown only while there is one, else the PDF.
@@ -124,6 +127,13 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
               </button>
             </span>
           ) : null}
+          {dark && (!onSource || kind === "office") ? (
+            // In dark mode the reader's own bar is hidden: its printing is here (the PDF as it is).
+            <button type="button" onClick={() => printPdf(onSource ? `/api/files/${source!.id}/as-pdf` : `/api/files/${pdf!.id}`)} title="Print the PDF" aria-label="Print the PDF"
+              className="grid h-6 w-6 place-items-center text-slate-600 hover:text-brand-ink">
+              <Printer className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
           {!full ? (
             // The same Preview over the whole window, in a new tab (owner: "full page"): what is shown now opens first.
             <a href={`/preview?${new URLSearchParams({ ...(pdf ? { pdf: pdf.id, pdfName: pdf.name } : {}), ...(source ? { source: source.id, sourceName: source.name } : {}),
@@ -140,7 +150,8 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
       </div>
       {!onSource ? (
         // The browser's own PDF viewer, opened at the zoom chosen.
-        <iframe key={zoom} src={`/api/files/${pdf!.id}#zoom=${Math.round(zoom * 100)}`} title={title} className={`block w-full bg-slate-100 ${height}`} />
+        <iframe key={`${zoom}-${dark}`} src={readerUrl(`/api/files/${pdf!.id}`, zoom, dark)} title={title} className={`block w-full bg-slate-100 ${height}`}
+          style={dark ? { filter: DARK_PDF_FILTER } : undefined} />
       ) : kind === "image" ? (
         <div className={`grid w-full place-items-center overflow-auto bg-slate-100 p-4 ${height}`}>
           {/* A picture uploaded as the source, served by the app's own file route (no outside address). */}

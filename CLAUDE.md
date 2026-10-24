@@ -329,9 +329,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   there (owner: "i have no way to visualize one or the other"): a source the page cannot draw says so with its download.
   The bar above carries the file's name, a zoom (owner: "some control like a zoom"; − 50…300% +, the percentage back to
   100%: the PDF opened at it, a picture, a workbook or a schedule scaled), its download, the **Full page** icon (owner: the same Preview, its bar and all, over the whole window in a new tab,
-  `/preview?pdf=…&source=…&show=…`, `app/(start)/preview`; the backend still checks every file). **No dark page** (owner, after trying it: "if it can't be done correctly we can't do anything"): the PDF is
-  the browser's own reader, as it is, whatever the theme; darkening it from outside flipped the reader's own bar, and a
-  reader of our own never matched the browser's (pages, text, drawing, print…). **Tabs read as tabs in the dark** (owner): the chosen `.segment`, and the chosen side of a `.choice`, stand raised in light. The PDF is never darkened by the theme alone. **Every
+  `/preview?pdf=…&source=…&show=…`, `app/(start)/preview`; the backend still checks every file). **The PDF follows the app's mode** (owner: "it would change with the app's modes"; no switch): in dark mode the
+  browser's reader is shown darkened, its page dark and its hues kept (a stamp stays green or red), its own bar and side
+  panel hidden (`#toolbar=0&navpanes=0`), since darkening the reader from outside flips them to light; the Preview's bar
+  then carries print (the PDF as it is) beside zoom and download (`lib/documents/pdf-dark.ts`). Word and PowerPoint, shown
+  as their PDF, the same. In light mode the reader is the browser's own, whole. A reader of our own was tried and taken
+  out (it never matched the browser's). **Tabs read as tabs in the dark** (owner): the chosen `.segment`, and the chosen side of a `.choice`, stand raised in light. **Every
   other kind the owner asked for** (`docs/gaps/previews.md`): an old Excel .xls as its sheets (values only, ExcelDataReader);
   plain text (.txt, .log, .json, .xml, .md, .yaml…) as text, its first 2 MB (`GET /files/{id}/text`); Word, PowerPoint
   and their kin (.doc/.docx, .ppt/.pptx, .odt, .rtf, .vsdx…) as the PDF LibreOffice makes of them (Gotenberg service,
