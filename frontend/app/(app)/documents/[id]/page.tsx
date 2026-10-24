@@ -47,6 +47,8 @@ import { SupplierDelivery } from "./supplier-delivery";
 import { Timeline } from "@/components/timeline";
 import { openCopy } from "@/lib/documents/copies";
 import { StampPending } from "@/components/stamp-pending";
+import { FilesChecking } from "@/components/files-checking";
+import { checking } from "@/lib/documents/checking";
 import { FilePreview } from "@/components/file-preview";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, Download, ExternalLink, FileText, Send, X, FileDown } from "lucide-react";
@@ -763,6 +765,7 @@ export default async function DocumentDetailPage({
             // The PDF as it stands, and the source file where the page can show it (a picture, a workbook).
             content: (<>
               {pdf && stampWaited ? <StampPending /> : null}
+              {previewed && checking(previewed.files).length ? <FilesChecking names={checking(previewed.files)} /> : null}
               <FilePreview pdf={pdf} source={shownSource} title={`${doc.docNumber} rev ${previewed?.value ?? ""}`} admin={isAdmin(user)} readers={await readersOn(ctx)} viewingNote={(await cookies()).get(PREF.viewingNote)?.value !== "0"}
                 empty={(
                   <div className="grid h-48 place-items-center p-6 text-center">

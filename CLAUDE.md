@@ -307,7 +307,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   new projects no longer carry it. The PDF opened from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`), of its newest
   submission only. **The document's Preview follows the newest revision** (owner), whatever its state, named on its tab
   ("Preview · rev B"): just started, nothing until its PDF is in; prepared or in review, its own newest PDF; returned, its
-  returned copy; released, its stamped copy. **The Preview shows the source file too where
+  returned copy; released, its stamped copy. A file just uploaded shows by itself once the virus check passes it (owner: "the preview does not refresh"): while one of the newest is being checked the page says so and reads itself again every few seconds (`FilesChecking`, three minutes at most), on the document and the review. **The Preview shows the source file too where
   the page can** (owner: "images, excel workbooks"; `components/file-preview.tsx`, `FilePreview`): a picture (JPG, PNG,
   GIF, WebP, AVIF, BMP; SVG stays a download, it can carry code) as itself, an Excel workbook (.xlsx, .xlsm) as its sheets
   (`components/workbook-view.tsx`; backend `Documents/WorkbookView.cs`, `GET /files/{id}/workbook`: each sheet's cells as
