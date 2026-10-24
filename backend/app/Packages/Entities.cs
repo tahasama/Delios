@@ -17,6 +17,11 @@ public sealed class Package
     public required string Number { get; set; }
     /// <summary>One of <c>PackageKinds</c>: documents we deliver, or documents a supplier owes us.</summary>
     public string Kind { get; set; } = PackageKinds.Delivery;
+    /// <summary>
+    /// The package it sits in, when it is a branch of another (owner: the arborescence clients ask for): of the same kind,
+    /// and for a supplier's package of the same supplier. Null: a package at the top. It may be moved while it is open.
+    /// </summary>
+    public Guid? ParentId { get; set; }
     /// <summary>For a supply package: the supplier whose placeholders it holds. Its people see the package.</summary>
     public Guid? SupplierPartyId { get; set; }
     /// <summary>For a supply package: the purchase order it is under, as written on it. Optional.</summary>

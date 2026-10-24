@@ -17,11 +17,12 @@ import { SearchPick } from "@/components/search-pick";
 import { RuleFields } from "./rule-fields";
 import { statusList, shortfallOf } from "@/lib/packages/package-rule";
 import { packagesOf, ourPeople, packageParties } from "@/lib/packages/api";
+import { PackageTree, treeOf } from "./arborescence";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Packages" };
 
-export default async function PackagesPage({ searchParams }: { searchParams: Promise<{ category?: string; from?: string; docs?: string }> }) {
+export default async function PackagesPage({ searchParams }: { searchParams: Promise<{ category?: string; from?: string; docs?: string; view?: string; parent?: string }> }) {
   const ctx = await requireScope();
   const packagePolicy = await formPolicy(ctx, "PACKAGE");
   const { user } = ctx;
@@ -67,6 +68,17 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
     return { ...pkg, ready, total, days, state };
   });
 
+  // Two ways to read packages that hold packages (owner): the list of those at the top, each drilled into from its page,
+  // or the whole tree; both open the same package page.
+  const view = sp.view === "tree" ? "tree" : "list";
+  const seen = new Set(pkgs.map((one) => one.id));
+  const atTop = (one: { place?: { parentId: string | null } | null }) => !one.place?.parentId || !seen.has(one.place.parentId);
+  const shownRows = view === "list" ? rows.filter(atTop) : rows;
+  const nested = pkgs.some((one) => !atTop(one));
+  // A new package inside another one ("New package in it" on its page): the package it goes in, of this kind.
+  const parent = sp.parent ? pkgs.find((one) => one.number === sp.parent) ?? null : null;
+  const inside = (count: number) => count ? <span className="block text-[11px] text-slate-500">{count} package{count === 1 ? "" : "s"} in it</span> : null;
+
   const tabs = [
     { code: "SUPPLIER", label: "From suppliers", says: "everything a supplier owes us; they send from it" },
     { code: "DELIVERY", label: "To deliver", says: "documents we hand to an organization by a date, on one transmittal" },
@@ -87,27 +99,36 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
           ) : null}
         </div>
         <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{supplierOnly ? "What your company is asked to send, and where each document stands." : here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
-        {(
-          <nav className="seg mt-3 w-fit max-w-full">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <nav className="seg w-fit max-w-full">
             {tabs.map((c) => (
-              <Link key={c.code} href={`/packages?category=${c.code}`} aria-current={category === c.code ? "page" : undefined} className="segment">{c.label}</Link>
+              <Link key={c.code} href={`/packages?category=${c.code}${view === "tree" ? "&view=tree" : ""}`} aria-current={category === c.code ? "page" : undefined} className="segment">{c.label}</Link>
             ))}
           </nav>
-        )}
+          {/* The list of packages at the top, or the whole tree (owner: both). */}
+          <nav className="seg ml-auto w-fit" aria-label="How the packages read">
+            <Link href={`/packages?category=${category}`} aria-current={view === "list" ? "page" : undefined} className="segment">List</Link>
+            <Link href={`/packages?category=${category}&view=tree`} aria-current={view === "tree" ? "page" : undefined} className="segment">Tree</Link>
+          </nav>
+        </div>
+        {view === "list" && nested ? <p className="mt-2 text-[11px] text-slate-500">Packages sitting in another are reached from its page, or read them all in the tree.</p> : null}
       </div>
 
-      {category === "SUPPLIER" ? (
-        rows.length ? (
+      {view === "tree" ? (
+        rows.length ? <PackageTree nodes={treeOf(pkgs)} />
+          : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">No packages yet.</p>
+      ) : category === "SUPPLIER" ? (
+        shownRows.length ? (
           <DataTable className="rounded-none border-0 shadow-none" id="supplier-packages" exportName="supplier-packages" head={supplierOnly
             ? <tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Package</Th><Th>Where it stands</Th><Th>With you</Th><Th>With us</Th><Th>Released</Th><Th>Overdue</Th><Th>Next due</Th></tr>
             : <tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Supplier</Th><Th>Where it stands</Th><Th title="Ours to send to the supplier">Not sent yet</Th><Th title="The supplier holds them: to send, correct or revise">With the supplier</Th><Th title="We hold them: to check, to send for review, or in review">With us</Th><Th>Released</Th><Th>Overdue</Th><Th>Next due</Th></tr>}>
-                {rows.map((pkg) => {
+                {shownRows.map((pkg) => {
                   const f = supplierStats.get(pkg.id)!;
                   const where = supplierStages.get(pkg.id)!;
                   return (
                     <tr key={pkg.id}>
                       <Td className="w-10"><input type="radio" name="number" value={pkg.number} form="package-export" required aria-label={`Tick ${pkg.number} to export it`} /></Td>
-                      <Td><Link href={`/packages/${pkg.number}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.names.to}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.number}</span></Td>
+                      <Td><Link href={`/packages/${pkg.number}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.names.to}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.number}</span>{inside(pkg.place?.branches.length ?? 0)}</Td>
                       <Td className={`text-xs`}>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
                       </Td>
@@ -122,14 +143,14 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                 })}
           </DataTable>
         ) : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">{supplierOnly ? "Nothing is expected from you yet. When documents are requested from your company they appear here." : "No supplier packages yet. One lists every document you expect from one supplier; they send from it."}</p>
-      ) : rows.length ? (
+      ) : shownRows.length ? (
         <DataTable className="rounded-none border-0 shadow-none" id="delivery-packages" exportName="delivery-packages" head={<tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Package</Th><Th>State</Th><Th title="Ready: the document's current released revision carries the status the package asks for.">Ready</Th><Th>Due</Th><Th>Accepted by</Th></tr>}>
-              {rows.map((pkg) => {
+              {shownRows.map((pkg) => {
                 const percent = pkg.total ? Math.round(pkg.ready / pkg.total * 100) : 0;
                 return (
                   <tr key={pkg.id}>
                     <Td className="w-10"><input type="radio" name="number" value={pkg.number} form="package-export" required aria-label={`Tick ${pkg.number} to export it`} /></Td>
-                    <Td><Link href={`/packages/${pkg.number}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.number}</Link><span className="block max-w-80 truncate text-[13px] text-slate-800">{pkg.title ?? `Delivery to ${pkg.names.to}`}</span><span className="block max-w-80 truncate text-xs text-slate-500">to {pkg.names.to}</span></Td>
+                    <Td><Link href={`/packages/${pkg.number}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.number}</Link><span className="block max-w-80 truncate text-[13px] text-slate-800">{pkg.title ?? `Delivery to ${pkg.names.to}`}</span><span className="block max-w-80 truncate text-xs text-slate-500">to {pkg.names.to}</span>{inside(pkg.place?.branches.length ?? 0)}</Td>
                     <Td><Status state={pkg.state}/></Td>
                     <Td><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-canvas-deep"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-[#d9a441]"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {pkg.requiredStatuses.join(" or ")}<Info>{pkg.requiredStatuses.map((code) => `${code} — ${statusMeaning.get(code) ?? code}`).join("\n")}</Info></span></div></Td>
                     <Td className={`whitespace-nowrap text-xs`}>{fmtDate(pkg.completionDate)}{!pkg.closedAt ? <span className={`block text-[11px] ${pkg.days < 0 ? "text-red-700" : "text-slate-400"}`}>{pkg.days < 0 ? `${Math.abs(pkg.days)} days late` : `in ${pkg.days} days`}</span> : null}</Td>
@@ -142,15 +163,19 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
     </section>
 
     {staff && category === "SUPPLIER" ? (
-      <details className="register register-sheet register-sheet-open">
+      <details id="new" className="register register-sheet register-sheet-open" open={!!parent}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6">
-          <span className="text-[13px] text-slate-600">Expecting documents from a new supplier?</span>
+          <span className="text-[13px] text-slate-600">{parent ? <>A package inside <span className="font-mono font-semibold">{parent.number}</span> · {parent.title}, for {parent.supplier ?? parent.names.to}.</> : "Expecting documents from a new supplier?"}</span>
           <span className="ask">New supplier package</span>
         </summary>
         <div className="border-t border-line px-5 py-4 sm:px-6">
-          <ActionForm action={createSupplierPackageAction} submitLabel="Create">
+          <ActionForm action={createSupplierPackageAction} submitLabel="Create" hidden={parent ? { parentId: parent.id, partyCode: parent.names.supplierCode ?? "" } : undefined}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Supplier" required><Select name="partyCode" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{parties.filter((p) => !p.isInternal).map((p) => <option key={p.id} value={p.code}>{p.name}</option>)}</Select></Field>
+              {parent ? (
+                <Field label="Name" required hint="what this part holds, e.g. Mechanical, Datasheets"><input name="title" required className={inputCls} /></Field>
+              ) : (
+                <Field label="Supplier" required><Select name="partyCode" required className={inputCls} defaultValue=""><option value="" disabled>Choose…</option>{parties.filter((p) => !p.isInternal).map((p) => <option key={p.id} value={p.code}>{p.name}</option>)}</Select></Field>
+              )}
               <Field label="PO" hint="optional — one package per PO"><input name="po" className={inputCls} /></Field>
               <Field label="Needed at status" hint="optional — each document goes as it is asked"><Select name="requiredStatus" className={inputCls} defaultValue=""><option value="">None</option>{statuses.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.label}</option>)}</Select></Field>
             </div>
@@ -161,9 +186,9 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
     ) : null}
 
     {!isReadOnly(user) && category === "DELIVERY" ? (
-      <details id="new" className="register register-sheet register-sheet-open" open={carried.length > 0}>
+      <details id="new" className="register register-sheet register-sheet-open" open={carried.length > 0 || !!parent}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6">
-          <span className="text-[13px] text-slate-600">{fromPackage ? `Deliver ${fromPackage}: its ${carried.length} document${carried.length === 1 ? "" : "s"} go in this delivery package.` : "Documents to hand over together?"}</span>
+          <span className="text-[13px] text-slate-600">{parent ? <>A package inside <span className="font-mono font-semibold">{parent.number}</span> · {parent.title}.</> : fromPackage ? `Deliver ${fromPackage}: its ${carried.length} document${carried.length === 1 ? "" : "s"} go in this delivery package.` : "Documents to hand over together?"}</span>
           <span className="ask">New delivery package</span>
         </summary>
         <div className="border-t border-line px-5 py-4 sm:px-6">
@@ -174,23 +199,23 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
               Each is delivered at the status the package needs, checked as any delivery is.
             </p>
           ) : null}
-          <ActionForm action={createPackageAction} submitLabel="Create package" hidden={fromPackage ? { from: fromPackage } : undefined}>
+          <ActionForm action={createPackageAction} submitLabel="Create package" hidden={{ ...(fromPackage ? { from: fromPackage } : {}), ...(parent ? { parentId: parent.id } : {}) }}>
             {carried.map((id) => <input key={id} type="hidden" name="documentId" value={id} />)}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <Asked policy={packagePolicy} field="title" hint="numbered PK-… when created" className="md:col-span-2">
                 {({ required }) => <input name="title" required={required} className={inputCls} defaultValue={fromPackage ? `${fromPackage} — handover` : undefined} placeholder="Operations handover — pump house" />}
               </Asked>
               <Asked policy={packagePolicy} field="completionDate">
-                {({ required }) => <input type="date" name="completionDate" required={required} className={inputCls} />}
+                {({ required }) => <input type="date" name="completionDate" required={required} className={inputCls} defaultValue={parent?.completionDate?.slice(0, 10)} />}
               </Asked>
               <Asked policy={packagePolicy} field="description" hint="what it is for, anything the recipient should know" className="md:col-span-2">
                 {({ required }) => <textarea name="description" required={required} rows={2} className={inputCls} />}
               </Asked>
               {/* Under "Due": what it needs, beside the description. */}
-              <SearchPick browse name="requiredStatus" required label="Needed at" hint="ready at any of them; it also says why they get it" items={statuses.map((item) => ({ id: item.code, name: item.code, detail: item.label }))} />
-              <SearchPick browse name="recipientPartyIds" required label="Delivered to" hint="one or several — us too, for an internal handover" items={parties.map((p) => ({ id: p.id, name: p.isInternal ? `${p.name} (us)` : p.name }))} />
-              <SearchPick name="compositionOwnerId" required label="Put together by" hint="one or several — they add and take out its documents; the control function does the rest" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
-              <SearchPick name="acceptanceAuthorityId" required label="Accepted by" hint="one or several, not those putting it together — any one of them accepts at the end and decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
+              <SearchPick browse name="requiredStatus" initial={parent?.requiredStatuses} required label="Needed at" hint="ready at any of them; it also says why they get it" items={statuses.map((item) => ({ id: item.code, name: item.code, detail: item.label }))} />
+              <SearchPick browse name="recipientPartyIds" initial={parent?.recipientPartyIds} required label="Delivered to" hint="one or several — us too, for an internal handover" items={parties.map((p) => ({ id: p.id, name: p.isInternal ? `${p.name} (us)` : p.name }))} />
+              <SearchPick name="compositionOwnerId" initial={parent?.ownerIds} required label="Put together by" hint="one or several — they add and take out its documents; the control function does the rest" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
+              <SearchPick name="acceptanceAuthorityId" initial={parent?.acceptorIds} required label="Accepted by" hint="one or several, not those putting it together — any one of them accepts at the end and decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
               <Added fields={packagePolicy.own} />
             </div>
             <div className="rounded-md bg-tint-soft px-3 py-2.5 ring-1 ring-line">

@@ -3982,6 +3982,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid[]")
                         .HasColumnName("owner_ids");
 
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_id");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid")
                         .HasColumnName("project_id");
@@ -4060,6 +4064,9 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_packages");
+
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("ix_packages_parent_id");
 
                     b.HasIndex("SupplierPartyId")
                         .HasDatabaseName("ix_packages_supplier_party_id");
@@ -7275,6 +7282,12 @@ namespace Delios.Host.Platform.Migrations
 
             modelBuilder.Entity("Delios.Host.Packages.Package", b =>
                 {
+                    b.HasOne("Delios.Host.Packages.Package", null)
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_packages_packages_parent_id");
+
                     b.HasOne("Delios.Host.Identity.Project", null)
                         .WithMany()
                         .HasForeignKey("ProjectId")

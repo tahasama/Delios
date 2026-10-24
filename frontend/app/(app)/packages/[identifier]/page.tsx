@@ -19,6 +19,8 @@ import { ArrowLeft } from "lucide-react";
 import { SupplierPackage } from "./supplier-package";
 import { isReadOnly } from "@/lib/core/auth";
 import { NextStepBody, StagePath, type StepItem } from "@/app/(app)/documents/[id]/next-step";
+import { Branches, MovePackage, PackagePath, moveTargets } from "../arborescence";
+import { packagesOf } from "@/lib/packages/api";
 
 export const dynamic = "force-dynamic";
 
@@ -157,12 +159,16 @@ export default async function PackageDetailPage({ params, searchParams }: { para
     items.push(...manageItems(pkg, { mayEdit: false, mayDelete: total === 0 && !pkg.transmittals.length }));
   }
 
+  // The arborescence: a package in it is opened here by whoever may put packages together; moved by the control function.
+  const newInside = open && !pkg.closedAt ? `/packages?category=DELIVERY&parent=${encodeURIComponent(pkg.number)}#new` : null;
+  const targets = canAct ? moveTargets(pkg, await packagesOf(ctx, "DELIVERY")) : null;
+
   return (
     <div className="space-y-4">
       <section className="register register-sheet register-sheet-open">
         <div className="flex flex-col-reverse gap-3 px-5 pt-6 pb-3 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{pkg.number}</p>
+            <PackagePath pkg={pkg} />
             <h1 className="plate-name mt-1 min-w-0">{pkg.title ?? `Delivery to ${pkg.names.to}`}</h1>
             <p className="plate-meta mt-2">
               To {pkg.names.to} &middot; {total} document{total === 1 ? "" : "s"} at {needs.map((code, i) => <span key={code}>{i ? " or " : ""}<span className="font-mono font-semibold text-slate-700">{code}</span></span>)}<Info>{needs.map((code) => `${code} — ${statusMeaning.get(code) ?? code}`).join("\n")}</Info> by {fmtDate(pkg.completionDate)} &middot; {purpose}
@@ -192,6 +198,9 @@ export default async function PackageDetailPage({ params, searchParams }: { para
           status={<StagePath stages={["Compose", "Check", "Deliver", "Accept"]} at={pkg.acceptedAt ? 4 : pkg.closedAt ? 3 : pkg.assessedAt ? 2 : total ? 1 : 0} note={note} />}
         />
       </section>
+
+      <Branches pkg={pkg} newHref={newInside} />
+      {targets ? <MovePackage pkg={pkg} targets={targets} /> : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0 space-y-4">

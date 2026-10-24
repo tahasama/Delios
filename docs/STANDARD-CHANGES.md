@@ -1494,3 +1494,21 @@ The Standard counts review and answer periods in working days without saying who
 - **A new project starts with the organization's place** (Defaults for new projects), then keeps its own.
 - **Dates read one way across the organization** (its choice of four), on every screen, so a date means the same to
   everyone reading it.
+
+## 81 · Packages in packages: the arborescence clients ask for
+
+The Standard knows packages as flat sets of documents. Clients often hand down an arborescence (a package broken into
+parts, each into smaller parts). DELIOS keeps it as it is asked:
+
+- **A package may hold packages of its own kind**, as deep as wanted, beside its own documents: a delivery package only
+  delivery packages, a supplier's package only packages of the same supplier (its people see the tree).
+- **Each package keeps its own number, delivery, check and acceptance.** Above, a package counts what is under it (its
+  documents and its branches'), and reads complete once every branch is delivered and accepted; delivering one never
+  delivers another.
+- **Where it sits is shown, never written into its number:** the packages above it lead to its name; it may be moved
+  inside another, or to the top, while it is open (a supplier's until it is shared), never inside one of its own
+  branches; every move is recorded with where it was. A package holding packages is not deleted.
+- **A supplier's document sits in one package of that supplier**, never counted twice: moved into a branch, it leaves
+  the other; once sent to the supplier it stays where it was asked.
+- **Two ways to read it, one page each package:** drilling down from a package into the packages in it, or the whole tree
+  on Packages; both open the same package page.

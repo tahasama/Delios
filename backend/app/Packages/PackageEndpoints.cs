@@ -6,7 +6,23 @@ namespace Delios.Host.Packages;
 
 /// <summary>One row of the package list.</summary>
 public sealed record PackageSummary(Guid Id, string Number, string Title, string Reason, string State, int Members,
-    bool HasRule, DateOnly? CompletionDate, DateTimeOffset CreatedAt, string Kind, string? Supplier, string? PurchaseOrder);
+    bool HasRule, DateOnly? CompletionDate, DateTimeOffset CreatedAt, string Kind, string? Supplier, string? PurchaseOrder,
+    Guid? ParentId = null);
+
+/// <summary>A package named in a path: its number and title, to open it.</summary>
+public sealed record PackageLink(Guid Id, string Number, string Title);
+
+/// <summary>
+/// A package and everything under it: packages below (and how many are still open), its documents once each, how many are
+/// released at the status their package needs, and how many are released at all.
+/// </summary>
+public sealed record PackageTally(int Packages, int Open, int Documents, int Ready, int Released);
+
+/// <summary>A package sitting inside another: its number, title and state, how many packages sit directly in it, and its whole tally.</summary>
+public sealed record BranchView(Guid Id, string Number, string Title, string State, int Branches, PackageTally Tally);
+
+/// <summary>Where a package sits (the packages above it, top first), its branches, and the whole: it and everything under it.</summary>
+public sealed record PackagePlace(Guid? ParentId, IReadOnlyList<PackageLink> Path, IReadOnlyList<BranchView> Branches, PackageTally Whole);
 
 /// <summary>
 /// One document in a package as returned to the browser: its released revision and status, the statuses it needs,
@@ -29,7 +45,7 @@ public sealed record PackageView(Guid Id, string Number, string Title, string? D
     IReadOnlyList<PackageTransmittal> Transmittals, string Kind, Guid? SupplierPartyId, string? Supplier, string? PurchaseOrder,
     IReadOnlyList<string>? Reasons = null, System.Text.Json.JsonElement? Extras = null, string? AcceptNote = null,
     DateTimeOffset? SharedAt = null, string? SharedBy = null, bool AutoCreated = false, IReadOnlyList<string>? SupplierPeople = null,
-    PackageNames? Names = null, AsReceivedView? AsReceived = null);
+    PackageNames? Names = null, AsReceivedView? AsReceived = null, PackagePlace? Place = null);
 
 /// <summary>A supplier's package on a project taking documents as they come (<see cref="Intake"/>): what they are filed under.</summary>
 public sealed record AsReceivedView(string DeliverableType, string DocType, string Discipline);
@@ -84,6 +100,8 @@ public static class PackageEndpoints
             Act(h, s, (a) => s.ShareAsync(a, packageId, c)));
         project.MapPost("/{packageId:guid}/request", (Guid packageId, SupplyRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.RequestAsync(a, packageId, r, c)));
+        project.MapPut("/{packageId:guid}/place", (Guid packageId, MoveRequest r, HttpContext h, PackageService s, CancellationToken c) =>
+            Act(h, s, (a) => s.MoveAsync(a, packageId, r, c)));
         project.MapPut("/{packageId:guid}", (Guid packageId, RenameRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.RenameAsync(a, packageId, r, c)));
         project.MapDelete("/{packageId:guid}", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c, string? reason) =>
@@ -107,7 +125,8 @@ public static class PackageEndpoints
     /// <summary>GET one package, brought up to date with its rule.</summary>
     private static async Task<IResult> GetAsync(Guid packageId, HttpContext http, PackageService packages, CancellationToken cancellationToken) =>
         await packages.ReadAsync(ProjectAccessFilter.Of(http), packageId, cancellationToken) is { } package
-            ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !ProjectAccessFilter.Of(http).IsInternal))
+            ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !ProjectAccessFilter.Of(http).IsInternal,
+                access: ProjectAccessFilter.Of(http)))
             : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package.");
 
     /// <summary>
@@ -120,7 +139,7 @@ public static class PackageEndpoints
         var views = new List<PackageView>();
         foreach (var row in (await packages.ListAsync(access, cancellationToken)).Where(r => kind is null || r.Kind == kind))
             if (await packages.ReadAsync(access, row.Id, cancellationToken) is { } package)
-                views.Add(await ViewAsync(packages, package, cancellationToken, outside: !access.IsInternal));
+                views.Add(await ViewAsync(packages, package, cancellationToken, outside: !access.IsInternal, access: access));
         return Results.Ok(views.OrderBy(v => v.CompletionDate is null).ThenBy(v => v.CompletionDate).ToList());
     }
 
@@ -130,7 +149,7 @@ public static class PackageEndpoints
         var access = ProjectAccessFilter.Of(http);
         var row = (await packages.ListAsync(access, cancellationToken)).FirstOrDefault(r => r.Number == number);
         return row is not null && await packages.ReadAsync(access, row.Id, cancellationToken) is { } package
-            ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !access.IsInternal))
+            ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !access.IsInternal, access: access))
             : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package.");
     }
 
@@ -155,7 +174,8 @@ public static class PackageEndpoints
     /// <summary>
     /// Builds the full package view, working out each member's readiness and looking up the transmittal numbers.
     /// </summary>
-    private static async Task<PackageView> ViewAsync(PackageService packages, Package p, CancellationToken cancellationToken, bool outside = false)
+    private static async Task<PackageView> ViewAsync(PackageService packages, Package p, CancellationToken cancellationToken, bool outside = false,
+        ProjectAccess? access = null)
     {
         var readiness = await packages.ReadinessAsync(p, cancellationToken);
         var transmittals = await packages.TransmittalsAsync(p, cancellationToken);
@@ -178,6 +198,7 @@ public static class PackageEndpoints
             p.SharedAt?.ToDateTimeOffset(), p.SharedByName, p.AutoCreated,
             outside ? null : (await packages.SupplierPeopleAsync(p, cancellationToken)).Select(x => x.Name).ToList(),
             await packages.NamesAsync(p, transmittals, cancellationToken),
-            asReceived ? new AsReceivedView(intake!.DeliverableType ?? "", intake.DocType ?? "", intake.Discipline ?? "") : null);
+            asReceived ? new AsReceivedView(intake!.DeliverableType ?? "", intake.DocType ?? "", intake.Discipline ?? "") : null,
+            access is null ? null : await packages.PlaceAsync(access, p, cancellationToken));
     }
 }

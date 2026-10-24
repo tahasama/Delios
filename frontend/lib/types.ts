@@ -362,6 +362,22 @@ export type PackageView = {
   names: { to: string; owners: string; acceptors: string; supplierCode: string | null; createdAt: string; deliveredAt: string | null };
   /** On a project taking other organizations' documents as they come (Control room): what they are filed under. */
   asReceived?: { deliverableType: string; docType: string; discipline: string } | null;
+  /** Where it sits in the arborescence: the packages above it (top first), its branches, and the whole under it. */
+  place?: PackagePlace | null;
+};
+
+/**
+ * A package and everything under it (PackageEndpoints.cs PackageTally): packages below and how many are still open, its
+ * documents once each, how many are released at the status their package needs, how many are released at all.
+ */
+export type PackageTally = { packages: number; open: number; documents: number; ready: number; released: number };
+
+/** Where a package sits (PackageEndpoints.cs PackagePlace): the packages above it, top first; its branches; the whole. */
+export type PackagePlace = {
+  parentId: string | null;
+  path: { id: string; number: string; title: string }[];
+  branches: { id: string; number: string; title: string; state: string; branches: number; tally: PackageTally }[];
+  whole: PackageTally;
 };
 
 /** GET /activity (ActivityEndpoints.cs): one act of the project, for Home's journal and log. */

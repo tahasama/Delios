@@ -103,7 +103,7 @@ frontend/
 │   │   ├── documents/    + import/
 │   │   ├── reviews/
 │   │   ├── transmittals/ + exposures/
-│   │   ├── packages/
+│   │   ├── packages/     arborescence.tsx: packages in packages (the path, "Packages in it", where it sits, the tree)
 │   │   ├── schedule/     the schedule list (/schedule), the same page for everyone
 │   │   ├── actions/      each action's page (/actions/<code>); /actions and needed/ are old addresses, redirect
 │   │   ├── assets/

@@ -387,6 +387,26 @@ a screen only words it. A new rule goes in the backend, never in a page.
   a transmittal, "Received from outside the system"). The supplier's page: only
   what was sent to it, in its words, the comments to take in, a file field
   beside each document it holds, and "Send to <us>".
+- **Packages in packages** (owner: "a lot of orgs, especially clients, ask for an arborescence"; Standard-changes §81):
+  a package may sit in another (`Package.ParentId`), of the same kind (PARENT_OTHER_KIND), a supplier's only in the same
+  supplier's (PARENT_OTHER_SUPPLIER), the one it sits in still open (PARENT_CLOSED), as deep as wanted, beside its own
+  documents. **Its own number, place shown** (owner): the number never changes; the packages above it lead to its name
+  (`PackagePath`); moved inside another or to the top while open by the control function ("Where it sits",
+  `PUT /packages/{id}/place`, PACKAGE_MOVED with where it was; a supplier's until shared, PACKAGE_SHARED; never inside one
+  of its own branches, INSIDE_ITS_BRANCH). **Each delivers alone, counts add up** (owner): every package keeps its own
+  check, delivery and acceptance; "Packages in it" on its page (`Branches`, `arborescence.tsx`) lists the packages in it,
+  each counting everything under it, headed by the whole (`PackageView.Place`, backend `PackageService.PlaceAsync`:
+  path, branches, tally of packages below and still open, documents once each, ready at their package's status,
+  released), with "New package in it" (`/packages?category=…&parent=<number>#new`, a delivery branch starting from its
+  parent's status, recipients, people and date; a supplier's branch naming only its part, its supplier fixed). **Two ways
+  to read it, the same package page** (owner): Packages' **List** shows the packages at the top (each saying how many sit
+  in it), drilled into from their pages; **Tree** (`?view=tree`, `PackageTree`) shows every package under the one it sits
+  in, folded open, each counting everything under it. A package holding packages is not deleted (HAS_BRANCHES).
+  **A supplier's document sits in one package of that supplier**: a package's rule never takes one another of the
+  supplier's packages holds; added by hand to a branch, it leaves the other package (which no longer takes it back), one
+  already sent to the supplier staying where it was asked (SENT_TO_SUPPLIER); a supplier's branch deleted hands its
+  documents back to the package it sat in. A delivery package's documents may sit in several, as before.
+  Another organization reads only the packages shared with it, and in them only what was asked of it.
 - A supplier package is delivered by "Deliver" (The package): a new delivery package opens with its documents
   in it (or they are added to one already open), then goes the delivery way (check, deliver, accept).
 - "Delivery list" downloads the package's own lines (`/api/packages/<n>/list`),

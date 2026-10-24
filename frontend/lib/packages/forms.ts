@@ -61,6 +61,8 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
       body: {
         title, description, reasons: purposes.length ? purposes : null, requiredStatuses, ownerIds: ownerList, acceptorIds: acceptorList, recipientPartyIds: partyIds,
         completionDate, kind: "DELIVERY", extras: Object.keys(extras).length ? extras : null,
+        // Inside another package: a branch of its arborescence.
+        parentId: String(formData.get("parentId") ?? "") || null,
         rule: isEmpty(filter) ? null : { disciplines: filter.disciplines ?? [], docTypes: filter.docTypes ?? [], originators: filter.originators ?? [], assetIds: filter.assetIds ?? [] },
       },
       idempotencyKey: randomUUID(),
@@ -242,3 +244,23 @@ export async function acceptShortfallAction(_prev: { error?: string } | undefine
  * Step 2 of the schedule process: whoever plans says which departments
  * an activity concerns. Until this is done nobody can list its documents.
  */
+
+/**
+ * Moves a package inside another one, or to the top, while it is open (the control function). Its number never changes;
+ * the backend refuses another kind, another supplier, a package delivered, or one of its own branches.
+ */
+export async function movePackageAction(_prev: { error?: string; message?: string } | undefined, formData: FormData): Promise<{ error?: string; message?: string }> {
+  const ctx = await requireScope();
+  const packageId = String(formData.get("packageId") ?? "");
+  const parentId = String(formData.get("parentId") ?? "");
+  try {
+    await api(projectPath(ctx, `/packages/${packageId}/place`), {
+      method: "PUT",
+      body: { parentId: parentId && parentId !== "TOP" ? parentId : null, reason: String(formData.get("reason") ?? "").trim() || null },
+    });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath("/packages", "layout");
+  return { message: parentId && parentId !== "TOP" ? "Moved." : "Moved to the top." };
+}

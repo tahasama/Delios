@@ -98,6 +98,7 @@ const WORDS: Record<string, string> = {
   PACKAGE_ACCEPTED: "Accepted a package",
   PACKAGE_CLOSED: "Closed a package",
   PACKAGE_DELETED: "Deleted an empty package",
+  PACKAGE_MOVED: "Moved a package inside another, or to the top",
   SHORTFALL_ISSUED: "Asked for what a package is missing",
   SHORTFALL_ACCEPTED: "Accepted a package short",
   // Schedule

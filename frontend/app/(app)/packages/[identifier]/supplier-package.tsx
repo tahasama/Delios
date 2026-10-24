@@ -17,6 +17,8 @@ import { plannedState } from "@/lib/actions/planned-state";
 import { ArrowLeft, Download, Filter, PackageCheck, Pencil, Send, Share2, Trash2 } from "lucide-react";
 import { getMe } from "@/lib/account/api";
 import type { PackageView } from "@/lib/types";
+import { Branches, MovePackage, PackagePath, moveTargets } from "../arborescence";
+import { packagesOf } from "@/lib/packages/api";
 
 /** What the planned date says today, as on every planned date: ready, submitted, overdue, at risk, days left. */
 function SubmitBy({ row }: { row: SupplierRow }) {
@@ -71,7 +73,8 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
   const asked = new Set(pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId));
   const listHref = `/api/packages/${encodeURIComponent(pkg.number)}/list`;
   const listLink = <a href={listHref} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> Delivery list</a>;
-  const plateCode = <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{pkg.number}</p>;
+  // The packages it sits in, then its own number (the arborescence).
+  const plateCode = <PackagePath pkg={pkg} />;
 
   // ── The supplier's page ──────────────────────────────────────────────────────
   if (isSupplier) {
@@ -127,6 +130,8 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
             </div>
           </div>
         </section>
+        {/* The packages shared with it that sit in this one, drilled into from here. */}
+        <Branches pkg={pkg} newHref={null} />
         <section data-dt-frame className="register register-sheet">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <span className="stencil mr-1 text-slate-500">Your documents</span>
@@ -237,6 +242,10 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
           <Figure label="Released" value={`${counts.released} of ${counts.total}`} hint={`${f.firstTime}% released first time`} />
         </div>
       </section>
+
+      {/* The arborescence: its packages, a new one in it, and where it sits (moved until it is shared). */}
+      <Branches pkg={pkg} newHref={staff ? `/packages?category=SUPPLIER&parent=${encodeURIComponent(pkg.number)}#new` : null} />
+      {staff && !pkg.sharedAt ? <MovePackage pkg={pkg} targets={moveTargets(pkg, await packagesOf(ctx, "SUPPLY"))} /> : null}
 
       {staff ? (
         <section id="package" className="register register-sheet register-sheet-open">

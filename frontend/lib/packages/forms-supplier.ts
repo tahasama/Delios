@@ -33,7 +33,9 @@ export async function createSupplierPackageAction(_prev: { error?: string } | un
   try {
     const created = await api<PackageView>(projectPath(ctx, "/packages"), {
       body: {
-        title: `${party.name}${po ? ` — ${po}` : ""}`, kind: "SUPPLY", supplierPartyId: party.id, purchaseOrder: po,
+        // A branch carries its own name ("Mechanical"); a package at the top is named after its supplier.
+        title: String(formData.get("title") ?? "").trim() || `${party.name}${po ? ` — ${po}` : ""}`, kind: "SUPPLY", supplierPartyId: party.id, purchaseOrder: po,
+        parentId: String(formData.get("parentId") ?? "") || null,
         reason: (await supplyReason()).code, requiredStatuses: requiredStatus ? [requiredStatus] : [],
         ownerIds: [user.id], acceptorIds: [],
       },
