@@ -1508,7 +1508,8 @@ parts, each into smaller parts). DELIOS keeps it as it is asked:
 - **Where it sits is shown, never written into its number:** the packages above it lead to its name; it may be moved
   inside another, or to the top, while it is open (a supplier's until it is shared), never inside one of its own
   branches; every move is recorded with where it was. A package holding packages is not deleted.
-- **A supplier's document sits in one package of that supplier**, never counted twice: moved into a branch, it leaves
-  the other; once sent to the supplier it stays where it was asked.
+- **A document sits in one package of a tree** (and in one package of a supplier), never counted twice: moved into a
+  branch, it leaves the package it was in; once delivered, or sent to the supplier, it stays where it went. Two
+  separate delivery trees may still share a document.
 - **Two ways to read it, one page each package:** drilling down from a package into the packages in it, or the whole tree
   on Packages; both open the same package page.

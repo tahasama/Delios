@@ -205,14 +205,19 @@ public sealed class PackageService(
         var have = package!.Members.Select(m => m.DocumentId).ToHashSet();
         var fresh = ids.Where(i => !have.Contains(i)).ToList();
         if (fresh.Count == 0) return Fail(Problems.Conflict("ALREADY_MEMBERS", "Those documents are already in the package."));
-        // A supplier's document sits in one package of that supplier (the arborescence): added here, it leaves the other,
-        // which no longer takes it back; one already sent to the supplier stays where it was asked.
+        // One package per document (the arborescence, owner): within a tree of delivery packages, and among a supplier's
+        // packages. Added here, it leaves the other, which no longer takes it back; one already delivered, or sent to the
+        // supplier, stays where it went.
         var movedFrom = new List<string>();
-        if (package.Kind == PackageKinds.Supply)
+        var others = await SharingAsync(package, cancellationToken);
+        if (others.Count > 0)
         {
-            var elsewhere = await db.PackageMembers.Where(m => fresh.Contains(m.DocumentId) && m.PackageId != package.Id
-                    && db.Packages.Any(p => p.Id == m.PackageId && p.Kind == PackageKinds.Supply && p.SupplierPartyId == package.SupplierPartyId))
-                .ToListAsync(cancellationToken);
+            var elsewhere = await db.PackageMembers.Where(m => fresh.Contains(m.DocumentId) && others.Contains(m.PackageId)).ToListAsync(cancellationToken);
+            var fixedIn = await db.Packages.AsNoTracking()
+                .Where(p => elsewhere.Select(m => m.PackageId).Contains(p.Id) && p.State != PackageStates.Open).Select(p => p.Number).ToListAsync(cancellationToken);
+            if (fixedIn.Count > 0)
+                return Fail(Problems.Conflict("ALREADY_DELIVERED", $"Some of them went out with {string.Join(", ", fixedIn)}, which is delivered: they stay there.",
+                    new { packages = fixedIn }));
             var sentIds = elsewhere.Where(m => m.RequestedAt is not null).Select(m => m.DocumentId).ToList();
             if (sentIds.Count > 0)
             {
@@ -539,6 +544,23 @@ public sealed class PackageService(
             // Climbing from the new place: meeting the package itself means it would sit inside its own branch.
             for (Guid? at = parentId; at is { } step; at = parents.GetValueOrDefault(step))
                 if (step == package.Id) return Fail(Problems.Invalid("INSIDE_ITS_BRANCH", "A package does not go inside one of its own branches."));
+            // One package per document in a tree: what it brings must not already sit in the tree it joins.
+            if (package.Kind == PackageKinds.Delivery)
+            {
+                var children = parents.Where(p => p.Value is not null).GroupBy(p => p.Value!.Value).ToDictionary(g => g.Key, g => g.Select(p => p.Key).ToList());
+                var moving = new HashSet<Guid> { package.Id };
+                var queue = new Queue<Guid>([package.Id]);
+                while (queue.TryDequeue(out var at))
+                    foreach (var child in children.GetValueOrDefault(at) ?? [])
+                        if (moving.Add(child)) queue.Enqueue(child);
+                var joining = (await SharingAsync(parent!, cancellationToken)).Append(parent!.Id).Where(id => !moving.Contains(id)).ToList();
+                var both = await db.PackageMembers.AsNoTracking().Where(m => moving.Contains(m.PackageId)
+                        && db.PackageMembers.Any(o => o.DocumentId == m.DocumentId && joining.Contains(o.PackageId)))
+                    .Join(db.Documents, m => m.DocumentId, d => d.Id, (m, d) => d.Number).Distinct().ToListAsync(cancellationToken);
+                if (both.Count > 0)
+                    return Fail(Problems.Conflict("IN_BOTH", $"{string.Join(", ", both)} already sit{(both.Count == 1 ? "s" : "")} in that tree: a document sits in one package of a tree; take it out of one first.",
+                        new { documents = both }));
+            }
         }
         var from = package.ParentId is { } was
             ? await db.Packages.AsNoTracking().Where(p => p.Id == was).Select(p => p.Number).SingleOrDefaultAsync(cancellationToken) : null;
@@ -908,12 +930,47 @@ public sealed class PackageService(
     public async Task<Package?> ReadAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
     {
         var package = await LoadAsync(access, id, cancellationToken);
-        if (package is not null && await SyncAsync(package, cancellationToken) > 0)
+        if (package is null) return null;
+        var handed = await HandDownAsync(package, cancellationToken);
+        if (await SyncAsync(package, cancellationToken) > 0 || handed)
         {
             ResetAssessment(package);
             await db.SaveChangesAsync(cancellationToken);
         }
         return package;
+    }
+
+    /// <summary>
+    /// One package per document in a tree (owner): what this open package holds that a package under it holds too goes to
+    /// the one under it, the lowest; this one no longer takes it back. Held twice from before the rule, it settles on its
+    /// first reading; recorded. One already sent to the supplier stays where it was asked.
+    /// </summary>
+    private async Task<bool> HandDownAsync(Package package, CancellationToken cancellationToken)
+    {
+        if (package.State != PackageStates.Open || package.Members.Count == 0) return false;
+        var all = await db.Packages.AsNoTracking().Where(p => p.ProjectId == package.ProjectId && p.Kind == package.Kind)
+            .Select(p => new { p.Id, p.ParentId, p.Number }).ToListAsync(cancellationToken);
+        var children = all.Where(p => p.ParentId is not null).GroupBy(p => p.ParentId!.Value).ToDictionary(g => g.Key, g => g.Select(p => p.Id).ToList());
+        var below = new HashSet<Guid>();
+        var queue = new Queue<Guid>([package.Id]);
+        while (queue.TryDequeue(out var at))
+            foreach (var child in children.GetValueOrDefault(at) ?? [])
+                if (below.Add(child) && child != package.Id) queue.Enqueue(child);
+        below.Remove(package.Id);
+        if (below.Count == 0) return false;
+        var mine = package.Members.Where(m => m.RequestedAt is null).Select(m => m.DocumentId).ToList();
+        var lower = await db.PackageMembers.AsNoTracking().Where(m => below.Contains(m.PackageId) && mine.Contains(m.DocumentId))
+            .Select(m => new { m.DocumentId, m.PackageId }).ToListAsync(cancellationToken);
+        if (lower.Count == 0) return false;
+        var going = lower.Select(m => m.DocumentId).ToHashSet();
+        var leaving = package.Members.Where(m => going.Contains(m.DocumentId)).ToList();
+        foreach (var member in leaving) package.Members.Remove(member);
+        db.PackageMembers.RemoveRange(leaving);
+        package.Excluded = package.Excluded.Union(going).ToArray();
+        var numbers = all.Where(p => lower.Any(m => m.PackageId == p.Id)).Select(p => p.Number).Distinct().OrderBy(n => n);
+        await audit.WriteAsync(new Actor(null, "System"), "PACKAGE_MEMBERS_REMOVED", "Package", package.Id, package.Number,
+            $"{going.Count} document(s) held lower in its tree, in {string.Join(", ", numbers)}: they sit there only.", package.ProjectId, cancellationToken);
+        return true;
     }
 
     /// <summary>
@@ -998,14 +1055,39 @@ public sealed class PackageService(
         // What a supplier owes is what was planned; something it sent unplanned (an RFI, an NCR) and we registered is not.
         if (package.Kind == PackageKinds.Supply)
             query = query.Where(d => !db.TransmittalItems.Any(i => i.DocumentId == d.Id && i.Kind == TransmittalItemKinds.Unplanned));
-        // A supplier's document sits in one package of that supplier: one another of its packages holds is not taken.
-        if (package.Kind == PackageKinds.Supply)
-            query = query.Where(d => !db.PackageMembers.Any(m => m.DocumentId == d.Id && m.PackageId != package.Id
-                && db.Packages.Any(p => p.Id == m.PackageId && p.Kind == PackageKinds.Supply && p.SupplierPartyId == package.SupplierPartyId)));
+        // One package per document: one another package of its tree (a supplier's: of its supplier) holds is not taken.
+        var others = await SharingAsync(package, cancellationToken);
+        if (others.Count > 0) query = query.Where(d => !db.PackageMembers.Any(m => m.DocumentId == d.Id && others.Contains(m.PackageId)));
         var have = package.Members.Select(m => m.DocumentId).Concat(package.Excluded).ToList();
         var fresh = await query.Where(d => !have.Contains(d.Id)).Select(d => d.Id).ToListAsync(cancellationToken);
         foreach (var documentId in fresh) package.Members.Add(NewMember(package, documentId, [], byRule: true));
         return fresh.Count;
+    }
+
+    /// <summary>
+    /// The packages a document of this one may not also sit in (owner: one package per document): for a delivery package,
+    /// every other package of its tree (from the top one down); for a supplier's, every other package of that supplier.
+    /// </summary>
+    private async Task<List<Guid>> SharingAsync(Package package, CancellationToken cancellationToken)
+    {
+        if (package.Kind == PackageKinds.Supply)
+            return await db.Packages.AsNoTracking().Where(p => p.ProjectId == package.ProjectId && p.Kind == PackageKinds.Supply
+                && p.SupplierPartyId == package.SupplierPartyId && p.Id != package.Id).Select(p => p.Id).ToListAsync(cancellationToken);
+        var all = await db.Packages.AsNoTracking().Where(p => p.ProjectId == package.ProjectId && p.Kind == package.Kind)
+            .Select(p => new { p.Id, p.ParentId }).ToListAsync(cancellationToken);
+        var parents = all.ToDictionary(p => p.Id, p => p.ParentId);
+        // Climb to the top (a package being made is not saved yet: start from the one it goes in).
+        var root = package.Id;
+        var guard = new HashSet<Guid> { root };
+        for (var up = package.ParentId; up is { } step && guard.Add(step); up = parents.GetValueOrDefault(step)) root = step;
+        var children = all.Where(p => p.ParentId is not null).GroupBy(p => p.ParentId!.Value).ToDictionary(g => g.Key, g => g.Select(p => p.Id).ToList());
+        var tree = new List<Guid> { root };
+        var seen = new HashSet<Guid> { root };
+        var queue = new Queue<Guid>([root]);
+        while (queue.TryDequeue(out var at))
+            foreach (var child in children.GetValueOrDefault(at) ?? [])
+                if (seen.Add(child)) { tree.Add(child); queue.Enqueue(child); }
+        return tree.Where(id => id != package.Id).ToList();
     }
 
     /// <summary>Builds a new member row for a document. The caller adds it to the package.</summary>

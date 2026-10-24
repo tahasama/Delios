@@ -402,10 +402,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   to read it, the same package page** (owner): Packages' **List** shows the packages at the top (each saying how many sit
   in it), drilled into from their pages; **Tree** (`?view=tree`, `PackageTree`) shows every package under the one it sits
   in, folded open, each counting everything under it. A package holding packages is not deleted (HAS_BRANCHES).
-  **A supplier's document sits in one package of that supplier**: a package's rule never takes one another of the
-  supplier's packages holds; added by hand to a branch, it leaves the other package (which no longer takes it back), one
-  already sent to the supplier staying where it was asked (SENT_TO_SUPPLIER); a supplier's branch deleted hands its
-  documents back to the package it sat in. A delivery package's documents may sit in several, as before.
+  **One package per document** (owner: "adding a document to a branch… didn't work", then "one per tree"): within one
+  tree of delivery packages, and among a supplier's packages, a document sits in one package only (`SharingAsync`): a
+  rule never takes one another of them holds; added by hand, it leaves the other (which no longer takes it back), one
+  already delivered staying where it went (ALREADY_DELIVERED), one sent to the supplier where it was asked
+  (SENT_TO_SUPPLIER); held twice from before, it settles on the package's next reading into the lowest that holds it,
+  recorded (`HandDownAsync`, PACKAGE_MEMBERS_REMOVED by the system); a package moved into a tree already holding one of
+  its documents is refused (IN_BOTH); a supplier's branch deleted hands its documents back to the package it sat in.
+  Two separate delivery trees may still share a document.
   Another organization reads only the packages shared with it, and in them only what was asked of it.
 - A supplier package is delivered by "Deliver" (The package): a new delivery package opens with its documents
   in it (or they are added to one already open), then goes the delivery way (check, deliver, accept).
