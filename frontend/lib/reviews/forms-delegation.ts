@@ -42,28 +42,24 @@ export async function delegateReviewAction(_prev: State | undefined, formData: F
 }
 
 /**
- * Adding people to a review in flow (the control function, whoever holds Manage): to the open step or one still to
- * come, or copied in; always with why. Steps already answered never change; nobody is taken off.
+ * Informing people of a review in flow (the control function, whoever holds Manage): copied in, told now and of what
+ * comes of it, never asked to answer. Why is optional.
  */
-export async function addReviewPeopleAction(_prev: State | undefined, formData: FormData): Promise<State> {
+export async function informReviewAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
   const cycleId = text(formData, "cycleId");
-  const userIds = formData.getAll("userIds").map(String).filter(Boolean);
   const copyUserIds = formData.getAll("copyUserIds").map(String).filter(Boolean);
-  const reason = text(formData, "reason");
-  if (!userIds.length && !copyUserIds.length) return { error: "Choose who is added to the step, or copied in." };
-  if (!reason) return { error: "Say why they are added: they, and the record, read it." };
-  let done: { seated: number; copied: number };
+  if (!copyUserIds.length) return { error: "Choose who is informed." };
+  let done: { copied: number };
   try {
-    done = await api<{ seated: number; copied: number }>(projectPath(ctx, `/reviews/${cycleId}/people`), {
-      body: { step: Number(text(formData, "step")) || null, userIds, copyUserIds, reason },
+    done = await api<{ copied: number }>(projectPath(ctx, `/reviews/${cycleId}/people`), {
+      body: { copyUserIds, reason: text(formData, "reason") || null },
     });
   } catch (e) {
     return { error: refusal(e).message };
   }
   revalidatePath(`/reviews/${cycleId}`);
-  const said = [done.seated ? `${done.seated} added to the step` : null, done.copied ? `${done.copied} copied in` : null].filter(Boolean).join(", ");
-  return { message: `${said}; each is told.` };
+  return { message: `${done.copied} informed; each is told.` };
 }
 
 /** One act on a hand-over already made, by its id. */

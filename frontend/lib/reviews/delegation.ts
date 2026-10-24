@@ -110,10 +110,9 @@ export async function delegationFlag(
   return flags().get(toUserId) ?? null;
 }
 
-/** What adding people in flow offers: the steps not done yet, who is on each, and the project's people. Closed for anyone else. */
+/** What informing in flow offers: the project's people, and who is copied in already. Closed for anyone else. */
 export type StepPeopleOptions = {
   open: boolean;
-  steps?: { number: number; title: string; state: string; on: string[] }[];
   people?: { id: string; name: string }[];
   copied?: string[];
 };

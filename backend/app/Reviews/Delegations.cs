@@ -10,7 +10,7 @@ namespace Delios.Host.Reviews;
 
 /// <summary>
 /// Body of a hand-over: who takes the step, the last day it is in force, and why. <c>FromUserId</c>: whose seat, when the
-/// control function or whoever holds Manage hands over somebody else's (then why is required); none, the caller's own.
+/// control function or whoever holds Manage hands over somebody else's; none, the caller's own. Why is optional.
 /// </summary>
 public sealed record DelegateRequest(Guid ToUserId, DateOnly? EndDate, string? Reason = null, Guid? FromUserId = null);
 /// <summary>Body of declining a hand-over: why, so the person who asked knows what to do next.</summary>
@@ -44,8 +44,9 @@ public sealed record DelegationOptions(IReadOnlyList<DelegationCandidate> Candid
 /// rule (<c>POLICY_MATRIX</c> = STRICT). The control function and administrators are
 /// never offered: they hold every verb for emergencies, not to review.
 /// The control function and whoever holds Manage may also hand over somebody else's seat on the open step (owner: one
-/// away, on leave, no longer the right person), always saying why: the control function's is in force at once; that of
-/// whoever holds Manage follows the project's answer, as the person's own would. Both people are told.
+/// away, on leave, no longer the right person), to anyone of ours on the project, the control function too (owner:
+/// "whomever i want"): the control function's is in force at once; that of whoever holds Manage follows the project's
+/// answer, as the person's own would. Both people are told.
 /// </summary>
 public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock clock, Notifications.Notifier notifier)
 {
@@ -110,10 +111,6 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
             return (null, Problems.Forbidden("CONTROL_OR_MANAGE", "Only the control function or whoever holds Manage hands over somebody else's step."));
         }
         var why = request.Reason?.Trim() is { Length: > 0 } said ? said : null;
-        if (forOther && why is null)
-        {
-            return (null, Problems.Invalid("REASON_REQUIRED", "Say why you hand it over for them: they, and whoever takes it, read it."));
-        }
         var step = review.Steps.SingleOrDefault(s => s.State == StepStates.Open);
         var seat = step?.Participants.SingleOrDefault(p => p.UserId == giver);
         if (review.State != ReviewStates.InProgress || step is null || seat is null)
@@ -190,18 +187,18 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
         {
             await TellAsync(review, await notifier.ControlHoldersAsync(review.ProjectId, cancellationToken),
                 $"Delegation asked for on review {review.Number}",
-                forOther ? $"{access.UserName} asks that {takes.Name} answer in {fromName}'s place. {why}" : $"{access.UserName} asks that {takes.Name} answer in their place.",
+                forOther ? $"{access.UserName} asks that {takes.Name} answer in {fromName}'s place. {why}".TrimEnd() : $"{access.UserName} asks that {takes.Name} answer in their place.",
                 cancellationToken);
         }
         else
         {
             await TellAsync(review, [takes.Id], $"You answer review {review.Number} for {fromName}",
-                forOther ? $"Until {ends:yyyy-MM-dd}. Handed over by {access.UserName}: {why}" : $"Until {ends:yyyy-MM-dd}.", cancellationToken);
+                forOther ? $"Until {ends:yyyy-MM-dd}. Handed over by {access.UserName}{(why is null ? "." : $": {why}")}" : $"Until {ends:yyyy-MM-dd}.", cancellationToken);
         }
         if (forOther)
         {
             await TellAsync(review, [giver], through ? $"{access.UserName} asks that {takes.Name} answer review {review.Number} in your place"
-                : $"{takes.Name} answers review {review.Number} in your place", $"{(through ? "Once the control function lets it, until" : "Until")} {ends:yyyy-MM-dd}. {why}", cancellationToken);
+                : $"{takes.Name} answers review {review.Number} in your place", $"{(through ? "Once the control function lets it, until" : "Until")} {ends:yyyy-MM-dd}. {why}".TrimEnd(), cancellationToken);
         }
         await db.SaveChangesAsync(cancellationToken);
         return (View(row), null);
@@ -234,7 +231,7 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
         await TellAsync(review, [row.ToUserId], $"You answer review {review.Number} for {row.FromName}", $"Until {row.EndDate:yyyy-MM-dd}.", cancellationToken);
         if (row.AskedByName != row.FromName)
         {
-            await TellAsync(review, [row.FromUserId], $"{row.ToName} answers review {review.Number} in your place", $"Until {row.EndDate:yyyy-MM-dd}. {row.Reason}", cancellationToken);
+            await TellAsync(review, [row.FromUserId], $"{row.ToName} answers review {review.Number} in your place", $"Until {row.EndDate:yyyy-MM-dd}. {row.Reason}".TrimEnd(), cancellationToken);
         }
         await db.SaveChangesAsync(cancellationToken);
         return (View(row), null);
@@ -296,7 +293,8 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
 
     /// <summary>
     /// Everybody active on the project who could take this step, the matrix's people first: never the one handing it
-    /// over, never somebody already on the step, never a holder of the control function or administration.
+    /// over, never somebody already on the step (they answer their own seat), and, unless the control function or whoever
+    /// holds Manage hands it over, never a holder of the control function or administration.
     /// </summary>
     private async Task<List<DelegationCandidate>> CandidatesAsync(
         ProjectAccess access, Review review, ReviewStep step, CancellationToken cancellationToken, Guid? from = null)
@@ -313,7 +311,7 @@ public sealed class DelegationService(DeliosDbContext db, AuditLog audit, IClock
         return members
             .Where(x => x.m.UserId != giver && !seated.Contains(x.m.UserId))
             .Select(x => new { x, their = ProjectAccess.OfFunction(access.Project, x.m.Function!, x.m.UserId, x.Name, x.m.ActsAsControl) })
-            .Where(y => !y.their.Holds(Verbs.Control) && !y.their.Holds(Verbs.Configure))
+            .Where(y => ForOthers(access) || (!y.their.Holds(Verbs.Control) && !y.their.Holds(Verbs.Configure)))
             .Select(y => new DelegationCandidate(y.x.m.UserId, y.x.Name, y.x.m.Function!.Name, y.their.Allows(verb, document.Facts)))
             .OrderByDescending(c => c.InMatrix).ThenBy(c => c.Name)
             .ToList();

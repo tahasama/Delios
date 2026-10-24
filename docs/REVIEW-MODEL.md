@@ -604,17 +604,16 @@ queue with its age, and the reports that measure each step's duration.
    require one, and the system's own stamp on the rendition at publication stays
    on regardless.
 
-## Who answers, changed in flow
+## Delegate and inform, in flow
 
-The control function and whoever holds Manage (of ours) may change who answers a review still in flow, touching only
-steps not done yet, always saying why:
+The control function and whoever holds Manage (of ours) act on a review still in flow, from the links "Delegate?" and
+"Inform?" in the review's title:
 
-- **Hand over someone's step**: a seat on the open step not yet answered goes to someone else until a date. The control
-  function's hand-over is in force at once; Manage's waits for the control function where it carries out hand-overs.
-  The person whose seat it is and the one taking it are both told.
-- **Add someone**: to the open step (seated at once; where every one answers, the step waits for them too) or to a step
-  still to come (they answer once it opens).
-- **Copy in**: told when copied and of what comes of it, never asked to answer.
+- **Delegate**: the same hand-over the step's holder makes from the answer card, for somebody on the open step who has
+  not answered yet, to anyone of ours on the project (the control function included; the matrix's people first, anyone
+  else flagged), until a date. The control function's hand-over is in force at once; Manage's waits for the control
+  function where it carries out hand-overs. Both people are told. Why is optional.
+- **Inform**: copies people in, told now and of what comes of it, never asked to answer. Why is optional.
 
-Nobody is taken off a step: their step is handed over instead. A step another organization answers as itself is not
-changed. Whoever sits on the open step still hands their own seat over from the answer card ("Delegate").
+Who answers a step changes only by a hand-over: adding someone to a step was tried and taken out, as it is the same as
+delegating.

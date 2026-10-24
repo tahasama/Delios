@@ -131,18 +131,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   including steps not yet reached.
 - The sender may change the people on each step for that review; that choice
   is what the review uses, and the record says so.
-- **Who answers, changed in flow** (owner: "control function and Manage should be able to delegate a step… or add someone
-  forgotten or cc, a modification mid-flow that touches only steps not done yet"): on the review's page, as Withdraw and
-  Notify (owner: "the same way… then forms are at the bottom"), links in the title, "Delegate?", "Add someone?", "Inform?"
-  (`?open=delegate|add|inform`), each opening its folded form under the document (`change-people.tsx`), for the control
-  function and whoever holds Manage, of ours: **Delegate** someone's step (a seat
-  on the open step not answered yet, to someone else until a date, always with why; the control function's in force at
-  once, Manage's waits for the control function where it carries out DELEGATE; both people told; `DelegateRequest.FromUserId`,
-  CONTROL_OR_MANAGE, REASON_REQUIRED), **Add someone** (to the open step, seated at once, or a step still to
-  come) and **Inform** (copied in like "Copy to (cc)"); always with why, each told; `Reviews/StepPeople.cs`, `GET`/`POST /reviews/{id}/people`,
-  REVIEW_PEOPLE_ADDED; STEP_DONE, PARTY_STEP). A step answered never changes; nobody is taken off (their step is handed
-  over instead). Whoever sits on the open step still hands their own over from the answer card's "Delegate" (asking the
-  control function where it carries out DELEGATE).
+- **Delegate and inform, in flow** (owner: "delegate existed already but was only visible to the person that has the
+  step… inform is the only one that should stay, and no need for obligatory why because mostly it is someone
+  forgotten"): on the review's page, as Withdraw and Notify, links in the title, "Delegate?" and "Inform?"
+  (`?open=delegate|inform`), each opening its folded form under the document (`change-people.tsx`), for the control
+  function and whoever holds Manage, of ours. **Delegate** is the same hand-over as the step holder's own "Delegate" on
+  the answer card, for somebody else's seat on the open step not answered yet (`DelegateRequest.FromUserId`,
+  CONTROL_OR_MANAGE): to anyone of ours on the project, the control function included (the matrix's people first,
+  anyone else flagged; nobody already on that step, who answers their own seat), until a date, why optional; the
+  control function's in force at once, Manage's waiting for the control function where it carries out DELEGATE; both
+  people told. **Inform** copies people in like "Copy to (cc)" (`Reviews/StepPeople.cs`, `GET`/`POST /reviews/{id}/people`,
+  REVIEW_PEOPLE_ADDED), told now and of what comes of it, why optional. Adding someone to a step was built and taken out
+  (owner: "the same as delegate"): who answers a step changes only by a hand-over.
 - Sending for review opens the new review's page.
 - A review is only ever started from the Send for review form (route, people
   per step, copies). No "create and send" shortcut on the new-document or
