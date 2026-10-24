@@ -43,7 +43,7 @@ export const TONE: Record<PlanRow["readiness"], string> = {
   UPCOMING: "bg-sky-500/65",
   AT_RISK: "bg-amber-500/70",
   NOT_READY: "bg-red-500/70",
-  UNKNOWN: "bg-slate-300",
+  UNKNOWN: "bg-slate-400",
 };
 /** The lead-in (from the day documents are needed to the day of the work): the same hue, lighter, as a planner draws it. */
 const LEAD: Record<PlanRow["readiness"], string> = {
@@ -53,7 +53,7 @@ const LEAD: Record<PlanRow["readiness"], string> = {
   UPCOMING: "bg-sky-500/30",
   AT_RISK: "bg-amber-500/35",
   NOT_READY: "bg-red-500/35",
-  UNKNOWN: "bg-slate-300/60",
+  UNKNOWN: "bg-slate-400/55",
 };
 const DAY = 86_400_000;
 
