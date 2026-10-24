@@ -68,8 +68,10 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
   const [showing, setShowing] = useState<"pdf" | "source">(pdf ? "pdf" : "source");
   const [zoom, setZoom] = useState(1);
   if (!pdf && !source) return <>{empty}</>;
-  const onSource = !pdf || showing === "source";
-  const shown = onSource ? source! : pdf!;
+  // The choice made is kept while the files change under it (a new one uploaded, another still being checked): the
+  // source shown only while there is one, else the PDF.
+  const onSource = !!source && (!pdf || showing === "source");
+  const shown = onSource ? source : pdf!;
   const at = ZOOMS.indexOf(zoom);
   const zoomable = !onSource || !!kind;
   return (
