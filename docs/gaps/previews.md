@@ -39,3 +39,6 @@ on the project's drawings, the certified routes above stay open.
   the readers the organization has on, and switches them off or back on where the switch `VIEWERS` leaves it free.
   Under a DWG that does not open, an administrator alone reads "A certified reader opens these: see Settings → Viewing
   files".
+- **A drawing with nothing the reader draws** (owner's "Visualization - Sun and Sky Demo": 15 3D solids, ACIS bodies,
+  nothing else) is said in words ("Nothing in … can be drawn here: it holds only 3D solids…"), never a blank page. No
+  free reader draws 3D solids; a certified reader does.

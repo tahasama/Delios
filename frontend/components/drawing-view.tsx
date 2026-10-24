@@ -48,6 +48,11 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false, not
         try {
           await made.Load({ url, fonts: ["/vendor/fonts/DejaVuSans.ttf"] });
           if (gone) return;
+          // Read, but nothing to draw (owner's sample: only 3D solids, which no free reader draws): said, never a blank page.
+          if (!made.GetBounds()) {
+            setState(`Nothing in ${name} can be drawn here: it holds only 3D solids or objects this reader does not draw. Download it to open it.`);
+            return;
+          }
           base.current = made.GetCamera().zoom;
           setLayers([...made.GetLayers(true)].sort((a, b) => a.displayName.localeCompare(b.displayName)));
           setState("ready");
