@@ -332,11 +332,19 @@ a screen only words it. A new rule goes in the backend, never in a page.
   turned, moved, zoomed, each part shown or hidden. A conversion is made once, the first time the file is opened, and
   kept in storage beside it (`previews/…`); converters not installed or failing, the file is offered to download with
   why (`Documents/Previews.cs`, `Previews__OfficeUrl` / `Previews__DwgUrl`). A drawing reads "For viewing only · the revision's PDF is the reference" above it
-  (owner: the long warning was "too long"). **A certified DWG reader is suggested only to those who decide** (owner):
-  the organization's Settings card **Viewing drawings** (`/organization/settings/drawings`): the reader in use, what it
-  leaves out, and "Ask for it", which lands with the app's owner (kept above every organization, `product_requests`,
-  backend command `requests`) and is emailed to DELIOS (`DELIOS_CONTACT_EMAIL`); under a DWG that does not open, only an
-  administrator reads the line leading there. The viewers' WebAssembly and font are
+  (owner: the long warning was "too long"), closed by its × for good (cookie `viewing-note`). **Every reader is a switch,
+  on two levels** (owner: "all readers in that card, that we can switch on and off"): Settings → **Viewing files**
+  (`Documents/Viewers.cs`, keys PICTURES, WORKBOOKS, SCHEDULES, TEXT, DXF, DWG, MODELS, OFFICE, DWG_CERTIFIED; settings
+  `VIEWER:<key>`, only "OFF" kept; VIEWER_SWITCHED). The organization's card (`/organization/settings/viewers`,
+  administrators; `/organization/settings/drawings` only redirects) lists every reader, free, heavy on the server
+  (Office) or paid (a certified DWG reader): one installed is switched at once; one not installed or not built is asked
+  of DELIOS by its switch, which opens the ask under its line (`POST /api/admin/product-requests`, PRODUCT_REQUESTED,
+  kept above every organization, `product_requests`, backend command `requests`, emailed to `DELIOS_CONTACT_EMAIL`).
+  A project's card (`/settings/viewers`, read by everyone of ours) shows only the readers the organization has on, the
+  control function switching them off and back on where the switch `VIEWERS` (area "Viewing files", Free by default)
+  leaves it free. A reader off: the Preview offers the file to download, saying so, and the backend refuses its preview
+  (VIEWER_OFF); the PDF is always shown. Under a DWG that does not open, only an administrator reads "A certified reader
+  opens these: see Settings → Viewing files". The viewers' WebAssembly and font are
   copied from their packages at build (`scripts/copy-vendor.mjs` → `public/vendor`, not committed). The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
   the side cards going under it once there is no room beside it (owner; `ResizablePane`, cookie `pane-review`; a double-click puts it back).
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on

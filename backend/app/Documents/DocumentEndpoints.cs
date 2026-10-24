@@ -335,12 +335,13 @@ public static class DocumentEndpoints
     /// view"), every sheet as the text its cells show (<see cref="WorkbookView"/>). Nothing in it runs.
     /// </summary>
     private static async Task<IResult> WorkbookAsync(Guid fileId, HttpContext http, DeliosDbContext db, Transmittals.TransmittalService transmittals,
-        FileStorage storage, CancellationToken cancellationToken)
+        FileStorage storage, Microsoft.Extensions.Options.IOptions<PreviewOptions> previews, CancellationToken cancellationToken)
     {
         var (file, refused) = await ReadableAsync(fileId, ProjectAccessFilter.Of(http), db, transmittals, cancellationToken);
         if (file is null) return refused!;
         if (!WorkbookView.CanShow(file.Name))
             return Problems.Invalid("NOT_A_WORKBOOK", $"{file.Name} is not an Excel workbook (.xlsx, .xls) or a CSV file: download it to open it.");
+        if (await Viewers.OffRefusalAsync(db, ProjectAccessFilter.Of(http).Project.Id, Viewers.Workbooks, file.Name, previews.Value, cancellationToken) is { } off) return off;
         if (file.Size > WorkbookView.MaxBytes)
             return Problems.Invalid("WORKBOOK_TOO_LARGE", $"{file.Name} is larger than {WorkbookView.MaxBytes / 1024 / 1024} MB: download it to open it.");
         await using var content = await storage.OpenReadAsync(file.ObjectKey, cancellationToken);
@@ -359,13 +360,14 @@ public static class DocumentEndpoints
     /// xer content too?"), every project with its WBS and activities, as the schedule reads it (<see cref="Actions.XerReader"/>).
     /// </summary>
     private static async Task<IResult> ScheduleFileAsync(Guid fileId, HttpContext http, DeliosDbContext db, Transmittals.TransmittalService transmittals,
-        FileStorage storage, CancellationToken cancellationToken)
+        FileStorage storage, Microsoft.Extensions.Options.IOptions<PreviewOptions> previews, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         var (file, refused) = await ReadableAsync(fileId, access, db, transmittals, cancellationToken);
         if (file is null) return refused!;
         if (!Actions.XerReader.IsXer(file.Name))
             return Problems.Invalid("NOT_A_SCHEDULE", $"{file.Name} is not a Primavera P6 export (.xer): download it to open it.");
+        if (await Viewers.OffRefusalAsync(db, access.Project.Id, Viewers.Schedules, file.Name, previews.Value, cancellationToken) is { } off) return off;
         await using var content = await storage.OpenReadAsync(file.ObjectKey, cancellationToken);
         var chosen = (await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == access.Project.Id, cancellationToken))?.Columns.Sheet;
         var reading = Actions.XerReader.Outline(content, chosen ?? access.Project.Code);

@@ -225,7 +225,7 @@ stays on 127.0.0.1.
 
 ## What organizations ask of DELIOS
 
-An administrator may ask DELIOS for a certified DWG reader (organization's Settings → Viewing drawings). Each ask is
+An administrator may ask DELIOS for a reader not installed here, Word and PowerPoint or a certified DWG reader (organization's Settings → Viewing files). Each ask is
 kept above every organization and listed by the backend command `requests`. Set `DELIOS_CONTACT_EMAIL` in `.env` to
 your own address to receive each one by email too (email on: `EMAIL_ENABLED=true` and the SMTP settings).
 

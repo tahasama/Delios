@@ -550,16 +550,3 @@ export async function putBackCopyAction(_prev: Result | undefined, formData: For
   return { ok: "It is the project's own again, as it was." };
 }
 
-/**
- * Asks DELIOS for a certified DWG reader (owner: "a form inside DELIOS that lands with me, and of course an email to
- * delios"): kept for the app's owner and emailed to DELIOS. Administrators only (the backend checks).
- */
-export async function askDwgReaderAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
-  try {
-    await api("/api/admin/product-requests", { method: "POST", body: { what: "DWG_READER", message: text(formData, "message") || null } });
-  } catch (e) {
-    return failed(e);
-  }
-  revalidatePath("/organization/settings/drawings");
-  return { ok: "Asked. DELIOS answers you by email." };
-}

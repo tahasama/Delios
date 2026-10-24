@@ -32,10 +32,10 @@ on the project's drawings, the certified routes above stay open.
 - **A certified DWG reader stays an option, not built**: added the day a client asks for one (Autodesk Platform Services
   for pay per use, ODA for volume or files that must not leave our servers).
 - **How it is suggested** (owner): above every drawing, one short line, "For viewing only · the revision's PDF is the
-  reference". The paid reader is suggested only to those who decide: the organization's Settings card **Viewing
-  drawings** (`/organization/settings/drawings`, administrators) says the reader in use and what it leaves out, and
-  offers "Ask for it" (a message, optional). The ask lands with the app's owner: kept above every organization
-  (`product_requests`, `Organizations/ProductRequests.cs`, `POST /api/admin/product-requests`, PRODUCT_REQUESTED), read
-  with the backend command `requests`, and emailed to DELIOS's address (`DELIOS_CONTACT_EMAIL` in `.env`,
-  `Email__DeliosAddress`; empty: kept only). Under a DWG that does not open, an administrator alone reads "A certified
-  reader opens these: see Settings → Viewing drawings".
+  reference", closed by its × for good. **Every reader on one card, switched on and off** (owner): Settings → Viewing
+  files (`Documents/Viewers.cs`). The organization's card lists them all, the heavy (Office) and the paid (a certified
+  DWG reader) among them: switching on one not installed opens the ask to DELIOS under its line (kept above every
+  organization, `product_requests`, backend command `requests`, emailed to `DELIOS_CONTACT_EMAIL`). A project sees only
+  the readers the organization has on, and switches them off or back on where the switch `VIEWERS` leaves it free.
+  Under a DWG that does not open, an administrator alone reads "A certified reader opens these: see Settings → Viewing
+  files".

@@ -381,6 +381,7 @@ public static class PlatformSetup
             Settings.OrganizationDefaults.MapOrganizationDefaultsEndpoints(app);
             Settings.ProjectPlace.MapProjectPlaceEndpoints(app);
             Organizations.ProductRequests.MapProductRequestEndpoints(app);
+            Documents.Viewers.MapViewerEndpoints(app);
             Settings.Calendar.MapCalendarEndpoints(app);
             Identity.ProjectFunctions.MapProjectFunctionEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);

@@ -39,6 +39,14 @@ export function sourceView(file: PreviewFile | null | undefined): SourceKind | n
   return null;
 }
 
+/** The reader that draws a source file (Settings → Viewing files), by what it is. */
+function readerOf(file: PreviewFile | null | undefined): string | null {
+  const kind = sourceView(file);
+  if (!kind) return null;
+  if (kind === "drawing") return /\.dxf$/i.test(file!.name) ? "DXF" : "DWG";
+  return ({ image: "PICTURES", workbook: "WORKBOOKS", schedule: "SCHEDULES", text: "TEXT", office: "OFFICE", model: "MODELS" } as const)[kind];
+}
+
 /** What the source file is, in words, on the choice above the preview. */
 function kindWords(file: PreviewFile): string {
   const kind = sourceView(file);
@@ -61,12 +69,18 @@ const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
  * or the other"); a source the page cannot draw is offered to download. A zoom for whatever is shown (owner: "some
  * control like a zoom"): − percentage + (the percentage puts it back to 100%).
  */
-export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-h-120", admin = false }: {
+export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-h-120", admin = false, readers, viewingNote = true }: {
   pdf: PreviewFile | null; source: PreviewFile | null; title: string; empty: React.ReactNode; height?: string;
-  /** An administrator: a drawing the free reader cannot open points them to Settings → Viewing drawings. */
+  /** An administrator: a drawing the free reader cannot open points them to Settings → Viewing files. */
   admin?: boolean;
+  /** The readers on for the project (Settings → Viewing files); a source whose reader is off is offered to download. */
+  readers?: string[];
+  /** "For viewing only" above a drawing, until closed. */
+  viewingNote?: boolean;
 }) {
-  const kind = sourceView(source);
+  const reader = readerOf(source);
+  const switchedOff = !!reader && !!readers && !readers.includes(reader);
+  const kind = switchedOff ? null : sourceView(source);
   const [showing, setShowing] = useState<"pdf" | "source">(pdf ? "pdf" : "source");
   const [zoom, setZoom] = useState(1);
   if (!pdf && !source) return <>{empty}</>;
@@ -130,14 +144,17 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
       ) : kind === "office" ? (
         <OfficeView fileId={source!.id} name={source!.name} zoom={zoom} height={height} />
       ) : kind === "drawing" ? (
-        <DrawingView fileId={source!.id} name={source!.name} zoom={zoom} height={height} admin={admin} />
+        <DrawingView fileId={source!.id} name={source!.name} zoom={zoom} height={height} admin={admin} note={viewingNote} />
       ) : kind === "model" ? (
         <ModelView fileId={source!.id} name={source!.name} zoom={zoom} height={height} />
       ) : (
         <div className={`grid w-full place-items-center bg-slate-100 p-6 text-center ${height}`}>
           <div>
             <p className="text-sm font-semibold text-slate-700">{source!.name} cannot be shown here</p>
-            <p className="mt-1 text-xs text-slate-500">The page shows PDFs, pictures, Excel and CSV, P6 exports, text, Word and PowerPoint, drawings (DWG, DXF) and 3D models (IFC, glTF, OBJ, STL).</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {switchedOff ? "Its reader is not on for this project (Settings → Viewing files)."
+                : "The page shows PDFs, pictures, Excel and CSV, P6 exports, text, Word and PowerPoint, drawings (DWG, DXF) and 3D models (IFC, glTF, OBJ, STL)."}
+            </p>
             <a href={`/api/files/${source!.id}?dl=1`} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-link hover:underline">
               <Download className="h-3.5 w-3.5" /> Download it to open it
             </a>

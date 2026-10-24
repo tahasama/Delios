@@ -48,7 +48,13 @@ public static class ProductRequests
 {
     /// <summary>A certified DWG reader (paid), in place of the free one.</summary>
     public const string DwgReader = "DWG_READER";
-    private static readonly Dictionary<string, string> Words = new() { [DwgReader] = "A certified DWG reader" };
+    /// <summary>Word and PowerPoint shown in the page (LibreOffice, heavy on the server, installed by DELIOS).</summary>
+    public const string OfficeReader = "OFFICE_READER";
+    private static readonly Dictionary<string, string> Words = new()
+    {
+        [DwgReader] = "A certified DWG reader",
+        [OfficeReader] = "Word and PowerPoint shown in the page",
+    };
 
     public sealed record AskRequest(string? What, string? Message);
     public sealed record Asked(Guid Id, string What, string? Message, string ByName, Instant At);

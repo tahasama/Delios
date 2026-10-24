@@ -52,6 +52,7 @@ public static class Previews
         var (file, refused) = await DocumentEndpoints.ReadableAsync(fileId, ProjectAccessFilter.Of(http), db, transmittals, cancellationToken);
         if (file is null) return refused!;
         if (!Is(file.Name, Office)) return Problems.Invalid("NOT_AN_OFFICE_FILE", $"{file.Name} is not a Word or PowerPoint file: download it to open it.");
+        if (await Viewers.OffRefusalAsync(db, ProjectAccessFilter.Of(http).Project.Id, Viewers.Office, file.Name, options.Value, cancellationToken) is { } off) return off;
         var key = KeyOf(file, ".pdf");
         if (await storage.SizeAsync(key, cancellationToken) is null)
         {
@@ -87,6 +88,9 @@ public static class Previews
         var (file, refused) = await DocumentEndpoints.ReadableAsync(fileId, ProjectAccessFilter.Of(http), db, transmittals, cancellationToken);
         if (file is null) return refused!;
         var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (extension is ".dxf" or ".dwg"
+            && await Viewers.OffRefusalAsync(db, ProjectAccessFilter.Of(http).Project.Id, extension == ".dxf" ? Viewers.Dxf : Viewers.Dwg, file.Name, options.Value, cancellationToken) is { } off)
+            return off;
         if (extension == ".dxf") return Results.File(await storage.OpenReadAsync(file.ObjectKey, cancellationToken), "application/dxf", file.Name);
         if (extension != ".dwg") return Problems.Invalid("NOT_A_DRAWING", $"{file.Name} is not a DWG or DXF drawing: download it to open it.");
         // Minimal: only the drawing's entities, asked when the viewer could not draw the full DXF (each kept apart).
@@ -123,11 +127,12 @@ public static class Previews
 
     /// <summary><c>GET /files/{fileId}/text</c>: a plain text file as text (its first 2 MB, said when cut). Shown, never run.</summary>
     private static async Task<IResult> TextAsync(Guid fileId, HttpContext http, DeliosDbContext db, Transmittals.TransmittalService transmittals,
-        FileStorage storage, CancellationToken cancellationToken)
+        FileStorage storage, IOptions<PreviewOptions> options, CancellationToken cancellationToken)
     {
         var (file, refused) = await DocumentEndpoints.ReadableAsync(fileId, ProjectAccessFilter.Of(http), db, transmittals, cancellationToken);
         if (file is null) return refused!;
         if (!Is(file.Name, Text)) return Problems.Invalid("NOT_TEXT", $"{file.Name} is not a text file: download it to open it.");
+        if (await Viewers.OffRefusalAsync(db, ProjectAccessFilter.Of(http).Project.Id, Viewers.Text, file.Name, options.Value, cancellationToken) is { } off) return off;
         await using var content = await storage.OpenReadAsync(file.ObjectKey, cancellationToken);
         var buffer = new byte[Math.Min(file.Size, MaxText)];
         var read = 0;

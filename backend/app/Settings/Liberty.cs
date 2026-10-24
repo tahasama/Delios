@@ -91,6 +91,7 @@ public static class Liberty
         new(ListKey("PRESERVATION_FORMATS"), Lists, "Preservation formats", "What is kept for the long term is the law's", false),
         new(ListKey(Actions.ScheduleSets.Decisions), Lists, "Activity decisions", "\"Postponed\" is read from what they mean, and the reports read them", false),
 
+        new(Documents.Viewers.Switch, "Viewing files", "Which readers it uses", "A project's files and team: a reader the organization has on may be left off", true),
         new(Calendar.Switch, "Calendar", "Its own days off", "A site has its own shutdowns and local holidays; due days skip them, the organization's holidays always count", true),
         new(Forms, "Forms & fields", "Forms & fields", "A client may ask fields of its own; a field a number part reads follows the numbering", true),
         new(Routes, "Review routes", "Review routes", "Each project has its own reviewers and steps", true),

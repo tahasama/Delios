@@ -31,7 +31,7 @@ delios/
 backend/
 ├── app/                  the program (API and worker)
 │   ├── Program.cs        start-up: what runs, in which order
-│   ├── Documents/        documents, revisions, files, the register; their numbers with other organizations (Equivalents.cs); the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
+│   ├── Documents/        documents, revisions, files, the register; their numbers with other organizations (Equivalents.cs); the readers of the Preview, switched on and off (Viewers.cs, the card Viewing files); the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
 │   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (the sets of Review outcomes, read by routes)
 │   │                     ProjectLists: the project's lists (own copy on first change, where each value is used, who changes them)
 │   │                     WorkbookView: an Excel source file read for the Preview (components/file-preview.tsx, workbook-view.tsx; a P6 .xer, schedule-file-view.tsx);
@@ -53,7 +53,7 @@ backend/
 │   │                     look-alikes, claims, merges), RegistryEndpoints (on DELIOS, our identity and domain,
 │   │                     claims, merges; command merge-organizations), ProductRequests (what an organization
 │   │                     asks of DELIOS, a certified DWG reader: kept above every organization, emailed, command
-│   │                     requests; the card organization/settings/drawings)
+│   │                     requests; asked from the card organization/settings/viewers)
 │   ├── Settings/         the organization's and the project's settings and lists; KeptCopies (a project's own copy kept when reset, put back from the organization's card); FormRules (Forms & fields: what each form asks, checked on save); Liberty (what projects may change: Fixed or Free per setting, and the projects a fixed one leaves free); ProjectDifferences (what one project changed, for the organization's Settings); OrganizationDefaults (the defaults for new projects replaced as a whole, a copy kept); ProjectPlace (where a new project's site starts: time zone, days off, country); Calendar (public holidays and a project's own days off, the calendars' endpoints); DateFormat (how dates read, carried to the screens on every answer)
 │   ├── Notifications/    notifications, email, pop-ups
 │   ├── Audit/            the audit trail

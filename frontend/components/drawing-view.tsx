@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { X } from "lucide-react";
 import type { DxfViewer, LayerInfo } from "dxf-viewer";
 
 /**
@@ -9,7 +10,12 @@ import type { DxfViewer, LayerInfo } from "dxf-viewer";
  * (LibreDWG, the free route: its reading depends on the drawing's version and content, and says so when it fails).
  * Dragged to move, the wheel to zoom, its layers switched on and off; text drawn in DejaVu Sans.
  */
-export function DrawingView({ fileId, name, zoom = 1, height, admin = false }: { fileId: string; name: string; zoom?: number; height: string; admin?: boolean }) {
+export function DrawingView({ fileId, name, zoom = 1, height, admin = false, note = true }: {
+  fileId: string; name: string; zoom?: number; height: string; admin?: boolean;
+  /** "For viewing only" shown above it, until closed (kept in a cookie, for every drawing). */
+  note?: boolean;
+}) {
+  const [noted, setNoted] = useState(note);
   const box = useRef<HTMLDivElement>(null);
   const viewer = useRef<DxfViewer | null>(null);
   const base = useRef(1);
@@ -75,9 +81,18 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false }: {
   return (
     <div className={`flex w-full flex-col bg-white ${height}`}>
       {/* Said above every drawing (owner: a warning that it is only for viewing; then "too long"). */}
-      <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-1 text-[11px] text-amber-900">
-        <span className="font-semibold">For viewing only</span> · the revision&apos;s PDF is the reference.
-      </p>
+      {noted ? (
+        <p className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1 text-[11px] text-amber-900">
+          <span><span className="font-semibold">For viewing only</span> · the revision&apos;s PDF is the reference.</span>
+          <button type="button" title="Close" aria-label="Close" className="ml-auto grid h-5 w-5 place-items-center rounded text-amber-900/70 hover:text-amber-950"
+            onClick={() => {
+              setNoted(false);
+              try { document.cookie = "viewing-note=0; path=/; max-age=31536000; samesite=lax"; } catch { /* closed for this visit only */ }
+            }}>
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </p>
+      ) : null}
       <div className="relative flex min-h-0 w-full flex-1">
       <div ref={box} className="min-w-0 flex-1" />
       {state === "ready" && layers.length > 1 ? (
@@ -99,7 +114,7 @@ export function DrawingView({ fileId, name, zoom = 1, height, admin = false }: {
             {/* Only to those who decide (owner): a certified reader, paid, opens what the free one does not. */}
             {admin && state !== "loading" && /\.dwg$/i.test(name) ? (
               <span className="mt-2 block">
-                A certified reader opens these: see <Link href="/organization/settings/drawings" className="font-semibold text-link hover:underline">Settings → Viewing drawings</Link>.
+                A certified reader opens these: see <Link href="/organization/settings/viewers" className="font-semibold text-link hover:underline">Settings → Viewing files</Link>.
               </span>
             ) : null}
           </span>

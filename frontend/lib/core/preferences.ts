@@ -18,6 +18,8 @@ export const PREF = {
   calendarDay: "calendar-day",
   /** "0" when the names of the days off and the actions are not written inside the days. */
   calendarNames: "calendar-names",
+  /** "0" once "For viewing only" above a drawing was closed. */
+  viewingNote: "viewing-note",
 } as const;
 
 /** How large a calendar's day is drawn, its side in pixels: 56 unless dragged, between 28 and 120. */

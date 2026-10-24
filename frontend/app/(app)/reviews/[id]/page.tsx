@@ -33,6 +33,7 @@ import { issueToReviewAction, withdrawRevisionAction, removeCommentAction, editC
 import { openCopy } from "@/lib/documents/copies";
 import { cookies } from "next/headers";
 import { PREF, paneWidth } from "@/lib/core/preferences";
+import { readersOn } from "@/lib/settings/viewers";
 import { ResizablePane } from "@/components/resizable-pane";
 import { ArrowLeft, Bell, ExternalLink, FileText, Pencil } from "lucide-react";
 
@@ -329,7 +330,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
               {rendition ? <a href={`/api/files/${rendition.id}`} target="_blank" className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-link hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Open PDF</a> : null}
             </div>
             {/* The same Preview as the document's: the PDF, and the source file where the page can show it. */}
-            <FilePreview pdf={rendition} source={source} title={`${doc.docNumber} revision ${rev.value}`} height="h-160" admin={isAdmin(user)}
+            <FilePreview pdf={rendition} source={source} title={`${doc.docNumber} revision ${rev.value}`} height="h-160" admin={isAdmin(user)} readers={await readersOn(ctx)} viewingNote={(await cookies()).get(PREF.viewingNote)?.value !== "0"}
               empty={<div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>} />
           </section>
 

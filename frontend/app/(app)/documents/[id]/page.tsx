@@ -22,6 +22,9 @@ import { ownFields, readExtras, formPolicy } from "@/lib/settings/field-policy";
 import { fmtDate, timeAgo, plain } from "@/lib/core/utils";
 import { readableDetail } from "@/lib/settings/activity-words";
 import { forType } from "@/lib/settings/serving";
+import { readersOn } from "@/lib/settings/viewers";
+import { cookies } from "next/headers";
+import { PREF } from "@/lib/core/preferences";
 import { servingOf } from "@/lib/settings/serving-api";
 import { getActiveSet, getSet, getValue } from "@/lib/settings/config";
 import { updateDocumentAction, reinstateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/documents/forms";
@@ -760,7 +763,7 @@ export default async function DocumentDetailPage({
             // The PDF as it stands, and the source file where the page can show it (a picture, a workbook).
             content: (<>
               {pdf && stampWaited ? <StampPending /> : null}
-              <FilePreview pdf={pdf} source={shownSource} title={`${doc.docNumber} rev ${previewed?.value ?? ""}`} admin={isAdmin(user)}
+              <FilePreview pdf={pdf} source={shownSource} title={`${doc.docNumber} rev ${previewed?.value ?? ""}`} admin={isAdmin(user)} readers={await readersOn(ctx)} viewingNote={(await cookies()).get(PREF.viewingNote)?.value !== "0"}
                 empty={(
                   <div className="grid h-48 place-items-center p-6 text-center">
                     <div>
