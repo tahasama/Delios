@@ -7,7 +7,7 @@ import { cn, fmtDate } from "@/lib/core/utils";
 type Activity = { code: string; name: string; wbs: string | null; type: string; start: string | null; finish: string | null; started: boolean; finished: boolean };
 type Wbs = { id: string; parent: string | null; code: string; name: string; order: number };
 type Project = { id: string; code: string; name: string; wbs: Wbs[]; activities: Activity[] };
-type Outline = { projects: Project[]; cut: boolean; read: string | null };
+type Outline = { projects: Project[]; cut: boolean; read: string | null; readId: string | null };
 
 type Row = { kind: "wbs"; node: Wbs; depth: number; count: number } | { kind: "activity"; activity: Activity; depth: number };
 
@@ -29,7 +29,12 @@ export function ScheduleFileView({ fileId, name }: { fileId: string; name: strin
         const body = await r.json().catch(() => ({}));
         if (gone) return;
         if (!r.ok) setError(body.error ?? "The export could not be shown.");
-        else setOutline(body as Outline);
+        else {
+          // Opened on the project the schedule reads, so it counts what the plan counts.
+          const outline = body as Outline;
+          setOutline(outline);
+          setAt(Math.max(0, outline.projects.findIndex((p) => p.id === outline.readId)));
+        }
       })
       .catch(() => { if (!gone) setError("The export could not be shown."); });
     return () => { gone = true; };
@@ -118,6 +123,7 @@ export function ScheduleFileView({ fileId, name }: { fileId: string; name: strin
             className={cn("-mt-px whitespace-nowrap border-t-2 px-3 py-1.5 text-[11px] font-semibold transition",
               i === at ? "border-brand-line bg-surface text-brand-ink" : "border-transparent text-slate-500 hover:text-slate-800")}>
             {p.code}<span className="ml-1 font-normal text-slate-400">{p.activities.length}</span>
+            {outline.projects.length > 1 && p.id === outline.readId ? <span className="ml-1 font-normal text-emerald-700">· the schedule</span> : null}
           </button>
         ))}
         <span className="ml-auto px-2 text-[11px] text-slate-500">A: the date happened</span>

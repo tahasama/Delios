@@ -303,7 +303,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`components/workbook-view.tsx`; backend `Documents/WorkbookView.cs`, `GET /files/{id}/workbook`: each sheet's cells as
   Excel shows them, last calculated values, bold, merged cells, widths; nothing in it runs; the first 2,000 rows and 100
   columns of 30 sheets, said when cut), a Primavera P6 export (.xer) as P6 lays it out (`components/schedule-file-view.tsx`;
-  `GET /files/{id}/schedule`, the same reading as the schedule's: each project on its tab, its activities under their
+  `GET /files/{id}/schedule`, the same reading as the schedule's: each project on its tab, opened on the one the schedule reads (marked "the schedule"
+  when there are several, so it counts what the plan counts), its activities under their
   WBS, each folded open or shut, ID · name · type · start · finish, "A" once it happened; what the schedule would make
   of it said above when it would not read it); with a PDF too, "The PDF · The source file" above it, the PDF first. Other
   sources (Word, drawings, models…) are downloaded; converting them is to discuss. The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,

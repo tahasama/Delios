@@ -448,10 +448,12 @@ export function PlanRegister({
                   the window — one line, on the left where counts are read. */}
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
                 <span className="font-mono tabular-nums">
-                  {more.shown.toLocaleString("en-GB")}<span className="ml-1 font-sans text-slate-500">of {more.total.toLocaleString("en-GB")}</span>
+                  {more.shown < more.total ? <>{more.shown.toLocaleString("en-GB")}<span className="mx-1 font-sans text-slate-500">of</span></> : null}
+                  {more.total.toLocaleString("en-GB")}
+                  <span className="ml-1 font-sans text-slate-500">{more.total === 1 ? "action" : "actions"}{more.window ? " in these days" : ""}</span>
                 </span>
                 {more.window && more.window.elsewhere ? (
-                  <span className="text-amber-800">· {more.window.elsewhere.toLocaleString("en-GB")} outside these days</span>
+                  <span className="text-amber-800">· {more.window.elsewhere.toLocaleString("en-GB")} more on other days</span>
                 ) : null}
                 {more.undated ? (
                   <button type="button" onClick={() => go(more.undatedHref ?? viewHref("table"))} className="text-amber-800 hover:underline" title="An action with no date has no bar; the table lists them">

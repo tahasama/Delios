@@ -371,6 +371,8 @@ public static class DocumentEndpoints
             cut = reading.Projects.Any(p => p.Activities.Length > most),
             // What the schedule would make of it: read for ours, or why not.
             read = reading.Error,
+            // The project the schedule reads, opened first (owner: the preview and the plan must count the same).
+            readId = reading.ReadId,
         });
     }
 

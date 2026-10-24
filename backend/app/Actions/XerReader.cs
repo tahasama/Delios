@@ -24,7 +24,7 @@ public static class XerReader
     public sealed record WbsNode(string Id, string? Parent, string Code, string Name, int Order);
     public sealed record ProjectOutline(string Id, string Code, string Name, WbsNode[] Wbs, Activity[] Activities);
     /// <summary>What an export holds: every project's outline, and the activities the schedule reads (or why none).</summary>
-    public sealed record Reading(ProjectOutline[] Projects, IReadOnlyList<ParsedActivity>? Activities, string? Error);
+    public sealed record Reading(ProjectOutline[] Projects, IReadOnlyList<ParsedActivity>? Activities, string? Error, string? ReadId = null);
 
     private sealed record Table(string[] Fields, List<string[]> Rows)
     {
@@ -145,7 +145,7 @@ public static class XerReader
         }
         return new(outlines, read.Activities.Select(a => new ParsedActivity(a.Code, a.Name,
             a.Start is { } s ? LocalDate.FromDateOnly(s) : null, a.Finish is { } f ? LocalDate.FromDateOnly(f) : null, null, null,
-            a.Started, a.Finished, PathOf(a.Wbs), a.Wbs is not null && order.TryGetValue(a.Wbs, out var n) ? n : null)).ToList(), null);
+            a.Started, a.Finished, PathOf(a.Wbs), a.Wbs is not null && order.TryGetValue(a.Wbs, out var n) ? n : null)).ToList(), null, read.Id);
     }
 
     /// <summary>P6's activity types in plain words.</summary>
