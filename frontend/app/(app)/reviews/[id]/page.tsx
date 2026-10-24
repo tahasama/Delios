@@ -347,7 +347,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             </div>
             {/* The same Preview as the document's: the PDF, and the source file where the page can show it. */}
             {checking(rev.files).length ? <FilesChecking names={checking(rev.files)} /> : null}
-            <FilePreview pdf={rendition} source={source} title={`${doc.docNumber} revision ${rev.value}`} height="h-160" admin={isAdmin(user)} readers={await readersOn(ctx)} viewingNote={(await cookies()).get(PREF.viewingNote)?.value !== "0"} pdfDark={(await cookies()).get(PREF.pdfDark)?.value === "1"}
+            <FilePreview pdf={rendition} source={source} title={`${doc.docNumber} revision ${rev.value}`} height="h-160" admin={isAdmin(user)} readers={await readersOn(ctx)} viewingNote={(await cookies()).get(PREF.viewingNote)?.value !== "0"}
               empty={<div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>} />
           </section>
 

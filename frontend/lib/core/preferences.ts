@@ -20,8 +20,6 @@ export const PREF = {
   calendarNames: "calendar-names",
   /** "0" once "For viewing only" above a drawing was closed. */
   viewingNote: "viewing-note",
-  /** "1" while the PDF is shown as a dark page. */
-  pdfDark: "pdf-dark",
 } as const;
 
 /** How large a calendar's day is drawn, its side in pixels: 56 unless dragged, between 28 and 120. */
