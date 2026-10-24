@@ -61,8 +61,10 @@ const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
  * or the other"); a source the page cannot draw is offered to download. A zoom for whatever is shown (owner: "some
  * control like a zoom"): − percentage + (the percentage puts it back to 100%).
  */
-export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-h-120" }: {
+export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-h-120", admin = false }: {
   pdf: PreviewFile | null; source: PreviewFile | null; title: string; empty: React.ReactNode; height?: string;
+  /** An administrator: a drawing the free reader cannot open points them to Settings → Viewing drawings. */
+  admin?: boolean;
 }) {
   const kind = sourceView(source);
   const [showing, setShowing] = useState<"pdf" | "source">(pdf ? "pdf" : "source");
@@ -128,7 +130,7 @@ export function FilePreview({ pdf, source, title, empty, height = "h-[70vh] min-
       ) : kind === "office" ? (
         <OfficeView fileId={source!.id} name={source!.name} zoom={zoom} height={height} />
       ) : kind === "drawing" ? (
-        <DrawingView fileId={source!.id} name={source!.name} zoom={zoom} height={height} />
+        <DrawingView fileId={source!.id} name={source!.name} zoom={zoom} height={height} admin={admin} />
       ) : kind === "model" ? (
         <ModelView fileId={source!.id} name={source!.name} zoom={zoom} height={height} />
       ) : (

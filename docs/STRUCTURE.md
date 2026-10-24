@@ -51,7 +51,9 @@ backend/
 │   ├── Organizations/    organizations working together: links, linked accounts, switching; Registry (what is
 │   │                     unique across DELIOS: codes, names, identifiers, contract numbers; changed once;
 │   │                     look-alikes, claims, merges), RegistryEndpoints (on DELIOS, our identity and domain,
-│   │                     claims, merges; command merge-organizations)
+│   │                     claims, merges; command merge-organizations), ProductRequests (what an organization
+│   │                     asks of DELIOS, a certified DWG reader: kept above every organization, emailed, command
+│   │                     requests; the card organization/settings/drawings)
 │   ├── Settings/         the organization's and the project's settings and lists; KeptCopies (a project's own copy kept when reset, put back from the organization's card); FormRules (Forms & fields: what each form asks, checked on save); Liberty (what projects may change: Fixed or Free per setting, and the projects a fixed one leaves free); ProjectDifferences (what one project changed, for the organization's Settings); OrganizationDefaults (the defaults for new projects replaced as a whole, a copy kept); ProjectPlace (where a new project's site starts: time zone, days off, country); Calendar (public holidays and a project's own days off, the calendars' endpoints); DateFormat (how dates read, carried to the screens on every answer)
 │   ├── Notifications/    notifications, email, pop-ups
 │   ├── Audit/            the audit trail

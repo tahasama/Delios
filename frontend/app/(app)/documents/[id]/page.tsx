@@ -760,7 +760,7 @@ export default async function DocumentDetailPage({
             // The PDF as it stands, and the source file where the page can show it (a picture, a workbook).
             content: (<>
               {pdf && stampWaited ? <StampPending /> : null}
-              <FilePreview pdf={pdf} source={shownSource} title={`${doc.docNumber} rev ${previewed?.value ?? ""}`}
+              <FilePreview pdf={pdf} source={shownSource} title={`${doc.docNumber} rev ${previewed?.value ?? ""}`} admin={isAdmin(user)}
                 empty={(
                   <div className="grid h-48 place-items-center p-6 text-center">
                     <div>

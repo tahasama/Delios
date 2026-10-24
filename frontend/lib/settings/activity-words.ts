@@ -7,6 +7,7 @@ const WORDS: Record<string, string> = {
   DOCUMENT_VIEWED: "Opened a document",
   DOWNLOAD: "Downloaded a file",
   ACTIVITY_READ: "Read someone's activity",
+  PRODUCT_REQUESTED: "Asked DELIOS for a certified DWG reader",
   TRANSMITTAL_OPENED: "Opened a transmittal",
   // Sign-ins and security
   SIGN_IN: "Signed in",

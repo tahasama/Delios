@@ -31,3 +31,11 @@ on the project's drawings, the certified routes above stay open.
 - **DWG, the free route kept**: light, and good on Autodesk's samples once its multi-line texts were mended (v2).
 - **A certified DWG reader stays an option, not built**: added the day a client asks for one (Autodesk Platform Services
   for pay per use, ODA for volume or files that must not leave our servers).
+- **How it is suggested** (owner): above every drawing, one short line, "For viewing only · the revision's PDF is the
+  reference". The paid reader is suggested only to those who decide: the organization's Settings card **Viewing
+  drawings** (`/organization/settings/drawings`, administrators) says the reader in use and what it leaves out, and
+  offers "Ask for it" (a message, optional). The ask lands with the app's owner: kept above every organization
+  (`product_requests`, `Organizations/ProductRequests.cs`, `POST /api/admin/product-requests`, PRODUCT_REQUESTED), read
+  with the backend command `requests`, and emailed to DELIOS's address (`DELIOS_CONTACT_EMAIL` in `.env`,
+  `Email__DeliosAddress`; empty: kept only). Under a DWG that does not open, an administrator alone reads "A certified
+  reader opens these: see Settings → Viewing drawings".

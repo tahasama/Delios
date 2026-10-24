@@ -81,9 +81,14 @@ public static class Commands
                 await Console.Out.WriteLineAsync(merged);
                 return merged.StartsWith("No such") || merged.StartsWith("One of") ? 2 : 0;
 
+            case "requests" when args.Length == 1:
+                // What organizations asked of DELIOS (a certified DWG reader), for the app's owner.
+                await Console.Out.WriteLineAsync(await services.GetRequiredService<Organizations.ListProductRequests>().RunAsync());
+                return 0;
+
             default:
                 await Console.Error.WriteLineAsync(
-                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex | grant-all <email> | unshare-package <email> <package-number> | merge-organizations [<merge-id>]");
+                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex | grant-all <email> | unshare-package <email> <package-number> | merge-organizations [<merge-id>] | requests");
                 return 2;
         }
     }

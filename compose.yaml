@@ -46,6 +46,7 @@ x-backend: &backend
     Email__Reviews: ${EMAIL_REVIEWS:-true}
     Email__Notifications: ${EMAIL_NOTIFICATIONS:-true}
     Email__From: ${EMAIL_FROM:-delios@localhost}
+    Email__DeliosAddress: ${DELIOS_CONTACT_EMAIL:-}
     Email__BaseUrl: ${PUBLIC_URL:-http://localhost:3080}
     Email__Smtp__Host: ${SMTP_HOST:-}
     Email__Smtp__Port: ${SMTP_PORT:-587}

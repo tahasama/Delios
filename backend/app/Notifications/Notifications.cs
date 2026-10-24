@@ -115,6 +115,8 @@ public sealed class EmailOptions
     public ReplyOptions Replies { get; set; } = new();
     /// <summary>The most a transmittal emailed to an organization not on DELIOS carries attached; beyond it, the files are listed.</summary>
     public long MaxAttachmentBytes { get; set; } = 15 * 1024 * 1024;
+    /// <summary>DELIOS's own address: what an organization asks of DELIOS (a certified DWG reader) is emailed there. Empty: kept only.</summary>
+    public string DeliosAddress { get; set; } = "";
 
     /// <summary>Whether an email of this kind is sent now.</summary>
     public bool Sends(string kind) => Enabled && kind switch

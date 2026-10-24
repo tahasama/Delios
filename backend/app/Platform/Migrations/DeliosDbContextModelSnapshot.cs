@@ -3690,6 +3690,62 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("organization_merges", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Organizations.ProductRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<string>("ByEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("by_email");
+
+                    b.Property<string>("ByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("by_name");
+
+                    b.Property<Guid>("ByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("by_user_id");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("message");
+
+                    b.Property<string>("OrganizationName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("organization_name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("What")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("what");
+
+                    b.HasKey("Id")
+                        .HasName("pk_product_requests");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_product_requests_tenant_id");
+
+                    b.ToTable("product_requests", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Organizations.ProjectParty", b =>
                 {
                     b.Property<Guid>("Id")

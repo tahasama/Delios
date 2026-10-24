@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import type { DxfViewer, LayerInfo } from "dxf-viewer";
 
 /**
@@ -8,7 +9,7 @@ import type { DxfViewer, LayerInfo } from "dxf-viewer";
  * (LibreDWG, the free route: its reading depends on the drawing's version and content, and says so when it fails).
  * Dragged to move, the wheel to zoom, its layers switched on and off; text drawn in DejaVu Sans.
  */
-export function DrawingView({ fileId, name, zoom = 1, height }: { fileId: string; name: string; zoom?: number; height: string }) {
+export function DrawingView({ fileId, name, zoom = 1, height, admin = false }: { fileId: string; name: string; zoom?: number; height: string; admin?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const viewer = useRef<DxfViewer | null>(null);
   const base = useRef(1);
@@ -73,13 +74,9 @@ export function DrawingView({ fileId, name, zoom = 1, height }: { fileId: string
 
   return (
     <div className={`flex w-full flex-col bg-white ${height}`}>
-      {/* Said above every drawing (owner: "a warning that the current might not be working that well and is only for
-          view"): what the free reader leaves out, and that the revision's PDF is the reference. */}
-      <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-900">
-        <span className="font-semibold">For viewing only.</span>{" "}
-        {/\.dwg$/i.test(name) ? "Read by a free DWG reader: " : "Drawn in the page: "}
-        paper layouts, linked drawings and pictures are not shown, lettering is approximate, and some drawings may not open.
-        The revision&apos;s PDF is the reference.
+      {/* Said above every drawing (owner: a warning that it is only for viewing; then "too long"). */}
+      <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-1 text-[11px] text-amber-900">
+        <span className="font-semibold">For viewing only</span> · the revision&apos;s PDF is the reference.
       </p>
       <div className="relative flex min-h-0 w-full flex-1">
       <div ref={box} className="min-w-0 flex-1" />
@@ -97,7 +94,15 @@ export function DrawingView({ fileId, name, zoom = 1, height }: { fileId: string
       ) : null}
       {state !== "ready" ? (
         <p className="absolute inset-0 grid place-items-center p-6 text-center text-xs text-slate-500">
-          {state === "loading" ? `Opening ${name}… (a DWG is read the first time it is opened)` : state}
+          <span>
+            {state === "loading" ? `Opening ${name}… (a DWG is read the first time it is opened)` : state}
+            {/* Only to those who decide (owner): a certified reader, paid, opens what the free one does not. */}
+            {admin && state !== "loading" && /\.dwg$/i.test(name) ? (
+              <span className="mt-2 block">
+                A certified reader opens these: see <Link href="/organization/settings/drawings" className="font-semibold text-link hover:underline">Settings → Viewing drawings</Link>.
+              </span>
+            ) : null}
+          </span>
         </p>
       ) : null}
       </div>

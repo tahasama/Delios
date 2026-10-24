@@ -331,7 +331,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   in the browser, its kinds of element as parts, spaces and openings hidden at first), glTF/GLB, OBJ, STL (three.js),
   turned, moved, zoomed, each part shown or hidden. A conversion is made once, the first time the file is opened, and
   kept in storage beside it (`previews/…`); converters not installed or failing, the file is offered to download with
-  why (`Documents/Previews.cs`, `Previews__OfficeUrl` / `Previews__DwgUrl`). The viewers' WebAssembly and font are
+  why (`Documents/Previews.cs`, `Previews__OfficeUrl` / `Previews__DwgUrl`). A drawing reads "For viewing only · the revision's PDF is the reference" above it
+  (owner: the long warning was "too long"). **A certified DWG reader is suggested only to those who decide** (owner):
+  the organization's Settings card **Viewing drawings** (`/organization/settings/drawings`): the reader in use, what it
+  leaves out, and "Ask for it", which lands with the app's owner (kept above every organization, `product_requests`,
+  backend command `requests`) and is emailed to DELIOS (`DELIOS_CONTACT_EMAIL`); under a DWG that does not open, only an
+  administrator reads the line leading there. The viewers' WebAssembly and font are
   copied from their packages at build (`scripts/copy-vendor.mjs` → `public/vendor`, not committed). The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
   the side cards going under it once there is no room beside it (owner; `ResizablePane`, cookie `pane-review`; a double-click puts it back).
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on

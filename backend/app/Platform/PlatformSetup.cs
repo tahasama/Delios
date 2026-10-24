@@ -196,6 +196,7 @@ public static class PlatformSetup
         services.AddScoped<Seeding.UnsharePackage>();
         services.AddScoped<Seeding.GrantAll>();
         services.AddScoped<Organizations.MergeOrganizations>();
+        services.AddScoped<Organizations.ListProductRequests>();
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null);
@@ -379,6 +380,7 @@ public static class PlatformSetup
             Actions.ScheduleDays.MapScheduleDaysEndpoints(app);
             Settings.OrganizationDefaults.MapOrganizationDefaultsEndpoints(app);
             Settings.ProjectPlace.MapProjectPlaceEndpoints(app);
+            Organizations.ProductRequests.MapProductRequestEndpoints(app);
             Settings.Calendar.MapCalendarEndpoints(app);
             Identity.ProjectFunctions.MapProjectFunctionEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
