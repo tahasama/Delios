@@ -10,7 +10,8 @@ export function cn(...inputs: ClassValue[]) {
 export function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
-  if (Number.isNaN(date.getTime())) return "—";
+  // Anything else than a date or its text (an object the server sent by mistake) reads as no date, never a broken page.
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "—";
   return formatDay(date, undefined, typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d));
 }
 

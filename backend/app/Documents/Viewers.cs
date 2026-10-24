@@ -102,12 +102,14 @@ public static class Viewers
         var tenantId = http.User.TenantId();
         var asked = await db.Set<Organizations.ProductRequest>().AsNoTracking().Where(r => r.TenantId == tenantId)
             .OrderByDescending(r => r.At).Select(r => new { r.What, r.ByName, r.At, r.Message }).ToListAsync(cancellationToken);
+        // An instant reaches the screens as its date and time (it has no converter of its own).
+        var askedAt = asked.Select(a => new { a.What, a.ByName, At = a.At.ToDateTimeOffset(), a.Message }).ToList();
         return Results.Ok(All.Select(r => new
         {
             r.Key, r.Title, r.Shows, r.Cost, r.Said, r.Asks,
             Installed = Installed(r, options.Value),
             On = OrganizationOn(r, options.Value, rows),
-            Asked = r.Asks is null ? null : asked.Where(a => a.What == r.Asks).Select(a => new { a.ByName, a.At, a.Message }).FirstOrDefault(),
+            Asked = r.Asks is null ? null : askedAt.Where(a => a.What == r.Asks).Select(a => new { a.ByName, a.At, a.Message }).FirstOrDefault(),
         }));
     }
 

@@ -63,7 +63,7 @@ public static class StampPlaceEndpoints
             plan.ProjectScale,
             plan.Returned,
             Placed = read.Revision.StampX is { } x && read.Revision.StampY is { } y
-                ? new { X = x, Y = y, Scale = read.Revision.StampScale ?? plan.ProjectScale, By = read.Revision.StampPlacedByName, At = read.Revision.StampPlacedAt } : null,
+                ? new { X = x, Y = y, Scale = read.Revision.StampScale ?? plan.ProjectScale, By = read.Revision.StampPlacedByName, At = read.Revision.StampPlacedAt?.ToDateTimeOffset() } : null,
         });
     }
 
