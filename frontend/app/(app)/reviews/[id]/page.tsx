@@ -20,7 +20,7 @@ import { requestChoices, authorOf, issuePolicy, decisionLetsItOut } from "@/lib/
 import { DelegatePanel, DelegateForm, type DelegationRow } from "./delegate-panel";
 import { AnswerCard } from "./answer-card";
 import { delegateCandidates, delegationFlag, delegationsOn, handOverForOthers, stepPeopleOptions } from "@/lib/reviews/delegation";
-import { HandOverForm, CopyInForm } from "./change-people";
+import { CopyInForm } from "./change-people";
 import { controlDoes, actIsOff, matrixBinds } from "@/lib/settings/control-activities";
 import { RequestIssue } from "@/app/(app)/documents/[id]/request-issue";
 import { Timeline } from "@/components/timeline";
@@ -45,7 +45,7 @@ import { ArrowLeft, Bell, ExternalLink, FileText, Pencil } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function ReviewCyclePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ open?: string }> }) {
-  // A link in the title opens one of the forms below the document: ?open=withdraw, notify, delegate or inform.
+  // A link in the title opens one of the forms below the document: ?open=withdraw, notify or cc.
   const opened = (await searchParams).open ?? null;
   const ctx = await requireScope();
   const { user } = ctx;
@@ -135,7 +135,6 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   const [forOthers, peopleOptions] = cycle.status === "OPEN" && !cycle.withdrawn
     ? await Promise.all([handOverForOthers(ctx, cycle.id), stepPeopleOptions(ctx, cycle.id)])
     : [null, null];
-  const mayHandOver = Boolean(forOthers && forOthers.seats.length && forOthers.candidates.length);
   const mayInform = Boolean(peopleOptions?.open && peopleOptions.people?.length);
   const [handCandidates, handThroughControl, handRows, handOff, handStrict] = await Promise.all([
     assigned && cycle.status === "OPEN" ? delegateCandidates(ctx, { target: doc, verb: handVerb, fromUserId: user.id }) : Promise.resolve([]),
@@ -144,6 +143,10 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
     actIsOff(ctx, "DELEGATE"),
     matrixBinds(ctx),
   ]);
+  // The hand-over is the answer card's Delegate: the person's own seat, and, for the control function and whoever holds
+  // Manage, anyone's on the open step not answered yet (the backend lists them).
+  const othersSeats = forOthers?.seats ?? [];
+  const ownSeat = assigned && !handRows.some((row) => row.fromUserId === user.id && (row.status === "ACTIVE" || row.status === "OPEN"));
   const handOvers: DelegationRow[] = await Promise.all(handRows.map(async (row) => ({
     id: row.id,
     fromName: row.fromUser.name,
@@ -308,8 +311,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             {/* Each opens its folded section under the document. */}
             {mayWithdraw ? <Link href="?open=withdraw#withdraw" className="text-xs font-semibold text-red-700 hover:underline">Withdraw?</Link> : null}
             {notify ? <Link href="?open=notify#notify" className="text-xs font-semibold text-link hover:underline">Notify?</Link> : null}
-            {mayHandOver ? <Link href="?open=delegate#delegate" className="text-xs font-semibold text-link hover:underline">Delegate?</Link> : null}
-            {mayInform ? <Link href="?open=inform#inform" className="text-xs font-semibold text-link hover:underline">Inform?</Link> : null}
+            {mayInform ? <Link href="?open=cc#cc" className="text-xs font-semibold text-link hover:underline">Cc?</Link> : null}
           </div>
         </div>
       </section>
@@ -399,24 +401,13 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             </details>
           ) : null}
 
-          {mayHandOver ? (
-            <details id="delegate" open={opened === "delegate"} className="register register-sheet register-sheet-open scroll-mt-24">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
-                <span className="text-[13px] text-slate-600">Someone on the open step cannot answer?</span>
-                <span className="ask">Delegate their step</span>
-              </summary>
-              <div className="border-t border-line px-5 py-4 sm:px-6">
-                <HandOverForm cycleId={cycle.id} seats={forOthers!.seats} candidates={forOthers!.candidates} throughControl={forOthers!.throughControl} />
-              </div>
-            </details>
-          ) : null}
 
 
           {mayInform ? (
-            <details id="inform" open={opened === "inform"} className="register register-sheet register-sheet-open scroll-mt-24">
+            <details id="cc" open={opened === "cc"} className="register register-sheet register-sheet-open scroll-mt-24">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
-                <span className="text-[13px] text-slate-600">Was someone forgotten? Tell them what comes of it</span>
-                <span className="ask">Inform them</span>
+                <span className="text-[13px] text-slate-600">Forgot to cc someone? They are kept informed, never asked to review</span>
+                <span className="ask">Cc them</span>
               </summary>
               <div className="border-t border-line px-5 py-4 sm:px-6">
                 <CopyInForm cycleId={cycle.id} people={peopleOptions!} />
@@ -549,8 +540,9 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
           <AnswerCard
             title={cycle.binding ? "Binding verdict" : "Advice"}
             answerLabel={cycle.binding ? "Give my verdict" : "Give my advice"}
-            delegate={cycle.status === "OPEN" && assigned && !cycle.outcome && !handOff && !handOvers.some((row) => row.status === "ACTIVE" || row.status === "OPEN")
-              ? <DelegateForm cycleId={cycle.id} verb={handVerb} candidates={handCandidates} throughControl={handThroughControl} strict={handStrict} />
+            delegate={cycle.status === "OPEN" && !cycle.outcome && !handOff && (ownSeat || othersSeats.length)
+              ? <DelegateForm cycleId={cycle.id} verb={handVerb} candidates={forOthers?.candidates.length ? forOthers.candidates : handCandidates}
+                  throughControl={handThroughControl && !controller} strict={handStrict} seats={othersSeats} self={ownSeat ? user.id : null} />
               : null}
           >
             {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900">{cycle.binding ? <><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</> : verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{verdictBlurb(cycle.outcome)}</p>              {/* What the verdict said. A verdict that reads "Comments" and

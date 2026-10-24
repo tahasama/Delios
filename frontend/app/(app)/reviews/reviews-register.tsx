@@ -33,7 +33,6 @@ export type ReviewRow = {
   docNumber: string;
   title: string;
   revision: string;
-  kind: "decision" | "advice" | "client review";
   verdict: string | null;
   verdictLabel: string | null;
   verdictProceeds: boolean | null;
@@ -64,7 +63,6 @@ type Opt = { code: string; label: string; group?: string };
 /** The filters a person may show or hide here (the Filters menu, `components/filter-menu.tsx`), in the order they stand. */
 const FILTERS = [
   { key: "status", label: "Review state" },
-  { key: "kind", label: "Kind" },
   { key: "verdict", label: "Verdict" },
   { key: "due", label: "Due" },
   { key: "discipline", label: "Discipline" },
@@ -81,8 +79,8 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
   plate: React.ReactNode;
   rows: ReviewRow[];
   total: number;
-  filters: { q: string; status: string; kind: string; verdict: string; due: string; discipline: string; docType: string; supplier: string; po: string; deliverable: string; on: string; from: string; to: string };
-  filterOptions: { statuses: Opt[]; kinds: Opt[]; verdicts: Opt[]; dues: Opt[]; disciplines: Opt[]; types: Opt[]; suppliers: Opt[]; pos: Opt[]; deliverables: Opt[]; dateFields: Opt[] };
+  filters: { q: string; status: string; verdict: string; due: string; discipline: string; docType: string; supplier: string; po: string; deliverable: string; on: string; from: string; to: string };
+  filterOptions: { statuses: Opt[]; verdicts: Opt[]; dues: Opt[]; disciplines: Opt[]; types: Opt[]; suppliers: Opt[]; pos: Opt[]; deliverables: Opt[]; dateFields: Opt[] };
   facets: { key: string; label: string; without: string }[];
   paging: { page: number; pages: number; perPage: number; sizes: number[]; from: number; to: number; query: string };
   sort?: { key: string; dir: "asc" | "desc" };
@@ -202,7 +200,6 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
 
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3 md:grid-cols-5">
           {show("status") ? <Narrow name="status" value={filters.status} empty="Review state" options={filterOptions.statuses} /> : null}
-          {show("kind") ? <Narrow name="kind" value={filters.kind} empty="Kind" options={filterOptions.kinds} /> : null}
           {show("verdict") ? <Narrow name="verdict" value={filters.verdict} empty="Verdict" options={verdicts} /> : null}
           {show("due") ? <Narrow name="due" value={filters.due} empty="Due" options={filterOptions.dues} /> : null}
           {show("discipline") ? <Narrow name="discipline" value={filters.discipline} empty="Discipline" options={filterOptions.disciplines} /> : null}
@@ -438,16 +435,6 @@ type Column = {
 /** The columns, in the order they start in. */
 const COLUMNS: Column[] = [
   { key: "revision", label: "Rev", sort: "rev", cellClass: "font-mono text-xs font-semibold text-slate-800", cell: (row) => row.revision },
-  {
-    key: "kind", label: "Kind", sort: "kind",
-    note: "A decision is the last step of a route and releases the revision or sends it back. Advice is any earlier step. A client review happens after we released it, and is answered by a new revision.",
-    cellClass: "whitespace-nowrap",
-    cell: (row) => (
-      <Chip className={row.kind === "client review" ? "bg-violet-100 text-violet-800 ring-violet-300" : row.kind === "decision" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>
-        {row.kind}
-      </Chip>
-    ),
-  },
   {
     key: "verdict", label: "Verdict", sort: "verdict",
     note: "On a decision, the code the decider gave. On an advisory step, what that person's comments amounted to — advisers are not asked for a code.",
