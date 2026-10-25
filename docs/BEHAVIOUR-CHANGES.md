@@ -737,3 +737,10 @@ none kept (the first opening of each page reads it again).
 alive: the database, Redis, the queue, the backend and the drawing converter. Before: every 5 to 30 seconds, for ever
 (the queue's and the backend's each start a program to answer). Now: every few seconds while starting, so what waits
 on them starts at once, then every 5 minutes.
+
+---
+
+**Opening and downloading no longer wait in the audit queue** (owner). Before: every recorded act, opening a document
+included, locked the organization's audit trail until its save, so readers queued behind one another. Now: opened,
+downloaded and a person's activity read are written beside the chain, unlocked, each sealed by its own fingerprint; acts
+that change something stay in the chain as before. Nothing disappears from the Audit trail or a person's activity.

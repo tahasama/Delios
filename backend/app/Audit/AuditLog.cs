@@ -29,11 +29,22 @@ public sealed class AuditLog(DeliosDbContext db, TenantContext tenant, Documents
         string? detail = null, Guid? projectId = null, CancellationToken cancellationToken = default)
     {
         snapshots.Note(entityType, entityId, action, detail, actor.Name);
-        await db.Database.ExecuteSqlAsync($"""
-            SELECT audit_append({tenant.Required}::uuid, {projectId}::uuid, {actor.Id}::uuid, {actor.Name}::text,
-                {action}::text, {entityType}::text, {entityId}::uuid, {entityLabel}::text, {detail}::text)
-            """, cancellationToken);
+        // Reading (opened, downloaded) changes nothing: kept outside the locked chain, so a reader never waits behind
+        // every other act of the organization (owner). Every other act extends the chain, one writer at a time.
+        if (OutsideChain.Contains(action))
+            await db.Database.ExecuteSqlAsync($"""
+                SELECT audit_note({tenant.Required}::uuid, {projectId}::uuid, {actor.Id}::uuid, {actor.Name}::text,
+                    {action}::text, {entityType}::text, {entityId}::uuid, {entityLabel}::text, {detail}::text)
+                """, cancellationToken);
+        else
+            await db.Database.ExecuteSqlAsync($"""
+                SELECT audit_append({tenant.Required}::uuid, {projectId}::uuid, {actor.Id}::uuid, {actor.Name}::text,
+                    {action}::text, {entityType}::text, {entityId}::uuid, {entityLabel}::text, {detail}::text)
+                """, cancellationToken);
     }
+
+    /// <summary>The acts of reading, kept outside the chain: the kinds Opened and Downloaded (<see cref="AuditKinds"/>).</summary>
+    public static readonly HashSet<string> OutsideChain = [.. AuditKinds.CodesOf("READING"), .. AuditKinds.CodesOf("DOWNLOADED")];
 
     /// <summary>The id of the first row whose hash does not match, or null when the chain is intact.</summary>
     public Task<long?> FirstBrokenLinkAsync(CancellationToken cancellationToken = default) =>

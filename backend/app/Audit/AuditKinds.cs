@@ -71,6 +71,9 @@ public static class AuditKinds
     private static bool Starts(string action, params string[] prefixes) => prefixes.Any(action.StartsWith);
 
     /// <summary>The kind of one act, from its code: named above, else by the start of its code, else the register.</summary>
+    /// <summary>The codes a kind holds.</summary>
+    public static IReadOnlyList<string> CodesOf(string kind) => Codes.TryGetValue(kind, out var codes) ? codes : [];
+
     public static string Of(string action) => ByCode.TryGetValue(action, out var kind) ? kind : action switch
     {
         _ when Starts(action, "SIGN_IN", "MFA_", "PASSWORD", "SSO_", "SECURITY_") => "SIGN_IN",

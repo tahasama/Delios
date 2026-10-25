@@ -1131,6 +1131,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   downloaded a file, `TRACK_READING`) kept unless switched off, read as two kinds, Opened and Downloaded (owner: opened
   is not downloaded; `AuditKinds` READING / DOWNLOADED); sign-ins always kept for security, shown on a person's
   activity only when switched on (`TRACK_SIGN_INS` = ON).
+  **Reading is kept outside the locked chain** (owner: every reader waited behind every other act of the organization):
+  opened, downloaded and a person's activity read (`AuditKinds` READING / DOWNLOADED, `AuditLog.OutsideChain`) are written
+  by `audit_note`, with no lock and no link to the row before, each sealed by its own hash (`audit_events.chained` false);
+  every act that changes something stays in the chain (`audit_append`, one writer at a time). Same table, append-only,
+  the same readers; `audit_verify` checks the chain and each reading row's own seal.
 - **Audit trail** (Settings, administrators) keeps its logbook look (owner: the agreement was on content, not styling):
   the day as a rule, each act a slip, the kinds beside it. Shared with a person's activity (`components/logbook.tsx`).
   Beside the log: the whole log, then each kind of act with its count and every act it holds (plain words, counts), so
