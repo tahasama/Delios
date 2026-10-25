@@ -23,6 +23,13 @@ x-backend: &backend
     ConnectionStrings__Redis: valkey:6379
     ConnectionStrings__RabbitMq: amqp://delios:${RABBITMQ_PASSWORD:?run sh deploy/init-env.sh}@rabbitmq:5672/
     # s3 (SeaweedFS here, Hetzner or AWS in production) or azure (docs/ACTIVATION.md "Azure Blob Storage").
+    # The second copy of each file, where file-backup keeps it: made as each file is stored.
+    Backup__Target: ${FILE_BACKUP_TARGET_TYPE:-local}
+    Backup__Path: ${FILE_BACKUP_TARGET_PATH:-/file-backup}
+    Backup__Endpoint: ${RCLONE_CONFIG_TARGET_ENDPOINT:-}
+    Backup__Region: ${RCLONE_CONFIG_TARGET_REGION:-}
+    Backup__AccessKey: ${RCLONE_CONFIG_TARGET_ACCESS_KEY_ID:-}
+    Backup__SecretKey: ${RCLONE_CONFIG_TARGET_SECRET_ACCESS_KEY:-}
     Storage__Provider: ${STORAGE_PROVIDER:-s3}
     Storage__AzureConnectionString: ${AZURE_STORAGE_CONNECTION_STRING:-}
     Storage__Endpoint: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
@@ -205,6 +212,8 @@ services:
     environment:
       <<: *backend-env
       Delios__Role: api
+    # The second copy of each file is made as it is stored (the weekly comparison in file-backup does the rest).
+    volumes: [file-backup:/file-backup]
     depends_on: &after-migrate
       migrate: { condition: service_completed_successfully }
       valkey: { condition: service_healthy }
@@ -216,6 +225,7 @@ services:
     environment:
       <<: *backend-env
       Delios__Role: worker
+    volumes: [file-backup:/file-backup]
     depends_on: *after-migrate
 
   # The way in: load-balances the API nodes, and terminates TLS in production.

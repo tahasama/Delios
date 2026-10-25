@@ -40,7 +40,7 @@ public interface IObjectStore
 /// short-lived signed links. The API only signs, checks and records. Which store
 /// holds them is a setting; nothing above this class knows.
 /// </summary>
-public sealed class FileStorage(IObjectStore store, IClock clock)
+public sealed class FileStorage(IObjectStore store, IClock clock, FileBackup backup)
 {
     /// <summary>How long an upload link stays valid.</summary>
     public static readonly Duration UploadWindow = Duration.FromMinutes(15);
@@ -77,6 +77,7 @@ public sealed class FileStorage(IObjectStore store, IClock clock)
         {
             await store.CopyAsync(incoming, key, cancellationToken);
             await store.DeleteAsync(incoming, cancellationToken);
+            backup.Post(key);
         }
         else if (await store.SizeAsync(key, cancellationToken) is null)
         {
@@ -95,14 +96,21 @@ public sealed class FileStorage(IObjectStore store, IClock clock)
     public Task<long?> SizeAsync(string key, CancellationToken cancellationToken) => store.SizeAsync(key, cancellationToken);
 
     /// <summary>Stores a file the system made itself, such as a stamped copy, under a new key.</summary>
-    public Task PutAsync(string key, byte[] content, string contentType, CancellationToken cancellationToken) =>
-        store.PutAsync(key, content, contentType, cancellationToken);
+    public async Task PutAsync(string key, byte[] content, string contentType, CancellationToken cancellationToken)
+    {
+        await store.PutAsync(key, content, contentType, cancellationToken);
+        backup.Post(key);
+    }
 
     /// <summary>Opens the stored bytes for reading. Used by the worker to scan and check a file.</summary>
     public Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken) => store.OpenReadAsync(key, cancellationToken);
 
     /// <summary>A stored file copied under another key: each file record owns its own object (keys are unique).</summary>
-    public Task CopyAsync(string from, string to, CancellationToken cancellationToken) => store.CopyAsync(from, to, cancellationToken);
+    public async Task CopyAsync(string from, string to, CancellationToken cancellationToken)
+    {
+        await store.CopyAsync(from, to, cancellationToken);
+        backup.Post(to);
+    }
 
     /// <summary>
     /// The <c>Content-Disposition</c> header value that makes the browser save the file under its own name

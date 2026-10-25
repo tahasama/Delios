@@ -750,3 +750,9 @@ that change something stay in the chain as before. Nothing disappears from the A
 **A document's history keeps only what changed** (owner). Before: every change saved the whole document again, with all
 its revisions and files. Now: each point keeps only what changed since the one before (a whole one every 20), and the
 History page reads exactly as before. Nothing kept earlier is touched.
+
+---
+
+**Each file is copied to the second place as it is stored** (owner). Before: every 6 hours the copier listed every file
+on both sides to find what was new. Now: the app copies each file the moment it is stored (an upload once checked, a
+stamped copy…), and the full comparison runs once a week as a safety net; its alert waits 8 days instead of 12 hours.

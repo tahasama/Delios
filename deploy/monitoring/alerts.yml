@@ -111,11 +111,12 @@ groups:
           action: "Check the postgres and node-exporter containers."
 
       - alert: FileBackupTooOld
-        expr: time() - max(delios_file_backup_last_success_timestamp_seconds) > 12 * 3600
+        # The full comparison runs weekly (each file is copied as it is stored): alert past 8 days.
+        expr: time() - max(delios_file_backup_last_success_timestamp_seconds) > 8 * 86400
         for: 15m
         labels: { severity: critical }
         annotations:
-          summary: "Stored files have not been copied to the second location for 12 hours."
+          summary: "The weekly full comparison of stored files with their second copy has not completed for 8 days."
           action: "Read the file-backup container logs."
 
       - alert: RestoreDrillOverdue

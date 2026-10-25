@@ -5,10 +5,12 @@
 # Source and target are rclone remotes configured by environment variables:
 #   RCLONE_CONFIG_SOURCE_*   the primary bucket (S3-compatible)
 #   RCLONE_CONFIG_TARGET_*   the second location (another provider or region; a volume in development)
-#   SOURCE_PATH, TARGET_PATH bucket and path on each, FILE_BACKUP_EVERY seconds (default 21600)
+#   SOURCE_PATH, TARGET_PATH bucket and path on each, FILE_BACKUP_EVERY seconds (default 604800, a week)
+# Each file is already copied by the app as it is stored (Documents/FileBackup.cs): this full comparison is the
+# safety net that copies what a stop lost (owner: no timer to find out what is new).
 set -u
 METRICS=/var/lib/delios-metrics
-EVERY=${FILE_BACKUP_EVERY:-21600}
+EVERY=${FILE_BACKUP_EVERY:-604800}
 # After a failure, try again soon rather than a whole interval later.
 RETRY=${FILE_BACKUP_RETRY:-300}
 last_success=0; failures=0; files=0

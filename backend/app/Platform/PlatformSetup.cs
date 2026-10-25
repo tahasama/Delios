@@ -137,6 +137,10 @@ public static class PlatformSetup
         services.AddScoped<Documents.DocumentService>();
         services.AddScoped<Organizations.OrganizationService>();
         services.AddScoped<Documents.FileStorage>();
+        // The second copy of each file, made when it is stored (the weekly comparison does the rest).
+        services.AddOptions<Documents.BackupOptions>().BindConfiguration(Documents.BackupOptions.Section);
+        services.AddSingleton<Documents.FileBackup>();
+        services.AddHostedService(sp => sp.GetRequiredService<Documents.FileBackup>());
         if (config.GetSection(StorageOptions.Section).Get<StorageOptions>()?.UsesAzure == true)
         {
             services.AddSingleton<Documents.IObjectStore, Documents.AzureObjectStore>();

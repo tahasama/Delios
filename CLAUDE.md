@@ -1794,7 +1794,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Nothing runs on a clock to find out what happened** (owner: "we do not send spies… we go outside and inform that it
   just happened"): the outbox's relay runs in every process and sleeps until an act of that process, once committed with
   a message, rings it (`OutboxWake`; on start it sends what was left waiting, a failure tries again after 5 seconds);
-  the checks run only when someone runs them (`CheckScheduler.RequestAsync`, no daily job); notices fall on days written
+  the checks run only when someone runs them (`CheckScheduler.RequestAsync`, no daily job); each stored file is copied to the
+  second place as it is stored (`Documents/FileBackup.cs`, from `FileStorage` keeping, putting or copying a file; never
+  overwriting, never deleting; `Backup__*`, the same place as file-backup), and file-backup's full comparison runs once a
+  week as the safety net (`FILE_BACKUP_EVERY` 604800; alert past 8 days); notices fall on days written
   by what changed them (above). What stays timed is a fallback, never the way to learn of a change: a kept answer read
   again within the hour, the search index's hourly catch-up (OpenSearch only, off by default), a page re-reading itself
   while a file it waits for is checked (three minutes at most). A state is never kept fresh by a
