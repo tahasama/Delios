@@ -128,6 +128,8 @@ public sealed class PackageTests(Infrastructure infrastructure) : IClassFixture<
     public async Task A_package_with_a_rule_fills_itself_and_one_taken_out_stays_out()
     {
         await using var app = await TestApp.StartAsync(infrastructure);
+        // What a rule admits is taken in by the worker after the save that may move it, never on a reading.
+        app.StartWorker();
         var engineer = await app.SignedInAsync("engineer@demo.local");
         var project = await Api.ProjectIdAsync(engineer);
         var first = (await Api.RegisterAsync(engineer, project, Api.Drawing("Switchroom layout", "EL"))).GetProperty("id").GetGuid();
@@ -158,9 +160,14 @@ public sealed class PackageTests(Infrastructure infrastructure) : IClassFixture<
         var p = $"{packages}/{package.GetProperty("id").GetGuid()}";
         Assert.Equal(first, package.GetProperty("members").EnumerateArray().Single().GetProperty("documentId").GetGuid());
 
-        // Registered later and matching: it joins by itself.
+        // Registered later and matching: it joins by itself, once the worker has brought the package up to date.
         var second = (await Api.RegisterAsync(engineer, project, Api.Drawing("Cable schedule", "EL"))).GetProperty("id").GetGuid();
         var now = await GetAsync(engineer, p);
+        for (var i = 0; i < 100 && now.GetProperty("members").GetArrayLength() < 2; i++)
+        {
+            await Task.Delay(200);
+            now = await GetAsync(engineer, p);
+        }
         Assert.Equal(2, now.GetProperty("members").GetArrayLength());
 
         var (_, removed) = await Flow.PostAsync(engineer, $"{p}/members/remove", new { documentIds = new[] { second } });
