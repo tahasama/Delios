@@ -123,8 +123,8 @@ public sealed class OpenSearchClient(HttpClient http, IOptions<SearchOptions> op
                     filter = new object[] { new { term = new { tenantId } }, new { term = new { projectId } } },
                     should = new object[]
                     {
-                        new { multi_match = new { query = words, fields = new[] { "number^3", "title^2", "content" }, @operator = "and" } },
-                        new { multi_match = new { query = words, fields = new[] { "title", "content" }, fuzziness = "AUTO" } },
+                        new { multi_match = new { query = words, fields = new[] { "number^3", "title^2" }, @operator = "and" } },
+                        new { multi_match = new { query = words, fields = new[] { "title" }, fuzziness = "AUTO" } },
                         new { prefix = new { number_raw = new { value = words.Trim().ToUpperInvariant(), boost = 4 } } },
                     },
                     minimum_should_match = 1,

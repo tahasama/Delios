@@ -15,6 +15,12 @@ namespace Delios.Host.Extraction;
 /// <summary>The values a project's extraction switch (<c>Project.ContentExtraction</c>) can take.</summary>
 public static class ExtractionModes
 {
+    /// <summary>
+    /// Files are never read (owner: "never ever read the files, ever ever, forbidden forever, unless I get back on that
+    /// with a client's request"): no switch turns it on, nothing is queued, search reads a document's details only.
+    /// </summary>
+    public static readonly bool Forbidden = true;
+
     /// <summary>Files are never read; any text already read is deleted when the switch is turned off.</summary>
     public const string Off = "OFF";
     /// <summary>Files are read only when someone asks, for a revision or the whole project.</summary>
@@ -120,6 +126,12 @@ public sealed class ExtractionProcessor(
     /// </summary>
     public async Task ProcessAsync(FileExtract message, CancellationToken cancellationToken)
     {
+        // Forbidden: a message left from before is dropped unread.
+        if (ExtractionModes.Forbidden)
+        {
+            Extracted.WithLabels("skipped").Inc();
+            return;
+        }
         tenant.Set(message.TenantId);
         StoredFile? file;
         string mode;

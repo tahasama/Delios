@@ -86,13 +86,7 @@ public sealed class FileProcessor(
         if (file.DocumentId is { } changedDocument)
             screens.Post([$"doc:{changedDocument}", $"p:{file.ProjectId}:{Platform.Areas.Docs}"]);
         else screens.Post([$"p:{file.ProjectId}:{Platform.Areas.Transmittals}"]);
-        // Read for search straight away only where the organization chose so.
-        if (status == FileStatuses.Clean && file.DocumentId is not null && file.Kind is FileKinds.Native or FileKinds.Rendition
-            && await db.Projects.AnyAsync(p => p.Id == file.ProjectId && p.ContentExtraction == Extraction.ExtractionModes.Automatic, cancellationToken))
-        {
-            Extraction.ExtractionProcessor.Enqueue(db, file);
-            await db.SaveChangesAsync(cancellationToken);
-        }
+        // A file's content is never read for search (owner: forbidden, ExtractionModes.Forbidden).
 
         await audit.WriteAsync(Actor.System, status switch
         {

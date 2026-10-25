@@ -376,9 +376,9 @@ services:
       start_interval: 5s
       retries: 3
 
-  # ── Content extraction and OCR (installed when a client asks for it) ─────────
-  # Apache Tika with Tesseract: reads the text layer of PDFs and Office files, and
-  # OCRs pages that are only images. Reached by the worker alone.
+  # ── Content extraction and OCR: forbidden (owner: "never ever read the files… unless I get back on that with a
+  # client's request"). The backend reads no file whatever this service does (Extraction.ExtractionModes.Forbidden).
+  # Apache Tika with Tesseract: reads the text layer of PDFs and Office files, and OCRs pages that are only images.
 
   # Word, PowerPoint and their kin turned into a PDF for the Preview (LibreOffice inside), made once per file. On
   # standby (owner): about 1.5 GB and up to 1 GB of memory, for what the revision's PDF already shows. Switched on with

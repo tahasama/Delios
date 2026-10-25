@@ -97,6 +97,8 @@ public static class ExtractionEndpoints
     private static async Task<IResult?> RefusedAsync(
         ProjectAccess access, DeliosDbContext db, ExtractionOptions options, CancellationToken cancellationToken)
     {
+        if (ExtractionModes.Forbidden)
+            return Problems.Conflict("CONTENT_NOT_READ", "DELIOS never reads inside files: search finds documents by their number and title.");
         if (!access.IsInternal || !access.Holds(Verbs.Read))
             return Problems.Forbidden("EXTRACTION_NOT_ALLOWED", "Your function cannot ask for files to be read.");
         var mode = await db.Projects.Where(p => p.Id == access.Project.Id).Select(p => p.ContentExtraction).SingleAsync(cancellationToken);
@@ -129,6 +131,8 @@ public static class ExtractionEndpoints
         Guid projectId, ExtractionModeRequest request, HttpContext http, DeliosDbContext db, IClock clock, AuditLog audit,
         CancellationToken cancellationToken)
     {
+        if (ExtractionModes.Forbidden && request.Mode != ExtractionModes.Off)
+            return Problems.Conflict("CONTENT_NOT_READ", "DELIOS never reads inside files: search finds documents by their number and title.");
         if (request.Mode is not { } mode || !ExtractionModes.All.Contains(mode))
             return Problems.Invalid("MODE_INVALID", "OFF, ON_DEMAND or AUTOMATIC.", new { allowed = ExtractionModes.All });
         var project = await db.Projects.SingleOrDefaultAsync(p => p.Id == projectId, cancellationToken);

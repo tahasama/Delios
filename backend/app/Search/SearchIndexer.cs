@@ -46,8 +46,6 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, SearchSignal sign
 
     /// <summary>How long after a change it is certain to be committed and visible; the mark stays this far behind.</summary>
     private static readonly Duration Settle = Duration.FromMinutes(1);
-    /// <summary>Most characters of file text sent per document; the rest is left out of the index.</summary>
-    private const int MaxContent = 1_000_000;
     /// <summary>The catch-up of every organization, in case a word was lost.</summary>
     private static readonly TimeSpan CatchUp = TimeSpan.FromHours(1);
 
@@ -155,17 +153,10 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, SearchSignal sign
             .ToListAsync(cancellationToken);
         if (changed.Count == 0) return 0;
 
-        // The text read from the latest revision's files, where the organization lets them be read.
-        var latest = changed.Where(d => d.LatestRevisionId != null).Select(d => d.LatestRevisionId!.Value).ToList();
-        var texts = (await db.FileTexts.AsNoTracking().Where(t => t.RevisionId != null && latest.Contains(t.RevisionId.Value))
-                .Select(t => new { t.DocumentId, t.RevisionId, t.Text }).ToListAsync(cancellationToken))
-            .GroupBy(t => t.DocumentId)
-            .ToDictionary(g => g.Key, g => Cap(string.Join('\n', g.Select(t => t.Text))));
-
+        // A document's details only: a file's content is never read (owner).
         await client.BulkAsync(changed.Select(d => new IndexedDocument(d.Id, d.TenantId, d.ProjectId, d.Number, d.Title,
             d.DeliverableType, d.DocType, d.Discipline, d.Originator, d.Subproject, d.State, d.LatestRevisionValue,
-            d.LatestRevisionState, d.Confidentiality, d.UpdatedAt.ToDateTimeOffset(),
-            texts.GetValueOrDefault(d.Id))).ToList(), refresh, cancellationToken);
+            d.LatestRevisionState, d.Confidentiality, d.UpdatedAt.ToDateTimeOffset())).ToList(), refresh, cancellationToken);
 
         // Moved only once the index has them: a failed pass sends the same documents again.
         // And never past a minute ago: a change is stamped before its transaction commits,
@@ -188,9 +179,6 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, SearchSignal sign
         // Reaching recent changes means this pass has caught up.
         return upTo == changed[^1] ? changed.Count : Math.Min(changed.Count, Batch - 1);
     }
-
-    /// <summary>Cuts text to <c>MaxContent</c> characters.</summary>
-    private static string Cap(string text) => text.Length > MaxContent ? text[..MaxContent] : text;
 
     /// <summary>Forget what was sent, so the next pass sends everything again.</summary>
     public static async Task ResetAsync(IServiceScopeFactory scopes, CancellationToken cancellationToken)
