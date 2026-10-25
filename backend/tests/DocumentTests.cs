@@ -23,11 +23,20 @@ public static class Api
         docType = "DWG",
         discipline,
         subproject = "10",
+        criticality = "C",
     };
+
+    /// <summary>A request with a criticality, which the document form requires (Forms & fields), unless it names one.</summary>
+    public static System.Text.Json.Nodes.JsonObject WithCriticality(object request)
+    {
+        var node = System.Text.Json.JsonSerializer.SerializeToNode(request)!.AsObject();
+        if (!node.ContainsKey("criticality")) node["criticality"] = "C";
+        return node;
+    }
 
     public static async Task<JsonElement> RegisterAsync(HttpClient client, Guid project, object request)
     {
-        using var response = await client.PostAsJsonAsync($"/api/projects/{project}/documents", request);
+        using var response = await client.PostAsJsonAsync($"/api/projects/{project}/documents", WithCriticality(request));
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(response.StatusCode == HttpStatusCode.Created, body.ToString());
         return body;
@@ -98,7 +107,7 @@ public sealed class RegisterTests(Infrastructure infrastructure) : IClassFixture
         var project = await Api.ProjectIdAsync(client);
 
         using var response = await client.PostAsJsonAsync($"/api/projects/{project}/documents",
-            new { title, deliverableType, docType, discipline, subproject });
+            new { title, deliverableType, docType, discipline, subproject, criticality = "C" });
 
         Assert.Equal((HttpStatusCode.UnprocessableEntity, code), await Api.ProblemAsync(response));
     }
