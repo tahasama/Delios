@@ -129,3 +129,14 @@ export async function setMeasureAction(_prev: Result | undefined, formData: Form
   revalidatePath("/conformance", "layout");
   return {};
 }
+
+/** "Count again": the report counted now, as asked, kept for everyone who reads it. */
+export async function countReportAgainAction(id: string, query: Record<string, string>): Promise<Result> {
+  const ctx = await requireScope();
+  try {
+    await api(projectPath(ctx, `/reports/${encodeURIComponent(id)}/count`), { method: "POST", query });
+    return {};
+  } catch (e) {
+    return failed(e);
+  }
+}

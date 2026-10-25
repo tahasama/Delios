@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.Text;
 using ClosedXML.Excel;
 using Delios.Host.Identity;
@@ -46,31 +47,50 @@ public static class ReportEndpoints
         project.MapGet("", (HttpContext http) => Results.Ok((ProjectAccessFilter.Of(http).IsInternal ? ReportIds.All : ReportIds.Outside)
             .Select(id => new { id, title = Catalogue[id].Title, question = Catalogue[id].Question })));
         project.MapGet("/{reportId}", ReportAsync);
+        project.MapPost("/{reportId}/count", CountAsync);
         project.MapGet("/{reportId}/export", ExportAsync);
     }
 
-    /// <summary>GET /reports/{reportId}: counts one report now and returns it. The optional numbers override the report's default windows; <paramref name="q"/> filters the rows by text.</summary>
+    /// <summary>
+    /// GET /reports/{reportId}: the report as it was last counted, for everyone; counted now only the first time it is
+    /// asked so. The optional numbers override the report's default windows; <paramref name="q"/> filters the rows by text.
+    /// </summary>
     private static async Task<IResult> ReportAsync(
-        string reportId, HttpContext http, ReportBuilder builder, ReadDatabase reads, CancellationToken cancellationToken, string? q = null,
+        string reportId, HttpContext http, ReportBuilder builder, ReadDatabase reads, DeliosDbContext db, Transmittals.TransmittalService transmittals,
+        CancellationToken cancellationToken, string? q = null,
         int? horizonDays = null, int? months = null, int? warnDays = null, int? lateDays = null, int? turnaroundDays = null, int? onTimeTarget = null,
         string? on = null, string? bar = null, string? by = null, int? weeks = null)
     {
         if (Day(on) is { Problem: { } bad }) return bad;
-        var (report, problem) = await BuildAsync(reportId, http, builder, reads, q, bar,
-            Options(http, horizonDays, months, warnDays, lateDays, turnaroundDays, onTimeTarget, Day(on).Date, by, weeks), cancellationToken);
+        var (report, problem) = await BuildAsync(reportId, http, builder, reads, db, transmittals, q, bar,
+            Options(http, horizonDays, months, warnDays, lateDays, turnaroundDays, onTimeTarget, Day(on).Date, by, weeks), false, cancellationToken);
         return problem ?? Results.Ok(report);
+    }
+
+    /// <summary>POST /reports/{reportId}/count: "Count again": the report counted now, kept for everyone who reads it.</summary>
+    private static async Task<IResult> CountAsync(
+        string reportId, HttpContext http, ReportBuilder builder, ReadDatabase reads, DeliosDbContext db, Transmittals.TransmittalService transmittals,
+        CancellationToken cancellationToken,
+        int? horizonDays = null, int? months = null, int? warnDays = null, int? lateDays = null, int? turnaroundDays = null, int? onTimeTarget = null,
+        string? on = null, string? by = null, int? weeks = null)
+    {
+        if (Day(on) is { Problem: { } bad }) return bad;
+        var (report, problem) = await BuildAsync(reportId, http, builder, reads, db, transmittals, null, null,
+            Options(http, horizonDays, months, warnDays, lateDays, turnaroundDays, onTimeTarget, Day(on).Date, by, weeks), true, cancellationToken);
+        return problem ?? Results.Ok(new { report!.CountedAt, report.CountedBy });
     }
 
     /// <summary>The report's list as a file, headed with what it is and when it was counted.</summary>
     private static async Task<IResult> ExportAsync(
-        string reportId, HttpContext http, ReportBuilder builder, ReadDatabase reads, CancellationToken cancellationToken, string format = "csv", string? q = null,
+        string reportId, HttpContext http, ReportBuilder builder, ReadDatabase reads, DeliosDbContext db, Transmittals.TransmittalService transmittals,
+        CancellationToken cancellationToken, string format = "csv", string? q = null,
         int? horizonDays = null, int? months = null, int? warnDays = null, int? lateDays = null, int? turnaroundDays = null, int? onTimeTarget = null,
         string? on = null, string? bar = null, string? by = null, int? weeks = null)
     {
         if (format is not ("csv" or "xlsx")) return Problems.Invalid("FORMAT_INVALID", "csv or xlsx.");
         if (Day(on) is { Problem: { } bad }) return bad;
-        var (report, problem) = await BuildAsync(reportId, http, builder, reads, q, bar,
-            Options(http, horizonDays, months, warnDays, lateDays, turnaroundDays, onTimeTarget, Day(on).Date, by, weeks), cancellationToken);
+        var (report, problem) = await BuildAsync(reportId, http, builder, reads, db, transmittals, q, bar,
+            Options(http, horizonDays, months, warnDays, lateDays, turnaroundDays, onTimeTarget, Day(on).Date, by, weeks), false, cancellationToken);
         if (problem is not null) return problem;
         var project = ProjectAccessFilter.Of(http).Project;
         var heading = $"{report!.Title}, {project.Code}, counted {report.CountedAt:yyyy-MM-dd HH:mm} UTC";
@@ -105,19 +125,47 @@ public static class ReportEndpoints
         return (parsed.Value, null);
     }
 
+    private static readonly System.Text.Json.JsonSerializerOptions Json = new(System.Text.Json.JsonSerializerDefaults.Web);
+
     /// <summary>
-    /// Checks the report id and options, builds the report on the read database, and keeps only the rows containing the search text, if any.
-    /// Returns either the report or the error answer to send back. Shared by <see cref="ReportAsync"/> and <see cref="ExportAsync"/>.
+    /// Checks the report id and options, then reads the report as it was last counted (counting it the first time it is
+    /// asked so, or when <paramref name="again"/>), keeps only the rows this reader may open, then those of the bar
+    /// chosen and the words typed. Returns either the report or the error answer to send back.
     /// </summary>
     private static async Task<(Report? Report, IResult? Problem)> BuildAsync(
-        string reportId, HttpContext http, ReportBuilder builder, ReadDatabase reads, string? q, string? bar, ReportOptions options,
-        CancellationToken cancellationToken)
+        string reportId, HttpContext http, ReportBuilder builder, ReadDatabase reads, DeliosDbContext db, Transmittals.TransmittalService transmittals,
+        string? q, string? bar, ReportOptions options, bool again, CancellationToken cancellationToken)
     {
         if (!ReportIds.All.Contains(reportId)) return (null, Problems.NotFound("REPORT_NOT_FOUND", "No such report."));
         if (options.Invalid() is { } invalid) return (null, Problems.Invalid("REPORT_OPTIONS_INVALID", invalid));
-        // Reports are heavy reads: on the replica when there is one.
-        var project = ProjectAccessFilter.Of(http).Project;
-        var report = await reads.ReadAsync(db => builder.BuildAsync(db, project, reportId, options, cancellationToken), cancellationToken);
+        var access = ProjectAccessFilter.Of(http);
+        var project = access.Project;
+        var asked = string.Join('|', options.HorizonDays, options.Months, options.WarnDays, options.LateDays, options.TurnaroundDays,
+            options.OnTimeTarget, options.On?.ToString("yyyy-MM-dd", null) ?? "", options.By ?? "", options.Weeks);
+        var audience = options.Party ?? "";
+        // One count at a time for the same report asked the same way.
+        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({$"report:{project.Id}:{reportId}:{asked}:{audience}"}))", cancellationToken);
+        var kept = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.SingleOrDefaultAsync(db.Set<ReportCount>(),
+            c => c.ProjectId == project.Id && c.ReportId == reportId && c.Asked == asked && c.Audience == audience, cancellationToken);
+        Report report;
+        if (kept is null || again)
+        {
+            // Reports are heavy reads: on the replica when there is one.
+            report = await reads.ReadAsync(read => builder.BuildAsync(read, project, reportId, options, cancellationToken), cancellationToken);
+            report = report with { CountedBy = access.UserName };
+            if (kept is null)
+            {
+                kept = new ReportCount { TenantId = project.TenantId, ProjectId = project.Id, ReportId = reportId, Asked = asked, Audience = audience,
+                    Body = "", CountedByName = access.UserName };
+                db.Add(kept);
+            }
+            kept.Body = System.Text.Json.JsonSerializer.Serialize(report, Json);
+            kept.CountedAt = NodaTime.Instant.FromDateTimeOffset(report.CountedAt);
+            kept.CountedByName = access.UserName;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        else report = System.Text.Json.JsonSerializer.Deserialize<Report>(kept.Body, Json)! with { CountedBy = kept.CountedByName };
+        report = await ReadableAsync(db, transmittals, access, report, cancellationToken);
         // A bar chosen keeps its own rows; words typed keep the rows that hold them. Both narrow the list and the download.
         var needle = q?.Trim();
         var keep = report.Rows.Select((row, i) => (Row: row, Bar: report.RowBars?[i]))
@@ -125,6 +173,27 @@ public static class ReportEndpoints
             .Where(x => string.IsNullOrEmpty(needle) || x.Row.Any(c => c.Text.Contains(needle, StringComparison.OrdinalIgnoreCase)))
             .ToList();
         return (report with { Rows = [.. keep.Select(x => x.Row)], RowBars = [.. keep.Select(x => x.Bar)] }, null);
+    }
+
+    /// <summary>
+    /// The rows this reader may open: a line naming a document above their clearance, or a transmittal they may not open,
+    /// is left out (the counts in the figures and the chart stay the project's). The control function and administrators
+    /// read every line; another organization's count is its own already.
+    /// </summary>
+    private static async Task<Report> ReadableAsync(DeliosDbContext db, Transmittals.TransmittalService transmittals, ProjectAccess access,
+        Report report, CancellationToken cancellationToken)
+    {
+        if (!access.IsInternal || access.Holds(Verbs.Control) || access.Holds(Verbs.Configure)) return report;
+        var documents = report.Rows.SelectMany(r => r).Where(c => c.Kind == "document" && c.Id != null).Select(c => c.Id!.Value).Distinct().ToList();
+        var sent = report.Rows.SelectMany(r => r).Where(c => c.Kind == "transmittal" && c.Id != null).Select(c => c.Id!.Value).Distinct().ToList();
+        var open = documents.Count == 0 ? [] : (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+            Documents.DocumentQueries.Visible(db, access).Where(d => documents.Contains(d.Id)).Select(d => d.Id), cancellationToken)).ToHashSet();
+        var readable = sent.Count == 0 ? [] : (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+            transmittals.Visible(access).Where(t => sent.Contains(t.Id)).Select(t => t.Id), cancellationToken)).ToHashSet();
+        bool May(IReadOnlyList<Cell> row) => row.All(c => c.Id is not { } id
+            || (c.Kind == "document" ? open.Contains(id) : c.Kind == "transmittal" ? readable.Contains(id) : true));
+        var keep = report.Rows.Select((row, i) => (Row: row, Bar: report.RowBars?[i])).Where(x => May(x.Row)).ToList();
+        return keep.Count == report.Rows.Count ? report : report with { Rows = [.. keep.Select(x => x.Row)], RowBars = [.. keep.Select(x => x.Bar)] };
     }
 
     /// <summary>Writes the report's list as a UTF-8 CSV file: a heading line, the column names, then the rows.</summary>

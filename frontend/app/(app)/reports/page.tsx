@@ -5,10 +5,12 @@ import { DataTable, Th, Td, ToneChip, inputCls, btn } from "@/components/ui";
 import { when } from "@/app/(app)/home-parts";
 import { FindBox } from "./find-box";
 import { PrintButton } from "./print-button";
+import { CountAgainButton } from "./count-again";
 import { fromToday } from "@/lib/core/days";
 import {
   buildReport, CUTS, OUTSIDE_REPORT_IDS, REPORT_IDS, REPORT_TITLES, WINDOWS,
   type Bar, type Cell, type Chart, type ReportId, type ReportQuery, type Segment,
+  reportQuery,
 } from "@/lib/conformance/reports";
 
 export const dynamic = "force-dynamic";
@@ -87,12 +89,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <p className="mt-0.5 max-w-2xl text-xs leading-5 text-slate-500">
               {report?.audience ?? "Audits, claims and “what did we build from?”: the register as it stood at the end of that day."}
               {report ? <> · counted <span className="no-print">{when(new Date(report.countedAt))}</span>
-                <span className="print-only">{new Date(report.countedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</span></> : null}
+                <span className="print-only">{new Date(report.countedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</span>
+                {report.countedBy ? <> by {report.countedBy}</> : null}; it stays so until counted again</> : null}
               {!ctx.user.isInternal ? <> · your organization&rsquo;s documents only</> : null}
             </p>
           </div>
           {report ? (
             <div className="no-print flex shrink-0 flex-wrap items-center gap-2">
+              <CountAgainButton id={current} query={Object.fromEntries(Object.entries(reportQuery(current, asked)).filter(([k]) => k !== "q" && k !== "bar"))} />
               {/* An icon says it (owner); Excel's green, faintly, says which file. */}
               <a href={download("xlsx")} title={narrowed ? "Download the lines shown, in Excel" : "Download the lines below, in Excel"}
                 aria-label="Download in Excel" className="ask inline-flex items-center"><FileSpreadsheet className="h-3.5 w-3.5 text-emerald-700" aria-hidden="true" /></a>

@@ -72,7 +72,7 @@ internal sealed class NoticeMoves
 public static class Areas
 {
     public const string Plan = "plan", Docs = "docs", Reviews = "reviews", Transmittals = "transmittals", Packages = "packages",
-        Assets = "assets", Checks = "checks";
+        Assets = "assets", Checks = "checks", Reports = "reports";
 }
 
 /// <summary>
@@ -211,6 +211,8 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
         "Delios.Host.Packages" => Areas.Packages,
         "Delios.Host.Records" => Areas.Assets,
         "Delios.Host.Checks" => Areas.Checks,
+        // A report counted again: only the reports' kept answers (owner: a report is refreshed by hand only).
+        "Delios.Host.Reports" => Areas.Reports,
         "Delios.Host.Documents" when type.Name is "Document" or "Revision" or "StoredFile" or "DocumentAccess" or "NumberEquivalent"
             or "SubmissionRecord" or "HandBack" => Areas.Docs,
         "Delios.Host.Notifications" or "Delios.Host.Audit" or "Delios.Host.Messaging" or "Delios.Host.Search" or "Delios.Host.Extraction" => null,

@@ -1334,6 +1334,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
 ### Reports
 - No overview tab: a page repeating the tabs' figures was removed (the owner: no use to anyone). Every tab adds
   something of its own.
+- **A report is counted by hand, for everyone, as the checks are** (owner: "the refresh in assurance and reports is 100%
+  manual"; "mostly the control function… once a week per project"): counted the first time it is asked a way (its
+  window, how its chart is cut, its day), then kept in the database for everyone (`ReportCount`, `report_counts`, one per
+  report, way asked and audience: ours, or one other organization's own count), unchanged whatever happens on the
+  project, until anyone who reads it presses **Count again** (`POST /reports/{id}/count`, `CountAgainButton`), which counts
+  it for everybody. The plate says when and by whom ("counted 3 days ago by …; it stays so until counted again"). The
+  Excel download carries the same count. Words searched and a bar chosen narrow the kept count, never count again. The
+  screens keep it under `reports` only (no other change clears it). Each of our readers sees only the lines on what they
+  may open (`ReportEndpoints.ReadableAsync`: a document above their clearance, a transmittal they may not open, left
+  out; the control function and administrators read every line); the figures and the chart stay the project's counts.
 - DCIOM (governance measures, advice, health score) is on hold by the owner: build nothing of it until they come back
   to it; where the conversation stood is in `docs/gaps/dciom.md`. Where real projects differ from what the Standard
   assumes (plans move, obligations run both ways, waiting is never compliant…) is `docs/STANDARD-CHANGES.md` §58.
@@ -1717,7 +1727,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   gathered a quarter of a second; `Screens__Url`, the shared `SCREENS_SECRET`; Caddy refuses it from outside), which
   clears them for every other session (`revalidateTag(tag, { expire: 0 })`). A write around the save (an `ExecuteUpdate`)
   names its labels itself (the virus check finishing a file: its document). A kept answer is read again within the
-  hour at most (`KEEP_SECONDS`, for today's date). Kept: every read a page draws from (owner: reports, the register,
+  hour at most (`KEEP_SECONDS`, for today's date). Kept: every read a page draws from (owner: reports, cleared only by
+  Count again, the register,
   documents, transmittals, packages, assets, reviews, Assurance and its plan, the Schedule and the calendar, Home and its
   log, every Settings and organization page: a settings read keeps `areas: []`, cleared by `all`). Never kept, read fresh
   every time: notifications and the account (saved without telling the screens), sign-in and security, what waits for a

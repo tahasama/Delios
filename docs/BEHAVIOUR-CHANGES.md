@@ -716,3 +716,11 @@ Settings and organization page now keep their answers, per person, until a chang
 fresh every time, as before: notifications, the account, sign-in and security, what waits for a result, the audit trail
 and a person's activity, the notice log, and Excel downloads. A wrong password typed no longer throws away every kept
 answer; a discipline's confirmation now also refreshes the Schedule.
+
+---
+
+**Reports are counted by hand, for everyone** (owner, as the checks). Before: counted again on every opening, every
+tab, every page of lines and every download. Now: counted once, kept for everyone, and counted again only when someone
+presses "Count again"; the plate says when and by whom. Each of our readers now sees only the lines on documents and
+transmittals they may open (before, a report listed documents above the reader's clearance); the figures and the chart
+still count the whole project.

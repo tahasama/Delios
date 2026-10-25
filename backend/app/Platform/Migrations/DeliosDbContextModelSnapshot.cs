@@ -4816,6 +4816,63 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("sender_issues", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Reports.ReportCount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Asked")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("asked");
+
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("audience");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<Instant>("CountedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("counted_at");
+
+                    b.Property<string>("CountedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("counted_by_name");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("ReportId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("report_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_report_counts");
+
+                    b.HasIndex("ProjectId", "ReportId", "Asked", "Audience")
+                        .IsUnique()
+                        .HasDatabaseName("ix_report_counts_project_id_report_id_asked_audience");
+
+                    b.ToTable("report_counts", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Reviews.Review", b =>
                 {
                     b.Property<Guid>("Id")

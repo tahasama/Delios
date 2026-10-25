@@ -29,6 +29,8 @@ export type Report = {
   rows: Cell[][];
   empty: string;
   countedAt: string;
+  /** Who counted it last: a report stays as it was counted, for everyone, until someone counts it again. */
+  countedBy: string | null;
   /** Where the same rows are worked on, as a list with its own filters. */
   workedOn?: { label: string; href: string };
 };
@@ -84,7 +86,7 @@ type BackendReport = {
   id: ReportId; title: string; question: string; audience: string;
   figures: { label: string; value: string; tone: Tone | null; change: string | null; changeTone: "good" | "bad" | null }[];
   chart: Chart;
-  columns: string[]; rows: BackendCell[][]; empty: string; countedAt: string;
+  columns: string[]; rows: BackendCell[][]; empty: string; countedAt: string; countedBy?: string | null;
 };
 
 /** Where the same rows are worked on, with their own filters. */
@@ -142,6 +144,7 @@ export async function buildReport(t: { projectId: string }, id: ReportId, q: Rep
     rows: report.rows.map((row) => row.map(cellOf)),
     empty: report.empty,
     countedAt: report.countedAt,
+    countedBy: report.countedBy ?? null,
     workedOn: WORKED_ON[id],
   };
 }

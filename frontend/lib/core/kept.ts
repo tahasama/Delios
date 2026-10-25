@@ -7,7 +7,7 @@
  */
 
 /** The areas an answer depends on, as the backend names them. */
-export type Area = "plan" | "docs" | "reviews" | "transmittals" | "packages" | "assets" | "checks";
+export type Area = "plan" | "docs" | "reviews" | "transmittals" | "packages" | "assets" | "checks" | "reports";
 
 /** What a kept read says it depends on: its areas, and a document when it is one document's. */
 export type Keep = {
