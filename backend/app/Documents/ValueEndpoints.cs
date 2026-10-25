@@ -38,12 +38,17 @@ public static class ValueEndpoints
     /// (`ListRules.Serving`; null: none, nothing is offered), its default set, and whether it holds more than one set. A
     /// form offers a document the values whose set (none: the default) is the one serving its deliverable type.
     /// </summary>
-    private static async Task<IResult> ServingAsync(DeliosDbContext db, CancellationToken cancellationToken, string? sets = null)
+    private static async Task<IResult> ServingAsync(HttpContext http, DeliosDbContext db, Platform.AccessVersions shared,
+        CancellationToken cancellationToken, string? sets = null) =>
+        Results.Ok(await shared.SharedAsync(http.User.TenantId(), $"serving:{db.ListsProject}:{string.Join(',', db.ListsOwnKeys)}:{sets}",
+            () => ServingOfAsync(db, cancellationToken, sets)));
+
+    private static async Task<object> ServingOfAsync(DeliosDbContext db, CancellationToken cancellationToken, string? sets)
     {
         var names = (sets ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(100).ToList();
         var all = await db.ListSets.AsNoTracking().Where(s => names.Contains(s.ListKey)).ToListAsync(cancellationToken);
         var types = await db.ValueEntries.AsNoTracking().Where(v => v.SetKey == ValueSets.DeliverableTypes).Select(v => v.Code).ToListAsync(cancellationToken);
-        return Results.Ok(names.ToDictionary(n => n, n =>
+        return (object)names.ToDictionary(n => n, n =>
         {
             var own = all.Where(s => s.ListKey == n).ToList();
             return new
@@ -52,15 +57,20 @@ public static class ValueEndpoints
                 many = own.Count > 1,
                 byType = types.ToDictionary(t => t, t => ListRules.Serving(own, t)?.Id),
             };
-        }));
+        });
     }
 
-    /// <summary>The values of each list named (up to 100), in their published order, retired ones marked.</summary>
-    private static async Task<IResult> ValuesAsync(DeliosDbContext db, CancellationToken cancellationToken, string? sets = null)
-    {
-        var names = (sets ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(100).ToList();
-        var values = await db.ValueEntries.AsNoTracking().Where(v => names.Contains(v.SetKey)).OrderBy(v => v.Sort).ToListAsync(cancellationToken);
-        return Results.Ok(names.ToDictionary(n => n, n => values.Where(v => v.SetKey == n)
-            .Select(v => new ListValue(v.Code, v.Label, v.Status, v.Props?.RootElement.Clone(), v.SetId)).ToList()));
-    }
+    /// <summary>
+    /// The values of each list named (up to 100), in their published order, retired ones marked. The same for everyone of
+    /// the organization reading through the same project: read once for all of them.
+    /// </summary>
+    private static async Task<IResult> ValuesAsync(HttpContext http, DeliosDbContext db, Platform.AccessVersions shared,
+        CancellationToken cancellationToken, string? sets = null) =>
+        Results.Ok(await shared.SharedAsync(http.User.TenantId(), $"values:{db.ListsProject}:{string.Join(',', db.ListsOwnKeys)}:{sets}", async () =>
+        {
+            var names = (sets ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(100).ToList();
+            var values = await db.ValueEntries.AsNoTracking().Where(v => names.Contains(v.SetKey)).OrderBy(v => v.Sort).ToListAsync(cancellationToken);
+            return names.ToDictionary(n => n, n => values.Where(v => v.SetKey == n)
+                .Select(v => new ListValue(v.Code, v.Label, v.Status, v.Props?.RootElement.Clone(), v.SetId)).ToList());
+        }));
 }

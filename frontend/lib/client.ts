@@ -3,7 +3,7 @@ import { cookies, headers } from "next/headers";
 import { revalidateTag, updateTag } from "next/cache";
 import { after } from "next/server";
 import { keepRequestDateFormat } from "@/lib/core/date-format";
-import { KEEP_SECONDS, labelsOf, type Keep } from "@/lib/core/kept";
+import { dayOf, labelsOf, type Keep } from "@/lib/core/kept";
 
 /**
  * The one door to the backend. Every screen and action reaches the .NET API
@@ -81,13 +81,16 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   if (options.body !== undefined) sendHeaders["Content-Type"] = "application/json";
   const started = TRACE ? performance.now() : 0;
   const method = options.method ?? (options.body === undefined ? "GET" : "POST");
-  // A read that says what it depends on is kept, per session, until a change names one of its labels.
+  // A read that says what it depends on is kept, per session, until a change names one of its labels; one worked out
+  // against today is kept per day (the day is part of the question: the backend reads none of it).
   const kept = method === "GET" && options.keep;
+  const day = kept ? dayOf(path, options.keep!) : null;
+  if (day) sendHeaders["X-Delios-Day"] = day;
   const response = await fetch(url(path, options.query), {
     method,
     headers: sendHeaders,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    ...(kept ? { cache: "force-cache" as const, next: { revalidate: KEEP_SECONDS, tags: labelsOf(path, options.keep!) } } : { cache: "no-store" as const }),
+    ...(kept ? { cache: "force-cache" as const, next: { revalidate: false as const, tags: labelsOf(path, options.keep!) } } : { cache: "no-store" as const }),
   });
   // An act: what it changed is cleared now, so the page drawn after it reads it fresh (read-your-own-writes).
   if (method !== "GET") clearChanged(response.headers.get("x-delios-changed"));

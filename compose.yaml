@@ -45,6 +45,8 @@ x-backend: &backend
     # Where the screens are told what changed (their kept answers cleared); never reachable from outside (Caddy).
     Screens__Url: ${SCREENS_URL:-http://web:3000}
     Screens__Secret: ${SCREENS_SECRET:-}
+    # Where the screens keep their answers (Valkey's database 1): each change is written there too.
+    Screens__CacheDb: "1"
     # Plain HTTP on localhost; production sits behind TLS and keeps the default.
     Auth__SecureCookie: ${SECURE_COOKIE:-false}
     # An organization may register itself from the sign-up page.
@@ -123,6 +125,9 @@ services:
   valkey:
     image: valkey/valkey:8-alpine
     restart: unless-stopped
+    # Within 512 MB: when full, what carries an end (the screens' kept answers, cached sessions) goes first, the least
+    # used first; what carries none (the numbers that say access changed, the labels' times) always stays.
+    command: ["valkey-server", "--maxmemory", "512mb", "--maxmemory-policy", "volatile-lru"]
     ports: ["127.0.0.1:6379:6379"]
     healthcheck:
       test: ["CMD", "valkey-cli", "ping"]
@@ -255,9 +260,12 @@ services:
       DELIOS_API_URL: http://caddy:8080
       # The secret the backend shows when it says what changed (/api/screens/changed).
       DELIOS_SCREENS_SECRET: ${SCREENS_SECRET:-}
-    depends_on: [caddy]
+      # What the screens keep of the backend's answers, kept in Valkey (frontend/cache-handler.mjs).
+      SCREENS_CACHE_REDIS: redis://valkey:6379/1
+    depends_on: [caddy, valkey]
 
-  # Copies every stored file to a second location, every 6 hours.
+  # Compares every stored file with its second copy once a week, copying what is missing (each file is copied as it is
+  # stored by the app: Documents/FileBackup.cs).
   file-backup:
     image: rclone/rclone:latest
     profiles: [app]

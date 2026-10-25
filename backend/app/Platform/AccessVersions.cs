@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using StackExchange.Redis;
 
 namespace Delios.Host.Platform;
@@ -48,5 +49,25 @@ public sealed class AccessVersions(IServiceProvider services, ILogger<AccessVers
         {
             logger.LogWarning(e, "Raising the access number failed");
         }
+    }
+
+    /// <summary>
+    /// An answer the same for everyone who may ask it (the organization's lists and values as a project reads them):
+    /// read once and given to every one of them until how the organization works changes (owner: "shared reference
+    /// data", "one read instead of 200"). Never for an answer that depends on who asks.
+    /// </summary>
+    public async Task<T> SharedAsync<T>(Guid tenantId, string question, Func<Task<T>> read) where T : notnull
+    {
+        var version = await CurrentAsync(tenantId);
+        if (version is null) return await read();
+        var key = $"shared:{tenantId:N}:{version}:{question}";
+        if (Kept.TryGetValue(key, out T? kept) && kept is not null) return kept;
+        var answer = await read();
+        Kept.Set(key, answer, new Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = Identity.ProjectAccessLoader.KeptAtMost,
+            Size = 1,
+        });
+        return answer;
     }
 }

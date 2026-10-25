@@ -1,14 +1,16 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // A self-contained server for the container (frontend/Dockerfile).
   output: "standalone",
   poweredByHeader: false,
-  // What the pages keep of the backend's answers lives in memory only, at most 100 MB: when full, the copies used
-  // longest ago drop by themselves; nothing piles up on disk (owner: "cap them").
-  cacheMaxMemorySize: 100 * 1024 * 1024,
+  // What the pages keep of the backend's answers is kept in Redis (Valkey), not in the screens' memory nor on their disk
+  // (owner: "copies in Redis"): it survives a restart and is shared by every screens server; Valkey's own limit pushes
+  // out the least used when full (compose.yaml). Without SCREENS_CACHE_REDIS nothing is kept.
+  cacheHandler: path.join(process.cwd(), "cache-handler.mjs"),
+  cacheMaxMemorySize: 0,
   experimental: {
-    isrFlushToDisk: false,
     // A Primavera P6 export (.xer) can be large, and is sent whole: it is kept as it came.
     serverActions: { bodySizeLimit: "100mb" },
   },

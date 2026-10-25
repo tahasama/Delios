@@ -333,6 +333,11 @@ public sealed class ScreenChangeCommits(ScreenChangeWatcher watcher) : DbTransac
 public sealed class ScreensOptions
 {
     public const string Section = "Screens";
+    /// <summary>
+    /// The Redis database the screens keep their answers in (frontend/cache-handler.mjs, SCREENS_CACHE_REDIS): each
+    /// label changed is written there too, with when, so nothing is missed while the screens restart. Null: not written.
+    /// </summary>
+    public int? CacheDb { get; set; }
     /// <summary>The screens' own address on the internal network (http://web:3000); empty: nothing is posted.</summary>
     public string? Url { get; set; }
     public string? Secret { get; set; }
@@ -340,15 +345,33 @@ public sealed class ScreensOptions
 
 /// <summary>
 /// Posts the labels changed outside a screen's act to the screens' clearing route (`/api/screens/changed`), a moment
-/// later and gathered, so a burst of saves is one call. Best effort: a kept answer is also read again within the hour.
+/// later and gathered, so a burst of saves is one call; and writes them, with when, where the screens keep their answers
+/// (Redis), so a change is never missed while the screens are down.
 /// </summary>
-public sealed class ScreensNotifier(IHttpClientFactory clients, IOptions<ScreensOptions> options, ILogger<ScreensNotifier> logger) : BackgroundService
+public sealed class ScreensNotifier(IHttpClientFactory clients, IOptions<ScreensOptions> options, IServiceProvider services,
+    ILogger<ScreensNotifier> logger) : BackgroundService
 {
     private readonly Channel<string[]> queue = Channel.CreateUnbounded<string[]>();
 
     public void Post(string[] tags)
     {
-        if (!string.IsNullOrWhiteSpace(options.Value.Url) && tags.Length > 0) queue.Writer.TryWrite(tags);
+        if ((!string.IsNullOrWhiteSpace(options.Value.Url) || options.Value.CacheDb is not null) && tags.Length > 0) queue.Writer.TryWrite(tags);
+    }
+
+    /// <summary>The labels changed, with when, where the screens keep their answers: read there before any kept answer is used.</summary>
+    private void Mark(HashSet<string> tags)
+    {
+        if (options.Value.CacheDb is not { } index) return;
+        try
+        {
+            if (services.GetService<StackExchange.Redis.IConnectionMultiplexer>() is not { IsConnected: true } redis) return;
+            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+            redis.GetDatabase(index).HashSet("next:tags", [.. tags.Select(t => new StackExchange.Redis.HashEntry(t, now))]);
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Writing the changed labels where the screens keep their answers failed");
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -360,6 +383,8 @@ public sealed class ScreensNotifier(IHttpClientFactory clients, IOptions<Screens
             var tags = new HashSet<string>();
             while (queue.Reader.TryRead(out var some)) tags.UnionWith(some);
             if (tags.Count == 0) continue;
+            Mark(tags);
+            if (string.IsNullOrWhiteSpace(options.Value.Url)) continue;
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, $"{options.Value.Url!.TrimEnd('/')}/api/screens/changed")
@@ -372,7 +397,7 @@ public sealed class ScreensNotifier(IHttpClientFactory clients, IOptions<Screens
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                logger.LogWarning(e, "Telling the screens what changed failed; their kept answers are read again within the hour");
+                logger.LogWarning(e, "Telling the screens what changed failed; the labels written in Redis still say it");
             }
         }
     }

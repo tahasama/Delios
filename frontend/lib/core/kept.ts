@@ -17,8 +17,31 @@ export type Keep = {
   fallback?: Area[];
 };
 
-/** A safety net only: a kept answer is read again at least once an hour (today's date moves "due today", "overdue"). */
-export const KEEP_SECONDS = 3600;
+/**
+ * The areas whose answers the backend works out against today (an action at risk, a review step late, an answer
+ * overdue): their kept answers are kept per day of the project, so a new day is a new question (owner: "the same old
+ * image unless something changed"; what is worded from a date on the page itself needs no day). Nothing else expires:
+ * a kept answer stands until a change names one of its labels.
+ */
+const BY_DAY: Area[] = ["plan", "reviews", "transmittals"];
+
+/** Each project's time zone, as the signed-in person's projects say it (lib/core/scope.ts): its day turns at its midnight. */
+const zones = new Map<string, string>();
+export function rememberZone(projectId: string, timeZone: string | null | undefined) {
+  if (timeZone) zones.set(projectId, timeZone);
+}
+
+/** The project's day today (yyyy-MM-dd) when this answer depends on it; null otherwise. */
+export function dayOf(path: string, keep: Keep): string | null {
+  if (!keep.areas.some((area) => BY_DAY.includes(area))) return null;
+  const project = /\/api\/projects\/([0-9a-fA-F-]{36})\//.exec(path)?.[1];
+  const zone = (project && zones.get(project)) || "UTC";
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
 
 /** The labels of a kept read: each area on its project and on every project, its document, and everything. */
 export function labelsOf(path: string, keep: Keep): string[] {

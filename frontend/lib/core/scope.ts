@@ -7,6 +7,7 @@ import type { Role } from "@/lib/core/standard";
 import { can, verbsFor, explain, type Actor, type Verb, type DocumentClass } from "@/lib/core/permissions";
 import { api, forgetShortLived } from "@/lib/client";
 import { getMe } from "@/lib/account/api";
+import { rememberZone } from "@/lib/core/kept";
 
 /**
  * The scope is the request-bound tenancy: who is signed in and which project
@@ -116,6 +117,7 @@ export const getScope = cache(async (): Promise<Scope | null> => {
     })),
   };
   const role = actor.role as Role;
+  rememberZone(chosen.id, chosen.timeZone);
   const held = [...new Set(actor.rules.filter((r) => r.projectRole === null || r.projectRole === chosen.contractRole).flatMap((r) => r.verbs))];
   return {
     user: { ...user, role, verbs: held, functionName: actor.functionName, department: chosen.department ?? null, noControl: !!chosen.noControl },
