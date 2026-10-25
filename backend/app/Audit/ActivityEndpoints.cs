@@ -80,7 +80,7 @@ public static class ActivityEndpoints
     /// reading, and people and settings are left out (they are the administrators' trail).
     /// </summary>
     private static async Task<IResult> LogAsync(HttpContext http, DeliosDbContext db, Transmittals.TransmittalService transmittals,
-        CancellationToken cancellationToken,
+        AuditCounts counts, CancellationToken cancellationToken,
         string? kind = null, string? action = null, string? q = null, DateOnly? from = null, DateOnly? to = null, int page = 1, int per = 50)
     {
         var access = ProjectAccessFilter.Of(http);
@@ -90,9 +90,7 @@ public static class ActivityEndpoints
         page = Math.Max(1, page);
         // The project's work only: who signed in, who opened or downloaded what, and people and settings stay in the
         // administrators' trail (Settings, Audit trail; a person's activity), never on Home.
-        var outside = await db.AuditEvents.AsNoTracking().Where(e => e.ProjectId == access.Project.Id).Select(e => e.Action).Distinct()
-            .ToListAsync(cancellationToken);
-        var hidden = outside.Where(code => AuditKinds.Of(code) is "PEOPLE" or "READING" or "DOWNLOADED" or "SIGN_IN").ToArray();
+        var hidden = LeftOffLog;
         var query = Readable(db, transmittals, access,
             db.AuditEvents.AsNoTracking().Where(e => e.ProjectId == access.Project.Id && !hidden.Contains(e.Action)));
         var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(access.Project.TimeZone) ?? DateTimeZone.Utc;
@@ -104,7 +102,12 @@ public static class ActivityEndpoints
             query = query.Where(e => (e.EntityLabel != null && EF.Functions.ILike(e.EntityLabel, pattern))
                 || EF.Functions.ILike(e.ActorName, pattern) || (e.Detail != null && EF.Functions.ILike(e.Detail, pattern)));
         }
-        var actions = await query.GroupBy(e => e.Action).Select(g => new { Action = g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
+        // Those who read every act of the project, with no words or days asked: counted once, then only what was written
+        // since (AuditCounts). Anyone else's counts are of what they may open, counted as asked.
+        var counted = Whole(access) && from is null && to is null && string.IsNullOrWhiteSpace(q)
+            ? await counts.ByActionAsync(access.Project.TenantId, $"log:{access.Project.Id}", query, cancellationToken)
+            : await query.GroupBy(e => e.Action).Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N, cancellationToken);
+        var actions = counted.Where(x => !hidden.Contains(x.Key)).Select(x => new { Action = x.Key, Count = x.Value }).ToList();
         if (!string.IsNullOrWhiteSpace(kind))
         {
             var codes = actions.Where(a => AuditKinds.Of(a.Action) == kind).Select(a => a.Action).ToArray();
@@ -141,6 +144,9 @@ public static class ActivityEndpoints
     /// document (its clearance, <see cref="Documents.DocumentQueries.Visible"/>), on a transmittal only when they may
     /// open it; everything else of the project as it is. The control function and administrators read every act.
     /// </summary>
+    /// <summary>What Home's log leaves out: sign-ins, reading, and people and settings (the administrators' trail).</summary>
+    private static readonly string[] LeftOffLog = [.. new[] { "PEOPLE", "READING", "DOWNLOADED", "SIGN_IN" }.SelectMany(AuditKinds.CodesOf)];
+
     private static IQueryable<AuditEvent> Readable(DeliosDbContext db, Transmittals.TransmittalService transmittals, ProjectAccess access,
         IQueryable<AuditEvent> query)
     {

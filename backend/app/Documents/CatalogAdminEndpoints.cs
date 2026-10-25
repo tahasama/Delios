@@ -444,7 +444,7 @@ public static class CatalogAdminEndpoints
     /// a project, a person, and a date range (UTC days). Each row says its kind; the kinds come with their counts.
     /// </summary>
     private static async Task<IResult> AuditAsync(
-        DeliosDbContext db, CancellationToken cancellationToken, string? q = null, string? kind = null, string? action = null, string? entityType = null,
+        DeliosDbContext db, Audit.AuditCounts counts, TenantContext tenant, CancellationToken cancellationToken, string? q = null, string? kind = null, string? action = null, string? entityType = null,
         Guid? projectId = null, Guid? actorId = null, DateOnly? from = null, DateOnly? to = null, int page = 1, int per = 50)
     {
         per = Math.Clamp(per, 10, 200);
@@ -462,7 +462,11 @@ public static class CatalogAdminEndpoints
                 || (e.EntityLabel != null && EF.Functions.ILike(e.EntityLabel, pattern)) || (e.Detail != null && EF.Functions.ILike(e.Detail, pattern)));
         }
         // The kinds, counted over everything narrowed so far but the kind itself, so each count says what choosing it gives.
-        var actions = await query.GroupBy(e => e.Action).Select(g => new { Action = g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
+        // No words, days or type asked: counted once, then only what was written since (AuditCounts).
+        var counted = Blank(q) is null && from is null && to is null && Blank(entityType) is null
+            ? await counts.ByActionAsync(tenant.Required, $"trail:{projectId}:{actorId}", query, cancellationToken)
+            : await query.GroupBy(e => e.Action).Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N, cancellationToken);
+        var actions = counted.Select(x => new { Action = x.Key, Count = x.Value }).ToList();
         var kinds = AuditKinds.All.Select(k => new { k.Key, k.Label, Count = actions.Where(a => AuditKinds.Of(a.Action) == k.Key).Sum(a => a.Count) })
             .ToList();
         if (Blank(kind) is { } chosen)

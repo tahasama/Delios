@@ -121,6 +121,7 @@ public static class PlatformSetup
         services.AddHybridCache();
         // Who you are and what you may do, kept in each process until how the organization works changes.
         services.AddSingleton<AccessVersions>();
+        services.AddSingleton<Audit.AuditCounts>();
 
         services.AddScoped<AuditLog>();
         services.AddScoped<SessionStore>();
@@ -330,23 +331,33 @@ public static class PlatformSetup
             if (http.User.Identity?.IsAuthenticated == true)
             {
                 var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
-                // In a transaction of its own: the tenant is set on a transaction, and row-level security shows nothing
-                // outside one (the lists would silently be read as the organization's).
-                await using var look = await db.Database.BeginTransactionAsync(http.RequestAborted);
-                var project = Guid.TryParse(http.Request.Headers["X-Delios-Project"].ToString(), out var projectId)
-                    ? await db.Projects.AsNoTracking().Where(p => p.Id == projectId)
-                        .Select(p => new { p.Id, p.OwnListKeys, p.OwnFunctions }).SingleOrDefaultAsync(http.RequestAborted)
-                    // None said: the project the screens open first, as /api/me lists them.
-                    : await db.Memberships.AsNoTracking()
-                        .Where(m => m.UserId == http.User.UserId() && m.Active && m.Project!.Status == "ACTIVE" && m.Function!.Active)
-                        .OrderBy(m => m.Project!.Code).Select(m => new { m.Project!.Id, m.Project.OwnListKeys, m.Project.OwnFunctions })
-                        .FirstOrDefaultAsync(http.RequestAborted);
-                // How dates read: the organization's, carried on every answer for the screens to draw them so.
-                var dates = await db.Set<Settings.Setting>().AsNoTracking()
-                    .Where(s => s.ProjectId == null && s.Key == Settings.DateFormat.Key).Select(s => s.Value).FirstOrDefaultAsync(http.RequestAborted);
-                await look.CommitAsync(http.RequestAborted);
-                if (project is not null) db.UseListsOf(project.Id, project.OwnListKeys, project.OwnFunctions);
-                http.Response.Headers[Settings.DateFormat.Header] = Settings.DateFormat.Codes.Contains(dates) ? dates : Settings.DateFormat.Default;
+                var named = Guid.TryParse(http.Request.Headers["X-Delios-Project"].ToString(), out var projectId) ? projectId : (Guid?)null;
+                var userId = http.User.UserId();
+                // Kept until how the organization works changes (owner: "if that does not create a security
+                // vulnerability"): which lists a project reads and how dates read are the same for everyone who asks
+                // (nothing here grants anything: access is checked as before); the project opened first is per person.
+                var seen = await http.RequestServices.GetRequiredService<AccessVersions>().SharedAsync(http.User.TenantId(),
+                    named is { } id ? $"lists-of:{id}" : $"lists-of-first:{userId}", async () =>
+                    {
+                        // In a transaction of its own: the tenant is set on a transaction, and row-level security shows
+                        // nothing outside one (the lists would silently be read as the organization's).
+                        await using var look = await db.Database.BeginTransactionAsync(http.RequestAborted);
+                        var project = named is { } one
+                            ? await db.Projects.AsNoTracking().Where(p => p.Id == one)
+                                .Select(p => new ListsOf(p.Id, p.OwnListKeys, p.OwnFunctions)).SingleOrDefaultAsync(http.RequestAborted)
+                            // None said: the project the screens open first, as /api/me lists them.
+                            : await db.Memberships.AsNoTracking()
+                                .Where(m => m.UserId == userId && m.Active && m.Project!.Status == "ACTIVE" && m.Function!.Active)
+                                .OrderBy(m => m.Project!.Code).Select(m => new ListsOf(m.Project!.Id, m.Project.OwnListKeys, m.Project.OwnFunctions))
+                                .FirstOrDefaultAsync(http.RequestAborted);
+                        // How dates read: the organization's, carried on every answer for the screens to draw them so.
+                        var dates = await db.Set<Settings.Setting>().AsNoTracking()
+                            .Where(s => s.ProjectId == null && s.Key == Settings.DateFormat.Key).Select(s => s.Value).FirstOrDefaultAsync(http.RequestAborted);
+                        await look.CommitAsync(http.RequestAborted);
+                        return new RequestLists(project, dates);
+                    });
+                if (seen.Project is { } lists) db.UseListsOf(lists.Id, lists.OwnListKeys, lists.OwnFunctions);
+                http.Response.Headers[Settings.DateFormat.Header] = Settings.DateFormat.Codes.Contains(seen.Dates) ? seen.Dates : Settings.DateFormat.Default;
             }
             await next(http);
         });
@@ -439,3 +450,8 @@ public static class PlatformSetup
     private static void AddValidated<T>(IServiceCollection services, string section) where T : class =>
         services.AddOptions<T>().BindConfiguration(section).ValidateDataAnnotations().ValidateOnStart();
 }
+
+/// <summary>Which lists a project reads (its own copies), as every request sets them.</summary>
+internal sealed record ListsOf(Guid Id, string[] OwnListKeys, bool OwnFunctions);
+/// <summary>What every request reads before its endpoint: the project's lists and how dates read.</summary>
+internal sealed record RequestLists(ListsOf? Project, string? Dates);

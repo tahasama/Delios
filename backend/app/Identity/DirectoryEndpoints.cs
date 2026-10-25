@@ -110,7 +110,8 @@ public static class DirectoryEndpoints
     /// a kind of act. An administrator or the control function only (Settings, never the directory): it is the record
     /// kept for the integrity of the register, read by those who answer for it.
     /// </summary>
-    private static async Task<IResult> ActivityAsync(Guid userId, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken,
+    private static async Task<IResult> ActivityAsync(Guid userId, HttpContext http, DeliosDbContext db, AuditLog audit, AuditCounts counts,
+        CancellationToken cancellationToken,
         Guid? projectId = null, string? kind = null, string? action = null, string? q = null, DateOnly? from = null, DateOnly? to = null,
         int page = 1, int per = 50)
     {
@@ -134,16 +135,17 @@ public static class DirectoryEndpoints
             var pattern = $"%{q.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
             query = query.Where(e => (e.EntityLabel != null && EF.Functions.ILike(e.EntityLabel, pattern)) || (e.Detail != null && EF.Functions.ILike(e.Detail, pattern)));
         }
+        // Everything they did, counted once, then only what they did since (AuditCounts).
+        var counted = await counts.ByActionAsync(http.User.TenantId(), $"person:{userId}:{string.Join(",", hidden)}", mine, cancellationToken);
         if (!string.IsNullOrWhiteSpace(kind))
         {
-            var codes = (await mine.Select(e => e.Action).Distinct().ToListAsync(cancellationToken)).Where(c => AuditKinds.Of(c) == kind).ToArray();
+            var codes = counted.Keys.Where(c => AuditKinds.Of(c) == kind).ToArray();
             query = query.Where(e => codes.Contains(e.Action));
         }
         if (!string.IsNullOrWhiteSpace(action)) query = query.Where(e => e.Action == action);
         var total = await query.CountAsync(cancellationToken);
         var rows = await query.OrderByDescending(e => e.Id).Skip((page - 1) * per).Take(per).ToListAsync(cancellationToken);
-        var kinds = (await mine.GroupBy(e => e.Action).Select(g => new { Action = g.Key, Count = g.Count() })
-            .OrderByDescending(g => g.Count).ToListAsync(cancellationToken)).Select(x => new { x.Action, x.Count, Kind = AuditKinds.Of(x.Action) });
+        var kinds = counted.OrderByDescending(x => x.Value).Select(x => new { Action = x.Key, Count = x.Value, Kind = AuditKinds.Of(x.Key) });
         var first = await mine.OrderBy(e => e.Id).Select(e => (Instant?)e.At).FirstOrDefaultAsync(cancellationToken);
         var lastSignIn = !showsSignIns ? null : await mine.Where(e => e.Action.StartsWith("SIGN_IN") && e.Action != "SIGN_IN_FAILED")
             .OrderByDescending(e => e.Id).Select(e => (Instant?)e.At).FirstOrDefaultAsync(cancellationToken);

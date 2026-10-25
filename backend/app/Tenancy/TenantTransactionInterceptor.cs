@@ -13,6 +13,9 @@ namespace Delios.Host.Tenancy;
 /// </summary>
 public sealed class TenantTransactionInterceptor(TenantContext tenant) : DbTransactionInterceptor
 {
+    /// <summary>The organization this unit of work is for, if set.</summary>
+    public Guid? Tenant => tenant.TenantId;
+
     /// <summary>Called by Entity Framework right after a transaction begins (synchronous path); sets the tenant on it.</summary>
     public override DbTransaction TransactionStarted(
         DbConnection connection, TransactionEndEventData eventData, DbTransaction result)

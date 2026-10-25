@@ -21,8 +21,21 @@ public sealed class Catalog
         _listSets = sets.GroupBy(s => s.ListKey).ToDictionary(g => g.Key, g => g.ToList());
     }
 
-    /// <summary>Reads every value of the current tenant from the database. Called by <see cref="DocumentService"/> when it needs the lists.</summary>
-    public static async Task<Catalog> LoadAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
+    /// <summary>
+    /// Every value of the current tenant, as the project in hand reads them. Kept until how the organization works
+    /// changes (owner: lists read once, not on every call; <see cref="AccessVersions.SharedAsync"/>), never while this
+    /// request is changing a list itself (it reads its own change).
+    /// </summary>
+    public static async Task<Catalog> LoadAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var changing = db.ChangeTracker.Entries<ValueEntry>().Any() || db.ChangeTracker.Entries<ValueSet>().Any();
+        if (changing || db.CurrentTenant is not { } tenant || db.AppService<AccessVersions>() is not { } versions)
+            return await ReadAsync(db, cancellationToken);
+        return await versions.SharedAsync(tenant, $"catalog:{db.ListsProject}:{string.Join(",", db.ListsOwnKeys.Order())}",
+            () => ReadAsync(db, cancellationToken));
+    }
+
+    private static async Task<Catalog> ReadAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
         new(await db.ValueEntries.AsNoTracking().ToListAsync(cancellationToken), await db.ListSets.AsNoTracking().ToListAsync(cancellationToken));
 
     /// <summary>

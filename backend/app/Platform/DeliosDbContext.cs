@@ -22,6 +22,16 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     /// </summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
+    private Microsoft.EntityFrameworkCore.Infrastructure.CoreOptionsExtension? Core =>
+        Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptions>(this)
+            .FindExtension<Microsoft.EntityFrameworkCore.Infrastructure.CoreOptionsExtension>();
+
+    /// <summary>The organization this unit of work is for (the one its transactions are fenced to), if set.</summary>
+    public Guid? CurrentTenant => Core?.Interceptors?.OfType<Tenancy.TenantTransactionInterceptor>().FirstOrDefault()?.Tenant;
+
+    /// <summary>One of the application's services (for what is kept across requests, <see cref="AccessVersions"/>).</summary>
+    public T? AppService<T>() where T : class => Core?.ApplicationServiceProvider?.GetService(typeof(T)) as T;
+
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Party> Parties => Set<Party>();
     public DbSet<User> Users => Set<User>();
