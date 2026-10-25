@@ -59,6 +59,8 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<RevisionSchemeRouting> RevisionSchemeRoutings => Set<RevisionSchemeRouting>();
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<Revision> Revisions => Set<Revision>();
+    public DbSet<RevisionFact> RevisionFacts => Set<RevisionFact>();
+    public DbSet<TransmittalFact> TransmittalFacts => Set<TransmittalFact>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<DocumentAccess> DocumentAccess => Set<DocumentAccess>();
     public DbSet<HandBackRequest> HandBackRequests => Set<HandBackRequest>();

@@ -820,3 +820,10 @@ and transmittal log exports match their lines in one pass. The register's filter
 **Smaller**: the bell asks only how many are unread; Assets & tags counts every tag's documents in one read; the audit chain
 is verified once for all the projects checked in the hour; a package opened by its number is looked up by it (it was found
 in the newest 500 only).
+
+---
+
+**Recorded as it happens** (owner). "Not sent yet" and whether a transmittal was answered are now written by the
+database at the moment a transmittal or its line is added, and read back, instead of being looked for among every
+revision and transmittal each time. Opening or downloading a document no longer takes a point of its history (it changed
+nothing). `rebuild-recorded` (backend command) writes the recorded facts again from what exists, should one look wrong.

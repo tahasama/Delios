@@ -4288,6 +4288,62 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("idempotency_records", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Platform.RevisionFact", b =>
+                {
+                    b.Property<Guid>("RevisionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<Instant>("FirstCarriedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_carried_at");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("RevisionId")
+                        .HasName("pk_revision_facts");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_revision_facts_tenant_id");
+
+                    b.ToTable("revision_facts", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Platform.TransmittalFact", b =>
+                {
+                    b.Property<Guid>("TransmittalId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("transmittal_id");
+
+                    b.Property<Instant>("AnsweredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("answered_at");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("TransmittalId")
+                        .HasName("pk_transmittal_facts");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_transmittal_facts_tenant_id");
+
+                    b.ToTable("transmittal_facts", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Records.Asset", b =>
                 {
                     b.Property<Guid>("Id")

@@ -1825,6 +1825,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Kept until it changes, on the backend too**: the lists (`Catalog.LoadAsync`, not while the request changes a list),
   which lists a request reads and how dates read (`PlatformSetup`), counts of acts (`Audit/AuditCounts.cs`, topped up
   with what was written since), when people were last seen (`people_seen`, written by `audit_seen` with the act).
+- **Recorded as it happens, never swept for** (owner: "record the thing using the trigger that happens anyway"): a fact
+  derived from many rows is written by the act that makes it true and read back, never worked out by going back over
+  records on a page's reading. Where the app writes rows carrying a version stamp (documents, revisions, transmittals,
+  reviews, packages), the database records the fact in a table of its own (`Platform/Recorded.cs`): `revision_facts`
+  (a transmittal other than a review's first carried it: released with none is "not sent yet"; trigger
+  `record_carried` on `transmittal_items`), `transmittal_facts` (first answered or followed by someone else; trigger
+  `record_answered` on `transmittals`). Read only by the app; `rebuild-recorded` (backend command, by hand) writes them
+  again from what exists. Opening and downloading are only said (who, what, when): no history point is taken for them.
 - **Nothing runs on a clock to find out what happened** (owner: "we do not send spies… we go outside and inform that it
   just happened"): the outbox's relay runs in every process and sleeps until an act of that process, once committed with
   a message, rings it (`OutboxWake`; on start it sends what was left waiting, a failure tries again after 5 seconds);

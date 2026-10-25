@@ -28,7 +28,9 @@ public sealed class AuditLog(DeliosDbContext db, TenantContext tenant, Documents
         string? entityType = null, Guid? entityId = null, string? entityLabel = null,
         string? detail = null, Guid? projectId = null, CancellationToken cancellationToken = default)
     {
-        snapshots.Note(entityType, entityId, action, detail, actor.Name);
+        // Opening and downloading are only said (who, what, when): they change nothing, so no point of the document's
+        // history is taken for them (owner: "just a saying what happened when and by whom").
+        if (!OutsideChain.Contains(action)) snapshots.Note(entityType, entityId, action, detail, actor.Name);
         // Reading (opened, downloaded) changes nothing: kept outside the locked chain, so a reader never waits behind
         // every other act of the organization (owner). Every other act extends the chain, one writer at a time.
         if (OutsideChain.Contains(action))

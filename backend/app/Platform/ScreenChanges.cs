@@ -95,7 +95,7 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
     private static readonly HashSet<string> Silent =
     [
         "AuditEvent", "OutboxMessage", "Session", "Notification", "EmailMessage", "PushSubscription", "SearchWatermark",
-        "DocumentSnapshot", "IdempotencyRecord", "PersonSeen", "FileText", "DataProtectionKey", "Notice", "NoticeAlarm",
+        "DocumentSnapshot", "IdempotencyRecord", "PersonSeen", "RevisionFact", "TransmittalFact", "FileText", "DataProtectionKey", "Notice", "NoticeAlarm",
     ];
 
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result,
