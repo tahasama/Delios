@@ -13,6 +13,11 @@ type AssetRow = {
 export const projectAssets = cache(async (scope: Scope, q?: string): Promise<AssetRow[]> =>
   api<AssetRow[]>(projectPath(scope, "/assets"), { query: { q } }).catch(() => []));
 
+/** Assets & tags as its page shows it: the tags drawn, and of the rest only the counts and the areas and systems to filter by. */
+export const assetsPage = cache(async (scope: Scope, query: { q?: string; area?: string; system?: string; take: number }) =>
+  api<{ total: number; linked: number; bare: number; areas: string[]; systems: string[]; items: AssetRow[] }>(projectPath(scope, "/assets/page"),
+    { query, keep: { areas: ["assets", "docs"] } }));
+
 /** One asset and the documents (that the reader may see) describing it. */
 export async function projectAsset(scope: Scope, id: string) {
   return api<{

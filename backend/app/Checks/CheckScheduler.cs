@@ -15,10 +15,10 @@ public sealed class CheckScheduler(IServiceScopeFactory scopes, ILogger<CheckSch
     /// <summary>How often each project's checks run by themselves: once every 24 hours.</summary>
     public static readonly Duration Every = Duration.FromHours(24);
     /// <summary>How long the scheduler waits between looking for projects that are due (10 minutes).</summary>
-    private static readonly TimeSpan Pass = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan Pass = TimeSpan.FromHours(1);
 
     /// <summary>
-    /// The background loop: waits 30 seconds after start-up, then every 10 minutes queues the checks of each project that is due.
+    /// The background loop: waits 30 seconds after start-up, then every hour queues the checks of each project that is due.
     /// Started by the .NET host when the worker starts; stops when the worker shuts down.
     /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

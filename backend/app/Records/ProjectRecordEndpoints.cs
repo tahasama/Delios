@@ -47,6 +47,7 @@ public static partial class ProjectRecordEndpoints
 
         // Assets
         p.MapGet("/assets", AssetsAsync);
+        p.MapGet("/assets/page", AssetsPageAsync);
         p.MapGet("/assets/{assetId:guid}", AssetAsync);
         p.MapPost("/assets", AddAssetAsync);
         p.MapPut("/assets/{assetId:guid}", UpdateAssetAsync);

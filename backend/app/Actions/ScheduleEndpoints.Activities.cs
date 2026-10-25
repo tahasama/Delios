@@ -47,6 +47,25 @@ public static partial class ScheduleEndpoints
         return Results.Ok(views.ToList());
     }
 
+    /// <summary>
+    /// GET /activities/short?department=&amp;take=: the actions short of documents, for Home (owner: "we need top 4"):
+    /// how many, and the newest by their day, worked out in the database; never the whole schedule. A discipline narrows
+    /// them to the actions concerning it.
+    /// </summary>
+    private static async Task<IResult> ShortAsync(HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken,
+        string? department = null, int take = 4)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.IsInternal) return Results.Ok(new { count = 0, top = Array.Empty<ActivitySummary>() });
+        var (today, window) = await TodayAsync(db, clock, access.Project, cancellationToken);
+        var query = db.Activities.AsNoTracking().Where(a => a.ProjectId == access.Project.Id && a.State == ActivityStates.Active
+            && a.Start != null && a.NeedCount > 0 && a.MetCount + a.WaivedCount < a.NeedCount);
+        if (!string.IsNullOrWhiteSpace(department)) query = query.Where(a => a.Departments.Contains(department));
+        var count = await query.CountAsync(cancellationToken);
+        var top = await query.OrderByDescending(a => a.Start).ThenBy(a => a.Code).Take(Math.Clamp(take, 1, 20)).ToListAsync(cancellationToken);
+        return Results.Ok(new { count, top = top.Select(a => Summary(a, today, window)) });
+    }
+
     /// <summary>GET /activities/{activityId}: one activity with its needs and recorded decisions. Also used by the other endpoints to send back the updated activity.</summary>
     private static async Task<IResult> ActivityAsync(
         Guid activityId, HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken)

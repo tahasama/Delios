@@ -53,7 +53,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     api<Work>(projectPath(session, "/work"), { keep: { areas: ["reviews", "transmittals", "docs", "packages", "plan"] } }),
     controller ? api<{ lastRun: { integrity: number } | null }>(projectPath(session, "/checks"), { keep: { areas: ["checks"] } }).catch(() => ({ lastRun: null })) : Promise.resolve({ lastRun: null }),
     controller ? api<unknown[]>(projectPath(session, "/defects"), { query: { severity: "CRITICAL" } }).then((d) => d.length).catch(() => 0) : Promise.resolve(0),
-    user.isInternal ? api<ActivitySummary[]>(projectPath(session, "/activities"), { keep: { areas: ["plan"] } }).catch(() => [] as ActivitySummary[]) : Promise.resolve([] as ActivitySummary[]),
+    // The actions short of documents: how many, and the newest four, worked out by the backend (never the whole schedule).
+    user.isInternal && (controller || session.can("PLAN") || user.department)
+      ? api<{ count: number; top: ActivitySummary[] }>(projectPath(session, "/activities/short"), {
+          query: { department: controller || session.can("PLAN") ? null : user.department, take: 4 }, keep: { areas: ["plan"] },
+        }).catch(() => ({ count: 0, top: [] as ActivitySummary[] }))
+      : Promise.resolve({ count: 0, top: [] as ActivitySummary[] }),
     // Released, and nobody was ever told. Not a decision anybody owes: whoever
     // needed it sent did not ask, and this is where that stops being invisible.
     controller
@@ -117,24 +122,20 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // Schedule activities whose documents will not be ready in time, for the
   // people engaged in them. The control function and the planners are engaged in
   // all of them, because chasing the schedule is their work.
+  const shortCount = activities.count;
+  // Whoever keeps the whole schedule sees every action; the ones concerning their own discipline are marked "yours".
   const wholeSchedule = controller || session.can("PLAN");
-  const atRisk = activities
-    .map((a) => {
-      const total = a.needs;
-      const ready = a.met + a.waived;
-      const scheduledDate = at(a.start);
-      const late = scheduledDate ? scheduledDate.getTime() < Date.now() : false;
-      // Engaged in it: the action concerns the discipline this person answers for.
-      const mine = !!user.department && a.departments.includes(user.department);
-      return { id: a.id, code: a.code, name: a.name, scheduledDate, total, ready, short: total - ready, late, mine };
-    })
-    .filter((a) => a.total > 0 && a.short > 0 && a.scheduledDate)
-    .filter((a) => wholeSchedule || a.mine)
-    // Newest first, deliberately. Sorted by how late they are, one activity
-    // nobody intends to fix would sit at the top for months and hide every
-    // risk that appeared after it; sorted by date, what has just gone wrong is
-    // what the panel shows, and the standing failures are the schedule page's.
-    .sort((a, b) => (b.scheduledDate?.getTime() ?? 0) - (a.scheduledDate?.getTime() ?? 0));
+  // Newest first, deliberately. Sorted by how late they are, one activity nobody intends to fix would sit at the top
+  // for months and hide every risk that appeared after it; sorted by date, what has just gone wrong is what the panel
+  // shows, and the standing failures are the schedule page's.
+  const atRisk = activities.top.map((a) => {
+    const total = a.needs;
+    const ready = a.met + a.waived;
+    const scheduledDate = at(a.start);
+    const late = scheduledDate ? scheduledDate.getTime() < Date.now() : false;
+    const mine = !!user.department && a.departments.includes(user.department);
+    return { id: a.id, code: a.code, name: a.name, scheduledDate, total, ready, short: total - ready, late, mine };
+  });
 
   const revisionsOf = (kinds: string[]) => work.revisions.filter((w) => kinds.includes(w.kind));
   const issuesOf = (kinds: string[]) => work.issues.filter((w) => kinds.includes(w.kind));
@@ -343,7 +344,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               index={3}
             />
           ) : (
-            <Fig href="/schedule" value={atRisk.length} label="activities short of documents" index={3} />
+            <Fig href="/schedule" value={shortCount} label="activities short of documents" index={3} />
           )}
         </div>
 
@@ -463,7 +464,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           {view !== "log" && user.isInternal && atRisk.length ? (
             <section className="home-rise register register-sheet register-sheet-open px-4 py-3" style={rise()}>
               <h2 className="mb-1 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">Schedule</h2>
-              {atRisk.slice(0, 3).map((a) => {
+              {atRisk.map((a) => {
                 // An activity's name carries where it is after a dash — "Foundation
                 // concrete pour — clarifier TK-201, area 20" — and the place is
                 // what tells a reader whether it is theirs, so it gets its own line.
@@ -489,7 +490,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   </Link>
                 );
               })}
-                            <Link href="/schedule" className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">The whole schedule{atRisk.length > 3 ? ` · ${atRisk.length} at risk` : ""} →</Link>
+                            <Link href="/schedule" className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">The whole schedule{shortCount > atRisk.length ? ` · ${shortCount} at risk` : ""} →</Link>
             </section>
           ) : null}
 

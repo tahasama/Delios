@@ -122,7 +122,7 @@ export async function backendReviews(scope: Scope, ids: string[]): Promise<Revie
 export async function backendDocuments(scope: Scope, ids: string[]): Promise<DocumentView[]> {
   const wanted = [...new Set(ids.filter(Boolean))];
   if (!wanted.length) return [];
-  return api<DocumentView[]>(projectPath(scope, `/documents/many?ids=${wanted.map(encodeURIComponent).join(",")}`));
+  return api<DocumentView[]>(projectPath(scope, `/documents/many?ids=${wanted.map(encodeURIComponent).join(",")}`), { keep: { areas: ["docs", "reviews", "transmittals"] } });
 }
 
 /** Reviews, transmittals, packages, activities and history around one document. */

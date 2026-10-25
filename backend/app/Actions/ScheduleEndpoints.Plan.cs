@@ -105,6 +105,31 @@ public static partial class ScheduleEndpoints
         return value is null ? null : $"rev {value}";
     }
 
+    /// <summary>Where an action stands, from itself and its needs alone (no document read): the plan, its page and its filters.</summary>
+    internal readonly record struct ActionFacts(bool Covered, DateTimeOffset? LastMet, bool Passed, LocalDate? RiskFrom, string State);
+
+    internal static ActionFacts FactsOf(Activity a, LocalDate today, int window)
+    {
+        var covered = a.Requirements.Count > 0 && a.Requirements.All(n => n.State == RequirementStates.Met);
+        var lastMet = covered ? a.Requirements.Max(n => n.MetAt)?.ToDateTimeOffset() : null;
+        var passed = a.Start is { } day && day < today;
+        var riskFrom = RiskOf(a, _ => true, window);
+        var state = a.Requirements.Count == 0 ? ActionStates.Unknown
+            : covered ? (!passed ? ActionStates.Ready
+                : lastMet is { } met && a.Start is { } s && met > s.AtStartOfDayInZone(DateTimeZone.Utc).ToDateTimeOffset() ? ActionStates.LateReceipt
+                : ActionStates.Done)
+            : passed ? ActionStates.Overdue
+            : riskFrom is { } from && from <= today ? ActionStates.AtRisk : ActionStates.Upcoming;
+        return new ActionFacts(covered, lastMet, passed, riskFrom, state);
+    }
+
+    /// <summary>The day an action is at risk from, for the needs given: its day less the longest window of one still missing.</summary>
+    private static LocalDate? RiskOf(Activity a, Func<Requirement, bool> only, int window)
+    {
+        var missing = a.Requirements.Where(n => only(n) && n.State != RequirementStates.Met).ToList();
+        return a.Start is { } start && missing.Count > 0 ? missing.Min(n => start.PlusDays(-(n.RiskDays ?? window))) : null;
+    }
+
     private static async Task<List<PlanAction>> PlanActionsAsync(DeliosDbContext db, IClock clock, Project project, List<Activity> activities,
         CancellationToken cancellationToken)
     {
@@ -142,21 +167,8 @@ public static partial class ScheduleEndpoints
                             inForce is null ? null : new PlanReleased(inForce.Value, inForce.StatusCode, n.State == RequirementStates.Met),
                             newest is null ? null : new PlanLatest(newest.Value, newest.State, newest.StatusCode, newest.HeldAt is not null)));
                 }).ToList();
-            var covered = a.Requirements.Count > 0 && a.Requirements.All(n => n.State == RequirementStates.Met);
-            var lastMet = covered ? a.Requirements.Max(n => n.MetAt)?.ToDateTimeOffset() : null;
-            var passed = a.Start is { } day && day < today;
-            LocalDate? RiskFromOf(Func<Requirement, bool> only)
-            {
-                var missing = a.Requirements.Where(n => only(n) && n.State != RequirementStates.Met).ToList();
-                return a.Start is { } start && missing.Count > 0 ? missing.Min(n => start.PlusDays(-(n.RiskDays ?? window))) : null;
-            }
-            var riskFrom = RiskFromOf(_ => true);
-            var state = a.Requirements.Count == 0 ? ActionStates.Unknown
-                : covered ? (!passed ? ActionStates.Ready
-                    : lastMet is { } met && a.Start is { } s && met > s.AtStartOfDayInZone(DateTimeZone.Utc).ToDateTimeOffset() ? ActionStates.LateReceipt
-                    : ActionStates.Done)
-                : passed ? ActionStates.Overdue
-                : riskFrom is { } from && from <= today ? ActionStates.AtRisk : ActionStates.Upcoming;
+            var (_, lastMet, passed, riskFrom, state) = FactsOf(a, today, window);
+            LocalDate? RiskFromOf(Func<Requirement, bool> only) => RiskOf(a, only, window);
             var disciplineRisk = a.Departments.ToDictionary(d => d,
                 d => RiskFromOf(n => n.Department is null || string.Equals(n.Department, d, StringComparison.Ordinal))?.ToDateOnly());
             return new PlanAction(a.Id, a.Code, a.ExternalId, a.Name, a.Responsible, a.Departments, a.Start?.ToDateOnly(), a.Finish?.ToDateOnly(),

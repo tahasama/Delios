@@ -149,10 +149,12 @@ public static class PackageEndpoints
     /// GET every package of one kind (DELIVERY or SUPPLY) in full, each brought up to date with its rule: soonest due
     /// first, those with no date last.
     /// </summary>
-    private static async Task<IResult> ViewsAsync(string? kind, HttpContext http, PackageService packages, CancellationToken cancellationToken)
+    private static async Task<IResult> ViewsAsync(string? kind, HttpContext http, PackageService packages, CancellationToken cancellationToken,
+        bool top = false, int? take = null)
     {
         var access = ProjectAccessFilter.Of(http);
-        var views = (await packages.ListedAsync(access, kind, cancellationToken))
+        // The list shows the packages at the top, a page at a time (owner: only what is seen first); the tree asks for all.
+        var views = (await packages.ListedAsync(access, kind, cancellationToken, top, take))
             .Select(x => ViewOf(x.Package, x.Parts, outside: !access.IsInternal)).ToList();
         return Results.Ok(views.OrderBy(v => v.CompletionDate is null).ThenBy(v => v.CompletionDate).ToList());
     }

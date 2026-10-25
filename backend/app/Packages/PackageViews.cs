@@ -27,13 +27,19 @@ public sealed partial class PackageService
     /// in a few reads whatever their number (owner: "a page never reads its lines one by one"). Only a package in a tree
     /// reads its tree on its own.
     /// </summary>
-    public async Task<List<(Package Package, PackageParts Parts)>> ListedAsync(ProjectAccess access, string? kind, CancellationToken cancellationToken)
+    public async Task<List<(Package Package, PackageParts Parts)>> ListedAsync(ProjectAccess access, string? kind, CancellationToken cancellationToken,
+        bool topOnly = false, int? take = null)
     {
         if (!access.Holds(Verbs.Read)) return [];
         if (access.IsInternal && (access.Holds(Verbs.Control) || await StandIns.NoControlAsync(db, access.Project.Id, cancellationToken)))
             await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken);
-        var packages = await Visible(access).Where(p => kind == null || p.Kind == kind)
-            .OrderByDescending(p => p.CreatedAt).Take(5000).Include(p => p.Members).AsSplitQuery().ToListAsync(cancellationToken);
+        var chosen = Visible(access).Where(p => kind == null || p.Kind == kind);
+        // Those at the top only (the list), soonest due first as the list reads them, a page at a time; else every one (the tree).
+        if (topOnly) chosen = chosen.Where(p => p.ParentId == null);
+        var ordered = take is { } n
+            ? chosen.OrderBy(p => p.CompletionDate == null).ThenBy(p => p.CompletionDate).ThenByDescending(p => p.CreatedAt).Take(Math.Clamp(n, 1, 5000))
+            : chosen.OrderByDescending(p => p.CreatedAt).Take(5000);
+        var packages = await ordered.Include(p => p.Members).AsSplitQuery().ToListAsync(cancellationToken);
         if (packages.Count == 0) return [];
 
         // Which sit in a tree: one look for the whole project.

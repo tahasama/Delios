@@ -36,6 +36,36 @@ public static partial class ProjectRecordEndpoints
         return Results.Ok(rows.Select(x => View(x.a, x.Documents)));
     }
 
+    /// <summary>
+    /// GET /assets/page?q=&amp;area=&amp;system=&amp;take=: Assets &amp; tags as its page shows it (owner: only what is seen first):
+    /// the tags drawn, by tag, and of the rest only what is counted (how many, their document links, how many describe
+    /// none) and the areas and systems to filter by, worked out by the database.
+    /// </summary>
+    private static async Task<IResult> AssetsPageAsync(HttpContext h, DeliosDbContext db, CancellationToken c, string? q = null,
+        string? area = null, string? system = null, bool all = false, int take = 500)
+    {
+        var access = ProjectAccessFilter.Of(h);
+        var inUse = db.Set<Asset>().AsNoTracking().Where(a => a.ProjectId == access.Project.Id && (all || a.Active));
+        var areas = await inUse.Where(a => a.Area != null).Select(a => a.Area!).Distinct().OrderBy(x => x).ToListAsync(c);
+        var systems = await inUse.Where(a => a.System != null).Select(a => a.System!).Distinct().OrderBy(x => x).ToListAsync(c);
+        var query = inUse;
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var like = $"%{q.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
+            query = query.Where(a => EF.Functions.ILike(a.Code, like) || EF.Functions.ILike(a.Name, like)
+                || (a.Area != null && EF.Functions.ILike(a.Area, like)) || (a.System != null && EF.Functions.ILike(a.System, like)));
+        }
+        if (!string.IsNullOrWhiteSpace(area)) query = query.Where(a => a.Area == area);
+        if (!string.IsNullOrWhiteSpace(system)) query = query.Where(a => a.System == system);
+        var links = db.Set<DocumentAsset>();
+        var total = await query.CountAsync(c);
+        var linked = await query.SelectMany(a => links.Where(l => l.AssetId == a.Id)).CountAsync(c);
+        var bare = await query.CountAsync(a => !links.Any(l => l.AssetId == a.Id), c);
+        var rows = await query.OrderBy(a => a.Code).Take(Math.Clamp(take, 1, 5000))
+            .Select(a => new { a, Documents = links.Count(l => l.AssetId == a.Id) }).ToListAsync(c);
+        return Results.Ok(new { total, linked, bare, areas, systems, items = rows.Select(x => View(x.a, x.Documents)) });
+    }
+
     private static async Task<IResult> AssetAsync(Guid assetId, HttpContext h, DeliosDbContext db, DocumentService documents, CancellationToken c)
     {
         var access = ProjectAccessFilter.Of(h);

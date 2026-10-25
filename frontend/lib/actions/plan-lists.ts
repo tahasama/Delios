@@ -48,7 +48,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
   const [types, source, uploaded] = await Promise.all([getActiveSet("DOCUMENT_TYPES"), scheduleSource(scope), controlledSets(scope).catch(() => [])]);
   const ofTypes = async (codes: string[]): Promise<PlanListDocument[]> => {
     const pages = await Promise.all(codes.map((docType) =>
-      api<{ items: Summary[] }>(projectPath(scope, "/documents"), { query: { docType, limit: 50 } }).then((page) => page.items).catch(() => [] as Summary[])));
+      api<{ items: Summary[] }>(projectPath(scope, "/documents"), { query: { docType, limit: 50 }, keep: { areas: ["docs"] } }).then((page) => page.items).catch(() => [] as Summary[])));
     // Every document of these types in one read, not recorded as opened (nobody opened them).
     const views = new Map((await backendDocuments(scope, pages.flat().map((one) => one.id)).catch(() => [])).map((one) => [one.id, one]));
     return pages.flat().map((one) => {

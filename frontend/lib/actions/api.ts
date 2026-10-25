@@ -196,6 +196,30 @@ function datesOf(raw: Plan): Plan {
 const plan = cache(async (scope: Scope): Promise<Plan> =>
   datesOf(await api<Plan>(projectPath(scope, "/plan"), { keep: { areas: ["plan", "docs", "reviews", "transmittals"] } }).catch(orNothing({ versionInForce: null, actions: [] } as Plan))));
 
+/** An action as a list names it: the Action filter, the calendar's days. */
+export type PlanLight = { code: string; name: string; start: string | null; finish: string | null };
+
+/** The Schedule as its page shows it: the actions on screen in full, of the rest only what is counted (backend `/plan/page`). */
+export type PlanPage = {
+  versionInForce: string | null; actions: PlanAction[]; matching: number; undated: number; everywhere: number;
+  windowFrom: Date | null; windowTo: Date | null; spanFrom: Date | null; spanTo: Date | null;
+  hasWbs: boolean; sort: string; dir: "asc" | "desc"; withoutNote: number; codes: PlanLight[]; calendar: PlanLight[];
+};
+
+/** The Schedule's page for this question: its window or page, its counts; never the whole schedule in full. */
+export const planPage = cache(async (scope: Scope, query: Record<string, string | number | null>): Promise<PlanPage> => {
+  type Raw = Omit<PlanPage, "windowFrom" | "windowTo" | "spanFrom" | "spanTo" | "actions"> & {
+    actions: PlanAction[]; windowFrom: string | null; windowTo: string | null; spanFrom: string | null; spanTo: string | null;
+  };
+  const raw = await api<Raw>(projectPath(scope, "/plan/page"), { query, keep: { areas: ["plan", "docs", "reviews", "transmittals"] } });
+  const day = (iso: string | null) => (iso ? new Date(`${iso.slice(0, 10)}T00:00:00.000Z`) : null);
+  return {
+    ...raw,
+    actions: datesOf({ versionInForce: raw.versionInForce, actions: raw.actions }).actions,
+    windowFrom: day(raw.windowFrom), windowTo: day(raw.windowTo), spanFrom: day(raw.spanFrom), spanTo: day(raw.spanTo),
+  };
+});
+
 /** Every action in force, with its needs, decisions and confirmations. */
 export const planActions = cache(async (scope: Scope): Promise<PlanAction[]> => (await plan(scope)).actions);
 

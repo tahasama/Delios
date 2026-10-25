@@ -5,14 +5,14 @@ import { departmentsOf, daysBefore } from "@/lib/actions/schedule";
 import { getActiveSet } from "@/lib/settings/config";
 import { mayUploadLists } from "@/lib/core/permissions";
 import { clearance } from "@/lib/actions/requirements-process";
-import { readSearch, readDay } from "@/lib/documents/register-query";
+import { readDay } from "@/lib/documents/register-query";
 import { PLAN_CARD_HEIGHT, PLAN_FIRST } from "@/lib/actions/plan-card";
 import { ACTION_STATES, isPostponed } from "@/lib/actions/action-state";
 import { fmtDate } from "@/lib/core/utils";
 import { getSet } from "@/lib/settings/config";
 import { api } from "@/lib/client";
 import { backendDocument } from "@/lib/documents/api";
-import { planActions, planTotal, scheduleSource, type PlanAction } from "@/lib/actions/api";
+import { planPage, scheduleSource, type PlanAction } from "@/lib/actions/api";
 import { PlanCards } from "@/app/(app)/actions/plan-cards";
 import { PlanPlate } from "@/app/(app)/actions/plan-plate";
 import { PlanTimeline } from "@/app/(app)/actions/plan-timeline";
@@ -45,16 +45,8 @@ const PAGE_SIZES = [25, 50, 100, 200];
 /** The only date an action has, so the window asks about it without asking which. */
 const DATE_FIELDS = [{ code: "date", label: "Action date" }];
 
-/** Ordered by a column, ascending; an action with no date comes last. */
-const byCode = (a: PlanAction, b: PlanAction) => a.code.localeCompare(b.code);
-const SORTS: Record<string, (a: PlanAction, b: PlanAction) => number> = {
-  code: byCode,
-  name: (a, b) => a.name.localeCompare(b.name),
-  date: (a, b) => (a.start?.getTime() ?? Infinity) - (b.start?.getTime() ?? Infinity) || byCode(a, b),
-  documents: (a, b) => a.needs.length - b.needs.length || byCode(a, b),
-  // The planner's own order: by WBS element as P6 lays them out, then by date.
-  wbs: (a, b) => (a.wbsOrder ?? Infinity) - (b.wbsOrder ?? Infinity) || SORTS.date(a, b),
-};
+/** The columns the backend sorts by (`ScheduleEndpoints.PlanSorts`): code, name, date, documents, the planner's WBS order. */
+const SORTS = new Set(["code", "name", "date", "documents", "wbs"]);
 
 /** The states, said once for the schedule and the action's own page alike. */
 const STATES = ACTION_STATES;
@@ -91,7 +83,6 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const view = sp.view === "table" ? "table" : sp.view === "calendar" ? "calendar" : "plan";
 
   const q = (sp.q ?? "").trim().slice(0, 200);
-  const searches = readSearch(q);
   const state = STATES.some((one) => one.code === sp.state) ? sp.state! : "";
   const happened = HAPPENED.some((one) => one.code === sp.happened) ? sp.happened! : "";
   const discipline = (sp.discipline ?? "").trim();
@@ -110,100 +101,45 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const shown = Math.min(Math.max(Number(sp.show) || PLAN_FIRST, PLAN_FIRST), 2000);
   const step = PLAN_STEPS.includes(Number(sp.step)) ? Number(sp.step) : DEFAULT_STEP;
 
-  // What the window holds, and what the schedule holds: a plan that says "of
-  // 16" while the table says 33 is a page arguing with itself.
-  const [schedule, source, disciplineRows, typeRows, supplierRows, total] = await Promise.all([
-    planActions(ctx),
+  // The backend answers the whole question (owner: "you do not hit the full schedule"): the plan's first actions or the
+  // table's page in full, and of every other action only what is counted (the window, the schedule's span, how many
+  // match, how many have no date) — kept until something on the schedule changes.
+  const [plan, source, disciplineRows, typeRows, supplierRows] = await Promise.all([
+    planPage(ctx, {
+      view, all: sp.all ?? null, q, state, happened, nodate: sp.nodate ?? null, untagged: sp.untagged ?? null,
+      discipline, docType, supplier, code, from: sp.from ?? null, to: sp.to ?? null,
+      sort: sp.sort && SORTS.has(sp.sort) ? sp.sort : null, dir: sp.dir ?? null, page, per: perPage, show: shown,
+    }),
     scheduleSource(ctx),
     getSet("DISCIPLINES"),
     getSet("DOCUMENT_TYPES"),
     // Suppliers are the organizations the project deals with.
     api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
-    planTotal(ctx),
   ]);
 
   // As the planner lays it out where the schedule carries a WBS (owner: "keep the category/sub"), else by date.
-  const sortKey = sp.sort && SORTS[sp.sort] ? sp.sort : schedule.some((a) => a.wbs?.length) ? "wbs" : "date";
-  const dir = sp.dir === "desc" ? "desc" : "asc";
-  const orderBy = (a: PlanAction, b: PlanAction) => (dir === "desc" ? -1 : 1) * SORTS[sortKey](a, b);
+  const sortKey = plan.sort;
+  const dir = plan.dir;
   // Where the schedule runs: its first action's day to its last's (owner: "deduce first month and last month").
-  const dates = schedule.flatMap((a) => [a.start, a.finish]).filter((d): d is Date => !!d).map((d) => d.getTime());
-  // Folded, never spread: a schedule of thousands of actions would overflow the call.
-  const span = dates.length ? { from: new Date(dates.reduce((a, b) => Math.min(a, b))), to: new Date(dates.reduce((a, b) => Math.max(a, b))) } : null;
+  const span = plan.spanFrom && plan.spanTo ? { from: plan.spanFrom, to: plan.spanTo } : null;
   // The plan is naturally long, so it opens on a window around today — one month either side — until somebody asks
   // for another. A schedule that is over, or not begun, opens on its own last or first days instead (owner: "if a
   // project is over instead of pointing to today, point at last month").
   const windowed = !fromDay && !toDay && view === "plan" && sp.all !== "1";
-  // The window is two months, around today, held inside the schedule's span (owner, "that applies as general"): near or
-  // past its end it ends on the last action's day, near or before its start it starts on the first's.
-  const around = (() => {
-    const width = 2 * PLAN_WINDOW_DAYS * 86_400_000;
-    let from = Date.now() - width / 2;
-    if (span) {
-      from = Math.min(from, span.to.getTime() - width);
-      from = Math.max(from, span.from.getTime());
-    }
-    return { from: new Date(from), to: new Date(span ? Math.min(from + width, Math.max(span.to.getTime(), from)) : from + width) };
-  })();
-  const planFrom = fromDay ?? (windowed ? around.from : null);
-  const planTo = toDay ?? (windowed ? around.to : null);
+  const planFrom = plan.windowFrom;
+  const planTo = plan.windowTo;
 
-  // Where each action stands is one rule, shared with the action's own page;
-  // the schedule is read whole and filtered here.
-  const met = (action: PlanAction) => action.needs.filter((entry) => entry.state === "MET").length;
-  const shortOfWhatItNeeds = (action: PlanAction) => met(action) !== action.needs.length;
-  const afterTheDay = (action: PlanAction) => !!action.lastMetAt && !!action.start && action.lastMetAt > action.start;
-
-  // The work happened without everything it needed: its day has passed and, on
-  // that day, either something was still missing or the last of it had not yet
-  // arrived. Both readings of "short on the day", in one clause.
-  const shortOnTheDay = (a: PlanAction) => a.needs.length > 0 && a.passed && (shortOfWhatItNeeds(a) || afterTheDay(a));
   // Postponed: a decision of the organization's that does not proceed, not taken back.
   const postponeCodes = (await getActiveSet("ACTIVITY_DECISIONS")).filter((one) => one.props.proceeds !== true).map((one) => one.code);
   const postponed = (a: PlanAction) => isPostponed(a, postponeCodes);
-  // Went ahead? Once its day has passed: with its documents, with documents
-  // missing, or not at all because the control function postponed it.
-  const HAPPENED_WHERE: Record<string, (action: PlanAction) => boolean> = {
-    WITH: (a) => a.needs.length > 0 && a.passed && !shortOnTheDay(a) && !postponed(a),
-    WITHOUT: (a) => shortOnTheDay(a) && !postponed(a),
-    STOPPED: (a) => postponed(a),
-    NONE: (a) => a.needs.length === 0 && a.passed && !postponed(a),
-  };
 
-  const has = (text: string | null | undefined, word: string) => !!text && text.toLowerCase().includes(word.toLowerCase());
-  const inWindow = (a: PlanAction) =>
-    !(planFrom || planTo) || (!!a.start && (!planFrom || a.start >= planFrom) && (!planTo || a.start <= planTo));
-  const outsideWindow = (a: PlanAction) =>
-    (!code || a.code === code)
-    && (!state || a.state === state)
-    && (!happened || HAPPENED_WHERE[happened](a))
-    && (sp.nodate !== "1" || !a.start)
-    && (sp.untagged !== "1" || departmentsOf(a).length === 0)
-    // A discipline is what an action is tagged with and what a document
-    // belongs to — the same list, so the filter answers for both.
-    && (!discipline || departmentsOf(a).includes(discipline) || a.needs.some((e) => e.document.discipline === discipline))
-    // Type and supplier are facts about the documents an action needs, so an
-    // action matches when one of its documents does.
-    && (!(docType || supplier) || a.needs.some((e) => (!docType || e.document.docType === docType) && (!supplier || e.document.originator === supplier)))
-    // A space narrows, a comma widens: every word of a part must be found
-    // somewhere on the action, and any part may be the one that matches.
-    && (!searches.length || searches.some((search) => search.words.every((word) =>
-      has(a.code, word) || has(a.name, word) || has(a.externalId, word)
-      || a.needs.some((e) => has(e.document.number, word) || has(e.document.title, word)))));
-  const where = (a: PlanAction) => outsideWindow(a) && inWindow(a);
-
-  // How near a missing document's date must be to put its action at risk is the
-  // project's setting, the same one the late warnings use.
-  const found = schedule.filter(where).sort(orderBy);
-  const matching = found.length;
-  // Undated actions have no place in a window of days: they are counted on
-  // their own, every time, so they never quietly drop out of the plan.
-  const allMatching = schedule.filter(outsideWindow);
-  const undatedAll = allMatching.filter((one) => !one.start).length;
-  const everywhere = windowed ? allMatching.length : 0;
-  // The table pages through them; the plan draws as many as it has been asked
-  // for, and offers to draw more.
-  const actions = view === "table" ? found.slice((page - 1) * perPage, page * perPage) : found.slice(0, shown);
+  const matching = plan.matching;
+  // Undated actions have no place in a window of days: they are counted on their own, every time, so they never
+  // quietly drop out of the plan.
+  const undatedAll = plan.undated;
+  const everywhere = plan.everywhere;
+  // The table's page, or as many as the plan has been asked to draw: only these came in full.
+  const actions = plan.actions;
   // The schedule in force: the latest read of the schedule document, in force
   // since its revision was released. Reads are not held for a decision.
   const latest = source.imports.find((one) => one.status === "DONE") ?? null;
@@ -211,7 +147,6 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     ? (await backendDocument(ctx, source.source.documentId))?.revisions.find((one) => one.id === latest.revisionId)?.releasedAt ?? null
     : null;
   const publishedVersion = latest ? { publishedAt: releasedAt ? new Date(releasedAt) : null } : null;
-  const inUse = [...schedule].sort(SORTS.date);
 
   const deptLabel = new Map(disciplineRows.map((one) => [one.code, one.label]));
   const rows = actions.map((action) => {
@@ -299,7 +234,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   if (dateOn) query.set("on", dateOn);
   if (sp.from) query.set("from", sp.from);
   if (sp.to) query.set("to", sp.to);
-  if (sp.sort && SORTS[sp.sort]) { query.set("sort", sp.sort); query.set("dir", dir); }
+  if (sp.sort && SORTS.has(sp.sort)) { query.set("sort", sp.sort); query.set("dir", dir); }
   if (perPage !== 50) query.set("per", String(perPage));
   if (step !== DEFAULT_STEP) query.set("step", String(step));
 
@@ -376,17 +311,11 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
   const inSets = await setGrouping(ctx);
   // The calendar draws the actions the filters leave (the backend already narrowed another organization's), on the
   // project's months, with its days off; the days off are kept in Settings → Calendar.
-  const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
   const calendar = view === "calendar" ? await projectCalendar(ctx) : null;
   const jar = await cookies();
   const shownFilters = await keptFilters("schedule", ["code", "state", "happened", "discipline", "docType", "supplier", "date"]);
   return (
     <div>
-      {total ? (
-        <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          {`This schedule holds ${total.toLocaleString("en-GB")} actions: the first ${schedule.length.toLocaleString("en-GB")} by date are shown here, and the counts are theirs.`}
-        </p>
-      ) : null}
       <PlanRegister
         shownFilters={shownFilters}
         plate={
@@ -413,12 +342,12 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
                 span: span ? `${span.from.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" })} → ${span.to.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" })}` : null,
                 undated: undatedAll,
                 // Why there are no WBS bands, when there are none: no WBS read yet, or another order chosen.
-                wbs: !schedule.some((a) => a.wbs?.length) ? { none: true }
+                wbs: !plan.hasWbs ? { none: true }
                   : sortKey !== "wbs" ? { none: false, href: (() => { const p = new URLSearchParams(query); p.delete("sort"); p.delete("dir"); return `/schedule${p.size ? `?${p}` : ""}`; })() }
                   : null,
                 undatedHref: "/schedule?view=table&nodate=1",
                 // Went ahead with documents missing, across every date, opened on every date.
-                noNote: { count: schedule.filter(HAPPENED_WHERE.WITHOUT).length, href: "/schedule?happened=WITHOUT&all=1" },
+                noNote: { count: plan.withoutNote, href: "/schedule?happened=WITHOUT&all=1" },
               }
             : undefined
         }
@@ -435,7 +364,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
           <MonthsCalendar daySize={calendarDay(jar.get(PREF.calendarDay)?.value)} namesShown={jar.get(PREF.calendarNames)?.value !== "0"}
             from={calendar.from} to={calendar.to} weekend={calendar.place.weekendDays} today={calendar.today} daysOff={calendar.daysOff}
             country={calendar.place.country ?? ""} known={knownBetween(calendar.place.country, calendar.from, calendar.to)}
-            actions={found.map((a) => ({ code: a.code, name: a.name, start: day(a.start), finish: day(a.finish) }))}
+            actions={plan.calendar.map((a) => ({ code: a.code, name: a.name, start: a.start, finish: a.finish }))}
             aside={maySetup(ctx.user, SETUP_PAGES.find((p) => p.href === "/settings/calendar")!) ? (
               <Link href="/settings/calendar" className="text-xs font-semibold text-link hover:underline">
                 {calendar.mayChange ? "Change the days off" : "The days off"} in Settings → Calendar
@@ -451,7 +380,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
           disciplines: inSets("DISCIPLINES", disciplineRows, (one) => one.label),
           types: inSets("DOCUMENT_TYPES", typeRows, (one) => one.label),
           suppliers: supplierRows.map((one) => ({ code: one.code, label: one.label })),
-          codes: inUse.map((one) => ({ code: one.code, label: `${one.code} — ${one.name}` })),
+          codes: plan.codes.map((one) => ({ code: one.code, label: `${one.code} — ${one.name}` })),
           dateFields: DATE_FIELDS,
         }}
         facets={facets}
@@ -461,7 +390,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
           to: Math.min(page * perPage, matching),
           query: query.toString(),
         }}
-        sort={sp.sort && SORTS[sp.sort] ? { key: sortKey, dir } : undefined}
+        sort={sp.sort && SORTS.has(sp.sort) ? { key: sortKey, dir } : undefined}
         exportHref={`/api/export/baseline${query.size ? `?${query}` : ""}`}
       />
     </div>

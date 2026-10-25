@@ -16,13 +16,16 @@ import { isReadOnly } from "@/lib/core/auth";
 import { SearchPick } from "@/components/search-pick";
 import { RuleFields } from "./rule-fields";
 import { statusList, shortfallOf } from "@/lib/packages/package-rule";
-import { packagesOf, ourPeople, packageParties } from "@/lib/packages/api";
+import { packagesOf, ourPeople, packageParties, packagesAtTop, packageByNumber } from "@/lib/packages/api";
 import { PackageTree, treeOf } from "./arborescence";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Packages" };
 
-export default async function PackagesPage({ searchParams }: { searchParams: Promise<{ category?: string; from?: string; docs?: string; view?: string; parent?: string }> }) {
+/** How many packages the list shows at first, and adds at each "Load more". */
+const PACKAGES_FIRST = 50;
+
+export default async function PackagesPage({ searchParams }: { searchParams: Promise<{ category?: string; from?: string; docs?: string; view?: string; parent?: string; show?: string }> }) {
   const ctx = await requireScope();
   const packagePolicy = await formPolicy(ctx, "PACKAGE");
   const { user } = ctx;
@@ -38,12 +41,20 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   // Outside readers see the packages that concern them — theirs to deliver, or
   // addressed to them — and nothing else; the tenant client sees to that.
   const category = requested === "DELIVERY" ? "DELIVERY" : "SUPPLIER";
-  const [pkgs, statuses, users] = await Promise.all([
-    packagesOf(ctx, category === "SUPPLIER" ? "SUPPLY" : "DELIVERY"),
+  const kind = category === "SUPPLIER" ? "SUPPLY" : "DELIVERY";
+  // Two ways to read packages that hold packages (owner): the list of those at the top, each drilled into from its page,
+  // or the whole tree; both open the same package page. The list reads only the packages at the top, a page at a time.
+  const view = sp.view === "tree" ? "tree" : "list";
+  const shown = Math.min(Math.max(Number(sp.show) || PACKAGES_FIRST, PACKAGES_FIRST), 5000);
+  const paged = view === "list" && user.isInternal;
+  const [read, statuses, users] = await Promise.all([
+    paged ? packagesAtTop(ctx, kind, shown + 1) : packagesOf(ctx, kind),
     getActiveSet("STATUSES"),
     // Anyone on the project may put a package together or accept it.
     ourPeople(ctx),
   ]);
+  const more = paged && read.length > shown;
+  const pkgs = more ? read.slice(0, shown) : read;
   // A status code on its own says nothing to a newcomer: AB is "as-built".
   const statusMeaning = new Map(statuses.map((s) => [s.code, typeof s.props.may === "string" ? `${s.label}: ${s.props.may}` : s.label]));
   // Our own organization first: a package may be an internal handover.
@@ -68,15 +79,19 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
     return { ...pkg, ready, total, days, state };
   });
 
-  // Two ways to read packages that hold packages (owner): the list of those at the top, each drilled into from its page,
-  // or the whole tree; both open the same package page.
-  const view = sp.view === "tree" ? "tree" : "list";
   const seen = new Set(pkgs.map((one) => one.id));
   const atTop = (one: { place?: { parentId: string | null } | null }) => !one.place?.parentId || !seen.has(one.place.parentId);
-  const shownRows = view === "list" ? rows.filter(atTop) : rows;
-  const nested = pkgs.some((one) => !atTop(one));
+  const shownRows = view === "list" && !paged ? rows.filter(atTop) : rows;
+  const nested = paged ? pkgs.some((one) => (one.place?.branches.length ?? 0) > 0) : pkgs.some((one) => !atTop(one));
   // A new package inside another one ("New package in it" on its page): the package it goes in, of this kind.
-  const parent = sp.parent ? pkgs.find((one) => one.number === sp.parent) ?? null : null;
+  const asked = sp.parent ? await packageByNumber(ctx, sp.parent) : null;
+  const parent = asked && asked.kind === kind ? asked : null;
+  const moreHref = (() => {
+    const params = new URLSearchParams();
+    if (requested) params.set("category", requested);
+    params.set("show", String(shown + PACKAGES_FIRST));
+    return `/packages?${params}`;
+  })();
   const inside = (count: number) => count ? <span className="block text-[11px] text-slate-500">{count} package{count === 1 ? "" : "s"} in it</span> : null;
 
   const tabs = [
@@ -160,6 +175,12 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
               })}
         </DataTable>
       ) : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">No delivery packages yet. One groups documents we hand to an organization together by a date.</p>}
+      {more ? (
+        <div className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
+          {`The first ${pkgs.length}, soonest due first. `}
+          <Link href={moreHref} className="font-semibold text-link hover:underline">Load more</Link>
+        </div>
+      ) : null}
     </section>
 
     {staff && category === "SUPPLIER" ? (

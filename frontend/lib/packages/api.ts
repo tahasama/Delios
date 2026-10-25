@@ -58,6 +58,13 @@ export async function documentsByIds(scope: Scope, ids: string[]): Promise<{ id:
 export const packagesOf = cache(async (scope: Scope, kind: "DELIVERY" | "SUPPLY"): Promise<PackageView[]> =>
   api<PackageView[]>(projectPath(scope, "/packages/views"), { query: { kind }, keep: { areas: ["packages", "docs", "transmittals", "reviews"] } }));
 
+/**
+ * The packages at the top of one kind, a page at a time, soonest due first (the Packages list: owner, only what is seen
+ * first). One more than asked is read, to know whether there are more.
+ */
+export const packagesAtTop = cache(async (scope: Scope, kind: "DELIVERY" | "SUPPLY", take: number): Promise<PackageView[]> =>
+  api<PackageView[]>(projectPath(scope, "/packages/views"), { query: { kind, top: true, take }, keep: { areas: ["packages", "docs", "transmittals", "reviews"] } }));
+
 /** The package with this number, brought up to date with its rule; null when there is none the reader may see. */
 export const packageByNumber = cache(async (scope: Scope, number: string): Promise<PackageView | null> => {
   try {

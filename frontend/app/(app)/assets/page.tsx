@@ -2,7 +2,7 @@ import { Select } from "@/components/select";
 import Link from "next/link";
 import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
 import { FilterMenu } from "@/components/filter-menu";
-import { projectAssets } from "@/lib/records/api";
+import { assetsPage } from "@/lib/records/api";
 import { requireScope } from "@/lib/core/scope";
 import { inputCls, DataTable, Th, Td } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -29,14 +29,11 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const shown = await keptFilters("assets", ["area", "system"]);
   const q = (sp.q ?? "").trim();
-  const all = await projectAssets(ctx, q || undefined);
-  const areas = [...new Set(all.map((a) => a.area).filter((v): v is string => !!v))].sort();
-  const systems = [...new Set(all.map((a) => a.system).filter((v): v is string => !!v))].sort();
-  const assets = all.filter((a) => (!sp.area || a.area === sp.area) && (!sp.system || a.system === sp.system));
-  const linked = assets.reduce((n, a) => n + a.documents, 0);
-  const bare = assets.filter((a) => a.documents === 0).length;
-  // A plant runs to thousands of tags: the counts are of all of them, the table draws the first ones, said so.
-  const drawn = assets.slice(0, ASSETS_DRAWN);
+  // A plant runs to thousands of tags: the backend counts all of them and sends only the first ones drawn, said so.
+  const found = await assetsPage(ctx, { q: q || undefined, area: sp.area || undefined, system: sp.system || undefined, take: ASSETS_DRAWN });
+  const { areas, systems, linked, bare } = found;
+  const drawn = found.items;
+  const tags = found.total;
 
   return (
     <div className="space-y-4">
@@ -47,7 +44,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
             Equipment, systems and areas, and the controlled documents that describe each one. Open a tag to choose its documents in the register.
           </p>
           <p className="mt-2 text-xs text-slate-600">
-            <span className="font-semibold text-slate-900">{assets.length}</span> tag{assets.length === 1 ? "" : "s"} · {linked} document link{linked === 1 ? "" : "s"}
+            <span className="font-semibold text-slate-900">{tags}</span> tag{tags === 1 ? "" : "s"} · {linked} document link{linked === 1 ? "" : "s"}
             {bare ? <> · <span className="text-amber-700">{bare} describe{bare === 1 ? "s" : ""} no document yet</span></> : null}
           </p>
         </div>
@@ -73,7 +70,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
           <FilterMenu page="assets" shown={shown} filters={[{ key: "area", label: "Area", held: !!sp.area }, { key: "system", label: "System", held: !!sp.system }]} />
           <button type="submit" className="ask">Apply</button>
         </form>
-        {assets.length ? (
+        {tags ? (
           <DataTable className="rounded-none border-0 shadow-none" id="assets" exportName="assets"
             head={<tr><Th>Tag</Th><Th>Name</Th><Th>Area</Th><Th>System</Th><Th>Unit</Th><Th className="text-right">Documents</Th></tr>}>
             {drawn.map((a) => (
@@ -88,10 +85,10 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
             ))}
           </DataTable>
         ) : null}
-        {assets.length > drawn.length ? (
-          <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">{`The first ${drawn.length} of ${assets.length} tags, by tag. Find a tag, or choose an area or a system, to narrow them.`}</p>
+        {tags > drawn.length ? (
+          <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">{`The first ${drawn.length} of ${tags} tags, by tag. Find a tag, or choose an area or a system, to narrow them.`}</p>
         ) : null}
-        {assets.length ? null : (
+        {tags ? null : (
           <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">
             {q || sp.area || sp.system ? "Nothing matches that." : keeper ? "No tags yet. Add the first one below." : "No tags yet. The control function keeps the asset list."}
           </p>
@@ -99,7 +96,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
       </section>
 
       {keeper ? (
-        <details className="register register-sheet register-sheet-open" open={!all.length && !q}>
+        <details className="register register-sheet register-sheet-open" open={!found.total && !q && !sp.area && !sp.system}>
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
             <span className="text-[13px] text-slate-600">A piece of equipment, a system or an area not listed yet?</span>
             <span className="ask">New tag</span>

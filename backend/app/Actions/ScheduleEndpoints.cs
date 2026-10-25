@@ -125,6 +125,8 @@ public static partial class ScheduleEndpoints
                 ? await next(context)
                 : Problems.Forbidden("SCHEDULE_NOT_ALLOWED", "You do not read the schedule on this project."));
         everyone.MapGet("/plan", PlanAsync);
+        everyone.MapGet("/plan/page", PlanPageAsync);
+        everyone.MapGet("/plan/progress", PlanProgressAsync);
         everyone.MapGet("/plan/{code}", PlanActionAsync);
         everyone.MapGet("/activities/{activityId:guid}/lateness", LatenessAsync);
         project.MapGet("/schedule", SourceAsync);
@@ -132,6 +134,7 @@ public static partial class ScheduleEndpoints
         project.MapPut("/schedule/days", ScheduleDays.ProjectPutAsync);
         project.MapPost("/schedule/import", ImportAsync);
         project.MapGet("/activities", ActivitiesAsync);
+        project.MapGet("/activities/short", ShortAsync);
         project.MapGet("/activities/{activityId:guid}", ActivityAsync);
         project.MapPost("/activities/{activityId:guid}/needs", AddNeedAsync);
         project.MapPost("/activities/{activityId:guid}/needs/many", ChangeNeedsAsync);
