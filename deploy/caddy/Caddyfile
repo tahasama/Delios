@@ -45,6 +45,11 @@
 {$SITE_ADDRESS::80} {
 	encode zstd gzip
 
+	# The backend tells the screens what changed on the internal network only; never from outside.
+	handle /api/screens/* {
+		respond 404
+	}
+
 	handle /api/auth/sso/* {
 		import api
 	}

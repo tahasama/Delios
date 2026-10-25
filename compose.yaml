@@ -35,6 +35,9 @@ x-backend: &backend
     Storage__AccessKey: ${STORAGE_ACCESS_KEY:?run sh deploy/init-env.sh}
     Storage__SecretKey: ${STORAGE_SECRET_KEY:?run sh deploy/init-env.sh}
     ClamAv__Host: clamav
+    # Where the screens are told what changed (their kept answers cleared); never reachable from outside (Caddy).
+    Screens__Url: ${SCREENS_URL:-http://web:3000}
+    Screens__Secret: ${SCREENS_SECRET:-}
     # Plain HTTP on localhost; production sits behind TLS and keeps the default.
     Auth__SecureCookie: ${SECURE_COOKIE:-false}
     # An organization may register itself from the sign-up page.
@@ -231,6 +234,8 @@ services:
     restart: unless-stopped
     environment:
       DELIOS_API_URL: http://caddy:8080
+      # The secret the backend shows when it says what changed (/api/screens/changed).
+      DELIOS_SCREENS_SECRET: ${SCREENS_SECRET:-}
     depends_on: [caddy]
 
   # Copies every stored file to a second location, every 6 hours.

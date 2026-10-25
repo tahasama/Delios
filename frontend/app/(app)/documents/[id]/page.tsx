@@ -58,7 +58,7 @@ import { sendToSupplierAction, askBackAction, answerAskAction } from "@/lib/pack
 import { addressees } from "@/lib/transmittals/api";
 import { AlsoKnownAs, type Equivalent } from "./numbers";
 import { AsReceivedWarning } from "@/components/as-received-warning";
-import { api, projectPath } from "@/lib/client";
+import { api, apiAfter, projectPath } from "@/lib/client";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +83,8 @@ export default async function DocumentDetailPage({
   const sp = await searchParams;
 
   const doc = await documentPage(ctx, id);
+  // Opened: recorded once the page is drawn, its answers being kept (backend POST /documents/{id}/viewed).
+  if (doc) await apiAfter(projectPath(ctx, `/documents/${id}/viewed`));
   if (!doc) notFound();
 
   const context = await documentContext(ctx, id);

@@ -224,3 +224,10 @@ A new feature ....................... its area's folder in each part; a new area
   added to this file.
 - **Only `lib/client.ts` calls the backend.** Pages read through their area's `api.ts`; forms send through
   its `forms*.ts`.
+
+
+## Kept answers and what clears them
+- `frontend/lib/core/kept.ts` — the labels of a kept read; `frontend/lib/client.ts` `api(…, { keep })`, `apiAfter`.
+- `frontend/app/api/screens/changed/route.ts` — the backend says what changed; clears those labels.
+- `backend/app/Platform/ScreenChanges.cs` — the save interceptor naming the labels each save touched, and the poster.
+- `backend/app/Search/SearchSignal.cs` — "this organization's register changed", for the search index.

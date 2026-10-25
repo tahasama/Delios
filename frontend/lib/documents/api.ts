@@ -104,7 +104,7 @@ const date = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
 /** The backend's document, or null when it does not exist or is not the reader's to see. */
 export const backendDocument = cache(async (scope: Scope, id: string): Promise<DocumentView | null> => {
   try {
-    return await api<DocumentView>(projectPath(scope, `/documents/${id}`));
+    return await api<DocumentView>(projectPath(scope, `/documents/${id}`), { keep: { areas: [], doc: id, fallback: ["reviews", "transmittals"] } });
   } catch (e) {
     if (e instanceof ApiProblem && (e.status === 404 || e.status === 400)) return null;
     throw e;
@@ -127,7 +127,7 @@ export async function backendDocuments(scope: Scope, ids: string[]): Promise<Doc
 
 /** Reviews, transmittals, packages, activities and history around one document. */
 export const documentContext = cache(async (scope: Scope, id: string): Promise<BackendContext> =>
-  api<BackendContext>(projectPath(scope, `/documents/${id}/context`)));
+  api<BackendContext>(projectPath(scope, `/documents/${id}/context`), { keep: { areas: [], doc: id, fallback: ["reviews", "transmittals", "plan", "packages"] } }));
 
 /** Every ask to hand a supplier's document back, newest first, with its answer. */
 export const handBacks = cache(async (scope: Scope, id: string): Promise<HandBack[]> =>
@@ -135,7 +135,7 @@ export const handBacks = cache(async (scope: Scope, id: string): Promise<HandBac
 
 /** One review in full: its steps, who sits on them and the comments. */
 export const backendReview = cache(async (scope: Scope, id: string): Promise<ReviewView> =>
-  api<ReviewView>(projectPath(scope, `/reviews/${id}`)));
+  api<ReviewView>(projectPath(scope, `/reviews/${id}`), { keep: { areas: ["reviews"] } }));
 
 /** A review as a review cycle on the document page: one per review, binding when it has a deciding step. */
 function cycleOf(review: ReviewView, sequence: number): PageCycle {

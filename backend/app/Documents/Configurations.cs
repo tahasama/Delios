@@ -145,6 +145,8 @@ internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
         b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Revisions).WithOne().HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.ProjectId, x.Number }).IsUnique();
+        // What changed since the search index last looked, organization by organization: never a scan of the register.
+        b.HasIndex(x => new { x.TenantId, x.UpdatedAt, x.Id });
         b.HasIndex(x => new { x.ProjectId, x.Discipline });
         b.HasIndex(x => new { x.ProjectId, x.DocType });
         b.HasIndex(x => new { x.ProjectId, x.State });

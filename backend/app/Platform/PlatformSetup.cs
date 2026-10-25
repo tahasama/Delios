@@ -85,11 +85,20 @@ public static class PlatformSetup
         services.AddScoped<TenantContext>();
         services.AddScoped<TenantTransactionInterceptor>();
         services.AddScoped<ReadDatabase>();
+        // Every save names what the screens keep that it changed (ScreenChanges): on a screen's answer, or posted to them.
+        services.AddHttpContextAccessor();
+        services.AddOptions<ScreensOptions>().BindConfiguration(ScreensOptions.Section);
+        services.AddHttpClient(nameof(ScreensNotifier), c => c.Timeout = TimeSpan.FromSeconds(5));
+        services.AddSingleton<ScreensNotifier>();
+        services.AddHostedService(sp => sp.GetRequiredService<ScreensNotifier>());
+        services.AddSingleton<Search.SearchSignal>();
+        services.AddScoped<ScreenChanges>();
+        services.AddScoped<ScreenChangeWatcher>();
         services.AddDbContext<DeliosDbContext>((sp, o) => o
             .UseNpgsql(sp.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Postgres,
                 npgsql => npgsql.UseNodaTime())
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(sp.GetRequiredService<TenantTransactionInterceptor>()));
+            .AddInterceptors(sp.GetRequiredService<TenantTransactionInterceptor>(), sp.GetRequiredService<ScreenChangeWatcher>()));
 
         services.AddDataProtection()
             .SetApplicationName("delios")

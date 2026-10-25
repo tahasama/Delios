@@ -50,10 +50,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const backendNames = (kinds: string[]) => Object.keys(ALIAS).filter((name) => kinds.includes(ALIAS[name])).concat(kinds).join(",");
 
   const [work, checks, criticalDefects, activities, neverSent, scheduleWork] = await Promise.all([
-    api<Work>(projectPath(session, "/work")),
-    controller ? api<{ lastRun: { integrity: number } | null }>(projectPath(session, "/checks")).catch(() => ({ lastRun: null })) : Promise.resolve({ lastRun: null }),
+    api<Work>(projectPath(session, "/work"), { keep: { areas: ["reviews", "transmittals", "docs", "packages", "plan"] } }),
+    controller ? api<{ lastRun: { integrity: number } | null }>(projectPath(session, "/checks"), { keep: { areas: ["checks"] } }).catch(() => ({ lastRun: null })) : Promise.resolve({ lastRun: null }),
     controller ? api<unknown[]>(projectPath(session, "/defects"), { query: { severity: "CRITICAL" } }).then((d) => d.length).catch(() => 0) : Promise.resolve(0),
-    user.isInternal ? api<ActivitySummary[]>(projectPath(session, "/activities")).catch(() => [] as ActivitySummary[]) : Promise.resolve([] as ActivitySummary[]),
+    user.isInternal ? api<ActivitySummary[]>(projectPath(session, "/activities"), { keep: { areas: ["plan"] } }).catch(() => [] as ActivitySummary[]) : Promise.resolve([] as ActivitySummary[]),
     // Released, and nobody was ever told. Not a decision anybody owes: whoever
     // needed it sent did not ask, and this is where that stops being invisible.
     controller

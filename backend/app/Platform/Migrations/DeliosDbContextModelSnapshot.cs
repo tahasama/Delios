@@ -1162,9 +1162,6 @@ namespace Delios.Host.Platform.Migrations
                     b.HasIndex("CorrectsId")
                         .HasDatabaseName("ix_documents_corrects_id");
 
-                    b.HasIndex("TenantId")
-                        .HasDatabaseName("ix_documents_tenant_id");
-
                     b.HasIndex("ProjectId", "Discipline")
                         .HasDatabaseName("ix_documents_project_id_discipline");
 
@@ -1180,6 +1177,9 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasIndex("ProjectId", "State")
                         .HasDatabaseName("ix_documents_project_id_state");
+
+                    b.HasIndex("TenantId", "UpdatedAt", "Id")
+                        .HasDatabaseName("ix_documents_tenant_id_updated_at_id");
 
                     b.ToTable("documents", (string)null);
                 });

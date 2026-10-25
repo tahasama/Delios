@@ -25,7 +25,7 @@ public sealed record FileUploaded(Guid TenantId, Guid FileId)
 /// </summary>
 public sealed class FileProcessor(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, IVirusScanner scanner,
-    AuditLog audit, IClock clock, ILogger<FileProcessor> logger)
+    AuditLog audit, IClock clock, ILogger<FileProcessor> logger, Platform.ScreensNotifier screens)
 {
     /// <summary>
     /// Checks one uploaded file and records the result, then updates its revision's files state
@@ -82,6 +82,10 @@ public sealed class FileProcessor(
                 .SetProperty(x => x.ScannedAt, now), cancellationToken);
         if (updated == 0) return;
         AppMetrics.FilesProcessed.WithLabels(status).Inc();
+        // Written around the save: the screens are told the document's page changed (its Preview waits for this).
+        if (file.DocumentId is { } changedDocument)
+            screens.Post([$"doc:{changedDocument}", $"p:{file.ProjectId}:{Platform.Areas.Docs}"]);
+        else screens.Post([$"p:{file.ProjectId}:{Platform.Areas.Transmittals}"]);
         // Read for search straight away only where the organization chose so.
         if (status == FileStatuses.Clean && file.DocumentId is not null && file.Kind is FileKinds.Native or FileKinds.Rendition
             && await db.Projects.AnyAsync(p => p.Id == file.ProjectId && p.ContentExtraction == Extraction.ExtractionModes.Automatic, cancellationToken))

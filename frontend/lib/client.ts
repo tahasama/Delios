@@ -1,6 +1,9 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
+import { revalidateTag, updateTag } from "next/cache";
+import { after } from "next/server";
 import { keepRequestDateFormat } from "@/lib/core/date-format";
+import { KEEP_SECONDS, labelsOf, type Keep } from "@/lib/core/kept";
 
 /**
  * The one door to the backend. Every screen and action reaches the .NET API
@@ -39,6 +42,11 @@ type ApiOptions = {
   idempotencyKey?: string;
   /** This browser's id (the sign-in calls): a sign-in from a browser never seen before is emailed to the person. */
   device?: string;
+  /**
+   * Keep the answer (a read only) until a change names one of its labels (`lib/core/kept.ts`): what it depends on.
+   * Without it, the answer is read fresh every time.
+   */
+  keep?: Keep;
 };
 
 function url(path: string, query?: Query): string {
@@ -57,7 +65,8 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   const incoming = await headers();
   const session = jar.get(SESSION_COOKIE)?.value;
   const forwarded = incoming.get("x-forwarded-for") ?? incoming.get("x-real-ip");
-  const sendHeaders: Record<string, string> = { Accept: "application/json" };
+  // The screens read what changed on the answer to their own acts (backend ScreenChanges).
+  const sendHeaders: Record<string, string> = { Accept: "application/json", "X-Delios-Screens": "1" };
   if (session) sendHeaders.Cookie = `${BACKEND_COOKIE}=${session}`;
   // The project the person is in: the backend reads the lists as that project sees them (its own, else the organization's).
   const project = jar.get("edms_project")?.value;
@@ -71,16 +80,58 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   if (options.idempotencyKey) sendHeaders["Idempotency-Key"] = options.idempotencyKey;
   if (options.body !== undefined) sendHeaders["Content-Type"] = "application/json";
   const started = TRACE ? performance.now() : 0;
+  const method = options.method ?? (options.body === undefined ? "GET" : "POST");
+  // A read that says what it depends on is kept, per session, until a change names one of its labels.
+  const kept = method === "GET" && options.keep;
   const response = await fetch(url(path, options.query), {
-    method: options.method ?? (options.body === undefined ? "GET" : "POST"),
+    method,
     headers: sendHeaders,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    cache: "no-store",
+    ...(kept ? { cache: "force-cache" as const, next: { revalidate: KEEP_SECONDS, tags: labelsOf(path, options.keep!) } } : { cache: "no-store" as const }),
   });
+  // An act: what it changed is cleared now, so the page drawn after it reads it fresh (read-your-own-writes).
+  if (method !== "GET") clearChanged(response.headers.get("x-delios-changed"));
   if (TRACE) console.log(`[api] ${response.status} ${Math.round(performance.now() - started)}ms ${options.method ?? "GET"} ${path}`);
   // How dates read: the organization's, on every answer; kept for the page being drawn.
   keepRequestDateFormat(response.headers.get("x-delios-date-format"));
   return response;
+}
+
+/**
+ * An act sent once the page is drawn (Next.js `after`), never making it wait: an opening recorded while the page's
+ * answers are kept. The session is read now; the call goes after.
+ */
+export async function apiAfter(path: string, options: Pick<ApiOptions, "method" | "body"> = {}) {
+  const jar = await cookies();
+  const session = jar.get(SESSION_COOKIE)?.value;
+  const project = jar.get("edms_project")?.value;
+  const sendHeaders: Record<string, string> = { Accept: "application/json", "X-Delios-Screens": "1" };
+  if (session) sendHeaders.Cookie = `${BACKEND_COOKIE}=${session}`;
+  if (project) sendHeaders["X-Delios-Project"] = project;
+  if (options.body !== undefined) sendHeaders["Content-Type"] = "application/json";
+  after(async () => {
+    try {
+      await fetch(url(path), { method: options.method ?? "POST", headers: sendHeaders, body: options.body === undefined ? undefined : JSON.stringify(options.body), cache: "no-store" });
+    } catch {
+      // Recorded on the next opening.
+    }
+  });
+}
+
+/** Clears the labels a backend answer says its act changed: at once in a Server Action, else for the next view. */
+function clearChanged(header: string | null) {
+  if (!header) return;
+  for (const tag of header.split(",").map((one) => one.trim()).filter(Boolean)) {
+    try {
+      updateTag(tag);
+    } catch {
+      try {
+        revalidateTag(tag, { expire: 0 });
+      } catch {
+        // Neither an action nor a route (a page being drawn): the backend's own word, posted, clears it.
+      }
+    }
+  }
 }
 
 /** DELIOS_API_TRACE=1 logs every backend call with its time, to see what a page waits on. */

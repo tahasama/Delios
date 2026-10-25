@@ -124,6 +124,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const [register, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, phases, activities, views] =
     await Promise.all([
       api<RegisterPage>(projectPath(scope, "/register"), {
+        keep: { areas: ["docs", "reviews", "transmittals", "packages", "plan"] },
         query: {
           q, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, criticality, confidentiality,
           deliverable, phase: sp.phase ?? "", action: sp.action ?? "", own: ownFilter, on: dateOn, from: sp.from ?? "", to: sp.to ?? "", view, sort, dir, page, per: perPage,

@@ -95,7 +95,7 @@ public sealed record FileExtract(Guid TenantId, Guid FileId)
 /// </summary>
 public sealed class ExtractionProcessor(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, IHttpClientFactory http, IOptions<ExtractionOptions> options,
-    AuditLog audit, IClock clock, ILogger<ExtractionProcessor> logger)
+    AuditLog audit, IClock clock, ILogger<ExtractionProcessor> logger, Search.SearchSignal search)
 {
     /// <summary>Name of the HttpClient registered at startup for the extraction service, with its timeout.</summary>
     public const string HttpClientName = "extraction";
@@ -185,6 +185,7 @@ public sealed class ExtractionProcessor(
         // The document changed for search: the index takes the text on its next pass.
         await db.Documents.Where(d => d.Id == file.DocumentId)
             .ExecuteUpdateAsync(d => d.SetProperty(x => x.UpdatedAt, clock.GetCurrentInstant()), cancellationToken);
+        search.Publish([file.TenantId]);
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(Actor.System, "CONTENT_EXTRACTED", "StoredFile", file.Id, file.Name,
             text.Length == 0 ? "No readable text." : $"{text.Length} characters{(truncated ? " (cut at the limit)" : "")}.",

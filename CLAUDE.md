@@ -1690,7 +1690,25 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`POST /activities/{id}/needs/many`). An action's page reads only its own action (`planActionRead`), never the whole plan.
   Every check run on each opening has its index (whether someone opened a document in the last half hour: `audit_events`
   actor · entity · at; the audit trail by act: action · id).
-- **Never cut a list without saying so** (owner: "we do not want any surprises"): the Schedule carries up to 20,000
+- **Kept answers, cleared by what changed** (owner: "huge misuse of Next.js built-in functions… whatever and whenever an
+  activity happens, it triggers whatever needed to be updated, partially"): a read that says what it depends on
+  (`api(path, { keep: { areas, doc?, fallback? } })`, `lib/core/kept.ts`) is kept by Next.js (`force-cache` with
+  `next.tags`), keyed by the person's session (Next keys a kept fetch by its headers: nobody reads another's kept
+  answer), labelled `p:<project>:<area>`, `area:<area>`, `doc:<id>` and `all`. Every save in the backend names the
+  labels it touched (`Platform/ScreenChanges.cs`, an EF Core save interceptor: a row's project, its own or through the
+  review, transmittal, package, action or revision it hangs from; an area by the part of the app it lives in; settings,
+  lists, people, functions and organizations clear `all`; audit, notifications, sessions and the outbox clear nothing):
+  on a screen's own act they come back on the answer (`X-Delios-Changed`) and `api()` clears them at once (`updateTag`,
+  read-your-own-writes); every change is also posted to the screens' route `/api/screens/changed` (`ScreensNotifier`,
+  gathered a quarter of a second; `Screens__Url`, the shared `SCREENS_SECRET`; Caddy refuses it from outside), which
+  clears them for every other session (`revalidateTag(tag, { expire: 0 })`). A write around the save (an `ExecuteUpdate`)
+  names its labels itself (the virus check finishing a file: its document). A kept answer is read again within the
+  hour at most (`KEEP_SECONDS`, for today's date). Kept: the plan, an action, the register, a document and its context,
+  a review, the reviews and transmittals lists, packages and their lines, Home's work and checks, settings. Opening a
+  document is still recorded once every half hour, sent after the page is drawn (`apiAfter`, Next.js `after`;
+  `POST /documents/{id}/viewed`). The search index is told which organization changed (`Search/SearchSignal.cs`, through
+  Redis), never asking every few seconds; it catches up once an hour, on its own index (documents tenant · updated · id).
+ (owner: "we do not want any surprises"): the Schedule carries up to 20,000
   actions in one answer (`ScheduleEndpoints.MaxActions`; a P6 schedule runs to thousands) and past that says how many
   there are in all (`PlanView.Total`, `planTotal`, a line above the Schedule); Assets & tags counts up to 20,000 tags
   and draws the first 500, saying so; the Packages list reads up to 5,000. Never `Math.min(...list)` over a list that

@@ -78,7 +78,7 @@ export const scheduleSource = cache(async (scope: Scope) =>
 
 /** The schedule's activities in force, by start date. */
 export const activityList = cache(async (scope: Scope): Promise<ActivitySummary[]> =>
-  api<ActivitySummary[]>(projectPath(scope, "/activities")).catch(orNothing([] as ActivitySummary[])));
+  api<ActivitySummary[]>(projectPath(scope, "/activities"), { keep: { areas: ["plan"] } }).catch(orNothing([] as ActivitySummary[])));
 
 /** One activity with its needs and decisions, or null. */
 export const activityDetail = cache(async (scope: Scope, id: string): Promise<ActivityDetail | null> =>
@@ -194,7 +194,7 @@ function datesOf(raw: Plan): Plan {
 
 /** Every action in force, in one answer from the backend; another organization's people get none. */
 const plan = cache(async (scope: Scope): Promise<Plan> =>
-  datesOf(await api<Plan>(projectPath(scope, "/plan")).catch(orNothing({ versionInForce: null, actions: [] } as Plan))));
+  datesOf(await api<Plan>(projectPath(scope, "/plan"), { keep: { areas: ["plan", "docs", "reviews", "transmittals"] } }).catch(orNothing({ versionInForce: null, actions: [] } as Plan))));
 
 /** Every action in force, with its needs, decisions and confirmations. */
 export const planActions = cache(async (scope: Scope): Promise<PlanAction[]> => (await plan(scope)).actions);
@@ -208,7 +208,7 @@ export const planActionByCode = cache(async (scope: Scope, code: string): Promis
 
 /** One action by its code with the schedule read in force: its page, without reading the whole plan for the label. */
 export const planActionRead = cache(async (scope: Scope, code: string): Promise<{ action: PlanAction | null; version: string | null }> => {
-  const one = await api<Plan>(projectPath(scope, `/plan/${encodeURIComponent(code)}`)).catch(orNothing(null as Plan | null));
+  const one = await api<Plan>(projectPath(scope, `/plan/${encodeURIComponent(code)}`), { keep: { areas: ["plan", "docs", "reviews", "transmittals"] } }).catch(orNothing(null as Plan | null));
   return one ? { action: datesOf(one).actions[0] ?? null, version: one.versionInForce } : { action: null, version: null };
 });
 
@@ -248,7 +248,7 @@ type ActionWork = {
 };
 
 export const actionWork = cache(async (scope: Scope): Promise<ActionWork[]> =>
-  api<ActionWork[]>(projectPath(scope, "/activities-work")).catch(() => []));
+  api<ActionWork[]>(projectPath(scope, "/activities-work"), { keep: { areas: ["plan", "docs"] } }).catch(() => []));
 
 /** What a request will change once it is confirmed, as the control function checked it. */
 export type ActivityProposal = { documentIds: string[] | null; department: string | null; departments: string[] | null; purpose: string | null; statuses: string[] | null };

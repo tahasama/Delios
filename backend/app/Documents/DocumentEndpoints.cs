@@ -32,6 +32,7 @@ public static class DocumentEndpoints
         project.MapGet("/documents", ListAsync);
         project.MapGet("/documents/{documentId:guid}", GetAsync);
         project.MapGet("/documents/many", ManyAsync);
+        project.MapPost("/documents/{documentId:guid}/viewed", ViewedAsync);
         project.MapPost("/documents", RegisterAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/documents/check", CheckRegisterAsync);
         project.MapPost("/documents/{documentId:guid}/uploads", RequestUploadAsync);
@@ -128,13 +129,7 @@ public static class DocumentEndpoints
             .AsSplitQuery()
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (document is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
-        // Who opened it, and when (owner): in the audit trail, once per person and document every half hour, so a page
-        // asking several times reads as one look; only where the organization keeps reading (Settings.Tracking).
-        var since = clock.GetCurrentInstant() - Duration.FromMinutes(30);
-        if (await Settings.Tracking.KeepsReadingAsync(db, cancellationToken)
-            && !await db.AuditEvents.AnyAsync(e => e.ActorId == access.UserId && e.EntityId == documentId && e.Action == "DOCUMENT_VIEWED" && e.At > since, cancellationToken))
-            await audit.WriteAsync(http.User.Actor(), "DOCUMENT_VIEWED", "Document", documentId, document.Number,
-                projectId: access.Project.Id, cancellationToken: cancellationToken);
+        await RecordViewAsync(http, db, audit, clock, access, documentId, document.Number, cancellationToken);
         // Decided and waiting for release (with what the decider granted), and when each revision first went out.
         var decided = await db.Reviews.AsNoTracking().Where(r => r.DocumentId == documentId && r.State == Reviews.ReviewStates.Decided)
             .Select(r => new { r.RevisionId, r.GrantedStatus }).ToListAsync(cancellationToken);
@@ -174,6 +169,35 @@ public static class DocumentEndpoints
                 };
             }).ToList(),
         });
+    }
+
+    /// <summary>
+    /// Who opened it, and when (owner): in the audit trail, once per person and document every half hour, so a page
+    /// asking several times reads as one look; only where the organization keeps reading (Settings.Tracking).
+    /// </summary>
+    private static async Task RecordViewAsync(HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock, ProjectAccess access,
+        Guid documentId, string number, CancellationToken cancellationToken)
+    {
+        var since = clock.GetCurrentInstant() - Duration.FromMinutes(30);
+        if (await Settings.Tracking.KeepsReadingAsync(db, cancellationToken)
+            && !await db.AuditEvents.AnyAsync(e => e.ActorId == access.UserId && e.EntityId == documentId && e.Action == "DOCUMENT_VIEWED" && e.At > since, cancellationToken))
+            await audit.WriteAsync(http.User.Actor(), "DOCUMENT_VIEWED", "Document", documentId, number,
+                projectId: access.Project.Id, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// POST /documents/{documentId}/viewed: the document's page was opened. The screens keep the document's answer, so
+    /// an opening that did not read it again says so here, after the page is drawn; recorded as an opening once every
+    /// half hour, as when it is read.
+    /// </summary>
+    private static async Task<IResult> ViewedAsync(Guid documentId, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock,
+        CancellationToken cancellationToken)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        var number = await DocumentQueries.Visible(db, access).Where(d => d.Id == documentId).Select(d => d.Number).SingleOrDefaultAsync(cancellationToken);
+        if (number is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
+        await RecordViewAsync(http, db, audit, clock, access, documentId, number, cancellationToken);
+        return Results.NoContent();
     }
 
     /// <summary>

@@ -11,7 +11,7 @@ type Scope = { projectId: string };
 
 /** One page of the transmittal log, filtered and sorted by the backend. */
 export async function transmittalLog(scope: Scope, query: Query): Promise<TransmittalLog> {
-  return api<TransmittalLog>(projectPath(scope, "/transmittals/log"), { query });
+  return api<TransmittalLog>(projectPath(scope, "/transmittals/log"), { query, keep: { areas: ["transmittals", "docs"] } });
 }
 
 /** One transmittal, or null when it does not exist or is not the reader's to see. Reading it records a recipient's first opening. */
@@ -29,7 +29,7 @@ export const addressees = cache(async (scope: Scope): Promise<Addressees> =>
   api<Addressees>(projectPath(scope, "/addressees")).catch(() => ({ people: [], parties: [] })));
 
 /** What waits on the signed-in person in this project. */
-const work = cache(async (scope: Scope): Promise<Work> => api<Work>(projectPath(scope, "/work")));
+const work = cache(async (scope: Scope): Promise<Work> => api<Work>(projectPath(scope, "/work"), { keep: { areas: ["reviews", "transmittals", "docs", "packages", "plan"] } }));
 
 /**
  * Our organization's name as the record carries it: what was sent to us reads

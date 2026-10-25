@@ -56,7 +56,7 @@ export async function documentsByIds(scope: Scope, ids: string[]): Promise<{ id:
 
 /** The packages of one kind, in full, each brought up to date with its rule: soonest due first, those without a date last. */
 export const packagesOf = cache(async (scope: Scope, kind: "DELIVERY" | "SUPPLY"): Promise<PackageView[]> =>
-  api<PackageView[]>(projectPath(scope, "/packages/views"), { query: { kind } }));
+  api<PackageView[]>(projectPath(scope, "/packages/views"), { query: { kind }, keep: { areas: ["packages", "docs", "transmittals", "reviews"] } }));
 
 /** The package with this number, brought up to date with its rule; null when there is none the reader may see. */
 export const packageByNumber = cache(async (scope: Scope, number: string): Promise<PackageView | null> => {
@@ -88,4 +88,4 @@ export type PackageLine = {
  * by document: the document, its context and each of its reviews). Reading it records nothing in anyone's activity.
  */
 export const packageLines = cache(async (scope: Scope, packageId: string): Promise<PackageLine[]> =>
-  api<PackageLine[]>(projectPath(scope, `/packages/${packageId}/lines`)));
+  api<PackageLine[]>(projectPath(scope, `/packages/${packageId}/lines`), { keep: { areas: ["packages", "docs", "transmittals", "reviews"] } }));

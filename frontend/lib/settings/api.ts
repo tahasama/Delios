@@ -6,7 +6,7 @@ type SettingRow = { key: string; value: string; updatedAt: string; updatedBy: st
 
 /** This project's answers about how it works (control activities, policies), read once a request. */
 export const projectSettings = cache(async (projectId: string): Promise<Map<string, string>> => {
-  const rows = await api<SettingRow[]>(`/api/projects/${projectId}/settings`).catch(() => [] as SettingRow[]);
+  const rows = await api<SettingRow[]>(`/api/projects/${projectId}/settings`, { keep: { areas: [] } }).catch(() => [] as SettingRow[]);
   return new Map(rows.map((row) => [row.key, row.value]));
 });
 
@@ -15,7 +15,7 @@ export const orgSettings = cache(async (): Promise<Map<string, string>> => orgSe
 
 /** The same, throwing when the read fails: where "nothing set" would be read as a fact (the organization's Settings). */
 export const orgSettingsOrFail = cache(async (): Promise<Map<string, string>> => {
-  const rows = await api<SettingRow[]>("/api/settings");
+  const rows = await api<SettingRow[]>("/api/settings", { keep: { areas: [] } });
   return new Map(rows.map((row) => [row.key, row.value]));
 });
 

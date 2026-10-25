@@ -36,7 +36,7 @@ export function workingDaysBetween(from: Date, to: Date): number {
 
 /** One page of the reviews list, filtered and sorted by the backend. */
 export async function reviewsPage(scope: Scope, query: Query): Promise<ReviewsPage> {
-  return api<ReviewsPage>(projectPath(scope, "/reviews"), { query });
+  return api<ReviewsPage>(projectPath(scope, "/reviews"), { query, keep: { areas: ["reviews", "docs"] } });
 }
 
 /** The disciplines and document types the project's documents hold, so a filter offers only those. */

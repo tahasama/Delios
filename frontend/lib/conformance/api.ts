@@ -48,11 +48,11 @@ async function orNothing<T>(load: () => Promise<T>, nothing: T): Promise<T> {
 
 /** Every check, its result in the last finished run, and what is switched off. Read once a request. */
 export const checksOf = cache(async (projectId: string): Promise<ChecksAnswer> =>
-  orNothing(() => api<ChecksAnswer>(projectPath({ projectId }, "/checks")), { lastRun: null, checks: [] }));
+  orNothing(() => api<ChecksAnswer>(projectPath({ projectId }, "/checks"), { keep: { areas: ["checks"] } }), { lastRun: null, checks: [] }));
 
 /** The defects not closed (open and accepted), most serious first. Read once a request. */
 export const liveDefects = cache(async (projectId: string): Promise<DefectView[]> =>
-  orNothing(() => api<DefectView[]>(projectPath({ projectId }, "/defects")), []));
+  orNothing(() => api<DefectView[]>(projectPath({ projectId }, "/defects"), { keep: { areas: ["checks", "docs"] } }), []));
 
 /** One run, as it stands now. */
 async function runOf(scope: { projectId: string }, runId: string): Promise<RunView> {
