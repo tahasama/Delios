@@ -7,7 +7,7 @@ import { randomUUID } from "crypto";
 import { STATE_NAMES, STATE_NAME_MAX } from "@/lib/core/state-names";
 import { orgSettings, projectSettings, setOrgSetting, setProjectSetting } from "@/lib/settings/api";
 import { api, projectPath, refusal } from "@/lib/client";
-import { ESCALATE_AFTER_KEY } from "@/lib/actions/escalation";
+import { ESCALATE_AFTER_KEY, NOTIFY_AT_KEY } from "@/lib/actions/escalation";
 import {
   CONTROL_ACTIVITIES,
   controlSettings,
@@ -300,6 +300,11 @@ export async function setRoomAnswerAction(_prev: State | undefined, formData: Fo
       if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Notify again after 1 to 60 working days." };
       await save(formData, [[key, String(days)]]);
       said = `A silent discipline is notified again after ${days} working days.`;
+    } else if (key === NOTIFY_AT_KEY) {
+      const hour = Number(value);
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23) return { error: "Choose an hour from 0 to 23." };
+      await save(formData, [[key, String(hour)]]);
+      said = `The day's notices go out at ${String(hour).padStart(2, "0")}:00, the project's time.`;
     } else {
       const policy = POLICIES.find((one) => one.key === key);
       const option = policy?.options.find((one) => one.value === value);

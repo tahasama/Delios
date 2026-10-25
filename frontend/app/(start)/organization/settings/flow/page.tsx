@@ -6,7 +6,7 @@ import { projectDefaults } from "@/lib/organization/defaults";
 import { setRoomAnswerAction, setOrgScheduleDaysAction } from "@/lib/settings/forms-how-it-works";
 import { organizationDays } from "@/lib/settings/api-admin";
 import { controlFrom, CONTROL_ACTIVITIES, effectiveAnswer, POLICIES, SKIPPABLE, CONFIRMABLE, PEOPLE_KEY, PEOPLE_MODE_LABEL, roomItemOf } from "@/lib/settings/control-activities";
-import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
+import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER, NOTIFY_AT_KEY, DEFAULT_NOTIFY_AT, NOTIFY_AT_TITLE } from "@/lib/actions/escalation";
 import { stateNames } from "@/lib/core/state-names";
 import { stampAnswers, stampSaid } from "@/lib/settings/stamp";
 import { fmtDate } from "@/lib/core/utils";
@@ -49,7 +49,7 @@ const ORG_EXTRA: Partial<Record<Extra, string>> = {
 };
 
 /** The switch an answer of a step belongs to, beyond the answers' own keys. */
-const SWITCH_OF: Record<string, string[]> = { DAYS: ["LEAD_DAYS", "RISK_WINDOW"], INTAKE: ["SUPPLIER_INTAKE"], ESCALATE: [ESCALATE_AFTER_KEY] };
+const SWITCH_OF: Record<string, string[]> = { DAYS: ["LEAD_DAYS", "RISK_WINDOW"], INTAKE: ["SUPPLIER_INTAKE"], ESCALATE: [ESCALATE_AFTER_KEY], NOTIFY: [NOTIFY_AT_KEY] };
 
 export default async function OrganizationControlRoomPage() {
   const scope = await requireOrgAdmin();
@@ -131,6 +131,10 @@ export default async function OrganizationControlRoomPage() {
         <Choice key="risk" title="The action is at risk from" value={String(days.risk)} unit="days before" min={0} max={365} field="riskDays"
           action={setOrgScheduleDaysAction} hidden={{}} />,
       ];
+    }
+    if (key === "NOTIFY") {
+      return <Choice key={key} title={NOTIFY_AT_TITLE} value={answers.get(NOTIFY_AT_KEY) ?? String(DEFAULT_NOTIFY_AT)} unit=":00, the project's time" min={0} max={23}
+        action={setRoomAnswerAction} hidden={hidden(NOTIFY_AT_KEY)} />;
     }
     if (key === "ESCALATE") {
       return <Choice key={key} title="A discipline still silent after the day is told again, with whoever holds Manage and the control function, after"

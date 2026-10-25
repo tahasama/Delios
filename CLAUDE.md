@@ -1504,7 +1504,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   schedule read before its WBS was kept is read again by itself (owner: "users shouldn't have to do that"; no button):
   each read keeps the version of the reading that made it (`ScheduleImport.ReadWith`, `ScheduleImporter.ReaderVersion`,
   raised whenever the reading keeps more), and the worker reads again the released revision's .xer read by an older one
-  (`CatchUpAsync`, in the actions' job), unless a list was uploaded since. The plan says when no action has a WBS (an
+  (`CatchUpAsync`, once when the worker starts after an update), unless a list was uploaded since. The plan says when no action has a WBS (an
   Excel schedule carries none), and offers "Group by WBS" when sorted another way. The plan opens on two months around today, held inside the schedule's own span
   (owner, "that applies as general": near or past its end, the window ends on the last action's day; near or before its
   start, it starts on the first's), and "Show every date" draws the actions' own days only, never stretched to today; says "the schedule
@@ -1551,12 +1551,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   question in plain words ("Does Mechanical confirm going ahead with the action
   without it? Confirm, and say why"); then one row of buttons (Confirm, Notify,
   Request a document), an opened form taking the width under them.
-- Automatic notices (worker job, once each): at risk → each discipline still
-  short and not confirmed; day passed → the same. Confirmed disciplines and
-  postponed actions are not notified. A discipline still silent some working days
-  after the day (the Control room, Disciplines confirm, `ESCALATE_AFTER_DAYS`, 3 by
-  default) is escalated once: its people, Manage holders and Document Control
-  are all notified. Nothing marks the action "escalated"; the notice is the record.
+- **Automatic notices go once a day, at the project's notify hour** (owner: "09:00, and add it to settings as a choice";
+  `ActionNotices`, setting `NOTIFY_AT`, 0–23 on the project's own clock, 09:00 by default; the Control room's "At risk"
+  step, the organization's Control room and Defaults for new projects, its switch `NOTIFY_AT` as every answer). Nothing
+  sweeps the schedule (owner: "most of it are states"): where things stand is read when someone looks; the worker wakes
+  each hour, asks each organization which projects reached their hour today, and reads only the actions whose risk
+  window is open or whose day passed in the last 120 days, and the steps falling due. Once each: at risk → each
+  discipline still short and not confirmed; still silent some working days after the day (the Control room, Disciplines
+  confirm, `ESCALATE_AFTER_DAYS`, 3 by default) → its people, Manage holders and the control function notified again;
+  a review step due today or the next working day (`ReviewWarnings.WarnProjectAsync`). Confirmed disciplines and
+  postponed actions are not notified. No notice for "all ready" or "day passed" (states, shown on the action and
+  Home). The automatic confirmation on the day is written in the first day's notices after it. A schedule read by an
+  older reading is read again once when the worker starts, never on a clock.
 - Postponed: written with who decided and why; everyone concerned and whoever
   holds Plan are told; a Plan holder confirms it with what changes (a new
   schedule revision to follow); Document Control can take it back with a
@@ -1584,7 +1590,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (the disciplines saved) is the record. "Disciplines and documents" shows both as a
   list with one edit icon each, on the right.
 - A discipline whose documents are all released at their status, on an action
-  still ahead, is told so once, automatically ("nothing is asked of you").
+  still ahead, reads so on the action ("nothing is asked of you"); no notice is sent (owner: a state).
   A notice by hand says where the discipline stands: confirmed automatically, by
   hand (going ahead or not, with why), ready, short (still to come, at risk, day
   passed), or the action postponed.
@@ -1723,5 +1729,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `PROJECT_DEFAULTS`, `LIBERTY…`, the new projects' place), only the words (`STATE_NAME:`, `SET:`, `DATE_FORMAT`, the
   stamp's) for another organization's people, the same on a project's settings; `/api/liberty` none to them. The organization's controlled lists
   (`/api/controlled`, no project) are an administrator's only. Any new reader of a document's parts goes through these.
-- **The notices job reads once a pass** (`ActionNotices.ProjectAsync`): what was already sent, and the days off, once per
-  project, never one query per action and discipline (it runs every half hour, over every action of every project).
+- **The notices job reads once a pass** (`ActionNotices.ProjectAsync`): what was already sent about the actions it
+  reads, and the days off, once per project, never one query per action and discipline; it reads only the actions whose
+  date falls today (risk window open, day passed lately), never the whole schedule. A state is never kept fresh by a
+  clock: it is read when looked at, or written by the act that changes it.

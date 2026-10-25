@@ -7,7 +7,7 @@ import { projectSettings, orgSettings } from "@/lib/settings/api";
 import { stampAnswers, stampSaid } from "@/lib/settings/stamp";
 import { controlSettings, effectiveAnswer, PROJECT_MODE_LABEL, SKIPPABLE } from "@/lib/settings/control-activities";
 import { KINDS, KIND_LABEL, fieldsOf, fieldRules, fieldLabels, storedOwnFields, type FieldRule } from "@/lib/settings/field-policy";
-import { ESCALATE_AFTER_KEY } from "@/lib/actions/escalation";
+import { ESCALATE_AFTER_KEY, NOTIFY_AT_KEY } from "@/lib/actions/escalation";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
 import { scheduleSource } from "@/lib/actions/api";
 import { stateNames } from "@/lib/core/state-names";
@@ -167,6 +167,7 @@ export async function DocumentManagementPlan() {
   const strictMatrix = answer("POLICY_MATRIX") === "STRICT";
   const readyMeans = answer("POLICY_READY") === "STATUS" ? "carrying the status the action needs" : "released and issued at the status the action needs";
   const escalateAfter = Number(answer(ESCALATE_AFTER_KEY));
+  const notifyAt = `${String(Number(answer(NOTIFY_AT_KEY))).padStart(2, "0")}:00`;
   const riskWindow = schedule.days.risk;
   const leadDays = schedule.days.lead;
   const peopleRow = reading.rows.find((r) => r.activity.key === "PROJECT_PEOPLE");
@@ -588,9 +589,9 @@ export async function DocumentManagementPlan() {
         <Flow steps={[
           { what: "The schedule and its lists are released", who: "Whoever plans (or the control function)", detail: "The schedule, the disciplines per action and the documents each discipline needs are register documents, read when released.", rail: "rail-released" },
           { what: "Each document gets its planned day", who: "By itself", detail: `The earliest day an action needs it; sending for review is due on that day, released & issued on the action's day (${leadDays} days ahead by default).`, rail: "rail-ahead" },
-          { what: "An action is at risk", when: `${riskWindow} days before its day, or the document's own risk window`, detail: "Each discipline still short is told.", rail: "rail-risk" },
+          { what: "An action is at risk", when: `${riskWindow} days before its day, or the document's own risk window`, detail: `Each discipline still short is told, once, with the day's notices at ${notifyAt}, the project's time.`, rail: "rail-risk" },
           { what: "Each discipline confirms", who: "Its people", detail: `All its documents ${readyMeans}: confirmed by itself. Otherwise it confirms by hand, always saying why it goes ahead without them.`, rail: "rail-ready" },
-          { what: "A silent discipline is notified again", when: `${escalateAfter} working days after the day`, detail: "Its people, whoever holds Manage and the control function are told, once.", rail: "rail-overdue" },
+          { what: "A silent discipline is notified again", when: `${escalateAfter} working days after the day`, detail: `Its people, whoever holds Manage and the control function are told, once, at ${notifyAt}.`, rail: "rail-overdue" },
         ]} />
         <Say className="text-[12px] text-slate-500">An action that will not go ahead is recorded as postponed, with who decided and why; whoever plans confirms it with what changes.</Say>
         <Ensured rules={ensured("Schedule")} />

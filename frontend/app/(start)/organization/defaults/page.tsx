@@ -14,7 +14,7 @@ import {
   controlFrom, effectiveAnswer, roomItemOf, CONTROL_ACTIVITIES, CONFIRMABLE, CONFIRM_KEY, POLICIES, PEOPLE_KEY,
   PEOPLE_MODE_LABEL, PROJECT_KEY, PROJECT_MODE_LABEL, SKIPPABLE,
 } from "@/lib/settings/control-activities";
-import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
+import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER, NOTIFY_AT_KEY, DEFAULT_NOTIFY_AT, NOTIFY_AT_TITLE } from "@/lib/actions/escalation";
 import { fmtDate } from "@/lib/core/utils";
 
 export const dynamic = "force-dynamic";
@@ -252,6 +252,10 @@ export default async function DefaultsPage({ searchParams }: { searchParams: Pro
             value={answers.get(ESCALATE_AFTER_KEY) ?? String(DEFAULT_ESCALATE_AFTER)} unit="working days" min={1} max={60}
             action={setRoomAnswerAction} hidden={hidden(ESCALATE_AFTER_KEY)}
             mark={mark(ESCALATE_AFTER_KEY, !!answers.get(ESCALATE_AFTER_KEY) && answers.get(ESCALATE_AFTER_KEY) !== String(DEFAULT_ESCALATE_AFTER), `${DEFAULT_ESCALATE_AFTER} working days`)} />
+          <Choice title={NOTIFY_AT_TITLE}
+            value={answers.get(NOTIFY_AT_KEY) ?? String(DEFAULT_NOTIFY_AT)} unit=":00, the project's time" min={0} max={23}
+            action={setRoomAnswerAction} hidden={hidden(NOTIFY_AT_KEY)}
+            mark={mark(NOTIFY_AT_KEY, !!answers.get(NOTIFY_AT_KEY) && answers.get(NOTIFY_AT_KEY) !== String(DEFAULT_NOTIFY_AT), `${String(DEFAULT_NOTIFY_AT).padStart(2, "0")}:00`)} />
         </ul>
       </section>
 

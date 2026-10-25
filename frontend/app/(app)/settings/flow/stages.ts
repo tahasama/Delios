@@ -301,9 +301,9 @@ export const STAGES: Stage[] = [
   },
   {
     key: "act-risk", title: "At risk", tagline: "A document still missing", rail: "rail-risk",
-    text: "Inside the risk window with a document still missing, each discipline still short is told, once.",
-    who: [{ title: "Telling them", by: "The app, by itself" }],
-    answers: ["DAYS"],
+    text: "Inside the risk window with a document still missing, each discipline still short is told, once, with the day's notices.",
+    who: [{ title: "Telling them", by: "The app, by itself, at the hour set here" }],
+    answers: ["DAYS", "NOTIFY"],
   },
   {
     key: "act-confirm", title: "Disciplines confirm", tagline: "Go ahead, with or without", rail: "rail-ready",

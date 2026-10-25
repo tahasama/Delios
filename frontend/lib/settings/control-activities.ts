@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { Tenant } from "@/lib/core/tenant";
 import { projectSettings, holders } from "@/lib/settings/api";
-import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
+import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER, NOTIFY_AT_KEY, DEFAULT_NOTIFY_AT } from "@/lib/actions/escalation";
 
 /** Somebody on the project holds the control function. */
 async function hasControlFunction(t: Tenant): Promise<boolean> {
@@ -422,6 +422,7 @@ export function effectiveAnswer(key: string, value: string | null | undefined): 
   const declared = POLICIES.find((one) => one.key === key);
   if (declared) return declared.options[0].value;
   if (key === ESCALATE_AFTER_KEY) return String(DEFAULT_ESCALATE_AFTER);
+  if (key === NOTIFY_AT_KEY) return String(DEFAULT_NOTIFY_AT);
   // Joining a project is a request whoever holds Manage confirms unless the project unticks it (backend DefaultConfirm).
   if (key === "CONFIRM:PROJECT_PEOPLE") return "ON";
   if (key.startsWith("CONFIRM:")) return "OFF";
@@ -438,7 +439,7 @@ const ACT_KEYS = new Set(["REVIEW_ISSUE", "RETURN_OUTCOME", "ISSUE", "DELEGATE",
  */
 export function roomItemOf(key: string): string | null {
   if (ACT_KEYS.has(key) || key.startsWith("SKIP:") || key.startsWith("CONFIRM:")) return "WHO_DOES_WHAT";
-  if (["POLICY_RELEASE", "POLICY_READY", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL", "ESCALATE_AFTER_DAYS"].includes(key)) return key;
+  if (["POLICY_RELEASE", "POLICY_READY", "POLICY_MATRIX", "POLICY_MATRIX_DETAIL", "ESCALATE_AFTER_DAYS", "NOTIFY_AT"].includes(key)) return key;
   if (key === "POLICY_PDF_STAMP" || key === "STAMP_COMMENTS" || key === "STAMP_PLACE" || key === "STAMP_NOTE" || key === "STAMP_SIZE" || key.startsWith("STAMP:") || key.startsWith("STAMP_SHOW:")) return "POLICY_PDF_STAMP";
   return null;
 }

@@ -102,7 +102,8 @@ elease" works. Behind the scenes it creates a review with **no steps**, already
   the day itself. It is a notification, and an email when review email is on.
 - The reviews list shows "warned <date>". Sending a step back and opening it again clears it, so it is
   warned again.
-- It runs in the worker every 30 minutes. A step with no due date is never warned.
+- It goes with the project's day's notices, once a day at the project's notify hour (09:00 unless the Control room says
+  otherwise, "The day's notices go out at"). A step with no due date is never warned.
 
 ---
 
@@ -666,3 +667,20 @@ in the code; it lives only in your local database.
   the permission on every document, and two columns the backend never kept are gone. Sign-in & security sets single
   sign-on and password sign-in, and the sign-in page offers the organization's own account.
 
+
+
+---
+
+**The day's notices, once a day at a set hour** (owner: "09:00, and add it to settings as a choice").
+- Before: a worker job looked at every action of every project every 30 minutes.
+- Now: once a day per project, at its notify hour on its own clock (`NOTIFY_AT`, 09:00 by default, the Control room's
+  "At risk" step, the organization's Control room and Defaults for new projects; a switch as every Control room answer),
+  only the actions whose risk window is open or whose day passed lately, and the review steps falling due, are read.
+- Sent then, once each: at risk; notified again when a discipline stays silent (no longer waiting for a "day passed"
+  notice first); a review step due today or the next working day. Each is a notification, an email and a pop-up.
+- Taken out (owner: they are states, read when someone looks): the "all your documents are ready" notice for an action
+  still ahead, and the "its day passed with documents missing" notice. Both still read on the action and on Home.
+- The automatic confirmation of a discipline whose documents were all there by the day is still written, in the first
+  day's notices after the day.
+- A schedule read by an older version of the app's reading is read again once, when the worker starts after an update,
+  never on a clock.

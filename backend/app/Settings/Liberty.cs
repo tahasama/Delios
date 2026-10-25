@@ -106,6 +106,7 @@ public static class Liberty
         new("LEAD_DAYS", Room, "Days a document is needed before an action", "The project's way of planning", true),
         new("RISK_WINDOW", Room, "The risk window", "The project's way of planning", true),
         new("ESCALATE_AFTER_DAYS", Room, "Days before a silent discipline is notified again", "The project's way of planning", true),
+        new("NOTIFY_AT", Room, "The hour the day's notices go out", "The project's working day", true),
         new("SUPPLIER_INTAKE", Room, "How other organizations' documents come in: by placeholder, or as they come", "The project's contract with its suppliers", true),
     ];
 
@@ -206,7 +207,7 @@ public static class Liberty
     public static string? RoomItemOf(string settingKey) => settingKey switch
     {
         _ when Acts.Contains(settingKey) || settingKey.StartsWith("SKIP:") || settingKey.StartsWith("CONFIRM:") => "WHO_DOES_WHAT",
-        "POLICY_RELEASE" or "POLICY_READY" or "POLICY_MATRIX" or "POLICY_MATRIX_DETAIL" or "ESCALATE_AFTER_DAYS" => settingKey,
+        "POLICY_RELEASE" or "POLICY_READY" or "POLICY_MATRIX" or "POLICY_MATRIX_DETAIL" or "ESCALATE_AFTER_DAYS" or "NOTIFY_AT" => settingKey,
         "POLICY_PDF_STAMP" or "STAMP_COMMENTS" or "STAMP_PLACE" or "STAMP_NOTE" or "STAMP_SIZE" => "POLICY_PDF_STAMP",
         "SUPPLIER_INTAKE" or "AS_RECEIVED_FILING" => "SUPPLIER_INTAKE",
         _ when settingKey.StartsWith("STAMP:") || settingKey.StartsWith("STAMP_SHOW:") => "POLICY_PDF_STAMP",

@@ -11,7 +11,7 @@ import { holdersOf } from "@/lib/core/permissions";
 import { scheduleSource } from "@/lib/actions/api";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
-import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
+import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER, NOTIFY_AT_KEY, DEFAULT_NOTIFY_AT, NOTIFY_AT_TITLE } from "@/lib/actions/escalation";
 import { SceneDeck, type Flow, type Scene } from "./scene-deck";
 import { STAGES, EXTRA, flowsFor, type Extra } from "./stages";
 import { StepPanel } from "./step-panel";
@@ -206,6 +206,10 @@ export default async function ControlRoomPage() {
           mark={daysMark(days.ownRisk, days.organizationRisk)} />,
         ...(!readOnly && (days.ownLead || days.ownRisk) ? [<FollowOrganizationDays key="follow" lead={days.organizationLead} risk={days.organizationRisk} />] : []),
       ];
+    }
+    if (key === "NOTIFY") {
+      return <Choice key={key} title={NOTIFY_AT_TITLE} value={answers.get(NOTIFY_AT_KEY) ?? String(DEFAULT_NOTIFY_AT)} unit=":00, the project's time" min={0} max={23}
+        action={setRoomAnswerAction} hidden={{ key: NOTIFY_AT_KEY }} readOnly={readOnly} fixed={isFixed(NOTIFY_AT_KEY)} exception={exceptionOf(NOTIFY_AT_KEY)} />;
     }
     if (key === "ESCALATE") {
       return <Choice key={key} title="A discipline still silent after the day is told again, with whoever holds Manage and the control function, after" value={escalate} unit="working days" min={1} max={60}
