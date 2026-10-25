@@ -106,8 +106,12 @@ services:
       - delios-metrics:/var/lib/delios-metrics
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U delios -d delios"]
-      interval: 5s
-      retries: 10
+      # Asked often only while starting (what waits on it starts as soon as it answers), then every 5 minutes: the
+      # answer is only shown once it is up (owner: no check that serves nothing).
+      interval: 5m
+      start_period: 2m
+      start_interval: 2s
+      retries: 3
 
   valkey:
     image: valkey/valkey:8-alpine
@@ -115,8 +119,10 @@ services:
     ports: ["127.0.0.1:6379:6379"]
     healthcheck:
       test: ["CMD", "valkey-cli", "ping"]
-      interval: 5s
-      retries: 10
+      interval: 5m
+      start_period: 2m
+      start_interval: 2s
+      retries: 3
 
   rabbitmq:
     image: rabbitmq:4-management-alpine
@@ -127,9 +133,12 @@ services:
     ports: ["127.0.0.1:5672:5672", "127.0.0.1:15672:15672"]
     volumes: [rabbitmq:/var/lib/rabbitmq]
     healthcheck:
+      # Each check starts the queue's own command-line tool: often while starting, then every 5 minutes.
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      retries: 10
+      interval: 5m
+      start_period: 3m
+      start_interval: 3s
+      retries: 3
 
   # S3-compatible store for development only.
   seaweedfs:
@@ -294,8 +303,10 @@ services:
       - pgbackrest:/var/lib/pgbackrest:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U delios -d delios"]
-      interval: 5s
-      retries: 30
+      interval: 5m
+      start_period: 5m
+      start_interval: 3s
+      retries: 3
     depends_on:
       postgres: { condition: service_healthy }
 
@@ -342,8 +353,10 @@ services:
     volumes: [opensearch:/usr/share/opensearch/data]
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
-      interval: 10s
-      retries: 30
+      interval: 5m
+      start_period: 5m
+      start_interval: 5s
+      retries: 3
 
   # ── Content extraction and OCR (installed when a client asks for it) ─────────
   # Apache Tika with Tesseract: reads the text layer of PDFs and Office files, and

@@ -730,3 +730,10 @@ still count the whole project.
 **The pages' kept answers are capped** (owner). They live in the screens' memory only, at most 100 MB; when full, the
 ones used longest ago drop by themselves. Nothing is written to disk any more, and a restart of the screens starts with
 none kept (the first opening of each page reads it again).
+
+---
+
+**Health checks ask often only while starting** (owner: "what purpose of it all?"). Docker asks each part whether it is
+alive: the database, Redis, the queue, the backend and the drawing converter. Before: every 5 to 30 seconds, for ever
+(the queue's and the backend's each start a program to answer). Now: every few seconds while starting, so what waits
+on them starts at once, then every 5 minutes.
