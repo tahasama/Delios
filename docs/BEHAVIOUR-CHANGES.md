@@ -724,3 +724,9 @@ tab, every page of lines and every download. Now: counted once, kept for everyon
 presses "Count again"; the plate says when and by whom. Each of our readers now sees only the lines on documents and
 transmittals they may open (before, a report listed documents above the reader's clearance); the figures and the chart
 still count the whole project.
+
+---
+
+**The pages' kept answers are capped** (owner). They live in the screens' memory only, at most 100 MB; when full, the
+ones used longest ago drop by themselves. Nothing is written to disk any more, and a restart of the screens starts with
+none kept (the first opening of each page reads it again).

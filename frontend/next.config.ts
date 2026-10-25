@@ -4,7 +4,11 @@ const nextConfig: NextConfig = {
   // A self-contained server for the container (frontend/Dockerfile).
   output: "standalone",
   poweredByHeader: false,
+  // What the pages keep of the backend's answers lives in memory only, at most 100 MB: when full, the copies used
+  // longest ago drop by themselves; nothing piles up on disk (owner: "cap them").
+  cacheMaxMemorySize: 100 * 1024 * 1024,
   experimental: {
+    isrFlushToDisk: false,
     // A Primavera P6 export (.xer) can be large, and is sent whole: it is kept as it came.
     serverActions: { bodySizeLimit: "100mb" },
   },

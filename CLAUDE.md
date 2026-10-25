@@ -1727,7 +1727,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   gathered a quarter of a second; `Screens__Url`, the shared `SCREENS_SECRET`; Caddy refuses it from outside), which
   clears them for every other session (`revalidateTag(tag, { expire: 0 })`). A write around the save (an `ExecuteUpdate`)
   names its labels itself (the virus check finishing a file: its document). A kept answer is read again within the
-  hour at most (`KEEP_SECONDS`, for today's date). Kept: every read a page draws from (owner: reports, cleared only by
+  hour at most (`KEEP_SECONDS`, for today's date), and kept in memory only, at most 100 MB, the copies used longest ago
+  dropping by themselves (owner: "cap them"; `next.config.ts` `cacheMaxMemorySize`, `isrFlushToDisk: false`; a restart of
+  the screens starts them empty). Kept: every read a page draws from (owner: reports, cleared only by
   Count again, the register,
   documents, transmittals, packages, assets, reviews, Assurance and its plan, the Schedule and the calendar, Home and its
   log, every Settings and organization page: a settings read keeps `areas: []`, cleared by `all`). Never kept, read fresh
