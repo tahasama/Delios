@@ -233,8 +233,8 @@ public static class CheckCatalog
                 return Fail(ctx.Released.Where(r => !sent.Contains(r.Id)).Select(r => Rev(ctx.DocumentOf(r), r)));
             }),
         new("STO-03", Phases.Running, "The history has a broken link (outside the app)",
-            "Recomputes the hash chain of the organization's audit trail", Severities.Critical, "CF", async ctx =>
-                await ctx.Audit.FirstBrokenLinkAsync(ctx.CancellationToken) is { } at
+            "Recomputes the hash chain of the organization's audit trail, once for all the projects checked in the hour", Severities.Critical, "CF", async ctx =>
+                await ctx.Audit.FirstBrokenLinkOnceAsync(ctx.CancellationToken) is { } at
                     ? Fail([new Failure("audit:chain", "Audit", null, null, "Audit trail", $"The chain breaks at entry {at}: something was altered.")])
                     : Pass),
 

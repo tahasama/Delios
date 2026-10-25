@@ -772,3 +772,51 @@ changed, and kept in the screens' memory (lost on a restart). Now: kept until a 
 every screens server, surviving restarts); the answers worked out against today (the Schedule, reviews, transmittals) are
 kept per day of the project. The backend also writes each change into Valkey itself, so nothing is missed while the
 screens are down. The values of lists, read on every page, are read once for everyone of the organization.
+
+---
+
+**Packages are brought up to date when something changes, never when a list opens** (owner). Before: opening Packages (or
+a package) took in what each rule now admitted, handed documents down each tree, and filed every unfiled supplier
+document, package by package, sometimes saving while only reading. Now: a document registered or changed in what a rule
+reads, a tag linked, or a package made, moved or given a rule sends one word with its save, and the worker brings that
+project's packages up to date once (`Packages/PackagesMoved.cs`). A list reads its trees once for all its packages.
+Filing supplier documents left in none of their packages is now a button on a supplier's package, **Fill the package**
+(`POST /packages/{id}/fill`, PACKAGE_FILLED): nothing is filed by itself any more, but a new document is still filed as it
+is registered, and a deleted package's documents still go back as before.
+
+---
+
+**When people last signed in, acted and joined is kept with the act** (owner). Before: the organization's People and
+Organizations pages went through the whole audit trail on every opening. Now: the audit functions write it as they write
+the act (`people_seen`), filled once from the trail as it stood.
+
+---
+
+**Counts of acts are made once and topped up** (owner). The Audit trail, a person's activity and Home's log count each kind
+of act once, then only what was written since; words or days asked are counted as asked.
+
+---
+
+**Lists and the per-request lookups are kept until how the organization works changes** (owner). The lists every rule reads
+(`Catalog`) and, before each call, which lists a project reads and how dates read: read once, not on every call. Access is
+still checked on every act.
+
+---
+
+**Files are never read** (owner: "never ever read the files, ever ever, forbidden forever, unless I get back on that with a
+client's request"). Search finds a document by its number and title only. Reading text inside files (and OCR) can no longer
+be switched on (CONTENT_NOT_READ); every project's switch went to OFF and, as OFF always meant, the text read before was
+deleted (migration FilesNeverRead).
+
+---
+
+**Downloads are prepared in the background** (owner). Every export, list as it stands and report's Excel is asked for while
+you keep working: a tray in the corner says it is being prepared, then saves it (`components/downloads.tsx`). The register
+and transmittal log exports match their lines in one pass. The register's filters ask what the project holds once
+(`GET /register/used`), not with every page.
+
+---
+
+**Smaller**: the bell asks only how many are unread; Assets & tags counts every tag's documents in one read; the audit chain
+is verified once for all the projects checked in the hour; a package opened by its number is looked up by it (it was found
+in the newest 500 only).

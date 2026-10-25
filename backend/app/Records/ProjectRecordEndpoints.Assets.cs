@@ -31,9 +31,11 @@ public static partial class ProjectRecordEndpoints
             query = query.Where(a => EF.Functions.ILike(a.Code, like) || EF.Functions.ILike(a.Name, like)
                 || (a.Area != null && EF.Functions.ILike(a.Area, like)) || (a.System != null && EF.Functions.ILike(a.System, like)));
         }
-        var rows = await query.OrderBy(a => a.Code).Take(20_000)
-            .Select(a => new { a, Documents = db.Set<DocumentAsset>().Count(l => l.AssetId == a.Id) }).ToListAsync(c);
-        return Results.Ok(rows.Select(x => View(x.a, x.Documents)));
+        var rows = await query.OrderBy(a => a.Code).Take(20_000).ToListAsync(c);
+        // Each tag's documents counted in one read for the whole project, never tag by tag.
+        var counts = await db.Set<DocumentAsset>().AsNoTracking().Where(l => l.ProjectId == access.Project.Id)
+            .GroupBy(l => l.AssetId).Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N, c);
+        return Results.Ok(rows.Select(a => View(a, counts.GetValueOrDefault(a.Id))));
     }
 
     /// <summary>

@@ -49,7 +49,7 @@ export async function getNotifications(per = 60): Promise<{ unread: number; tota
 /** How many notifications are unread; 0 when the backend cannot say. */
 export async function unreadNotifications(): Promise<number> {
   try {
-    return (await apiShortLived<{ unread: number }>("/api/me/notifications", 5000, { query: { per: 1 } })).unread;
+    return (await apiShortLived<{ unread: number }>("/api/me/notifications", 5000, { query: { bell: "true" } })).unread;
   } catch {
     return 0;
   }

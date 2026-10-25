@@ -227,6 +227,14 @@ A new feature ....................... its area's folder in each part; a new area
   its `forms*.ts`.
 
 
+
+- Packages brought up to date after a change, in the worker: `backend/app/Packages/PackagesMoved.cs` (sent by
+  `ScreenChangeWatcher.MovesPackages`), `PackageService.RestateAsync`.
+- When people were last seen (sign-in, acts, joined): table `people_seen`, written by the database function `audit_seen`
+  (called by `audit_append` / `audit_note`), read by `DirectoryEndpoints.SeenAsync`.
+- Counts of acts made once and topped up: `backend/app/Audit/AuditCounts.cs`.
+- Downloads prepared in the background: `frontend/components/downloads.tsx` (in the app's layout; `startDownload` from code).
+
 ## Kept answers and what clears them
 - `frontend/lib/core/kept.ts` — the labels of a kept read; `frontend/lib/client.ts` `api(…, { keep })`, `apiAfter`.
 - `frontend/app/api/screens/changed/route.ts` — the backend says what changed; clears those labels.

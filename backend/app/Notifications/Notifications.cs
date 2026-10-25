@@ -391,7 +391,7 @@ public static class NotificationEndpoints
 
     /// <summary><c>GET /api/me/notifications</c>: newest first, a page at a time, with how many are unread.</summary>
     private static async Task<IResult> ListAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken,
-        bool unread = false, int page = 1, int per = 50, Guid? projectId = null)
+        bool unread = false, int page = 1, int per = 50, Guid? projectId = null, bool bell = false)
     {
         var me = http.User.UserId();
         per = Math.Clamp(per, 1, 200);
@@ -399,6 +399,8 @@ public static class NotificationEndpoints
         var mine = db.Set<Notification>().AsNoTracking().Where(n => n.UserId == me);
         if (projectId is { } p) mine = mine.Where(n => n.ProjectId == p || n.ProjectId == null);
         var unreadCount = await mine.CountAsync(n => n.ReadAt == null, cancellationToken);
+        // The bell asks only how many are unread: one count, nothing else.
+        if (bell) return Results.Ok(new { unread = unreadCount });
         var query = unread ? mine.Where(n => n.ReadAt == null) : mine;
         var total = await query.CountAsync(cancellationToken);
         var rows = await query.OrderByDescending(n => n.CreatedAt).Skip((page - 1) * per).Take(per).ToListAsync(cancellationToken);

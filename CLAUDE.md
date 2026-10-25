@@ -1810,6 +1810,21 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **The notices job reads once a pass** (`ActionNotices.ProjectAsync`): what was already sent about the actions it
   reads, and the days off, once per project, never one query per action and discipline; it reads only the actions whose
   notice day has come (`NoticeOn`), never the whole schedule.
+- **Packages move on a change, never on a reading** (owner): a document registered or changed in what a rule reads, a tag
+  linked, a package made, moved, given a rule or ended sends `PackagesMoved` with its save; the worker takes in what
+  rules admit and hands documents down trees (`PackageService.RestateAsync`). Opening a list or a package changes
+  nothing; a list reads its trees once (`TreeFactsAsync`, `PlaceOf`). Supplier documents in none of their packages are
+  filed by hand only, **Fill the package** on a supplier's package (`POST /packages/{id}/fill`, PACKAGE_FILLED).
+- **Files are never read** (owner: "never ever read the files, ever ever, forbidden forever, unless I get back on that
+  with a client's request"): search is a document's number and title only; text extraction and OCR cannot be switched
+  on (`ExtractionModes.Forbidden`, CONTENT_NOT_READ).
+- **Downloads are prepared in the background** (owner: "people should expect big files to take time"): every link or
+  GET form to an export, a list or a report's Excel is fetched by `components/downloads.tsx` while the person works, a
+  tray saying so; from code, `startDownload(href, label)`. Exports match their lines in one pass (lookups, never a scan
+  per row).
+- **Kept until it changes, on the backend too**: the lists (`Catalog.LoadAsync`, not while the request changes a list),
+  which lists a request reads and how dates read (`PlatformSetup`), counts of acts (`Audit/AuditCounts.cs`, topped up
+  with what was written since), when people were last seen (`people_seen`, written by `audit_seen` with the act).
 - **Nothing runs on a clock to find out what happened** (owner: "we do not send spies… we go outside and inform that it
   just happened"): the outbox's relay runs in every process and sleeps until an act of that process, once committed with
   a message, rings it (`OutboxWake`; on start it sends what was left waiting, a failure tries again after 5 seconds);

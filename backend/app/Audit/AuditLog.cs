@@ -50,4 +50,19 @@ public sealed class AuditLog(DeliosDbContext db, TenantContext tenant, Documents
     public Task<long?> FirstBrokenLinkAsync(CancellationToken cancellationToken = default) =>
         db.Database.SqlQuery<long?>($"SELECT audit_verify({tenant.Required}::uuid) AS \"Value\"")
             .SingleAsync(cancellationToken);
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, (DateTime At, long? Broken)> Verified = new();
+
+    /// <summary>
+    /// As <see cref="FirstBrokenLinkAsync"/>, verified once for the organization however many of its projects are
+    /// checked in the hour (the chain is the organization's, not a project's): never once per project.
+    /// </summary>
+    public async Task<long?> FirstBrokenLinkOnceAsync(CancellationToken cancellationToken = default)
+    {
+        var id = tenant.Required;
+        if (Verified.TryGetValue(id, out var kept) && DateTime.UtcNow - kept.At < TimeSpan.FromHours(1)) return kept.Broken;
+        var broken = await FirstBrokenLinkAsync(cancellationToken);
+        Verified[id] = (DateTime.UtcNow, broken);
+        return broken;
+    }
 }
