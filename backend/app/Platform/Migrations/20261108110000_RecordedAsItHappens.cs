@@ -88,7 +88,7 @@ namespace Delios.Host.Platform.Migrations
                     FOR EACH ROW WHEN (NEW.in_reply_to_id IS NOT NULL OR NEW.follows_id IS NOT NULL)
                     EXECUTE FUNCTION record_answered();
                 """);
-            migrationBuilder.Sql(Delios.Host.Platform.Recorded.Rebuild);
+            migrationBuilder.Sql(Delios.Host.Platform.Recorded.RebuildCarriedAndAnswered);
         }
 
         /// <inheritdoc />

@@ -835,3 +835,12 @@ with all its documents and worked out each one's state. Now: each action keeps w
 documents or needs changes), and only the actions on screen are read with their documents. One small difference: a
 document marked as waived no longer makes an action "at risk" on the plan, as the rule always said ("a document still
 missing"); the notices already read it so.
+
+---
+
+**The register filters and sorts on what is recorded** (owner). Released or not, released at what, the newest revision's
+verdict, waiting to be released, the last file added and when it first went out are written by the database as a
+revision, review, file or transmittal line changes, for that document only, and the register reads them; it no longer
+works them out over every document on each filter or sort. Which disciplines and document types the documents carry is
+counted as they are registered and changed. Sorting by "Issued" now follows the Issued column (the first time it went out
+to someone), as the column always read.

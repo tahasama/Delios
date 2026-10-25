@@ -1831,7 +1831,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   reviews, packages), the database records the fact in a table of its own (`Platform/Recorded.cs`): `revision_facts`
   (a transmittal other than a review's first carried it: released with none is "not sent yet"; trigger
   `record_carried` on `transmittal_items`), `transmittal_facts` (first answered or followed by someone else; trigger
-  `record_answered` on `transmittals`). Read only by the app; `rebuild-recorded` (backend command, by hand) writes them
+  `record_answered` on `transmittals`), `document_facts` (released and at what, the newest revision's verdict and
+  whether it waits to be released, its last file, when it first went out: what the register filters and sorts on,
+  worked out again for that one document by `refresh_document_facts` whenever its revisions, reviews, files, transmittal
+  lines or newest revision change), `values_used` (how many documents carry each discipline and document type, counted
+  up and down by `count_values_used`: the register's filters, `GET /register/used`). Read only by the app; `rebuild-recorded` (backend command, by hand) writes them
   again from what exists. Opening and downloading are only said (who, what, when): no history point is taken for them.
   **The Schedule reads where each action stands from what it keeps** (`Activity.NeedCount`, `MetCount`, `RiskFrom`,
   `LastMetAt`, written by `Readiness.RestateAsync` when one of its documents or needs changes, or the days around an

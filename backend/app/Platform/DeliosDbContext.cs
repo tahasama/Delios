@@ -60,6 +60,8 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<Revision> Revisions => Set<Revision>();
     public DbSet<RevisionFact> RevisionFacts => Set<RevisionFact>();
+    public DbSet<DocumentFact> DocumentFacts => Set<DocumentFact>();
+    public DbSet<ValueUsed> ValuesUsed => Set<ValueUsed>();
     public DbSet<TransmittalFact> TransmittalFacts => Set<TransmittalFact>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<DocumentAccess> DocumentAccess => Set<DocumentAccess>();

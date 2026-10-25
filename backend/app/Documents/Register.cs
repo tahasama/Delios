@@ -277,18 +277,18 @@ public static class RegisterEndpoints
             }
             query = query.Where(predicate);
         }
-        if (f.Released == true) query = query.Where(d => db.Revisions.Any(r => r.DocumentId == d.Id && r.State == RevisionStates.Released));
+        // What the register filters on beyond a document's own columns is recorded as it happens (document_facts).
+        if (f.Released == true) query = query.Where(d => db.DocumentFacts.Any(x => x.DocumentId == d.Id && x.Released));
         if (Has(f.State)) query = query.Where(d => d.State == f.State);
         if (f.Rev == "NONE") query = query.Where(d => d.LatestRevisionId == null);
         // Reviewed and not yet released: the route is finished, the control function has not published it.
         else if (f.Rev is "NOT_RELEASED" or "FOR_RELEASE")
             query = query.Where(d => d.LatestRevisionState == RevisionStates.InReview
-                && db.Reviews.Any(r => r.RevisionId == d.LatestRevisionId && r.State == Reviews.ReviewStates.Decided));
+                && db.DocumentFacts.Any(x => x.DocumentId == d.Id && x.Decided));
         else if (Has(f.Rev)) query = query.Where(d => d.LatestRevisionState == f.Rev);
-        if (Has(f.Status)) query = query.Where(d => db.Revisions.Any(r => r.DocumentId == d.Id && r.State == RevisionStates.Released && r.StatusCode == f.Status));
+        if (Has(f.Status)) query = query.Where(d => db.DocumentFacts.Any(x => x.DocumentId == d.Id && x.Released && x.ReleasedStatus == f.Status));
         if (Has(f.Verdict))
-            query = query.Where(d => db.Reviews.Where(r => r.RevisionId == d.LatestRevisionId && r.Verdict != null)
-                .OrderByDescending(r => r.DecidedAt).Select(r => r.Verdict).FirstOrDefault() == f.Verdict);
+            query = query.Where(d => db.DocumentFacts.Any(x => x.DocumentId == d.Id && x.Verdict == f.Verdict));
         if (Has(f.Supplier)) query = query.Where(d => d.Originator == f.Supplier);
         if (Has(f.Po)) query = query.Where(d => d.ContractRef == f.Po);
         if (Has(f.Discipline)) query = query.Where(d => d.Discipline == f.Discipline);
@@ -356,13 +356,13 @@ public static class RegisterEndpoints
             "revState" => By(d => d.LatestRevisionState),
             "planned" => By(d => d.PlannedDate),
             "created" => By(d => d.CreatedAt),
-            "releasedFor" => By(d => db.Revisions.Where(r => r.DocumentId == d.Id && r.State == RevisionStates.Released).Select(r => r.StatusCode).FirstOrDefault()),
-            "released" => By(d => db.Revisions.Where(r => r.DocumentId == d.Id && r.State == RevisionStates.Released).Select(r => r.ReleasedAt).FirstOrDefault()),
-            "verdict" => By(d => db.Reviews.Where(r => r.RevisionId == d.LatestRevisionId && r.Verdict != null).OrderByDescending(r => r.DecidedAt).Select(r => r.Verdict).FirstOrDefault()),
+            // Recorded as it happens (document_facts), read by the document's own key.
+            "releasedFor" => By(d => db.DocumentFacts.Where(x => x.DocumentId == d.Id).Select(x => x.ReleasedStatus).FirstOrDefault()),
+            "released" => By(d => db.DocumentFacts.Where(x => x.DocumentId == d.Id).Select(x => x.ReleasedAt).FirstOrDefault()),
+            "verdict" => By(d => db.DocumentFacts.Where(x => x.DocumentId == d.Id).Select(x => x.Verdict).FirstOrDefault()),
             "revStarted" => By(d => db.Revisions.Where(r => r.Id == d.LatestRevisionId).Select(r => (Instant?)r.CreatedAt).FirstOrDefault()),
-            "fileAdded" => By(d => db.StoredFiles.Where(x => x.DocumentId == d.Id).Max(x => (Instant?)x.CreatedAt)),
-            "issued" => By(d => db.TransmittalItems.Where(i => i.DocumentId == d.Id)
-                .Join(db.Transmittals.Where(x => x.ReviewStepId == null), i => i.TransmittalId, x => x.Id, (i, x) => (Instant?)x.IssuedAt).Min()),
+            "fileAdded" => By(d => db.DocumentFacts.Where(x => x.DocumentId == d.Id).Select(x => x.FileAddedAt).FirstOrDefault()),
+            "issued" => By(d => db.DocumentFacts.Where(x => x.DocumentId == d.Id).Select(x => x.FirstIssuedAt).FirstOrDefault()),
             _ => By(d => d.UpdatedAt),
         };
         // A stable order: two documents never swap between pages.
@@ -470,12 +470,16 @@ public static class RegisterEndpoints
     private static async Task<IResult> UsedAsync(HttpContext http, ReadDatabase reads, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        return Results.Ok(await reads.ReadAsync(async db => new
+        // Counted as documents are registered and changed (values_used), never read off the register.
+        return Results.Ok(await reads.ReadAsync(async db =>
         {
-            usedDisciplines = await db.Documents.AsNoTracking().Where(d => d.ProjectId == access.Project.Id).Select(d => d.Discipline)
-                .Distinct().ToListAsync(cancellationToken),
-            usedDocTypes = await db.Documents.AsNoTracking().Where(d => d.ProjectId == access.Project.Id).Select(d => d.DocType)
-                .Distinct().ToListAsync(cancellationToken),
+            var used = await db.ValuesUsed.AsNoTracking().Where(v => v.ProjectId == access.Project.Id && v.Documents > 0)
+                .Select(v => new { v.Field, v.Code }).ToListAsync(cancellationToken);
+            return new
+            {
+                usedDisciplines = used.Where(v => v.Field == "DISCIPLINE").Select(v => v.Code).ToList(),
+                usedDocTypes = used.Where(v => v.Field == "DOC_TYPE").Select(v => v.Code).ToList(),
+            };
         }, cancellationToken));
     }
 

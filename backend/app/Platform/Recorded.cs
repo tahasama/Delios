@@ -25,6 +25,13 @@ public static class Recorded
                     FROM transmittal_items i JOIN transmittals x ON x.id = i.transmittal_id
                     WHERE i.revision_id IS NOT NULL AND x.review_step_id IS NULL
                     GROUP BY i.revision_id, x.project_id;
+                DELETE FROM document_facts;
+                PERFORM refresh_document_facts(id) FROM documents;
+                DELETE FROM values_used;
+                INSERT INTO values_used (project_id, field, code, tenant_id, documents)
+                    SELECT project_id, 'DISCIPLINE', discipline, t.id, count(*) FROM documents GROUP BY project_id, discipline;
+                INSERT INTO values_used (project_id, field, code, tenant_id, documents)
+                    SELECT project_id, 'DOC_TYPE', doc_type, t.id, count(*) FROM documents GROUP BY project_id, doc_type;
                 DELETE FROM transmittal_facts;
                 INSERT INTO transmittal_facts (transmittal_id, tenant_id, project_id, answered_at)
                     SELECT p.id, t.id, p.project_id, min(a.issued_at)
@@ -35,6 +42,62 @@ public static class Recorded
         END
         $$;
         """;
+
+    /// <summary>What migration RecordedAsItHappens filled, as it stood then (a migration never changes).</summary>
+    public const string RebuildCarriedAndAnswered = """
+        DO $$
+        DECLARE t record;
+        BEGIN
+            FOR t IN SELECT id FROM tenants LOOP
+                PERFORM set_config('app.tenant_id', t.id::text, true);
+                DELETE FROM revision_facts;
+                INSERT INTO revision_facts (revision_id, tenant_id, project_id, first_carried_at)
+                    SELECT i.revision_id, t.id, x.project_id, min(x.issued_at)
+                    FROM transmittal_items i JOIN transmittals x ON x.id = i.transmittal_id
+                    WHERE i.revision_id IS NOT NULL AND x.review_step_id IS NULL
+                    GROUP BY i.revision_id, x.project_id;
+                DELETE FROM transmittal_facts;
+                INSERT INTO transmittal_facts (transmittal_id, tenant_id, project_id, answered_at)
+                    SELECT p.id, t.id, p.project_id, min(a.issued_at)
+                    FROM transmittals p JOIN transmittals a
+                        ON a.in_reply_to_id = p.id OR (a.follows_id = p.id AND a.issued_by_id IS DISTINCT FROM p.issued_by_id)
+                    GROUP BY p.id, p.project_id;
+            END LOOP;
+        END
+        $$;
+        """;
+}
+
+/// <summary>
+/// What the register filters and sorts a document by, beyond its own columns, written by the database whenever one of its
+/// revisions, reviews, files or transmittal lines changes (<c>refresh_document_facts</c>).
+/// </summary>
+public sealed class DocumentFact
+{
+    public Guid DocumentId { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid ProjectId { get; set; }
+    /// <summary>A revision of it is released now.</summary>
+    public bool Released { get; set; }
+    public string? ReleasedStatus { get; set; }
+    public Instant? ReleasedAt { get; set; }
+    /// <summary>The verdict its newest revision was last given.</summary>
+    public string? Verdict { get; set; }
+    /// <summary>Its newest revision's review is decided, not released yet.</summary>
+    public bool Decided { get; set; }
+    public Instant? FileAddedAt { get; set; }
+    /// <summary>When one of ours first went out on a transmittal (other than a review's).</summary>
+    public Instant? FirstIssuedAt { get; set; }
+}
+
+/// <summary>How many of a project's documents carry a discipline or a document type (field DISCIPLINE / DOC_TYPE).</summary>
+public sealed class ValueUsed
+{
+    public Guid ProjectId { get; set; }
+    public required string Field { get; set; }
+    public required string Code { get; set; }
+    public Guid TenantId { get; set; }
+    public int Documents { get; set; }
 }
 
 /// <summary>A revision a transmittal (other than a review's) carried: when it first did. None: released and "not sent yet".</summary>
@@ -53,6 +116,30 @@ public sealed class TransmittalFact
     public Guid TenantId { get; set; }
     public Guid ProjectId { get; set; }
     public Instant AnsweredAt { get; set; }
+}
+
+internal sealed class DocumentFactConfiguration : IEntityTypeConfiguration<DocumentFact>
+{
+    public void Configure(EntityTypeBuilder<DocumentFact> b)
+    {
+        b.ToTable("document_facts");
+        b.HasKey(x => x.DocumentId);
+        b.HasIndex(x => x.TenantId);
+        b.Property(x => x.ReleasedStatus).HasMaxLength(64);
+        b.Property(x => x.Verdict).HasMaxLength(64);
+    }
+}
+
+internal sealed class ValueUsedConfiguration : IEntityTypeConfiguration<ValueUsed>
+{
+    public void Configure(EntityTypeBuilder<ValueUsed> b)
+    {
+        b.ToTable("values_used");
+        b.HasKey(x => new { x.ProjectId, x.Field, x.Code });
+        b.HasIndex(x => x.TenantId);
+        b.Property(x => x.Field).HasMaxLength(16);
+        b.Property(x => x.Code).HasMaxLength(64);
+    }
 }
 
 internal sealed class RevisionFactConfiguration : IEntityTypeConfiguration<RevisionFact>

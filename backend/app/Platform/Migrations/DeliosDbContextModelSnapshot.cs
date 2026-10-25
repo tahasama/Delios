@@ -4236,6 +4236,60 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("package_members", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Platform.DocumentFact", b =>
+                {
+                    b.Property<Guid>("DocumentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<bool>("Decided")
+                        .HasColumnType("boolean")
+                        .HasColumnName("decided");
+
+                    b.Property<Instant?>("FileAddedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("file_added_at");
+
+                    b.Property<Instant?>("FirstIssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_issued_at");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<bool>("Released")
+                        .HasColumnType("boolean")
+                        .HasColumnName("released");
+
+                    b.Property<Instant?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
+
+                    b.Property<string>("ReleasedStatus")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("released_status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Verdict")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("verdict");
+
+                    b.HasKey("DocumentId")
+                        .HasName("pk_document_facts");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_document_facts_tenant_id");
+
+                    b.ToTable("document_facts", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Platform.IdempotencyRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4346,6 +4400,39 @@ namespace Delios.Host.Platform.Migrations
                         .HasDatabaseName("ix_transmittal_facts_tenant_id");
 
                     b.ToTable("transmittal_facts", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Platform.ValueUsed", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Field")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("field");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("code");
+
+                    b.Property<int>("Documents")
+                        .HasColumnType("integer")
+                        .HasColumnName("documents");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("ProjectId", "Field", "Code")
+                        .HasName("pk_values_used");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_values_used_tenant_id");
+
+                    b.ToTable("values_used", (string)null);
                 });
 
             modelBuilder.Entity("Delios.Host.Records.Asset", b =>
