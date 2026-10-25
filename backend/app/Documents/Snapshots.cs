@@ -247,8 +247,12 @@ public static class SnapshotEndpoints
             CancellationToken c) =>
         {
             var access = ProjectAccessFilter.Of(h);
-            if (!await DocumentQueries.Visible(db, access).AnyAsync(d => d.Id == documentId, c))
-                return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
+            var seen = await DocumentQueries.Visible(db, access).Where(d => d.Id == documentId).Select(d => new { d.Originator })
+                .FirstOrDefaultAsync(c);
+            if (seen is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
+            // Each point holds the whole document as it stood, revisions never sent included: another organization reads
+            // none of one of ours (its History lists the revisions sent to it, from the document's context).
+            if (!OutsideReading.Whole(access, seen.Originator)) return Results.Ok(Array.Empty<SnapshotView>());
             var rows = await db.Set<DocumentSnapshot>().AsNoTracking().Where(s => s.DocumentId == documentId).OrderBy(s => s.CapturedAt)
                 .ToListAsync(c);
             return Results.Ok(SnapshotChanges.Rebuild(rows).Select(p => new SnapshotView(p.Row.Id, p.Row.RevisionId, p.Row.CapturedAt.ToDateTimeOffset(),

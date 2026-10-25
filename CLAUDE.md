@@ -1786,7 +1786,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   which documents; `Documents/OutsideReading.cs` says what of them. Of one of ours, only the revisions a transmittal
   carried to them (`SentRevisions`): the document's view, `/documents/many`, `/revisions/{id}`, every file and preview
   (`ReadableAsync`), and its context (no review, history only of those revisions, only the transmittals they may open,
-  only supplier packages shared with them). Of their own (originator), everything. A review only of their own document
+  only supplier packages shared with them; none of its recorded points, "as it stood", which hold every revision). Of their own (originator), everything. A review only of their own document
   once decided, or with a step they answer (`OutsideReading.Reviews`: the review, `/reviews/many`, the reviews list);
   hand-overs are ours only. The register and `/documents` read one of ours at its newest revision sent to them, no
   verdict, decider or packages (`Register.RowsAsync(…, access)`). `/api/parties` gives them only their own organization.
