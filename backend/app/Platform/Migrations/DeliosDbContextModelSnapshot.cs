@@ -54,6 +54,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("finish_achieved");
 
+                    b.Property<Instant?>("LastMetAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_met_at");
+
                     b.Property<int>("MetCount")
                         .HasColumnType("integer")
                         .HasColumnName("met_count");

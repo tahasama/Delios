@@ -1833,6 +1833,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `record_carried` on `transmittal_items`), `transmittal_facts` (first answered or followed by someone else; trigger
   `record_answered` on `transmittals`). Read only by the app; `rebuild-recorded` (backend command, by hand) writes them
   again from what exists. Opening and downloading are only said (who, what, when): no history point is taken for them.
+  **The Schedule reads where each action stands from what it keeps** (`Activity.NeedCount`, `MetCount`, `RiskFrom`,
+  `LastMetAt`, written by `Readiness.RestateAsync` when one of its documents or needs changes, or the days around an
+  action do; `ScheduleEndpoints.RecordedFacts`): its needs are read only for the actions shown (`RowsAsync`,
+  `InFullAsync`). Another organization's actions are still read with their needs, narrowed to what it sees.
 - **Nothing runs on a clock to find out what happened** (owner: "we do not send spies… we go outside and inform that it
   just happened"): the outbox's relay runs in every process and sleeps until an act of that process, once committed with
   a message, rings it (`OutboxWake`; on start it sends what was left waiting, a failure tries again after 5 seconds);

@@ -827,3 +827,11 @@ in the newest 500 only).
 database at the moment a transmittal or its line is added, and read back, instead of being looked for among every
 revision and transmittal each time. Opening or downloading a document no longer takes a point of its history (it changed
 nothing). `rebuild-recorded` (backend command) writes the recorded facts again from what exists, should one look wrong.
+
+---
+
+**The Schedule reads where each action stands from the action itself** (owner). Before: every reading loaded every action
+with all its documents and worked out each one's state. Now: each action keeps where it stands (written when one of its
+documents or needs changes), and only the actions on screen are read with their documents. One small difference: a
+document marked as waived no longer makes an action "at risk" on the plan, as the rule always said ("a document still
+missing"); the notices already read it so.

@@ -124,6 +124,24 @@ public static partial class ScheduleEndpoints
         return new ActionFacts(covered, lastMet, passed, riskFrom, state);
     }
 
+    /// <summary>
+    /// Where an action stands, from what it keeps (written by Readiness.RestateAsync when one of its documents or needs
+    /// changes): the same answer as <see cref="FactsOf"/>, without reading its needs.
+    /// </summary>
+    internal static ActionFacts RecordedFacts(int needs, int met, Instant? lastMetAt, LocalDate? riskFrom, LocalDate? start, LocalDate today)
+    {
+        var covered = needs > 0 && met == needs;
+        var lastMet = covered ? lastMetAt?.ToDateTimeOffset() : null;
+        var passed = start is { } day && day < today;
+        var state = needs == 0 ? ActionStates.Unknown
+            : covered ? (!passed ? ActionStates.Ready
+                : lastMet is { } at && start is { } s && at > s.AtStartOfDayInZone(DateTimeZone.Utc).ToDateTimeOffset() ? ActionStates.LateReceipt
+                : ActionStates.Done)
+            : passed ? ActionStates.Overdue
+            : riskFrom is { } from && from <= today ? ActionStates.AtRisk : ActionStates.Upcoming;
+        return new ActionFacts(covered, lastMet, passed, riskFrom, state);
+    }
+
     /// <summary>The day an action is at risk from, for the needs given: its day less the longest window of one still missing.</summary>
     private static LocalDate? RiskOf(Activity a, Func<Requirement, bool> only, int window)
     {

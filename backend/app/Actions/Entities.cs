@@ -159,6 +159,8 @@ public sealed class Activity
     /// of a document still missing. Null when nothing is missing. Written by Readiness.RestateAsync.
     /// </summary>
     public LocalDate? RiskFrom { get; set; }
+    /// <summary>When its last document came, once every one it needs is there; null otherwise. Written by Readiness.RestateAsync.</summary>
+    public Instant? LastMetAt { get; set; }
     /// <summary>
     /// The next day the project's notices have something to do about this activity (at risk, confirmed on the day after,
     /// notified again), written by what changed it (<see cref="NoticeDays"/>); null: nothing to tell.

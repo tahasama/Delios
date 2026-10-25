@@ -80,6 +80,8 @@ public static class Readiness
             activity.NeedCount = activity.Requirements.Count;
             activity.MetCount = activity.Requirements.Count(r => r.State == RequirementStates.Met);
             activity.WaivedCount = activity.Requirements.Count(r => r.State == RequirementStates.Waived);
+            activity.LastMetAt = activity.NeedCount > 0 && activity.MetCount == activity.NeedCount
+                ? activity.Requirements.Max(r => r.MetAt) : null;
             activity.NextNeededBy = activity.Requirements.Where(r => r.State == RequirementStates.Missing && r.NeededBy is not null)
                 .Select(r => r.NeededBy).Min();
             // At risk from the earliest day a missing document's window opens, counted back from the activity's day:

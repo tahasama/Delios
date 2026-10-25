@@ -43,18 +43,17 @@ public static partial class ScheduleEndpoints
         await ScheduleImporter.AskCatchUpAsync(db, project, cancellationToken);
         var today = WorkingCalendar.Today(clock, project.TimeZone);
         var window = (await ScheduleDays.ForProjectAsync(db, project.Id, cancellationToken)).Risk;
-        var activities = await db.Activities.AsNoTracking().Include(a => a.Requirements)
-            .Where(a => a.ProjectId == project.Id && a.State == ActivityStates.Active).AsSplitQuery().ToListAsync(cancellationToken);
+        // Every action as it keeps itself (owner: recorded when it happens, never worked out again on a reading): where it
+        // stands comes from what Readiness wrote on it when its documents changed; its needs are read only for those shown.
+        // Another organization reads only its own part of each action, so its actions are read with their needs, narrowed.
         var visible = await OutsideViewAsync(db, access, cancellationToken);
-        if (visible is not null) activities = Narrow(activities, visible);
+        var rows = await RowsAsync(db, project.Id, today, window, visible, cancellationToken);
 
         // Postponed: a published decision that does not proceed, not taken back.
         var catalog = await Documents.Catalog.LoadAsync(db, cancellationToken);
-        var ids = activities.Select(a => a.Id).ToList();
-        var postponed = (await db.ActivityDecisions.AsNoTracking().Where(d => ids.Contains(d.ActivityId) && d.ReversedAt == null)
+        var postponed = (await db.ActivityDecisions.AsNoTracking().Where(d => d.ProjectId == project.Id && d.ReversedAt == null)
                 .Select(d => new { d.ActivityId, d.Decision }).ToListAsync(cancellationToken))
             .Where(d => !ActionNotices.Proceeds(catalog, d.Decision)).Select(d => d.ActivityId).ToHashSet();
-        var facts = activities.ToDictionary(a => a.Id, a => FactsOf(a, today, window));
 
         // Which actions need a document matching the document filters, asked of the database (never each document read).
         async Task<HashSet<(Guid Activity, Guid Document)>> NeedingAsync(System.Linq.Expressions.Expression<Func<Documents.Document, bool>> match)
@@ -64,7 +63,9 @@ public static partial class ScheduleEndpoints
                 .Select(r => new { r.ActivityId, r.DocumentId }).Distinct().ToListAsync(cancellationToken))
                 .Select(x => (x.ActivityId, x.DocumentId)).ToHashSet();
         }
-        bool Needs(Activity a, HashSet<(Guid, Guid)> pairs) => a.Requirements.Any(r => pairs.Contains((a.Id, r.DocumentId)));
+        // Another organization's action counts only the documents it sees.
+        bool Needs(PlanRow a, HashSet<(Guid Activity, Guid Document)> pairs) =>
+            a.Documents is null ? pairs.Any(p => p.Activity == a.Id) : a.Documents.Any(d => pairs.Contains((a.Id, d)));
         static string Like(string word) => "%" + word.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
 
         discipline = Blank(discipline); docType = Blank(docType); supplier = Blank(supplier); code = Blank(code);
@@ -81,19 +82,19 @@ public static partial class ScheduleEndpoints
         }
         static bool Has(string? text, string word) => text is not null && text.Contains(word, StringComparison.OrdinalIgnoreCase);
 
-        bool ShortOnTheDay(Activity a) => a.Requirements.Count > 0 && facts[a.Id].Passed
-            && (!facts[a.Id].Covered || (facts[a.Id].LastMet is { } met && a.Start is { } s && met > s.AtStartOfDayInZone(DateTimeZone.Utc).ToDateTimeOffset()));
-        bool Happened(Activity a, string which) => which switch
+        bool ShortOnTheDay(PlanRow a) => a.Needs > 0 && a.Facts.Passed
+            && (!a.Facts.Covered || (a.Facts.LastMet is { } met && a.Start is { } s && met > s.AtStartOfDayInZone(DateTimeZone.Utc).ToDateTimeOffset()));
+        bool Happened(PlanRow a, string which) => which switch
         {
-            "WITH" => a.Requirements.Count > 0 && facts[a.Id].Passed && !ShortOnTheDay(a) && !postponed.Contains(a.Id),
+            "WITH" => a.Needs > 0 && a.Facts.Passed && !ShortOnTheDay(a) && !postponed.Contains(a.Id),
             "WITHOUT" => ShortOnTheDay(a) && !postponed.Contains(a.Id),
             "STOPPED" => postponed.Contains(a.Id),
-            "NONE" => a.Requirements.Count == 0 && facts[a.Id].Passed && !postponed.Contains(a.Id),
+            "NONE" => a.Needs == 0 && a.Facts.Passed && !postponed.Contains(a.Id),
             _ => true,
         };
-        bool OutsideWindow(Activity a) =>
+        bool OutsideWindow(PlanRow a) =>
             (code is null || a.Code == code)
-            && (Blank(state) is not { } st || facts[a.Id].State == st)
+            && (Blank(state) is not { } st || a.Facts.State == st)
             && (Blank(happened) is not { } h || Happened(a, h))
             && (nodate != "1" || a.Start is null)
             && (untagged != "1" || a.Departments.Length == 0)
@@ -103,7 +104,7 @@ public static partial class ScheduleEndpoints
                 Has(a.Code, word) || Has(a.Name, word) || Has(a.ExternalId, word) || Needs(a, byWord[word]))));
 
         // Where the schedule runs, and the window the plan opens on: two months around today, held inside it.
-        var dates = activities.SelectMany(a => new[] { a.Start, a.Finish }).OfType<LocalDate>().ToList();
+        var dates = rows.SelectMany(a => new[] { a.Start, a.Finish }).OfType<LocalDate>().ToList();
         LocalDate? spanFrom = dates.Count > 0 ? dates.Min() : null;
         LocalDate? spanTo = dates.Count > 0 ? dates.Max() : null;
         var fromDay = ReadDay(from);
@@ -120,32 +121,34 @@ public static partial class ScheduleEndpoints
             if (spanTo is { } last) stop = LocalDate.Min(stop, LocalDate.Max(last, start));
             (planFrom, planTo) = (start, stop);
         }
-        bool InWindow(Activity a) => planFrom is null && planTo is null
+        bool InWindow(PlanRow a) => planFrom is null && planTo is null
             || (a.Start is { } s && (planFrom is null || s >= planFrom) && (planTo is null || s <= planTo));
 
-        var hasWbs = activities.Any(a => a.Wbs.Length > 0);
+        var hasWbs = rows.Any(a => a.HasWbs);
         var sortKey = sort is not null && PlanSorts.Contains(sort) ? sort : hasWbs ? "wbs" : "date";
         var descending = dir == "desc" && sort is not null && PlanSorts.Contains(sort);
         var maxDay = LocalDate.MaxIsoValue;
-        IOrderedEnumerable<Activity> Sorted(IEnumerable<Activity> rows)
+        IOrderedEnumerable<PlanRow> Sorted(IEnumerable<PlanRow> list)
         {
-            var byDate = rows.OrderBy(a => a.Start ?? maxDay).ThenBy(a => a.Code, StringComparer.Ordinal);
-            IOrderedEnumerable<Activity> ordered = sortKey switch
+            var byDate = list.OrderBy(a => a.Start ?? maxDay).ThenBy(a => a.Code, StringComparer.Ordinal);
+            IOrderedEnumerable<PlanRow> ordered = sortKey switch
             {
-                "code" => rows.OrderBy(a => a.Code, StringComparer.Ordinal),
-                "name" => rows.OrderBy(a => a.Name, StringComparer.CurrentCulture),
-                "documents" => rows.OrderBy(a => a.Requirements.Count).ThenBy(a => a.Code, StringComparer.Ordinal),
-                "wbs" => rows.OrderBy(a => a.WbsOrder ?? int.MaxValue).ThenBy(a => a.Start ?? maxDay).ThenBy(a => a.Code, StringComparer.Ordinal),
+                "code" => list.OrderBy(a => a.Code, StringComparer.Ordinal),
+                "name" => list.OrderBy(a => a.Name, StringComparer.CurrentCulture),
+                "documents" => list.OrderBy(a => a.Needs).ThenBy(a => a.Code, StringComparer.Ordinal),
+                "wbs" => list.OrderBy(a => a.WbsOrder ?? int.MaxValue).ThenBy(a => a.Start ?? maxDay).ThenBy(a => a.Code, StringComparer.Ordinal),
                 _ => byDate,
             };
             return descending ? ordered.Reverse().OrderBy(_ => 0) : ordered;
         }
 
-        var allMatching = activities.Where(OutsideWindow).ToList();
+        var allMatching = rows.Where(OutsideWindow).ToList();
         var found = Sorted(allMatching.Where(InWindow)).ToList();
-        var shown = view_ == "table"
+        var shownRows = view_ == "table"
             ? found.Skip((Math.Max(page, 1) - 1) * Math.Clamp(per, 1, 500)).Take(Math.Clamp(per, 1, 500)).ToList()
             : view_ == "plan" ? found.Take(Math.Clamp(show, 1, 2000)).ToList() : [];
+        // Only the actions shown are read in full, with their needs.
+        var shown = await InFullAsync(db, shownRows, visible, cancellationToken);
         var actions = await PlanActionsAsync(db, clock, project, shown, cancellationToken);
         if (visible is not null) actions = actions.Select(ForOutside).ToList();
 
@@ -153,10 +156,51 @@ public static partial class ScheduleEndpoints
             await VersionInForceAsync(db, project.Id, cancellationToken), actions,
             found.Count, allMatching.Count(a => a.Start is null), windowed ? allMatching.Count : 0,
             planFrom?.ToDateOnly(), planTo?.ToDateOnly(), spanFrom?.ToDateOnly(), spanTo?.ToDateOnly(),
-            hasWbs, sortKey, descending ? "desc" : "asc", activities.Count(a => Happened(a, "WITHOUT")),
-            activities.OrderBy(a => a.Start ?? maxDay).ThenBy(a => a.Code, StringComparer.Ordinal)
+            hasWbs, sortKey, descending ? "desc" : "asc", rows.Count(a => Happened(a, "WITHOUT")),
+            rows.OrderBy(a => a.Start ?? maxDay).ThenBy(a => a.Code, StringComparer.Ordinal)
                 .Select(a => new PlanLight(a.Code, a.Name, null, null)).ToList(),
             view_ == "calendar" ? found.Select(a => new PlanLight(a.Code, a.Name, a.Start?.ToDateOnly(), a.Finish?.ToDateOnly())).ToList() : []));
+    }
+
+    /// <summary>
+    /// An action as the Schedule's page filters and sorts it, from what it keeps. <see cref="Documents"/>: for another
+    /// organization, the documents of it that it sees (null for ours).
+    /// </summary>
+    private sealed record PlanRow(Guid Id, string Code, string Name, string? ExternalId, LocalDate? Start, LocalDate? Finish,
+        string[] Departments, bool HasWbs, int? WbsOrder, int Needs, ActionFacts Facts, HashSet<Guid>? Documents, Activity? Whole);
+
+    /// <summary>
+    /// Every active action of the project. Ours: each one's own columns, where it stands from what Readiness wrote on it,
+    /// its needs not read. Another organization's: read with its needs, narrowed to what it sees, and worked out from those.
+    /// </summary>
+    private static async Task<List<PlanRow>> RowsAsync(DeliosDbContext db, Guid projectId, LocalDate today, int window, HashSet<Guid>? visible,
+        CancellationToken cancellationToken)
+    {
+        if (visible is not null)
+        {
+            var activities = Narrow(await db.Activities.AsNoTracking().Include(a => a.Requirements)
+                .Where(a => a.ProjectId == projectId && a.State == ActivityStates.Active).AsSplitQuery().ToListAsync(cancellationToken), visible);
+            return activities.Select(a => new PlanRow(a.Id, a.Code, a.Name, a.ExternalId, a.Start, a.Finish, a.Departments, a.Wbs.Length > 0,
+                a.WbsOrder, a.Requirements.Count, FactsOf(a, today, window), a.Requirements.Select(r => r.DocumentId).ToHashSet(), a)).ToList();
+        }
+        var kept = await db.Activities.AsNoTracking().Where(a => a.ProjectId == projectId && a.State == ActivityStates.Active)
+            .Select(a => new
+            {
+                a.Id, a.Code, a.Name, a.ExternalId, a.Start, a.Finish, a.Departments, HasWbs = a.Wbs.Length > 0, a.WbsOrder,
+                a.NeedCount, a.MetCount, a.LastMetAt, a.RiskFrom,
+            }).ToListAsync(cancellationToken);
+        return kept.Select(a => new PlanRow(a.Id, a.Code, a.Name, a.ExternalId, a.Start, a.Finish, a.Departments, a.HasWbs, a.WbsOrder,
+            a.NeedCount, RecordedFacts(a.NeedCount, a.MetCount, a.LastMetAt, a.RiskFrom, a.Start, today), null, null)).ToList();
+    }
+
+    /// <summary>The actions shown, in full with their needs, in the order shown.</summary>
+    private static async Task<List<Activity>> InFullAsync(DeliosDbContext db, List<PlanRow> rows, HashSet<Guid>? visible, CancellationToken cancellationToken)
+    {
+        if (visible is not null) return rows.Select(r => r.Whole!).ToList();
+        var ids = rows.Select(r => r.Id).ToList();
+        var read = await db.Activities.AsNoTracking().Include(a => a.Requirements).Where(a => ids.Contains(a.Id))
+            .AsSplitQuery().ToDictionaryAsync(a => a.Id, cancellationToken);
+        return ids.Where(read.ContainsKey).Select(id => read[id]).ToList();
     }
 
     /// <summary>
@@ -171,16 +215,21 @@ public static partial class ScheduleEndpoints
         var access = ProjectAccessFilter.Of(http);
         var today = WorkingCalendar.Today(clock, access.Project.TimeZone);
         var window = (await ScheduleDays.ForProjectAsync(db, access.Project.Id, cancellationToken)).Risk;
-        var activities = await db.Activities.AsNoTracking().Include(a => a.Requirements)
-            .Where(a => a.ProjectId == access.Project.Id && a.State == ActivityStates.Active).AsSplitQuery().ToListAsync(cancellationToken);
-        if (await OutsideViewAsync(db, access, cancellationToken) is { } visible) activities = Narrow(activities, visible);
+        // Where each action stands, from what it keeps (RowsAsync); which disciplines have documents listed, in one read.
+        var visible = await OutsideViewAsync(db, access, cancellationToken);
+        var activities = await RowsAsync(db, access.Project.Id, today, window, visible, cancellationToken);
+        var listedFor = visible is not null
+            ? activities.SelectMany(a => a.Whole!.Requirements.Select(n => (a.Id, n.Department))).ToHashSet()
+            : (await db.Requirements.AsNoTracking().Where(n => n.ProjectId == access.Project.Id)
+                .Select(n => new { n.ActivityId, n.Department }).Distinct().ToListAsync(cancellationToken))
+                .Select(x => (x.ActivityId, x.Department)).ToHashSet();
         var untagged = activities.Count(a => a.Departments.Length == 0);
         var pairs = activities.SelectMany(a => a.Departments.Select(d => (a, d))).ToList();
-        var answered = pairs.Count(p => p.a.Requirements.Any(n => n.Department == p.d));
+        var answered = pairs.Count(p => listedFor.Contains((p.a.Id, p.d)));
         var first = ReadDay(from) ?? today.PlusDays(-PlanWindowDays);
         var last = ReadDay(to) ?? today.PlusDays(PlanWindowDays);
-        var listed = activities.Where(a => a.Start is { } s && s >= first && s <= last && a.Requirements.Count > 0).ToList();
-        var complete = listed.Count(a => FactsOf(a, today, window).State is ActionStates.Ready or ActionStates.Done or ActionStates.LateReceipt);
+        var listed = activities.Where(a => a.Start is { } s && s >= first && s <= last && a.Needs > 0).ToList();
+        var complete = listed.Count(a => a.Facts.State is ActionStates.Ready or ActionStates.Done or ActionStates.LateReceipt);
         var at = activities.Count == 0 ? 0 : untagged > 0 ? 1 : answered < pairs.Count || listed.Count == 0 ? 2 : complete == listed.Count ? 4 : 3;
         return Results.Ok(new { at, actions = activities.Count, untagged, answered, asked = pairs.Count, complete, listed = listed.Count,
             from = first.ToDateOnly(), to = last.ToDateOnly() });
