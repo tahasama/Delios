@@ -433,7 +433,7 @@ public sealed class ScreensNotifier(IHttpClientFactory clients, IOptions<Screens
                 };
                 if (!string.IsNullOrEmpty(options.Value.Secret)) request.Headers.Add("X-Delios-Screens-Secret", options.Value.Secret);
                 using var response = await clients.CreateClient(nameof(ScreensNotifier)).SendAsync(request, stoppingToken);
-                if (!response.IsSuccessStatusCode) logger.LogWarning("The screens refused the changed labels: {Status}", (int)response.StatusCode);
+                if (response.StatusCode != System.Net.HttpStatusCode.NoContent) logger.LogWarning("The screens refused the changed labels: {Status}", (int)response.StatusCode);
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {

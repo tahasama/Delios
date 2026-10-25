@@ -88,7 +88,9 @@ public static class PlatformSetup
         // Every save names what the screens keep that it changed (ScreenChanges): on a screen's answer, or posted to them.
         services.AddHttpContextAccessor();
         services.AddOptions<ScreensOptions>().BindConfiguration(ScreensOptions.Section);
-        services.AddHttpClient(nameof(ScreensNotifier), c => c.Timeout = TimeSpan.FromSeconds(5));
+        services.AddHttpClient(nameof(ScreensNotifier), c => c.Timeout = TimeSpan.FromSeconds(5))
+            // A redirect (to the sign-in page) is a refusal, never the screens' answer.
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddSingleton<ScreensNotifier>();
         services.AddHostedService(sp => sp.GetRequiredService<ScreensNotifier>());
         services.AddSingleton<Search.SearchSignal>();
