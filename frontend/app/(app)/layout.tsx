@@ -1,4 +1,5 @@
 import { DateFormatKeeper } from "@/components/date-format";
+import { Downloads } from "@/components/downloads";
 import { dateFormat } from "@/lib/core/date-format";
 import { mayCreateDocument, isAdmin } from "@/lib/core/auth";
 import { requireScope } from "@/lib/core/scope";
@@ -89,6 +90,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </header>
         <main className="mx-auto max-w-[1560px] px-4 py-5 lg:px-7 lg:py-6">{children}</main>
+        <Downloads />
       </div>
     </div>
   );

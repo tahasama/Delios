@@ -5,7 +5,7 @@ import type { SupplierStage } from "@/lib/core/state-names";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath } from "@/lib/client";
 import { getMe } from "@/lib/account/api";
-import type { ActivitySummary, RegisterPage } from "@/lib/types";
+import type { ActivitySummary, RegisterPage, RegisterUsed } from "@/lib/types";
 import { RegisterPlate } from "./register-plate";
 import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_MEANING, REV_STATES, REV_MEANING } from "@/lib/core/standard";
 import { getSet } from "@/lib/settings/config";
@@ -121,7 +121,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const page = Math.max(1, Number(sp.page) || 1);
 
   // The register itself, filtered, sorted and cut into pages by the backend.
-  const [register, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, phases, activities, views] =
+  const [register, used, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, phases, activities, views] =
     await Promise.all([
       api<RegisterPage>(projectPath(scope, "/register"), {
         keep: { areas: ["docs", "reviews", "transmittals", "packages", "plan"] },
@@ -130,6 +130,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
           deliverable, phase: sp.phase ?? "", action: sp.action ?? "", own: ownFilter, on: dateOn, from: sp.from ?? "", to: sp.to ?? "", view, sort, dir, page, per: perPage,
         },
       }),
+      // What the filters offer, kept until a document changes: never worked out again with every page or filter.
+      api<RegisterUsed>(projectPath(scope, "/register/used"), { keep: { areas: ["docs"] } }),
       getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
       getSet("CRITICALITY"), getSet("CONFIDENTIALITY"), getSet("RETENTION_CLASSES"), getSet("DELIVERABLE_TYPES"), getSet("PHASES"),
       // Only the activities that actually owe something: an action nobody has
@@ -154,8 +156,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const current = Math.min(register.page, pages);
 
   // Filters offer what the register holds, not every value the organisation publishes.
-  const usedDisciplines = new Set(register.lists.usedDisciplines);
-  const usedTypes = new Set(register.lists.usedDocTypes);
+  const usedDisciplines = new Set(used.usedDisciplines);
+  const usedTypes = new Set(used.usedDocTypes);
   const disciplineLabel = new Map(disciplines.map((d) => [d.code, d.label]));
   const typeLabel = new Map(types.map((t) => [t.code, t.label]));
   const retentionLabel = new Map(retentions.map((item) => [item.code, item.label]));

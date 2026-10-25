@@ -3,7 +3,7 @@ import { cache } from "react";
 import { api, apiFetch, ApiProblem, projectPath, type Query } from "@/lib/client";
 import { backendDocument, backendDocuments, backendRevision, backendReview, documentPage, type PageDocument, type PageRevision } from "@/lib/documents/api";
 import type { DocumentView } from "@/lib/types";
-import type { RegisterPage, ReviewsPage, ReviewView, TransmittalView } from "@/lib/types";
+import type { RegisterUsed, ReviewsPage, ReviewView, TransmittalView } from "@/lib/types";
 import type { RunData, WfRuntimeStep } from "@/lib/reviews/workflow";
 import { getMe } from "@/lib/account/api";
 
@@ -41,8 +41,8 @@ export async function reviewsPage(scope: Scope, query: Query): Promise<ReviewsPa
 
 /** The disciplines and document types the project's documents hold, so a filter offers only those. */
 export async function valuesInUse(scope: Scope): Promise<{ disciplines: string[]; docTypes: string[] }> {
-  const register = await api<RegisterPage>(projectPath(scope, "/register"), { keep: { areas: ["docs", "reviews", "transmittals", "packages"] }, query: { per: 25 } });
-  return { disciplines: register.lists.usedDisciplines, docTypes: register.lists.usedDocTypes };
+  const used = await api<RegisterUsed>(projectPath(scope, "/register/used"), { keep: { areas: ["docs"] } });
+  return { disciplines: used.usedDisciplines, docTypes: used.usedDocTypes };
 }
 
 /** The step a review stands at: the open one, or once none is, the last that answered. */

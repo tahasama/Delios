@@ -210,9 +210,12 @@ public static class TransmittalLogEndpoints
         var replies = (await db.Transmittals.AsNoTracking()
             .Where(a => (a.InReplyToId != null && listed.Contains(a.InReplyToId.Value)) || (a.FollowsId != null && listed.Contains(a.FollowsId.Value)))
             .Select(a => new { a.InReplyToId, a.FollowsId, a.IssuedById, a.IssuedAt }).ToListAsync(cancellationToken));
+        // Matched in one pass (an export holds up to 20,000).
+        var answering = replies.Where(a => a.InReplyToId != null).ToLookup(a => a.InReplyToId!.Value);
+        var following = replies.Where(a => a.FollowsId != null).ToLookup(a => a.FollowsId!.Value);
         Instant? AnsweredAt(Transmittal t) => t.ReviewStepId is { } step
             ? (stepDone.TryGetValue(step, out var at) ? at : null)
-            : replies.Where(a => a.InReplyToId == t.Id || (a.FollowsId == t.Id && a.IssuedById != t.IssuedById))
+            : answering[t.Id].Concat(following[t.Id].Where(a => a.IssuedById != t.IssuedById))
                 .Select(a => (Instant?)a.IssuedAt).OrderBy(a => a).FirstOrDefault();
         // What the control function's check said of what came in, read from each submission it carried (Arrivals).
         var sentIn = list.Values.Where(t => t.Direction == TransmittalDirections.Incoming)

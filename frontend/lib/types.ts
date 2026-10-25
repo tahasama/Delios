@@ -63,14 +63,10 @@ export type RegisterPage = {
   per: number;
   sizes: number[];
   rows: RegisterRow[];
-  lists: {
-    values: Record<string, ListValue[]>;
-    usedDisciplines: string[];
-    usedDocTypes: string[];
-    parties: { code: string; name: string }[];
-    activities: { code: string; name: string }[];
-  };
 };
+
+/** The disciplines and document types the project's documents carry (`GET /register/used`). */
+export type RegisterUsed = { usedDisciplines: string[]; usedDocTypes: string[] };
 
 export type RegisterRow = {
   /** The answers kept with it to the project's own fields and lists of its own. */

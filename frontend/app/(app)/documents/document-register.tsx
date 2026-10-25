@@ -1,4 +1,5 @@
 "use client";
+import { startDownload } from "@/components/downloads";
 import { Select } from "@/components/select";
 
 import { setAssetDocumentsAction } from "@/lib/records/forms";
@@ -531,7 +532,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         {rows.length ? <DataTable id="register" className="rounded-none border-0 shadow-none" stretch={!!cardHeight} defaultHidden={OPTIONAL} onMove={move} onReorder={moveTo} forced={forced} fill tools={
           <a
             href={exportHref}
-            onClick={(event) => { event.preventDefault(); window.location.href = exportWith(exportHref); }}
+            onClick={(event) => { event.preventDefault(); startDownload(exportWith(exportHref), "The register"); }}
             className="dt-tool"
             title="The rows these filters match, in the columns you are looking at, as CSV"
           >
@@ -708,7 +709,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       {mayAddToAction ? <Link href={`/actions/add?docs=${encodeURIComponent(selected.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><CalendarCheck className="h-4 w-4" /> Add to action</Link> : null}
       <a
         href={selectedExportHref}
-        onClick={(event) => { event.preventDefault(); window.location.href = exportWith(selectedExportHref); }}
+        onClick={(event) => { event.preventDefault(); startDownload(exportWith(selectedExportHref), "The register"); }}
         className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"
       >
         <Download className="h-4 w-4" /> Export {allMatching ? "all matching" : "selected"}
