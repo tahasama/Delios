@@ -25,8 +25,103 @@ public sealed class DocumentSnapshot
     public required string EventType { get; set; }
     public string? EventLabel { get; set; }
     public required string ActorName { get; set; }
-    /// <summary>The document as GET /documents/{id} showed it then, as JSON.</summary>
+    /// <summary>
+    /// The document as GET /documents/{id} showed it then, as JSON: whole when <see cref="IsChange"/> is false, else only
+    /// what changed since the point before (<see cref="SnapshotChanges"/>; owner: never the whole document again).
+    /// </summary>
     public required string Payload { get; set; }
+    /// <summary>The payload holds only what changed since the point before.</summary>
+    public bool IsChange { get; set; }
+}
+
+/// <summary>
+/// What changed between two points of a document, and the point rebuilt from the one before and its change. An object
+/// keeps only the fields that changed ($o), a list of records with an id only the records that changed and their order
+/// ($a), anything else is written whole ($v); a field gone is marked ($d).
+/// </summary>
+public static class SnapshotChanges
+{
+    /// <summary>A whole point is kept every so many, so rebuilding one never reads far back.</summary>
+    public const int WholeEvery = 20;
+
+    public static System.Text.Json.Nodes.JsonNode? Diff(System.Text.Json.Nodes.JsonNode? before, System.Text.Json.Nodes.JsonNode? after)
+    {
+        if (System.Text.Json.Nodes.JsonNode.DeepEquals(before, after)) return null;
+        if (before is System.Text.Json.Nodes.JsonObject a && after is System.Text.Json.Nodes.JsonObject b)
+        {
+            var changes = new System.Text.Json.Nodes.JsonObject();
+            foreach (var (key, value) in b)
+                if ((a.ContainsKey(key) ? Diff(a[key], value) : Whole(value)) is { } change) changes[key] = change;
+            foreach (var (key, _) in a)
+                if (!b.ContainsKey(key)) changes[key] = new System.Text.Json.Nodes.JsonObject { ["$d"] = true };
+            return new System.Text.Json.Nodes.JsonObject { ["$o"] = changes };
+        }
+        if (before is System.Text.Json.Nodes.JsonArray x && after is System.Text.Json.Nodes.JsonArray y && Keyed(x) && Keyed(y))
+        {
+            var was = x.ToDictionary(e => Id(e)!, e => e);
+            var items = new System.Text.Json.Nodes.JsonObject();
+            var ids = new System.Text.Json.Nodes.JsonArray();
+            foreach (var element in y)
+            {
+                var id = Id(element)!;
+                ids.Add(id);
+                if ((was.TryGetValue(id, out var old) ? Diff(old, element) : Whole(element)) is { } change) items[id] = change;
+            }
+            return new System.Text.Json.Nodes.JsonObject { ["$a"] = new System.Text.Json.Nodes.JsonObject { ["ids"] = ids, ["items"] = items } };
+        }
+        return Whole(after);
+    }
+
+    public static System.Text.Json.Nodes.JsonNode? Apply(System.Text.Json.Nodes.JsonNode? before, System.Text.Json.Nodes.JsonNode change)
+    {
+        var patch = change.AsObject();
+        if (patch.TryGetPropertyValue("$v", out var value)) return value?.DeepClone();
+        if (patch["$o"] is System.Text.Json.Nodes.JsonObject fields)
+        {
+            var result = before is System.Text.Json.Nodes.JsonObject o ? o.DeepClone().AsObject() : new System.Text.Json.Nodes.JsonObject();
+            foreach (var (key, field) in fields)
+            {
+                if (field is System.Text.Json.Nodes.JsonObject f && f.ContainsKey("$d")) { result.Remove(key); continue; }
+                result[key] = Apply(result[key], field!);
+            }
+            return result;
+        }
+        if (patch["$a"] is System.Text.Json.Nodes.JsonObject list)
+        {
+            var was = before is System.Text.Json.Nodes.JsonArray arr && Keyed(arr) ? arr.ToDictionary(e => Id(e)!, e => e) : [];
+            var items = list["items"]!.AsObject();
+            var result = new System.Text.Json.Nodes.JsonArray();
+            foreach (var id in list["ids"]!.AsArray().Select(i => i!.GetValue<string>()))
+            {
+                was.TryGetValue(id, out var old);
+                result.Add(items.TryGetPropertyValue(id, out var c) && c is not null ? Apply(old, c) : old?.DeepClone());
+            }
+            return result;
+        }
+        return before?.DeepClone();
+    }
+
+    private static System.Text.Json.Nodes.JsonObject Whole(System.Text.Json.Nodes.JsonNode? value) => new() { ["$v"] = value?.DeepClone() };
+
+    private static bool Keyed(System.Text.Json.Nodes.JsonArray list) =>
+        list.All(e => Id(e) is not null) && list.Select(Id).Distinct().Count() == list.Count;
+
+    private static string? Id(System.Text.Json.Nodes.JsonNode? element) =>
+        element is System.Text.Json.Nodes.JsonObject o && o["id"] is System.Text.Json.Nodes.JsonValue v && v.TryGetValue<string>(out var id) ? id : null;
+
+    /// <summary>Every point of a document, rebuilt whole, oldest first.</summary>
+    public static List<(DocumentSnapshot Row, string Whole)> Rebuild(IEnumerable<DocumentSnapshot> rows)
+    {
+        var points = new List<(DocumentSnapshot, string)>();
+        System.Text.Json.Nodes.JsonNode? current = null;
+        foreach (var row in rows)
+        {
+            var payload = System.Text.Json.Nodes.JsonNode.Parse(row.Payload);
+            current = row.IsChange && payload is not null ? Apply(current, payload) : payload;
+            points.Add((row, current?.ToJsonString() ?? "null"));
+        }
+        return points;
+    }
 }
 
 /// <summary>EF Core mapping for <see cref="DocumentSnapshot"/>.</summary>
@@ -94,9 +189,19 @@ public sealed class SnapshotRecorder(DeliosDbContext db, IClock clock)
             if (document is null) continue;
             document.Revisions = [.. document.Revisions.OrderBy(r => r.CreatedAt)];
             var payload = JsonSerializer.Serialize(DocumentEndpoints.View(document), JsonSerializerOptions.Web);
-            var last = await db.Set<DocumentSnapshot>().AsNoTracking().Where(s => s.DocumentId == documentId)
-                .OrderByDescending(s => s.CapturedAt).Select(s => s.Payload).FirstOrDefaultAsync(cancellationToken);
+            // The last point, rebuilt from the last whole one and the changes after it.
+            var lastWhole = await db.Set<DocumentSnapshot>().AsNoTracking().Where(s => s.DocumentId == documentId && !s.IsChange)
+                .OrderByDescending(s => s.CapturedAt).Select(s => (Instant?)s.CapturedAt).FirstOrDefaultAsync(cancellationToken);
+            var since = lastWhole is { } from
+                ? await db.Set<DocumentSnapshot>().AsNoTracking().Where(s => s.DocumentId == documentId && s.CapturedAt >= from)
+                    .OrderBy(s => s.CapturedAt).ToListAsync(cancellationToken)
+                : [];
+            var last = since.Count > 0 ? SnapshotChanges.Rebuild(since)[^1].Whole : null;
             if (last is not null && Same(last, payload)) continue;
+            // Only what changed, but a whole point every so often.
+            var change = last is not null && since.Count < SnapshotChanges.WholeEvery
+                ? SnapshotChanges.Diff(System.Text.Json.Nodes.JsonNode.Parse(last), System.Text.Json.Nodes.JsonNode.Parse(payload))?.ToJsonString()
+                : null;
             db.Add(new DocumentSnapshot
             {
                 TenantId = document.TenantId,
@@ -107,7 +212,8 @@ public sealed class SnapshotRecorder(DeliosDbContext db, IClock clock)
                 EventType = noted.Action,
                 EventLabel = noted.Detail is { Length: > 2000 } d ? d[..2000] : noted.Detail,
                 ActorName = noted.Actor,
-                Payload = payload,
+                Payload = change ?? payload,
+                IsChange = change is not null,
             });
         }
         await db.SaveChangesAsync(cancellationToken);
@@ -145,8 +251,8 @@ public static class SnapshotEndpoints
                 return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
             var rows = await db.Set<DocumentSnapshot>().AsNoTracking().Where(s => s.DocumentId == documentId).OrderBy(s => s.CapturedAt)
                 .ToListAsync(c);
-            return Results.Ok(rows.Select(s => new SnapshotView(s.Id, s.RevisionId, s.CapturedAt.ToDateTimeOffset(), s.EventType, s.EventLabel,
-                s.ActorName, JsonDocument.Parse(s.Payload).RootElement.Clone())));
+            return Results.Ok(SnapshotChanges.Rebuild(rows).Select(p => new SnapshotView(p.Row.Id, p.Row.RevisionId, p.Row.CapturedAt.ToDateTimeOffset(),
+                p.Row.EventType, p.Row.EventLabel, p.Row.ActorName, JsonDocument.Parse(p.Whole).RootElement.Clone())));
         });
     }
 }

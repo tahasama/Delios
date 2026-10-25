@@ -1304,6 +1304,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("event_type");
 
+                    b.Property<bool>("IsChange")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_change");
+
                     b.Property<string>("Payload")
                         .IsRequired()
                         .HasColumnType("jsonb")

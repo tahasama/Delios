@@ -1491,6 +1491,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   lifted hold or a reinstatement in Details beside the reason it answers.
   Taking something back never erases the reason it answers. No list in the
   Revisions tab repeats History or Reviews.
+- A document's recorded points (History, "as it stood") keep only what changed since the point before (owner: never the
+  whole document again on every change; `DocumentSnapshot.IsChange`, `SnapshotChanges`: fields changed, records of a list
+  by their id), a whole point every 20; read back whole, as before (`GET /documents/{id}/snapshots` rebuilds them).
+  Points kept whole before stay as they are.
 
 ### Schedule & actions
 - The schedule (SCH), disciplines per action (DPA) and requirements (RQL) are

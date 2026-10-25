@@ -744,3 +744,9 @@ on them starts at once, then every 5 minutes.
 included, locked the organization's audit trail until its save, so readers queued behind one another. Now: opened,
 downloaded and a person's activity read are written beside the chain, unlocked, each sealed by its own fingerprint; acts
 that change something stay in the chain as before. Nothing disappears from the Audit trail or a person's activity.
+
+---
+
+**A document's history keeps only what changed** (owner). Before: every change saved the whole document again, with all
+its revisions and files. Now: each point keeps only what changed since the one before (a whole one every 20), and the
+History page reads exactly as before. Nothing kept earlier is touched.
