@@ -1145,8 +1145,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   document's History): "<what>: […] → […]" too, a list of records as added / taken out / changed, each by its name,
   one line per field under it (owner: "don't condense, no fancy transformations": a code reads as itself, only not
   in capitals). An id is never shown: the backend puts each id in a detail as the name it stands for
-  (`AuditKinds.NamesInAsync` / `Readable`, on every audit reader), and new details are written with names. Home's Log tab is the same logbook for its project (backend `GET /log`,
-  the control function and administrators), the project's work only: sign-ins, opened and downloaded, and people and
+  (`AuditKinds.NamesInAsync` / `Readable`, on every audit reader), and new details are written with names. Home's Log tab is the same logbook for its project (backend `GET /log`),
+  read by everyone of ours on the project (owner): the control function and administrators every act, anyone else only
+  the acts on what they may open (a document, its revisions, files and reviews by its clearance, a transmittal they may
+  open; a document named inside a detail they may not open reads "a document you may not open"; `ActivityEndpoints.Readable`,
+  the journal beside Home the same), the names opening a person's activity only for those who read it; another
+  organization's people never. The project's work only: sign-ins, opened and downloaded, and people and
   settings are left out (the administrators' trail). Its menu is on the left (`LogbookSide categoriesOnly`: the kinds,
   not every act; then Find), the days beside it, the page's right column away while the log is open.
   The log's menu: Find first, on a white box (words; the day and Show on one line; no labels), then the kinds, which

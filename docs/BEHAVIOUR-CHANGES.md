@@ -700,3 +700,10 @@ in the code; it lives only in your local database.
   the first time someone opens that project's schedule. Schedules nobody opens are left as they are.
 - The screens are told what changed only once the change is committed (before, a screen could read just before the
   commit and keep the old answer).
+
+---
+
+**Home's log is read by everyone of ours on the project** (owner). Before: the control function and administrators only.
+Now anyone of ours reads it, narrowed to the acts on what they may open (a document above their clearance, its
+revisions, files, reviews, and a transmittal they may not open are left out). The journal beside Home is narrowed the
+same way (before, it named documents above the reader's clearance). Another organization's people still never read it.

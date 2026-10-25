@@ -151,7 +151,7 @@ export function LogbookSide({ counts, chosen, href, find, categoriesOnly = false
 }
 
 /** The log itself: the day as a rule, each act a slip in its kind's side colour, and the pager further back. */
-export function LogbookDays({ acts, chosen, href, paging, showWho = true }: { acts: LogAct[]; chosen: Chosen; href: Href; paging: Paging; showWho?: boolean }) {
+export function LogbookDays({ acts, chosen, href, paging, showWho = true, whoLinks = true }: { acts: LogAct[]; chosen: Chosen; href: Href; paging: Paging; showWho?: boolean; /** Each name opens what that person did: only for whoever reads it (an administrator, the control function). */ whoLinks?: boolean }) {
   // Filed by the day it happened: correspondence is remembered by its day, and a day with nothing in it is not a heading.
   const days: { day: string; when: Date; acts: LogAct[] }[] = [];
   for (const e of acts) {
@@ -194,7 +194,7 @@ export function LogbookDays({ acts, chosen, href, paging, showWho = true }: { ac
                   <span className="route">
                     {showWho ? (
                       <span className="route-party">
-                        {e.actorId ? <Link href={`/settings/users/${e.actorId}`} className="hover:underline">{e.actorName}</Link> : e.actorName}
+                        {e.actorId && whoLinks ? <Link href={`/settings/users/${e.actorId}`} className="hover:underline">{e.actorName}</Link> : e.actorName}
                       </span>
                     ) : null}
                     {showWho ? <span className="route-line" aria-hidden="true" /> : null}

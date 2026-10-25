@@ -41,9 +41,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const invitations = isAdmin(ctx.user) ? (await organizationLinks()).filter((one) => one.side === "GUEST" && one.state === "INVITED") : [];
   // Replies by email from organizations not on DELIOS, waiting for the control function to record them.
   const repliesByEmail = ctx.can("CONTROL") ? await emailReplies(ctx) : [];
-  // The whole log is the control function's and the administrator's: they answer
-  // for what the record says. Anybody else asking for it gets their own page.
-  const view = sp.view === "log" && !controller ? undefined : sp.view;
+  // The log is everyone of ours on the project (owner), each reading only acts on what
+  // they may open (the backend narrows it); another organization's people get their own page.
+  const mayLog = user.isInternal && ctx.can("READ");
+  const view = sp.view === "log" && !mayLog ? undefined : sp.view;
   const at = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
   const acts = (rows: ActivityRow[]) => rows.map((e) => ({ id: e.id, ts: new Date(e.at), action: ALIAS[e.action] ?? e.action, actorName: e.actorName, entityType: e.entityType, entityLabel: e.entityLabel, detail: e.detail }));
   // The backend's names for the acts each kind of the journal covers.
@@ -374,7 +375,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         {/* The log is not work waiting on anybody, so it sits apart at the end
             and carries no count: a number here would join a total that means
             "what is owed by you". */}
-        {controller ? (
+        {mayLog ? (
           <Link
             href="/?view=log"
             scroll={false}
@@ -405,7 +406,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 <p className="slip-note">{readingLine({ from: sp.from, to: sp.to, kindLabel: AUDIT_KINDS.find((k) => k.key === sp.kind)?.label, q: sp.q })}</p>
               ) : null}
               {log ? (
-                <LogbookDays acts={log.rows} chosen={{ kind: sp.kind, action: sp.action }} href={logHref} paging={{ page: log.page, pages: log.pages, total: log.total }} />
+                <LogbookDays acts={log.rows} chosen={{ kind: sp.kind, action: sp.action }} href={logHref} paging={{ page: log.page, pages: log.pages, total: log.total }} whoLinks={controller} />
               ) : (
                 <p className="slip px-4 py-6 text-[13px] text-(--ink-soft)">The log could not be read just now. Try again in a moment.</p>
               )}
