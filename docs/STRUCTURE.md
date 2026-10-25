@@ -31,7 +31,7 @@ delios/
 backend/
 ├── app/                  the program (API and worker)
 │   ├── Program.cs        start-up: what runs, in which order
-│   ├── Documents/        documents, revisions, files, the register; their numbers with other organizations (Equivalents.cs); the readers of the Preview, switched on and off (Viewers.cs, the card Viewing files); the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
+│   ├── Documents/        documents, revisions, files, the register; FileBackup (each file copied to the second place as it is stored); their numbers with other organizations (Equivalents.cs); the readers of the Preview, switched on and off (Viewers.cs, the card Viewing files); the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
 │   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (the sets of Review outcomes, read by routes)
 │   │                     ProjectLists: the project's lists (own copy on first change, where each value is used, who changes them)
 │   │                     WorkbookView: an Excel source file read for the Preview (components/file-preview.tsx, workbook-view.tsx; a P6 .xer, schedule-file-view.tsx);
@@ -61,7 +61,7 @@ backend/
 │   ├── Messaging/        the queue between the API and the worker; the outbox relay, woken by the acts that fill it (OutboxWake)
 │   ├── Tenancy/          keeping each organization's data apart
 │   ├── Seeding/          the demo data
-│   ├── Platform/         the database, Migrations/, shared plumbing
+│   ├── Platform/         the database, Migrations/, shared plumbing; ScreenChanges (what a save tells the screens), AccessVersions (access and shared answers kept until the organization's way of working changes)
 │   ├── Resources/        files built into the program (fonts for stamped PDFs)
 │   └── appsettings.json  default settings (.env overrides them)
 ├── tests/                the automated tests, one file per area (DocumentTests.cs…)
@@ -87,6 +87,7 @@ The program's internal name is still `Delios.Host` (in the code and the built fi
 
 ```
 frontend/
+├── cache-handler.mjs     where Next.js keeps the backend's answers: Valkey, until a change names them
 ├── app/                  the pages: a folder's name is its web address
 │   ├── layout.tsx        the outer frame of every page
 │   ├── (public)/         pages for someone not signed in

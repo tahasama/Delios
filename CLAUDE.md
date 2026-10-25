@@ -1817,7 +1817,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   second place as it is stored (`Documents/FileBackup.cs`, from `FileStorage` keeping, putting or copying a file; never
   overwriting, never deleting; `Backup__*`, the same place as file-backup), and file-backup's full comparison runs once a
   week as the safety net (`FILE_BACKUP_EVERY` 604800; alert past 8 days); notices fall on days written
-  by what changed them (above). What stays timed is a fallback, never the way to learn of a change: a kept answer read
-  again within the hour, the search index's hourly catch-up (OpenSearch only, off by default), a page re-reading itself
+  by what changed them (above). What stays timed is a fallback, never the way to learn of a change: access kept 15 minutes at
+  most, the search index's hourly catch-up (OpenSearch only, off by default), a page re-reading itself
   while a file it waits for is checked (three minutes at most). A state is never kept fresh by a
   clock: it is read when looked at, or written by the act that changes it.
