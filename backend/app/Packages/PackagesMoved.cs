@@ -17,8 +17,21 @@ public sealed record PackagesMoved(Guid TenantId, Guid[] Projects)
     {
         services.GetRequiredService<TenantContext>().Set(message.TenantId);
         var db = services.GetRequiredService<DeliosDbContext>();
-        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
-        await services.GetRequiredService<PackageService>().RestateAsync(message.Projects, cancellationToken);
-        await tx.CommitAsync(cancellationToken);
+        // A document taken in by the act itself at the same moment: read again once, and it is already there.
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+                await services.GetRequiredService<PackageService>().RestateAsync(message.Projects, cancellationToken);
+                await tx.CommitAsync(cancellationToken);
+                return;
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException e) when (attempt == 1
+                && e.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation })
+            {
+                db.ChangeTracker.Clear();
+            }
+        }
     }
 }
