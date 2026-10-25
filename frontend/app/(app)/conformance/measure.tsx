@@ -7,13 +7,13 @@ import { type ScopeConfig } from "@/lib/settings/api-admin";
 
 /**
  * How this project is measured, said once, where it is measured: the share of clear documents it
- * aims at. The checks run by themselves every day. An administrator or the control function changes it.
+ * aims at. The checks run when someone runs them. An administrator or the control function changes it.
  */
 export function HowMeasured({ scope, mayChange }: { scope: ScopeConfig; mayChange: boolean }) {
   const line = (
     <span className="text-[13px] text-slate-600">
       <span className="font-semibold text-slate-800">How it is measured:</span> target {scope.integrityThreshold}% of
-      documents clear · checked every day by themselves
+      documents clear · checked when the checks are run
       {scope.measuredBy ? <span className="text-[11px] text-slate-500"> · set by {scope.measuredBy.name}, {fmtDate(new Date(scope.measuredBy.at))}</span> : null}
     </span>
   );

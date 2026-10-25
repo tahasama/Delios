@@ -159,7 +159,37 @@ public sealed class Activity
     /// of a document still missing. Null when nothing is missing. Written by Readiness.RestateAsync.
     /// </summary>
     public LocalDate? RiskFrom { get; set; }
+    /// <summary>
+    /// The next day the project's notices have something to do about this activity (at risk, confirmed on the day after,
+    /// notified again), written by what changed it (<see cref="NoticeDays"/>); null: nothing to tell.
+    /// </summary>
+    public LocalDate? NoticeOn { get; set; }
     public List<Requirement> Requirements { get; set; } = [];
+}
+
+/// <summary>
+/// When a project's notices next go out: the earliest day written on its activities and review steps, at its notify
+/// hour (<see cref="NoticeDays"/>). Kept above every organization (no row-level security: it holds no content, only
+/// when to look), so the one alarm of the worker reads its next moment in one question.
+/// </summary>
+public sealed class NoticeAlarm
+{
+    public Guid ProjectId { get; set; }
+    public Guid TenantId { get; set; }
+    /// <summary>The next moment its notices go out; null: nothing to tell.</summary>
+    public Instant? DueAt { get; set; }
+    /// <summary>The project's day its notices last went out.</summary>
+    public LocalDate? LastRun { get; set; }
+}
+
+internal sealed class NoticeAlarmConfiguration : IEntityTypeConfiguration<NoticeAlarm>
+{
+    public void Configure(EntityTypeBuilder<NoticeAlarm> b)
+    {
+        b.ToTable("notice_alarms");
+        b.HasKey(x => x.ProjectId);
+        b.HasIndex(x => x.DueAt);
+    }
 }
 
 /// <summary>Whether an activity is still in the schedule (ACTIVE) or a later revision dropped it (REMOVED).</summary>
@@ -337,6 +367,7 @@ internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
         b.HasIndex(x => new { x.ProjectId, x.Code }).IsUnique();
         b.HasIndex(x => new { x.ProjectId, x.Start });
         b.HasIndex(x => new { x.ProjectId, x.NextNeededBy });
+        b.HasIndex(x => new { x.ProjectId, x.NoticeOn });
         b.Property(x => x.MovedIn).HasMaxLength(32);
         b.Property(x => x.Code).HasMaxLength(64);
         b.Property(x => x.ExternalId).HasMaxLength(64);

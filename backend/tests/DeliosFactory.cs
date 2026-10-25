@@ -17,7 +17,6 @@ public sealed class DeliosFactory(IDictionary<string, string?> overrides, Action
         ["Delios:Role"] = "api",
         ["Metrics:Port"] = "0",
         // Tests ask for their runs; the daily schedule would race them.
-        ["Checks:Schedule"] = "false",
         ["Reviews:Warnings"] = "false",
         ["Auth:SecureCookie"] = "false",
         ["ConnectionStrings:Postgres"] = "Host=127.0.0.1;Port=1;Database=x;Username=x;Password=x;Timeout=2",

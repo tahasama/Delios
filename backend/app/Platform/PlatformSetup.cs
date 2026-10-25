@@ -94,11 +94,13 @@ public static class PlatformSetup
         services.AddSingleton<Search.SearchSignal>();
         services.AddScoped<ScreenChanges>();
         services.AddScoped<ScreenChangeWatcher>();
+        services.AddScoped<ScreenChangeCommits>();
         services.AddDbContext<DeliosDbContext>((sp, o) => o
             .UseNpgsql(sp.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Postgres,
                 npgsql => npgsql.UseNodaTime())
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(sp.GetRequiredService<TenantTransactionInterceptor>(), sp.GetRequiredService<ScreenChangeWatcher>()));
+            .AddInterceptors(sp.GetRequiredService<TenantTransactionInterceptor>(), sp.GetRequiredService<ScreenChangeWatcher>(),
+                sp.GetRequiredService<ScreenChangeCommits>()));
 
         services.AddDataProtection()
             .SetApplicationName("delios")
@@ -184,11 +186,11 @@ public static class PlatformSetup
         var search = config.GetSection(Search.SearchOptions.Section).Get<Search.SearchOptions>() ?? new();
         services.AddSingleton<Documents.IVirusScanner, Documents.ClamAvScanner>();
         services.AddSingleton<Messaging.RabbitMqConnection>();
-        if (role == Roles.Api)
-        {
-            services.AddHostedService<Messaging.OutboxRelay>();
-        }
-        else
+        services.AddSingleton<Messaging.OutboxWake>();
+        services.AddSingleton<Actions.NoticeAlarmBell>();
+        // Every process sends what its own acts put in the outbox, woken by them.
+        services.AddHostedService<Messaging.OutboxRelay>();
+        if (role != Roles.Api)
         {
             foreach (var queue in Messaging.Topology.Queues)
             {
@@ -196,7 +198,6 @@ public static class PlatformSetup
                     ActivatorUtilities.CreateInstance<Messaging.FileQueueConsumer>(sp, queue));
             }
             if (search.UsesOpenSearch) services.AddHostedService<Search.SearchIndexer>();
-            if (config.GetValue("Checks:Schedule", true)) services.AddHostedService<Checks.CheckScheduler>();
             if (config.GetValue("Schedule:Notices", true)) services.AddHostedService<Actions.ActionNotices>();
         }
         services.AddScoped<Seeding.TenantSetup>();

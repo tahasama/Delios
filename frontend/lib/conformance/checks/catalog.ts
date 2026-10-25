@@ -32,7 +32,7 @@ export const PHASE_LABEL: Record<Phase, string> = {
 
 export const PHASE_BLURB: Record<Phase, string> = {
   SETUP: "Lists, matrices and rules that have to be published before the register can be trusted. Each one is an administrator's to settle, once.",
-  RUNNING: "The register against itself, every day: numbering, revisions, approvals, what was issued and to whom.",
+  RUNNING: "The register against itself, whenever the checks run: numbering, revisions, approvals, what was issued and to whom.",
   HANDOVER: "What has to be settled before anything is handed over or closed — retention, disposal, archives and packages.",
 };
 

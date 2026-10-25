@@ -81,6 +81,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("date")
                         .HasColumnName("next_needed_by");
 
+                    b.Property<LocalDate?>("NoticeOn")
+                        .HasColumnType("date")
+                        .HasColumnName("notice_on");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid")
                         .HasColumnName("project_id");
@@ -156,6 +160,9 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasIndex("ProjectId", "NextNeededBy")
                         .HasDatabaseName("ix_activities_project_id_next_needed_by");
+
+                    b.HasIndex("ProjectId", "NoticeOn")
+                        .HasDatabaseName("ix_activities_project_id_notice_on");
 
                     b.HasIndex("ProjectId", "Start")
                         .HasDatabaseName("ix_activities_project_id_start");
@@ -332,6 +339,34 @@ namespace Delios.Host.Platform.Migrations
                         .HasDatabaseName("ix_notices_project_id_subject_sent_at");
 
                     b.ToTable("notices", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Actions.NoticeAlarm", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Instant?>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
+
+                    b.Property<LocalDate?>("LastRun")
+                        .HasColumnType("date")
+                        .HasColumnName("last_run");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("ProjectId")
+                        .HasName("pk_notice_alarms");
+
+                    b.HasIndex("DueAt")
+                        .HasDatabaseName("ix_notice_alarms_due_at");
+
+                    b.ToTable("notice_alarms", (string)null);
                 });
 
             modelBuilder.Entity("Delios.Host.Actions.Requirement", b =>
@@ -5422,6 +5457,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid[]")
                         .HasColumnName("user_ids");
 
+                    b.Property<LocalDate?>("WarnOn")
+                        .HasColumnType("date")
+                        .HasColumnName("warn_on");
+
                     b.Property<Instant?>("WarnedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("warned_at");
@@ -5434,6 +5473,9 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasIndex("PartyId")
                         .HasDatabaseName("ix_review_steps_party_id");
+
+                    b.HasIndex("WarnOn")
+                        .HasDatabaseName("ix_review_steps_warn_on");
 
                     b.HasIndex("ReviewId", "Index")
                         .IsUnique()

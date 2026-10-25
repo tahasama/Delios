@@ -40,6 +40,7 @@ public static partial class ScheduleEndpoints
     {
         var access = ProjectAccessFilter.Of(http);
         var project = access.Project;
+        await ScheduleImporter.AskCatchUpAsync(db, project, cancellationToken);
         var today = WorkingCalendar.Today(clock, project.TimeZone);
         var window = (await ScheduleDays.ForProjectAsync(db, project.Id, cancellationToken)).Risk;
         var activities = await db.Activities.AsNoTracking().Include(a => a.Requirements)

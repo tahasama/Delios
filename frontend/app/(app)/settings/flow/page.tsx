@@ -236,7 +236,7 @@ export default async function ControlRoomPage() {
     "form:TRANSMITTAL": "what it asks", "form:PACKAGE": "what it asks", "form:ASSET": "what it asks",
     "form:PARTY": "the organization's", "form:PROJECT": "the organization's",
     assets: "what each tag describes",
-    checks: checksOff === null ? "what is checked every day" : checksOff ? `${checksOff} switched off, with why` : "none switched off",
+    checks: checksOff === null ? "what is checked when someone runs the checks" : checksOff ? `${checksOff} switched off, with why` : "none switched off",
     project: "what it is, our role, its dates",
   };
 

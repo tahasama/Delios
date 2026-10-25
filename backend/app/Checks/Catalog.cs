@@ -23,7 +23,7 @@ public static class Phases
 {
     /// <summary>What has to be published before the register can be trusted: an administrator's, once.</summary>
     public const string Setup = "SETUP";
-    /// <summary>The register against itself, every day.</summary>
+    /// <summary>The register against itself, whenever the checks run.</summary>
     public const string Running = "RUNNING";
     /// <summary>What has to be settled before anything is handed over.</summary>
     public const string Handover = "HANDOVER";

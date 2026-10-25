@@ -18,6 +18,15 @@ public sealed record ScheduleImportRequested(Guid TenantId, Guid RevisionId)
 }
 
 /// <summary>
+/// Asks the worker to read a project's schedule again with the newer reading, when someone opens it and an older
+/// reading made what it shows (<see cref="ScheduleImporter.AskCatchUpAsync"/>).
+/// </summary>
+public sealed record ScheduleCatchUp(Guid TenantId, Guid ProjectId)
+{
+    public const string RoutingKey = "schedule.catchup";
+}
+
+/// <summary>
 /// In the worker, after every release: a released revision of the project's
 /// schedule document is read into activities; any other release may complete what
 /// activities need. A revision is read once; what it changed is kept.
@@ -27,10 +36,34 @@ public sealed class ScheduleImporter(
 {
     /// <summary>
     /// The version of the reading. Raised whenever reading a file keeps more than before (1: the WBS and what happened,
-    /// from a P6 export): a released revision read by an older version is read again by itself (<see cref="CatchUpAsync"/>),
-    /// nobody asked to do it (owner: "users shouldn't have to do that").
+    /// from a P6 export): a released revision read by an older version is read again by itself, nobody asked to do it
+    /// (owner: "users shouldn't have to do that"), but only when it is needed: the first time someone opens that
+    /// project's schedule (<see cref="AskCatchUpAsync"/>). Schedules nobody opens are never read again.
     /// </summary>
     public const int ReaderVersion = 1;
+
+    /// <summary>The projects asked to be read again lately, so opening the schedule while it is being read asks once.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, DateTime> asked = new();
+
+    /// <summary>
+    /// Someone opened the project's schedule: if its released revision was read by an older reading, the worker is asked
+    /// to read it again (<see cref="CatchUpAsync"/>, which decides whether it is worth it). One indexed look otherwise.
+    /// </summary>
+    public static async Task AskCatchUpAsync(DeliosDbContext db, Identity.Project project, CancellationToken cancellationToken)
+    {
+        if (asked.TryGetValue(project.Id, out var at) && DateTime.UtcNow - at < TimeSpan.FromMinutes(10)) return;
+        var older = await (from source in db.ScheduleSources
+                           where source.ProjectId == project.Id
+                           join revision in db.Revisions on source.DocumentId equals revision.DocumentId
+                           where revision.State == RevisionStates.Released
+                           join read in db.ScheduleImports on revision.Id equals read.RevisionId
+                           where read.ReadWith < ReaderVersion && read.Status == ScheduleImportStatuses.Done
+                           select read.Id).AnyAsync(cancellationToken);
+        if (!older) return;
+        asked[project.Id] = DateTime.UtcNow;
+        db.Enqueue(ScheduleCatchUp.RoutingKey, new ScheduleCatchUp(project.TenantId, project.Id));
+        await db.SaveChangesAsync(cancellationToken);
+    }
 
     /// <summary>
     /// After any release: activities needing that document are restated; a release of
@@ -82,8 +115,8 @@ public sealed class ScheduleImporter(
     }
 
     /// <summary>
-    /// In the worker: the schedule's released revision read by an older version of the reading (<see cref="ReaderVersion"/>)
-    /// is read again, the same file read as the app reads it now, so what the reading keeps since (the WBS, what happened)
+    /// In the worker, asked when someone opened the schedule: its released revision read by an older version of the
+    /// reading (<see cref="ReaderVersion"/>) is read again, the same file read as the app reads it now, so what the reading keeps since (the WBS, what happened)
     /// comes in by itself. Only a P6 export is read again (the only file the reading keeps more of), only when that read is
     /// what the activities stand on (no upload since), and never one that failed. Returns whether it read it.
     /// </summary>
@@ -98,9 +131,10 @@ public sealed class ScheduleImporter(
         if (revision is null) return false;
         var earlier = await db.ScheduleImports.SingleOrDefaultAsync(i => i.RevisionId == revision.Id, cancellationToken);
         if (earlier is null || earlier.ReadWith >= ReaderVersion || earlier.Status != ScheduleImportStatuses.Done) return false;
-        if (!revision.Files.Any(f => f.Submission == revision.Submission && f.Status == FileStatuses.Clean && XerReader.IsXer(f.Name))) return false;
-        // A list uploaded since stands: the activities are no longer this read's.
-        if (await db.Set<Records.ControlledVersion>().AnyAsync(v => v.ProjectId == projectId && v.Kind == "SCHEDULE" && v.CreatedAt > earlier.ImportedAt, cancellationToken))
+        // Not a P6 export (the newer reading keeps nothing more of it), or a list uploaded since stands (the activities are
+        // no longer this read's): marked as read by the newer reading, never asked again.
+        if (!revision.Files.Any(f => f.Submission == revision.Submission && f.Status == FileStatuses.Clean && XerReader.IsXer(f.Name))
+            || await db.Set<Records.ControlledVersion>().AnyAsync(v => v.ProjectId == projectId && v.Kind == "SCHEDULE" && v.CreatedAt > earlier.ImportedAt, cancellationToken))
         {
             earlier.ReadWith = ReaderVersion;
         }

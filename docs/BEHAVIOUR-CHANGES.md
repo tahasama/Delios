@@ -684,3 +684,19 @@ in the code; it lives only in your local database.
   day's notices after the day.
 - A schedule read by an older version of the app's reading is read again once, when the worker starts after an update,
   never on a clock.
+
+---
+
+**Nothing runs on a clock to find out what happened** (owner: "the changes are the ones who tell us").
+- The checks (Assurance) no longer run by themselves every day: they run when someone of the control function presses
+  "Run the checks". Their figures say when they last ran. Taken out because the daily run re-read stored files and the
+  whole history of every project every day, a cost growing every year, whoever looked.
+- The notices no longer look every day whether anything is due: what changes an action, a review step or how a project
+  counts its days writes the day its notices fall on, and the worker sleeps until the earliest one. A day with nothing
+  written runs nothing. What is sent, and when, is unchanged.
+- The sender of emails, notifications and the worker's jobs no longer asks every second whether there is something to
+  send: the act that put it there wakes it once its save is committed.
+- A schedule read by an older version of the reading is no longer read again when the worker starts: it is read again
+  the first time someone opens that project's schedule. Schedules nobody opens are left as they are.
+- The screens are told what changed only once the change is committed (before, a screen could read just before the
+  commit and keep the old answer).

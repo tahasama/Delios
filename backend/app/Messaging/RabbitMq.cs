@@ -84,15 +84,18 @@ public static class Topology
 
     /// <summary>A project's checks and schedule reads: a few seconds to minutes each, never in the way of uploads.</summary>
     public static readonly WorkQueue Checks = new("delios.checks", "delios.checks.retry",
-        [Host.Checks.CheckRunRequested.RoutingKey, Host.Actions.ScheduleImportRequested.RoutingKey, Host.Actions.RequirementsImportRequested.RoutingKey,
+        [Host.Checks.CheckRunRequested.RoutingKey, Host.Actions.ScheduleImportRequested.RoutingKey, Host.Actions.ScheduleCatchUp.RoutingKey, Host.Actions.RequirementsImportRequested.RoutingKey,
             Host.Actions.DepartmentsImportRequested.RoutingKey], Prefetch: 1);
 
     /// <summary>Email: each one to the mail server on its own, apart from every other job.</summary>
     public static readonly WorkQueue Mail = new("delios.mail", "delios.mail.retry",
         [Host.Notifications.EmailRequested.RoutingKey, Host.Notifications.PushRequested.RoutingKey], Prefetch: 4);
 
+    /// <summary>Notice days written again after a change (<see cref="Actions.NoticeDays"/>): one at a time.</summary>
+    public static readonly WorkQueue Notices = new("delios.notices", "delios.notices.retry", [Host.Actions.NoticesMoved.RoutingKey], Prefetch: 1);
+
     /// <summary>Every work queue; the worker runs one <see cref="FileQueueConsumer"/> per entry.</summary>
-    public static readonly WorkQueue[] Queues = [Files, Extraction, Checks, Mail];
+    public static readonly WorkQueue[] Queues = [Files, Extraction, Checks, Mail, Notices];
 
     /// <summary>
     /// Creates the exchanges, the work queues with their retry queues and bindings, and the dead queue, if they do not exist yet.

@@ -85,6 +85,14 @@ public sealed class FileQueueConsumer(
                     await scope.ServiceProvider.GetRequiredService<Actions.ScheduleImporter>().OnRequestedAsync(
                         Read<Actions.ScheduleImportRequested>(delivery), stoppingToken);
                     break;
+                case Actions.ScheduleCatchUp.RoutingKey:
+                    var catchUp = Read<Actions.ScheduleCatchUp>(delivery);
+                    scope.ServiceProvider.GetRequiredService<Tenancy.TenantContext>().Set(catchUp.TenantId);
+                    await scope.ServiceProvider.GetRequiredService<Actions.ScheduleImporter>().CatchUpAsync(catchUp.ProjectId, stoppingToken);
+                    break;
+                case Actions.NoticesMoved.RoutingKey:
+                    await Actions.NoticeDays.OnMovedAsync(scope.ServiceProvider, Read<Actions.NoticesMoved>(delivery), stoppingToken);
+                    break;
                 case Checks.CheckRunRequested.RoutingKey:
                     await scope.ServiceProvider.GetRequiredService<Checks.CheckEngine>().ProcessAsync(
                         Read<Checks.CheckRunRequested>(delivery), stoppingToken);

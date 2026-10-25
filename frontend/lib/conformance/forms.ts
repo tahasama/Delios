@@ -112,7 +112,7 @@ export async function restoreCheckAction(_prev: Result | undefined, formData: Fo
 }
 
 /**
- * How this project is measured: the share of clear documents it aims at (the checks run by themselves every day).
+ * How this project is measured: the share of clear documents it aims at (the checks run when someone runs them).
  * The project's answer (MEASURE); the backend lets an administrator or the control function change it.
  */
 export async function setMeasureAction(_prev: Result | undefined, formData: FormData): Promise<Result> {

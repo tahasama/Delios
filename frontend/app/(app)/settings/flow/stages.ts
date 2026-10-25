@@ -231,7 +231,7 @@ export const STAGES: Stage[] = [
   {
     key: "kept", title: "Kept", tagline: "As long as it must be", rail: "rail-released",
     text: "Every revision and its files are kept, read only by those its confidentiality allows, for as long as its retention class says; what is kept for the long term is kept in a preservation format.",
-    who: [{ title: "Keeping it", by: "The app, by itself" }, { title: "Checking the register every day", by: "The app, by itself" }],
+    who: [{ title: "Keeping it", by: "The app, by itself" }, { title: "Checking the register", by: "Whoever runs the checks" }],
     answers: ["TRACKING"],
     sets: ["RETENTION_CLASSES", "CONFIDENTIALITY", "PRESERVATION_FORMATS"],
     extras: ["checks", "functions"],

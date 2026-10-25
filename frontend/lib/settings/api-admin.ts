@@ -419,7 +419,7 @@ export type ScopeConfig = {
   measuredBy: { name: string; at: string } | null;
 };
 
-/** How a project is measured: the share of clear documents it aims at. The checks run by themselves every day. */
+/** How a project is measured: the share of clear documents it aims at. The checks run when someone runs them. */
 export const MEASURE_KEY = "MEASURE";
 
 export async function scopeConfig(projectId?: string): Promise<ScopeConfig> {

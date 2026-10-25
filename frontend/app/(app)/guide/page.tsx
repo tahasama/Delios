@@ -35,7 +35,7 @@ const DAILY: Place[] = [
 ];
 
 const CONTROL: Place[] = [
-  { href: "/conformance", title: "Assurance", text: "The checks run every day, how far the register can be trusted, and what to put right.", icon: ShieldCheck },
+  { href: "/conformance", title: "Assurance", text: "The checks, run when you ask, how far the register can be trusted, and what to put right.", icon: ShieldCheck },
   { href: "/reports", title: "Reports", text: "Where the register stands, deliveries against plan, reviews waiting, progress week by week, who owes what, and the register on any day. Each prints.", icon: ListChecks },
   { href: "/exposures", title: "Use and copy exposure", text: "Copies that went out of a revision no longer valid, who holds them, and what is still to settle.", icon: Network },
   { href: "/import", title: "Import & export", text: "A deliverable list, a team, the matrix or a list, brought in from a template: each file is checked before anything is written.", icon: Import },

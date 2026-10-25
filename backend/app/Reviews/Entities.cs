@@ -181,6 +181,8 @@ public sealed class ReviewStep
     public Guid[] UserIds { get; set; } = [];
     /// <summary>When the people on the step were warned that it falls due the next working day.</summary>
     public Instant? WarnedAt { get; set; }
+    /// <summary>The day its people are warned it falls due, written when the step opens or changes (<see cref="Actions.NoticeDays"/>).</summary>
+    public LocalDate? WarnOn { get; set; }
     /// <summary>The outside party that answers, copied when the review starts.</summary>
     public Guid? PartyId { get; set; }
     public string? PartyName { get; set; }

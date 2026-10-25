@@ -66,6 +66,7 @@ public static partial class ScheduleEndpoints
     private static async Task<IResult> PlanAsync(HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
+        await ScheduleImporter.AskCatchUpAsync(db, access.Project, cancellationToken);
         var inForce = db.Activities.AsNoTracking().Where(a => a.ProjectId == access.Project.Id && a.State == ActivityStates.Active);
         var activities = await inForce.Include(a => a.Requirements).AsSplitQuery()
             .OrderBy(a => a.Start).ThenBy(a => a.Code).Take(MaxActions).ToListAsync(cancellationToken);

@@ -73,7 +73,7 @@ public static class CheckEndpoints
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Control)) return Problems.Forbidden("CONTROL_ONLY", "The control function runs the checks.");
         var run = await CheckScheduler.RequestAsync(db, clock, access.Project.TenantId, access.Project.Id, access.UserName,
-            onlyIfDue: false, cancellationToken);
+            cancellationToken);
         return run is null
             ? Problems.Conflict("CHECKS_ALREADY_RUNNING", "The checks are already queued or running for this project.")
             : Results.Accepted($"/api/projects/{access.Project.Id}/checks/runs/{run.Id}", View(run));

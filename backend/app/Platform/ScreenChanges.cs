@@ -31,6 +31,10 @@ public sealed class ScreenChanges
     internal bool HeaderPlanned { get; set; }
     /// <summary>Every label this request's saves changed, for its answer's header.</summary>
     internal HashSet<string>? Answered { get; set; }
+    /// <summary>A save put a message in the outbox: the relay is woken once it is committed.</summary>
+    internal bool Outbox { get; set; }
+    /// <summary>What moved notice days, per organization, sent with the save (<see cref="Actions.NoticesMoved"/>).</summary>
+    internal Dictionary<Guid, NoticeMoves> Moves { get; } = [];
 
     /// <summary>A project's area changed (plan, docs, reviews, transmittals, packages, assets, checks).</summary>
     public void Area(Guid? projectId, string area)
@@ -46,7 +50,22 @@ public sealed class ScreenChanges
         Area(projectId, Areas.Docs);
     }
 
-    internal void Clear() => tags.Clear();
+    internal void Clear()
+    {
+        tags.Clear();
+        SearchTenants.Clear();
+        Outbox = false;
+    }
+}
+
+/// <summary>What one save changed that moves an organization's notice days.</summary>
+internal sealed class NoticeMoves
+{
+    public HashSet<Guid> Projects { get; } = [];
+    public bool Organization { get; set; }
+    public HashSet<Guid> Activities { get; } = [];
+    public HashSet<Guid> Steps { get; } = [];
+    public HashSet<Guid> Reviews { get; } = [];
 }
 
 /// <summary>The areas a kept answer depends on, the same names as the screens' (`lib/core/kept.ts`).</summary>
@@ -59,16 +78,19 @@ public static class Areas
 /// <summary>
 /// Watches every save: from the rows added, changed or removed, the labels they touch. A row naming its project
 /// (or reaching it through the review, transmittal, package, action or revision it belongs to) clears that project's
-/// area only; one that cannot, that area on every project; a change to how things work clears everything.
+/// area only; one that cannot, that area on every project; a change to how things work clears everything. What it
+/// changed is told once it is committed (<see cref="ScreenChangeCommits"/>), never before: the screens, the search
+/// index and the outbox's relay. A change to the schedule, a review step or how days are counted sends, with the save
+/// itself, the notice days it moved (<see cref="Actions.NoticesMoved"/>).
 /// </summary>
 public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier notifier, IHttpContextAccessor accessor,
-    Search.SearchSignal search) : SaveChangesInterceptor
+    Search.SearchSignal search, Messaging.OutboxWake outbox) : SaveChangesInterceptor
 {
     /// <summary>Rows the screens never show as such: their saving clears nothing.</summary>
     private static readonly HashSet<string> Silent =
     [
         "AuditEvent", "OutboxMessage", "Session", "Notification", "EmailMessage", "PushSubscription", "SearchWatermark",
-        "DocumentSnapshot", "IdempotencyRecord", "FileText", "DataProtectionKey", "Notice",
+        "DocumentSnapshot", "IdempotencyRecord", "FileText", "DataProtectionKey", "Notice", "NoticeAlarm",
     ];
 
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result,
@@ -86,26 +108,73 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
 
     public override ValueTask<int> SavedChangesAsync(SaveChangesCompletedEventData eventData, int result, CancellationToken cancellationToken = default)
     {
-        Flush();
+        Flush(eventData.Context);
         return base.SavedChangesAsync(eventData, result, cancellationToken);
     }
 
     public override int SavedChanges(SaveChangesCompletedEventData eventData, int result)
     {
-        Flush();
+        Flush(eventData.Context);
         return base.SavedChanges(eventData, result);
     }
 
     private void Collect(DbContext context)
     {
-        foreach (var entry in context.ChangeTracker.Entries())
+        foreach (var entry in context.ChangeTracker.Entries().ToList())
         {
             if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted)) continue;
             var type = entry.Metadata.ClrType;
+            if (type.Name == "OutboxMessage") changes.Outbox = true;
             if (Silent.Contains(type.Name)) continue;
             // A document, or the project that says how its text is read, changed: the search index is told.
             if (type.Name is "Document" or "Project" && Guid(entry, "TenantId") is { } tenant) changes.SearchTenants.Add(tenant);
+            Moves(entry, type);
             Mark(entry, type);
+        }
+        // The notice days moved go with the save itself: committed with it, or not at all.
+        foreach (var (tenantId, moves) in changes.Moves)
+        {
+            context.Add(new Messaging.OutboxMessage
+            {
+                RoutingKey = Actions.NoticesMoved.RoutingKey,
+                Payload = System.Text.Json.JsonSerializer.Serialize(new Actions.NoticesMoved(tenantId, [.. moves.Projects], moves.Organization,
+                    [.. moves.Activities], [.. moves.Steps], [.. moves.Reviews])),
+            });
+            changes.Outbox = true;
+        }
+        changes.Moves.Clear();
+    }
+
+    /// <summary>What moves notice days: an action and what hangs from it, a review and its steps, how days are counted.</summary>
+    private void Moves(EntityEntry entry, Type type)
+    {
+        if (Guid(entry, "TenantId") is not { } tenantId) return;
+        NoticeMoves Of() => changes.Moves.TryGetValue(tenantId, out var m) ? m : changes.Moves[tenantId] = new NoticeMoves();
+        switch (type.Namespace, type.Name)
+        {
+            case ("Delios.Host.Actions", "Activity"):
+                if (Guid(entry, "Id") is { } activity) Of().Activities.Add(activity);
+                break;
+            // What hangs from an action: its documents, confirmations, decisions.
+            case ("Delios.Host.Actions" or "Delios.Host.Records", _) when Guid(entry, "ActivityId") is { } activityId:
+                Of().Activities.Add(activityId);
+                break;
+            case ("Delios.Host.Reviews", "Review"):
+                if (Guid(entry, "Id") is { } review) Of().Reviews.Add(review);
+                break;
+            case ("Delios.Host.Reviews", "ReviewStep"):
+                if (Guid(entry, "Id") is { } step) Of().Steps.Add(step);
+                break;
+            case ("Delios.Host.Reviews", "ReviewParticipant") when Guid(entry, "StepId") is { } stepId:
+                Of().Steps.Add(stepId);
+                break;
+            case ("Delios.Host.Settings", "Setting" or "DayOff"):
+                if (Guid(entry, "ProjectId") is { } own) Of().Projects.Add(own);
+                else Of().Organization = true;
+                break;
+            case ("Delios.Host.Identity", "Project"):
+                if (Guid(entry, "Id") is { } project) Of().Projects.Add(project);
+                break;
         }
     }
 
@@ -172,12 +241,32 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
 
     /// <summary>
     /// After a save: a screen's own act carries the labels back on its answer, cleared by the screen at once
-    /// (read-your-own-writes); and every change is posted to the screens too, for every other session and for a change
-    /// no screen asked for (the worker, another way in). Cleared twice costs nothing.
+    /// (read-your-own-writes). The rest waits for the commit (<see cref="Release"/>); a save outside a transaction is
+    /// committed already.
     /// </summary>
-    private void Flush()
+    private void Flush(DbContext? context)
     {
-        if (changes.SearchTenants.Count > 0) { search.Publish(changes.SearchTenants); changes.SearchTenants.Clear(); }
+        PlanHeader();
+        if (context?.Database.CurrentTransaction is null) Release();
+    }
+
+    /// <summary>
+    /// Once committed: every change is posted to the screens, for every other session and for a change no screen asked for
+    /// (the worker, another way in); the search index is told; the outbox's relay woken. Cleared twice costs nothing.
+    /// </summary>
+    internal void Release()
+    {
+        if (changes.SearchTenants.Count > 0) search.Publish(changes.SearchTenants);
+        if (changes.Outbox) outbox.Ring();
+        if (changes.Tags.Count > 0) notifier.Post([.. changes.Tags]);
+        changes.Clear();
+    }
+
+    /// <summary>Rolled back: nothing happened, nothing is told.</summary>
+    internal void Discard() => changes.Clear();
+
+    private void PlanHeader()
+    {
         if (changes.Tags.Count == 0) return;
         var http = accessor.HttpContext;
         if (http is not null && http.Request.Headers.ContainsKey(ScreenChanges.FromScreens) && !HttpMethods.IsGet(http.Request.Method)
@@ -193,8 +282,28 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
             });
         }
         changes.Answered?.UnionWith(changes.Tags);
-        notifier.Post([.. changes.Tags]);
-        changes.Clear();
+    }
+}
+
+/// <summary>Tells what the saves of a transaction changed once it is committed, and nothing once it is rolled back.</summary>
+public sealed class ScreenChangeCommits(ScreenChangeWatcher watcher) : DbTransactionInterceptor
+{
+    public override void TransactionCommitted(System.Data.Common.DbTransaction transaction, TransactionEndEventData eventData) => watcher.Release();
+
+    public override Task TransactionCommittedAsync(System.Data.Common.DbTransaction transaction, TransactionEndEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        watcher.Release();
+        return Task.CompletedTask;
+    }
+
+    public override void TransactionRolledBack(System.Data.Common.DbTransaction transaction, TransactionEndEventData eventData) => watcher.Discard();
+
+    public override Task TransactionRolledBackAsync(System.Data.Common.DbTransaction transaction, TransactionEndEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        watcher.Discard();
+        return Task.CompletedTask;
     }
 }
 

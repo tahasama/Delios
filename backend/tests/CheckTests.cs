@@ -162,16 +162,13 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
     }
 
     [Fact]
-    public async Task Every_project_is_checked_once_a_day_by_itself_and_never_queued_twice()
+    public async Task A_run_is_never_queued_twice()
     {
         await using var app = await TestApp.StartAsync(infrastructure);
-        var scopes = app.Factory.Services.GetRequiredService<IServiceScopeFactory>();
-
-        Assert.Equal(1, await CheckScheduler.QueueDueAsync(scopes, default));
-        Assert.Equal(0, await CheckScheduler.QueueDueAsync(scopes, default));
-
         var controller = await app.SignedInAsync("controller@demo.local");
-        var (busy, body) = await Flow.PostAsync(controller, $"/api/projects/{await Api.ProjectIdAsync(controller)}/checks/run", new { });
+        var path = $"/api/projects/{await Api.ProjectIdAsync(controller)}/checks/run";
+        await Flow.PostAsync(controller, path, new { });
+        var (busy, body) = await Flow.PostAsync(controller, path, new { });
         Assert.Equal((HttpStatusCode.Conflict, "CHECKS_ALREADY_RUNNING"), (busy, Flow.Code(body)));
     }
 }

@@ -78,10 +78,10 @@ public static class NoticeLog
 }
 
 /// <summary>
-/// In the worker: the day's notices, sent once a day per project at its notify hour, on the project's own clock (owner:
-/// "09:00, and add it to settings as a choice"). Nothing sweeps the schedule: where things stand (ready, at risk,
-/// overdue) is read when someone looks; only what has to reach people without them looking falls on a date known in
-/// advance, and only the actions and steps whose date falls today are read.
+/// In the worker: the project's notices, at its notify hour on its own clock (owner: "09:00, and add it to settings as a
+/// choice"), only on the days something was written down for it (<see cref="NoticeDays"/>: owner, "the changes are the
+/// ones who tell us"). One alarm rings at the earliest moment of all projects; a change that writes an earlier one rings
+/// it again (<see cref="NoticeAlarmBell"/>). A day with nothing written runs nothing.
 /// <list type="bullet">
 /// <item>At risk: from the day an action's risk window opens until its day, each discipline still short of a document
 /// and not confirmed is told, once.</item>
@@ -93,146 +93,149 @@ public static class NoticeLog
 /// </list>
 /// A postponed action is left alone. Every notice is kept in the notice log and goes as a notification, an email and a pop-up.
 /// </summary>
-public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNotices> logger) : BackgroundService
+public sealed class ActionNotices(IServiceScopeFactory scopes, NoticeAlarmBell bell, IClock clock, ILogger<ActionNotices> logger) : BackgroundService
 {
     /// <summary>The project setting: the hour of the project's day (0–23) its notices go out.</summary>
     public const string NotifyAtKey = "NOTIFY_AT";
     /// <summary>Unless the project says otherwise: 09:00.</summary>
     public const int DefaultNotifyAt = 9;
-    /// <summary>How far back an action's day may lie and still be looked at: past the longest "notified again" (60 working days).</summary>
-    private const int PassedWindowDays = 120;
-
-    /// <summary>The day each project last had its notices, so a project runs once a day (a restart runs it again: nothing is sent twice).</summary>
-    private readonly Dictionary<Guid, LocalDate> ran = [];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
-        // A schedule read by an older version of the app's reading is read again once, after the app is updated
-        // (owner: never on a clock: the schedule is read when someone uploads it).
-        await CatchUpSchedulesAsync(stoppingToken);
+        // Once, when the worker starts: a project whose days were never written (just after this update) has them written.
+        await WriteMissingAsync(stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                var told = await RunAsync(stoppingToken);
-                if (told > 0) logger.LogInformation("Sent the day's notices: {Count}", told);
+                foreach (var (projectId, tenantId) in await DueAsync(stoppingToken))
+                {
+                    try { await RunAsync(projectId, tenantId, stoppingToken); }
+                    catch (Exception e) when (e is not OperationCanceledException)
+                    {
+                        // Failed: tried again in an hour, not at once over and over.
+                        logger.LogWarning(e, "The notices of project {Project} failed; trying again in an hour", projectId);
+                        await using var scope = scopes.CreateAsyncScope();
+                        var later = clock.GetCurrentInstant() + Duration.FromHours(1);
+                        await scope.ServiceProvider.GetRequiredService<DeliosDbContext>().Database
+                            .ExecuteSqlAsync($"UPDATE notice_alarms SET due_at = {later} WHERE project_id = {projectId}", stoppingToken);
+                    }
+                }
+                // Asleep until the earliest moment written, or until a change writes an earlier one.
+                var next = await NextAsync(stoppingToken);
+                var wait = next is { } at ? at - clock.GetCurrentInstant() : Duration.MaxValue;
+                await bell.WaitAsync(wait <= Duration.Zero ? TimeSpan.Zero
+                    : wait > Duration.FromDays(24) ? TimeSpan.FromDays(24) : wait.ToTimeSpan(), stoppingToken);
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                logger.LogWarning(e, "The day's notices failed; trying again within the hour");
+                logger.LogWarning(e, "Reading when the notices go failed; waiting for the next change");
+                await bell.WaitAsync(Timeout.InfiniteTimeSpan, stoppingToken);
             }
-            // Wakes at the top of every hour: a project's notify hour is a whole hour of its own clock.
-            var now = DateTimeOffset.UtcNow;
-            var next = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, 0, 5, TimeSpan.Zero).AddHours(1);
-            await Task.Delay(next - now, stoppingToken);
         }
     }
 
-    /// <summary>Every active tenant: the projects whose notify hour has come today, and only those, are run.</summary>
-    private async Task<int> RunAsync(CancellationToken cancellationToken)
+    /// <summary>The projects whose moment has come.</summary>
+    private async Task<List<(Guid ProjectId, Guid TenantId)>> DueAsync(CancellationToken cancellationToken)
     {
-        List<Guid> tenants;
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
+        var now = clock.GetCurrentInstant();
+        return (await db.Set<NoticeAlarm>().AsNoTracking().Where(a => a.DueAt != null && a.DueAt <= now)
+            .Select(a => new { a.ProjectId, a.TenantId }).ToListAsync(cancellationToken)).Select(a => (a.ProjectId, a.TenantId)).ToList();
+    }
+
+    private async Task<Instant?> NextAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<DeliosDbContext>().Set<NoticeAlarm>().Where(a => a.DueAt != null)
+            .MinAsync(a => a.DueAt, cancellationToken);
+    }
+
+    /// <summary>One project's moment: its day is marked told first, then its steps and actions are told, then its days written again.</summary>
+    private async Task RunAsync(Guid projectId, Guid tenantId, CancellationToken cancellationToken)
+    {
         await using (var scope = scopes.CreateAsyncScope())
         {
-            tenants = await scope.ServiceProvider.GetRequiredService<DeliosDbContext>().Tenants.AsNoTracking()
-                .Where(t => t.Active).Select(t => t.Id).ToListAsync(cancellationToken);
+            scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
+            var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == projectId, cancellationToken);
+            var today = WorkingCalendar.Today(clock, project.TimeZone);
+            await db.Database.ExecuteSqlAsync($"UPDATE notice_alarms SET last_run = {today} WHERE project_id = {projectId}", cancellationToken);
         }
         var told = 0;
-        foreach (var tenantId in tenants)
+        if (await StillActiveAsync(projectId, tenantId, cancellationToken))
         {
-            List<(Guid Id, LocalDate Today)> due;
             await using (var scope = scopes.CreateAsyncScope())
             {
                 scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
-                var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
-                var clock = scope.ServiceProvider.GetRequiredService<IClock>();
-                await using var read = await db.Database.BeginTransactionAsync(cancellationToken);
-                // One look per organization: its active projects with their clocks and notify hours.
-                var projects = await db.Projects.AsNoTracking().Where(p => p.Status == "ACTIVE").Select(p => new { p.Id, p.TimeZone }).ToListAsync(cancellationToken);
-                var hours = await db.Set<Settings.Setting>().AsNoTracking().Where(s => s.Key == NotifyAtKey).Select(s => new { s.ProjectId, s.Value }).ToListAsync(cancellationToken);
-                await read.CommitAsync(cancellationToken);
-                var orgHour = HourOf(hours.FirstOrDefault(h => h.ProjectId == null)?.Value);
-                due = [];
-                foreach (var p in projects)
-                {
-                    var hour = HourOf(hours.FirstOrDefault(h => h.ProjectId == p.Id)?.Value) ?? orgHour ?? DefaultNotifyAt;
-                    var local = clock.GetCurrentInstant().InZone(DateTimeZoneProviders.Tzdb.GetZoneOrNull(p.TimeZone) ?? DateTimeZone.Utc);
-                    if (local.Hour >= hour && (!ran.TryGetValue(p.Id, out var last) || last < local.Date)) due.Add((p.Id, local.Date));
-                }
+                told += await Reviews.ReviewWarnings.WarnProjectAsync(scope.ServiceProvider, projectId, cancellationToken);
             }
-            foreach (var (projectId, today) in due)
+            await using (var scope = scopes.CreateAsyncScope())
             {
-                try
-                {
-                    await using (var scope = scopes.CreateAsyncScope())
-                    {
-                        scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
-                        told += await Reviews.ReviewWarnings.WarnProjectAsync(scope.ServiceProvider, projectId, cancellationToken);
-                    }
-                    await using (var scope = scopes.CreateAsyncScope())
-                    {
-                        scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
-                        told += await ProjectAsync(scope.ServiceProvider, projectId, cancellationToken);
-                    }
-                    ran[projectId] = today;
-                }
-                catch (Exception e) when (e is not OperationCanceledException)
-                {
-                    logger.LogWarning(e, "The day's notices of project {Project} failed; trying again within the hour", projectId);
-                }
+                scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
+                told += await ProjectAsync(scope.ServiceProvider, projectId, cancellationToken);
             }
         }
-        return told;
+        await using (var scope = scopes.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
+            await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+            var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == projectId, cancellationToken);
+            var today = WorkingCalendar.Today(clock, project.TimeZone);
+            // What fell today is written again, from tomorrow on.
+            var activities = await db.Activities.Where(a => a.ProjectId == projectId && a.NoticeOn != null && a.NoticeOn <= today).Select(a => a.Id).ToListAsync(cancellationToken);
+            var steps = await (from s in db.ReviewSteps join r in db.Reviews on s.ReviewId equals r.Id
+                               where r.ProjectId == projectId && s.WarnOn != null && s.WarnOn <= today select s.Id).ToListAsync(cancellationToken);
+            await NoticeDays.WriteAsync(db, clock, project, activities, steps, cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+        }
+        if (told > 0) logger.LogInformation("Sent the notices of project {Project}: {Count}", projectId, told);
     }
 
-    private static int? HourOf(string? value) => int.TryParse(value, out var hour) && hour is >= 0 and <= 23 ? hour : null;
+    private async Task<bool> StillActiveAsync(Guid projectId, Guid tenantId, CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
+        await using var read = await db.Database.BeginTransactionAsync(cancellationToken);
+        return await db.Projects.AnyAsync(p => p.Id == projectId && p.Status == "ACTIVE", cancellationToken);
+    }
 
-    /// <summary>Once, when the worker starts: every project's schedule read by an older reading is read again.</summary>
-    private async Task CatchUpSchedulesAsync(CancellationToken cancellationToken)
+    /// <summary>Once, when the worker starts: every project with no moment kept yet has its days written.</summary>
+    private async Task WriteMissingAsync(CancellationToken cancellationToken)
     {
         try
         {
             List<Guid> tenants;
+            HashSet<Guid> kept;
             await using (var scope = scopes.CreateAsyncScope())
             {
-                tenants = await scope.ServiceProvider.GetRequiredService<DeliosDbContext>().Tenants.AsNoTracking()
-                    .Where(t => t.Active).Select(t => t.Id).ToListAsync(cancellationToken);
+                var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
+                tenants = await db.Tenants.AsNoTracking().Where(t => t.Active).Select(t => t.Id).ToListAsync(cancellationToken);
+                kept = (await db.Set<NoticeAlarm>().AsNoTracking().Select(a => a.ProjectId).ToListAsync(cancellationToken)).ToHashSet();
             }
             foreach (var tenantId in tenants)
             {
-                List<Guid> projects;
-                await using (var scope = scopes.CreateAsyncScope())
-                {
-                    scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
-                    var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
-                    await using var read = await db.Database.BeginTransactionAsync(cancellationToken);
-                    projects = await db.Projects.Where(p => p.Status == "ACTIVE").Select(p => p.Id).ToListAsync(cancellationToken);
-                    await read.CommitAsync(cancellationToken);
-                }
-                foreach (var projectId in projects)
-                {
-                    try
-                    {
-                        await using var catchUp = scopes.CreateAsyncScope();
-                        catchUp.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
-                        await catchUp.ServiceProvider.GetRequiredService<ScheduleImporter>().CatchUpAsync(projectId, cancellationToken);
-                    }
-                    catch (Exception e) when (e is not OperationCanceledException)
-                    {
-                        logger.LogWarning(e, "Reading the schedule of project {Project} again failed", projectId);
-                    }
-                }
+                await using var scope = scopes.CreateAsyncScope();
+                scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenantId);
+                var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
+                await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+                var projects = await db.Projects.AsNoTracking().Where(p => p.Status == "ACTIVE").ToListAsync(cancellationToken);
+                foreach (var project in projects.Where(p => !kept.Contains(p.Id)))
+                    await NoticeDays.WriteAsync(db, clock, project, null, null, cancellationToken);
+                await tx.CommitAsync(cancellationToken);
             }
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            logger.LogWarning(e, "Reading older schedules again failed");
+            logger.LogWarning(e, "Writing the notice days of projects that had none failed");
         }
     }
 
     /// <summary>
-    /// One project's day: only the actions whose risk window is open, or whose day passed lately, are read, their
+    /// One project's day: only the actions whose notice day has come (<see cref="Activity.NoticeOn"/>) are read, their
     /// documents read again first; nothing else of the schedule is touched.
     /// </summary>
     private static async Task<int> ProjectAsync(IServiceProvider services, Guid projectId, CancellationToken cancellationToken)
@@ -245,12 +248,11 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
         var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == projectId, cancellationToken);
         db.UseListsOf(project.Id, project.OwnListKeys, project.OwnFunctions);
         var today = WorkingCalendar.Today(clock, project.TimeZone);
-        var since = today.PlusDays(-PassedWindowDays);
+        var since = today.PlusDays(-NoticeDays.PassedWindowDays);
 
-        // What falls today: inside its risk window and its day still ahead, or its day passed lately.
-        var ids = await db.Activities.Where(a => a.ProjectId == projectId && a.State == ActivityStates.Active && a.Start != null
-                && a.Departments.Length > 0 && a.Requirements.Any()
-                && ((a.Start >= today && a.RiskFrom != null && a.RiskFrom <= today) || (a.Start < today && a.Start >= since)))
+        // What falls today, as written down by what changed it.
+        var ids = await db.Activities.Where(a => a.ProjectId == projectId && a.NoticeOn != null && a.NoticeOn <= today
+                && a.State == ActivityStates.Active && a.Start != null && a.Start >= since && a.Departments.Length > 0 && a.Requirements.Any())
             .Select(a => a.Id).ToListAsync(cancellationToken);
         if (ids.Count == 0) { await tx.CommitAsync(cancellationToken); return 0; }
         // Their documents as they stand now, before anyone is told.
@@ -310,6 +312,7 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, ILogger<ActionNot
                 continue;
             }
             // At risk: its risk window is open and its day is still ahead.
+            if (activity.RiskFrom is not { } riskFrom || riskFrom > today) continue;
             foreach (var department in activity.Departments.Where(d => missing[d] > 0 && !Confirmed(d)))
             {
                 var subject = $"activity:{activity.Id}:risk:{department}";

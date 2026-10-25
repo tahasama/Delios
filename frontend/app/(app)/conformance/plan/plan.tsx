@@ -647,11 +647,11 @@ export async function DocumentManagementPlan() {
       </Chapter>
 
       <Chapter n={n("assurance")} id="assurance" title="How it is checked"
-        why="The register checks itself every day, so its figures are always current, and some mistakes simply cannot happen."
+        why="The register checks itself whenever someone runs the checks, and its figures say when; some mistakes simply cannot happen."
         change={[{ href: "/conformance/checks", label: "Assurance" }]}>
         <Facts rows={[
           ["Target", `${scope.integrityThreshold}% of documents with nothing critical or major outstanding, and no critical finding open`],
-          ["How often", "Every day, by itself; anyone of the control function may run it again"],
+          ["How often", "When someone of the control function runs the checks (nothing runs by itself); the figures say when they last ran"],
           ["Checks", <span key="c">{CATALOG.length} questions the app answers from its own records <span className="text-slate-500">({checksBy.map((c) => `${c.count} ${PHASE_LABEL[c.phase].toLowerCase()}`).join(" · ")})</span></span>],
           ["Refused outright", `${PREVENTED.length} mistakes the app refuses at the moment someone tries (listed in each chapter)`],
         ]} />

@@ -1170,7 +1170,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   makes sure of it" (`prevented.ts` by area); "Set in" links on screen only. Every sentence is read from how the
   project is set up (`GET /management-plan`, `PlanEndpoints`, for what only the keepers read elsewhere); what is not set up is said
   where it belongs. Nothing on it is typed and nothing repeats a Settings page. Scope is said once (This project); the
-  target once (Assurance, "How it is measured", `MEASURE`; the checks run by themselves every day, so no interval). The
+  target once (Assurance, "How it is measured", `MEASURE`; the checks run when someone runs them, so no interval). The
   organization's name is its own. No exceptions register (it changed nothing): a check switched off, with why, is the
   departure that applies. `/settings/dmp` only redirects.
   **A plan, never a manual** (owner): it is the app's plan for this project, made of its switches, settings, the inputs
@@ -1503,8 +1503,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   muted, the title under; the names take 16rem and the bars the rest (owner: "give enough space for the bars"). A
   schedule read before its WBS was kept is read again by itself (owner: "users shouldn't have to do that"; no button):
   each read keeps the version of the reading that made it (`ScheduleImport.ReadWith`, `ScheduleImporter.ReaderVersion`,
-  raised whenever the reading keeps more), and the worker reads again the released revision's .xer read by an older one
-  (`CatchUpAsync`, once when the worker starts after an update), unless a list was uploaded since. The plan says when no action has a WBS (an
+  raised whenever the reading keeps more), and the released revision's .xer read by an older one is read again only
+  when needed (owner: "no full historical reprocessing merely because code was deployed"): the first time someone opens
+  that project's schedule (`AskCatchUpAsync` on `/plan` and `/plan/page`, message `schedule.catchup`, `CatchUpAsync` in
+  the worker), unless a list was uploaded since or it is no P6 export (then marked read, never asked again). Schedules
+  nobody opens are never read again. The plan says when no action has a WBS (an
   Excel schedule carries none), and offers "Group by WBS" when sorted another way. The plan opens on two months around today, held inside the schedule's own span
   (owner, "that applies as general": near or past its end, the window ends on the last action's day; near or before its
   start, it starts on the first's), and "Show every date" draws the actions' own days only, never stretched to today; says "the schedule
@@ -1551,18 +1554,24 @@ a screen only words it. A new rule goes in the backend, never in a page.
   question in plain words ("Does Mechanical confirm going ahead with the action
   without it? Confirm, and say why"); then one row of buttons (Confirm, Notify,
   Request a document), an opened form taking the width under them.
-- **Automatic notices go once a day, at the project's notify hour** (owner: "09:00, and add it to settings as a choice";
-  `ActionNotices`, setting `NOTIFY_AT`, 0–23 on the project's own clock, 09:00 by default; the Control room's "At risk"
-  step, the organization's Control room and Defaults for new projects, its switch `NOTIFY_AT` as every answer). Nothing
-  sweeps the schedule (owner: "most of it are states"): where things stand is read when someone looks; the worker wakes
-  each hour, asks each organization which projects reached their hour today, and reads only the actions whose risk
-  window is open or whose day passed in the last 120 days, and the steps falling due. Once each: at risk → each
+- **Automatic notices go at the project's notify hour, only on the days something was written down for it** (owner:
+  "09:00, and add it to settings as a choice"; "the changes are the ones who tell us"; `ActionNotices`, setting
+  `NOTIFY_AT`, 0–23 on the project's own clock, 09:00 by default; the Control room's "At risk" step, the organization's
+  Control room and Defaults for new projects, its switch `NOTIFY_AT` as every answer). Nothing sweeps the schedule and
+  nothing asks whether a day has something (owner: "most of it are states"): what changes an action (its documents,
+  confirmations, decisions), a review step, or how a project counts its days (settings, days off, the project) sends,
+  with its save, the notice days it moved (`NoticesMoved`, queue `delios.notices`); the worker writes them on the rows
+  (`Actions/NoticeDays.cs`: `Activity.NoticeOn`, the risk window opening, the day after the day, the day of notifying
+  again; `ReviewStep.WarnOn`) and each project's next moment (`notice_alarms`, no row-level security, its day at the
+  notify hour), and sleeps until the earliest of all (`NoticeAlarmBell` rings it when an earlier one is written). On
+  that moment it reads only what falls that day, then writes those days again. A day with nothing written runs
+  nothing. A failure tries again in an hour. Once each: at risk → each
   discipline still short and not confirmed; still silent some working days after the day (the Control room, Disciplines
   confirm, `ESCALATE_AFTER_DAYS`, 3 by default) → its people, Manage holders and the control function notified again;
   a review step due today or the next working day (`ReviewWarnings.WarnProjectAsync`). Confirmed disciplines and
   postponed actions are not notified. No notice for "all ready" or "day passed" (states, shown on the action and
   Home). The automatic confirmation on the day is written in the first day's notices after it. A schedule read by an
-  older reading is read again once when the worker starts, never on a clock.
+  older reading is read again when someone opens it, never on a clock.
 - Postponed: written with who decided and why; everyone concerned and whoever
   holds Plan are told; a Plan holder confirms it with what changes (a new
   schedule revision to follow); Document Control can take it back with a
@@ -1699,7 +1708,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   review, transmittal, package, action or revision it hangs from; an area by the part of the app it lives in; settings,
   lists, people, functions and organizations clear `all`; audit, notifications, sessions and the outbox clear nothing):
   on a screen's own act they come back on the answer (`X-Delios-Changed`) and `api()` clears them at once (`updateTag`,
-  read-your-own-writes); every change is also posted to the screens' route `/api/screens/changed` (`ScreensNotifier`,
+  read-your-own-writes); every change, once committed (`ScreenChangeCommits`, never before: a read in between would keep
+  the old answer), is also posted to the screens' route `/api/screens/changed` (`ScreensNotifier`,
   gathered a quarter of a second; `Screens__Url`, the shared `SCREENS_SECRET`; Caddy refuses it from outside), which
   clears them for every other session (`revalidateTag(tag, { expire: 0 })`). A write around the save (an `ExecuteUpdate`)
   names its labels itself (the virus check finishing a file: its document). A kept answer is read again within the
@@ -1749,5 +1759,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`/api/controlled`, no project) are an administrator's only. Any new reader of a document's parts goes through these.
 - **The notices job reads once a pass** (`ActionNotices.ProjectAsync`): what was already sent about the actions it
   reads, and the days off, once per project, never one query per action and discipline; it reads only the actions whose
-  date falls today (risk window open, day passed lately), never the whole schedule. A state is never kept fresh by a
+  notice day has come (`NoticeOn`), never the whole schedule.
+- **Nothing runs on a clock to find out what happened** (owner: "we do not send spies… we go outside and inform that it
+  just happened"): the outbox's relay runs in every process and sleeps until an act of that process, once committed with
+  a message, rings it (`OutboxWake`; on start it sends what was left waiting, a failure tries again after 5 seconds);
+  the checks run only when someone runs them (`CheckScheduler.RequestAsync`, no daily job); notices fall on days written
+  by what changed them (above). What stays timed is a fallback, never the way to learn of a change: a kept answer read
+  again within the hour, the search index's hourly catch-up (OpenSearch only, off by default), a page re-reading itself
+  while a file it waits for is checked (three minutes at most). A state is never kept fresh by a
   clock: it is read when looked at, or written by the act that changes it.
