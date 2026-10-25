@@ -764,3 +764,11 @@ membership, function and rights from the database (about four reads), and every 
 projects. Now: kept in memory until something about people, functions, rights, projects, organizations or settings
 changes in your organization, then read again once; at most 15 minutes in any case, as a safety net. The backend still
 checks every act; signing out and sessions ended work as before.
+
+---
+
+**The pages' kept answers never expire, and live in Valkey** (owner). Before: read again after an hour even when nothing
+changed, and kept in the screens' memory (lost on a restart). Now: kept until a change names them, in Valkey (shared by
+every screens server, surviving restarts); the answers worked out against today (the Schedule, reviews, transmittals) are
+kept per day of the project. The backend also writes each change into Valkey itself, so nothing is missed while the
+screens are down. The values of lists, read on every page, are read once for everyone of the organization.

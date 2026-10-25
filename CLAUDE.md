@@ -1735,10 +1735,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the old answer), is also posted to the screens' route `/api/screens/changed` (`ScreensNotifier`,
   gathered a quarter of a second; `Screens__Url`, the shared `SCREENS_SECRET`; Caddy refuses it from outside), which
   clears them for every other session (`revalidateTag(tag, { expire: 0 })`). A write around the save (an `ExecuteUpdate`)
-  names its labels itself (the virus check finishing a file: its document). A kept answer is read again within the
-  hour at most (`KEEP_SECONDS`, for today's date), and kept in memory only, at most 100 MB, the copies used longest ago
-  dropping by themselves (owner: "cap them"; `next.config.ts` `cacheMaxMemorySize`, `isrFlushToDisk: false`; a restart of
-  the screens starts them empty). Kept: every read a page draws from (owner: reports, cleared only by
+  names its labels itself (the virus check finishing a file: its document). **Nothing expires** (owner: "the same old image unless something
+  changed"): a kept answer stands until a change names one of its labels; an answer the backend works out against today
+  (areas plan, reviews, transmittals: an action at risk, a step late, an answer overdue) is kept per day of its project
+  (`dayOf`, header `X-Delios-Day`, the project's own midnight); what a page words from a date needs none. Kept in Valkey,
+  not in the screens (owner: "copies in Redis"; `frontend/cache-handler.mjs`, `SCREENS_CACHE_REDIS`, database 1;
+  `cacheMaxMemorySize: 0`): it survives a restart and is shared by every screens server; each label keeps when it was
+  last named (`next:tags`), written by the screens' own acts and by the backend itself (`ScreensNotifier`,
+  `Screens__CacheDb`), so a change made while the screens are down is never missed; a screens server finding Valkey
+  again after losing it leaves every older answer unused (`next:epoch`). Valkey stays within 512 MB (`volatile-lru`: kept
+  answers, which carry an end of 30 days unused, go first; the labels' times and the access numbers carry none and stay).
+  Valkey unreachable: nothing is kept. Kept: every read a page draws from (owner: reports, cleared only by
   Count again, the register,
   documents, transmittals, packages, assets, reviews, Assurance and its plan, the Schedule and the calendar, Home and its
   log, every Settings and organization page: a settings read keeps `areas: []`, cleared by `all`). Never kept, read fresh
@@ -1788,6 +1795,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `PROJECT_DEFAULTS`, `LIBERTY…`, the new projects' place), only the words (`STATE_NAME:`, `SET:`, `DATE_FORMAT`, the
   stamp's) for another organization's people, the same on a project's settings; `/api/liberty` none to them. The organization's controlled lists
   (`/api/controlled`, no project) are an administrator's only. Any new reader of a document's parts goes through these.
+- **Answers the same for everyone of the organization** (owner: "shared reference data", "one read instead of 200"):
+  read once in each backend process for all who ask, until how the organization works changes
+  (`AccessVersions.SharedAsync`, under the same number as access): the values of lists (`/api/values`, read on every
+  page) and which set serves which type (`/api/values/serving`), per project lists. Never an answer that depends on
+  who asks (most Settings pages say who may change them: theirs stay per person).
 - **Who you are and what you may do is kept until it changes** (owner: "literally static once done"): each project's
   access (`ProjectAccessLoader`) and `/api/me` are kept in each process's memory under the organization's number in Redis
   (`Platform/AccessVersions.cs`, `access:v:<tenant>`), raised once committed by every change that clears `all` on the
