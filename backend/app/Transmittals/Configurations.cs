@@ -90,7 +90,8 @@ internal sealed class TransmittalItemConfiguration : IEntityTypeConfiguration<Tr
         b.HasOne<Revision>().WithMany().HasForeignKey(x => x.RevisionId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => x.TransmittalId);
         b.HasIndex(x => x.RevisionId);
-        b.HasIndex(x => x.DocumentId);
+        // What passed with another organization, by document and kind (placeholder, submission, unplanned).
+        b.HasIndex(x => new { x.DocumentId, x.Kind });
         b.Property(x => x.DocumentNumber).HasMaxLength(128);
         b.Property(x => x.Title).HasMaxLength(500);
         b.Property(x => x.RevisionValue).HasMaxLength(32);

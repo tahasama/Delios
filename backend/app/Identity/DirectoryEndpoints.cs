@@ -189,7 +189,8 @@ public static class DirectoryEndpoints
     private static async Task<IResult> UsersAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {
         var users = await db.Users.AsNoTracking().Include(u => u.Party).OrderBy(u => u.Name).ToListAsync(cancellationToken);
-        var memberships = await db.Memberships.AsNoTracking().Include(m => m.Function).Include(m => m.Project).ToListAsync(cancellationToken);
+        var memberships = (await db.Memberships.AsNoTracking().Include(m => m.Function).Include(m => m.Project).ToListAsync(cancellationToken))
+            .ToLookup(m => m.UserId);
         var seen = await SeenAsync(db, cancellationToken);
         return Results.Ok(users.Select(u => new
         {
@@ -208,11 +209,11 @@ public static class DirectoryEndpoints
             LockedUntil = u.LockedUntil?.ToDateTimeOffset(),
             CreatedAt = u.CreatedAt.ToDateTimeOffset(),
             u.HomeFunction,
-            // The last time they signed in (or switched in from their own DELIOS), from the audit trail.
+            // The last time they signed in (or switched in from their own DELIOS), kept with the act.
             LastSignInAt = seen.SignIns.TryGetValue(u.Id, out var signedIn) ? signedIn.ToDateTimeOffset() : (DateTimeOffset?)null,
-            Memberships = memberships.Where(m => m.UserId == u.Id).Select(m => new
+            Memberships = memberships[u.Id].Select(m => new
             {
-                // On the project since: confirmed, else first put on it (the audit trail), else their account's day.
+                // On the project since: confirmed, else first put on it (kept with the act), else their account's day.
                 Since = (m.ConfirmedAt ?? (seen.Joined.TryGetValue((u.Id, m.ProjectId), out var joined) ? joined : u.CreatedAt)).ToDateTimeOffset(),
                 // Their last act on the project.
                 LastSeenAt = seen.Acts.TryGetValue((u.Id, m.ProjectId), out var last) ? last.ToDateTimeOffset() : (DateTimeOffset?)null,
@@ -246,18 +247,14 @@ public static class DirectoryEndpoints
         Dictionary<(Guid, Guid), Instant> FirstActs)>
         SeenAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {
-        string[] signIns = ["SIGN_IN", "SIGN_IN_MFA", "SIGN_IN_SSO", "LOGIN", "SWITCHED_IN"];
-        string[] joins = ["MEMBERSHIP_CHANGED", "PERSON_JOINED_PROJECT"];
-        var signedIn = await db.AuditEvents.AsNoTracking().Where(e => e.ActorId != null && signIns.Contains(e.Action))
-            .GroupBy(e => e.ActorId!.Value).Select(g => new { g.Key, At = g.Max(e => e.At) }).ToListAsync(cancellationToken);
-        var joined = await db.AuditEvents.AsNoTracking().Where(e => e.EntityType == "User" && e.EntityId != null && e.ProjectId != null && joins.Contains(e.Action))
-            .GroupBy(e => new { User = e.EntityId!.Value, Project = e.ProjectId!.Value }).Select(g => new { g.Key, At = g.Min(e => e.At) }).ToListAsync(cancellationToken);
-        var acts = await db.AuditEvents.AsNoTracking().Where(e => e.ActorId != null && e.ProjectId != null)
-            .GroupBy(e => new { User = e.ActorId!.Value, Project = e.ProjectId!.Value }).Select(g => new { g.Key, At = g.Max(e => e.At), First = g.Min(e => e.At) }).ToListAsync(cancellationToken);
-        return (signedIn.ToDictionary(r => r.Key, r => r.At),
-            joined.ToDictionary(r => (r.Key.User, r.Key.Project), r => r.At),
-            acts.ToDictionary(r => (r.Key.User, r.Key.Project), r => r.At),
-            acts.ToDictionary(r => (r.Key.User, r.Key.Project), r => r.First));
+        // Written with each act (people_seen, audit_seen): never worked out again from the whole trail (owner).
+        var rows = await db.PeopleSeen.AsNoTracking().ToListAsync(cancellationToken);
+        var signIns = rows.Where(r => r.ProjectId == PersonSeen.SignIns && r.LastAt is not null).ToDictionary(r => r.UserId, r => r.LastAt!.Value);
+        var onProjects = rows.Where(r => r.ProjectId != PersonSeen.SignIns).ToList();
+        return (signIns,
+            onProjects.Where(r => r.JoinedAt is not null).ToDictionary(r => (r.UserId, r.ProjectId), r => r.JoinedAt!.Value),
+            onProjects.Where(r => r.LastAt is not null).ToDictionary(r => (r.UserId, r.ProjectId), r => r.LastAt!.Value),
+            onProjects.Where(r => r.FirstAt is not null).ToDictionary(r => (r.UserId, r.ProjectId), r => r.FirstAt!.Value));
     }
 
     /// <summary><c>POST /api/admin/users</c>: a new person. Their email signs them in to this organization alone.</summary>
@@ -871,7 +868,8 @@ public static class DirectoryEndpoints
         var peopleOf = (await db.Users.AsNoTracking().Where(u => u.PartyId != null).Select(u => new { u.Id, u.PartyId }).ToListAsync(cancellationToken))
             .GroupBy(u => u.PartyId!.Value).ToDictionary(g => g.Key, g => g.Select(u => u.Id).ToList());
         // Joined a project: the earliest of the day it was put on it and the day its people first came or acted there.
-        var seats = await db.Memberships.AsNoTracking().Select(m => new { m.UserId, m.ProjectId, m.ConfirmedAt }).ToListAsync(cancellationToken);
+        var seats = (await db.Memberships.AsNoTracking().Where(m => m.ConfirmedAt != null).Select(m => new { m.UserId, m.ProjectId, m.ConfirmedAt })
+            .ToListAsync(cancellationToken)).GroupBy(m => (m.UserId, m.ProjectId)).ToDictionary(g => g.Key, g => g.Min(m => m.ConfirmedAt!.Value));
         DateTimeOffset Joined(Guid partyId, Guid projectId, Instant added)
         {
             var earliest = added;
@@ -880,7 +878,7 @@ public static class DirectoryEndpoints
                 {
                     if (seen.Joined.TryGetValue((id, projectId), out var j) && j < earliest) earliest = j;
                     if (seen.FirstActs.TryGetValue((id, projectId), out var f) && f < earliest) earliest = f;
-                    if (seats.FirstOrDefault(m => m.UserId == id && m.ProjectId == projectId)?.ConfirmedAt is { } c && c < earliest) earliest = c;
+                    if (seats.TryGetValue((id, projectId), out var c) && c < earliest) earliest = c;
                 }
             return earliest.ToDateTimeOffset();
         }

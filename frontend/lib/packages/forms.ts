@@ -207,6 +207,12 @@ export async function sharePackageAction(_prev: { error?: string } | undefined, 
   return error ? { error } : {};
 }
 
+/** "Fill the package": its supplier's documents in none of its packages yet are filed, by hand only. */
+export async function fillPackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const { error } = await onPackage(String(formData.get("packageId") ?? ""), "/fill", {});
+  return error ? { error } : {};
+}
+
 /**
  * Delete a package that holds nothing and never went anywhere. Its documents
  * stay in the register; only the package goes. The number is not given out again.

@@ -93,6 +93,7 @@ const WORDS: Record<string, string> = {
   PACKAGE_UNSHARED: "Put a package back to not shared",
   PACKAGE_MEMBERS_ADDED: "Added documents to a package",
   PACKAGE_MEMBERS_REMOVED: "Took documents out of a package",
+  PACKAGE_FILLED: "Filled a supplier's package with its documents",
   PACKAGE_DELIVERED: "Delivered a package",
   PACKAGE_ASSESSED: "Checked a package",
   PACKAGE_ACCEPTED: "Accepted a package",

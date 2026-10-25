@@ -343,6 +343,8 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.UserId, x.ReadAt, x.CreatedAt });
+        // A person's notifications on one project.
+        b.HasIndex(x => new { x.UserId, x.ProjectId, x.CreatedAt });
         b.Property(x => x.Kind).HasMaxLength(40);
         b.Property(x => x.Title).HasMaxLength(300);
         b.Property(x => x.Body).HasMaxLength(2000);

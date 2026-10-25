@@ -37,6 +37,8 @@ public sealed class ScreenChanges
     internal bool Outbox { get; set; }
     /// <summary>What moved notice days, per organization, sent with the save (<see cref="Actions.NoticesMoved"/>).</summary>
     internal Dictionary<Guid, NoticeMoves> Moves { get; } = [];
+    /// <summary>The projects, per organization, whose packages a change may move (<see cref="Packages.PackagesMoved"/>).</summary>
+    internal Dictionary<Guid, HashSet<Guid>> PackageMoves { get; } = [];
 
     /// <summary>A project's area changed (plan, docs, reviews, transmittals, packages, assets, checks).</summary>
     public void Area(Guid? projectId, string area)
@@ -93,7 +95,7 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
     private static readonly HashSet<string> Silent =
     [
         "AuditEvent", "OutboxMessage", "Session", "Notification", "EmailMessage", "PushSubscription", "SearchWatermark",
-        "DocumentSnapshot", "IdempotencyRecord", "FileText", "DataProtectionKey", "Notice", "NoticeAlarm",
+        "DocumentSnapshot", "IdempotencyRecord", "PersonSeen", "FileText", "DataProtectionKey", "Notice", "NoticeAlarm",
     ];
 
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result,
@@ -132,8 +134,20 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
             // A document, or the project that says how its text is read, changed: the search index is told.
             if (type.Name is "Document" or "Project" && Guid(entry, "TenantId") is { } tenant) changes.SearchTenants.Add(tenant);
             Moves(entry, type);
+            MovesPackages(entry, type);
             Mark(entry, type);
         }
+        // What a package's rule admits, or its tree hands down, is worked out after the save that may move it.
+        foreach (var (tenantId, projects) in changes.PackageMoves)
+        {
+            context.Add(new Messaging.OutboxMessage
+            {
+                RoutingKey = Packages.PackagesMoved.RoutingKey,
+                Payload = System.Text.Json.JsonSerializer.Serialize(new Packages.PackagesMoved(tenantId, [.. projects])),
+            });
+            changes.Outbox = true;
+        }
+        changes.PackageMoves.Clear();
         // The notice days moved go with the save itself: committed with it, or not at all.
         foreach (var (tenantId, moves) in changes.Moves)
         {
@@ -180,6 +194,32 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
                 break;
         }
     }
+
+    /// <summary>
+    /// What may move a package (owner: worked out when a document or a package changes, never when a list opens): a
+    /// document registered, or changed in what a rule reads (its types, discipline, originator, order, state); a tag
+    /// linked or unlinked; a package made, or changed in its rule, its place or its state. The packages' own work
+    /// (members taken in, handed down) sends nothing again.
+    /// </summary>
+    private void MovesPackages(EntityEntry entry, Type type)
+    {
+        var moves = (type.Namespace, type.Name) switch
+        {
+            ("Delios.Host.Documents", "Document") => entry.State == EntityState.Added || Changed(entry, RuleReads),
+            ("Delios.Host.Records", "DocumentAsset") => entry.State != EntityState.Modified,
+            ("Delios.Host.Packages", "Package") => entry.State == EntityState.Added || Changed(entry, PackageMoves)
+                || entry.References.Any(r => r.TargetEntry is { State: EntityState.Added or EntityState.Modified or EntityState.Deleted }),
+            _ => false,
+        };
+        if (!moves || Guid(entry, "TenantId") is not { } tenantId || Guid(entry, "ProjectId") is not { } projectId) return;
+        (changes.PackageMoves.TryGetValue(tenantId, out var set) ? set : changes.PackageMoves[tenantId] = []).Add(projectId);
+    }
+
+    private static readonly HashSet<string> RuleReads = ["DeliverableType", "DocType", "Discipline", "Originator", "ContractRef", "State"];
+    private static readonly HashSet<string> PackageMoves = ["ParentId", "State", "RuleCeasedAt"];
+
+    private static bool Changed(EntityEntry entry, HashSet<string> names) =>
+        entry.State == EntityState.Modified && entry.Properties.Any(p => p.IsModified && names.Contains(p.Metadata.Name));
 
     /// <summary>
     /// A change only to what no screen shows as such (a failed sign-in counted, a lock): it clears nothing, or every

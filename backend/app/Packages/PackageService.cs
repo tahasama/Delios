@@ -363,6 +363,26 @@ public sealed partial class PackageService(
         return (package, null);
     }
 
+    /// <summary>
+    /// "Fill the package" (owner: by hand, never by itself): every document of the package's supplier not yet in any of
+    /// its packages is filed, each where a new one would go (the package for its order first). The control function, or
+    /// whoever stands in for it on a project with none.
+    /// </summary>
+    public async Task<(Package? Package, IResult? Problem)> FillAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
+    {
+        var (package, problem) = await ComposableAsync(access, id, cancellationToken);
+        if (problem is not null) return Fail(problem);
+        if (package!.Kind != PackageKinds.Supply)
+            return Fail(Problems.Conflict("NOT_A_SUPPLY_PACKAGE", "Only a supplier's package is filled with its supplier's documents."));
+        var supplier = await db.Parties.AsNoTracking().SingleAsync(p => p.Id == package.SupplierPartyId, cancellationToken);
+        var filed = await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken, originator: supplier.Code);
+        await audit.WriteAsync(Actor(access), "PACKAGE_FILLED", "Package", package.Id, package.Number,
+            filed == 0 ? $"Nothing of {supplier.Name} was left to file." : $"{filed} document(s) of {supplier.Name} filed in its packages.",
+            package.ProjectId, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await LoadAsync(access, id, cancellationToken), null);
+    }
+
     /// <summary>How the project takes other organizations' documents (<see cref="Intake"/>).</summary>
     public Task<IntakeView> IntakeAsync(Guid projectId, CancellationToken cancellationToken) => Intake.ReadAsync(db, projectId, cancellationToken);
 
@@ -476,6 +496,7 @@ public sealed partial class PackageService(
         if (package.SharedAt is not null)
             return Problems.Conflict("PACKAGE_SHARED", "It was shared with its supplier; it is kept.");
         var held = package.Members.Count;
+        var heldIds = package.Members.Select(m => m.DocumentId).ToList();
         // A supplier's branch hands its documents back to the package it sits in, which takes them again.
         Package? up = null;
         if (supply && held > 0 && package.ParentId is { } parentId)
@@ -499,7 +520,8 @@ public sealed partial class PackageService(
             $"{package.Title}: deleted before it was shared{(held > 0 ? up is not null ? $"; its {held} document(s) go back to {up.Number}" : $"; its {held} document(s) stay in the register" : ", empty")}.{(Blank(reason) is { } why ? $" {why}" : "")}",
             package.ProjectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        if (held > 0) await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken);
+        // Its documents only, filed where a new one would go.
+        if (held > 0) await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken, documentIds: heldIds);
         return null;
     }
 
@@ -651,36 +673,62 @@ public sealed partial class PackageService(
                 && (m.RequiredStatuses.Length > 0 ? m.RequiredStatuses : package.RequiredStatuses).Contains(status));
             return new PackagePlace(null, [], [], new PackageTally(0, 0, ownIds.Count, ready, ownIds.Count(at.ContainsKey)));
         }
-        var all = await Visible(access).AsNoTracking().Where(p => p.Kind == package.Kind)
-            .Select(p => new { p.Id, p.ParentId, p.Number, p.Title, p.State, p.RequiredStatuses })
+        var facts = await TreeFactsAsync(access, package.Kind, [package.Id], cancellationToken);
+        return PlaceOf(package, facts);
+    }
+
+    /// <summary>A package of the trees read, as the tree reads it.</summary>
+    internal sealed record TreeNode(Guid Id, Guid? ParentId, string Number, string Title, string State, string[] RequiredStatuses);
+    internal sealed record TreeMember(Guid PackageId, Guid DocumentId, string[] RequiredStatuses);
+    /// <summary>What the places of packages of one kind are worked out from: read once for a whole list.</summary>
+    internal sealed record TreeFacts(Dictionary<Guid, TreeNode> All, Dictionary<Guid, List<Guid>> Children, List<TreeMember> Members,
+        Dictionary<Guid, string?> Released, bool Internal);
+
+    /// <summary>
+    /// The packages of one kind the reader sees, and the documents of the trees holding those named (each with every
+    /// package under it), with their released status: one read for every package of a list.
+    /// </summary>
+    internal async Task<TreeFacts> TreeFactsAsync(ProjectAccess access, string kind, IReadOnlyCollection<Guid> packageIds, CancellationToken cancellationToken)
+    {
+        var all = await Visible(access).AsNoTracking().Where(p => p.Kind == kind)
+            .Select(p => new TreeNode(p.Id, p.ParentId, p.Number, p.Title, p.State, p.RequiredStatuses))
             .ToDictionaryAsync(p => p.Id, cancellationToken);
         var children = all.Values.Where(p => p.ParentId is not null && all.ContainsKey(p.ParentId.Value))
             .GroupBy(p => p.ParentId!.Value).ToDictionary(g => g.Key, g => g.OrderBy(p => p.Number).Select(p => p.Id).ToList());
-        List<Guid> Under(Guid id)
-        {
-            var found = new List<Guid>();
-            var seen = new HashSet<Guid> { id };
-            var queue = new Queue<Guid>([id]);
-            while (queue.TryDequeue(out var at))
-                foreach (var child in children.GetValueOrDefault(at) ?? [])
-                    if (seen.Add(child)) { found.Add(child); queue.Enqueue(child); }
-            return found;
-        }
-        var below = Under(package.Id);
-        var counted = below.Append(package.Id).ToList();
-        var members = await db.PackageMembers.AsNoTracking().Where(m => counted.Contains(m.PackageId))
+        var counted = new HashSet<Guid>();
+        foreach (var id in packageIds) { counted.Add(id); counted.UnionWith(Under(children, id)); }
+        var ids = counted.ToList();
+        var members = await db.PackageMembers.AsNoTracking().Where(m => ids.Contains(m.PackageId))
             .Where(m => access.IsInternal || m.RequestedAt != null)
-            .Select(m => new { m.PackageId, m.DocumentId, m.RequiredStatuses }).ToListAsync(cancellationToken);
+            .Select(m => new TreeMember(m.PackageId, m.DocumentId, m.RequiredStatuses)).ToListAsync(cancellationToken);
         var documentIds = members.Select(m => m.DocumentId).Distinct().ToList();
         var released = (await db.Revisions.AsNoTracking().Where(r => documentIds.Contains(r.DocumentId) && r.State == RevisionStates.Released)
             .Select(r => new { r.DocumentId, r.StatusCode }).ToListAsync(cancellationToken))
             .GroupBy(r => r.DocumentId).ToDictionary(g => g.Key, g => g.First().StatusCode);
+        return new TreeFacts(all, children, members, released, access.IsInternal);
+    }
+
+    private static List<Guid> Under(Dictionary<Guid, List<Guid>> children, Guid id)
+    {
+        var found = new List<Guid>();
+        var seen = new HashSet<Guid> { id };
+        var queue = new Queue<Guid>([id]);
+        while (queue.TryDequeue(out var at))
+            foreach (var child in children.GetValueOrDefault(at) ?? [])
+                if (seen.Add(child)) { found.Add(child); queue.Enqueue(child); }
+        return found;
+    }
+
+    /// <summary>Where a package sits and what it holds below, from the facts read for its trees.</summary>
+    internal static PackagePlace PlaceOf(Package package, TreeFacts facts)
+    {
+        var (all, children, members, released) = (facts.All, facts.Children, facts.Members, facts.Released);
+        var byPackage = members.GroupBy(m => m.PackageId).ToDictionary(g => g.Key, g => g.ToList());
         // A package and everything under it: how many packages below (and still open), its documents once each, how many
         // are released at the status their package needs, and how many are released at all.
         PackageTally Tally(Guid root, IReadOnlyCollection<Guid> under)
         {
-            var ids = under.Append(root).ToHashSet();
-            var lines = members.Where(m => ids.Contains(m.PackageId)).ToList();
+            var lines = under.Append(root).Distinct().SelectMany(id => byPackage.GetValueOrDefault(id) ?? []).ToList();
             bool Ready(Guid packageId, Guid documentId, string[] own) =>
                 released.TryGetValue(documentId, out var status) && status is not null
                 && (own.Length > 0 ? own : all.TryGetValue(packageId, out var p) ? p.RequiredStatuses : []).Contains(status);
@@ -699,9 +747,9 @@ public sealed partial class PackageService(
         var branches = (children.GetValueOrDefault(package.Id) ?? []).Select(id =>
         {
             var b = all[id];
-            return new BranchView(b.Id, b.Number, b.Title, b.State, children.GetValueOrDefault(id)?.Count ?? 0, Tally(id, Under(id)));
+            return new BranchView(b.Id, b.Number, b.Title, b.State, children.GetValueOrDefault(id)?.Count ?? 0, Tally(id, Under(children, id)));
         }).ToList();
-        return new PackagePlace(package.ParentId is { } p && all.ContainsKey(p) ? p : null, path, branches, Tally(package.Id, below));
+        return new PackagePlace(package.ParentId is { } p && all.ContainsKey(p) ? p : null, path, branches, Tally(package.Id, Under(children, package.Id)));
     }
 
     // ── Readiness ─────────────────────────────────────────────────────────────
@@ -985,9 +1033,6 @@ public sealed partial class PackageService(
     public async Task<IReadOnlyList<PackageSummary>> ListAsync(ProjectAccess access, CancellationToken cancellationToken)
     {
         if (!access.Holds(Verbs.Read)) return [];
-        // Supplier documents registered before packages were made by themselves join their package now.
-        if (access.IsInternal && (access.Holds(Verbs.Control) || await StandIns.NoControlAsync(db, access.Project.Id, cancellationToken)))
-            await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken);
         var rows = await Visible(access)
             .OrderByDescending(p => p.CreatedAt).Take(500)
             .Select(p => new
@@ -1011,18 +1056,36 @@ public sealed partial class PackageService(
             p.CompletionDate?.ToDateOnly(), p.CreatedAt.ToDateTimeOffset(), p.Kind, p.Supplier, p.PurchaseOrder, p.ParentId)).ToList();
     }
 
-    /// <summary>The package, brought up to date with its rule.</summary>
-    public async Task<Package?> ReadAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
+    /// <summary>The package of this number the reader sees, if any.</summary>
+    public async Task<Guid?> IdOfAsync(ProjectAccess access, string number, CancellationToken cancellationToken) =>
+        access.Holds(Verbs.Read)
+            ? await Visible(access).Where(p => p.Number == number).Select(p => (Guid?)p.Id).FirstOrDefaultAsync(cancellationToken)
+            : null;
+
+    /// <summary>
+    /// The package as it stands. Reading it changes nothing (owner): what its rule admits, and what goes down its tree,
+    /// is worked out when a document or a package changes (<see cref="RestateAsync"/>).
+    /// </summary>
+    public Task<Package?> ReadAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken) =>
+        LoadAsync(access, id, cancellationToken);
+
+    /// <summary>
+    /// In the worker, after a document or a package of these projects changed (<see cref="PackagesMoved"/>): every open
+    /// package with a rule takes what it now admits, and what a package under another holds goes down to it. Saves.
+    /// </summary>
+    public async Task RestateAsync(IReadOnlyCollection<Guid> projectIds, CancellationToken cancellationToken)
     {
-        var package = await LoadAsync(access, id, cancellationToken);
-        if (package is null) return null;
-        var handed = await HandDownAsync(package, cancellationToken);
-        if (await SyncAsync(package, cancellationToken) > 0 || handed)
+        var packages = await db.Packages.Include(p => p.Members)
+            .Where(p => projectIds.Contains(p.ProjectId) && p.State == PackageStates.Open
+                && ((p.Rule != null && p.RuleCeasedAt == null) || db.Packages.Any(c => c.ParentId == p.Id)))
+            .AsSplitQuery().ToListAsync(cancellationToken);
+        var changed = false;
+        foreach (var package in packages)
         {
-            ResetAssessment(package);
-            await db.SaveChangesAsync(cancellationToken);
+            var handed = await HandDownAsync(package, cancellationToken);
+            if (await SyncAsync(package, cancellationToken) > 0 || handed) { ResetAssessment(package); changed = true; }
         }
-        return package;
+        if (changed) await db.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>

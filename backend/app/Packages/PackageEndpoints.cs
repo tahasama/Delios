@@ -114,6 +114,8 @@ public static class PackageEndpoints
             Act(h, s, (a) => s.AcceptAsync(a, packageId, r, c)));
         project.MapPost("/{packageId:guid}/share", (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.ShareAsync(a, packageId, c)));
+        project.MapPost("/{packageId:guid}/fill", (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
+            Act(h, s, (a) => s.FillAsync(a, packageId, c)));
         project.MapPost("/{packageId:guid}/request", (Guid packageId, SupplyRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.RequestAsync(a, packageId, r, c)));
         project.MapPut("/{packageId:guid}/place", (Guid packageId, MoveRequest r, HttpContext h, PackageService s, CancellationToken c) =>
@@ -163,8 +165,8 @@ public static class PackageEndpoints
     private static async Task<IResult> ByNumberAsync(string number, HttpContext http, PackageService packages, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        var row = (await packages.ListAsync(access, cancellationToken)).FirstOrDefault(r => r.Number == number);
-        return row is not null && await packages.ReadAsync(access, row.Id, cancellationToken) is { } package
+        // One look by its number, never the whole list.
+        return await packages.IdOfAsync(access, number, cancellationToken) is { } id && await packages.ReadAsync(access, id, cancellationToken) is { } package
             ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !access.IsInternal, access: access))
             : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package.");
     }

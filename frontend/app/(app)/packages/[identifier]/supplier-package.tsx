@@ -3,7 +3,7 @@ import { requireScope } from "@/lib/core/scope";
 import { isController, isAdmin, hasVerb, standsInForControl } from "@/lib/core/auth";
 import { DataTable, Th, Td, Field, inputCls, ToneChip, Chip, btn } from "@/components/ui";
 import { FileTally } from "./file-tally";
-import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@/lib/packages/forms";
+import { setPackageRuleAction, sharePackageAction, deletePackageAction, fillPackageAction } from "@/lib/packages/forms";
 import { PackageLines, type PackageLine } from "./package-lines";
 import { ruleFilter, ruleWords } from "@/lib/packages/package-rule";
 import { RuleFields } from "../rule-fields";
@@ -14,7 +14,7 @@ import { AsReceivedWarning } from "@/components/as-received-warning";
 import { supplierRows, supplierFigures, packageStage, packageCounts, lineStage, WITH_SUPPLIER, type SupplierRow } from "@/lib/packages/supplier";
 import { fmtDate } from "@/lib/core/utils";
 import { plannedState } from "@/lib/actions/planned-state";
-import { ArrowLeft, Download, Filter, PackageCheck, Pencil, Send, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Filter, FolderInput, PackageCheck, Pencil, Send, Share2, Trash2 } from "lucide-react";
 import { getMe } from "@/lib/account/api";
 import type { PackageView } from "@/lib/types";
 import { Branches, MovePackage, PackagePath, moveTargets } from "../arborescence";
@@ -288,6 +288,13 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
                 <Act icon={Share2} label={`Share with ${supplierName}`} primary>
                   <ActionForm action={sharePackageAction} submitLabel={`Share with ${supplierName}`} size="sm" hidden={{ packageId: pkg.id }} confirmText={`Once shared, ${supplierName} sees this package for good. Continue?`}>
                     <p className="text-xs leading-5 text-slate-600">Once shared, {supplierName} sees this package for good, with only the documents sent to them on a transmittal. You can no longer rename it, change its rule or delete it.</p>
+                  </ActionForm>
+                </Act>
+              ) : null}
+              {pkg.state === "OPEN" ? (
+                <Act icon={FolderInput} label="Fill the package">
+                  <ActionForm action={fillPackageAction} submitLabel="Fill the package" size="sm" hidden={{ packageId: pkg.id }}>
+                    <p className="text-xs leading-5 text-slate-600">Files every document of {supplierName} that is in none of its packages yet, each where a new one would go: the package for its order first. Nothing is filed by itself until you do.</p>
                   </ActionForm>
                 </Act>
               ) : null}

@@ -687,8 +687,14 @@ namespace Delios.Host.Platform.Migrations
                     b.HasIndex("ActorId", "Id")
                         .HasDatabaseName("ix_audit_events_actor_id_id");
 
+                    b.HasIndex("EntityId", "Id")
+                        .HasDatabaseName("ix_audit_events_entity_id_id");
+
                     b.HasIndex("EntityType", "EntityId")
                         .HasDatabaseName("ix_audit_events_entity_type_entity_id");
+
+                    b.HasIndex("ProjectId", "Id")
+                        .HasDatabaseName("ix_audit_events_project_id_id");
 
                     b.HasIndex("TenantId", "Id")
                         .HasDatabaseName("ix_audit_events_tenant_id_id");
@@ -1196,6 +1202,9 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasIndex("CorrectsId")
                         .HasDatabaseName("ix_documents_corrects_id");
+
+                    b.HasIndex("LatestRevisionId")
+                        .HasDatabaseName("ix_documents_latest_revision_id");
 
                     b.HasIndex("ProjectId", "Discipline")
                         .HasDatabaseName("ix_documents_project_id_discipline");
@@ -1840,6 +1849,9 @@ namespace Delios.Host.Platform.Migrations
                     b.HasIndex("DocumentId", "Value")
                         .IsUnique()
                         .HasDatabaseName("ix_revisions_document_id_value");
+
+                    b.HasIndex("ProjectId", "State")
+                        .HasDatabaseName("ix_revisions_project_id_state");
 
                     b.ToTable("revisions", (string)null);
                 });
@@ -2697,6 +2709,41 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("permission_rules", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Identity.PersonSeen", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Instant?>("FirstAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_at");
+
+                    b.Property<Instant?>("JoinedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("joined_at");
+
+                    b.Property<Instant?>("LastAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("UserId", "ProjectId")
+                        .HasName("pk_people_seen");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_people_seen_tenant_id");
+
+                    b.ToTable("people_seen", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Identity.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3229,6 +3276,9 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_notifications_tenant_id");
+
+                    b.HasIndex("UserId", "ProjectId", "CreatedAt")
+                        .HasDatabaseName("ix_notifications_user_id_project_id_created_at");
 
                     b.HasIndex("UserId", "ReadAt", "CreatedAt")
                         .HasDatabaseName("ix_notifications_user_id_read_at_created_at");
@@ -6366,9 +6416,6 @@ namespace Delios.Host.Platform.Migrations
                     b.HasKey("Id")
                         .HasName("pk_transmittal_items");
 
-                    b.HasIndex("DocumentId")
-                        .HasDatabaseName("ix_transmittal_items_document_id");
-
                     b.HasIndex("RevisionId")
                         .HasDatabaseName("ix_transmittal_items_revision_id");
 
@@ -6377,6 +6424,9 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasIndex("TransmittalId")
                         .HasDatabaseName("ix_transmittal_items_transmittal_id");
+
+                    b.HasIndex("DocumentId", "Kind")
+                        .HasDatabaseName("ix_transmittal_items_document_id_kind");
 
                     b.ToTable("transmittal_items", (string)null);
                 });

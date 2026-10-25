@@ -23,7 +23,7 @@ public sealed partial class PackageService
     }
 
     /// <summary>
-    /// Every package of one kind the reader sees, brought up to date with its rule, with what its view shows: worked out
+    /// Every package of one kind the reader sees, with what its view shows: worked out
     /// in a few reads whatever their number (owner: "a page never reads its lines one by one"). Only a package in a tree
     /// reads its tree on its own.
     /// </summary>
@@ -31,8 +31,6 @@ public sealed partial class PackageService
         bool topOnly = false, int? take = null)
     {
         if (!access.Holds(Verbs.Read)) return [];
-        if (access.IsInternal && (access.Holds(Verbs.Control) || await StandIns.NoControlAsync(db, access.Project.Id, cancellationToken)))
-            await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken);
         var chosen = Visible(access).Where(p => kind == null || p.Kind == kind);
         // Those at the top only (the list), soonest due first as the list reads them, a page at a time; else every one (the tree).
         if (topOnly) chosen = chosen.Where(p => p.ParentId == null);
@@ -47,17 +45,6 @@ public sealed partial class PackageService
             .Select(p => new { p.Id, Parent = p.ParentId!.Value }).ToListAsync(cancellationToken);
         var parents = linked.Select(l => l.Parent).ToHashSet();
         var inTree = linked.Select(l => l.Id).Concat(parents).ToHashSet();
-
-        // Brought up to date: what a rule now admits joins, and what a package under it holds goes down.
-        var changed = false;
-        foreach (var package in packages)
-        {
-            var handed = parents.Contains(package.Id) && await HandDownAsync(package, cancellationToken);
-            var synced = package.Rule is { IsEmpty: false } && package.State == PackageStates.Open && package.RuleCeasedAt is null
-                && await SyncAsync(package, cancellationToken) > 0;
-            if (handed || synced) { ResetAssessment(package); changed = true; }
-        }
-        if (changed) await db.SaveChangesAsync(cancellationToken);
 
         var outside = !access.IsInternal;
         var (documents, released) = await ReadinessFactsAsync(packages.SelectMany(p => p.Members).Select(m => m.DocumentId).Distinct().ToList(), cancellationToken);
@@ -90,6 +77,11 @@ public sealed partial class PackageService
                     select new { Party = u.PartyId!.Value, u.Id, u.Name }).Distinct().AsNoTracking().ToListAsync(cancellationToken))
             .GroupBy(x => x.Party).ToDictionary(g => g.Key, g => g.Select(x => x.Name).ToList());
 
+        // The trees read once for the whole list, one kind at a time (owner: "a page never reads its lines one by one").
+        var trees = new Dictionary<string, TreeFacts>();
+        foreach (var group in packages.Where(p => inTree.Contains(p.Id)).GroupBy(p => p.Kind))
+            trees[group.Key] = await TreeFactsAsync(access, group.Key, group.Select(p => p.Id).ToList(), cancellationToken);
+
         var listed = new List<(Package, PackageParts)>();
         foreach (var p in packages)
         {
@@ -98,7 +90,7 @@ public sealed partial class PackageService
             var transmittals = own.Where(t => t.Package == p.Id).Select(t => t.Line)
                 .Concat(p.Kind == PackageKinds.Supply ? incoming.Where(t => t.From == p.SupplierPartyId && t.Documents.Any(members.Contains)).Select(t => t.Line) : [])
                 .DistinctBy(t => t.Id).OrderBy(t => t.IssuedAt).ToList();
-            var place = inTree.Contains(p.Id) ? await PlaceAsync(access, p, cancellationToken) : Alone(p, readiness, outside);
+            var place = inTree.Contains(p.Id) ? PlaceOf(p, trees[p.Kind]) : Alone(p, readiness, outside);
             listed.Add((p, new PackageParts(readiness, transmittals, p.Kind == PackageKinds.Supply ? intake : null,
                 p.SupplierPartyId is { } s ? parties.GetValueOrDefault(s)?.Name : null,
                 outside ? null : p.SupplierPartyId is { } sp ? supplierPeople.GetValueOrDefault(sp) ?? [] : [],

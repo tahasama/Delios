@@ -101,8 +101,10 @@ public static class DocumentContextEndpoints
                                 select new { ActivityId = a.Id, a.Code, a.Name, n.Purpose, n.NeededBy, n.State, n.WaiverNote, NeedId = n.Id, n.RequiredStatuses, a.Start })
             .AsNoTracking().ToListAsync(cancellationToken);
         // The document's own events and its revisions'. Another organization sees what happened, not who did it inside.
+        // One list of the items it is about, read by its index (entity, id).
+        var about = whole ? revisionIds.Append(documentId).ToList() : revisionIds.ToList();
         var history = await db.AuditEvents.AsNoTracking()
-            .Where(e => (whole && e.EntityId == documentId) || (e.EntityId != null && revisionIds.Contains(e.EntityId.Value)))
+            .Where(e => e.EntityId != null && about.Contains(e.EntityId.Value))
             .OrderByDescending(e => e.Id).Take(200)
             .Select(e => new { e.At, Actor = access.IsInternal ? e.ActorName : null, e.Action, e.EntityType, e.EntityId, e.EntityLabel, e.Detail })
             .ToListAsync(cancellationToken);
