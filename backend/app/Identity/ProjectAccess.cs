@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using System.Security.Claims;
 using Delios.Host.Platform;
 using Microsoft.EntityFrameworkCore;
@@ -71,13 +72,39 @@ public sealed class ProjectAccess
 /// <summary>
 /// Loads a <c>ProjectAccess</c> from the database for the signed-in user. Used by <c>ProjectAccessFilter</c> on project endpoints.
 /// </summary>
-public sealed class ProjectAccessLoader(DeliosDbContext db)
+public sealed class ProjectAccessLoader(DeliosDbContext db, AccessVersions versions)
 {
+    /// <summary>
+    /// How long a kept copy may be used at most, whatever: a safety net only, should the number that leaves it unused
+    /// fail to be raised (<see cref="AccessVersions"/>). Access is never kept longer than this.
+    /// </summary>
+    public static readonly TimeSpan KeptAtMost = TimeSpan.FromMinutes(15);
+
     /// <summary>
     /// Null when the person holds no active function on an active project, which
     /// callers answer with 404: a project you are not on does not exist for you.
     /// </summary>
     public async Task<ProjectAccess?> LoadAsync(Guid projectId, ClaimsPrincipal principal, CancellationToken cancellationToken)
+    {
+        // Kept until how the organization works changes (owner: "static once done"): the number says whether it did.
+        var version = await versions.CurrentAsync(principal.TenantId());
+        var key = version is null ? null : $"access:{principal.TenantId():N}:{version}:{projectId:N}:{principal.UserId():N}:{principal.Identity?.Name}";
+        if (key is not null && versions.Kept.TryGetValue(key, out ProjectAccess? kept) && kept is not null)
+        {
+            db.UseListsOf(kept.Project.Id, kept.Project.OwnListKeys, kept.Project.OwnFunctions);
+            return kept;
+        }
+        var loaded = await ReadAsync(projectId, principal, cancellationToken);
+        if (key is not null && loaded is not null)
+            versions.Kept.Set(key, loaded, new Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = KeptAtMost,
+                Size = 1,
+            });
+        return loaded;
+    }
+
+    private async Task<ProjectAccess?> ReadAsync(Guid projectId, ClaimsPrincipal principal, CancellationToken cancellationToken)
     {
         var userId = principal.UserId();
         var membership = await db.Memberships.AsNoTracking()

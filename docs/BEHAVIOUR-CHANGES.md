@@ -756,3 +756,11 @@ History page reads exactly as before. Nothing kept earlier is touched.
 **Each file is copied to the second place as it is stored** (owner). Before: every 6 hours the copier listed every file
 on both sides to find what was new. Now: the app copies each file the moment it is stored (an upload once checked, a
 stamped copy…), and the full comparison runs once a week as a safety net; its alert waits 8 days instead of 12 hours.
+
+---
+
+**Who you are and what you may do is read once, not on every click** (owner). Before: every backend call read your
+membership, function and rights from the database (about four reads), and every page read your profile and all your
+projects. Now: kept in memory until something about people, functions, rights, projects, organizations or settings
+changes in your organization, then read again once; at most 15 minutes in any case, as a safety net. The backend still
+checks every act; signing out and sessions ended work as before.

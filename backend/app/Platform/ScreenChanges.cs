@@ -31,6 +31,8 @@ public sealed class ScreenChanges
     internal bool HeaderPlanned { get; set; }
     /// <summary>Every label this request's saves changed, for its answer's header.</summary>
     internal HashSet<string>? Answered { get; set; }
+    /// <summary>The organizations whose way of working changed: their kept access is left unused once committed (<see cref="AccessVersions"/>).</summary>
+    internal HashSet<Guid> AccessTenants { get; } = [];
     /// <summary>A save put a message in the outbox: the relay is woken once it is committed.</summary>
     internal bool Outbox { get; set; }
     /// <summary>What moved notice days, per organization, sent with the save (<see cref="Actions.NoticesMoved"/>).</summary>
@@ -54,6 +56,7 @@ public sealed class ScreenChanges
     {
         tags.Clear();
         SearchTenants.Clear();
+        AccessTenants.Clear();
         Outbox = false;
     }
 }
@@ -84,7 +87,7 @@ public static class Areas
 /// itself, the notice days it moved (<see cref="Actions.NoticesMoved"/>).
 /// </summary>
 public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier notifier, IHttpContextAccessor accessor,
-    Search.SearchSignal search, Messaging.OutboxWake outbox) : SaveChangesInterceptor
+    Search.SearchSignal search, Messaging.OutboxWake outbox, AccessVersions access) : SaveChangesInterceptor
 {
     /// <summary>Rows the screens never show as such: their saving clears nothing.</summary>
     private static readonly HashSet<string> Silent =
@@ -192,7 +195,12 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
         var area = AreaOf(type);
         if (area is null) return;
         var projectId = ProjectOf(entry);
-        if (area == ScreenChanges.All) { changes.Area(projectId, ScreenChanges.All); return; }
+        if (area == ScreenChanges.All)
+        {
+            changes.Area(projectId, ScreenChanges.All);
+            if (Guid(entry, "TenantId") is { } tenantId) changes.AccessTenants.Add(tenantId);
+            return;
+        }
         changes.Area(projectId, area);
         if (Guid(entry, "DocumentId") is { } documentId) changes.Document(projectId, documentId);
         else if (type.Name == "Document" && Guid(entry, "Id") is { } id) changes.Document(projectId, id);
@@ -270,6 +278,7 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
     internal void Release()
     {
         if (changes.SearchTenants.Count > 0) search.Publish(changes.SearchTenants);
+        if (changes.AccessTenants.Count > 0) access.Raise(changes.AccessTenants);
         if (changes.Outbox) outbox.Ring();
         if (changes.Tags.Count > 0) notifier.Post([.. changes.Tags]);
         changes.Clear();

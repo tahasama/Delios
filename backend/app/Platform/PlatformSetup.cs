@@ -119,6 +119,8 @@ public static class PlatformSetup
         services.AddOptions<RedisCacheOptions>().Configure<IServiceProvider>((o, sp) =>
             o.ConnectionMultiplexerFactory = () => Task.FromResult(sp.GetRequiredService<IConnectionMultiplexer>()));
         services.AddHybridCache();
+        // Who you are and what you may do, kept in each process until how the organization works changes.
+        services.AddSingleton<AccessVersions>();
 
         services.AddScoped<AuditLog>();
         services.AddScoped<SessionStore>();

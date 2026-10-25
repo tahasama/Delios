@@ -1788,6 +1788,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `PROJECT_DEFAULTS`, `LIBERTY…`, the new projects' place), only the words (`STATE_NAME:`, `SET:`, `DATE_FORMAT`, the
   stamp's) for another organization's people, the same on a project's settings; `/api/liberty` none to them. The organization's controlled lists
   (`/api/controlled`, no project) are an administrator's only. Any new reader of a document's parts goes through these.
+- **Who you are and what you may do is kept until it changes** (owner: "literally static once done"): each project's
+  access (`ProjectAccessLoader`) and `/api/me` are kept in each process's memory under the organization's number in Redis
+  (`Platform/AccessVersions.cs`, `access:v:<tenant>`), raised once committed by every change that clears `all` on the
+  screens (people, functions, rights, projects, organizations, settings, lists; `ScreenChangeWatcher`): a raised number
+  leaves every older copy unused. Every request still reads the number (one Redis read, never the database) and the
+  backend still checks every act. Never longer than 15 minutes (`KeptAtMost`), a safety net should a number fail to be
+  raised; Redis unreachable, nothing is kept. Sign-out and a session ended are checked by the session itself, never kept.
 - **The notices job reads once a pass** (`ActionNotices.ProjectAsync`): what was already sent about the actions it
   reads, and the days off, once per project, never one query per action and discipline; it reads only the actions whose
   notice day has come (`NoticeOn`), never the whole schedule.
