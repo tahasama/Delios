@@ -1850,6 +1850,9 @@ namespace Delios.Host.Platform.Migrations
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_revisions_tenant_id");
 
+                    b.HasIndex("AuthoredById", "State")
+                        .HasDatabaseName("ix_revisions_authored_by_id_state");
+
                     b.HasIndex("DocumentId", "Value")
                         .IsUnique()
                         .HasDatabaseName("ix_revisions_document_id_value");
@@ -6562,6 +6565,10 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_transmittal_items");
+
+                    b.HasIndex("Kind")
+                        .HasDatabaseName("ix_transmittal_items_waiting")
+                        .HasFilter("registered_at IS NULL AND returned_at IS NULL");
 
                     b.HasIndex("RevisionId")
                         .HasDatabaseName("ix_transmittal_items_revision_id");

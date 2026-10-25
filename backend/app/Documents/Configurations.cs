@@ -199,6 +199,8 @@ internal sealed class RevisionConfiguration : IEntityTypeConfiguration<Revision>
         b.HasIndex(x => new { x.DocumentId, x.Value }).IsUnique();
         // A project's revisions in a state (Home's to-do, the checks): never every revision of the organization.
         b.HasIndex(x => new { x.ProjectId, x.State });
+        // Home: what of mine waits in a state (being prepared, returned, released with comments to take in).
+        b.HasIndex(x => new { x.AuthoredById, x.State });
         b.Property(x => x.Value).HasMaxLength(16);
         b.Property(x => x.Series).HasMaxLength(16);
         b.Property(x => x.Phase).HasMaxLength(64);

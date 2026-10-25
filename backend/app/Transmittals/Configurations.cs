@@ -92,6 +92,8 @@ internal sealed class TransmittalItemConfiguration : IEntityTypeConfiguration<Tr
         b.HasIndex(x => x.RevisionId);
         // What passed with another organization, by document and kind (placeholder, submission, unplanned).
         b.HasIndex(x => new { x.DocumentId, x.Kind });
+        // Home: what came in unplanned and still waits to be put in the register or returned.
+        b.HasIndex(x => x.Kind).HasFilter("registered_at IS NULL AND returned_at IS NULL").HasDatabaseName("ix_transmittal_items_waiting");
         b.Property(x => x.DocumentNumber).HasMaxLength(128);
         b.Property(x => x.Title).HasMaxLength(500);
         b.Property(x => x.RevisionValue).HasMaxLength(32);
