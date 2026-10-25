@@ -114,7 +114,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
     getSet("DISCIPLINES"),
     getSet("DOCUMENT_TYPES"),
     // Suppliers are the organizations the project deals with.
-    api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
+    api<{ code: string; name: string }[]>("/api/parties", { keep: { areas: [] } }).then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
   ]);
 
   // As the planner lays it out where the schedule carries a WBS (owner: "keep the category/sub"), else by date.

@@ -36,7 +36,7 @@ type HaltedRevision = { id: string; documentId: string; value: string; document:
 export async function haltedRevisions(t: { projectId: string }): Promise<HaltedRevision[]> {
   const verdicts = await haltingVerdicts();
   const pages = await Promise.all(verdicts.map((verdict) =>
-    api<RegisterPage>(projectPath(t, "/register"), { query: { released: true, verdict, per: 250 } })));
+    api<RegisterPage>(projectPath(t, "/register"), { keep: { areas: ["docs", "reviews", "transmittals", "packages"] }, query: { released: true, verdict, per: 250 } })));
   return pages.flatMap((page) => page.rows)
     .filter((row) => row.releasedRevisionId && row.releasedRevisionId === row.latestRevisionId)
     .map((row) => ({

@@ -125,7 +125,7 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
             if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted)) continue;
             var type = entry.Metadata.ClrType;
             if (type.Name == "OutboxMessage") changes.Outbox = true;
-            if (Silent.Contains(type.Name)) continue;
+            if (Silent.Contains(type.Name) || Bookkeeping(entry)) continue;
             // A document, or the project that says how its text is read, changed: the search index is told.
             if (type.Name is "Document" or "Project" && Guid(entry, "TenantId") is { } tenant) changes.SearchTenants.Add(tenant);
             Moves(entry, type);
@@ -178,6 +178,15 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
         }
     }
 
+    /// <summary>
+    /// A change only to what no screen shows as such (a failed sign-in counted, a lock): it clears nothing, or every
+    /// wrong password typed anywhere would throw away every kept answer.
+    /// </summary>
+    private static bool Bookkeeping(EntityEntry entry) =>
+        entry.State == EntityState.Modified && entry.Properties.Where(p => p.IsModified).All(p => Unshown.Contains(p.Metadata.Name));
+
+    private static readonly HashSet<string> Unshown = ["FailedSignIns", "LockedUntil"];
+
     private void Mark(EntityEntry entry, Type type)
     {
         var area = AreaOf(type);
@@ -189,6 +198,8 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
         else if (type.Name == "Document" && Guid(entry, "Id") is { } id) changes.Document(projectId, id);
         // What a change moves beyond its own area: a document's state shows on the plan, its packages and Home.
         foreach (var also in Beyond(area)) changes.Area(projectId, also);
+        // What hangs from an action, wherever it is kept (a discipline's confirmation is a record): the plan shows it.
+        if (area != Areas.Plan && Guid(entry, "ActivityId") is not null) changes.Area(projectId, Areas.Plan);
     }
 
     /// <summary>The area a kind of row belongs to, by the part of the app it lives in.</summary>

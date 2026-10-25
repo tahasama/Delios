@@ -26,7 +26,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
     getActiveSet("REASONS_FOR_ISSUE"),
     // The register's newest documents, each with its released revision and the
     // one being worked on: what can be enclosed.
-    api<RegisterPage>(projectPath(ctx, "/register"), { query: { per: 250 } }),
+    api<RegisterPage>(projectPath(ctx, "/register"), { keep: { areas: ["docs", "reviews", "transmittals", "packages"] }, query: { per: 250 } }),
     addressees(ctx),
     holdersOf(ctx, "REVIEW"),
   ]);
@@ -128,7 +128,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   // asked of someone; put on at once, it is no letter and stays where it was.
   type JoinOptions = { functions: { id: string; name: string }[]; ours: { id: string; name: string }[]; guests: { id: string; name: string }[];
     confirmers: { id: string; name: string; function: string; manager: boolean }[]; asks: boolean };
-  const joinOptions = sp.join === "1" && ctx.user.isInternal ? await api<JoinOptions>(projectPath(ctx, "/people/join-options")).catch(() => null) : null;
+  const joinOptions = sp.join === "1" && ctx.user.isInternal ? await api<JoinOptions>(projectPath(ctx, "/people/join-options"), { keep: { areas: [] } }).catch(() => null) : null;
   const disciplines = (await getActiveSet("DISCIPLINES")).map((one) => ({ code: one.code, label: one.label })).sort((x, y) => x.label.localeCompare(y.label));
   const joining = joinOptions?.asks ? {
     projectCode: ctx.project.code,

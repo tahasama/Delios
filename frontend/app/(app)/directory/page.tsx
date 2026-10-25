@@ -44,8 +44,8 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
   const { project, user } = ctx;
   const sp = await searchParams;
   const [directory, options, disciplines, roles] = await Promise.all([
-    api<Directory>(projectPath(ctx, "/people/directory")).catch(() => null),
-    user.isInternal ? api<Options>(projectPath(ctx, "/people/join-options")).catch(() => null) : Promise.resolve(null),
+    api<Directory>(projectPath(ctx, "/people/directory"), { keep: { areas: [] } }).catch(() => null),
+    user.isInternal ? api<Options>(projectPath(ctx, "/people/join-options"), { keep: { areas: [] } }).catch(() => null) : Promise.resolve(null),
     getActiveSet("DISCIPLINES").then((all) => all.map((one) => ({ value: one.code, label: one.label })).sort((x, y) => x.label.localeCompare(y.label))).catch(() => []),
     contractRoleOptions().catch(() => []),
   ]);

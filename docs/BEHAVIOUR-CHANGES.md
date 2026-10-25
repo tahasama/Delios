@@ -707,3 +707,12 @@ in the code; it lives only in your local database.
 Now anyone of ours reads it, narrowed to the acts on what they may open (a document above their clearance, its
 revisions, files, reviews, and a transmittal they may not open are left out). The journal beside Home is narrowed the
 same way (before, it named documents above the reader's clearance). Another organization's people still never read it.
+
+---
+
+**Every page keeps what it read until something it shows changes** (owner). Reports, the register's other reads,
+transmittals, packages, assets, reviews, Assurance and its plan, the Schedule's extras, the calendar, Home, and every
+Settings and organization page now keep their answers, per person, until a change names them (at most an hour). Read
+fresh every time, as before: notifications, the account, sign-in and security, what waits for a result, the audit trail
+and a person's activity, the notice log, and Excel downloads. A wrong password typed no longer throws away every kept
+answer; a discipline's confirmation now also refreshes the Schedule.

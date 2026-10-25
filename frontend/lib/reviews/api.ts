@@ -41,7 +41,7 @@ export async function reviewsPage(scope: Scope, query: Query): Promise<ReviewsPa
 
 /** The disciplines and document types the project's documents hold, so a filter offers only those. */
 export async function valuesInUse(scope: Scope): Promise<{ disciplines: string[]; docTypes: string[] }> {
-  const register = await api<RegisterPage>(projectPath(scope, "/register"), { query: { per: 25 } });
+  const register = await api<RegisterPage>(projectPath(scope, "/register"), { keep: { areas: ["docs", "reviews", "transmittals", "packages"] }, query: { per: 25 } });
   return { disciplines: register.lists.usedDisciplines, docTypes: register.lists.usedDocTypes };
 }
 
@@ -93,7 +93,7 @@ type ReviewCycle = Awaited<ReturnType<typeof readCycle>>;
  */
 async function standIn(scope: Scope, review: ReviewView, step: Step) {
   if (step.state !== "OPEN") return [];
-  const me = await api<{ seated: boolean; answered: boolean; onBehalfOf: string | null }>(projectPath(scope, `/reviews/${review.id}/me`)).catch(() => null);
+  const me = await api<{ seated: boolean; answered: boolean; onBehalfOf: string | null }>(projectPath(scope, `/reviews/${review.id}/me`), { keep: { areas: ["reviews"] } }).catch(() => null);
   const who = me?.onBehalfOf ? (await getMe())?.user : null;
   if (!me?.onBehalfOf || !who) return [];
   return [{ id: `${review.id}-${step.number}-standin`, userId: who.id, userName: who.name, completedAt: me.answered ? new Date() : null }];
@@ -106,7 +106,7 @@ async function readCycle(scope: Scope, review: ReviewView) {
   const by = answered(step);
   const outcome = step.deciding ? review.verdict : step.answer;
   const transmittal = step.transmittalId
-    ? await api<TransmittalView>(projectPath(scope, `/transmittals/${step.transmittalId}`)).then((one) => ({ id: one.id, number: one.number })).catch(() => null)
+    ? await api<TransmittalView>(projectPath(scope, `/transmittals/${step.transmittalId}`), { keep: { areas: ["transmittals"] } }).then((one) => ({ id: one.id, number: one.number })).catch(() => null)
     : null;
   const proof = step.evidenceFileId ? await fileName(scope, step.evidenceFileId).catch(() => null) : null;
   return {
@@ -274,5 +274,5 @@ export type StampPlan = {
 };
 
 export async function stampPlan(t: { projectId: string }, reviewId: string): Promise<StampPlan | null> {
-  return api<StampPlan>(projectPath(t, `/reviews/${reviewId}/stamp-place`)).catch(() => null);
+  return api<StampPlan>(projectPath(t, `/reviews/${reviewId}/stamp-place`), { keep: { areas: ["reviews", "docs"] } }).catch(() => null);
 }

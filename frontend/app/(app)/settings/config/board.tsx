@@ -96,7 +96,7 @@ export async function ListsBoard({ level, sp }: { level: "project" | "organizati
   const read = organization ? organizationSet : getSet;
   const [sets, lists] = await Promise.all([
     organization ? organizationSets() : getSets(),
-    api<ListsAnswer>(at("/lists")).catch(() => ({ level, mayChange: false, sets: [], lists: [] } as ListsAnswer)),
+    api<ListsAnswer>(at("/lists"), { keep: { areas: [] } }).catch(() => ({ level, mayChange: false, sets: [], lists: [] } as ListsAnswer)),
   ]);
   const countOf = (key: string) => lists.sets.find((c) => c.key === key)?.active ?? 0;
   const headingOf = (one: (typeof sets)[number]) =>

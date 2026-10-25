@@ -55,7 +55,7 @@ const flags = cache(() => new Map<string, string | null>());
 
 /** The hand-overs raised from a review, newest first. */
 export async function delegationsOn(t: Tenant, cycleId: string): Promise<DelegationRecord[]> {
-  const rows = await api<BackendDelegation[]>(projectPath(t, `/reviews/${cycleId}/delegations`)).catch(() => [] as BackendDelegation[]);
+  const rows = await api<BackendDelegation[]>(projectPath(t, `/reviews/${cycleId}/delegations`), { keep: { areas: ["reviews"] } }).catch(() => [] as BackendDelegation[]);
   for (const row of rows) if (!flags().has(row.toUserId)) flags().set(row.toUserId, row.flag);
   return rows.map((row) => ({
     id: row.id, fromUserId: row.fromUserId, toUserId: row.toUserId, verb: row.verb, status: row.status,
@@ -73,7 +73,7 @@ type Options = {
 
 /** Who may take the open step of a review, as the backend offers them for the person asking. */
 const allOptions = cache(async (t: Tenant, cycleId: string): Promise<Options> =>
-  api<Options>(projectPath(t, `/reviews/${cycleId}/delegation-options`))
+  api<Options>(projectPath(t, `/reviews/${cycleId}/delegation-options`), { keep: { areas: ["reviews"] } })
     .then((one) => ({ ...one, seats: one.seats ?? [] })).catch(() => ({ candidates: [], seats: [], throughControl: false })));
 const options = cache(async (t: Tenant, cycleId: string) => (await allOptions(t, cycleId)).candidates);
 
@@ -118,5 +118,5 @@ export type StepPeopleOptions = {
 };
 
 export async function stepPeopleOptions(t: Tenant, cycleId: string): Promise<StepPeopleOptions> {
-  return api<StepPeopleOptions>(projectPath(t, `/reviews/${cycleId}/people`)).catch(() => ({ open: false }));
+  return api<StepPeopleOptions>(projectPath(t, `/reviews/${cycleId}/people`), { keep: { areas: ["reviews"] } }).catch(() => ({ open: false }));
 }

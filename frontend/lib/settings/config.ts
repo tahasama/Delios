@@ -67,7 +67,7 @@ export const organizationSets = cache(async (): Promise<SetInfo[]> => readSets("
 
 /** The organization's values of a list, as its Settings show them (not the project's copy). */
 export const organizationSet = cache(async (setKey: string): Promise<ValueRow[]> =>
-  (await api<RawRow[]>(`/api/admin/lists/${encodeURIComponent(setKey)}/values`).catch(() => [] as RawRow[]))
+  (await api<RawRow[]>(`/api/admin/lists/${encodeURIComponent(setKey)}/values`, { keep: { areas: [] } }).catch(() => [] as RawRow[]))
     .map((row) => ({ code: row.code, label: row.label, status: row.status, props: row.props ?? {}, setId: row.setId ?? null })));
 
 async function readSets(level: "project" | "organization"): Promise<SetInfo[]> {
@@ -77,10 +77,10 @@ async function readSets(level: "project" | "organization"): Promise<SetInfo[]> {
   // The project's lists (its own, else the organization's) and their names: the project's over the organization's.
   const [counted, org, own] = await Promise.all([
     scope
-      ? api<{ sets: { key: string; active: number; retired: number }[] }>(`/api/projects/${scope.projectId}/lists`).then((r) => r.sets).catch(() => [])
+      ? api<{ sets: { key: string; active: number; retired: number }[] }>(`/api/projects/${scope.projectId}/lists`, { keep: { areas: [] } }).then((r) => r.sets).catch(() => [])
       : level === "organization"
-        ? api<{ sets: { key: string; active: number; retired: number }[] }>("/api/admin/lists").then((r) => r.sets).catch(() => [])
-        : api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets").catch(() => []),
+        ? api<{ sets: { key: string; active: number; retired: number }[] }>("/api/admin/lists", { keep: { areas: [] } }).then((r) => r.sets).catch(() => [])
+        : api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets", { keep: { areas: [] } }).catch(() => []),
     orgSettings().catch(() => new Map<string, string>()),
     scope ? projectSettings(scope.projectId).catch(() => new Map<string, string>()) : Promise.resolve(new Map<string, string>()),
   ]);

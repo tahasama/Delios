@@ -56,7 +56,7 @@ export const liveDefects = cache(async (projectId: string): Promise<DefectView[]
 
 /** One run, as it stands now. */
 async function runOf(scope: { projectId: string }, runId: string): Promise<RunView> {
-  return api<RunView>(projectPath(scope, `/checks/runs/${runId}`));
+  return api<RunView>(projectPath(scope, `/checks/runs/${runId}`), { keep: { areas: ["checks"] } });
 }
 
 /**
@@ -76,7 +76,7 @@ export async function runAndWait(scope: { projectId: string }, seconds = 25): Pr
 
 /** How many documents the project holds, in every state. */
 export const documentCount = cache(async (projectId: string): Promise<number> =>
-  (await api<RegisterPage>(projectPath({ projectId }, "/register"), { query: { view: "all", per: 25 } })).total);
+  (await api<RegisterPage>(projectPath({ projectId }, "/register"), { keep: { areas: ["docs"] }, query: { view: "all", per: 25 } })).total);
 
 /** Documents carrying an open or accepted Critical or Major defect: those not clear. */
 export function flawedDocuments(defects: DefectView[]): number {

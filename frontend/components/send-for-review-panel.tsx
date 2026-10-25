@@ -28,12 +28,12 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
   if (!docs.length) return null;
 
   const [routeLists, reviewers, approvers, strict, directory] = await Promise.all([
-    Promise.all(docs.map((d) => api<RouteView[]>(projectPath(ctx, `/documents/${d.id}/routes`)))),
+    Promise.all(docs.map((d) => api<RouteView[]>(projectPath(ctx, `/documents/${d.id}/routes`), { keep: { areas: ["reviews", "docs"] } }))),
     eligiblePeople(ctx, docs, "REVIEW"),
     eligiblePeople(ctx, docs, "APPROVAL"),
     matrixBinds(ctx),
     // The organizations taking part and their people: a step another organization answers offers its own people.
-    api<{ organizations: { id: string; code: string; name: string; kind: string }[]; people: { id: string; name: string; partyId: string | null; function: string }[] }>(projectPath(ctx, "/people/directory"))
+    api<{ organizations: { id: string; code: string; name: string; kind: string }[]; people: { id: string; name: string; partyId: string | null; function: string }[] }>(projectPath(ctx, "/people/directory"), { keep: { areas: [] } })
       .catch(() => ({ organizations: [], people: [] })),
   ]);
   const applicable = routeLists[0].filter((route) => routeLists.every((list) => list.some((one) => one.id === route.id)));
@@ -109,7 +109,7 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
 
   const person = (p: { id: string; name: string; functionName: string }) => ({ id: p.id, name: p.name, functionName: p.functionName, inMatrix: true });
   // Anyone on the project may be copied in; being told is not reviewing.
-  const spread = await api<Distribution>(projectPath(ctx, `/documents/${docs[0].id}/distribution`)).catch(() => null);
+  const spread = await api<Distribution>(projectPath(ctx, `/documents/${docs[0].id}/distribution`), { keep: { areas: ["docs"] } }).catch(() => null);
   const everyone = [...(spread?.proposed ?? []), ...(spread?.others ?? [])]
     .map((one) => ({ id: one.id, name: one.name, functionName: one.function }))
     .sort((a, b) => a.name.localeCompare(b.name));

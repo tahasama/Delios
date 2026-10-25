@@ -51,13 +51,13 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
     getActiveSet("REASONS_FOR_ISSUE"),
     getActiveSet("STATUSES"),
     getActiveSet("REVIEW_ADVICE"),
-    (level === "organization" ? api<ListSets>("/api/admin/lists") : requireScope().then((scope) => api<ListSets>(projectPath(scope, "/lists")))).catch(() => ({ lists: [] }) as ListSets),
+    (level === "organization" ? api<ListSets>("/api/admin/lists", { keep: { areas: [] } }) : requireScope().then((scope) => api<ListSets>(projectPath(scope, "/lists"), { keep: { areas: [] } }))).catch(() => ({ lists: [] }) as ListSets),
   ]);
   const organizations = outsideParties.map((p) => ({ code: p.code, name: p.name }));
   const parties = outsideParties.map((p) => ({ id: p.id, name: p.name, participation: p.participation }));
   // The sets of the review outcomes (each verdict with its meaning) and of the review advice; none named, a route
   // answers from the set serving each document's deliverable type.
-  const outcomeSets = await api<{ key: string; title: string; verdicts: { code: string; label: string; status: string; meaning: string | null }[] }[]>("/api/admin/verdict-lists").catch(() => []);
+  const outcomeSets = await api<{ key: string; title: string; verdicts: { code: string; label: string; status: string; meaning: string | null }[] }[]>("/api/admin/verdict-lists", { keep: { areas: [] } }).catch(() => []);
   const adviceSets = (lists.lists.find((l) => l.key === "REVIEW_ADVICE")?.sets ?? []).map((s) => ({ key: s.name, title: s.name }));
   const classOptions = {
     documentTypes: classValues.filter((value) => value.setKey === "DOCUMENT_TYPES").map(({ code, label }) => ({ code, label })),

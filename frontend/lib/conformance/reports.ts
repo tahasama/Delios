@@ -128,7 +128,7 @@ export function reportQuery(id: ReportId, q: ReportQuery): Record<string, string
 
 /** One report, counted now and narrowed as asked (the backend narrows the rows; the chart stays whole). */
 export async function buildReport(t: { projectId: string }, id: ReportId, q: ReportQuery = {}): Promise<Report> {
-  const report = await api<BackendReport>(projectPath(t, `/reports/${id}`), { query: reportQuery(id, q) });
+  const report = await api<BackendReport>(projectPath(t, `/reports/${id}`), { keep: { areas: ["docs", "reviews", "transmittals", "packages", "plan", "checks"] }, query: reportQuery(id, q) });
   return {
     id: report.id,
     title: report.title,

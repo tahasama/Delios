@@ -101,7 +101,7 @@ const requirements: Handler = {
     const [actions, docs, functions, types, statuses, disciplines, subprojects, pos, parties] = await Promise.all([
       planActions(t), registerByNumber(t), orEmpty(adminFunctions), getActiveSet("DOCUMENT_TYPES"), getActiveSet("STATUSES"),
       getActiveSet("DISCIPLINES"), getActiveSet("SUBPROJECTS"), getActiveSet("PURCHASE_ORDERS"),
-      api<{ code: string }[]>("/api/parties").catch(() => [] as { code: string }[]),
+      api<{ code: string }[]>("/api/parties", { keep: { areas: [] } }).catch(() => [] as { code: string }[]),
     ]);
     const actionByCode = new Map(actions.map((a) => [a.code, a]));
     // Document types that describe a piece of equipment, from the published list.

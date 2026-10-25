@@ -16,7 +16,7 @@ export type ProjectCalendar = {
 
 /** The organization's calendar for a year (administrators). */
 export const organizationCalendar = cache(async (year?: number) =>
-  api<OrganizationCalendar>("/api/admin/calendar", { query: { year } }));
+  api<OrganizationCalendar>("/api/admin/calendar", { keep: { areas: [] }, query: { year } }));
 
 /** A project's calendar, from the month it starts to the month it finishes. */
-export const projectCalendar = cache(async (t: { projectId: string }) => api<ProjectCalendar>(projectPath(t, "/calendar")));
+export const projectCalendar = cache(async (t: { projectId: string }) => api<ProjectCalendar>(projectPath(t, "/calendar"), { keep: { areas: ["plan"] } }));

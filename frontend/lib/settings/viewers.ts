@@ -10,10 +10,10 @@ export type OrganizationReader = Reader & { installed: boolean; asks: string | n
 export type ProjectReaders = { readers: Reader[]; mayChange: boolean; free: boolean; exception: ExceptionHere };
 
 /** Every reader, installed or not, with the organization's answer (administrators). */
-export const organizationReaders = cache(async () => api<OrganizationReader[]>("/api/admin/viewers"));
+export const organizationReaders = cache(async () => api<OrganizationReader[]>("/api/admin/viewers", { keep: { areas: [] } }));
 
 /** The readers the organization has on, with this project's answer. */
-export const projectReaders = cache(async (t: { projectId: string }) => api<ProjectReaders>(projectPath(t, "/viewers")));
+export const projectReaders = cache(async (t: { projectId: string }) => api<ProjectReaders>(projectPath(t, "/viewers"), { keep: { areas: [] } }));
 
 /** The keys of the readers on for the project: what the Preview may draw. */
 export async function readersOn(t: { projectId: string }): Promise<string[] | undefined> {

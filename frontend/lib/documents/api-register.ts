@@ -18,7 +18,7 @@ export async function registerByNumber(scope: { projectId: string }): Promise<Ma
   const byNumber = new Map<string, DocumentSummary>();
   let after: string | null = null;
   do {
-    const page: { items: DocumentSummary[]; next: string | null } = await api(projectPath(scope, "/documents"), { query: { limit: 200, after } });
+    const page: { items: DocumentSummary[]; next: string | null } = await api(projectPath(scope, "/documents"), { keep: { areas: ["docs"] }, query: { limit: 200, after } });
     for (const one of page.items) byNumber.set(one.number, one);
     after = page.next;
   } while (after);
@@ -29,7 +29,7 @@ export async function registerByNumber(scope: { projectId: string }): Promise<Ma
 export async function registerRows(scope: { projectId: string }, query: Record<string, string | undefined> = {}): Promise<RegisterRow[]> {
   const rows: RegisterRow[] = [];
   for (let page = 1; ; page++) {
-    const answer = await api<RegisterPage>(projectPath(scope, "/register"), { query: { ...query, per: 250, page } });
+    const answer = await api<RegisterPage>(projectPath(scope, "/register"), { keep: { areas: ["docs", "reviews", "transmittals", "packages"] }, query: { ...query, per: 250, page } });
     rows.push(...answer.rows);
     if (answer.page >= answer.pages) return rows;
   }
@@ -37,7 +37,7 @@ export async function registerRows(scope: { projectId: string }, query: Record<s
 
 /** One document, with everything the backend keeps on it. */
 export async function documentView(scope: { projectId: string }, id: string): Promise<DocumentView> {
-  return api<DocumentView>(projectPath(scope, `/documents/${id}`));
+  return api<DocumentView>(projectPath(scope, `/documents/${id}`), { keep: { areas: ["docs", "reviews"], doc: id } });
 }
 
 /**

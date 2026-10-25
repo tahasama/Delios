@@ -73,7 +73,7 @@ function orNothing<T>(fallback: T) {
 
 /** The project's schedule document and its latest reads, newest first. */
 export const scheduleSource = cache(async (scope: Scope) =>
-  api<{ source: ScheduleSourceView | null; imports: ScheduleImportView[]; days: ScheduleDaysView }>(projectPath(scope, "/schedule"))
+  api<{ source: ScheduleSourceView | null; imports: ScheduleImportView[]; days: ScheduleDaysView }>(projectPath(scope, "/schedule"), { keep: { areas: ["plan", "docs"] } })
     .catch(orNothing({ source: null as ScheduleSourceView | null, imports: [] as ScheduleImportView[], days: APP_DAYS })));
 
 /** The schedule's activities in force, by start date. */
@@ -82,11 +82,11 @@ export const activityList = cache(async (scope: Scope): Promise<ActivitySummary[
 
 /** One activity with its needs and decisions, or null. */
 export const activityDetail = cache(async (scope: Scope, id: string): Promise<ActivityDetail | null> =>
-  api<ActivityDetail>(projectPath(scope, `/activities/${id}`)).catch(orNothing(null)));
+  api<ActivityDetail>(projectPath(scope, `/activities/${id}`), { keep: { areas: ["plan", "assets", "docs", "reviews", "transmittals"] } }).catch(orNothing(null)));
 
 /** For each need of an activity, the checkpoints its document went through and the first that slipped. */
 export const activityLateness = cache(async (scope: Scope, id: string): Promise<NeedLateness[]> =>
-  api<NeedLateness[]>(projectPath(scope, `/activities/${id}/lateness`)).catch(orNothing([] as NeedLateness[])));
+  api<NeedLateness[]>(projectPath(scope, `/activities/${id}/lateness`), { keep: { areas: ["plan", "docs", "reviews", "transmittals"] } }).catch(orNothing([] as NeedLateness[])));
 // ── The plan, as the schedule screens show it ─────────────────────────────────
 
 /** One thing an action needs: a document, for what (the statuses it names, or its purpose), by when, and where it stands. */
@@ -286,4 +286,4 @@ export type ActivityRequest = {
 };
 
 export const activityRequests = cache(async (scope: Scope, activityId: string): Promise<ActivityRequest[]> =>
-  api<ActivityRequest[]>(projectPath(scope, `/activities/${activityId}/requests`)).catch(() => []));
+  api<ActivityRequest[]>(projectPath(scope, `/activities/${activityId}/requests`), { keep: { areas: ["plan", "assets", "transmittals"] } }).catch(() => []));

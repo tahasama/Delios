@@ -35,7 +35,7 @@ type UntoldRow = {
  * not issued is not looked for: drafts are kept apart until issued.
  */
 export async function untoldRecipients(t: { projectId: string }): Promise<Untold[]> {
-  const rows = await api<UntoldRow[]>(projectPath(t, "/exposures/untold")).catch(() => [] as UntoldRow[]);
+  const rows = await api<UntoldRow[]>(projectPath(t, "/exposures/untold"), { keep: { areas: ["docs", "transmittals"] } }).catch(() => [] as UntoldRow[]);
   return rows.map((row) => ({
     document: { id: row.documentId, docNumber: row.documentNumber, title: row.title },
     old: { id: row.oldRevisionId, value: row.oldValue, supersededAt: row.supersededAt ? new Date(row.supersededAt) : null },

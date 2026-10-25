@@ -36,4 +36,4 @@ export const holders = cache(async (
   projectId: string, verb: string, deliverableType?: string | null, docType?: string | null, discipline?: string | null,
   criticality?: string | null, confidentiality?: string | null,
 ): Promise<Holder[]> =>
-  api<Holder[]>(`/api/projects/${projectId}/holders`, { query: { verb, deliverableType, docType, discipline, criticality, confidentiality } }));
+  api<Holder[]>(`/api/projects/${projectId}/holders`, { keep: { areas: [] }, query: { verb, deliverableType, docType, discipline, criticality, confidentiality } }));

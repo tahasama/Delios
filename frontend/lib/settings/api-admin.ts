@@ -116,10 +116,10 @@ export type AuditPage = {
     entityLabel: string | null; detail: string | null; projectId: string | null; project: string | null }[];
 };
 
-export const adminUsers = cache(async () => api<AdminUser[]>("/api/admin/users"));
-export const adminProjects = cache(async () => api<AdminProject[]>("/api/admin/projects"));
-export const adminFunctions = cache(async () => api<AdminFunction[]>("/api/admin/functions"));
-export const adminParties = cache(async () => api<AdminParty[]>("/api/admin/parties"));
+export const adminUsers = cache(async () => api<AdminUser[]>("/api/admin/users", { keep: { areas: [] } }));
+export const adminProjects = cache(async () => api<AdminProject[]>("/api/admin/projects", { keep: { areas: [] } }));
+export const adminFunctions = cache(async () => api<AdminFunction[]>("/api/admin/functions", { keep: { areas: [] } }));
+export const adminParties = cache(async () => api<AdminParty[]>("/api/admin/parties", { keep: { areas: [] } }));
 /** One series of a revision scheme (backend RevisionSeriesRule). */
 export type RevisionSeries = {
   code: string; label: string; kind: string; prefix: string; start: string; width: number; lowercase: boolean; excludedLetters: string[];
@@ -127,7 +127,7 @@ export type RevisionSeries = {
   phase?: string | null;
 };
 
-export const adminNumbering = cache(async () => api<AdminNumbering>("/api/admin/numbering"));
+export const adminNumbering = cache(async () => api<AdminNumbering>("/api/admin/numbering", { keep: { areas: [] } }));
 /**
  * The numbering a project uses (its own copy, else the organization's), whether numbering is free for projects
  * (What projects may change), and whether the person may change it here.
@@ -135,10 +135,10 @@ export const adminNumbering = cache(async () => api<AdminNumbering>("/api/admin/
 type ProjectNumbering = Pick<AdminNumbering, "schemes" | "routing"> & { own: boolean; free: boolean; exception?: ExceptionHere; mayChange: boolean; mayChangeOrganization: boolean };
 export const projectNumbering = cache(async () => {
   const ctx = await requireScope();
-  return api<ProjectNumbering>(projectPath(ctx, "/numbering"));
+  return api<ProjectNumbering>(projectPath(ctx, "/numbering"), { keep: { areas: [] } });
 });
-export const adminRoutes = cache(async () => api<AdminRoute[]>("/api/admin/routes"));
-export const adminValueSets = cache(async () => api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets"));
+export const adminRoutes = cache(async () => api<AdminRoute[]>("/api/admin/routes", { keep: { areas: [] } }));
+export const adminValueSets = cache(async () => api<{ key: string; active: number; retired: number }[]>("/api/admin/value-sets", { keep: { areas: [] } }));
 
 export async function adminAudit(query: { q?: string; kind?: string; action?: string; entityType?: string; projectId?: string; actorId?: string; from?: string; to?: string; page?: number; per?: number }) {
   return api<AuditPage>("/api/admin/audit", { query });
@@ -318,12 +318,12 @@ export type EditorRouteStep = {
 type ProjectRoutes = { routes: AdminRoute[]; own: boolean; free: boolean; exception?: ExceptionHere; mayChange: boolean; mayChangeOrganization: boolean };
 export const projectRoutes = cache(async () => {
   const ctx = await requireScope();
-  return api<ProjectRoutes>(projectPath(ctx, "/routes"));
+  return api<ProjectRoutes>(projectPath(ctx, "/routes"), { keep: { areas: [] } });
 });
 
 /** The projects offering their own copy of the review routes, since when and by whom. */
 export const routeCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/routes/projects"));
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/routes/projects", { keep: { areas: [] } }));
 
 export async function routesForEditor(level: "organization" | "project" = "project") {
   const [routes, parties] = await Promise.all([level === "organization" ? adminRoutes() : projectRoutes().then((p) => p.routes), adminParties()]);
@@ -448,26 +448,26 @@ export async function scopeConfig(projectId?: string): Promise<ScopeConfig> {
 
 /** The projects numbering by their own copy (where numbering was free for projects), since when and by whom. */
 export const numberingCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/numbering/projects"));
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/numbering/projects", { keep: { areas: [] } }));
 
 /** The revision naming a project uses (its own copy, else the organization's), whether it is free for projects, and who may change it here. */
 type ProjectRevisions = Pick<AdminNumbering, "revisionSchemes" | "revisionRouting"> & { own: boolean; free: boolean; exception?: ExceptionHere; mayChange: boolean; mayChangeOrganization: boolean };
 export const projectRevisions = cache(async () => {
   const ctx = await requireScope();
-  return api<ProjectRevisions>(projectPath(ctx, "/revisions"));
+  return api<ProjectRevisions>(projectPath(ctx, "/revisions"), { keep: { areas: [] } });
 });
 
 /** The projects naming revisions by their own copy, since when and by whom. */
 export const revisionCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/revisions/projects"));
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/revisions/projects", { keep: { areas: [] } }));
 
 /** The projects keeping their own copy of lists (the organization's Types & sets card), and which. */
 export const listCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; lists: string[] }[]>("/api/admin/lists/projects"));
+  api<{ id: string; code: string; name: string; lists: string[] }[]>("/api/admin/lists/projects", { keep: { areas: [] } }));
 
 /** The projects keeping their own copy of forms (the organization's Forms & fields card), and which. */
 export const formCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; forms: string[] }[]>("/api/admin/forms/projects"));
+  api<{ id: string; code: string; name: string; forms: string[] }[]>("/api/admin/forms/projects", { keep: { areas: [] } }));
 
 /** A project's own copy kept when it was put back to the organization's (backend `KeptCopies`). */
 export type KeptCopy = {
@@ -478,17 +478,17 @@ export type KeptCopy = {
 
 /** The kept copies of one card ("NUMBERING", "REVISIONS", "ROUTES"; "LIST:" or "FORM:" for every list or form). */
 export const keptCopies = cache(async (kind: string) =>
-  api<KeptCopy[]>("/api/admin/kept-copies", { query: { kind } }));
+  api<KeptCopy[]>("/api/admin/kept-copies", { keep: { areas: [] }, query: { kind } }));
 
 /** What each function may do on a project (its own copy where it keeps one), as the matrix reads it, with who may change it. */
 export async function projectFunctionsForMatrix(scope: { projectId: string }) {
-  const view = await api<{ own: boolean; free: boolean; exception?: ExceptionHere; mayChange: boolean; functions: AdminFunction[] }>(projectPath(scope, "/functions"));
+  const view = await api<{ own: boolean; free: boolean; exception?: ExceptionHere; mayChange: boolean; functions: AdminFunction[] }>(projectPath(scope, "/functions"), { keep: { areas: [] } });
   return { ...view, functions: matrixOf(view.functions) };
 }
 
 /** The projects keeping their own rights. */
 export const functionCopies = cache(async () =>
-  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/functions/projects"));
+  api<{ id: string; code: string; name: string; since: string; by: string }[]>("/api/admin/functions/projects", { keep: { areas: [] } }));
 
 /** What one project changed from the organization's (backend `ProjectDifferences`), read on the organization's Settings. */
 export type ProjectDifferences = {
@@ -503,10 +503,10 @@ export type ProjectDifferences = {
 
 /** A failed read throws: "it changed nothing" is never said of a project that could not be read. */
 export const projectDifferences = cache(async (projectId: string) =>
-  api<ProjectDifferences>(`/api/admin/projects/${projectId}/differences`));
+  api<ProjectDifferences>(`/api/admin/projects/${projectId}/differences`, { keep: { areas: [] } }));
 
 /** The organization's days around an action, the default of every project (backend `ScheduleDays`). A failed read throws. */
-export const organizationDays = cache(async () => api<{ lead: number; risk: number }>("/api/admin/schedule-days"));
+export const organizationDays = cache(async () => api<{ lead: number; risk: number }>("/api/admin/schedule-days", { keep: { areas: [] } }));
 
 /** Where every new project starts: time zone, days off each week and country (Defaults for new projects). */
-export const projectPlace = cache(async () => api<import("@/lib/settings/place").Place>("/api/admin/project-place"));
+export const projectPlace = cache(async () => api<import("@/lib/settings/place").Place>("/api/admin/project-place", { keep: { areas: [] } }));

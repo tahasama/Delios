@@ -50,7 +50,7 @@ export default async function AdminPage() {
     // What the project's forms ask beyond the app's (Forms & fields): fields made required or left out, and fields added.
     projectForms(ctx.projectId).then((answer) => (answer?.forms ?? []).reduce((n, form) =>
       n + Object.entries(form.rules).filter(([key, rule]) => fieldsOf(form.form).find((f) => f.key === key)?.fallback !== rule).length + form.own.length, 0)).catch(() => 0),
-    api<{ verdicts: { status: string; meaning: string | null }[] }[]>("/api/admin/verdict-lists").catch(() => null),
+    api<{ verdicts: { status: string; meaning: string | null }[] }[]>("/api/admin/verdict-lists", { keep: { areas: [] } }).catch(() => null),
     getActiveSet("DELIVERABLE_TYPES").catch(() => []),
     Promise.all(ESSENTIAL.map(async (key) => ((await getActiveSet(key).catch(() => [])).length ? null : key))).then((all) => all.filter(Boolean).length),
   ]);

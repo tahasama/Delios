@@ -26,7 +26,7 @@ export default async function NumberingPage({ searchParams }: { searchParams: Pr
   const [numbering, sets, deliverables] = await Promise.all([
     numberingForEditor("project"),
     // A part reads one of the app's numbering lists, or a list of the project's own in Numbering & identity.
-    Promise.all([getSets(), api<{ lists: { key: string; group: string; app: boolean }[] }>(projectPath(ctx, "/lists")).catch(() => ({ lists: [] }))])
+    Promise.all([getSets(), api<{ lists: { key: string; group: string; app: boolean }[] }>(projectPath(ctx, "/lists"), { keep: { areas: [] } }).catch(() => ({ lists: [] }))])
       .then(([all, read]) => {
         const own = new Set(read.lists.filter((l) => !l.app && l.group === "NUMBERING").map((l) => l.key));
         return all.filter((one) => NUMBERING_SETS.includes(one.key) || own.has(one.key));

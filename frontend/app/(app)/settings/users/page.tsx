@@ -59,7 +59,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
     projectSettings(projectId).catch(() => new Map<string, string>()),
     holdersOf(ctx, "MANAGE").catch(() => []),
     projectOrganizations(ctx).catch(() => []),
-    api<Pending[]>(projectPath(ctx, "/people/pending")).catch(() => [] as Pending[]),
+    api<Pending[]>(projectPath(ctx, "/people/pending"), { keep: { areas: [] } }).catch(() => [] as Pending[]),
   ]);
 
   // Whether someone put on here goes straight on, or is asked first (the backend decides the same way).

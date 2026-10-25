@@ -44,7 +44,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const [disciplines, parties] = await Promise.all([
     getActiveSet("DISCIPLINES").then((rows) => [...rows].sort((a, b) => a.label.localeCompare(b.label))),
     // Suppliers are the organizations the project deals with.
-    api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
+    api<{ code: string; name: string }[]>("/api/parties", { keep: { areas: [] } }).then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
   ]);
   const deptLabel = (c: string | null) => (c ? disciplines.find((d) => d.code === c)?.label ?? c : "—");
   const partyLabel = (c: string | null) => (c ? parties.find((p) => p.code === c)?.label ?? c : "Us");

@@ -136,7 +136,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       // listed a document against would filter to an empty register.
       api<ActivitySummary[]>(projectPath(scope, "/activities")).catch(() => [] as ActivitySummary[]),
       // The questions this reader keeps, oldest first so the list stays put.
-      api<{ id: string; name: string; query: string; createdAt: string }[]>(projectPath(scope, "/register/views")).catch(() => []),
+      api<{ id: string; name: string; query: string; createdAt: string }[]>(projectPath(scope, "/register/views"), { keep: { areas: [] } }).catch(() => []),
     ]);
   // A filter on a list of several sets offers every set's values under the set's name and whom it serves (owner).
   const inSets = await setGrouping(scope);

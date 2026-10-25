@@ -74,9 +74,9 @@ export default async function ControlRoomPage() {
       people: { id: string; name: string; partyId: string | null; function: string; control: boolean; actsAsControl: boolean }[];
       organizations: { id: string; kind: string }[];
       mayNameControl: boolean;
-    }>(projectPath(ctx, "/people/directory")).catch(() => null),
+    }>(projectPath(ctx, "/people/directory"), { keep: { areas: [] } }).catch(() => null),
     projectLiberty(ctx.projectId),
-    api<{ key: string; title: string; verdicts: { code: string; status: string }[] }[]>("/api/admin/verdict-lists").catch(() => null),
+    api<{ key: string; title: string; verdicts: { code: string; status: string }[] }[]>("/api/admin/verdict-lists", { keep: { areas: [] } }).catch(() => null),
     // What is kept about people's activity is the organization's (What is kept), read here only.
     orgSettings().catch(() => null),
     optOutsOf(ctx.projectId).then((all) => all.length).catch(() => null),

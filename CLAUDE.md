@@ -1717,8 +1717,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   gathered a quarter of a second; `Screens__Url`, the shared `SCREENS_SECRET`; Caddy refuses it from outside), which
   clears them for every other session (`revalidateTag(tag, { expire: 0 })`). A write around the save (an `ExecuteUpdate`)
   names its labels itself (the virus check finishing a file: its document). A kept answer is read again within the
-  hour at most (`KEEP_SECONDS`, for today's date). Kept: the plan, an action, the register, a document and its context,
-  a review, the reviews and transmittals lists, packages and their lines, Home's work and checks, settings. Opening a
+  hour at most (`KEEP_SECONDS`, for today's date). Kept: every read a page draws from (owner: reports, the register,
+  documents, transmittals, packages, assets, reviews, Assurance and its plan, the Schedule and the calendar, Home and its
+  log, every Settings and organization page: a settings read keeps `areas: []`, cleared by `all`). Never kept, read fresh
+  every time: notifications and the account (saved without telling the screens), sign-in and security, what waits for a
+  result (a file's virus check, a sheet's check, an upload, a document's snapshots), the audit trail and a person's
+  activity, the notice log, and the Excel downloads. A failed sign-in counted or a lock clears nothing
+  (`ScreenChangeWatcher.Bookkeeping`); a row hanging from an action, wherever it is kept, also clears the plan. Opening a
   document is still recorded once every half hour, sent after the page is drawn (`apiAfter`, Next.js `after`;
   `POST /documents/{id}/viewed`). The search index is told which organization changed (`Search/SearchSignal.cs`, through
   Redis), never asking every few seconds; it catches up once an hour, on its own index (documents tenant · updated · id).

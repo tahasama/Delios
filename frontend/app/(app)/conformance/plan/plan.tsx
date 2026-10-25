@@ -113,7 +113,7 @@ export async function DocumentManagementPlan() {
     scheduleSource(ctx),
     optOutsOf(ctx.projectId),
     scopeOf(ctx.projectId),
-    api<Directory>(projectPath(ctx, "/people/directory")).catch(() => null),
+    api<Directory>(projectPath(ctx, "/people/directory"), { keep: { areas: [] } }).catch(() => null),
     contractRoleOptions().catch(() => []),
     projectKinds(),
     getActiveSet("DELIVERABLE_TYPES"),
@@ -140,7 +140,7 @@ export async function DocumentManagementPlan() {
   const setTitle = (key: string) => sets.find((s) => s.key === key)?.title ?? key;
 
   // The sets of the review outcomes, each with whom it serves, the routes naming it, its verdicts and what each means.
-  const outcomeSets = (await api<{ lists: { key: string; sets: { id: string | null; name: string; isDefault: boolean; active: boolean; deliverableTypes: string[] }[] }[] }>(projectPath(ctx, "/lists"))
+  const outcomeSets = (await api<{ lists: { key: string; sets: { id: string | null; name: string; isDefault: boolean; active: boolean; deliverableTypes: string[] }[] }[] }>(projectPath(ctx, "/lists"), { keep: { areas: [] } })
     .catch(() => ({ lists: [] }))).lists.find((l) => l.key === "REVIEW_OUTCOMES")?.sets.filter((s) => s.active) ?? [];
   const outcomeValues = await getActiveSet("REVIEW_OUTCOMES");
   const defaultSetId = outcomeSets.find((s) => s.isDefault)?.id ?? null;

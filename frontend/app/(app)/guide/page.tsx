@@ -80,7 +80,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
   };
   const [roleOptions, directory, me, familyList, typed] = await Promise.all([
     contractRoleOptions().then((all) => all.filter((r) => r.code !== "GENERIC")),
-    api<Directory>(projectPath(ctx, "/people/directory")).catch(() => null),
+    api<Directory>(projectPath(ctx, "/people/directory"), { keep: { areas: [] } }).catch(() => null),
     getMe(),
     families(ctx).catch(() => []),
     typesByFamily(ctx).catch(() => []),

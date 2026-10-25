@@ -53,7 +53,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const [work, checks, criticalDefects, activities, neverSent, scheduleWork] = await Promise.all([
     api<Work>(projectPath(session, "/work"), { keep: { areas: ["reviews", "transmittals", "docs", "packages", "plan"] } }),
     controller ? api<{ lastRun: { integrity: number } | null }>(projectPath(session, "/checks"), { keep: { areas: ["checks"] } }).catch(() => ({ lastRun: null })) : Promise.resolve({ lastRun: null }),
-    controller ? api<unknown[]>(projectPath(session, "/defects"), { query: { severity: "CRITICAL" } }).then((d) => d.length).catch(() => 0) : Promise.resolve(0),
+    controller ? api<unknown[]>(projectPath(session, "/defects"), { keep: { areas: ["checks"] }, query: { severity: "CRITICAL" } }).then((d) => d.length).catch(() => 0) : Promise.resolve(0),
     // The actions short of documents: how many, and the newest four, worked out by the backend (never the whole schedule).
     user.isInternal && (controller || session.can("PLAN") || user.department)
       ? api<{ count: number; top: ActivitySummary[] }>(projectPath(session, "/activities/short"), {
@@ -81,12 +81,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // ends up looking at a different project. What a reader may not see is
   // already settled by the backend, not by this page.
   const since = lastWorkingDay();
-  const news = acts(await api<ActivityRow[]>(projectPath(session, "/activity"), { query: { actions: backendNames(NEWS), since: since.toISOString(), take: 4 } }));
+  const news = acts(await api<ActivityRow[]>(projectPath(session, "/activity"), { keep: { areas: ["docs", "reviews", "transmittals", "packages", "plan", "checks"] }, query: { actions: backendNames(NEWS), since: since.toISOString(), take: 4 } }));
   // A quiet day should not leave the panel empty or showing one lonely line:
   // when the last working day produced almost nothing, the journal reaches
   // further back and says so instead.
   const older = news.length < 4
-    ? acts(await api<ActivityRow[]>(projectPath(session, "/activity"), { query: { actions: backendNames(NEWS), before: since.toISOString(), take: 4 - news.length } }))
+    ? acts(await api<ActivityRow[]>(projectPath(session, "/activity"), { keep: { areas: ["docs", "reviews", "transmittals", "packages", "plan", "checks"] }, query: { actions: backendNames(NEWS), before: since.toISOString(), take: 4 - news.length } }))
     : [];
   const journal = [...news, ...older];
   // The whole log, when the reader asks for it. It carries the same kinds of
@@ -98,7 +98,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // 3rd to the 3rd returns the 3rd.
   // The log: the project's whole trail on the logbook (kinds, every act, words, days), as the Audit trail reads it.
   const log = view === "log"
-    ? await api<ProjectLog>(projectPath(session, "/log"), {
+    ? await api<ProjectLog>(projectPath(session, "/log"), { keep: { areas: ["docs", "reviews", "transmittals", "packages", "plan", "checks", "assets"] },
         query: { kind: sp.kind || undefined, action: sp.action || undefined, q: sp.q || undefined, from: sp.from || undefined, to: sp.to || undefined, page: sp.page || undefined, per: 50 },
       }).catch(() => null)
     : null;

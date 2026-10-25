@@ -115,7 +115,7 @@ export const backendDocument = cache(async (scope: Scope, id: string): Promise<D
 export async function backendReviews(scope: Scope, ids: string[]): Promise<ReviewView[]> {
   const wanted = [...new Set(ids.filter(Boolean))];
   if (!wanted.length) return [];
-  return api<ReviewView[]>(projectPath(scope, `/reviews/many?ids=${wanted.map(encodeURIComponent).join(",")}`));
+  return api<ReviewView[]>(projectPath(scope, `/reviews/many?ids=${wanted.map(encodeURIComponent).join(",")}`), { keep: { areas: ["reviews", "docs"] } });
 }
 
 /** Several documents at once, those the reader may see (a form enclosing them): one read, never one a document. */
@@ -131,7 +131,7 @@ export const documentContext = cache(async (scope: Scope, id: string): Promise<B
 
 /** Every ask to hand a supplier's document back, newest first, with its answer. */
 export const handBacks = cache(async (scope: Scope, id: string): Promise<HandBack[]> =>
-  api<HandBack[]>(projectPath(scope, `/documents/${id}/asks`)).catch(() => []));
+  api<HandBack[]>(projectPath(scope, `/documents/${id}/asks`), { keep: { areas: ["docs"], doc: id } }).catch(() => []));
 
 /** One review in full: its steps, who sits on them and the comments. */
 export const backendReview = cache(async (scope: Scope, id: string): Promise<ReviewView> =>
@@ -242,11 +242,11 @@ export const documentPage = cache(async (scope: Scope, id: string): Promise<Page
 /** A revision on its own, with the document it belongs to. */
 export const backendRevision = cache(async (scope: Scope, revisionId: string) =>
   api<{ id: string; documentId: string; value: string; state: string; statusCode: string | null; authoredById: string; authoredByName: string }>(
-    projectPath(scope, `/revisions/${revisionId}`)));
+    projectPath(scope, `/revisions/${revisionId}`), { keep: { areas: ["docs", "reviews"] } }));
 
 /** What the caller may do about sending a revision out, and who wrote it. */
 export const revisionStanding = cache(async (scope: Scope, revisionId: string) =>
-  api<{ mayRequest: boolean; letsItOut: boolean; author: string | null; authorId: string | null }>(projectPath(scope, `/revisions/${revisionId}/standing`)));
+  api<{ mayRequest: boolean; letsItOut: boolean; author: string | null; authorId: string | null }>(projectPath(scope, `/revisions/${revisionId}/standing`), { keep: { areas: ["docs", "reviews", "transmittals"] } }));
 
 /** The review a revision is in, or was last in: the newest one. Null when it never went to review. */
 export async function reviewOfRevision(scope: Scope, revisionId: string): Promise<{ id: string; documentId: string; state: string } | null> {

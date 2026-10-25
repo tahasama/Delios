@@ -180,7 +180,7 @@ async function configures(me: NonNullable<Awaited<ReturnType<typeof getMe>>>): P
 
 /** The organization's projects, as an administrator sees them. */
 const organizationProjects = cache(async () =>
-  api<{ id: string; code: string; name: string; contractRole: string; kind?: string; status: string }[]>("/api/admin/projects").catch(() => []));
+  api<{ id: string; code: string; name: string; contractRole: string; kind?: string; status: string }[]>("/api/admin/projects", { keep: { areas: [] } }).catch(() => []));
 
 /** Remembers the project to open next, one the backend already put this person on (after switching organization). */
 export async function rememberProject(projectId: string) {
