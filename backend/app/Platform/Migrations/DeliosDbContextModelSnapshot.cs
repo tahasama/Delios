@@ -278,6 +278,81 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("activity_decisions", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Actions.ListSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant?>("ChosenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("chosen_at");
+
+                    b.Property<string>("ChosenByName")
+                        .HasColumnType("text")
+                        .HasColumnName("chosen_by_name");
+
+                    b.Property<Guid?>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<Instant?>("LastAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_at");
+
+                    b.Property<string>("LastByName")
+                        .HasColumnType("text")
+                        .HasColumnName("last_by_name");
+
+                    b.Property<string>("LastFrom")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("last_from");
+
+                    b.Property<string>("LastLabel")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("last_label");
+
+                    b.Property<Guid?>("LastRevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_revision_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_list_sources");
+
+                    b.HasIndex("DocumentId")
+                        .HasDatabaseName("ix_list_sources_document_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_list_sources_tenant_id");
+
+                    b.HasIndex("ProjectId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ix_list_sources_project_id_kind");
+
+                    b.ToTable("list_sources", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Actions.Notice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6748,6 +6823,29 @@ namespace Delios.Host.Platform.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_activity_decisions_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Delios.Host.Actions.ListSource", b =>
+                {
+                    b.HasOne("Delios.Host.Documents.Document", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_list_sources_documents_document_id");
+
+                    b.HasOne("Delios.Host.Identity.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_list_sources_projects_project_id");
+
+                    b.HasOne("Delios.Host.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_list_sources_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Delios.Host.Actions.Notice", b =>

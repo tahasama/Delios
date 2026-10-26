@@ -434,6 +434,7 @@ public static class PlatformSetup
             Documents.ProjectLists.MapProjectListEndpoints(app);
             Actions.ScheduleEndpoints.MapScheduleEndpoints(app);
             Actions.ListUploadEndpoints.MapListUploadEndpoints(app);
+            Actions.ListSources.MapListSourceEndpoints(app);
             Documents.SheetGuard.MapSheetGuardEndpoints(app);
             Audit.ActivityEndpoints.MapActivityEndpoints(app);
             Settings.SettingEndpoints.MapSettingEndpoints(app);
