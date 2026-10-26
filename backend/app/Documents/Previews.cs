@@ -109,10 +109,13 @@ public static class Previews
                 using var drawing = new MemoryStream();
                 await using (var source = await storage.OpenReadAsync(file.ObjectKey, cancellationToken))
                     await source.CopyToAsync(drawing, cancellationToken);
-                using var body = new ByteArrayContent(drawing.ToArray());
+                // Its own buffer, not a copy of it: a drawing runs to hundreds of megabytes.
+                using var body = new ByteArrayContent(drawing.GetBuffer(), 0, (int)drawing.Length);
                 body.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
                 using var client = clients.CreateClient(HttpClientName);
                 using var answer = await client.PostAsync($"{options.Value.DwgUrl!.TrimEnd('/')}/convert{(minimal ? "?minimal=1" : "")}", body, cancellationToken);
+                if (answer.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
+                    return Problems.Invalid("PREVIEW_BUSY", $"The converter is busy with other drawings: try again in a minute, or download {file.Name} to open it.");
                 if (!answer.IsSuccessStatusCode)
                     return Problems.Invalid("PREVIEW_FAILED", $"{file.Name} could not be read (a DWG version or content the free reader does not know): download it to open it.");
                 dxf = await answer.Content.ReadAsByteArrayAsync(cancellationToken);

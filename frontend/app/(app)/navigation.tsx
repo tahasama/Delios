@@ -157,7 +157,7 @@ function NavLink({
       onMouseEnter={(e) => tipFor(e, item.label, onTip)}
       onMouseLeave={() => onTip?.(null)}
       className={cn(
-        "group flex rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#d9a441]/70 rail:justify-center rail:px-0",
+        "group flex rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/70 rail:justify-center rail:px-0",
         compact ? "items-center gap-3 px-3 py-2" : "items-start gap-3 px-3 py-3 rail:py-1.5",
         active
           ? "bg-surface text-brand-ink shadow-sm dark:bg-white/10 dark:text-white dark:shadow-none"
@@ -167,7 +167,7 @@ function NavLink({
       <span
         className={cn(
           "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg rail:mt-0",
-          active ? "bg-tint text-brand-ink dark:bg-[#d9a441]/20 dark:text-[#e4b654]" : "bg-white/7 text-slate-300",
+          active ? "bg-tint text-brand-ink dark:bg-gold/20 dark:text-gold-bright" : "bg-white/7 text-slate-300",
         )}
       >
         <item.icon className="h-4 w-4" />
@@ -194,7 +194,7 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
   return (
     <>
       <Link href="/" onClick={onNavigate} className="mb-6 flex items-center gap-3 px-2 text-white rail:justify-center rail:px-0">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#d9a441] text-sm font-black text-[#102a43] shadow-sm">D</span>
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gold text-sm font-black text-[#102a43] shadow-sm">D</span>
         <span className="rail:hidden">
           <span className="block text-[15px] font-bold tracking-[0.08em]">DELIOS</span>
           <span className="block text-[11px] text-slate-400">Project information, controlled</span>
@@ -265,7 +265,7 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
             aria-label="Create document"
             onMouseEnter={(e) => tipFor(e, "Create document", onTip)}
             onMouseLeave={() => onTip?.(null)}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-[#d9a441] px-3 py-2.5 text-xs font-bold text-[#102a43] transition hover:bg-[#e4b654] rail:px-0"
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-gold px-3 py-2.5 text-xs font-bold text-[#102a43] transition hover:bg-gold-bright rail:px-0"
           >
             <FilePlus2 className="h-3.5 w-3.5 shrink-0" /> <span className="rail:hidden">Create document</span>
           </Link>
@@ -340,7 +340,7 @@ export function Sidebar({ perms }: { perms: NavPermissions }) {
         onDoubleClick={toggle}
         className="group/resize absolute inset-y-0 -right-1.5 z-30 w-3 cursor-col-resize"
       >
-        <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 transition group-hover/resize:bg-[#d9a441]/80" />
+        <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 transition group-hover/resize:bg-gold/80" />
       </div>
       {tip ? (
         <span

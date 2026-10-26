@@ -105,6 +105,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - One control size everywhere, set once in `frontend/app/globals.css` on `:root`:
   `--control-h` (2rem), `--control-text` (13px), `--control-radius`. Every
   field, dropdown, button and file field stands that height with that text.
+- The brand's gold is one colour, `gold` / `gold-bright` (`scripts/gen-theme.mjs` → `app/theme.css`), never typed as
+  a hex on a page.
 - Use the shared pieces only: `btn()` and `inputCls` (`frontend/components/ui.tsx`),
   `.ask`, `.plain`, `ActionForm`. Never give a field or button its own height,
   padding or text size on a page; never restyle the file button locally.
@@ -1773,6 +1775,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   backend code, messages or comments. Functions are the organization's data. Say **the control function** (whoever
   holds CONTROL on the project) and **whoever holds Manage** (or another verb); a name shown is read from the data
   (the function's own name). The demo data's starter functions are data, not code.
+- **The person's own address reaches the API** (the sign-in limit counts per address): the site's Caddy sets it, the
+  screens pass it on, the API's Caddy trusts the private network (`trusted_proxies`), and the API walks back through
+  every hop of ours (`ForwardLimit = null`). Lost, every sign-in came from the screens' address: one limit for everybody.
+- An import reads what it compares once, never once a line, and keeps what it adds in hand: a query does not see what
+  this request added and has not saved (two lines naming one new tag made it twice, and the save failed).
 - An outbox routing key is at most 16 characters; `ControlledVersion.VersionLabel` too.
 - Migrations: `dotnet ef migrations add Name -p app -s app -o Platform/Migrations`
   (from `backend/`). Each new table gets `RowLevelSecurity.Enable(migrationBuilder, "<table>")`.

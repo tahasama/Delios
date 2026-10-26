@@ -37,3 +37,6 @@ yarn-error.log*
 
 # copied from packages at every build (frontend/scripts/copy-vendor.mjs)
 /frontend/public/vendor/
+
+# Python bytecode
+__pycache__/

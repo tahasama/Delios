@@ -14,6 +14,8 @@
   --color-link: #2b5b80;
   --color-tint: #e4eef7;
   --color-tint-soft: #f2f6fb;
+  --color-gold: #d9a441;
+  --color-gold-bright: #e4b654;
 }
 
 :root {
@@ -35,6 +37,8 @@
   --color-link: #8db8de;
   --color-tint: #1a2a3c;
   --color-tint-soft: #152131;
+  --color-gold: #d9a441;
+  --color-gold-bright: #e4b654;
   --color-slate-50: #161e2b;
   --color-slate-100: #1d2636;
   --color-slate-200: #2a3547;
@@ -273,6 +277,8 @@
   --color-link: #2b5b80;
   --color-tint: #e4eef7;
   --color-tint-soft: #f2f6fb;
+  --color-gold: #d9a441;
+  --color-gold-bright: #e4b654;
   --color-slate-50: oklch(98.4% 0.003 247.858);
   --color-slate-100: oklch(96.8% 0.007 247.896);
   --color-slate-200: oklch(92.9% 0.013 255.508);

@@ -651,7 +651,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           <span className="font-mono text-sm tabular-nums">{selected.length}</span>
           <span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked</span>
         </span>
-        <Link href={withDocs(picking.back, selected)} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink">Continue with {selected.length}</Link>
+        <Link href={withDocs(picking.back, selected)} className="inline-flex items-center gap-1.5 rounded-sm bg-gold px-3 py-2 text-xs font-semibold text-brand-ink">Continue with {selected.length}</Link>
         <Link href={withDocs(picking.back, picking.linked)} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without changing</Link>
       </div>
     ) : picking?.kind === "asset" ? (
@@ -694,14 +694,14 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       </div>
     ) : selected.length ? <div className="dock palette-light sticky bottom-4 z-30 mx-auto flex w-fit max-w-full flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
       <span className="px-2 font-mono text-sm tabular-nums">{allMatching ? total.toLocaleString("en-GB") : selected.length}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">selected</span></span>
-      {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : null) : null}
+      {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-gold px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : null) : null}
       {transmittableRows.length + placeholderRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length + placeholderRows.length})</Link> : null}
       {supplier && !supplier.readOnly ? (() => {
         const sendable = selectedRows.map((row) => row.sendRevisionId).filter((id): id is string => !!id);
         return sendable.length ? (
           <form action={sendFromRegister}>
             {sendable.map((id) => <input key={id} type="hidden" name="revisionId" value={id} />)}
-            <button type="submit" className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><Send className="h-4 w-4" /> Send to {supplier.to} ({sendable.length})</button>
+            <button type="submit" className="inline-flex items-center gap-1.5 rounded-sm bg-gold px-3 py-2 text-xs font-semibold text-brand-ink"><Send className="h-4 w-4" /> Send to {supplier.to} ({sendable.length})</button>
           </form>
         ) : null;
       })() : null}

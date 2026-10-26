@@ -55,7 +55,7 @@ export function ValuesDock({ formId, otherSets }: { formId: string; otherSets: {
   const act = "inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15";
   return (
     <div className="dock palette-light sticky bottom-4 z-30 mx-auto flex w-fit max-w-full flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
-      <span className="px-2 font-mono text-sm tabular-nums">{count}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked</span></span>
+      <span className="px-2 font-mono text-sm tabular-nums">{count}<span className="ml-1.5 text-[11px] uppercase tracking-[0.12em] text-white/60">ticked</span></span>
       {ticked.active ? <button type="submit" form={formId} name="op" value="RETIRE" className={act}><Archive className="h-4 w-4" /> Retire ({ticked.active})</button> : null}
       {ticked.retired ? <button type="submit" form={formId} name="op" value="REACTIVATE" className={act}><ArchiveRestore className="h-4 w-4" /> Bring back ({ticked.retired})</button> : null}
       {ticked.unused && otherSets.length ? (

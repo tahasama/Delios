@@ -240,6 +240,9 @@ public static class PlatformSetup
         services.Configure<ForwardedHeadersOptions>(o =>
         {
             o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            // Two hops of ours (the site's Caddy, the screens, then the API's Caddy): walked back while the address is
+            // one of ours, so the person's own address is the one counted (the sign-in limit, known devices).
+            o.ForwardLimit = null;
             foreach (var network in new[] { "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16" })
             {
                 o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));

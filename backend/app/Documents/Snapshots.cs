@@ -162,22 +162,25 @@ public sealed class SnapshotRecorder(DeliosDbContext db, IClock clock)
         if (_noted.Count == 0) return;
         await db.SaveChangesAsync(cancellationToken);
         var byDocument = new Dictionary<Guid, (Noted Event, Guid? RevisionId)>();
+        // Which document each revision and review noted belongs to, in two reads whatever their number (an import
+        // registers hundreds in one request).
+        var revisionIds = _noted.Where(n => n.EntityType == "Revision").Select(n => n.EntityId).Distinct().ToList();
+        var reviewIds = _noted.Where(n => n.EntityType == "Review").Select(n => n.EntityId).Distinct().ToList();
+        var revisions = revisionIds.Count == 0 ? new Dictionary<Guid, Guid>()
+            : (await db.Revisions.AsNoTracking().Where(x => revisionIds.Contains(x.Id)).Select(x => new { x.Id, x.DocumentId })
+                .ToListAsync(cancellationToken)).ToDictionary(x => x.Id, x => x.DocumentId);
+        var reviews = reviewIds.Count == 0 ? new Dictionary<Guid, (Guid DocumentId, Guid RevisionId)>()
+            : (await db.Reviews.AsNoTracking().Where(x => reviewIds.Contains(x.Id)).Select(x => new { x.Id, x.DocumentId, x.RevisionId })
+                .ToListAsync(cancellationToken)).ToDictionary(x => x.Id, x => (x.DocumentId, x.RevisionId));
         foreach (var noted in _noted)
         {
             (Guid DocumentId, Guid? RevisionId)? target = null;
             if (noted.EntityType == "Document") target = (noted.EntityId, null);
             else if (noted.EntityType == "Revision")
             {
-                var r = await db.Revisions.AsNoTracking().Where(x => x.Id == noted.EntityId).Select(x => new { x.DocumentId, x.Id })
-                    .SingleOrDefaultAsync(cancellationToken);
-                if (r is not null) target = (r.DocumentId, r.Id);
+                if (revisions.TryGetValue(noted.EntityId, out var documentOf)) target = (documentOf, noted.EntityId);
             }
-            else
-            {
-                var r = await db.Reviews.AsNoTracking().Where(x => x.Id == noted.EntityId).Select(x => new { x.DocumentId, x.RevisionId })
-                    .SingleOrDefaultAsync(cancellationToken);
-                if (r is not null) target = (r.DocumentId, r.RevisionId);
-            }
+            else if (reviews.TryGetValue(noted.EntityId, out var r)) target = (r.DocumentId, r.RevisionId);
             // The first event of the request names the point; a later one only fills in the revision.
             if (target is { } t && !byDocument.ContainsKey(t.DocumentId)) byDocument[t.DocumentId] = (noted, t.RevisionId);
         }

@@ -7,11 +7,16 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 MAX_BYTES = 300 * 1024 * 1024
 TIMEOUT = 110
+# Drawings read at the same time: each dwg2dxf can take hundreds of megabytes on a large drawing, so a handful opened
+# together could take the machine's memory. The rest wait their turn, then are told it is busy.
+AT_ONCE = threading.BoundedSemaphore(int(os.environ.get("DWG_AT_ONCE", "2")))
+WAIT = 60
 
 
 LINE = re.compile(rb"\r\n|\n|\r")
@@ -66,6 +71,9 @@ class Handler(BaseHTTPRequestHandler):
         if size <= 0 or size > MAX_BYTES:
             self._answer(413, b"the drawing is empty or too large")
             return
+        if not AT_ONCE.acquire(timeout=WAIT):
+            self._answer(503, b"the reader is busy with other drawings: try again in a minute")
+            return
         folder = tempfile.mkdtemp(prefix="dwg-")
         try:
             source = os.path.join(folder, "drawing.dwg")
@@ -91,6 +99,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._answer(200, mended(dxf.read()), "application/dxf")
         finally:
             shutil.rmtree(folder, ignore_errors=True)
+            AT_ONCE.release()
 
     def log_message(self, *args):
         pass
