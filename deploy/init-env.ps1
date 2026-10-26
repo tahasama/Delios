@@ -38,6 +38,17 @@ if (Test-Path $envFile) {
     Write-Host "Created $envFile"
 }
 
+# A file not ending in a new line had the next key glued onto its last line: put each back on its own,
+# then end the file with a new line, so a key added below starts on its own.
+$text = [System.IO.File]::ReadAllText($envFile)
+$before = $text
+foreach ($name in 'SCREENS_SECRET', 'STORAGE_COPIER_KEY', 'STORAGE_COPIER_SECRET', 'FILES_KEY') {
+    $fixed = [regex]::Replace($text, "(?m)^(?!#)([^\r\n]+?)($name=)", "`$1`n`$2")
+    if ($fixed -ne $text) { Write-Host "Put $name back on its own line in $envFile"; $text = $fixed }
+}
+if ($text.Length -gt 0 -and -not $text.EndsWith("`n")) { $text += "`n" }
+if ($text -ne $before) { [System.IO.File]::WriteAllText($envFile, $text) }
+
 # What a newer version needs, added to an existing file without touching the rest (Unix line endings, no byte-order mark).
 function Add-Missing([string]$name, [string]$value) {
     if (-not (Select-String -Path $envFile -Pattern "^$name=" -Quiet)) {

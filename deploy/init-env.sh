@@ -34,6 +34,17 @@ ENV
   echo "Created $env_file"
 fi
 
+# A file not ending in a new line had the next key glued onto its last line: put each back on its own.
+for name in SCREENS_SECRET STORAGE_COPIER_KEY STORAGE_COPIER_SECRET FILES_KEY; do
+  if grep -q "^[^#].*$name=" "$env_file"; then
+    awk -v k="$name=" '{ i = index($0, k); if (i > 1 && substr($0, 1, 1) != "#") { print substr($0, 1, i - 1); print substr($0, i) } else print }' \
+      "$env_file" > "$env_file.tmp" && cat "$env_file.tmp" > "$env_file" && rm -f "$env_file.tmp"
+    echo "Put $name back on its own line in $env_file"
+  fi
+done
+# End the file with a new line, so a key added below starts on its own.
+if [ -s "$env_file" ] && [ -n "$(tail -c 1 "$env_file")" ]; then printf '\n' >> "$env_file"; fi
+
 # What a newer version needs, added to an existing file without touching the rest.
 add() { grep -q "^$1=" "$env_file" || { printf '%s=%s\n' "$1" "$2" >> "$env_file"; echo "Added $1 to $env_file"; }; }
 add SCREENS_SECRET "$(random)"
