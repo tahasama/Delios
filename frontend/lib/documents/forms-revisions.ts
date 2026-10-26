@@ -42,21 +42,29 @@ export async function prepareRevisionAction(_prev: Result | undefined, formData:
 
 /**
  * Edit a revision not yet released, in one go: its files and the document's
- * details. A new file replaces the one of its kind as a new submission of the
- * revision, the earlier one kept in its history; a revision without files yet
- * simply takes them. Its author or the control function only, for the files.
+ * details. While nothing has looked at its files (no review, no transmittal), a
+ * new file replaces the one of its kind outright, the earlier one gone (a draft
+ * has no value); past that, as a new submission, the earlier kept. A revision
+ * without files yet simply takes them. Its author or the control function only, for the files.
  */
 export async function editRevisionAction(_prev: Result | undefined, formData: FormData): Promise<Result & { ok?: string }> {
   const ctx = await requireScope();
   const revisionId = text(formData, "revisionId");
   const files = filesOf(formData, "nativeFile", "renditionFile");
   let documentId: string;
+  // The same file sent again changes nothing (backend SAME_FILES): said, and the details are still saved.
+  let same: string | null = null;
   try {
     documentId = (await backendRevision(ctx, revisionId)).documentId;
     if (files.length) {
       const fileIds = await uploadRevisionFiles(ctx, documentId, formData);
       const path = text(formData, "hasFiles") === "yes" ? "update" : "files";
-      await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/${path}`), { body: { fileIds } });
+      try {
+        await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/${path}`), { body: { fileIds } });
+      } catch (e) {
+        if (refusal(e).code !== "SAME_FILES") throw e;
+        same = refusal(e).message;
+      }
     }
   } catch (e) {
     return failed(e);
@@ -64,8 +72,8 @@ export async function editRevisionAction(_prev: Result | undefined, formData: Fo
   const { updateDocumentAction } = await import("@/lib/documents/forms");
   const details = await updateDocumentAction(undefined, formData);
   revalidatePath(`/documents/${documentId}`);
-  if (details.error) return { error: files.length ? `The files are in; the details were not saved: ${details.error}` : details.error };
-  return { ok: files.length ? "Saved: files and details." : details.ok ?? "Saved." };
+  if (details.error) return { error: files.length && !same ? `The files are in; the details were not saved: ${details.error}` : details.error };
+  return { ok: same ? `${same} The details are saved.` : files.length ? "Saved: files and details." : details.ok ?? "Saved." };
 }
 
 /** Take a revision out of its review to edit it: closed as withdrawn, everyone on it told, comments kept. */

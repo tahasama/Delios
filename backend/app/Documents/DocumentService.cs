@@ -651,6 +651,7 @@ public sealed class DocumentService(
         }
         var (files, filesProblem) = await UploadedFilesAsync(access, document!, request.FileIds, cancellationToken);
         if (filesProblem is not null) return (null, filesProblem);
+        if (await ReplaceDraftAsync(access, document!, revision, files!, request.ChangeDescription, cancellationToken) is { } replaced) return replaced;
         Bind(files!, revision);
         revision.FilesState = FilesStates.Processing;
         document!.UpdatedAt = clock.GetCurrentInstant();
@@ -683,6 +684,7 @@ public sealed class DocumentService(
         var (files, filesProblem) = await UploadedFilesAsync(access, document!, request.FileIds, cancellationToken);
         if (filesProblem is not null) return (null, filesProblem);
         if (files!.Count == 0) return (null, Problems.Invalid("FILES_REQUIRED", "Choose the new files."));
+        if (await ReplaceDraftAsync(access, document!, revision, files, request.ChangeDescription, cancellationToken) is { } drafted) return drafted;
         var now = clock.GetCurrentInstant();
         // A new file replaces the one of its kind; the other kind carries over as it was, already scanned.
         var replaced = files.Select(f => f.Kind).ToHashSet();
@@ -829,6 +831,55 @@ public sealed class DocumentService(
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "RESUBMITTED", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}", $"Submission {revision.Submission}: {files!.Count} corrected file(s).",
             document.ProjectId, cancellationToken);
+        return (revision, null);
+    }
+
+    /// <summary>
+    /// A draft is replaced, never kept (owner: "those files have no value unless they are past that stage"): while the
+    /// revision is in preparation and nothing has looked at its files (none came on a transmittal, none was checked on
+    /// arrival, no transmittal carried them, no review of the revision), a new file takes the place of the one of its
+    /// kind, record and bytes (the bytes once committed, <see cref="DraftReplaced"/>; the database allows only this,
+    /// <c>stored_files_kept_unless_draft</c>), with no new submission. The same file sent again changes nothing.
+    /// Null when the files are no draft: then they are kept, as every file past preparation is.
+    /// </summary>
+    private async Task<(Revision? Revision, IResult? Problem)?> ReplaceDraftAsync(
+        ProjectAccess access, Document document, Revision revision, List<StoredFile> files, string? why, CancellationToken cancellationToken)
+    {
+        if (revision.State != RevisionStates.InPreparation) return null;
+        if (revision.Submissions.FirstOrDefault(x => x.Number == revision.Submission) is { Check: not null } or { Outcome: not null }) return null;
+        var current = revision.Files.Where(f => f.Submission == revision.Submission && f.Kind is FileKinds.Native or FileKinds.Rendition).ToList();
+        if (current.Any(f => f.TransmittalItemId is not null)) return null;
+        if (await db.Reviews.AnyAsync(r => r.RevisionId == revision.Id, cancellationToken)) return null;
+        if (await db.TransmittalItems.AnyAsync(i => i.RevisionId == revision.Id && (i.Submission == null || i.Submission == revision.Submission), cancellationToken))
+            return null;
+
+        // The same file again, of the same kind: nothing to replace (a refused one is replaced by itself all the same).
+        var repeated = files.Where(n => current.Any(o => o.Kind == n.Kind && o.Sha256 == n.Sha256
+            && o.Status is not (FileStatuses.Infected or FileStatuses.Rejected))).ToList();
+        var fresh = files.Except(repeated).ToList();
+        var gone = current.Where(o => fresh.Any(n => n.Kind == o.Kind)).ToList();
+        db.StoredFiles.RemoveRange(repeated);
+        db.StoredFiles.RemoveRange(gone);
+        var keys = repeated.Select(f => f.ObjectKey).Concat(gone.SelectMany(f => Previews.KeysOf(f).Prepend(f.ObjectKey))).ToArray();
+        if (keys.Length > 0) db.Enqueue(DraftReplaced.RoutingKey, new DraftReplaced(document.TenantId, keys));
+        if (fresh.Count == 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return (null, Problems.Conflict("SAME_FILES",
+                $"{string.Join(", ", repeated.Select(f => f.Name))} {(repeated.Count == 1 ? "is" : "are")} already what rev {revision.Value} holds: nothing changed."));
+        }
+        Bind(fresh, revision);
+        revision.FilesState = FilesStates.Processing;
+        document.UpdatedAt = clock.GetCurrentInstant();
+        await db.SaveChangesAsync(cancellationToken);
+        static string KindName(string kind) => kind == FileKinds.Rendition ? "PDF" : "source file";
+        var said = fresh.Select(n => gone.FirstOrDefault(o => o.Kind == n.Kind) is { } old
+            ? $"{KindName(n.Kind)} replaced: {old.Name} → {n.Name}" : $"{KindName(n.Kind)}: {n.Name}");
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), gone.Count > 0 ? "DRAFT_REPLACED" : "FILE_UPLOADED", "Revision", revision.Id,
+            $"{document.Number} rev {revision.Value}",
+            string.Join("; ", said) + (string.IsNullOrWhiteSpace(why) ? "" : $". Why: {why.Trim()}"),
+            document.ProjectId, cancellationToken);
+        revision.Files = [.. revision.Files.Except(gone)];
         return (revision, null);
     }
 

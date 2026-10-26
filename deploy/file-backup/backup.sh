@@ -39,7 +39,13 @@ copy_as_stored() {
   while true; do
     key=$(valkey-cli -h "${VALKEY_HOST:-valkey}" -p "${VALKEY_PORT:-6379}" --raw BRPOP files:to-copy 0 2>/dev/null | sed -n 2p)
     if [ -z "$key" ]; then sleep 5; continue; fi
-    if ! rclone copyto "source:${SOURCE_PATH}/$key" "target:${TARGET_PATH}/$key" --immutable --checksum --log-level NOTICE; then
+    rclone copyto "source:${SOURCE_PATH}/$key" "target:${TARGET_PATH}/$key" --immutable --checksum --log-level NOTICE
+    code=$?
+    # Gone from the store before it was copied (a draft replaced while its revision was in preparation): nothing to copy.
+    # rclone says so with 3 (directory not found) or 4 (file not found); trying again would hold up every file behind it.
+    if [ "$code" -eq 3 ] || [ "$code" -eq 4 ]; then
+      echo "file-backup: $key is no longer stored; nothing to copy"
+    elif [ "$code" -ne 0 ]; then
       valkey-cli -h "${VALKEY_HOST:-valkey}" -p "${VALKEY_PORT:-6379}" LPUSH files:to-copy "$key" >/dev/null 2>&1
       echo "file-backup: copying $key failed; trying again shortly" >&2
       sleep "$RETRY"

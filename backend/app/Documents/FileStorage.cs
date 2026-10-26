@@ -126,6 +126,16 @@ public sealed class FileStorage(IObjectStore store, IClock clock, FileBackup bac
     }
 
     /// <summary>
+    /// A draft replaced while its revision was in preparation (owner: it has no value until it is past that stage): its
+    /// bytes go, kept and still waiting alike. The copy elsewhere is never touched (the copier never deletes).
+    /// </summary>
+    public async Task RemoveAsync(string key, CancellationToken cancellationToken)
+    {
+        await store.DeleteAsync(key, cancellationToken);
+        await store.DeleteAsync(IncomingKey(key), cancellationToken);
+    }
+
+    /// <summary>
     /// The <c>Content-Disposition</c> header value that makes the browser save the file under its own name
     /// (UTF-8 encoded, so any characters work).
     /// </summary>

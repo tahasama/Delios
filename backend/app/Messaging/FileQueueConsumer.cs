@@ -60,6 +60,10 @@ public sealed class FileQueueConsumer(
                     await scope.ServiceProvider.GetRequiredService<FileProcessor>().ProcessAsync(
                         Read<FileUploaded>(delivery), stoppingToken);
                     break;
+                case DraftReplaced.RoutingKey:
+                    await scope.ServiceProvider.GetRequiredService<FileProcessor>().RemoveAsync(
+                        Read<DraftReplaced>(delivery), stoppingToken);
+                    break;
                 case Reviews.RevisionReleased.RoutingKey:
                     var released = Read<Reviews.RevisionReleased>(delivery);
                     await scope.ServiceProvider.GetRequiredService<Reviews.Stamping>().ProcessAsync(released, stoppingToken);

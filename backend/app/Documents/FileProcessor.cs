@@ -18,6 +18,15 @@ public sealed record FileUploaded(Guid TenantId, Guid FileId)
 }
 
 /// <summary>
+/// Drafts replaced while their revision was in preparation: their stored bytes and previews go, once the replacing is
+/// committed (never before: a save that rolled back would leave records with nothing behind them).
+/// </summary>
+public sealed record DraftReplaced(Guid TenantId, string[] Keys)
+{
+    public const string RoutingKey = "file.replaced";
+}
+
+/// <summary>
 /// The worker's part of an upload: read the stored bytes once, scanning them for
 /// viruses, checking them against the size and checksum the uploader declared,
 /// and identifying what they are. A revision is ready only when all its files pass.
@@ -81,7 +90,12 @@ public sealed class FileProcessor(
                 .SetProperty(x => x.StatusDetail, detail)
                 .SetProperty(x => x.DetectedType, detected)
                 .SetProperty(x => x.ScannedAt, now), cancellationToken);
-        if (updated == 0) return;
+        if (updated == 0)
+        {
+            // Replaced while it was checked: keeping it above put its bytes back, so they go again.
+            if (!await db.StoredFiles.AnyAsync(f => f.Id == file.Id, cancellationToken)) await storage.RemoveAsync(file.ObjectKey, cancellationToken);
+            return;
+        }
         AppMetrics.FilesProcessed.WithLabels(status).Inc();
         // Written around the save: the screens are told the document's page changed (its Preview waits for this).
         if (file.DocumentId is { } changedDocument)
@@ -124,5 +138,11 @@ public sealed class FileProcessor(
             }
         }
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>Removes the bytes of drafts replaced (<see cref="DraftReplaced"/>). Safe to run twice: a key gone stays gone.</summary>
+    public async Task RemoveAsync(DraftReplaced message, CancellationToken cancellationToken)
+    {
+        foreach (var key in message.Keys) await storage.RemoveAsync(key, cancellationToken);
     }
 }

@@ -145,6 +145,7 @@ const WORDS: Record<string, string> = {
   REVISION_ESTABLISHED: "Started a revision",
   FILE_UPLOADED: "Uploaded a file",
   FILES_UPDATED: "Changed a revision's files",
+  DRAFT_REPLACED: "Replaced a file of a revision in preparation",
   FILE_CLEAN: "File passed the virus check",
   REVISION_FILES_READY: "A revision's files are ready",
   REVISION_FILES_REJECTED: "A revision's files were refused",

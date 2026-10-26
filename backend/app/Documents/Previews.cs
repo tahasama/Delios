@@ -37,6 +37,8 @@ public static class Previews
 
     private static bool Is(string name, string[] extensions) => extensions.Contains(Path.GetExtension(name).ToLowerInvariant());
     private static string KeyOf(StoredFile file, string extension) => $"previews/{file.TenantId}/{file.ProjectId}/{file.Id}{extension}";
+    /// <summary>Every preview that may have been made of a file, kept beside it: they go with a draft replaced.</summary>
+    public static string[] KeysOf(StoredFile file) => [KeyOf(file, ".pdf"), KeyOf(file, $".{DxfVersion}.dxf"), KeyOf(file, $".{DxfVersion}.min.dxf")];
 
     public static void Map(RouteGroupBuilder project)
     {
