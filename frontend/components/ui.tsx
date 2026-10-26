@@ -259,7 +259,7 @@ export function Field({
 }
 
 export const inputCls =
-  "w-full min-h-(--control-h) rounded-t-[0.25rem] rounded-b-none border-0 border-b border-line-strong bg-[color-mix(in_oklab,var(--color-canvas)_60%,var(--color-surface))] px-1.5 py-1 text-(length:--control-text) text-slate-800 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 hover:bg-[color-mix(in_oklab,var(--color-canvas)_85%,var(--color-surface))] focus:border-brand-line disabled:cursor-not-allowed disabled:text-slate-500";
+  "w-full min-h-(--control-h) rounded-t-[0.25rem] rounded-b-none border-0 border-b border-line-strong bg-[color-mix(in_oklab,var(--color-canvas)_60%,var(--color-surface))] px-1.5 py-1 text-(length:--control-text) text-slate-800 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 hover:bg-[color-mix(in_oklab,var(--color-canvas)_85%,var(--color-surface))] focus:border-brand-line disabled:cursor-not-allowed disabled:border-dashed disabled:bg-transparent disabled:text-slate-500 disabled:hover:bg-transparent";
 
 export function EmptyState({ title, body, action }: { title: string; body?: string; action?: React.ReactNode }) {
   return (

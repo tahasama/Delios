@@ -1147,6 +1147,24 @@ summary::-webkit-details-marker {
   }
   .register select.plain[data-on="true"],
   .register button.plain[data-on="true"]:not([data-caret="none"]) { background-color: var(--color-tint); }
+  /* A field that cannot be changed reads so at once, not only under the pointer (owner): no grey behind it, a dashed
+     rule, muted words, no caret, and the pointer saying no. Every plain control of the app, and inputCls (ui.tsx). */
+  .register select.plain:disabled,
+  .register button.plain:disabled,
+  .register input.plain:disabled,
+  .register textarea.plain:disabled,
+  .register select.plain:disabled:hover,
+  .register button.plain:disabled:hover,
+  .register input.plain:disabled:hover,
+  .register textarea.plain:disabled:hover {
+    background-color: transparent;
+    background-image: none;
+    border-bottom-style: dashed;
+    border-bottom-color: var(--color-line-strong);
+    color: var(--color-slate-500);
+    cursor: not-allowed;
+  }
+  .register button.plain:disabled svg { display: none; }
 
 
   /* The kept views are a way back to a question, so they sit quieter than the

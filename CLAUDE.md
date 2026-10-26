@@ -112,6 +112,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   padding or text size on a page; never restyle the file button locally.
 - Every field and dropdown stands on the same hint of grey (owner): `inputCls` and every `.plain` control in a
   register (not only a register's question), its top corners barely rounded; a switch drawn as a plain button stays bare.
+- **A field that cannot be changed looks unavailable at once** (owner: "blocked fields must look unavailable"), never
+  only under the pointer: no grey behind it, a dashed rule, muted words, no caret, the pointer saying no (`globals.css`,
+  `.register .plain:disabled`; `inputCls` likewise). A form opened under a line sits on white, so its grey fields show
+  (owner: "fields are the same colour as the background").
 - A card's side colour is its own left edge (`border-l-[3px] border-l-(--rail)`), never a bar laid over it: it
   follows the rounded corners. A sheet left open (`register-sheet-open`) rounds its first and last strip seen (a hidden field or a
   mark before it does not count; a form wrapping the strips passes it on), so no band's square corner stands out.
@@ -1334,8 +1338,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **The deliverable list on two pages** (owner; backend `Documents/DeliverableImport.cs`, `POST /imports/deliverables/check`
   and `/write`, one call each, never one per line; screens `lib/documents/forms-deliverables.ts`,
   `app/(app)/import/deliverable-import.tsx`): the file is read into lines and checked, then every line says what it
-  would do (New document · Update, each field "was → now" · Problem, with why; lines that change nothing are counted,
-  not listed) before anything is written. One way to take a line off (owner: "I don't understand the switch, the leave
+  would do (New document · Update, each field "was → now" · No change · Problem, with why; every line of the file is
+  listed, owner) before anything is written. One way to take a line off (owner: "I don't understand the switch, the leave
   out, the keep"): its red × ("Take this line off the list"), back from "Taken off the list" with Put back; "Take every
   line with a problem off". **Correcting a line is the document form itself** (owner: "the edit must be the very
   create/update document form"): its pencil opens the form under the line (`LineForm`; fields read once for the template

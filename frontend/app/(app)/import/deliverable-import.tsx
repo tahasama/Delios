@@ -6,7 +6,7 @@ import {
   type ListLine, type ListView, type LineView,
 } from "@/lib/documents/forms-deliverables";
 import type { DeliverableFields, DocumentField } from "@/lib/documents/deliverable-fields";
-import { btn, inputCls } from "@/components/ui";
+import { btn } from "@/components/ui";
 import { Select } from "@/components/select";
 import { FileSpreadsheet, Pencil, Undo2, X } from "lucide-react";
 
@@ -42,7 +42,7 @@ function LineForm({ form, values, update, faulty, many, onSave, onCancel }: {
       // A value the file gave that is not offered stays visible, so the person sees what is wrong with it.
       const unknown = value && !values.some((v) => v.code === value) ? [{ code: value, label: `${value} (not offered for this type)` }] : [];
       return (
-        <Select value={value} disabled={locked} onChange={(e) => set(field.key, e.target.value)} aria-label={field.label}>
+        <Select className="plain w-full" value={value} disabled={locked} onChange={(e) => set(field.key, e.target.value)} aria-label={field.label}>
           <option value="">{many ? "Leave each line's own" : "—"}</option>
           {[...unknown, ...values].map((v) => <option key={v.code} value={v.code}>{v.label === v.code ? v.code : `${v.code} — ${v.label}`}</option>)}
         </Select>
@@ -50,18 +50,18 @@ function LineForm({ form, values, update, faulty, many, onSave, onCancel }: {
     }
     return (
       <input type={field.kind === "date" ? "date" : "text"} value={value} disabled={locked} onChange={(e) => set(field.key, e.target.value)}
-        placeholder={many ? "Leave each line's own" : undefined} aria-label={field.label} className={inputCls} />
+        placeholder={many ? "Leave each line's own" : undefined} aria-label={field.label} className="plain w-full" />
     );
   };
   return (
-    <div className="space-y-3 bg-tint-soft px-3 py-3">
+    <div className="space-y-3 border-t border-line bg-surface px-3 py-3">
       {many ? <p className="text-xs text-slate-600">Fill in only what should change on the {many} lines ticked; what you leave empty stays as each line has it.</p> : null}
       <div className="grid gap-x-4 gap-y-3 sm:grid-cols-3">
         {!many ? (
           <label className="block min-w-0">
             <span className="mb-1.5 flex h-4 items-baseline gap-2 leading-4"><span className="text-xs font-medium text-slate-700">Deliverable type</span>
               {update ? <span className="truncate text-[11px] text-slate-500">part of the number</span> : null}</span>
-            <Select value={now.deliverableType ?? ""} disabled={update} onChange={(e) => set("deliverableType", e.target.value)} aria-label="Deliverable type">
+            <Select className="plain w-full" value={now.deliverableType ?? ""} disabled={update} onChange={(e) => set("deliverableType", e.target.value)} aria-label="Deliverable type">
               <option value="">—</option>
               {form.map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
             </Select>
@@ -121,8 +121,9 @@ export function DeliverableImport() {
   const said = useMemo(() => new Map((view?.lines ?? []).map((l) => [l.at, l] as const)), [view]);
   const nameOf = (key: string) => form.flatMap((t) => t.fields).find((f) => f.key === key)?.label ?? key;
   const onList = (lines ?? []).filter((l) => !off.has(l.at));
-  const shown = onList.filter((l) => said.get(l.at)?.outcome !== "SAME");
-  const same = onList.length - shown.length;
+  // Every line of the list is shown, those that change nothing too (owner): the person sees the whole file.
+  const shown = onList;
+  const same = onList.filter((l) => said.get(l.at)?.outcome === "SAME").length;
   const problems = onList.filter((l) => said.get(l.at)?.outcome === "PROBLEM");
   const registering = onList.filter((l) => said.get(l.at)?.outcome === "NEW").length;
   const updating = onList.filter((l) => said.get(l.at)?.outcome === "UPDATE").length;
@@ -211,7 +212,7 @@ export function DeliverableImport() {
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-sm font-semibold text-slate-800">What this list will do</h2>
             <p className="text-xs text-slate-600">
-              {plural(registering, "new document")} · {plural(updating, "update")} · {plural(problems.length, "problem")}
+              {plural(registering, "new document")} · {plural(updating, "update")} · {same} no change · {plural(problems.length, "problem")}
               {busy ? " · checking…" : ""}
             </p>
           </div>
@@ -261,6 +262,7 @@ export function DeliverableImport() {
                         {one?.problems.length ? <span className="block text-red-700">{one.problems.join(" ")}</span> : null}
                         {one?.changes.map((c) => <span key={c.field} className="block">{nameOf(c.field)}: {c.was ?? "—"} → {c.now ?? "—"}</span>)}
                         {one?.outcome === "NEW" ? <span className="text-slate-500">Registered as listed, given its number.</span> : null}
+                        {one?.outcome === "SAME" ? <span className="text-slate-500">Already reads so in the register: nothing to write.</span> : null}
                       </td>
                       <td className="px-2 py-1.5 align-top">
                         <span className="flex items-center gap-2">
@@ -286,7 +288,6 @@ export function DeliverableImport() {
               </tbody>
             </table>
           </div>
-          {same ? <p className="text-xs text-slate-500">{plural(same, "line")} already {same === 1 ? "reads" : "read"} as in the register: nothing to do for {same === 1 ? "it" : "them"}.</p> : null}
 
           {off.size ? (
             <details className="rounded-md ring-1 ring-line">
