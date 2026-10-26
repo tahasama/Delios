@@ -2,18 +2,15 @@
 
 import { requireScope } from "@/lib/core/scope";
 import { parseCsv, toCsv, toObjects } from "@/lib/core/csv";
-import { getActiveSet, getSet, getSets } from "@/lib/settings/config";
+import { getSet, getSets } from "@/lib/settings/config";
 import { isReadOnly } from "@/lib/core/auth";
 import { isAdmin } from "@/lib/core/auth";
 import { revalidatePath } from "next/cache";
 import { readSheet, applyChanges } from "@/lib/settings/matrix-read";
 import { propFieldsFor } from "@/lib/settings/set-props";
-import { checkRegistration, registerDocument } from "@/lib/documents/register";
 import { sheetRefusal } from "@/lib/documents/sheet-check";
 import { api, projectPath, refusal } from "@/lib/client";
-import type { RegisterRow } from "@/lib/types";
 import { adminFunctions, adminParties, adminUsers } from "@/lib/settings/api-admin";
-import { documentView, registerRows } from "@/lib/documents/api-register";
 
 // Bulk in/out — document controllers live in spreadsheets. A file is always
 // checked first; the check says what writing it would do, and only then is it
@@ -59,63 +56,18 @@ export type ImportResult = {
 type Read = { data: Record<string, string>; at: string };
 
 /** What each kind of import reads: the file formats it takes. */
-const FORMATS: Record<string, RegExp> = { deliverables: /\.(xlsx|csv)$/i, people: /\.csv$/i, matrix: /\.csv$/i, sets: /\.xlsx$/i };
+const FORMATS: Record<string, RegExp> = { people: /\.csv$/i, matrix: /\.csv$/i, sets: /\.xlsx$/i };
 const FORMAT_WORDS: Record<string, string> = {
-  deliverables: "the workbook (.xlsx) or a CSV",
   people: "a CSV, as the template",
   matrix: "the matrix as downloaded (.csv)",
   sets: "the workbook (.xlsx) as downloaded",
 };
 
 /**
- * Read the upload, whichever of the two shapes it came in.
- *
- * A workbook carries one sheet per deliverable type, and the sheet name is what
- * says who produced the documents on it — so the Producer column that a flat
- * file needs does not exist there, and is filled in from the tab. A single-sheet
- * CSV still works, because fixing forty rows should not need a workbook. Each
- * row keeps where it is, so a problem points at the row the person sees; empty
- * rows are no rows.
+ * Read the uploaded CSV (the team list). Each row keeps where it is, so a problem points at the row the person sees;
+ * empty rows are no rows. The deliverable list has its own reader (`forms-deliverables.ts`).
  */
 async function readUpload(file: File): Promise<Read[] | { error: string }> {
-  if (/\.xlsx$/i.test(file.name)) {
-    const ExcelJS = (await import("exceljs")).default;
-    const book = new ExcelJS.Workbook();
-    await book.xlsx.load(await file.arrayBuffer());
-    const read: Read[] = [];
-    for (const sheet of book.worksheets) {
-      if (sheet.state === "veryHidden" || sheet.state === "hidden") continue;
-      // The tab is named "<code> — <label>"; the code before the dash is the
-      // deliverable type every row on it was produced under.
-      const producer = sheet.name.split("—")[0].trim().split(/\s/)[0].toUpperCase();
-      // Row 1 is the caption the template writes; row 2 holds the headings.
-      const headers: string[] = [];
-      sheet.getRow(2).eachCell({ includeEmpty: true }, (cell, column) => { headers[column] = String(cell.value ?? "").trim(); });
-      if (!headers.some((h) => h === "Title")) continue;
-      sheet.eachRow({ includeEmpty: false }, (row, index) => {
-        if (index <= 2) return;
-        const one: Record<string, string> = { Producer: producer };
-        let any = false;
-        row.eachCell({ includeEmpty: false }, (cell, column) => {
-          const key = headers[column];
-          if (!key) return;
-          const raw = cell.value;
-          const text =
-            raw instanceof Date ? raw.toISOString().slice(0, 10)
-            : raw && typeof raw === "object" && "text" in raw ? String((raw as { text: unknown }).text)
-            : raw && typeof raw === "object" && "result" in raw ? String((raw as { result: unknown }).result ?? "")
-            : raw == null ? ""
-            : String(raw);
-          one[key] = text.trim();
-          if (one[key]) any = true;
-        });
-        if (any) read.push({ data: one, at: `Sheet ${sheet.name}, row ${index}` });
-      });
-    }
-    if (!read.length) return { error: "No filled-in rows in that workbook: rows start under the headings, on the sheet of each deliverable type." };
-    return read;
-  }
-
   const { objects } = toObjects(parseCsv(await file.text()));
   // Row 1 holds the headings, so the first data row is row 2 of the file.
   const read = objects.map((data, index) => ({ data, at: `Row ${index + 2}` })).filter((one) => Object.values(one.data).some((v) => v.trim()));
@@ -164,90 +116,9 @@ export async function importBulkAction(_prev: ImportResult | undefined, formData
   if ("error" in read) return { error: read.error };
 
   const rows: ImportRow[] = [];
-  // Document numbers to ids, for the rows that correct a document.
-  let known: Map<string, string> | undefined;
-  let registering = 0, correcting = 0, unchanged = 0;
+  let registering = 0;
 
-  if (kind === "deliverables") {
-    const [deliverables, types, disciplines, projects, subs, suppliers, pos, crits, confs, retentions, lists] = await Promise.all([
-      getActiveSet("DELIVERABLE_TYPES"), getActiveSet("DOCUMENT_TYPES"), getActiveSet("DISCIPLINES"), getActiveSet("PROJECT_CODES"),
-      getActiveSet("SUBPROJECTS"), getActiveSet("SUPPLIER_CODES"), getActiveSet("PURCHASE_ORDERS"), getActiveSet("CRITICALITY"),
-      getActiveSet("CONFIDENTIALITY"), getActiveSet("RETENTION_CLASSES"), getSets(),
-    ]);
-    const title = new Map(lists.map((one) => [one.key, one.title] as const));
-    const active = (set: { code: string }[], code: string) => set.some((v) => v.code === code);
-    // A value that is not in its list, said with the list's own name, where it is kept.
-    const notIn = (key: string, column: string, given: string) =>
-      given ? `${column} "${given}" is not in the list ${title.get(key) ?? key} (Settings)` : `no ${column.toLowerCase()}`;
-    const register = new Map((await registerRows(ctx)).map((d) => [d.number, d] as const));
-    known = new Map([...register].map(([number, d]) => [number, d.id]));
-    // What the number is built from cannot be corrected here: the number would
-    // then say one thing and the record another, and a number is never rewritten.
-    // A file taken out as the register stands carries them as they are: only a change is refused.
-    const projectCode = ctx.project?.code ?? "";
-    const INSIDE_THE_NUMBER: [string, (d: RegisterRow) => string][] = [
-      ["Type", (d) => d.docType], ["Discipline", (d) => d.discipline], ["Project", () => projectCode],
-      ["SubProject", (d) => d.subproject ?? ""], ["Supplier", (d) => d.originator ?? ""],
-    ];
-    // What a row may correct, and what the document holds now: a value already so is no change.
-    const CORRECTABLE: [string, (d: RegisterRow) => string | null][] = [
-      ["Title", (d) => d.title], ["Criticality", (d) => d.criticality ?? ""], ["Confidentiality", (d) => d.confidentiality ?? ""],
-      ["RetentionClass", (d) => d.retentionClass ?? ""], ["ContractRef", (d) => d.contractRef ?? ""],
-      ["PlannedDate", (d) => d.plannedDate?.slice(0, 10) ?? ""], ["AssetCode", () => null], ["ReceivedDate", () => null],
-    ];
-    const same = (column: string, given: string, now: string | null) =>
-      now !== null && (column.endsWith("Date") && !isNaN(new Date(given).getTime()) ? new Date(given).toISOString().slice(0, 10) === now : given === now);
-    for (const [i, { data: o, at }] of read.entries()) {
-      const line = i + 1;
-      const errs: string[] = [];
-      const number = GET(o, "Document Number");
-      if (number) {
-        // A row that names a document is a correction to that document.
-        const doc = register.get(number);
-        if (!doc) { rows.push({ line, at, ok: false, message: `${number} is not in the register. Leave Document Number empty to register it as a new document.` }); continue; }
-        const locked = INSIDE_THE_NUMBER.filter(([column, now]) => GET(o, column) && GET(o, column) !== now(doc)).map(([column]) => column);
-        if (locked.length) { rows.push({ line, at, ok: false, message: `${number}: ${locked.join(", ")} ${locked.length === 1 ? "is" : "are"} part of the number and cannot be corrected. Withdraw it and register it again under the right number.` }); continue; }
-        const fields = CORRECTABLE.filter(([column, now]) => GET(o, column) && !same(column, GET(o, column), now(doc))).map(([column]) => column);
-        // A row that already matches the register is no news: it is counted, not listed.
-        if (!fields.length) { unchanged++; continue; }
-        correcting++;
-        rows.push({ line, at, ok: true, message: `Will correct ${number}: ${fields.join(", ")}` });
-        continue;
-      }
-      const producer = (GET(o, "Producer") || "ENG").toUpperCase();
-      const deliverable = deliverables.find((one) => one.code === producer);
-      if (!GET(o, "Title")) errs.push("no title");
-      if (!deliverable) errs.push(notIn("DELIVERABLE_TYPES", "Producer", producer));
-      if (!active(types, GET(o, "Type"))) errs.push(notIn("DOCUMENT_TYPES", "Type", GET(o, "Type")));
-      if (!active(disciplines, GET(o, "Discipline"))) errs.push(notIn("DISCIPLINES", "Discipline", GET(o, "Discipline")));
-      // The backend registers into the project the import runs in; a Project column, when filled, must still be published.
-      if (GET(o, "Project") && !active(projects, GET(o, "Project"))) errs.push(notIn("PROJECT_CODES", "Project", GET(o, "Project")));
-      if (GET(o, "SubProject") && !active(subs, GET(o, "SubProject"))) errs.push(notIn("SUBPROJECTS", "SubProject", GET(o, "SubProject")));
-      if (GET(o, "Supplier") && !active(suppliers, GET(o, "Supplier"))) errs.push(notIn("SUPPLIER_CODES", "Supplier", GET(o, "Supplier")));
-      if (GET(o, "PO") && !active(pos, GET(o, "PO"))) errs.push(notIn("PURCHASE_ORDERS", "PO", GET(o, "PO")));
-      if (GET(o, "Criticality") && !active(crits, GET(o, "Criticality"))) errs.push(notIn("CRITICALITY", "Criticality", GET(o, "Criticality")));
-      if (GET(o, "Confidentiality") && !active(confs, GET(o, "Confidentiality"))) errs.push(notIn("CONFIDENTIALITY", "Confidentiality", GET(o, "Confidentiality")));
-      if (GET(o, "RetentionClass") && !active(retentions, GET(o, "RetentionClass"))) errs.push(notIn("RETENTION_CLASSES", "RetentionClass", GET(o, "RetentionClass")));
-      // From another organization: read from the deliverable type (it requires an originator), never from fixed codes.
-      const required = Array.isArray(deliverable?.props?.required) ? (deliverable!.props.required as unknown[]).map(String) : [];
-      if (required.includes("originator") && !GET(o, "Supplier")) errs.push(`a ${deliverable!.label.toLowerCase()} document comes from another organization: fill Supplier with whose it is`);
-      // A check that passes and a write that fails is worse than no check at
-      // all: everything the write can refuse is refused here too.
-      for (const column of ["ReceivedDate", "PlannedDate"]) {
-        const given = GET(o, column);
-        if (given && isNaN(new Date(given).getTime())) errs.push(`${column} "${given}" is not a date: write it as YYYY-MM-DD`);
-      }
-      // What the lists allow, the backend then checks as registering would: what the deliverable type requires, what
-      // the number is built from, who may register it. A row that passes here registers.
-      const refused = errs.length ? null : await checkRegistration(ctx, toInput(o));
-      if (refused) errs.push(refused);
-      if (errs.length) rows.push({ line, at, ok: false, message: errs.join("; ") });
-      else {
-        registering++;
-        rows.push({ line, at, ok: true, message: `Will register “${GET(o, "Title")}” (${[producer, GET(o, "Type"), GET(o, "Discipline")].join(" · ")}); its number is given when it is registered` });
-      }
-    }
-  } else if (kind === "people") {
+  if (kind === "people") {
     // A whole team arrives at once, in a spreadsheet, like everything else here.
     if (!ctx.can("CONFIGURE") && !ctx.can("CONTROL")) return { error: "Adding people is the control function's, or an administrator's. Ask one of them." };
     let functions: { id: string; name: string }[], parties: { id: string; code: string; name: string }[], existing: { email: string }[];
@@ -288,62 +159,26 @@ export async function importBulkAction(_prev: ImportResult | undefined, formData
   const problems = rows.filter((r) => !r.ok).length;
   const ready = rows.length - problems;
   const act = kind === "people" ? `Add ${plural(ready, "person", "people")}`
-    : [registering ? `Register ${plural(registering, "document")}` : "", correcting ? `${registering ? "correct" : "Correct"} ${plural(correcting, "document")}` : ""].filter(Boolean).join(", ");
+    : "";
   if (checking) {
     return {
       checked: true, rows, ready, problems, act, problemCsv: problemFile(read, rows),
-      summary: (!ready && !problems ? "Nothing to write: every row already matches the register."
+      summary: (!ready && !problems ? "Nothing to write in that file."
         : !ready ? `Nothing can be written: ${plural(problems, "row")} with problems.`
         : problems ? `${plural(ready, "row")} ready, ${plural(problems, "row")} with problems. Nothing is written yet.`
         : `All ${plural(ready, "row")} ready. Nothing is written yet.`)
-        + (unchanged && (ready || problems) ? ` ${plural(unchanged, "row")} already ${unchanged === 1 ? "matches" : "match"} the register and ${unchanged === 1 ? "is" : "are"} left as ${unchanged === 1 ? "it is" : "they are"}.` : ""),
+        ,
     };
   }
 
   let done = 0, failed = 0;
-  let registered = false, corrected = false, handOver = false;
+  let handOver = false;
   for (let i = 0; i < read.length; i++) {
     const o = read[i].data;
     const report = rows.find((r) => r.line === i + 1);
     if (!report || !report.ok) continue;
     try {
-      if (kind === "deliverables" && GET(o, "Document Number")) {
-        // A row naming a document corrects it; only what is not inside the
-        // number may change, which the check has already enforced.
-        const doc = await documentView(ctx, known!.get(GET(o, "Document Number"))!);
-        const map: Record<string, string> = { Title: "title", Criticality: "criticality", Confidentiality: "confidentiality", RetentionClass: "retentionClass", ContractRef: "contractRef", PlannedDate: "plannedDate", ReceivedDate: "receivedDate" };
-        const dates = new Set(["plannedDate", "receivedDate"]);
-        const data: Record<string, string> = {};
-        for (const [col, field] of Object.entries(map)) {
-          const v = GET(o, col);
-          if (!v) continue;
-          const current = (doc as unknown as Record<string, string | null>)[field];
-          if (dates.has(field)) {
-            const next = new Date(v).toISOString().slice(0, 10);
-            if (current?.slice(0, 10) !== next) data[field] = next;
-            continue;
-          }
-          if (String(current ?? "") !== v) data[field] = v;
-        }
-        // The backend records every change with its old and new value (4.9).
-        if (Object.keys(data).length) {
-          await api(projectPath(ctx, `/documents/${doc.id}`), { method: "PUT", body: { changes: data } });
-          corrected = true;
-          report.message = `Corrected ${doc.number}: ${Object.keys(data).join(", ")}`;
-        } else {
-          report.wrote = false;
-          report.message = `${doc.number} already reads so: nothing to change`;
-        }
-        report.link = `/documents/${doc.id}`;
-        done++;
-      } else if (kind === "deliverables") {
-        // The same act as the form: one implementation, in lib/register.
-        const made = await registerDocument(ctx, user, toInput(o));
-        registered = true;
-        report.message = `Registered ${made.docNumber}: “${GET(o, "Title")}”`;
-        report.link = `/documents/${made.id}`;
-        done++;
-      } else if (kind === "people") {
+      if (kind === "people") {
         const fn = (await adminFunctions()).find((f) => f.active && f.name.toLowerCase() === GET(o, "Function").toLowerCase());
         if (!fn) throw new Error(`no function called "${GET(o, "Function")}"`);
         const company = GET(o, "Company").toLowerCase();
@@ -380,35 +215,11 @@ export async function importBulkAction(_prev: ImportResult | undefined, formData
       report.message = `Not written: ${e instanceof Error ? e.message : "refused"}`;
     }
   }
-  const today = new Date().toISOString().slice(0, 10);
   return {
     checked: false, rows, done, problems: problems + failed, problemCsv: problemFile(read, rows), handOver,
-    registerLink: registered ? `/documents?on=created&from=${today}&to=${today}&sort=created&dir=desc`
-      : corrected ? `/documents?on=updated&from=${today}&to=${today}&sort=updated&dir=desc` : undefined,
     summary: `${kind === "people" ? `${plural(done, "person", "people")} added` : `${plural(done, "document")} written`}.`
       + (problems ? ` ${plural(problems, "row")} with problems left out, as the check said.` : "")
       + (failed ? ` ${plural(failed, "row")} refused while writing: see the report.` : ""),
-  };
-}
-
-/** A deliverable-list row as the register takes it. */
-function toInput(o: Record<string, string>) {
-  return {
-    title: GET(o, "Title"),
-    deliverableType: (GET(o, "Producer") || "ENG").toUpperCase(),
-    docType: GET(o, "Type"),
-    discipline: GET(o, "Discipline"),
-    projectCode: GET(o, "Project"),
-    originator: GET(o, "Supplier") || null,
-    subProject: GET(o, "SubProject") || null,
-    contractRef: GET(o, "PO") || null,
-    criticality: GET(o, "Criticality") || null,
-    confidentiality: GET(o, "Confidentiality") || null,
-    retentionClass: GET(o, "RetentionClass") || null,
-    receivedDate: GET(o, "ReceivedDate") ? new Date(GET(o, "ReceivedDate")) : null,
-    plannedDate: GET(o, "PlannedDate") ? new Date(GET(o, "PlannedDate")) : null,
-    assetCode: GET(o, "AssetCode") || null,
-    how: "Registered from a deliverable list.",
   };
 }
 
@@ -423,8 +234,18 @@ type AdminUserLite = { id: string; memberships: { projectId: string; pendingSinc
  * from the other twenty, and retiring stays a deliberate act on the list's page.
  */
 async function importSets(ctx: Awaited<ReturnType<typeof requireScope>>, file: File, checking: boolean): Promise<ImportResult> {
-  const { user } = ctx;
-  if (!isAdmin(user)) return { error: "Only an administrator changes the Settings lists. Ask one of them." };
+  // The project's lists (owner): each is the organization's until the project changes it, by hand or here; the first
+  // change of a list the organization leaves free makes this project's own copy of that list, and a list it keeps the
+  // same on every project is refused. Whoever acts as the control function changes them (the backend says so).
+  type Standing = { key: string; own: boolean; free: boolean };
+  let standing: { mayChange: boolean; lists: Standing[] };
+  try {
+    standing = await api<{ mayChange: boolean; lists: Standing[] }>(projectPath(ctx, "/lists"));
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  if (!standing.mayChange) return { error: "Whoever acts as the control function on this project changes its lists. Ask them." };
+  const fixed = new Set(standing.lists.filter((one) => !one.own && !one.free).map((one) => one.key));
 
   const ExcelJS = (await import("exceljs")).default;
   const book = new ExcelJS.Workbook();
@@ -438,6 +259,11 @@ async function importSets(ctx: Awaited<ReturnType<typeof requireScope>>, file: F
   for (const sheet of book.worksheets) {
     const setKey = sheet.name.trim();
     if (!sets.has(setKey)) continue;
+    if (fixed.has(setKey)) {
+      // Said once for the sheet, only when it would change something: a list read as it stands is no news.
+      rows.push({ line: ++line, at: `Sheet ${setKey}`, ok: false, message: `${sets.get(setKey)} is the organization's, the same on every project: an administrator changes it in the organization's Settings. This sheet is left as it is.` });
+      continue;
+    }
     const fields = propFieldsFor(setKey) ?? [];
     const headers: string[] = [];
     sheet.getRow(2).eachCell({ includeEmpty: true }, (cell, column) => { headers[column] = String(cell.value ?? "").trim(); });
@@ -525,9 +351,9 @@ async function importSets(ctx: Awaited<ReturnType<typeof requireScope>>, file: F
   let published = 0;
   try {
     for (const one of work) {
-      await api("/api/admin/values", {
+      await api(projectPath(ctx, `/lists/${encodeURIComponent(one.setKey)}/values`), {
         method: "PUT",
-        body: { setKey: one.setKey, code: one.code, label: one.label, status: one.status, props: one.props ? JSON.parse(one.props) : undefined },
+        body: { code: one.code, label: one.label, status: one.status, props: one.props ? JSON.parse(one.props) : undefined },
       });
       published++;
     }

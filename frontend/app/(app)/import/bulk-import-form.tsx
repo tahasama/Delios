@@ -5,6 +5,7 @@ import { importBulkAction, type ImportResult, type ImportRow } from "@/lib/docum
 import { ToneChip, btn } from "@/components/ui";
 import { csvSafe } from "@/lib/core/csv";
 import { Check, Copy, Download, FileSpreadsheet, X } from "lucide-react";
+import { DeliverableImport } from "./deliverable-import";
 
 type Kind = {
   key: string;
@@ -23,6 +24,8 @@ type Kind = {
   formats: string;
   /** Changes what every screen offers: an administrator's. */
   adminOnly?: boolean;
+  /** Changes the project wholesale (the team, the matrix): the control function's or whoever sets the project up. */
+  keepersOnly?: boolean;
 };
 
 // What each action needs is agreed through the Schedule (the requirements list) and
@@ -33,8 +36,8 @@ const KINDS: Kind[] = [
     name: "Deliverable list",
     hint: "the register in one go",
     title: "Register documents from a list",
-    blurb: "One row per document. A row with no Document Number is registered and given its number; a row with a number corrects that document (taken out as the register stands, only what you change is corrected). What the number is made of (type, discipline, project, sub-project, supplier) cannot be corrected, because the number would then disagree with the document.",
-    columns: "The workbook has a sheet per deliverable type, with only that type's columns and each Settings list as a dropdown. Shaded headings must be filled.",
+    blurb: "One line per document. A new document has no number: it is given one when it is registered. To update documents, download the register as it stands: each line carries its number, and only what you change is updated, while its revision is being prepared (once it is out of preparation, a change takes a new revision). What the number is made of (type, discipline, sub-project, supplier) never changes. The file is this project's: a list made for another project is refused.",
+    columns: "A sheet per deliverable type, with the fields the document form asks and only the values offered for that type as dropdowns. Shaded headings must be filled. You see every line, and may leave some out or correct them, before anything is written.",
     now: { href: "/api/export/template-deliverables?filled=1", label: "The register as it stands (.xlsx)" },
     template: { href: "/api/export/template-deliverables", label: "An empty template (.xlsx)" },
     accept: ".xlsx,.csv,text/csv",
@@ -51,6 +54,7 @@ const KINDS: Kind[] = [
     template: { href: "/api/export/template-people", label: "An empty template, with an example (.csv)" },
     accept: ".csv,text/csv",
     formats: "a CSV, headings kept",
+    keepersOnly: true,
   },
   {
     key: "matrix",
@@ -69,14 +73,14 @@ const KINDS: Kind[] = [
     key: "sets",
     name: "Settings lists",
     hint: "disciplines, types, statuses…",
-    title: "Update the Settings lists",
-    blurb: "One workbook, a sheet per list. Change the sheets you need and bring it back once. A code already there is updated; a new code is added. A row you delete is left as it is: a value is retired on its list's own page.",
+    title: "Update this project's Settings lists",
+    blurb: "One workbook, a sheet per list, as this project reads them. Change the sheets you need and bring it back once. A code already there is updated; a new code is added. A row you delete is left as it is: a value is retired on its list's own page. Each list is the organization's until this project changes it: the first change makes this project's own copy of that list, and a list the organization keeps the same on every project is left as it is.",
     columns: "Code, Label, Status, then whatever that list carries.",
     now: { href: "/api/export/template-sets", label: "Every list as it stands (.xlsx)" },
     template: { href: "/api/export/template-sets?blank=1", label: "An empty template (.xlsx)" },
     accept: ".xlsx",
     formats: "the workbook (.xlsx) as downloaded",
-    adminOnly: true,
+    keepersOnly: true,
   },
 ];
 
@@ -122,9 +126,9 @@ const cell = (raw: string) => {
   return /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
 };
 
-export function BulkImportForm({ initialKind, admin }: { initialKind: string; admin: boolean }) {
+export function BulkImportForm({ initialKind, admin, keeps }: { initialKind: string; admin: boolean; keeps: boolean }) {
   const [result, run, pending] = useActionState(importBulkAction, undefined);
-  const usable = (k: Kind) => !k.adminOnly || admin;
+  const usable = (k: Kind) => (!k.adminOnly || admin) && (!k.keepersOnly || keeps);
   const [kind, setKind] = useState(KINDS.find((k) => k.key === initialKind && usable(k))?.key ?? KINDS[0].key);
   const chosen = KINDS.find((k) => k.key === kind)!;
   // The file is held here, not in the field: the form is emptied each time the server answers, and the same file
@@ -190,7 +194,7 @@ export function BulkImportForm({ initialKind, admin }: { initialKind: string; ad
                   <input type="radio" name="kind" value={k.key} checked={kind === k.key} disabled={!usable(k)} onChange={() => choose(k.key)} className="mt-0.5 shrink-0" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] font-semibold text-slate-800">{k.name}</span>
-                    <span className="block text-xs text-slate-600">{usable(k) ? k.hint : "an administrator imports it"}</span>
+                    <span className="block text-xs text-slate-600">{usable(k) ? k.hint : k.adminOnly ? "an administrator imports it" : "the control function imports it"}</span>
                   </span>
                 </label>
               ))}
@@ -213,6 +217,7 @@ export function BulkImportForm({ initialKind, admin }: { initialKind: string; ad
           </div>
         </li>
 
+        {kind === "deliverables" ? <li><DeliverableImport /></li> : <>
         <li className="space-y-3 px-5 py-4 sm:px-6">
           <div className="max-w-xl">
             <div className="mb-1.5 flex h-4 min-w-0 items-baseline gap-2 overflow-hidden leading-4">
@@ -343,6 +348,7 @@ export function BulkImportForm({ initialKind, admin }: { initialKind: string; ad
             ) : null}
           </li>
         ) : null}
+        </>}
       </ul>
     </section>
   );

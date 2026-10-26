@@ -225,7 +225,7 @@ public sealed class DocumentService(
     /// new value. Coded values must be published; the title must say what the document is.
     /// </summary>
     public async Task<(Document? Document, IResult? Problem)> UpdateAsync(
-        ProjectAccess access, Guid documentId, UpdateDocumentRequest request, CancellationToken cancellationToken)
+        ProjectAccess access, Guid documentId, UpdateDocumentRequest request, CancellationToken cancellationToken, bool checkOnly = false)
     {
         var document = await DocumentQueries.Visible(db, access)
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
@@ -354,6 +354,8 @@ public sealed class DocumentService(
         }
         // An order stays the document's supplier's, whichever of the two changed.
         if (await PurchaseOrderProblemAsync(catalog, document.ContractRef, document.Originator, cancellationToken) is { } poProblem) return Fail(poProblem);
+        // Checked as changing it would, and nothing written (a list checked before it is imported).
+        if (checkOnly) return (document, null);
         document.UpdatedAt = clock.GetCurrentInstant();
         await db.SaveChangesAsync(cancellationToken);
         foreach (var change in changes)

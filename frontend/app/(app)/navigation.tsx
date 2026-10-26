@@ -98,7 +98,7 @@ function moreNav(p: NavPermissions): NavItem[] {
       // Everyone on the project reads who takes part.
       { href: "/directory", label: "Project directory", icon: UsersRound, also: ["/people/ask"] },
       { href: "/conformance/checks", label: "Assurance", icon: ShieldCheck, also: ["/conformance", "/exposures"], when: p.canControl && !p.external },
-      { href: "/import", label: "Import & export", icon: Import, when: (p.canControl || p.canConfigure) && !p.external },
+      { href: "/import", label: "Import & export", icon: Import, when: (p.canControl || p.canConfigure || p.canCreate) && !p.external },
     ] as NavItem[]
   ).filter((i) => i.when !== false);
 }

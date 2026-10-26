@@ -405,6 +405,7 @@ public static class PlatformSetup
             Reviews.VerdictListEndpoints.MapVerdictListEndpoints(app);
             Documents.DocumentEndpoints.MapDocumentEndpoints(app);
             Documents.Equivalents.MapEquivalentEndpoints(app);
+            Documents.DeliverableImport.MapDeliverableImportEndpoints(app);
             Packages.Intake.MapIntakeEndpoints(app);
             Settings.KeptCopies.MapKeptCopyEndpoints(app);
             Settings.ProjectDifferences.MapProjectDifferenceEndpoints(app);

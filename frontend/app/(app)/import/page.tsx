@@ -43,9 +43,11 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   const ctx = await requireScope();
   const sp = await searchParams;
 
-  // Everything on this page changes the project wholesale (a register, a team, the matrix, the lists) or copies it
-  // out whole: the control function's, or whoever sets the project up.
-  const allowed = ctx.can("CONTROL") || ctx.can("CONFIGURE");
+  // The team, the matrix and the lists change the project wholesale: the control function's, or whoever sets the project
+  // up. The deliverable list is anyone's of ours who may register documents (owner: our people add and update documents
+  // as they wish): the backend checks each line as registering or changing it by hand would.
+  const keeps = ctx.can("CONTROL") || ctx.can("CONFIGURE");
+  const allowed = keeps || ctx.can("CREATE");
   const chosen = sp.kind ?? "deliverables";
 
   return (
@@ -61,8 +63,8 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
               </p>
             ) : (
               <p className="mt-2 max-w-2xl rounded-md bg-tint-soft px-2.5 py-1.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
-                Importing and exporting whole lists is for the control function and administrators. Ask the control function for a copy of a
-                register, or to bring a list in.
+                Bringing lists in is for whoever may register documents, and the team, the matrix and the Settings lists for the control
+                function and administrators. Ask the control function for a copy of a register, or to bring a list in.
               </p>
             )}
           </div>
@@ -78,7 +80,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
       {allowed ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
           {/* A step chosen above opens its import: the form starts again on that kind. */}
-          <BulkImportForm key={chosen} initialKind={chosen} admin={isAdmin(ctx.user)} />
+          <BulkImportForm key={chosen} initialKind={chosen} admin={isAdmin(ctx.user)} keeps={keeps} />
 
           <aside className="min-w-0">
             <section className="register register-sheet register-sheet-open" aria-labelledby="export-head">

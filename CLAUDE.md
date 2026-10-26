@@ -1329,9 +1329,32 @@ a screen only words it. A new rule goes in the backend, never in a page.
   text under 11px.
 
 ### Import & export
-- A file is always checked first; the check writes nothing and uses the backend's own rules (`POST /documents/check`,
-  the same as registering). Problems name the sheet and row the person sees. Writing names its count; rows with
-  problems are left out only after it is said and agreed, and they download to fix and import again.
+- A file is always checked first; the check writes nothing and uses the backend's own rules. Problems name the sheet and
+  row the person sees. Writing names its count; rows with problems are left out only after it is said and agreed.
+- **The deliverable list on two pages** (owner; backend `Documents/DeliverableImport.cs`, `POST /imports/deliverables/check`
+  and `/write`, one call each, never one per line; screens `lib/documents/forms-deliverables.ts`,
+  `app/(app)/import/deliverable-import.tsx`): the file is read into lines and checked, then every line says what it
+  would do (New · Update, each field "was → now" · Same · Problem, with why) before anything is written; a line is left
+  out by its switch (problems out at first, "Leave out every problem", "Keep every line"), corrected in place (its
+  pencil), or a field set on every ticked line; corrected lines are checked again; then one act writes them all, or none
+  (a line that no longer passes undoes the rest, said line by line). A new document has **no number** (numbering is never
+  manual): it is given one when registered; a line with a number updates that document of this project, never creates
+  one (a number not in the register, or on two lines, is a problem). What the number is built from never changes, and a
+  document's details change only while a revision is prepared (DETAILS_NEED_A_REVISION, as by hand). **The file is the
+  project's**: the template carries the project's code on its hidden sheet `DELIOS` (with which field each column holds),
+  and a file made for another project is refused whole before a line is read (ANOTHER_PROJECT); a CSV may name its
+  project in a Project column, one project only. The template follows the app (`lib/documents/deliverable-workbook.ts`):
+  a sheet per deliverable type with the document form's fields (Forms & fields: left out, insisted on shaded, the
+  organization's own words, its own fields after), each list offering only the values of the set serving that type;
+  the empty template has no number column, "the register as it stands" has it first. Anyone of ours who may register
+  documents brings one in (owner: our people add and update documents as they wish); the backend checks each line as
+  registering or changing it by hand would. The columns AssetCode, ContractRef and ReceivedDate were dropped: the tag was
+  never kept, ContractRef said the same as PO, and the received date is never asked on registering.
+- **Settings lists are the project's** on its Import & export (owner): a workbook of the lists as this project reads
+  them, written through the project's lists (`PUT /projects/{id}/lists/{set}/values`): each list is the organization's
+  until the project changes it, by hand or by import, its first change making the project's own copy of that list; a
+  list the organization keeps the same on every project is left as it is, said once per sheet. The control function
+  brings it in (CONTROL_ONLY), as it changes the lists by hand.
 - A person added is never given a password chosen by someone else: Team list (and `POST /api/admin/users` with `invite`)
   emails a link to choose their own (7 days, once); with email off, the link is handed back to whoever added them.
   **An administrator may set someone's password** (owner: "as apps like this do"), on the organization's People, in the

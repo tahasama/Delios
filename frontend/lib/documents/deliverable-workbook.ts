@@ -3,118 +3,142 @@ import type { Tenant } from "@/lib/core/tenant";
 import { getActiveSet } from "@/lib/settings/config";
 import { getMe } from "@/lib/account/api";
 import { registerRows } from "@/lib/documents/api-register";
+import { fieldLabels, fieldRules, ownFields } from "@/lib/settings/field-policy";
+import { forType } from "@/lib/settings/serving";
+import { servingOf } from "@/lib/settings/serving-api";
+import { api } from "@/lib/client";
 
 /**
- * The deliverable list, as a workbook people can actually fill in.
+ * The deliverable list, as a workbook people can actually fill in, made as the app works now.
  *
- * One sheet per deliverable type, because who produced a document decides which
- * columns it has: a vendor document has a purchase order and a date it arrived,
- * ours has neither. That is not a judgement made here — it is the published
- * type-to-field matrix, read as data.
+ * One sheet per deliverable type: who produces a document decides what it is asked (the type-to-field list), and
+ * every list offers only the values of the set serving that type (forms follow the sets). The columns are the
+ * document form's (Forms & fields): what the form leaves out is left out, what it insists on is shaded, the
+ * organization's own words head them, and the fields of one's own follow. A new document has no number (numbering is
+ * never manual); "the register as it stands" carries each document's number, its first column, to update it.
  *
- * Every column drawn from a published list carries that list as a dropdown, so
- * nobody invents a discipline that does not exist. The lists live on a hidden
- * sheet because Excel refuses an inline list longer than 255 characters, and
- * this organization publishes nearly two hundred document types.
- *
- * The dropdowns are a courtesy, not a control. Pasting defeats them and some
- * spreadsheets drop them on import, so the server still checks every cell.
+ * A veryHidden sheet, DELIOS, says which project the file was made for (A1) and which field each column holds, so the
+ * file is read by what it is, never by guessing headings: a file of another project is refused before a line is read.
+ * The dropdowns are a courtesy, not a control (pasting defeats them): the backend checks every cell.
  */
 
-/** A column in a sheet, and the published list it draws from. */
-type Column = {
-  header: string;
-  /** The value set this column is chosen from, where it is a choice. */
-  set?: string;
-  width: number;
-  note?: string;
-};
-
-/** The columns every deliverable has, whoever produced it. */
-const ALWAYS: Column[] = [
-  { header: "Document Number", width: 26, note: "Leave empty to register it. Give a number to correct that document instead." },
-  { header: "Title", width: 44 },
-  { header: "Type", set: "DOCUMENT_TYPES", width: 14 },
-  { header: "Discipline", set: "DISCIPLINES", width: 14 },
-  { header: "Project", set: "PROJECT_CODES", width: 12 },
-  { header: "Criticality", set: "CRITICALITY", width: 14 },
-  { header: "Confidentiality", set: "CONFIDENTIALITY", width: 16 },
-  { header: "RetentionClass", set: "RETENTION_CLASSES", width: 18 },
-  { header: "AssetCode", width: 14 },
-  { header: "ContractRef", width: 16 },
-  { header: "PlannedDate", width: 16, note: "When it is due. YYYY-MM-DD. Nothing fills this in for you." },
-];
-
-/** The columns the type-to-field matrix turns on or off, by its property name. */
-const CONDITIONAL: { prop: string; column: Column }[] = [
-  { prop: "subProject", column: { header: "SubProject", set: "SUBPROJECTS", width: 14 } },
-  { prop: "originator", column: { header: "Supplier", set: "SUPPLIER_CODES", width: 14 } },
-  { prop: "po", column: { header: "PO", set: "PURCHASE_ORDERS", width: 14 } },
-  { prop: "receivedDate", column: { header: "ReceivedDate", width: 16, note: "YYYY-MM-DD" } },
-];
+/** A column of a sheet: the field it holds (as the backend names it), its heading, and the list it draws from. */
+type Column = { key: string; header: string; width: number; set?: string; values?: { code: string }[]; required?: boolean; note?: string };
 
 const HEADER_FILL = "FF102A43";
 const REQUIRED_FILL = "FFFDF3D7";
+const NUMBER_FILL = "FFE2E7EE";
+/** The hidden sheet's name, and the mark in its first cell saying what the file is. */
+export const MARK_SHEET = "DELIOS";
+export const MARK = "deliverable-list";
 
 /** Excel refuses a sheet name carrying any of these. */
 const sheetName = (label: string) => label.replace(/[*?:\\/\[\]]/g, " ").replace(/\s{2,}/g, " ").slice(0, 31);
 
+/** The lists the document form may draw from, by its field. */
+const LISTED: { key: string; set: string; width: number }[] = [
+  { key: "subProject", set: "SUBPROJECTS", width: 14 },
+  { key: "phase", set: "PHASES", width: 12 },
+  { key: "contractRef", set: "PURCHASE_ORDERS", width: 16 },
+  { key: "criticality", set: "CRITICALITY", width: 14 },
+  { key: "confidentiality", set: "CONFIDENTIALITY", width: 16 },
+  { key: "retentionClass", set: "RETENTION_CLASSES", width: 18 },
+];
+/** The form's field names as the backend's document changes read them. */
+const BACKEND_KEY: Record<string, string> = { subProject: "subproject" };
+
 /**
  * The workbook, empty to start from, or (`filled`) with the register as it stands: each document on its deliverable
- * type's sheet, with its number, so a row changed and brought back corrects that document.
+ * type's sheet, with its number, so a row changed and brought back updates that document.
  */
 export async function buildDeliverableWorkbook(t: Tenant, options: { filled?: boolean } = {}): Promise<Buffer> {
-  // The backend gives each list in its published order.
   const value = (key: string) => getActiveSet(key);
-
-  const [deliverableTypes, fieldMatrix, project, register] = await Promise.all([
+  const sets = ["DOCUMENT_TYPES", "DISCIPLINES", ...LISTED.map((l) => l.set)];
+  const [deliverableTypes, fieldMatrix, project, register, rules, labels, own, serving, parties, ...lists] = await Promise.all([
     value("DELIVERABLE_TYPES"),
     value("DELIVERABLE_TYPE_FIELDS"),
     getMe().then((me) => me?.projects.find((one) => one.id === t.projectId) ?? null),
     options.filled ? registerRows(t) : Promise.resolve([]),
+    fieldRules(t, "DOCUMENT"),
+    fieldLabels(t, "DOCUMENT"),
+    ownFields(t, "DOCUMENT"),
+    servingOf(sets),
+    // Whose a document is: the outside organizations, as registering checks it.
+    api<{ code: string }[]>("/api/parties", { keep: { areas: [] } }).catch(() => []),
+    ...sets.map(value),
   ]);
-  const rules = new Map(fieldMatrix.map((row) => [row.code, row.props] as const));
-
-  // Every list any column might draw from, fetched once.
-  const needed = [...new Set([...ALWAYS, ...CONDITIONAL.map((c) => c.column)].map((c) => c.set).filter(Boolean))] as string[];
-  const lists = new Map<string, { code: string; label: string }[]>();
-  for (const key of needed) lists.set(key, await value(key));
+  const rowsOf = new Map(sets.map((set, index) => [set, lists[index]] as const));
+  const matrix = new Map(fieldMatrix.map((row) => [row.code, row.props] as const));
 
   const book = new ExcelJS.Workbook();
   book.creator = "DELIOS";
   book.created = new Date();
 
-  // The hidden sheet the dropdowns point at: one list per column, so a list of
-  // two hundred values costs a reference rather than a 255-character string.
+  // What the file is: its project, then which field each column of each sheet holds.
+  const mark = book.addWorksheet(MARK_SHEET, { state: "veryHidden" });
+  mark.getCell(1, 1).value = project?.code ?? "";
+  mark.getCell(1, 2).value = MARK;
+  let markRow = 2;
+
+  // The lists the dropdowns point at, one column per distinct list of values (a type's own values often repeat).
   const source = book.addWorksheet("Lists", { state: "veryHidden" });
-  const rangeOf = new Map<string, string>();
-  needed.forEach((key, index) => {
-    const column = index + 1;
-    const values = lists.get(key) ?? [];
-    source.getCell(1, column).value = key;
-    values.forEach((one, row) => { source.getCell(row + 2, column).value = one.code; });
-    const letter = source.getColumn(column).letter;
-    if (values.length) rangeOf.set(key, `Lists!$${letter}$2:$${letter}$${values.length + 1}`);
-  });
+  const ranges = new Map<string, string>();
+  const rangeOf = (values: { code: string }[]) => {
+    if (!values.length) return undefined;
+    const id = values.map((v) => v.code).join("\u0001");
+    if (!ranges.has(id)) {
+      const column = ranges.size + 1;
+      values.forEach((one, row) => { source.getCell(row + 1, column).value = one.code; });
+      const letter = source.getColumn(column).letter;
+      ranges.set(id, `Lists!$${letter}$1:$${letter}$${values.length}`);
+    }
+    return ranges.get(id);
+  };
 
   for (const type of deliverableTypes) {
-    const props = rules.get(type.code) ?? {};
-    const columns = [
-      ...ALWAYS,
-      ...CONDITIONAL.filter(({ prop }) => (props[prop] ?? "na") !== "na").map(({ column, prop }) => ({
-        ...column,
-        required: props[prop] === "required",
-      })),
-    ] as (Column & { required?: boolean })[];
-
-    const sheet = book.addWorksheet(sheetName(`${type.code} — ${type.label}`), {
-      views: [{ state: "frozen", ySplit: 2 }],
+    const props = matrix.get(type.code) ?? {};
+    const requires = Array.isArray(type.props.required) ? (type.props.required as unknown[]).map(String) : [];
+    const offered = (set: string) => forType(serving, set, type.code, (rowsOf.get(set) ?? []) as { code: string; setId?: string | null; props?: Record<string, unknown> }[]);
+    // A document type names the deliverable types it belongs to; one naming none falls back to who produces it.
+    const supplied = requires.includes("originator");
+    const docTypes = offered("DOCUMENT_TYPES").filter((one) => {
+      const of = Array.isArray(one.props?.deliverables) ? (one.props!.deliverables as unknown[]).map(String) : [];
+      if (of.length) return of.includes(type.code);
+      const applies = typeof one.props?.appliesTo === "string" ? one.props.appliesTo : null;
+      return !applies || applies === "Unclassified" || applies === (supplied ? "Supplier" : "Non-supplier");
     });
+    const asked = (key: string) => (rules[key] ?? "OPTIONAL") !== "OFF";
+    const columns: Column[] = [
+      ...(options.filled ? [{ key: "number", header: "Document Number", width: 26, note: "Its number, given when it was registered: keep it to update this document. A new document has none." }] : []),
+      { key: "title", header: labels.title ?? "Title", width: 44, required: true },
+      { key: "docType", header: labels.docType ?? "Document type", width: 14, values: docTypes, required: true },
+      { key: "discipline", header: labels.discipline ?? "Discipline", width: 14, values: offered("DISCIPLINES"), required: true },
+      ...(supplied || (props.originator ?? "na") !== "na"
+        ? [{ key: "originator", header: labels.originator ?? "Supplier", width: 14, values: parties, required: supplied || props.originator === "required" }] : []),
+      ...LISTED.filter((l) => asked(l.key) && (l.key !== "contractRef" || (props.po ?? "") !== "na")).map((l) => ({
+        key: BACKEND_KEY[l.key] ?? l.key, header: labels[l.key] ?? l.key, width: l.width, values: offered(l.set),
+        required: rules[l.key] === "REQUIRED" || (l.key === "contractRef" && props.po === "required"),
+      })),
+      ...(asked("plannedDate") ? [{ key: "plannedDate", header: labels.plannedDate ?? "Planned date", width: 16, required: rules.plannedDate === "REQUIRED", note: "YYYY-MM-DD. For a document no action of the schedule needs: the schedule plans the others." }] : []),
+      ...own.map((field) => ({
+        key: `extra:${field.key}`, header: field.label, width: 18, required: field.rule === "REQUIRED", note: field.help ?? undefined,
+        values: field.setKey ? forType(serving, field.setKey, type.code, field.options ?? []) : undefined,
+      })),
+    ];
+
+    const name = sheetName(`${type.code} — ${type.label}`);
+    const sheet = book.addWorksheet(name, { views: [{ state: "frozen", ySplit: 2 }] });
+    mark.getCell(markRow, 1).value = name;
+    mark.getCell(markRow, 2).value = type.code;
+    columns.forEach((column, index) => { mark.getCell(markRow, index + 3).value = column.key; });
+    markRow++;
 
     // One line saying what the sheet is, because a tab name is not an instruction.
     sheet.mergeCells(1, 1, 1, columns.length);
     const caption = sheet.getCell(1, 1);
-    caption.value = `${type.label} — ${project?.code ?? ""} ${project?.name ?? ""}. ${options.filled ? "The register as it stands: change a row to correct that document, or add a row with no number to register one." : "One row per document. Leave Document Number empty to register it; fill it to correct that document."} Shaded headings are required.`;
+    caption.value = `${type.label} — ${project?.code ?? ""} ${project?.name ?? ""}. ${options.filled
+      ? "The register as it stands: change a line to update that document, or add a line with no number to register one."
+      : "One line per document: each is given its number when it is registered."} Shaded headings must be filled. This file is for ${project?.code ?? "this project"} only.`;
     caption.font = { size: 9, italic: true, color: { argb: "FF5B7183" } };
     caption.alignment = { vertical: "middle" };
     sheet.getRow(1).height = 26;
@@ -123,38 +147,36 @@ export async function buildDeliverableWorkbook(t: Tenant, options: { filled?: bo
       const at = index + 1;
       const cell = sheet.getCell(2, at);
       cell.value = column.header;
-      cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: column.required ? REQUIRED_FILL : HEADER_FILL } };
-      if (column.required) cell.font = { bold: true, size: 10, color: { argb: "FF6B4B00" } };
+      cell.font = column.key === "number" ? { bold: true, size: 10, color: { argb: "FF334E68" } }
+        : column.required ? { bold: true, size: 10, color: { argb: "FF6B4B00" } } : { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: column.key === "number" ? NUMBER_FILL : column.required ? REQUIRED_FILL : HEADER_FILL } };
       cell.alignment = { vertical: "middle" };
       if (column.note) cell.note = column.note;
       sheet.getColumn(at).width = column.width;
 
       // The dropdown, on enough rows that nobody runs out filling a register.
-      const range = column.set ? rangeOf.get(column.set) : undefined;
+      const range = column.values ? rangeOf(column.values) : undefined;
       if (!range) return;
       for (let row = 3; row <= 1000 + register.length; row++) {
         sheet.getCell(row, at).dataValidation = {
-          type: "list",
-          allowBlank: true,
-          formulae: [range],
-          showErrorMessage: true,
-          errorStyle: "warning",
-          errorTitle: "Not on the published list",
-          error: `Choose a value from ${column.set}. Anything else is refused when the file is read.`,
+          type: "list", allowBlank: true, formulae: [range], showErrorMessage: true, errorStyle: "warning",
+          errorTitle: "Not offered for this type", error: `Choose one of the values offered for ${type.label}. Anything else is refused when the file is read.`,
         };
       }
     });
 
     // The register as it stands, under the headings: what each column holds for each document of this type.
-    const valueOf: Record<string, (d: (typeof register)[number]) => string> = {
-      "Document Number": (d) => d.number, Title: (d) => d.title, Type: (d) => d.docType, Discipline: (d) => d.discipline,
-      Project: () => project?.code ?? "", Criticality: (d) => d.criticality ?? "", Confidentiality: (d) => d.confidentiality ?? "",
-      RetentionClass: (d) => d.retentionClass ?? "", ContractRef: (d) => d.contractRef ?? "", PlannedDate: (d) => d.plannedDate?.slice(0, 10) ?? "",
-      SubProject: (d) => d.subproject ?? "", Supplier: (d) => d.originator ?? "", PO: (d) => d.contractRef ?? "",
+    const valueOf = (d: (typeof register)[number], key: string): string => {
+      if (key.startsWith("extra:")) return d.extras?.[key.slice(6)] ?? "";
+      const read: Record<string, string | null | undefined> = {
+        number: d.number, title: d.title, docType: d.docType, discipline: d.discipline, originator: d.originator, subproject: d.subproject,
+        phase: d.phase, contractRef: d.contractRef, criticality: d.criticality, confidentiality: d.confidentiality,
+        retentionClass: d.retentionClass, plannedDate: d.plannedDate?.slice(0, 10),
+      };
+      return read[key] ?? "";
     };
     register.filter((d) => d.deliverableType === type.code).forEach((d, index) => {
-      columns.forEach((column, at) => { sheet.getCell(index + 3, at + 1).value = valueOf[column.header]?.(d) ?? ""; });
+      columns.forEach((column, at) => { sheet.getCell(index + 3, at + 1).value = valueOf(d, column.key); });
     });
 
     sheet.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: columns.length } };
