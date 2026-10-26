@@ -69,7 +69,7 @@ public static class ListUploadEndpoints
     }
 
     private static async Task<IResult> SourceFileAsync(string kind, HttpContext http, DeliosDbContext db, Documents.FileStorage storage, AuditLog audit,
-        CancellationToken cancellationToken)
+        Notifications.Notifier notifier, NodaTime.IClock clock, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.IsInternal || !Lists.ContainsKey(kind)) return Results.NotFound();
@@ -77,6 +77,7 @@ public static class ListUploadEndpoints
         if (read?.ObjectKey is not { } key) return Results.NotFound();
         await audit.WriteAsync(http.User.Actor(), "DOWNLOAD", "Project", access.Project.Id, read.Value.Name,
             $"{Lists[kind].Title}: the file uploaded, as it came.", access.Project.Id, cancellationToken);
+        await DownloadWatch.CountAsync(db, audit, notifier, clock, http.User.Actor(), access.Project.Id, cancellationToken);
         var content = await storage.OpenReadAsync(key, cancellationToken);
         return Results.File(content, ContentTypeOf(read.Value.Name), read.Value.Name);
     }

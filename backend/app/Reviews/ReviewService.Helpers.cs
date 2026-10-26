@@ -184,7 +184,7 @@ public sealed partial class ReviewService
     internal static IResult FilesNotReady(Revision revision) => Problems.Conflict("FILES_NOT_READY", revision.FilesState switch
     {
         FilesStates.Processing => $"Rev {revision.Value}'s files are still being checked for viruses, which takes about a minute: try again shortly. If it stays so, the virus check is not running (the worker or the scanner): whoever runs the app restarts it.",
-        FilesStates.Rejected => $"A file of rev {revision.Value} failed the virus check and was set aside: replace it in Edit rev {revision.Value}, then try again.",
+        FilesStates.Rejected => $"A file of rev {revision.Value} was refused by the virus check, its Preview says why (a virus, a password, too much inside to check): replace it in Edit rev {revision.Value}, then try again.",
         FilesStates.None => $"Rev {revision.Value} has no files yet: add its PDF in Edit rev {revision.Value}, then try again.",
         _ => $"Rev {revision.Value}'s files have not all passed the virus check yet.",
     }, new { filesState = revision.FilesState });

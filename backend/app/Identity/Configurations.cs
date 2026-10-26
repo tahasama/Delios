@@ -191,6 +191,8 @@ internal sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEv
         b.HasIndex(x => new { x.ActorId, x.Id });
         // Whether someone opened this document in the last half hour, asked on every opening: never a scan of all they did.
         b.HasIndex(x => new { x.ActorId, x.EntityId, x.At });
+        // Downloads by one person in the last hour (Audit/DownloadWatch), read with each download.
+        b.HasIndex(x => new { x.ActorId, x.Action, x.At });
         // The audit trail and the log narrowed to one kind of act, newest first.
         b.HasIndex(x => new { x.Action, x.Id });
         b.Property(x => x.Action).HasMaxLength(64);

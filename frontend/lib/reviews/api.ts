@@ -75,16 +75,6 @@ function commentsOf(review: ReviewView, step: number) {
   }));
 }
 
-/** The name a stored file goes by, from its download; null when it cannot be read. */
-async function fileName(scope: Scope, fileId: string): Promise<string | null> {
-  const response = await apiFetch(projectPath(scope, `/files/${fileId}/download`));
-  await response.body?.cancel();
-  if (!response.ok) return null;
-  const disposition = response.headers.get("content-disposition") ?? "";
-  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
-  return encoded ? decodeURIComponent(encoded) : /filename="?([^";]+)"?/i.exec(disposition)?.[1] ?? null;
-}
-
 type ReviewCycle = Awaited<ReturnType<typeof readCycle>>;
 
 /**
@@ -108,7 +98,8 @@ async function readCycle(scope: Scope, review: ReviewView) {
   const transmittal = step.transmittalId
     ? await api<TransmittalView>(projectPath(scope, `/transmittals/${step.transmittalId}`), { keep: { areas: ["transmittals"] } }).then((one) => ({ id: one.id, number: one.number })).catch(() => null)
     : null;
-  const proof = step.evidenceFileId ? await fileName(scope, step.evidenceFileId).catch(() => null) : null;
+  // The proof kept with an answer recorded for another organization: its name, from the revision's files (never a download).
+  const proof = step.evidenceFileId ? rev.files.find((one) => one.id === step.evidenceFileId)?.name ?? null : null;
   return {
     id: review.id, number: review.number as string | null, sequence: rev.cycles.find((one) => one.id === review.id)?.sequence ?? 1,
     revisionId: review.revisionId, revision: { ...rev, document: doc },

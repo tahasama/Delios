@@ -6,6 +6,7 @@ const WORDS: Record<string, string> = {
   // Opened, downloaded
   DOCUMENT_VIEWED: "Opened a document",
   DOWNLOAD: "Downloaded a file",
+  DOWNLOADS_MANY: "Downloaded many files in an hour (administrators told)",
   ACTIVITY_READ: "Read someone's activity",
   PRODUCT_REQUESTED: "Asked DELIOS for a reader",
   VIEWER_SWITCHED: "Switched a reader on or off",

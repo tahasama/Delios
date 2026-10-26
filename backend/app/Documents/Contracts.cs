@@ -112,5 +112,3 @@ public sealed record DocumentPage(IReadOnlyList<DocumentSummary> Items, string? 
 /// </summary>
 public sealed record UploadTicket(Guid FileId, string Method, string Url, IReadOnlyDictionary<string, string> Headers, DateTimeOffset ExpiresAt);
 
-/// <summary>A short-lived signed URL the browser uses to download a file directly from object storage.</summary>
-public sealed record DownloadTicket(string Url, DateTimeOffset ExpiresAt);

@@ -157,9 +157,8 @@ public sealed class ReviewTests(Infrastructure infrastructure) : IClassFixture<I
         Assert.Equal(("RELEASED", "IFC"), (revA.GetProperty("state").GetString(), revA.GetProperty("statusCode").GetString()));
 
         var stamped = revA.GetProperty("files").EnumerateArray().Single(f => f.GetProperty("kind").GetString() == "STAMPED");
-        var link = await engineer.GetFromJsonAsync<JsonElement>($"/api/projects/{p.Project}/files/{stamped.GetProperty("id").GetGuid()}/download");
-        using var raw = new HttpClient();
-        using (var pdf = PdfReader.Open(new MemoryStream(await raw.GetByteArrayAsync(new Uri(link.GetProperty("url").GetString()!))), PdfDocumentOpenMode.Import))
+        var bytes = await engineer.GetByteArrayAsync($"/api/projects/{p.Project}/files/{stamped.GetProperty("id").GetGuid()}/download");
+        using (var pdf = PdfReader.Open(new MemoryStream(bytes), PdfDocumentOpenMode.Import))
         {
             Assert.Equal(2, pdf.PageCount);
         }

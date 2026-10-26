@@ -142,10 +142,10 @@ public static class PlatformSetup
         services.AddScoped<Documents.DocumentService>();
         services.AddScoped<Organizations.OrganizationService>();
         services.AddScoped<Documents.FileStorage>();
-        // The second copy of each file, made when it is stored (the weekly comparison does the rest).
-        services.AddOptions<Documents.BackupOptions>().BindConfiguration(Documents.BackupOptions.Section);
+        // The files' key, apart from the files (Storage:EncryptionKey, FILES_KEY in .env): read once, refused at start when missing.
+        services.AddSingleton(sp => new Documents.FileCipher(sp.GetRequiredService<IOptions<StorageOptions>>().Value.EncryptionKey));
+        // The copier (deploy/file-backup) is told of each file stored; the app holds no key to the copy.
         services.AddSingleton<Documents.FileBackup>();
-        services.AddHostedService(sp => sp.GetRequiredService<Documents.FileBackup>());
         if (config.GetSection(StorageOptions.Section).Get<StorageOptions>()?.UsesAzure == true)
         {
             services.AddSingleton<Documents.IObjectStore, Documents.AzureObjectStore>();

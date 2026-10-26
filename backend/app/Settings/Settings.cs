@@ -153,7 +153,7 @@ public static class SettingEndpoints
 /// <summary>
 /// What is kept about people's activity (owner): the organization's choice, never a project's, since a privacy policy is
 /// the organization's. Acts on documents (registered, reviewed, released, sent) are always kept: they are the
-/// register's own record. Reading (a document opened, a file downloaded) is kept unless switched off
+/// register's own record. A document opened is kept unless switched off; a file downloaded always is
 /// (<c>TRACK_READING</c> = OFF). Sign-ins are always kept for security, and shown on a person's activity only when
 /// switched on (<c>TRACK_SIGN_INS</c> = ON).
 /// </summary>
@@ -161,8 +161,11 @@ public static class Tracking
 {
     public const string ReadingKey = "TRACK_READING";
     public const string SignInsKey = "TRACK_SIGN_INS";
-    /// <summary>The acts that are reading, kept or not by <see cref="ReadingKey"/>.</summary>
-    public static readonly string[] Reading = ["DOCUMENT_VIEWED", "DOWNLOAD"];
+    /// <summary>
+    /// The acts that are reading, kept or not by <see cref="ReadingKey"/>: a document opened. A file downloaded is always
+    /// kept (owner: the files are protected), and watched (<c>Audit.DownloadWatch</c>).
+    /// </summary>
+    public static readonly string[] Reading = ["DOCUMENT_VIEWED"];
     /// <summary>The sign-ins, always kept, shown or not by <see cref="SignInsKey"/>.</summary>
     public static readonly string[] SignIns = ["SIGN_IN", "SIGN_IN_MFA", "SIGN_IN_SSO", "SIGN_IN_FAILED", "ACCOUNT_LOCKED", "LOGIN"];
 

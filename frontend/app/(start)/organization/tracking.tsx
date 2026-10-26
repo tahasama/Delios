@@ -15,11 +15,12 @@ export function TrackingSheet({ reading, signIns }: { reading: boolean; signIns:
       </div>
       <ActionForm id="tracking-form" action={setTrackingAction} hideSubmit className="asking space-y-5 px-5 py-5 sm:px-6">
         <p className="text-xs leading-5 text-slate-600">
-          <span className="font-semibold text-slate-800">Always kept:</span> what people do to documents (registered, reviewed, released, sent, returned). It is the
-          register&rsquo;s own record, and the app&rsquo;s rules rest on it.
+          <span className="font-semibold text-slate-800">Always kept:</span> what people do to documents (registered, reviewed, released, sent, returned), and every file
+          downloaded. It is the register&rsquo;s own record, and the app&rsquo;s rules rest on it; downloads protect the files: the
+          administrators are told when one person downloads more than 200 files in an hour.
         </p>
         <fieldset className="space-y-2">
-          <legend className="stencil mb-1.5 text-slate-500">Keep who opened a document and who downloaded a file?</legend>
+          <legend className="stencil mb-1.5 text-slate-500">Keep who opened a document?</legend>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-700">
             <label className="flex items-center gap-1.5"><input type="radio" name="reading" value="ON" defaultChecked={reading} required /> Keep it: who saw which revision, and when</label>
             <label className="flex items-center gap-1.5"><input type="radio" name="reading" value="OFF" defaultChecked={!reading} required /> Do not keep it</label>

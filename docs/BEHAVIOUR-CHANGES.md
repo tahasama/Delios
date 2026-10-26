@@ -844,3 +844,15 @@ revision, review, file or transmittal line changes, for that document only, and 
 works them out over every document on each filter or sort. Which disciplines and document types the documents carry is
 counted as they are registered and changed. Sorting by "Issued" now follows the Issued column (the first time it went out
 to someone), as the column always read.
+
+---
+
+**The files are protected** (owner, security review). Every file is now kept encrypted, with the files' key (FILES_KEY in
+.env) kept apart; files kept before stay readable as they were. Downloads no longer go straight from the store: the app
+opens each file and the screens pass it on. The backup copy is made by its own copier as each file is stored, and the app
+no longer holds any key to it. A file the virus check cannot look into (locked by a password, too much inside) is
+refused with why, where before it passed as clean. Every download is recorded, even where the organization switched
+reading off, and administrators are told when one person downloads more than 200 files in an hour. Another organization
+sent a revision opens only its files as they stand, no longer the drafts replaced before it went. The converters (DWG,
+office files) sit on a network of their own. The review page no longer records a download each time it opens (it asked
+the download for a file's name).

@@ -85,8 +85,19 @@ public sealed class StorageOptions : IValidatableObject
     public string? SecretKey { get; set; }
     /// <summary>S3 region name. Many S3-compatible stores accept any value.</summary>
     public string Region { get; set; } = "us-east-1";
+    /// <summary>
+    /// The key every file is encrypted with (32 bytes in base64; FILES_KEY in .env, made by deploy/init-env), kept apart
+    /// from the files and their copies: lost, the files cannot be read. Required.
+    /// </summary>
+    public string? EncryptionKey { get; set; }
     /// <summary>For Azure: the storage account's connection string, with its account key (it signs upload and download links).</summary>
     public string? AzureConnectionString { get; set; }
+
+    private static bool IsKey(string encoded)
+    {
+        var bytes = new byte[64];
+        return Convert.TryFromBase64String(encoded.Trim(), bytes, out var length) && length == 32;
+    }
 
     /// <summary>True when <c>Provider</c> is "azure".</summary>
     public bool UsesAzure => string.Equals(Provider, Azure, StringComparison.OrdinalIgnoreCase);
@@ -97,6 +108,8 @@ public sealed class StorageOptions : IValidatableObject
     /// </summary>
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        if (string.IsNullOrWhiteSpace(EncryptionKey) || !IsKey(EncryptionKey))
+            yield return new ValidationResult("Storage:EncryptionKey is required: 32 bytes in base64 (FILES_KEY in .env: run deploy/init-env).", [nameof(EncryptionKey)]);
         if (UsesAzure)
         {
             if (string.IsNullOrWhiteSpace(AzureConnectionString))

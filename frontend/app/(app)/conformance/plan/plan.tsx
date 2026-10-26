@@ -640,7 +640,7 @@ export async function DocumentManagementPlan() {
         change={[{ href: "/organization", label: "The organization's page" }]}>
         <Always items={[
           "Every act on a document, review, transmittal, package and setting: always.",
-          trackReading ? "Opening a document and downloading a file: kept." : "Opening a document and downloading a file: not kept on this organization.",
+          (trackReading ? "Opening a document: kept." : "Opening a document: not kept on this organization.") + " Downloading a file: always kept; the administrators are told when one person downloads more than 200 files in an hour.",
           trackSignIns ? "Sign-ins: kept and shown on a person's activity." : "Sign-ins: kept for security, not shown on a person's activity.",
           "Every reason given is kept with its document, in full.",
         ]} />

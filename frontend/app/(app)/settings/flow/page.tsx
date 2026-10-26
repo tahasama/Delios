@@ -159,7 +159,7 @@ export default async function ControlRoomPage() {
       if (!organization) return fact(key, "What is kept about people's activity", "The organization's choice");
       return [
         fact("track-acts", "What people do to documents", "Always kept"),
-        fact("track-reading", "Opening a document, downloading a file", organization.get("TRACK_READING") === "OFF" ? "Not kept" : "Kept", where),
+        fact("track-reading", "Opening a document", organization.get("TRACK_READING") === "OFF" ? "Not kept" : "Kept", where),
         fact("track-signins", "Sign-ins, on a person's activity", organization.get("TRACK_SIGN_INS") === "ON" ? "Shown" : "Kept for security, not shown", where),
       ];
     }

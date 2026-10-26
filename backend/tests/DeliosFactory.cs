@@ -26,6 +26,8 @@ public sealed class DeliosFactory(IDictionary<string, string?> overrides, Action
         ["Storage:Bucket"] = "delios",
         ["Storage:AccessKey"] = "x",
         ["Storage:SecretKey"] = "x",
+        // Any 32 bytes: tests seal and open their files with it.
+        ["Storage:EncryptionKey"] = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
         ["ClamAv:Host"] = "127.0.0.1",
         ["ClamAv:Port"] = "1",
         // Tests never reach the breached-password list on the internet.

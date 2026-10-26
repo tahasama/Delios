@@ -378,9 +378,8 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         Assert.Equal("application/pdf", file.GetProperty("detectedType").GetString());
         Assert.Equal("RENDITION", file.GetProperty("kind").GetString());
 
-        var ticket = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/files/{fileId}/download");
-        using var raw = new HttpClient();
-        Assert.Equal(Pdf, await raw.GetByteArrayAsync(new Uri(ticket.GetProperty("url").GetString()!)));
+        // The bytes come through the app, opened from their seal: byte for byte what was uploaded.
+        Assert.Equal(Pdf, await client.GetByteArrayAsync($"/api/projects/{project}/files/{fileId}/download"));
 
         using var second = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions",
             new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) } });
@@ -414,9 +413,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         Assert.Equal(Pdf.Length, swapped.Length);
         await Flow.PutAsync(ticket, swapped);
 
-        var download = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/files/{fileId}/download");
-        using var raw = new HttpClient();
-        Assert.Equal(Pdf, await raw.GetByteArrayAsync(new Uri(download.GetProperty("url").GetString()!)));
+        Assert.Equal(Pdf, await client.GetByteArrayAsync($"/api/projects/{project}/files/{fileId}/download"));
     }
 
     [Fact]

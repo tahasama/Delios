@@ -63,7 +63,8 @@ public sealed class FileProcessor(
             detected = FileSniffer.Detect(content.Head);
         }
 
-        var (status, detail) = scan.Infected ? (FileStatuses.Infected, $"Virus found: {scan.Signature}")
+        var (status, detail) = scan.Infected && FileScanning.CouldNotCheck(scan.Signature) is { } why ? (FileStatuses.Rejected, why)
+            : scan.Infected ? (FileStatuses.Infected, $"Virus found: {scan.Signature}")
             : size != file.Size ? (FileStatuses.Rejected, $"The stored file is {size} bytes; {file.Size} were declared.")
             : sha256 != file.Sha256 ? (FileStatuses.Rejected, "The stored bytes do not match the declared SHA-256.")
             : (FileStatuses.Clean, (string?)null);

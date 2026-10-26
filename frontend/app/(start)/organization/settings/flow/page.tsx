@@ -92,7 +92,7 @@ export default async function OrganizationControlRoomPage() {
     if (key === "TRACKING") {
       return [
         fact("track-acts", "What people do to documents", "Always kept"),
-        fact("track-reading", "Opening a document, downloading a file", organization.get("TRACK_READING") === "OFF" ? "Not kept" : "Kept", "/organization/settings/security#tracking"),
+        fact("track-reading", "Opening a document", organization.get("TRACK_READING") === "OFF" ? "Not kept" : "Kept", "/organization/settings/security#tracking"),
         fact("track-signins", "Sign-ins, on a person's activity", organization.get("TRACK_SIGN_INS") === "ON" ? "Shown" : "Kept for security, not shown", "/organization/settings/security#tracking"),
       ];
     }

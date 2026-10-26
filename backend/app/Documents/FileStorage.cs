@@ -19,12 +19,14 @@ public interface IObjectStore
 {
     /// <summary>Makes a signed link that lets a browser upload (PUT) the bytes for one key until <paramref name="expires"/>.</summary>
     SignedLink SignUpload(string key, string contentType, Instant expires);
-    /// <summary>Makes a signed link that lets a browser download one key, saved under <paramref name="fileName"/>, until <paramref name="expires"/>.</summary>
-    string SignDownload(string key, string fileName, Instant expires);
     /// <summary>The stored size in bytes, or null when nothing is stored under the key.</summary>
     Task<long?> SizeAsync(string key, CancellationToken cancellationToken);
     /// <summary>Stores bytes the system made itself under a key.</summary>
     Task PutAsync(string key, byte[] content, string contentType, CancellationToken cancellationToken);
+    /// <summary>Stores a file of the system's own (an upload, once encrypted) under a key.</summary>
+    Task PutFileAsync(string key, string path, CancellationToken cancellationToken);
+    /// <summary>The first bytes stored under a key (fewer when it is shorter).</summary>
+    Task<byte[]> ReadHeadAsync(string key, int count, CancellationToken cancellationToken);
     /// <summary>Opens the stored bytes for reading, from the start.</summary>
     Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken);
     /// <summary>True when the store answers and the bucket or container exists. Used by the health check.</summary>
@@ -36,24 +38,22 @@ public interface IObjectStore
 }
 
 /// <summary>
-/// File bytes go between the browser and object storage directly, through
-/// short-lived signed links. The API only signs, checks and records. Which store
-/// holds them is a setting; nothing above this class knows.
+/// Where the files are kept, encrypted (<see cref="FileCipher"/>): the store and its copies hold only sealed bytes, and
+/// every read opens them here. The screens upload through a short-lived signed link to a waiting place; the worker
+/// seals what arrived into the file's own key, and nobody downloads from the store: the bytes come through the API,
+/// which checks who asks (<c>DocumentEndpoints.ReadableAsync</c>). Which store holds them is a setting.
 /// </summary>
-public sealed class FileStorage(IObjectStore store, IClock clock, FileBackup backup)
+public sealed class FileStorage(IObjectStore store, IClock clock, FileBackup backup, FileCipher cipher)
 {
     /// <summary>How long an upload link stays valid.</summary>
     public static readonly Duration UploadWindow = Duration.FromMinutes(15);
-    /// <summary>How long a download link stays valid.</summary>
-    public static readonly Duration DownloadWindow = Duration.FromMinutes(5);
 
     /// <summary>The object key for a new file: tenant id, project id and file id joined by "/". Each file gets its own key.</summary>
     public static string KeyFor(Guid tenantId, Guid projectId, Guid fileId) => $"{tenantId}/{projectId}/{fileId}";
 
     /// <summary>
-    /// Where a browser uploads a file before it is scanned. The upload link writes
-    /// here, never to the file's own key: a link can be used again until it
-    /// expires, so the bytes people later download must sit where no link reaches.
+    /// Where an upload lands before it is scanned. The upload link writes here, never to the file's own key: a link can
+    /// be used again until it expires, so the bytes people later read must sit where no link reaches.
     /// </summary>
     public static string IncomingKey(string key) => $"incoming/{key}";
 
@@ -63,19 +63,27 @@ public sealed class FileStorage(IObjectStore store, IClock clock, FileBackup bac
 
     /// <summary>The size of what was uploaded for this key: still incoming, or already kept. Null when nothing arrived.</summary>
     public async Task<long?> UploadedSizeAsync(string key, CancellationToken cancellationToken) =>
-        await store.SizeAsync(IncomingKey(key), cancellationToken) ?? await store.SizeAsync(key, cancellationToken);
+        await store.SizeAsync(IncomingKey(key), cancellationToken) ?? await SizeAsync(key, cancellationToken);
 
     /// <summary>
-    /// Moves an upload from its incoming place to the file's own key, which no
-    /// upload link can write, before it is scanned. What is scanned is then exactly
-    /// what is served. Called by the worker's file processing; safe to repeat.
+    /// Moves an upload from its incoming place to the file's own key, which no upload link can write, sealed on the way,
+    /// before it is scanned: what is scanned is then exactly what is served. Called by the worker's file processing;
+    /// safe to repeat.
     /// </summary>
     public async Task KeepAsync(string key, CancellationToken cancellationToken)
     {
         var incoming = IncomingKey(key);
         if (await store.SizeAsync(incoming, cancellationToken) is not null)
         {
-            await store.CopyAsync(incoming, key, cancellationToken);
+            var sealedFile = Path.GetTempFileName();
+            try
+            {
+                await using (var from = await store.OpenReadAsync(incoming, cancellationToken))
+                await using (var to = File.Create(sealedFile))
+                    await cipher.SealAsync(from, to, cancellationToken);
+                await store.PutFileAsync(key, sealedFile, cancellationToken);
+            }
+            finally { File.Delete(sealedFile); }
             await store.DeleteAsync(incoming, cancellationToken);
             backup.Post(key);
         }
@@ -85,27 +93,32 @@ public sealed class FileStorage(IObjectStore store, IClock clock, FileBackup bac
         }
     }
 
-    /// <summary>A signed download link for the key, valid for <see cref="DownloadWindow"/>, and when it expires.</summary>
-    public (string Url, Instant ExpiresAt) PresignDownload(string key, string fileName)
+    /// <summary>The file's own size (an encrypted one read from what the store holds), or null when nothing is stored.</summary>
+    public async Task<long?> SizeAsync(string key, CancellationToken cancellationToken)
     {
-        var expires = clock.GetCurrentInstant() + DownloadWindow;
-        return (store.SignDownload(key, fileName, expires), expires);
+        if (await store.SizeAsync(key, cancellationToken) is not { } stored) return null;
+        if (stored < FileCipher.HeaderLength) return stored;
+        return FileCipher.IsSealed(await store.ReadHeadAsync(key, FileCipher.HeaderLength, cancellationToken)) ? FileCipher.PlainLength(stored) : stored;
     }
 
-    /// <summary>The stored size, or null when nothing was uploaded under the key.</summary>
-    public Task<long?> SizeAsync(string key, CancellationToken cancellationToken) => store.SizeAsync(key, cancellationToken);
-
-    /// <summary>Stores a file the system made itself, such as a stamped copy, under a new key.</summary>
+    /// <summary>Stores a file the system made itself, such as a stamped copy, under a new key, sealed.</summary>
     public async Task PutAsync(string key, byte[] content, string contentType, CancellationToken cancellationToken)
     {
-        await store.PutAsync(key, content, contentType, cancellationToken);
+        await store.PutAsync(key, cipher.Seal(content), "application/octet-stream", cancellationToken);
         backup.Post(key);
     }
 
-    /// <summary>Opens the stored bytes for reading. Used by the worker to scan and check a file.</summary>
-    public Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken) => store.OpenReadAsync(key, cancellationToken);
+    /// <summary>Opens a file's own bytes for reading, from the start: opened from its seal, or as it was kept before.</summary>
+    public async Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken)
+    {
+        var stream = await store.OpenReadAsync(key, cancellationToken);
+        var head = new byte[FileCipher.HeaderLength];
+        var filled = 0;
+        while (filled < head.Length && await stream.ReadAsync(head.AsMemory(filled), cancellationToken) is var read and > 0) filled += read;
+        return filled == head.Length && FileCipher.IsSealed(head) ? cipher.Open(head, stream) : new Replay(head, filled, stream);
+    }
 
-    /// <summary>A stored file copied under another key: each file record owns its own object (keys are unique).</summary>
+    /// <summary>A stored file copied under another key: each file record owns its own object (keys are unique). Its seal goes with it.</summary>
     public async Task CopyAsync(string from, string to, CancellationToken cancellationToken)
     {
         await store.CopyAsync(from, to, cancellationToken);
@@ -141,21 +154,6 @@ public sealed class S3ObjectStore(IAmazonS3 s3, IOptions<StorageOptions> options
         return new SignedLink(url, expires, new Dictionary<string, string> { ["Content-Type"] = contentType });
     }
 
-    /// <summary>A pre-signed GET URL for the key that tells the browser to save the file under its own name.</summary>
-    public string SignDownload(string key, string fileName, Instant expires)
-    {
-        var request = new GetPreSignedUrlRequest
-        {
-            BucketName = _options.Bucket,
-            Key = key,
-            Verb = HttpVerb.GET,
-            Expires = expires.ToDateTimeUtc(),
-            Protocol = Protocol(_options.PublicEndpoint ?? _options.Endpoint!),
-        };
-        request.ResponseHeaderOverrides.ContentDisposition = FileStorage.Attachment(fileName);
-        return _signer.Value.GetPreSignedURL(request);
-    }
-
     /// <summary>Asks S3 for the object's metadata (a HEAD request) and returns its size; null when it does not exist.</summary>
     public async Task<long?> SizeAsync(string key, CancellationToken cancellationToken)
     {
@@ -181,6 +179,26 @@ public sealed class S3ObjectStore(IAmazonS3 s3, IOptions<StorageOptions> options
             InputStream = body,
             ContentType = contentType,
         }, cancellationToken);
+    }
+
+    /// <summary>Uploads a file from disk under the key.</summary>
+    public async Task PutFileAsync(string key, string path, CancellationToken cancellationToken) =>
+        await s3.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = _options.Bucket,
+            Key = key,
+            FilePath = path,
+            ContentType = "application/octet-stream",
+        }, cancellationToken);
+
+    /// <summary>The first bytes of the object (a ranged GET).</summary>
+    public async Task<byte[]> ReadHeadAsync(string key, int count, CancellationToken cancellationToken)
+    {
+        using var response = await s3.GetObjectAsync(new GetObjectRequest { BucketName = _options.Bucket, Key = key, ByteRange = new ByteRange(0, count - 1) },
+            cancellationToken);
+        using var head = new MemoryStream();
+        await response.ResponseStream.CopyToAsync(head, cancellationToken);
+        return head.ToArray();
     }
 
     /// <summary>Starts downloading the object and returns its body as a stream; the caller must dispose it.</summary>
@@ -252,19 +270,6 @@ public sealed class AzureObjectStore(IOptions<StorageOptions> options) : IObject
         });
     }
 
-    /// <summary>A read-only SAS URL for one blob that tells the browser to save the file under its own name.</summary>
-    public string SignDownload(string key, string fileName, Instant expires)
-    {
-        var sas = new BlobSasBuilder(BlobSasPermissions.Read, expires.ToDateTimeOffset())
-        {
-            BlobContainerName = Container.Name,
-            BlobName = key,
-            Resource = "b",
-            ContentDisposition = FileStorage.Attachment(fileName),
-        };
-        return Public(Container.GetBlobClient(key).GenerateSasUri(sas));
-    }
-
     /// <summary>Reads the blob's properties and returns its size; null when it does not exist.</summary>
     public async Task<long?> SizeAsync(string key, CancellationToken cancellationToken)
     {
@@ -286,6 +291,21 @@ public sealed class AzureObjectStore(IOptions<StorageOptions> options) : IObject
             HttpHeaders = new BlobHttpHeaders { ContentType = contentType },
             Conditions = new BlobRequestConditions { IfNoneMatch = Azure.ETag.All },
         }, cancellationToken);
+
+    /// <summary>Uploads a file from disk as a new blob; fails if a blob already exists under the key.</summary>
+    public async Task PutFileAsync(string key, string path, CancellationToken cancellationToken) =>
+        await Container.GetBlobClient(key).UploadAsync(path, new BlobUploadOptions
+        {
+            HttpHeaders = new BlobHttpHeaders { ContentType = "application/octet-stream" },
+            Conditions = new BlobRequestConditions { IfNoneMatch = Azure.ETag.All },
+        }, cancellationToken);
+
+    /// <summary>The first bytes of the blob (a ranged download).</summary>
+    public async Task<byte[]> ReadHeadAsync(string key, int count, CancellationToken cancellationToken)
+    {
+        var part = await Container.GetBlobClient(key).DownloadContentAsync(new BlobDownloadOptions { Range = new Azure.HttpRange(0, count) }, cancellationToken);
+        return part.Value.Content.ToArray();
+    }
 
     /// <summary>Starts downloading the blob and returns its content as a stream; the caller must dispose it.</summary>
     public async Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken) =>

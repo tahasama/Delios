@@ -1519,7 +1519,8 @@ parts, each into smaller parts). DELIOS keeps it as it is asked:
 The Standard lets a recipient read what was transmitted to it; it does not say what else of the document comes with it.
 
 - **Of a document of ours, another organization reads only the revisions a transmittal carried to its people**: never a
-  revision in preparation, never one sent to someone else, and only those revisions' files. Our reviews of it, our
+  revision in preparation, never one sent to someone else, and only those revisions' files as they stand (the newest
+  submission: never a draft replaced before it went). Our reviews of it, our
   exchanges about it with others and the packages it sits in are ours; it reads the transmittals it may open and the
   supplier packages shared with it.
 - **Of its own documents** (it is their originator) it reads everything it read before.
@@ -1538,3 +1539,22 @@ The Standard lets a recipient read what was transmitted to it; it does not say w
 - **Who else we work with is ours**: another organization's people read, of the organizations we deal with, only their own.
 - **The organization's own lists are an administrator's**: the control function of one project does not upload or
   approve them for every project.
+
+## 83 · How the files themselves are protected
+
+The Standard asks that controlled information be kept safe; it says nothing of the files' bytes once stored.
+
+- **Every file is kept encrypted**, with a key kept apart from the files and their copies (owner: "those files should
+  be PROTECTED"): whoever takes the disk, the store or a backup reads nothing. The key is the organization's to keep
+  safe: lost, the files cannot be read again.
+- **Nobody reaches a file but through the app**, which checks who asks every time; no link to the store is ever given.
+- **The backup copy is out of the app's reach**: a copier of its own makes it, as each file is stored, and nothing that
+  breaks into the app can change or wipe it. In production it goes to another place, under a key that may add and
+  never delete.
+- **A file that cannot be checked for viruses is refused, never kept as clean** (owner: "refuse them with
+  explanation"): locked by a password, or holding more than the check opens. The sender is told why, and sends it again
+  without the password, or in parts.
+- **Every download is recorded, whatever the organization keeps about reading**, and the administrators are told when
+  one person takes more than 200 files in an hour (owner).
+- **What opens drawings and office files is shut in**: on a network of its own, it reaches neither the register, the
+  store nor the internet.

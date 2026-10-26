@@ -12,6 +12,8 @@ name: delios
 x-backend: &backend
   build: ./backend
   image: delios-backend
+  # The converters' closed network too: the only way to them, and theirs to nothing else.
+  networks: [default, converters]
   restart: unless-stopped
   environment: &backend-env
     # Production at go-live (docs/ACTIVATION.md "Go-live"): refuses demo data, hides error details.
@@ -23,13 +25,6 @@ x-backend: &backend
     ConnectionStrings__Redis: valkey:6379
     ConnectionStrings__RabbitMq: amqp://delios:${RABBITMQ_PASSWORD:?run sh deploy/init-env.sh}@rabbitmq:5672/
     # s3 (SeaweedFS here, Hetzner or AWS in production) or azure (docs/ACTIVATION.md "Azure Blob Storage").
-    # The second copy of each file, where file-backup keeps it: made as each file is stored.
-    Backup__Target: ${FILE_BACKUP_TARGET_TYPE:-local}
-    Backup__Path: ${FILE_BACKUP_TARGET_PATH:-/file-backup}
-    Backup__Endpoint: ${RCLONE_CONFIG_TARGET_ENDPOINT:-}
-    Backup__Region: ${RCLONE_CONFIG_TARGET_REGION:-}
-    Backup__AccessKey: ${RCLONE_CONFIG_TARGET_ACCESS_KEY_ID:-}
-    Backup__SecretKey: ${RCLONE_CONFIG_TARGET_SECRET_ACCESS_KEY:-}
     Storage__Provider: ${STORAGE_PROVIDER:-s3}
     Storage__AzureConnectionString: ${AZURE_STORAGE_CONNECTION_STRING:-}
     Storage__Endpoint: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
@@ -41,6 +36,9 @@ x-backend: &backend
     Storage__Bucket: ${STORAGE_BUCKET:-delios}
     Storage__AccessKey: ${STORAGE_ACCESS_KEY:?run sh deploy/init-env.sh}
     Storage__SecretKey: ${STORAGE_SECRET_KEY:?run sh deploy/init-env.sh}
+    # Every file is kept encrypted with this key (Documents/FileCipher.cs). Keep a copy of it apart from the files and
+    # their backups (a password manager, a safe): without it, nothing stored can be read again.
+    Storage__EncryptionKey: ${FILES_KEY:?run deploy/init-env again, it adds FILES_KEY (the files key) to .env}
     ClamAv__Host: clamav
     # Where the screens are told what changed (their kept answers cleared); never reachable from outside (Caddy).
     Screens__Url: ${SCREENS_URL:-http://web:3000}
@@ -154,25 +152,30 @@ services:
 
   # S3-compatible store for development only.
   seaweedfs:
-    image: chrislusf/seaweedfs:latest
+    # Pinned (owner, security review): the files' store and their copier change version only when we choose to.
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
     restart: unless-stopped
     # The access keys come from .env; the config file is written at start.
     environment:
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?run sh deploy/init-env.sh}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?run sh deploy/init-env.sh}
+      STORAGE_COPIER_KEY: ${STORAGE_COPIER_KEY:-copier}
+      STORAGE_COPIER_SECRET: ${STORAGE_COPIER_SECRET:?run deploy/init-env again, it adds the copier key to .env}
+    # Two keys, each with no more than it needs (owner, security review): the app's reads and adds files and never
+    # administers the store (no bucket made or removed by it); the copier's only reads.
     entrypoint:
       - /bin/sh
       - -c
       - >-
-        printf '{"identities":[{"name":"delios","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}'
-        "$$STORAGE_ACCESS_KEY" "$$STORAGE_SECRET_KEY" > /tmp/s3.json &&
+        printf '{"identities":[{"name":"delios","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Read","Write","List","Tagging"]},{"name":"copier","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Read","List"]}]}'
+        "$$STORAGE_ACCESS_KEY" "$$STORAGE_SECRET_KEY" "$$STORAGE_COPIER_KEY" "$$STORAGE_COPIER_SECRET" > /tmp/s3.json &&
         exec weed server -dir=/data -s3 -s3.config=/tmp/s3.json
     ports: ["127.0.0.1:8333:8333"]
     volumes:
       - seaweedfs:/data
 
   storage-init:
-    image: chrislusf/seaweedfs:latest
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
     depends_on: [seaweedfs]
     restart: on-failure
     entrypoint:
@@ -186,13 +189,14 @@ services:
   clamav:
     image: clamav/clamav:stable
     restart: unless-stopped
-    # clamd refuses streams over 25 MB by default; drawings and scans are larger.
+    # clamd refuses streams over 25 MB by default; drawings and scans are larger. What it cannot look into (a file locked
+    # by a password, one holding more than it opens) it reports, and the app refuses it in plain words (FileScanning).
     entrypoint:
       - /bin/sh
       - -c
       - >-
         grep -q '^StreamMaxLength' /etc/clamav/clamd.conf ||
-        printf 'StreamMaxLength 2048M\nMaxFileSize 2048M\nMaxScanSize 4096M\n' >> /etc/clamav/clamd.conf;
+        printf 'StreamMaxLength 2048M\nMaxFileSize 2048M\nMaxScanSize 4096M\nAlertEncrypted yes\nAlertExceedsMax yes\n' >> /etc/clamav/clamd.conf;
         exec /init
     ports: ["127.0.0.1:3310:3310"]
     volumes: [clamav:/var/lib/clamav]
@@ -217,8 +221,6 @@ services:
     environment:
       <<: *backend-env
       Delios__Role: api
-    # The second copy of each file is made as it is stored (the weekly comparison in file-backup does the rest).
-    volumes: [file-backup:/file-backup]
     depends_on: &after-migrate
       migrate: { condition: service_completed_successfully }
       valkey: { condition: service_healthy }
@@ -230,7 +232,6 @@ services:
     environment:
       <<: *backend-env
       Delios__Role: worker
-    volumes: [file-backup:/file-backup]
     depends_on: *after-migrate
 
   # The way in: load-balances the API nodes, and terminates TLS in production.
@@ -264,32 +265,40 @@ services:
       SCREENS_CACHE_REDIS: redis://valkey:6379/1
     depends_on: [caddy, valkey]
 
-  # Compares every stored file with its second copy once a week, copying what is missing (each file is copied as it is
-  # stored by the app: Documents/FileBackup.cs).
+  # The second copy of the files: each copied as it is stored (the app says which on Valkey, Documents/FileBackup.cs),
+  # and compared whole once a week. The app holds no key to the copy; this copier reads the store with a key that may
+  # only read. What it copies is sealed by the app: the copy reads as nothing without FILES_KEY.
   file-backup:
-    image: rclone/rclone:latest
+    build: ./deploy/file-backup
+    image: delios-file-backup
     profiles: [app]
     restart: unless-stopped
-    # Line endings stripped: a Windows checkout may have turned them into CRLF.
-    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /backup.sh > /tmp/backup.sh && exec sh /tmp/backup.sh"]
     environment:
       # azureblob when the files live in Azure (with the account name and key below).
       RCLONE_CONFIG_SOURCE_TYPE: ${FILE_BACKUP_SOURCE_TYPE:-s3}
       RCLONE_CONFIG_SOURCE_ACCOUNT: ${AZURE_STORAGE_ACCOUNT:-}
       RCLONE_CONFIG_SOURCE_KEY: ${AZURE_STORAGE_KEY:-}
       RCLONE_CONFIG_SOURCE_PROVIDER: Other
+      # Its key may not make a bucket: rclone is told not to try.
+      RCLONE_CONFIG_SOURCE_NO_CHECK_BUCKET: "true"
       RCLONE_CONFIG_SOURCE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
-      RCLONE_CONFIG_SOURCE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY:?run sh deploy/init-env.sh}
-      RCLONE_CONFIG_SOURCE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_KEY:?run sh deploy/init-env.sh}
+      RCLONE_CONFIG_SOURCE_ACCESS_KEY_ID: ${STORAGE_COPIER_KEY:-copier}
+      RCLONE_CONFIG_SOURCE_SECRET_ACCESS_KEY: ${STORAGE_COPIER_SECRET:?run deploy/init-env again, it adds the copier key to .env}
       SOURCE_PATH: ${STORAGE_BUCKET:-delios}
-      # Production: a second S3 remote (RCLONE_CONFIG_TARGET_TYPE=s3 and its keys).
+      # Production: a second S3 remote, in another place, with a key that may add and never delete (or a bucket with
+      # object lock): RCLONE_CONFIG_TARGET_TYPE=s3 and the four below.
       RCLONE_CONFIG_TARGET_TYPE: ${FILE_BACKUP_TARGET_TYPE:-local}
+      RCLONE_CONFIG_TARGET_PROVIDER: ${RCLONE_CONFIG_TARGET_PROVIDER:-Other}
+      RCLONE_CONFIG_TARGET_ENDPOINT: ${RCLONE_CONFIG_TARGET_ENDPOINT:-}
+      RCLONE_CONFIG_TARGET_REGION: ${RCLONE_CONFIG_TARGET_REGION:-}
+      RCLONE_CONFIG_TARGET_ACCESS_KEY_ID: ${RCLONE_CONFIG_TARGET_ACCESS_KEY_ID:-}
+      RCLONE_CONFIG_TARGET_SECRET_ACCESS_KEY: ${RCLONE_CONFIG_TARGET_SECRET_ACCESS_KEY:-}
       TARGET_PATH: ${FILE_BACKUP_TARGET_PATH:-/file-backup}
+      VALKEY_HOST: valkey
     volumes:
-      - ./deploy/file-backup/backup.sh:/backup.sh:ro
       - file-backup:/file-backup
       - delios-metrics:/var/lib/delios-metrics
-    depends_on: [seaweedfs]
+    depends_on: [seaweedfs, valkey]
 
   # ── Restore drill (run monthly) ─────────────────────────────────────────────
   #   docker compose --profile drill run --rm restore-drill
@@ -387,6 +396,9 @@ services:
     image: gotenberg/gotenberg:8
     profiles: [office]
     restart: unless-stopped
+    # A file it reads may be made to break it: on a network of its own, it reaches neither the database, the
+    # storage nor the internet; only the API and the worker reach it.
+    networks: [converters]
 
   # DWG drawings turned into DXF for the Preview (LibreDWG, the free route; deploy/dwg).
   dwg:
@@ -394,11 +406,17 @@ services:
     image: delios-dwg
     profiles: [app]
     restart: unless-stopped
+    # A file it reads may be made to break it: on a network of its own, it reaches neither the database, the
+    # storage nor the internet; only the API and the worker reach it.
+    networks: [converters]
 
   tika:
     image: apache/tika:3.2.3.0-full
     profiles: [extraction]
     restart: unless-stopped
+    # A file it reads may be made to break it: on a network of its own, it reaches neither the database, the
+    # storage nor the internet; only the API and the worker reach it.
+    networks: [converters]
 
   # ── Monitoring ──────────────────────────────────────────────────────────────
   # How we know: metrics, alerts that say what to do, a dashboard. Alerts reach
@@ -480,3 +498,9 @@ volumes:
   rabbitmq:
   seaweedfs:
   clamav:
+
+networks:
+  default:
+  # The converters' own (owner, security review): no way out, and nothing on it but them, the API and the worker.
+  converters:
+    internal: true

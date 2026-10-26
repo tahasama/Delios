@@ -30,6 +30,16 @@ public static class OutsideReading
             : (await SentRevisions(db, access).Where(id => db.Revisions.Any(r => r.Id == id && r.DocumentId == documentId))
                 .Distinct().ToListAsync(cancellationToken)).ToHashSet();
 
+    /// <summary>
+    /// A revision sent to them, as it stands: only the files of its newest submission, never the drafts replaced while it
+    /// was prepared (each kept as an earlier submission), nor what was said of them.
+    /// </summary>
+    public static RevisionView AsSent(RevisionView revision) => revision with
+    {
+        Files = revision.Files.Where(f => f.Submission == revision.Submission).ToList(),
+        Submissions = revision.Submissions.Where(s => s.Number == revision.Submission).ToList(),
+    };
+
     /// <summary>The reviews this reader reads: all for ours; for another organization, of its own documents or a step it answers.</summary>
     public static IQueryable<Review> Reviews(DeliosDbContext db, ProjectAccess access, IQueryable<Review> reviews)
     {

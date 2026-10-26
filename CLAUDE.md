@@ -1127,10 +1127,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Lawful as the register's integrity record, provided people are told it is kept (privacy notice), it is read only for
   that purpose, and the organization sets how long it is kept; some countries also ask staff representatives first.
   What is kept is the organization's choice (organization page, "What is kept about people's activity",
-  `Settings.Tracking`; shown read-only in the Control room): acts on documents always; reading (opened a document,
-  downloaded a file, `TRACK_READING`) kept unless switched off, read as two kinds, Opened and Downloaded (owner: opened
-  is not downloaded; `AuditKinds` READING / DOWNLOADED); sign-ins always kept for security, shown on a person's
-  activity only when switched on (`TRACK_SIGN_INS` = ON).
+  `Settings.Tracking`; shown read-only in the Control room): acts on documents always; opening a document
+  (`TRACK_READING`) kept unless switched off; **a file downloaded always** (owner, security review: the files are
+  protected; `Tracking.Reading` holds only DOCUMENT_VIEWED), and watched: one person past 200 files in an hour, our
+  administrators are told once that hour, by notification and email, with a link to their activity (`Audit/DownloadWatch.cs`,
+  DOWNLOADS_MANY, read with each download on its index actor · action · at); read as two kinds, Opened and Downloaded
+  (owner: opened is not downloaded; `AuditKinds` READING / DOWNLOADED); sign-ins always kept for security, shown on a
+  person's activity only when switched on (`TRACK_SIGN_INS` = ON).
   **Reading is kept outside the locked chain** (owner: every reader waited behind every other act of the organization):
   opened, downloaded and a person's activity read (`AuditKinds` READING / DOWNLOADED, `AuditLog.OutsideChain`) are written
   by `audit_note`, with no lock and no link to the row before, each sealed by its own hash (`audit_events.chained` false);
@@ -1231,8 +1234,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   band "Step N · <title>" (what is chosen there is that step's only); "Routes in use" heads the routes below; a route
   being changed is marked "being changed". "The status it releases at" is a dropdown (`SearchPick`), never pills.
 - A revision whose files are not through the virus check is refused in plain words by what happened (`FilesNotReady`):
-  still being checked (about a minute; if it stays, the worker or scanner is not running), set aside (replace it), or
-  no file yet.
+  still being checked (about a minute; if it stays, the worker or scanner is not running), refused (its Preview says
+  why: replace it), or no file yet.
+- **What the virus check cannot look into is refused** (owner: "refuse them with explanation"): a file locked by a password
+  (a zip, a PDF that needs one to open) or holding more than the scanner opens (clamd `AlertEncrypted`, `AlertExceedsMax`,
+  compose and Kubernetes), never passed as clean; said in plain words on the file and in the document's Preview
+  ("<name> was refused: It is locked by a password… Send it without the password", `FileScanning.CouldNotCheck`,
+  `refused` in `lib/documents/checking.ts`). A PDF that opens without a password, however it limits printing, is checked.
 - One status chosen on the last step: every document the route accepts is released at it, shown fixed on the verdict
   form ("the route releases at IFC, not IFA"), nothing to choose or confirm; several: the decider chooses. "It stays at
   <status>" is asked only when what the revision carries is one the step may give (owner: a verdict was blocked by a
@@ -1784,8 +1792,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   through `DocumentQueries.Visible`.
 - **What another organization reads of a document** (security review, Standard-changes §82): `DocumentQueries.Visible` says
   which documents; `Documents/OutsideReading.cs` says what of them. Of one of ours, only the revisions a transmittal
-  carried to them (`SentRevisions`): the document's view, `/documents/many`, `/revisions/{id}`, every file and preview
-  (`ReadableAsync`), and its context (no review, history only of those revisions, only the transmittals they may open,
+  carried to them (`SentRevisions`), and of those only the files of their newest submission, never a draft replaced
+  while it was prepared, nor what was said of it (`OutsideReading.AsSent`): the document's view, `/documents/many`,
+  `/revisions/{id}`, every file and preview (`ReadableAsync`), and its context (no review, history only of those revisions, only the transmittals they may open,
   only supplier packages shared with them; none of its recorded points, "as it stood", which hold every revision). Of their own (originator), everything. A review only of their own document
   once decided, or with a step they answer (`OutsideReading.Reviews`: the review, `/reviews/many`, the reviews list);
   hand-overs are ours only. The register and `/documents` read one of ours at its newest revision sent to them, no
@@ -1817,7 +1826,25 @@ a screen only words it. A new rule goes in the backend, never in a page.
   filed by hand only, **Fill the package** on a supplier's package (`POST /packages/{id}/fill`, PACKAGE_FILLED).
 - **Files are never read** (owner: "never ever read the files, ever ever, forbidden forever, unless I get back on that
   with a client's request"): search is a document's number and title only; text extraction and OCR cannot be switched
-  on (`ExtractionModes.Forbidden`, CONTENT_NOT_READ).
+  on (`ExtractionModes.Forbidden`, CONTENT_NOT_READ). The extraction code stays, locked off (owner: "it may be helpful
+  for future AI integration").
+- **Files are kept encrypted** (owner, security review: "those files should be PROTECTED"): every file is sealed by the
+  app before it is stored (`Documents/FileCipher.cs`: a key of its own per file, kept in its header under the
+  installation's key, AES-256-GCM, pieces of 64 KiB each checked, the last marked), so the store, its disk and every
+  copy hold only sealed bytes; the key lives apart (`Storage:EncryptionKey`, FILES_KEY in .env, made by deploy/init-env;
+  lost, nothing can be read again: kept also in a password manager or a safe). `FileStorage` seals on keeping an upload
+  (in from its waiting place, through a temporary file), on putting what the app makes (stamped copies, previews,
+  lists, replies by email) and opens on every read; a copy in the store keeps its seal; files kept before stay as they
+  were and are read so. **Nobody downloads from the store** (no signed download link any more): the bytes come through
+  `GET /files/{id}/download`, which checks who asks (`ReadableAsync`) and opens them, and the screens pass them on
+  (`app/api/files/[id]/route.ts`). Uploads still go to the waiting place by a signed link, through the screens' server.
+- **Each key holds no more than it needs** (owner, security review): the app's storage key reads, adds and removes files
+  and never administers the store (no bucket made or removed); the copier's only reads (`STORAGE_COPIER_KEY` /
+  `STORAGE_COPIER_SECRET`, SeaweedFS identities in compose). The app holds no key to the backup copy.
+- **Converters on a closed network** (owner, security review): the DWG reader, LibreOffice (Gotenberg) and Tika sit on
+  the compose network `converters` (internal: no way out), reached only by the API and the worker, never reaching the
+  database or the store. The files' store and their copier are pinned to a version (`seaweedfs:4.48@…`,
+  `rclone:1.75.2@…`), changed only when we choose.
 - **Downloads are prepared in the background** (owner: "people should expect big files to take time"): every link or
   GET form to an export, a list or a report's Excel is fetched by `components/downloads.tsx` while the person works, a
   tray saying so; from code, `startDownload(href, label)`. Exports match their lines in one pass (lookups, never a scan
@@ -1845,8 +1872,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   just happened"): the outbox's relay runs in every process and sleeps until an act of that process, once committed with
   a message, rings it (`OutboxWake`; on start it sends what was left waiting, a failure tries again after 5 seconds);
   the checks run only when someone runs them (`CheckScheduler.RequestAsync`, no daily job); each stored file is copied to the
-  second place as it is stored (`Documents/FileBackup.cs`, from `FileStorage` keeping, putting or copying a file; never
-  overwriting, never deleting; `Backup__*`, the same place as file-backup), and file-backup's full comparison runs once a
+  second place as it is stored, by the copier, never the app (owner, security review): `FileStorage` keeping, putting or
+  copying a file says its key on a Valkey list (`Documents/FileBackup.cs`, `files:to-copy`), the copier waits on it
+  (`deploy/file-backup`, its own image: rclone with Valkey's client, both pinned) and copies that one file, never
+  overwriting, never deleting, putting it back on the list when a copy fails; its full comparison runs once a
   week as the safety net (`FILE_BACKUP_EVERY` 604800; alert past 8 days); notices fall on days written
   by what changed them (above). What stays timed is a fallback, never the way to learn of a change: access kept 15 minutes at
   most, the search index's hourly catch-up (OpenSearch only, off by default), a page re-reading itself

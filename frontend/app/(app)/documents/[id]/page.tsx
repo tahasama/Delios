@@ -48,7 +48,7 @@ import { Timeline } from "@/components/timeline";
 import { openCopy } from "@/lib/documents/copies";
 import { StampPending } from "@/components/stamp-pending";
 import { FilesChecking } from "@/components/files-checking";
-import { checking } from "@/lib/documents/checking";
+import { checking, refused } from "@/lib/documents/checking";
 import { FilePreview } from "@/components/file-preview";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, Download, ExternalLink, FileText, Send, X, FileDown } from "lucide-react";
@@ -768,6 +768,9 @@ export default async function DocumentDetailPage({
             content: (<>
               {pdf && stampWaited ? <StampPending /> : null}
               {previewed && checking(previewed.files).length ? <FilesChecking names={checking(previewed.files)} /> : null}
+              {previewed ? refused(previewed.files).map((f) => (
+                <p key={f.name} className="px-5 py-2 text-[11px] text-rose-700 sm:px-6 dark:text-rose-300">{f.name} was refused: {f.why} Replace it in Edit rev {previewed.value}.</p>
+              )) : null}
               <FilePreview pdf={pdf} source={shownSource} title={`${doc.docNumber} rev ${previewed?.value ?? ""}`} admin={isAdmin(user)} readers={await readersOn(ctx)} viewingNote={(await cookies()).get(PREF.viewingNote)?.value !== "0"} pdfDark={(await cookies()).get(PREF.pdfDark)?.value === "1"}
                 empty={(
                   <div className="grid h-48 place-items-center p-6 text-center">

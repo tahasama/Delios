@@ -6,8 +6,11 @@
 #   RCLONE_CONFIG_SOURCE_*   the primary bucket (S3-compatible)
 #   RCLONE_CONFIG_TARGET_*   the second location (another provider or region; a volume in development)
 #   SOURCE_PATH, TARGET_PATH bucket and path on each, FILE_BACKUP_EVERY seconds (default 604800, a week)
-# Each file is already copied by the app as it is stored (Documents/FileBackup.cs): this full comparison is the
-# safety net that copies what a stop lost (owner: no timer to find out what is new).
+# Each file is copied as it is stored: the app says its key on a Valkey list (Documents/FileBackup.cs, files:to-copy)
+# and the copier waits on it (owner: no timer to find out what is new). The app holds no key to the copy: only this
+# copier reads the store (with a key that may only read) and writes the copy. The full comparison is the safety net
+# that copies what a stop lost. What is copied is sealed by the app (Documents/FileCipher.cs): the copy reads as nothing.
+#   VALKEY_HOST, VALKEY_PORT  where the list is (valkey:6379)
 set -u
 METRICS=/var/lib/delios-metrics
 EVERY=${FILE_BACKUP_EVERY:-604800}
@@ -29,6 +32,21 @@ delios_file_backup_objects $files
 M
   mv "$METRICS/file-backup.prom.tmp" "$METRICS/file-backup.prom"
 }
+
+# Each file as it is stored: wait on the list, copy that one file (never over one already there), and put it back on
+# the list when the copy fails, to try again a little later.
+copy_as_stored() {
+  while true; do
+    key=$(valkey-cli -h "${VALKEY_HOST:-valkey}" -p "${VALKEY_PORT:-6379}" --raw BRPOP files:to-copy 0 2>/dev/null | sed -n 2p)
+    if [ -z "$key" ]; then sleep 5; continue; fi
+    if ! rclone copyto "source:${SOURCE_PATH}/$key" "target:${TARGET_PATH}/$key" --immutable --checksum --log-level NOTICE; then
+      valkey-cli -h "${VALKEY_HOST:-valkey}" -p "${VALKEY_PORT:-6379}" LPUSH files:to-copy "$key" >/dev/null 2>&1
+      echo "file-backup: copying $key failed; trying again shortly" >&2
+      sleep "$RETRY"
+    fi
+  done
+}
+copy_as_stored &
 
 while true; do
   if rclone copy "source:${SOURCE_PATH}" "target:${TARGET_PATH}" --immutable --checksum --transfers 8 --log-level NOTICE; then

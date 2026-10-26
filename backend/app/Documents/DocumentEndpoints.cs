@@ -155,7 +155,7 @@ public static class DocumentEndpoints
         return Results.Ok(view with
         {
             AboveSomeClearance = aboveSome,
-            Revisions = view.Revisions.Where(r => readable is null || readable.Contains(r.Id)).Select(r =>
+            Revisions = view.Revisions.Where(r => readable is null || readable.Contains(r.Id)).Select(r => readable is null ? r : OutsideReading.AsSent(r)).Select(r =>
             {
                 var ruling = decided.FirstOrDefault(d => d.RevisionId == r.Id);
                 return r with
@@ -216,7 +216,7 @@ public static class DocumentEndpoints
             .AsSplitQuery().ToListAsync(cancellationToken);
         var sent = access.IsInternal ? null : (await OutsideReading.SentRevisions(db, access).Distinct().ToListAsync(cancellationToken)).ToHashSet();
         return Results.Ok(found.Select(View).Select(v => sent is null || OutsideReading.Whole(access, v.Originator) ? v
-            : v with { Revisions = v.Revisions.Where(r => sent.Contains(r.Id)).ToList() }).ToList());
+            : v with { Revisions = v.Revisions.Where(r => sent.Contains(r.Id)).Select(OutsideReading.AsSent).ToList() }).ToList());
     }
 
     /// <summary>
@@ -348,23 +348,24 @@ public static class DocumentEndpoints
     }
 
     /// <summary>
-    /// GET /files/{fileId}/download: returns a short-lived download link for a file that passed scanning,
-    /// if the caller may see its document. Every download is written to the audit trail.
+    /// GET /files/{fileId}/download: the file's own bytes, opened from their seal (FileCipher), for whoever may see its
+    /// document, once it passed scanning. No link to the store is ever given: the store holds only sealed bytes. Every
+    /// download is written to the audit trail and watched (DownloadWatch).
     /// </summary>
     private static async Task<IResult> DownloadAsync(
         Guid fileId, HttpContext http, DeliosDbContext db, DocumentService documents, Transmittals.TransmittalService transmittals,
-        FileStorage storage, AuditLog audit, CancellationToken cancellationToken)
+        FileStorage storage, AuditLog audit, Notifications.Notifier notifier, NodaTime.IClock clock, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         var (file, refused) = await ReadableAsync(fileId, access, db, transmittals, cancellationToken);
         if (file is null) return refused!;
 
-        var (url, expires) = storage.PresignDownload(file.ObjectKey, file.Name);
-        // Kept where the organization keeps reading (Settings.Tracking).
-        if (await Settings.Tracking.KeepsReadingAsync(db, cancellationToken))
-            await audit.WriteAsync(http.User.Actor(), "DOWNLOAD", "StoredFile", file.Id, file.Name,
+        // Always kept (owner: the files are protected, whatever is kept about reading), and watched (DownloadWatch).
+        await audit.WriteAsync(http.User.Actor(), "DOWNLOAD", "StoredFile", file.Id, file.Name,
             projectId: access.Project.Id, cancellationToken: cancellationToken);
-        return Results.Ok(new DownloadTicket(url, expires.ToDateTimeOffset()));
+        await DownloadWatch.CountAsync(db, audit, notifier, clock, http.User.Actor(), access.Project.Id, cancellationToken);
+        http.Response.ContentLength = file.Size;
+        return Results.File(await storage.OpenReadAsync(file.ObjectKey, cancellationToken), file.ContentType, file.Name);
     }
 
     /// <summary>
@@ -382,7 +383,9 @@ public static class DocumentEndpoints
             ? await DocumentQueries.Visible(db, access).Where(d => d.Id == documentId).Select(d => d.Originator).ToListAsync(cancellationToken) is [var originator]
                 // Another organization opens, of one of our documents, only the files of a revision sent to it.
                 && (OutsideReading.Whole(access, originator)
-                    || (file.RevisionId is { } revisionId && await OutsideReading.SentRevisions(db, access).AnyAsync(id => id == revisionId, cancellationToken)))
+                    || (file.RevisionId is { } revisionId && await OutsideReading.SentRevisions(db, access).AnyAsync(id => id == revisionId, cancellationToken)
+                        // Of that revision, the files that stand: never a draft replaced before it went (OutsideReading.AsSent).
+                        && await db.Revisions.AnyAsync(r => r.Id == revisionId && r.Submission == file.Submission, cancellationToken)))
             : await transmittals.Visible(access).AnyAsync(t => t.ProofFileId == file.Id
                 || t.Items.Any(i => i.Id == file.TransmittalItemId), cancellationToken));
         if (file is null || !visible) return (null, Problems.NotFound("FILE_NOT_FOUND", "No such file."));

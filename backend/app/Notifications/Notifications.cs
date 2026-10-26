@@ -307,13 +307,10 @@ public sealed class EmailSender(
             {
                 var files = await db.StoredFiles.AsNoTracking()
                     .Where(f => email.FileIds.Contains(f.Id) && f.Status == Documents.FileStatuses.Clean).ToListAsync(cancellationToken);
+                // Read from storage as it is sent, never held whole in memory (a drawing may weigh hundreds of MB); the
+                // message disposes each stream with itself.
                 foreach (var file in files)
-                {
-                    var content = new MemoryStream();
-                    await using (var stored = await storage.OpenReadAsync(file.ObjectKey, cancellationToken)) await stored.CopyToAsync(content, cancellationToken);
-                    content.Position = 0;
-                    mail.Attachments.Add(new System.Net.Mail.Attachment(content, file.Name, file.ContentType));
-                }
+                    mail.Attachments.Add(new System.Net.Mail.Attachment(await storage.OpenReadAsync(file.ObjectKey, cancellationToken), file.Name, file.ContentType));
             }
             await transport.SendAsync(mail, settings, cancellationToken);
             email.State = EmailStates.Sent;
