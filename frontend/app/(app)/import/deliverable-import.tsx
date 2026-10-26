@@ -111,6 +111,8 @@ export function DeliverableImport({ fromDocument }: { fromDocument?: { label: st
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<ListView | null>(null);
   const [busy, run] = useTransition();
+  // Which lines show (owner: as the Schedule's check): all, or those of one outcome.
+  const [only, setOnly] = useState<string>("ALL");
   const [seenRead, setSeenRead] = useState<typeof read>(undefined);
 
   // A new reading of the file starts the second page afresh.
@@ -126,7 +128,7 @@ export function DeliverableImport({ fromDocument }: { fromDocument?: { label: st
   const nameOf = (key: string) => form.flatMap((t) => t.fields).find((f) => f.key === key)?.label ?? key;
   const onList = (lines ?? []).filter((l) => !off.has(l.at));
   // Every line of the list is shown, those that change nothing too (owner): the person sees the whole file.
-  const shown = onList;
+  const shown = onList.filter((l) => only === "ALL" || said.get(l.at)?.outcome === only);
   const same = onList.filter((l) => said.get(l.at)?.outcome === "SAME").length;
   const problems = onList.filter((l) => said.get(l.at)?.outcome === "PROBLEM");
   const registering = onList.filter((l) => said.get(l.at)?.outcome === "NEW").length;
@@ -221,10 +223,14 @@ export function DeliverableImport({ fromDocument }: { fromDocument?: { label: st
         <div className="space-y-3 border-t border-line px-5 py-4 sm:px-6" aria-live="polite">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-sm font-semibold text-slate-800">What this list will do</h2>
-            <p className="text-xs text-slate-600">
-              {plural(registering, "new document")} · {plural(updating, "update")} · {same} no change · {plural(problems.length, "problem")}
-              {busy ? " · checking…" : ""}
-            </p>
+            <div className="seg" aria-label="Which lines">
+              {([["ALL", "All", onList.length], ["NEW", "New document", registering], ["UPDATE", "Update", updating], ["SAME", "No change", same], ["PROBLEM", "Problem", problems.length]] as const).map(([key, word, n]) => (
+                <button key={key} type="button" aria-pressed={only === key} className="segment" onClick={() => setOnly(key)}>
+                  {word} <span className="tabular-nums text-slate-500">{n.toLocaleString("en-GB")}</span>
+                </button>
+              ))}
+              {busy ? <span className="ml-2 self-center text-xs text-slate-500">checking…</span> : null}
+            </div>
           </div>
 
 

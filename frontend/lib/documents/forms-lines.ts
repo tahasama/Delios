@@ -6,7 +6,7 @@ import { isAdmin, isReadOnly } from "@/lib/core/auth";
 import { parseCsv, toObjects } from "@/lib/core/csv";
 import { api, apiFetch, problemOf, projectPath, refusal } from "@/lib/client";
 import { sheetRefusal } from "@/lib/documents/sheet-check";
-import { getSet, getSets } from "@/lib/settings/config";
+import { getSet, getSets, organizationSet, organizationSets } from "@/lib/settings/config";
 import { propFieldsFor } from "@/lib/settings/set-props";
 import { adminFunctions, adminParties, adminUsers } from "@/lib/settings/api-admin";
 import { matrixRows, planChanges, readRows } from "@/lib/settings/matrix-read";
@@ -22,7 +22,8 @@ import { releasedFile } from "@/lib/actions/list-files";
  * very same endpoints, undone (`dry`), so a line passes exactly when writing it would.
  */
 
-export type LinesKind = "people" | "matrix" | "sets";
+/** "org-sets": the organization's own lists, the default of every project (its Types & sets card, an administrator's). */
+export type LinesKind = "people" | "matrix" | "sets" | "org-sets";
 export type LineField = {
   key: string; label: string; kind: "text" | "choice"; values?: { code: string; label: string }[]; required?: boolean;
   /** What identifies the line: shown, never changed. */
@@ -49,9 +50,13 @@ export type LinesAnswer = {
 type Ctx = Awaited<ReturnType<typeof requireScope>>;
 type Batch = { lines: { at: string; ok: boolean; problem: string | null; value: Record<string, unknown> | null }[]; written: boolean };
 
-const FORMATS: Record<LinesKind, RegExp> = { people: /\.csv$/i, matrix: /\.csv$/i, sets: /\.xlsx$/i };
-const FORMAT_WORDS: Record<LinesKind, string> = { people: "a CSV, as the template", matrix: "the matrix as downloaded (.csv)", sets: "the workbook (.xlsx) as downloaded" };
-const SOURCE_OF: Record<LinesKind, ListSourceKind> = { people: "TEAM", matrix: "MATRIX", sets: "LISTS" };
+const FORMATS: Record<LinesKind, RegExp> = { people: /\.csv$/i, matrix: /\.csv$/i, sets: /\.xlsx$/i, "org-sets": /\.xlsx$/i };
+const FORMAT_WORDS: Record<LinesKind, string> = { people: "a CSV, as the template", matrix: "the matrix as downloaded (.csv)", sets: "the workbook (.xlsx) as downloaded", "org-sets": "the workbook (.xlsx) as downloaded" };
+const SOURCE_OF: Record<LinesKind, ListSourceKind | null> = { people: "TEAM", matrix: "MATRIX", sets: "LISTS", "org-sets": null };
+const orgLevel = (kind: LinesKind) => kind === "org-sets";
+/** The lists and their values at the level imported: the project's, or the organization's. */
+const setsAt = (kind: LinesKind) => (orgLevel(kind) ? organizationSets() : getSets());
+const valuesAt = (kind: LinesKind, set: string) => (orgLevel(kind) ? organizationSet(set) : getSet(set));
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`;
 const clean = (v: string | undefined | null) => (v ?? "").trim();
 
@@ -60,6 +65,7 @@ function refusedFor(ctx: Ctx, kind: LinesKind): string | null {
   if (isReadOnly(ctx.user)) return "You can read this project, not change it, so you cannot import.";
   if (kind === "people" && !ctx.can("CONFIGURE") && !ctx.can("CONTROL")) return "Adding people is the control function's, or an administrator's. Ask one of them.";
   if (kind === "matrix" && !isAdmin(ctx.user)) return "Only an administrator changes the distribution matrix. Ask one of them.";
+  if (kind === "org-sets" && !isAdmin(ctx.user)) return "An administrator changes the organization's lists.";
   return null;
 }
 
@@ -101,7 +107,7 @@ async function linesOf(kind: LinesKind, file: File): Promise<{ lines: Line[] } |
   const ExcelJS = (await import("exceljs")).default;
   const book = new ExcelJS.Workbook();
   await book.xlsx.load(await file.arrayBuffer());
-  const sets = new Set((await getSets()).map((one) => one.key));
+  const sets = new Set((await setsAt(kind)).map((one) => one.key));
   const lines: Line[] = [];
   for (const sheet of book.worksheets) {
     const set = sheet.name.trim();
@@ -144,7 +150,7 @@ async function fieldsOf(kind: LinesKind): Promise<LineField[]> {
       ...functions.map((f) => ({ key: `fn:${f.code}`, label: f.code, kind: "choice" as const, values: letters, note: f.name })),
     ];
   }
-  const sets = await getSets();
+  const sets = await setsAt(kind);
   const fields: LineField[] = [
     { key: "set", label: "List", kind: "text", locked: true },
     { key: "code", label: "Code", kind: "text", required: true },
@@ -243,15 +249,16 @@ async function matrix(ctx: Ctx, lines: Line[], write: boolean): Promise<{ checks
 }
 
 /** The Settings lists: each value against the project's list as it reads now, then every value written as one. */
-async function sets(ctx: Ctx, lines: Line[], write: boolean): Promise<{ checks: LineCheck[]; written: boolean }> {
+async function sets(ctx: Ctx, lines: Line[], write: boolean, kind: LinesKind = "sets"): Promise<{ checks: LineCheck[]; written: boolean }> {
   type Standing = { key: string; own: boolean; free: boolean };
-  const standing = await api<{ mayChange: boolean; lists: Standing[] }>(projectPath(ctx, "/lists"));
-  const titles = new Map((await getSets()).map((one) => [one.key, one.title] as const));
+  // The organization's own lists are never fixed for it: only a project reads a list the organization keeps.
+  const standing = orgLevel(kind) ? { mayChange: true, lists: [] as Standing[] } : await api<{ mayChange: boolean; lists: Standing[] }>(projectPath(ctx, "/lists"));
+  const titles = new Map((await setsAt(kind)).map((one) => [one.key, one.title] as const));
   const fixed = new Set(standing.lists.filter((one) => !one.own && !one.free).map((one) => one.key));
   const existing = new Map<string, Map<string, { label: string; status: string; props: Record<string, unknown> }>>();
   for (const set of new Set(lines.map((l) => l.values.set ?? ""))) {
     if (!titles.has(set)) continue;
-    existing.set(set, new Map((await getSet(set)).map((one) => [one.code, { label: one.label, status: one.status, props: one.props }] as const)));
+    existing.set(set, new Map((await valuesAt(kind, set)).map((one) => [one.code, { label: one.label, status: one.status, props: one.props }] as const)));
   }
   const seen = new Map<string, number>();
   for (const l of lines) { const k = `${l.values.set}:${l.values.code}`; seen.set(k, (seen.get(k) ?? 0) + 1); }
@@ -294,7 +301,7 @@ async function sets(ctx: Ctx, lines: Line[], write: boolean): Promise<{ checks: 
     return { at: l.at, outcome: "UPDATE", title, changes, problems: [] };
   });
   if (!sent.length || (write && checks.some((c) => c.outcome === "PROBLEM"))) return { checks, written: false };
-  const answer = await batch(projectPath(ctx, "/lists/values/many"), { values: sent, dry: !write });
+  const answer = await batch(orgLevel(kind) ? "/api/admin/lists/values/many" : projectPath(ctx, "/lists/values/many"), { values: sent, dry: !write });
   for (const one of answer.lines.filter((l) => !l.ok)) {
     const check = checks.find((c) => c.at === one.at)!;
     check.outcome = "PROBLEM"; check.problems = [one.problem ?? "Refused."];
@@ -303,7 +310,7 @@ async function sets(ctx: Ctx, lines: Line[], write: boolean): Promise<{ checks: 
 }
 
 async function run(ctx: Ctx, kind: LinesKind, lines: Line[], write: boolean) {
-  return kind === "people" ? people(ctx, lines, write) : kind === "matrix" ? matrix(ctx, lines, write) : sets(ctx, lines, write);
+  return kind === "people" ? people(ctx, lines, write) : kind === "matrix" ? matrix(ctx, lines, write) : sets(ctx, lines, write, kind);
 }
 
 /** The file read into lines and checked; nothing written. From a file chosen, or (`fromDocument`) its register document's released revision. */
@@ -316,7 +323,9 @@ export async function readLinesAction(_prev: LinesAnswer | undefined, formData: 
   let file = formData.get("file") as File | null;
   let from: LinesAnswer["from"] = null;
   if (formData.get("fromDocument") === "1") {
-    const got = await releasedFile(ctx, SOURCE_OF[kind], FORMATS[kind]);
+    const source = SOURCE_OF[kind];
+    if (!source) return { error: "The organization's lists come from a workbook only." };
+    const got = await releasedFile(ctx, source, FORMATS[kind]);
     if ("error" in got) return { error: got.error };
     file = got.file; from = got.from;
   }
@@ -357,7 +366,7 @@ export async function writeLinesAction(kind: LinesKind, lines: Line[], from: Lin
     if (first.checks.some((c) => c.outcome === "PROBLEM")) return { checks: first.checks, written: false, error: "Nothing was written: some lines have problems. Correct them or take them off the list." };
     const { checks, written } = await run(ctx, kind, lines, true);
     if (!written) return { checks, written: false, error: "Nothing was written: a line was refused while writing. See it below." };
-    await api(projectPath(ctx, `/lists/sources/${SOURCE_OF[kind]}/brought`), {
+    if (SOURCE_OF[kind]) await api(projectPath(ctx, `/lists/sources/${SOURCE_OF[kind]}/brought`), {
       body: from ? { from: "DOCUMENT", revisionId: from.revisionId, label: from.label } : { from: "UPLOAD", revisionId: null, label: null },
     }).catch(() => undefined);
     revalidatePath("/", "layout");

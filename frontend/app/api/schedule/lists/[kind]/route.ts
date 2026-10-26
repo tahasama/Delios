@@ -12,12 +12,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   try {
     read = await api(projectPath(scope, `/schedule/lists/${encodeURIComponent(kind)}/source`));
   } catch (e) {
-    if (e instanceof ApiProblem) return NextResponse.json({ error: e.message }, { status: e.status });
+    // Said in plain words, never as data (the person followed a link): nothing to download for this list yet.
+    if (e instanceof ApiProblem) return said(e.status === 404 ? "There is no file to download for this list yet: it was not read from a file." : e.message, e.status);
     throw e;
   }
   if (read.fileId) return NextResponse.redirect(new URL(`/api/files/${read.fileId}?dl=1`, req.url));
   const stored = await apiFetch(projectPath(scope, `/schedule/lists/${encodeURIComponent(kind)}/source/file`));
-  if (!stored.ok || !stored.body) return NextResponse.json({ error: "The file could not be found." }, { status: stored.status });
+  if (!stored.ok || !stored.body) return said("The file it was read from could not be found.", stored.status || 404);
   const plain = read.name.replace(/[\r\n"\\]/g, "_").replace(/[^\x20-\x7e]/g, "_");
   return new NextResponse(stored.body, {
     headers: {
@@ -29,3 +30,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     },
   });
 }
+
+const said = (words: string, status: number) =>
+  new NextResponse(words, { status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });

@@ -81,6 +81,7 @@ public static class ProjectLists
         organization.MapPut("/{set}", UpdateListAsync);
         organization.MapDelete("/{set}", DeleteListAsync);
         organization.MapPut("/{set}/values", ValueAsync);
+        organization.MapPost("/values/many", ValuesAsync);
         organization.MapDelete("/{set}/values/{code}", DeleteValueAsync);
         organization.MapPost("/{set}/sets", CreateSetAsync);
         organization.MapPut("/{set}/sets/{setId:guid}", UpdateSetAsync);

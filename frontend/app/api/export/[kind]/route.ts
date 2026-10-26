@@ -1,3 +1,4 @@
+import { isAdmin } from "@/lib/core/auth";
 import { NextResponse } from "next/server";
 import { getScope } from "@/lib/core/scope";
 import { getSessionUser } from "@/lib/core/auth";
@@ -189,11 +190,14 @@ async function extract(req: Request, { params }: { params: Promise<{ kind: strin
   } else if (kind === "template-sets") {
     // Every published list, a tab each, so one download covers the lot.
     const blank = new URL(req.url).searchParams.get("blank") === "1";
-    const book = await buildSetsWorkbook(ctx, { blank });
+    // The organization's own lists (its Types & sets card): an administrator's only.
+    const organization = new URL(req.url).searchParams.get("level") === "organization";
+    if (organization && !isAdmin(ctx.user)) return NextResponse.json({ error: "An administrator downloads the organization's lists." }, { status: 403 });
+    const book = await buildSetsWorkbook(ctx, { blank, organization });
     return new NextResponse(new Uint8Array(book), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${blank ? "settings-lists-template" : "settings-lists"}-${stamp.toISOString().slice(0, 10)}.xlsx"`,
+        "Content-Disposition": `attachment; filename="${organization ? "organization-" : ""}${blank ? "settings-lists-template" : "settings-lists"}-${stamp.toISOString().slice(0, 10)}.xlsx"`,
       },
     });
   } else if (kind === "template-deliverables") {

@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { Download } from "lucide-react";
 import type { ListSource } from "@/lib/actions/list-sources";
+import { ListSourceCard } from "@/components/list-source-card";
 import { DeliverableImport } from "./deliverable-import";
 import { LinesImport } from "./lines-import";
 
@@ -143,20 +143,7 @@ export function BulkImportForm({ initialKind, admin, keeps, sources }: { initial
           </div>
 
           {/* Where the list comes from (owner): its register document, chosen in the register by the control function, or a file. */}
-          {source ? (
-            <div className="space-y-1 rounded-md px-3 py-2.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
-              <p>
-                <span className="font-semibold">Its register document: </span>
-                {doc ? <Link href={`/documents/${doc.id}`} className="font-mono font-semibold text-brand-ink hover:underline">{doc.number}</Link> : <span className="text-slate-500">none chosen</span>}
-                {doc ? <span className="text-slate-500">{doc.releasedValue ? ` · released: rev ${doc.releasedValue}` : " · nothing released yet"}</span> : null}
-                {source.mayChoose ? <> · <Link href={`/documents?pick=${encodeURIComponent(`src:${source.kind}`)}`} className="font-semibold text-link hover:underline">{doc ? "Choose another in the register" : "Choose it in the register"}</Link></> : null}
-              </p>
-              {last ? (
-                <p><span className="font-semibold">Brought in last from: </span>{last.from === "DOCUMENT" ? last.label ?? "its register document" : "a file uploaded"}{last.at ? `, ${new Date(last.at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : ""}{last.byName ? ` by ${last.byName}` : ""}. The latest stands.</p>
-              ) : null}
-              {newer && fromDocument ? <p className="text-amber-800">{fromDocument.label} was released since: bring it in below.</p> : null}
-            </div>
-          ) : null}
+          {source ? <ListSourceCard source={source} newer={newer && fromDocument ? `${fromDocument.label} was released since it was last brought in: bring it in below.` : null} /> : null}
         </li>
 
         <li>{kind === "deliverables" ? <DeliverableImport key={kind} fromDocument={fromDocument} /> : <LinesImport key={kind} kind={kind as "people" | "matrix" | "sets"} fromDocument={fromDocument} />}</li>

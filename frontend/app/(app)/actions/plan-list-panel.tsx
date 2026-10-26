@@ -2,7 +2,7 @@ import { Select } from "@/components/select";
 import Link from "next/link";
 import { fmtDate } from "@/lib/core/utils";
 import { Field, inputCls } from "@/components/ui";
-import { chooseHref } from "@/lib/actions/list-sources";
+import { ListSourceCard } from "@/components/list-source-card";
 import { CheckedListForm } from "./checked-list-form";
 import type { PlanList } from "@/lib/actions/plan-lists";
 import { ConfirmOrWhy } from "./confirm-or-why";
@@ -88,8 +88,9 @@ export function PlanListPanel({ list, control, switcher, projectCode }: { list: 
 
       {list.documents.length ? (
         <>
+          {/* The card above names the document; each line here only says what it does not (a later revision on its way, a file that differs). */}
           <ul className="mt-4 space-y-1.5 text-xs leading-5 text-slate-600">
-            {list.documents.map((doc) => (
+            {list.documents.filter((doc) => !list.source?.document || doc.pending || doc.differs).map((doc) => (
               <li key={doc.id}>
                 <Link href={`/documents/${doc.id}`} className="font-mono font-semibold text-brand-ink hover:underline">{doc.number}</Link>
                 <span className="text-slate-500">
@@ -163,37 +164,29 @@ function SourceLine({ list, switcher }: { list: PlanList; switcher: boolean }) {
   if (!source) return null;
   const doc = source.document;
   const last = source.last;
-  const lastSaid = last
-    ? `${last.from === "DOCUMENT" ? `its register document${last.label ? `, ${last.label}` : ""}` : `a file uploaded${last.label ? ` (${last.label})` : ""}`}${last.at ? `, ${fmtDate(new Date(last.at))}` : ""}${last.byName ? ` by ${last.byName}` : ""}`
-    : null;
   const others = [
     ...(doc?.releasedValue && last?.from !== "DOCUMENT" ? [{ value: "DOCUMENT", label: `Its register document, ${doc.number} rev ${doc.releasedValue}` }] : []),
     ...(last?.from === "DOCUMENT" || (!last && doc) ? [{ value: "UPLOAD", label: "The file last uploaded here" }] : []),
   ];
   return (
-    <div className="mt-4 space-y-1.5 rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
-      <p>
-        <span className="font-semibold">Its register document: </span>
-        {doc ? <Link href={`/documents/${doc.id}`} className="font-mono font-semibold text-brand-ink hover:underline">{doc.number}</Link> : <span className="text-slate-500">none chosen</span>}
-        {doc?.chosenByApp ? <span className="text-amber-800"> · found by its type, not chosen yet</span> : null}
-        {source.mayChoose ? <> · <Link href={chooseHref(source.kind, "SCHEDULE")} className="font-semibold text-link hover:underline">{doc && !doc.chosenByApp ? "Choose another in the register" : "Choose it in the register"}</Link></> : null}
-      </p>
-      {lastSaid ? <p><span className="font-semibold">Read last from: </span>{lastSaid}. The latest read stands.</p> : null}
-      {switcher && others.length ? (
-        <details className="pt-1">
-          <summary className="cursor-pointer font-semibold text-link">Read it again from the other source</summary>
-          <CheckedListForm hidden={{ kind: list.kind, mode: "switch" }} ask="Check what it changes" className="mt-3">
-            <Field label="Read it from" required>
-              <Select name="from" required defaultValue={others[0].value} className="plain w-full">
-                {others.map((one) => <option key={one.value} value={one.value}>{one.label}</option>)}
-              </Select>
-            </Field>
-            <Field label="Why" required hint="kept with the read">
-              <input name="reason" required className={inputCls} placeholder="e.g. The direct upload was a draft; the released revision is the reference" />
-            </Field>
-          </CheckedListForm>
-        </details>
-      ) : null}
+    <div className="mt-4">
+      <ListSourceCard source={source}>
+        {switcher && others.length ? (
+          <details>
+            <summary className="cursor-pointer text-xs font-semibold text-link">Read it again from the other source</summary>
+            <CheckedListForm hidden={{ kind: list.kind, mode: "switch" }} ask="Check what it changes" className="mt-3">
+              <Field label="Read it from" required>
+                <Select name="from" required defaultValue={others[0].value} className="plain w-full">
+                  {others.map((one) => <option key={one.value} value={one.value}>{one.label}</option>)}
+                </Select>
+              </Field>
+              <Field label="Why" required hint="kept with the read">
+                <input name="reason" required className={inputCls} placeholder="e.g. The direct upload was a draft; the released revision is the reference" />
+              </Field>
+            </CheckedListForm>
+          </details>
+        ) : null}
+      </ListSourceCard>
     </div>
   );
 }

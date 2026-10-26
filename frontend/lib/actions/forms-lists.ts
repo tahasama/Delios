@@ -14,7 +14,12 @@ type Result = { error?: string; ok?: string; link?: { href: string; label: strin
 /** A line of what a list would change: an action, or a discipline's need, before and after. */
 export type ListChangeLine = { key: string; outcome: "NEW" | "UPDATE" | "REMOVED" | "SAME"; title: string; changes: { field: string; was: string | null; now: string | null }[] };
 /** A list checked: what it would change and why it cannot be read; nothing written. */
-export type ListCheck = { kind: string; title: string; source: string | null; lines: ListChangeLine[]; problems: string[]; summary: string | null; new: number; updates: number; removed: number; same: number };
+/** A row of a disciplines or requirements file: its line, what it does, and why not. */
+export type ListRow = { line: number; outcome: "NEW" | "UPDATE" | "SAME" | "PROBLEM" | "PENDING"; title: string; changes: { field: string; was: string | null; now: string | null }[]; problems: string[] };
+/** The file as read: every row, the row its headings are on, and each row under them. */
+export type ListSheet = { cells: string[][]; headerAt: number; headings: string[]; rows: ListRow[]; inherited?: number[] | null };
+export type ListCheck = { kind: string; title: string; source: string | null; lines: ListChangeLine[]; problems: string[]; summary: string | null; new: number; updates: number; removed: number; same: number;
+  sheet?: ListSheet | null };
 
 /** The placeholders a requirements list registered, found in the register by their numbers. */
 const placeholders = (numbers: string[] | undefined) => numbers?.length

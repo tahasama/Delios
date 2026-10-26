@@ -108,11 +108,14 @@ export function Tip({
   lead,
   children,
   steps,
+  row,
   className,
 }: {
   lead?: React.ReactNode;
   children?: React.ReactNode;
   steps?: { label: React.ReactNode; hint?: React.ReactNode; href?: string; current?: boolean }[];
+  /** The steps side by side, in order, as a path (owner: "horizontal, like steps"), not one under the other. */
+  row?: boolean;
   className?: string;
 }) {
   return (
@@ -128,7 +131,7 @@ export function Tip({
         </span>
       </p>
       {steps?.length ? (
-        <ol className="mt-2 space-y-1 pl-[1.875rem]">
+        <ol className={row ? "mt-2 grid gap-2 pl-[1.875rem] sm:grid-cols-2 lg:grid-flow-col lg:auto-cols-fr lg:grid-cols-none" : "mt-2 space-y-1 pl-[1.875rem]"}>
           {steps.map((step, index) => {
             const body = (
               <>

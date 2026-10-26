@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import type { Tenant } from "@/lib/core/tenant";
 import { propFieldsFor, type PropField } from "@/lib/settings/set-props";
-import { getSet, getSets } from "@/lib/settings/config";
+import { getSet, getSets, organizationSet, organizationSets } from "@/lib/settings/config";
 
 /**
  * Every published list, as one workbook with a tab each.
@@ -42,10 +42,11 @@ function propText(field: PropField, props: Record<string, unknown>): string {
 }
 
 /** Every list, a sheet each: as published now, or (`blank`) the headings only, to start from. */
-export async function buildSetsWorkbook(_t: Tenant, options: { blank?: boolean } = {}): Promise<Buffer> {
-  // Each list in its published order, as the backend gives it.
-  const sets = [...(await getSets())].sort((a, b) => a.title.localeCompare(b.title));
-  const bySet = new Map(await Promise.all(sets.map(async (set) => [set.key, await getSet(set.key)] as const)));
+export async function buildSetsWorkbook(_t: Tenant, options: { blank?: boolean; organization?: boolean } = {}): Promise<Buffer> {
+  // Each list in its published order, as the backend gives it: the project's, or the organization's own (its Types & sets).
+  const org = !!options.organization;
+  const sets = [...(await (org ? organizationSets() : getSets()))].sort((a, b) => a.title.localeCompare(b.title));
+  const bySet = new Map(await Promise.all(sets.map(async (set) => [set.key, await (org ? organizationSet(set.key) : getSet(set.key))] as const)));
 
   const book = new ExcelJS.Workbook();
   book.creator = "DELIOS";

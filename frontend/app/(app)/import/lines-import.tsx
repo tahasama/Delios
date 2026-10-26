@@ -17,11 +17,13 @@ const NEW_SAID: Record<LinesKind, string> = {
   people: "Gets an account and joins the project; they are emailed a link to choose their password.",
   matrix: "",
   sets: "Added to the list as written.",
+  "org-sets": "Added to the organization's list as written: every project reading it gets it.",
 };
 const WHAT: Record<LinesKind, { file: string; hint: string; accept: string; line: string }> = {
   people: { file: "The filled-in team list", hint: "a CSV with the template's headings", accept: ".csv,text/csv", line: "Person" },
   matrix: { file: "The filled-in matrix", hint: "the matrix as downloaded (.csv)", accept: ".csv,text/csv", line: "Documents it is for" },
   sets: { file: "The filled-in workbook", hint: "the workbook (.xlsx) as downloaded", accept: ".xlsx", line: "Value" },
+  "org-sets": { file: "The filled-in workbook", hint: "the organization's lists as downloaded (.xlsx)", accept: ".xlsx", line: "Value" },
 };
 
 /** The register's dock: its first act in the brand's gold, the others light on the dark bar. */
@@ -97,6 +99,8 @@ export function LinesImport({ kind, fromDocument }: { kind: LinesKind; fromDocum
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ summary: string; checks: LineCheck[] } | null>(null);
   const [busy, run] = useTransition();
+  // Which lines show (owner: as the Schedule's check): all, or those of one outcome.
+  const [only, setOnly] = useState<string>("ALL");
   const [seenRead, setSeenRead] = useState<typeof read>(undefined);
   const what = WHAT[kind];
 
@@ -111,9 +115,10 @@ export function LinesImport({ kind, fromDocument }: { kind: LinesKind; fromDocum
   const fields = read?.fields ?? [];
   const said = useMemo(() => new Map(checks.map((c) => [c.at, c] as const)), [checks]);
   // Every line of the list is shown, those that change nothing too (owner): the person sees the whole file.
-  const shown = (lines ?? []).filter((l) => !off.has(l.at));
-  const count = (outcome: LineCheck["outcome"]) => shown.filter((l) => said.get(l.at)?.outcome === outcome).length;
-  const problems = shown.filter((l) => said.get(l.at)?.outcome === "PROBLEM");
+  const listed = (lines ?? []).filter((l) => !off.has(l.at));
+  const shown = listed.filter((l) => only === "ALL" || said.get(l.at)?.outcome === only);
+  const count = (outcome: LineCheck["outcome"]) => listed.filter((l) => said.get(l.at)?.outcome === outcome).length;
+  const problems = listed.filter((l) => said.get(l.at)?.outcome === "PROBLEM");
   const changing = count("NEW") + count("UPDATE");
   const tickedLines = shown.filter((l) => ticked.has(l.at));
   const tickedSets = new Set(tickedLines.map((l) => l.values.set ?? ""));
@@ -135,7 +140,7 @@ export function LinesImport({ kind, fromDocument }: { kind: LinesKind; fromDocum
   const takeOff = (ats: string[]) => { const away = new Set([...off, ...ats]); setOff(away); setTicked(new Set()); setEditing(null); recheck(lines ?? [], away); };
   const putBack = (at: string) => { const away = new Set([...off].filter((one) => one !== at)); setOff(away); recheck(lines ?? [], away); };
   const write = () => run(async () => {
-    const answer = await writeLinesAction(kind, shown, read?.from ?? null);
+    const answer = await writeLinesAction(kind, listed, read?.from ?? null);
     if (answer.checks) setChecks(answer.checks);
     if (answer.error || !answer.written) { setError(answer.error ?? "Nothing was written."); return; }
     setDone({ summary: answer.summary ?? "Written.", checks: answer.checks ?? [] }); setError(null);
@@ -197,9 +202,14 @@ export function LinesImport({ kind, fromDocument }: { kind: LinesKind; fromDocum
         <div className="space-y-3 border-t border-line px-5 py-4 sm:px-6" aria-live="polite">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-sm font-semibold text-slate-800">What this list will do</h2>
-            <p className="text-xs text-slate-600">
-              {count("NEW")} new · {plural(count("UPDATE"), "update")} · {count("SAME")} no change · {plural(problems.length, "problem")}{busy ? " · checking…" : ""}
-            </p>
+            <div className="seg" aria-label="Which lines">
+              {([["ALL", "All", listed.length], ["NEW", "New", count("NEW")], ["UPDATE", "Update", count("UPDATE")], ["SAME", "No change", count("SAME")], ["PROBLEM", "Problem", count("PROBLEM")]] as const).map(([key, word, n]) => (
+                <button key={key} type="button" aria-pressed={only === key} className="segment" onClick={() => setOnly(key)}>
+                  {word} <span className="tabular-nums text-slate-500">{n.toLocaleString("en-GB")}</span>
+                </button>
+              ))}
+              {busy ? <span className="ml-2 self-center text-xs text-slate-500">checking…</span> : null}
+            </div>
           </div>
 
           <DataTable

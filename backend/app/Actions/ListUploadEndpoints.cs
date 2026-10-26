@@ -25,7 +25,15 @@ public sealed record ListChangeLine(string Key, string Outcome, string Title, IR
 
 /// <summary>A list checked: what it would change, what is wrong with it, and its one-line summary; nothing written.</summary>
 public sealed record ListCheckView(string Kind, string Title, string? Source, IReadOnlyList<ListChangeLine> Lines, IReadOnlyList<string> Problems, string? Summary,
-    int New, int Updates, int Removed, int Same);
+    int New, int Updates, int Removed, int Same, ListSheetView? Sheet = null);
+
+/// <summary>
+/// The disciplines or requirements list as its file reads (owner: ours, not the planner's word, so corrected line by line):
+/// every row of the file, the row its headings are on, and each row under them with what it does and what is wrong.
+/// </summary>
+public sealed record ListSheetView(string[][] Cells, int HeaderAt, string[] Headings, IReadOnlyList<ListRowView> Rows, int[]? Inherited = null);
+/// <summary>One row of the file: its line, what it does (NEW, UPDATE, SAME, PROBLEM, or PENDING while others have problems), and why.</summary>
+public sealed record ListRowView(int Line, string Outcome, string Title, IReadOnlyList<Documents.ImportChange> Changes, IReadOnlyList<string> Problems);
 
 /// <summary>
 /// The schedule's three lists — the schedule, the disciplines per action, the document requirements — are documents
@@ -103,10 +111,27 @@ public static class ListUploadEndpoints
     {
         var listKind = Lists[kind].Kind;
         var versions = await db.Set<ControlledVersion>().AsNoTracking()
-            .Where(v => v.ProjectId == projectId && v.Kind == listKind && v.State == "APPROVED" && (v.ObjectKey != null || v.FileId != null))
-            .OrderByDescending(v => v.CreatedAt).Select(v => new { v.CreatedAt, v.ObjectKey, v.FileId }).FirstOrDefaultAsync(cancellationToken);
+            .Where(v => v.ProjectId == projectId && v.Kind == listKind && v.State == "APPROVED")
+            .OrderByDescending(v => v.CreatedAt).Select(v => new { v.CreatedAt, v.ObjectKey, v.FileId, v.SourceName }).FirstOrDefaultAsync(cancellationToken);
         var candidates = new List<(Instant At, string? ObjectKey, Guid? FileId)>();
-        if (versions is not null) candidates.Add((versions.CreatedAt, versions.ObjectKey, versions.FileId));
+        if (versions is not null)
+        {
+            var fileId = versions.FileId;
+            // A read kept before its file was named ("<number> rev <value>"): that released revision's spreadsheet.
+            if (versions.ObjectKey is null && fileId is null && versions.SourceName is { } label && label.LastIndexOf(" rev ", StringComparison.Ordinal) is var cut and > 0)
+            {
+                var number = label[..cut];
+                var value = label[(cut + 5)..];
+                var files = await (from d in db.Documents.AsNoTracking()
+                                   join r in db.Revisions.AsNoTracking() on d.Id equals r.DocumentId
+                                   join f in db.StoredFiles.AsNoTracking() on r.Id equals f.RevisionId
+                                   where d.ProjectId == projectId && d.Number == number && r.Value == value && f.Submission == r.Submission
+                                   orderby f.CreatedAt descending
+                                   select new { f.Id, f.Name }).ToListAsync(cancellationToken);
+                fileId = files.FirstOrDefault(f => ScheduleReader.CanRead(f.Name))?.Id;
+            }
+            if (versions.ObjectKey is not null || fileId is not null) candidates.Add((versions.CreatedAt, versions.ObjectKey, fileId));
+        }
         if (listKind == "SCHEDULE")
         {
             var import = await db.ScheduleImports.AsNoTracking()
@@ -258,8 +283,11 @@ public static class ListUploadEndpoints
             var (summary, problems) = await ReadAsync(ready, access.Project, p6, schedules, departments, requirements, cancellationToken);
             var after = problems.Count > 0 ? before : await SnapshotAsync(db, access.Project.Id, ready.List.Kind, cancellationToken);
             var lines = Compare(before, after);
-            return Results.Ok(new ListCheckView(ready.List.Kind, ready.List.Title, ready.Label ?? ready.FileName, lines, problems, summary,
-                lines.Count(l => l.Outcome == "NEW"), lines.Count(l => l.Outcome == "UPDATE"), lines.Count(l => l.Outcome == "REMOVED"), lines.Count(l => l.Outcome == "SAME")));
+            var sheet = ready.List.Kind == "SCHEDULE" ? null : await SheetAsync(db, access.Project.Id, ready, lines, problems, cancellationToken);
+            // A file with problems reads nothing: its other rows wait on them, never "no change".
+            var listProblems = sheet is null ? problems : problems.Where(p => !LineOf(p).HasValue).ToList();
+            return Results.Ok(new ListCheckView(ready.List.Kind, ready.List.Title, ready.Label ?? ready.FileName, lines, listProblems, summary,
+                lines.Count(l => l.Outcome == "NEW"), lines.Count(l => l.Outcome == "UPDATE"), lines.Count(l => l.Outcome == "REMOVED"), lines.Count(l => l.Outcome == "SAME"), sheet));
         }
         finally
         {
@@ -267,6 +295,90 @@ public static class ListUploadEndpoints
             await transaction.RollbackAsync(CancellationToken.None);
             db.ChangeTracker.Clear();
         }
+    }
+
+    /// <summary>The line a problem names ("Line 12: …"), as the importers write them.</summary>
+    private static int? LineOf(string problem)
+    {
+        if (!problem.StartsWith("Line ", StringComparison.Ordinal)) return null;
+        var colon = problem.IndexOf(':', 5);
+        return colon > 5 && int.TryParse(problem[5..colon], out var line) ? line : null;
+    }
+
+    /// <summary>
+    /// Every row of a disciplines or requirements file with what it does: its problems (by the line the reading names), else
+    /// the change it makes to the action or need it names (read from the comparison before and after), so each row can be
+    /// corrected or taken off before the list is applied.
+    /// </summary>
+    private static async Task<ListSheetView?> SheetAsync(DeliosDbContext db, Guid projectId, Prepared ready, List<ListChangeLine> lines, IReadOnlyList<string> problems,
+        CancellationToken cancellationToken)
+    {
+        List<string[]> rows;
+        try { using var content = new MemoryStream(ready.Bytes); rows = ScheduleReader.ReadRows(content, ready.FileName); }
+        catch (Exception e) when (e is not OperationCanceledException) { return null; }
+        static string Norm(string text) => text.Trim().ToLowerInvariant();
+        var requirements = ready.List.Kind == RequirementsImporter.Kind;
+        var header = -1;
+        var at = new Dictionary<string, int>();
+        for (var r = 0; r < Math.Min(10, rows.Count) && header < 0; r++)
+        {
+            var headings = rows[r].Select(Norm).ToArray();
+            int Find(IEnumerable<string> names) => names.Select(n => Array.IndexOf(headings, n)).FirstOrDefault(i => i >= 0, -1);
+            if (requirements)
+            {
+                var found = RequirementsImporter.Columns.ToDictionary(c => c.Key, c => Find(c.Value));
+                if (found["action"] >= 0 && found["document"] >= 0 && found["department"] >= 0) { header = r; at = found; }
+            }
+            else
+            {
+                var action = Find(DepartmentsImporter.ActionHeadings);
+                var departments = Find(DepartmentsImporter.DepartmentHeadings);
+                if (action >= 0 && departments >= 0) { header = r; at = new() { ["action"] = action, ["departments"] = departments }; }
+            }
+        }
+        var width = rows.Count == 0 ? 0 : rows.Max(r => r.Length);
+        var cells = rows.Select(r => r.Concat(Enumerable.Repeat("", width - r.Length)).ToArray()).ToArray();
+        if (header < 0) return new ListSheetView(cells, -1, [], []);
+        var activities = await db.Activities.AsNoTracking().Where(a => a.ProjectId == projectId && a.State != ActivityStates.Removed).ToListAsync(cancellationToken);
+        var byKey = lines.ToDictionary(l => l.Key);
+        var wrong = problems.Select(p => (Line: LineOf(p), Text: p)).Where(p => p.Line.HasValue).GroupBy(p => p.Line!.Value)
+            .ToDictionary(g => g.Key, g => g.Select(p => p.Text[(p.Text.IndexOf(':') + 1)..].Trim()).ToList());
+        var anyWrong = problems.Count > 0;
+        var result = new List<ListRowView>();
+        string lastAction = "", lastDepartment = "";
+        for (var r = header + 1; r < cells.Length; r++)
+        {
+            if (cells[r].All(string.IsNullOrWhiteSpace)) continue;
+            var line = r + 1;
+            string Cell(string column) => at.TryGetValue(column, out var i) && i >= 0 && i < cells[r].Length ? cells[r][i].Trim() : "";
+            string key, title;
+            if (requirements)
+            {
+                var action = Cell("action").ToUpperInvariant() is { Length: > 0 } a ? a : lastAction;
+                var department = (Cell("department").ToUpperInvariant() is { Length: > 0 } d ? d : lastDepartment).Split(',')[0].Trim();
+                if (action.Length > 0) lastAction = action;
+                if (department.Length > 0) lastDepartment = department;
+                var document = Cell("document");
+                var code = ScheduleImporter.Named(activities, action)?.Code ?? action;
+                key = $"{code} · {document} · {department}";
+                title = $"{code} — {(document.Length > 0 ? document : "nothing more needed")}{(department.Length > 0 ? $" ({department})" : "")}";
+                if (document.Length == 0) { result.Add(new(line, "SAME", title, [], [])); continue; }
+            }
+            else
+            {
+                var given = Cell("action");
+                var found = ScheduleImporter.Named(activities, given);
+                key = found?.Code ?? given;
+                title = found is null ? given : $"{found.Code}{(found.ExternalId is null ? "" : $" ({found.ExternalId})")} {found.Name}";
+            }
+            if (wrong.TryGetValue(line, out var said)) { result.Add(new(line, "PROBLEM", title, [], said)); continue; }
+            if (anyWrong) { result.Add(new(line, "PENDING", title, [], [])); continue; }
+            if (byKey.TryGetValue(key, out var change)) result.Add(new(line, change.Outcome, change.Title, change.Changes, []));
+            else result.Add(new(line, requirements ? "NEW" : "SAME", title, [], []));
+        }
+        // The requirements' rows inherit their action and department from the row above: a row taken off must not move them.
+        int[] inherited = requirements ? [at["action"], at["department"]] : [];
+        return new ListSheetView(cells, header, cells[header], result, inherited);
     }
 
     /// <summary>What a list's reading touches, by line: each action (the schedule, its disciplines) or each need (the requirements).</summary>

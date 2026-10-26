@@ -33,8 +33,8 @@ public sealed class DepartmentsImporter(
     /// <summary>How the list is filed among the uploaded lists, so its history reads in one place.</summary>
     public const string Kind = "ACTION_DEPARTMENTS";
 
-    private static readonly string[] ActionHeadings = ["action code", "activity code", "activity id"];
-    private static readonly string[] DepartmentHeadings = ["departments", "department", "disciplines", "discipline"];
+    internal static readonly string[] ActionHeadings = ["action code", "activity code", "activity id"];
+    internal static readonly string[] DepartmentHeadings = ["departments", "department", "disciplines", "discipline"];
 
     /// <summary>Whether a released revision is a disciplines-per-action list, by its document's type.</summary>
     public static async Task<bool> IsListAsync(DeliosDbContext db, Guid documentId, CancellationToken cancellationToken) =>

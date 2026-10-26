@@ -1391,7 +1391,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   list) and an empty template. A register taken out and brought back corrects only what changed; what the number is
   built from may be carried as it is, never changed; a row that matches is counted, not listed.
 - Nothing is uploaded in Settings: Settings regulates. Lists come in on Import & export or the Schedule (Settings →
-  Controlled changes, an upload with approval, is removed).
+  Controlled changes, an upload with approval, is removed). **One exception** (owner): the organization's own lists come
+  in on the organization's Types & sets card (`/organization/settings/types`, "Bring the lists in from a workbook",
+  administrators; `LinesImport kind="org-sets"`, `POST /api/admin/lists/values/many`, the workbook `template-sets?level=organization`):
+  the same two pages, written whole or not at all, every project reading a list getting the change, a project's own copy
+  never touched.
+- Import & export (owner): the import takes the page's whole width, "Take a copy out" under it; the setup Tip's steps
+  stand side by side as a path (`Tip row`); every import's lines in tabs by outcome (All · New · Update · No change ·
+  Problem), as the Schedule's check.
 - Every spreadsheet read (Schedule lists, Import & export) first passes `SheetGuard` (backend):
   it is what its name says (a workbook is a zip, a CSV is text), a workbook unpacks within 200 MB and 5000 parts and
   carries no macros, the virus check finds nothing (scanner down: refused, said so), a sheet spans at most 100,000
@@ -1621,8 +1628,21 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Every schedule upload is checked before it is applied** (owner: every import shows what it would do first):
   `POST /schedule/lists/check` reads the list exactly as applying it would, in a transaction always undone, and lists
   every line (an action new, changed field by field "was → now", removed, or no change; for the requirements, each
-  discipline's need), with why the file cannot be read; then "Apply it" sends the same file (`CheckedListForm`). Lines
-  are not corrected or taken off here: the planner's file is the planner's word, corrected in the file and sent again.
+  discipline's need), with why the file cannot be read, in tabs by outcome (All · New · Changed · Removed · No change);
+  then "Apply it" sends the same file (`CheckedListForm`). **The schedule's lines are not corrected or taken off here**
+  (owner, kept: the planner's file is the planner's word, corrected in P6 or the file and sent again; actions are never
+  added or changed one by one in DELIOS). **The disciplines per action and the requirements are ours** (owner: "you
+  didn't do them like the others"): every row of the file is listed with what it does and what is wrong (backend
+  `ListSheetView`, rows mapped to the comparison, problems by the line the reading names; rows waiting while others have
+  problems read "Waits"), its pencil correcting it in place, its × taking it off, tick-all and the dock; checked again at
+  once; applied, the list as corrected is sent as a CSV (a row taken off left blank so every row keeps its line; the
+  requirements' inherited action and department written out on every row), kept as the file read, and why it differs
+  from the file is asked (no longer "as released"). Read again from the other source, it is applied as it is.
+- **Each list's source is a card of its own** (owner: "more visible"; `components/list-source-card.tsx`, the same on the
+  Schedule and Import & export): its register document with its side colour (released emerald, nothing released amber,
+  none chosen grey), "found by its type, not chosen yet", what it was read from last, and "Choose it in the register".
+  The download of what a list was read from finds the released revision's file for reads kept before the file was named
+  (`LatestAsync`, by "<number> rev <value>"); with no file it says so in plain words, never as data.
 - Releasing a list document reads its Excel automatically (the schedule, when it
   is the project's schedule; DPA and RQL by their type, or the document chosen for them). The three uploads stay,
   for no document, not released, no Excel attached, or a failed read. They are

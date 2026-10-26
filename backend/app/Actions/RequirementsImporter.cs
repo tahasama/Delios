@@ -40,7 +40,7 @@ public sealed class RequirementsImporter(
     /// <summary>How the list is filed among the uploaded lists, so its history reads in one place.</summary>
     public const string Kind = "DOCUMENT_REQUIREMENTS";
 
-    private static readonly Dictionary<string, string[]> Columns = new()
+    internal static readonly Dictionary<string, string[]> Columns = new()
     {
         ["department"] = ["department", "departments"],
         ["action"] = ["action code", "activity code", "activity id"],
@@ -58,7 +58,7 @@ public sealed class RequirementsImporter(
         ["riskDays"] = ["risk window (days)", "risk window", "risk days", "at risk days before"],
     };
 
-    private static readonly string[] Ours = ["", "OURS", "US", "INTERNAL", "INTERNAL ENGINEERING", "OUR ENGINEERING", "ENG"];
+    internal static readonly string[] Ours = ["", "OURS", "US", "INTERNAL", "INTERNAL ENGINEERING", "OUR ENGINEERING", "ENG"];
 
     private sealed record Row(
         int Line, string ActionCode, string Department, string? DocNumber, string? Title, string? Discipline, string? DocType,
