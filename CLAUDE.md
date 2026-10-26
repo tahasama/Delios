@@ -1334,10 +1334,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **The deliverable list on two pages** (owner; backend `Documents/DeliverableImport.cs`, `POST /imports/deliverables/check`
   and `/write`, one call each, never one per line; screens `lib/documents/forms-deliverables.ts`,
   `app/(app)/import/deliverable-import.tsx`): the file is read into lines and checked, then every line says what it
-  would do (New · Update, each field "was → now" · Same · Problem, with why) before anything is written; a line is left
-  out by its switch (problems out at first, "Leave out every problem", "Keep every line"), corrected in place (its
-  pencil), or a field set on every ticked line; corrected lines are checked again; then one act writes them all, or none
-  (a line that no longer passes undoes the rest, said line by line). A new document has **no number** (numbering is never
+  would do (New document · Update, each field "was → now" · Problem, with why; lines that change nothing are counted,
+  not listed) before anything is written. One way to take a line off (owner: "I don't understand the switch, the leave
+  out, the keep"): its red × ("Take this line off the list"), back from "Taken off the list" with Put back; "Take every
+  line with a problem off". **Correcting a line is the document form itself** (owner: "the edit must be the very
+  create/update document form"): its pencil opens the form under the line (`LineForm`; fields read once for the template
+  and the form, `lib/documents/deliverable-fields.ts`: the same fields, order and names as registering, each list
+  offering only the values for its deliverable type, a field the backend names outlined; on an update what the number is
+  made of shown locked). Lines ticked are changed together (the same form, empty: only what is filled in changes; lines
+  of one deliverable type) or taken off together. Every change is checked again at once (no "check again" button); then
+  one act writes the whole list, or nothing (a line that no longer passes undoes the rest, said line by line). A new document has **no number** (numbering is never
   manual): it is given one when registered; a line with a number updates that document of this project, never creates
   one (a number not in the register, or on two lines, is a problem). What the number is built from never changes, and a
   document's details change only while a revision is prepared (DETAILS_NEED_A_REVISION, as by hand). **The file is the

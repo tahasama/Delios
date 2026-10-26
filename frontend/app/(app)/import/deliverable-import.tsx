@@ -5,122 +5,168 @@ import {
   readDeliverableListAction, checkDeliverableLinesAction, writeDeliverableLinesAction,
   type ListLine, type ListView, type LineView,
 } from "@/lib/documents/forms-deliverables";
+import type { DeliverableFields, DocumentField } from "@/lib/documents/deliverable-fields";
 import { btn, inputCls } from "@/components/ui";
 import { Select } from "@/components/select";
-import { Switch } from "@/components/switch";
-import { Check, FileSpreadsheet, Pencil, X } from "lucide-react";
+import { FileSpreadsheet, Pencil, Undo2, X } from "lucide-react";
 
-/** What a line does, in words and the app's colours (text, never a pill inside a register). */
+/** What a line does, in words and the app's colours (coloured text inside a register, never a pill). */
 const OUTCOME: Record<LineView["outcome"], { word: string; ink: string }> = {
-  NEW: { word: "New", ink: "text-sky-700" },
+  NEW: { word: "New document", ink: "text-sky-700" },
   UPDATE: { word: "Update", ink: "text-amber-800" },
-  SAME: { word: "Same", ink: "text-slate-500" },
+  SAME: { word: "No change", ink: "text-slate-500" },
   PROBLEM: { word: "Problem", ink: "text-red-700" },
 };
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /**
- * The deliverable list, brought in on two pages (owner): the file is read and checked, then every line shows what it
- * would do (new, an update with each field "was → now", the same, or a problem with why) before anything is written.
- * Lines are left out by their tick, one by one or all problems at once; a line is corrected in place, or a field set on
- * every ticked line at once; the list is checked again; then one act writes them all, or none.
+ * Correcting a line is the document form itself (owner): the same fields, in the same order, called the same, each
+ * list offering only the values offered for the deliverable type, a field the backend names outlined. On an update,
+ * what the number is made of is shown and never changed. For several lines at once (`many`), every field starts empty
+ * and only what is filled in changes, on each line.
+ */
+function LineForm({ form, values, update, faulty, many, onSave, onCancel }: {
+  form: DeliverableFields[]; values: Record<string, string>; update: boolean; faulty: string[]; many?: number;
+  onSave: (values: Record<string, string>) => void; onCancel: () => void;
+}) {
+  const [now, setNow] = useState<Record<string, string>>(many ? {} : values);
+  const type = form.find((one) => one.code === (now.deliverableType ?? values.deliverableType)) ?? null;
+  const set = (key: string, value: string) => setNow((before) => ({ ...before, [key]: value }));
+  const fields: DocumentField[] = (type?.fields ?? []).filter((f) => !(many && update && f.inNumber) && !(many && f.key === "title"));
+  const control = (field: DocumentField) => {
+    const locked = update && !!field.inNumber;
+    const value = now[field.key] ?? "";
+    if (field.kind === "choice") {
+      const values = field.values ?? [];
+      // A value the file gave that is not offered stays visible, so the person sees what is wrong with it.
+      const unknown = value && !values.some((v) => v.code === value) ? [{ code: value, label: `${value} (not offered for this type)` }] : [];
+      return (
+        <Select value={value} disabled={locked} onChange={(e) => set(field.key, e.target.value)} aria-label={field.label}>
+          <option value="">{many ? "Leave each line's own" : "—"}</option>
+          {[...unknown, ...values].map((v) => <option key={v.code} value={v.code}>{v.label === v.code ? v.code : `${v.code} — ${v.label}`}</option>)}
+        </Select>
+      );
+    }
+    return (
+      <input type={field.kind === "date" ? "date" : "text"} value={value} disabled={locked} onChange={(e) => set(field.key, e.target.value)}
+        placeholder={many ? "Leave each line's own" : undefined} aria-label={field.label} className={inputCls} />
+    );
+  };
+  return (
+    <div className="space-y-3 bg-tint-soft px-3 py-3">
+      {many ? <p className="text-xs text-slate-600">Fill in only what should change on the {many} lines ticked; what you leave empty stays as each line has it.</p> : null}
+      <div className="grid gap-x-4 gap-y-3 sm:grid-cols-3">
+        {!many ? (
+          <label className="block min-w-0">
+            <span className="mb-1.5 flex h-4 items-baseline gap-2 leading-4"><span className="text-xs font-medium text-slate-700">Deliverable type</span>
+              {update ? <span className="truncate text-[11px] text-slate-500">part of the number</span> : null}</span>
+            <Select value={now.deliverableType ?? ""} disabled={update} onChange={(e) => set("deliverableType", e.target.value)} aria-label="Deliverable type">
+              <option value="">—</option>
+              {form.map((one) => <option key={one.code} value={one.code}>{one.label}</option>)}
+            </Select>
+          </label>
+        ) : null}
+        {fields.map((field) => (
+          <label key={field.key} className={`block min-w-0 ${field.key === "title" ? "sm:col-span-2" : ""}`} data-missing={faulty.includes(field.key) ? "" : undefined}>
+            <span className="mb-1.5 flex h-4 min-w-0 items-baseline gap-2 overflow-hidden leading-4">
+              <span className="shrink-0 text-xs font-medium text-slate-700">{field.label}{field.required && !many ? " *" : ""}</span>
+              <span className="truncate text-[11px] text-slate-500" title={update && field.inNumber ? "Part of the number: it never changes." : field.note}>
+                {update && field.inNumber ? "part of the number" : field.note ?? ""}
+              </span>
+            </span>
+            {control(field)}
+          </label>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+        <button type="button" className={btn("secondary")} onClick={onCancel}>Cancel</button>
+        <button type="button" className={btn("primary")} onClick={() => onSave(many ? Object.fromEntries(Object.entries(now).filter(([, v]) => v.trim())) : now)}>
+          {many ? `Change the ${many} lines` : "Save this line"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The deliverable list, brought in on two pages (owner): the file is read and checked, then every line says what it
+ * would do (a new document, an update with each change "was → now", or a problem with why) before anything is written.
+ * A line is corrected with the document form (its pencil) or taken off the list (its ×, put back from "Taken off");
+ * several lines ticked are changed together or taken off together. Every change is checked again at once. Then one
+ * act writes the whole list, or nothing.
  */
 export function DeliverableImport() {
   const [read, readFile, reading] = useActionState(readDeliverableListAction, undefined);
   const [file, setFile] = useState<File | null>(null);
-  // The lines as the person left them, keyed by where they are in the file; and what the backend said of them.
   const [lines, setLines] = useState<ListLine[] | null>(null);
   const [view, setView] = useState<ListView | null>(null);
-  const [left, setLeft] = useState<Set<string>>(new Set());
+  const [off, setOff] = useState<Set<string>>(new Set());
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
-  const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<ListView | null>(null);
   const [busy, run] = useTransition();
-  const [bulkField, setBulkField] = useState("");
-  const [bulkValue, setBulkValue] = useState("");
   const [seenRead, setSeenRead] = useState<typeof read>(undefined);
 
-  // A new reading of the file starts the second page afresh: problems left out, the rest kept.
+  // A new reading of the file starts the second page afresh.
   if (read !== seenRead) {
     setSeenRead(read);
     if (read?.lines && read.view) {
-      setLines(read.lines);
-      setView(read.view);
-      setLeft(new Set(read.view.lines.filter((l) => l.outcome === "PROBLEM").map((l) => l.at)));
-      setTicked(new Set());
-      setStale(false);
-      setError(null);
-      setDone(null);
+      setLines(read.lines); setView(read.view); setOff(new Set()); setTicked(new Set()); setEditing(null); setError(null); setDone(null);
     }
   }
 
-  const columns = read?.columns ?? {};
+  const form = read?.form ?? [];
   const said = useMemo(() => new Map((view?.lines ?? []).map((l) => [l.at, l] as const)), [view]);
-  const kept = (lines ?? []).filter((l) => !left.has(l.at));
-  const keptViews = kept.map((l) => said.get(l.at)).filter((v): v is LineView => !!v);
-  const registering = keptViews.filter((v) => v.outcome === "NEW").length;
-  const updating = keptViews.filter((v) => v.outcome === "UPDATE").length;
-  const blocking = keptViews.filter((v) => v.outcome === "PROBLEM").length;
-  // Lines that change nothing are not sent: there is nothing to write for them.
-  const toWrite = kept.filter((l) => said.get(l.at)?.outcome !== "SAME");
-  // Every field a line may carry, for the corrections and the bulk change.
-  const fields = useMemo(() => {
-    const seen = new Set<string>();
-    for (const l of lines ?? []) for (const k of Object.keys(l.values)) if (k !== "deliverableType") seen.add(k);
-    return [...seen];
-  }, [lines]);
-  const nameOf = (key: string) => columns[key] ?? key;
+  const nameOf = (key: string) => form.flatMap((t) => t.fields).find((f) => f.key === key)?.label ?? key;
+  const onList = (lines ?? []).filter((l) => !off.has(l.at));
+  const shown = onList.filter((l) => said.get(l.at)?.outcome !== "SAME");
+  const same = onList.length - shown.length;
+  const problems = onList.filter((l) => said.get(l.at)?.outcome === "PROBLEM");
+  const registering = onList.filter((l) => said.get(l.at)?.outcome === "NEW").length;
+  const updating = onList.filter((l) => said.get(l.at)?.outcome === "UPDATE").length;
+  const tickedLines = shown.filter((l) => ticked.has(l.at));
+  const tickedTypes = new Set(tickedLines.map((l) => l.values.deliverableType ?? ""));
 
-  const choose = () => {
-    if (!file) return;
-    const data = new FormData();
-    data.set("file", file);
-    startTransition(() => readFile(data));
-  };
-  const checkAgain = () => run(async () => {
-    const answer = await checkDeliverableLinesAction(read?.project ?? null, kept);
+  /** Check what is on the list as it now stands: every change is checked at once, nothing is written. */
+  const recheck = (next: ListLine[], away: Set<string>) => run(async () => {
+    const keep = next.filter((l) => !away.has(l.at));
+    if (!keep.length) { setError(null); return; }
+    const answer = await checkDeliverableLinesAction(read?.project ?? null, keep);
     if (answer.error) { setError(answer.error); return; }
-    // What was left out stays as it was said before; what is kept is read anew.
-    setView((before) => ({ ...answer.view!, lines: [...(before?.lines ?? []).filter((l) => left.has(l.at)), ...answer.view!.lines] }));
-    setStale(false);
+    setView((before) => ({ ...answer.view!, lines: [...(before?.lines ?? []).filter((l) => away.has(l.at)), ...answer.view!.lines] }));
     setError(null);
   });
+  // What the form gave is laid over the line: a field emptied is emptied, one the form does not ask stays as the file had it.
+  const correct = (ats: string[], values: Record<string, string>) => {
+    const next = (lines ?? []).map((l) => {
+      if (!ats.includes(l.at)) return l;
+      const merged = { ...l.values, ...values };
+      for (const key of Object.keys(merged)) if (!merged[key]?.trim()) delete merged[key];
+      return { ...l, values: merged };
+    });
+    setLines(next); setEditing(null); setTicked(new Set());
+    recheck(next, off);
+  };
+  const takeOff = (ats: string[]) => { const away = new Set([...off, ...ats]); setOff(away); setTicked(new Set()); setEditing(null); recheck(lines ?? [], away); };
+  const putBack = (at: string) => { const away = new Set([...off].filter((one) => one !== at)); setOff(away); recheck(lines ?? [], away); };
   const write = () => run(async () => {
-    const answer = await writeDeliverableLinesAction(read?.project ?? null, toWrite);
+    const answer = await writeDeliverableLinesAction(read?.project ?? null, onList.filter((l) => said.get(l.at)?.outcome !== "SAME"));
     if (answer.view && !answer.view.written) setView(answer.view);
     if (answer.error) { setError(answer.error); return; }
-    setDone(answer.view ?? null);
-    setError(null);
+    setDone(answer.view ?? null); setError(null);
   });
-  const change = (at: string, key: string, value: string) => {
-    setLines((all) => (all ?? []).map((l) => {
-      if (l.at !== at) return l;
-      const values = { ...l.values };
-      if (value.trim()) values[key] = value.trim(); else delete values[key];
-      return { ...l, values };
-    }));
-    setStale(true);
-  };
-  const setBulk = () => {
-    if (!bulkField || !ticked.size) return;
-    for (const at of ticked) change(at, bulkField, bulkValue);
-    setBulkValue("");
-  };
-  const toggle = (set: Set<string>, at: string) => { const next = new Set(set); if (next.has(at)) next.delete(at); else next.add(at); return next; };
+  const toggle = (at: string) => setTicked((before) => { const next = new Set(before); if (next.has(at)) next.delete(at); else next.add(at); return next; });
 
   if (done) {
     return (
       <div className="space-y-3 px-5 py-4 sm:px-6" aria-live="polite">
-        <p className="text-sm font-semibold text-slate-800">
-          Written: {plural(done.new, "document")} registered, {plural(done.updates, "document")} updated.
-        </p>
+        <p className="text-sm font-semibold text-slate-800">Done: {plural(done.new, "document")} registered, {plural(done.updates, "document")} updated.</p>
         <ul className="divide-y divide-line rounded-md ring-1 ring-line">
           {done.lines.filter((l) => l.outcome !== "SAME").map((l) => (
             <li key={l.at} className="flex flex-wrap items-baseline gap-x-3 px-3 py-1.5 text-xs">
-              <span className={`w-16 font-semibold ${OUTCOME[l.outcome].ink}`}>{l.outcome === "NEW" ? "Registered" : "Updated"}</span>
+              <span className={`w-20 font-semibold ${OUTCOME[l.outcome].ink}`}>{l.outcome === "NEW" ? "Registered" : "Updated"}</span>
               {l.documentId ? <a href={`/documents/${l.documentId}`} className="font-mono text-link hover:underline">{l.number}</a> : <span className="font-mono">{l.number}</span>}
               <span className="min-w-0 flex-1 truncate text-slate-700">{l.title}</span>
             </li>
@@ -152,8 +198,10 @@ export function DeliverableImport() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" disabled={!file || reading} onClick={choose} className={btn("primary")}>{reading ? "Checking…" : "Check the list"}</button>
-          <span className="text-xs text-slate-500">Checking writes nothing: you see every line first.</span>
+          <button type="button" disabled={!file || reading} onClick={() => { if (!file) return; const data = new FormData(); data.set("file", file); startTransition(() => readFile(data)); }} className={btn("primary")}>
+            {reading ? "Checking…" : "Check the list"}
+          </button>
+          <span className="text-xs text-slate-500">Nothing is written yet: you see every line first.</span>
         </div>
         {read?.error ? <p role="alert" className="rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-800 ring-1 ring-red-200">{read.error}</p> : null}
       </div>
@@ -161,113 +209,117 @@ export function DeliverableImport() {
       {lines && view ? (
         <div className="space-y-3 border-t border-line px-5 py-4 sm:px-6" aria-live="polite">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-800">What the list would do</h2>
+            <h2 className="text-sm font-semibold text-slate-800">What this list will do</h2>
             <p className="text-xs text-slate-600">
-              {plural(view.new, "new document")} · {plural(view.updates, "update")} · {view.same} the same · {plural(view.problems, "problem")}
-              {left.size ? ` · ${left.size} left out` : ""}
+              {plural(registering, "new document")} · {plural(updating, "update")} · {plural(problems.length, "problem")}
+              {busy ? " · checking…" : ""}
             </p>
           </div>
 
-          {/* For many lines at once. */}
-          <div className="flex flex-wrap items-center gap-2 rounded-md bg-tint-soft px-3 py-2 text-xs ring-1 ring-line">
-            <button type="button" className={btn("ghost", "sm")} onClick={() => setLeft(new Set([...left, ...view.lines.filter((l) => l.outcome === "PROBLEM").map((l) => l.at)]))}>Leave out every problem</button>
-            <button type="button" className={btn("ghost", "sm")} onClick={() => setLeft(new Set())}>Keep every line</button>
-            {ticked.size ? (
-              <>
-                <span className="ml-2 font-semibold text-slate-700">{ticked.size} ticked:</span>
-                <button type="button" className={btn("ghost", "sm")} onClick={() => { setLeft(new Set([...left, ...ticked])); setTicked(new Set()); }}>Leave them out</button>
-                <span className="w-44"><Select value={bulkField} onChange={(e) => setBulkField(e.target.value)} aria-label="The field to set">
-                  <option value="">Set a field…</option>
-                  {fields.map((key) => <option key={key} value={key}>{nameOf(key)}</option>)}
-                </Select></span>
-                <input value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} aria-label="Its value" placeholder="its value (empty: as the file had nothing)" className={`${inputCls} w-56`} />
-                <button type="button" disabled={!bulkField} className={btn("secondary", "sm")} onClick={setBulk}>Set it</button>
-              </>
-            ) : <span className="ml-2 text-slate-500">Tick lines to leave them out or set a field on all of them.</span>}
-          </div>
+          {/* Several lines at once, once some are ticked. */}
+          {tickedLines.length ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-md bg-tint-soft px-3 py-2 text-xs ring-1 ring-line">
+              <span className="font-semibold text-slate-700">{plural(tickedLines.length, "line")} ticked</span>
+              {tickedTypes.size === 1
+                ? <button type="button" className={btn("secondary", "sm")} onClick={() => setEditing("many")}><Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Change them together</button>
+                : <span className="text-slate-500">To change them together, tick lines of one deliverable type.</span>}
+              <button type="button" className={btn("secondary", "sm")} onClick={() => takeOff(tickedLines.map((l) => l.at))}><X className="h-3.5 w-3.5" aria-hidden="true" /> Take them off the list</button>
+              <button type="button" className="ml-auto text-link hover:underline" onClick={() => setTicked(new Set())}>Untick all</button>
+            </div>
+          ) : null}
+          {editing === "many" && tickedLines.length ? (
+            <div className="overflow-hidden rounded-md ring-1 ring-line">
+              <LineForm form={form} values={{ deliverableType: tickedLines[0].values.deliverableType ?? "" }} update={tickedLines.some((l) => said.get(l.at)?.outcome !== "NEW")}
+                faulty={[]} many={tickedLines.length} onCancel={() => setEditing(null)} onSave={(values) => correct(tickedLines.map((l) => l.at), values)} />
+            </div>
+          ) : null}
 
           <div className="overflow-x-auto rounded-md ring-1 ring-line">
             <table className="w-full table-fixed text-left text-xs">
               <thead className="bg-tint-soft text-[11px] text-slate-500">
                 <tr>
                   <th scope="col" className="w-8 px-2 py-2"><span className="sr-only">Tick</span></th>
-                  <th scope="col" className="w-20 px-2 py-2 font-semibold">Kept</th>
-                  <th scope="col" className="w-36 px-2 py-2 font-semibold">Where in the file</th>
-                  <th scope="col" className="w-20 px-2 py-2 font-semibold">It does</th>
-                  <th scope="col" className="px-2 py-2 font-semibold">Document, and what changes</th>
-                  <th scope="col" className="w-10 px-2 py-2"><span className="sr-only">Correct</span></th>
+                  <th scope="col" className="w-28 px-2 py-2 font-semibold">It will be</th>
+                  <th scope="col" className="w-64 px-2 py-2 font-semibold">Document</th>
+                  <th scope="col" className="px-2 py-2 font-semibold">What changes, or what is wrong</th>
+                  <th scope="col" className="w-16 px-2 py-2"><span className="sr-only">Correct or take off</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {lines.map((line) => {
+                {shown.map((line) => {
                   const one = said.get(line.at);
-                  const out = left.has(line.at);
-                  return (
-                    <tr key={line.at} className={out ? "opacity-55" : one?.outcome === "PROBLEM" ? "bg-red-50/50" : ""}>
-                      <td className="px-2 py-1.5 align-top">
-                        <input type="checkbox" aria-label={`Tick ${line.at}`} checked={ticked.has(line.at)} onChange={() => setTicked(toggle(ticked, line.at))} />
-                      </td>
-                      <td className="px-2 py-1.5 align-top">
-                        <Switch on={!out} words={["In", "Out"]} label={`Keep ${line.at} in the list`} onToggle={() => setLeft(toggle(left, line.at))} />
-                      </td>
-                      <td className="px-2 py-1.5 align-top break-words text-slate-600 tabular-nums">{line.at}</td>
-                      <td className={`px-2 py-1.5 align-top font-semibold ${one ? OUTCOME[one.outcome].ink : "text-slate-500"}`}>
-                        {stale && !out ? "to check" : one ? OUTCOME[one.outcome].word : "—"}
+                  return [
+                    <tr key={line.at} className={one?.outcome === "PROBLEM" ? "bg-red-50/50" : ""}>
+                      <td className="px-2 py-1.5 align-top"><input type="checkbox" aria-label={`Tick ${line.at}`} checked={ticked.has(line.at)} onChange={() => toggle(line.at)} /></td>
+                      <td className={`px-2 py-1.5 align-top font-semibold ${one ? OUTCOME[one.outcome].ink : "text-slate-500"}`}>{one ? OUTCOME[one.outcome].word : "—"}</td>
+                      <td className="max-w-0 px-2 py-1.5 align-top leading-5 break-words">
+                        <span className="block font-mono text-slate-800">{one?.number ?? line.number ?? "number given when registered"}</span>
+                        <span className="block text-slate-700">{line.values.title ?? one?.title ?? ""}</span>
+                        <span className="block text-[11px] text-slate-500">{line.at}</span>
                       </td>
                       <td className="max-w-0 px-2 py-1.5 align-top leading-5 break-words text-slate-700">
-                        <span className="font-mono text-slate-800">{one?.number ?? line.number ?? "number given when registered"}</span>
-                        {" · "}{line.values.title ?? one?.title ?? ""}
-                        {one?.changes.length ? (
-                          <span className="block text-slate-600">
-                            {one.changes.map((c) => `${nameOf(c.field)}: ${c.was ?? "—"} → ${c.now ?? "—"}`).join("; ")}
-                          </span>
-                        ) : null}
                         {one?.problems.length ? <span className="block text-red-700">{one.problems.join(" ")}</span> : null}
-                        {editing === line.at ? (
-                          <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                            {[...new Set([...fields, ...(one?.fields ?? []).filter((f) => f !== "deliverableType")])].map((key) => (
-                              <label key={key} className="block min-w-0" data-missing={one?.fields.includes(key) ? "" : undefined}>
-                                <span className="mb-1 block truncate text-[11px] text-slate-500">{nameOf(key)}</span>
-                                <input defaultValue={line.values[key] ?? ""} onBlur={(e) => change(line.at, key, e.target.value)} className={inputCls} />
-                              </label>
-                            ))}
-                            <div className="sm:col-span-3">
-                              <button type="button" className={btn("secondary", "sm")} onClick={() => setEditing(null)}><Check className="h-3.5 w-3.5" aria-hidden="true" /> Done</button>
-                            </div>
-                          </div>
-                        ) : null}
+                        {one?.changes.map((c) => <span key={c.field} className="block">{nameOf(c.field)}: {c.was ?? "—"} → {c.now ?? "—"}</span>)}
+                        {one?.outcome === "NEW" ? <span className="text-slate-500">Registered as listed, given its number.</span> : null}
                       </td>
                       <td className="px-2 py-1.5 align-top">
-                        <button type="button" title="Correct this line" aria-label={`Correct ${line.at}`} onClick={() => setEditing(editing === line.at ? null : line.at)} className="text-slate-500 hover:text-brand-ink">
-                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
+                        <span className="flex items-center gap-2">
+                          <button type="button" title="Correct this line" aria-label={`Correct ${line.at}`} onClick={() => setEditing(editing === line.at ? null : line.at)} className="text-slate-500 hover:text-brand-ink">
+                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                          </button>
+                          <button type="button" title="Take this line off the list: it is not brought in" aria-label={`Take ${line.at} off the list`} onClick={() => takeOff([line.at])} className="text-red-600 hover:text-red-800">
+                            <X className="h-3.5 w-3.5" aria-hidden="true" />
+                          </button>
+                        </span>
                       </td>
-                    </tr>
-                  );
+                    </tr>,
+                    editing === line.at ? (
+                      <tr key={`${line.at}-form`}>
+                        <td colSpan={5} className="p-0">
+                          <LineForm form={form} values={line.values} update={!!(one?.number ?? line.number)} faulty={one?.fields ?? []}
+                            onCancel={() => setEditing(null)} onSave={(values) => correct([line.at], values)} />
+                        </td>
+                      </tr>
+                    ) : null,
+                  ];
                 })}
               </tbody>
             </table>
           </div>
+          {same ? <p className="text-xs text-slate-500">{plural(same, "line")} already {same === 1 ? "reads" : "read"} as in the register: nothing to do for {same === 1 ? "it" : "them"}.</p> : null}
+
+          {off.size ? (
+            <details className="rounded-md ring-1 ring-line">
+              <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-700">Taken off the list ({off.size}): not brought in</summary>
+              <ul className="divide-y divide-line border-t border-line">
+                {(lines ?? []).filter((l) => off.has(l.at)).map((line) => (
+                  <li key={line.at} className="flex items-baseline gap-3 px-3 py-1.5 text-xs">
+                    <span className="min-w-0 flex-1 truncate text-slate-700">{line.number ?? "new"} · {line.values.title ?? ""} <span className="text-slate-500">({line.at})</span></span>
+                    <button type="button" className="inline-flex items-center gap-1 font-semibold text-link hover:underline" onClick={() => putBack(line.at)}>
+                      <Undo2 className="h-3.5 w-3.5" aria-hidden="true" /> Put back
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
 
           {error ? <p role="alert" className="rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-800 ring-1 ring-red-200">{error}</p> : null}
 
-          {/* The act, named with its count; only once what is kept has been checked as it stands and nothing in it is a problem. */}
           <div className="flex flex-wrap items-center gap-3 rounded-md bg-tint-soft px-3 py-2.5 text-xs ring-1 ring-line">
-            {stale ? (
+            {problems.length ? (
               <>
-                <span className="text-slate-700">Lines were corrected: check them again before writing.</span>
-                <button type="button" disabled={busy} className={btn("primary")} onClick={checkAgain}>{busy ? "Checking…" : "Check again"}</button>
+                <span className="text-slate-700">{plural(problems.length, "line")} {problems.length === 1 ? "has a problem" : "have problems"}: correct {problems.length === 1 ? "it" : "them"} with the pencil, or take {problems.length === 1 ? "it" : "them"} off the list.</span>
+                <button type="button" disabled={busy} className={btn("secondary")} onClick={() => takeOff(problems.map((l) => l.at))}>Take every line with a problem off</button>
               </>
-            ) : blocking ? (
-              <span className="text-slate-700">{plural(blocking, "line")} kept {blocking === 1 ? "has a problem" : "have problems"}: correct {blocking === 1 ? "it" : "them"} and check again, or leave {blocking === 1 ? "it" : "them"} out.</span>
-            ) : toWrite.length ? (
+            ) : registering + updating ? (
               <>
-                <span className="text-slate-700">Nothing is written until you press it; then all of it is, or none.</span>
+                <span className="text-slate-700">Nothing is written until you press it; then the whole list is, or nothing.</span>
                 <button type="button" disabled={busy} className={btn("primary")} onClick={write}>
-                  {busy ? "Writing…" : [registering ? `Register ${plural(registering, "document")}` : "", updating ? `${registering ? "update" : "Update"} ${plural(updating, "document")}` : ""].filter(Boolean).join(", ")}
+                  {busy ? "Working…" : [registering ? `Register ${plural(registering, "document")}` : "", updating ? `${registering ? "update" : "Update"} ${plural(updating, "document")}` : ""].filter(Boolean).join(", ")}
                 </button>
               </>
-            ) : <span className="text-slate-700">Nothing to write: every line kept already reads so.</span>}
+            ) : <span className="text-slate-700">Nothing to bring in: every line on the list already reads as in the register.</span>}
           </div>
         </div>
       ) : null}

@@ -7,6 +7,7 @@ import { api, projectPath, refusal, ApiProblem } from "@/lib/client";
 import { sheetRefusal } from "@/lib/documents/sheet-check";
 import { fieldLabels, ownFields } from "@/lib/settings/field-policy";
 import { MARK, MARK_SHEET } from "@/lib/documents/deliverable-workbook";
+import { deliverableFields, type DeliverableFields } from "@/lib/documents/deliverable-fields";
 
 // The deliverable list: the screens read the file into lines, the backend checks and writes them, one call each
 // (`DeliverableImport`). Every rule is the backend's; the screens only show what each line would do and let the person
@@ -22,7 +23,8 @@ export type LineView = {
 };
 export type ListView = { lines: LineView[]; new: number; updates: number; same: number; problems: number; written: boolean };
 
-export type ListAnswer = { error?: string; project?: string | null; lines?: ListLine[]; view?: ListView; columns?: Record<string, string> };
+/** The read file: its lines, what each would do, and the document form per deliverable type to correct a line with. */
+export type ListAnswer = { error?: string; project?: string | null; lines?: ListLine[]; view?: ListView; form?: DeliverableFields[] };
 
 /** The headings a CSV may carry, by the field they hold (a workbook says it itself, on its hidden DELIOS sheet). */
 const ALIASES: Record<string, string[]> = {
@@ -132,14 +134,12 @@ export async function readDeliverableListAction(_prev: ListAnswer | undefined, f
   if (!/\.(xlsx|csv)$/i.test(file.name)) return { error: `The deliverable list is the workbook (.xlsx) or a CSV; ${file.name} is neither.` };
   const refused = await sheetRefusal(ctx, file);
   if (refused) return { error: refused };
-  const [labels, own] = await Promise.all([fieldLabels(ctx, "DOCUMENT"), ownFields(ctx, "DOCUMENT")]);
+  const [labels, own, { types }] = await Promise.all([fieldLabels(ctx, "DOCUMENT"), ownFields(ctx, "DOCUMENT"), deliverableFields(ctx)]);
   const read = /\.xlsx$/i.test(file.name) ? await readWorkbook(file) : await readCsv(file, labels, own);
   if ("error" in read) return { error: read.error };
   if (!read.lines.length) return { error: "No filled-in lines in that file: they start under the headings." };
-  const columns: Record<string, string> = { ...Object.fromEntries(Object.entries(labels).map(([k, v]) => [k === "subProject" ? "subproject" : k, v])), deliverableType: labels.deliverableType ?? "Deliverable type" };
-  for (const field of own) columns[`extra:${field.key}`] = field.label;
   try {
-    return { project: read.project, lines: read.lines, view: await backend(read.project, read.lines), columns };
+    return { project: read.project, lines: read.lines, view: await backend(read.project, read.lines), form: types };
   } catch (e) {
     return { error: refusal(e).message };
   }

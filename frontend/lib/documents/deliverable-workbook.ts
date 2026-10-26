@@ -1,12 +1,7 @@
 import ExcelJS from "exceljs";
 import type { Tenant } from "@/lib/core/tenant";
-import { getActiveSet } from "@/lib/settings/config";
-import { getMe } from "@/lib/account/api";
 import { registerRows } from "@/lib/documents/api-register";
-import { fieldLabels, fieldRules, ownFields } from "@/lib/settings/field-policy";
-import { forType } from "@/lib/settings/serving";
-import { servingOf } from "@/lib/settings/serving-api";
-import { api } from "@/lib/client";
+import { deliverableFields } from "@/lib/documents/deliverable-fields";
 
 /**
  * The deliverable list, as a workbook people can actually fill in, made as the app works now.
@@ -23,7 +18,7 @@ import { api } from "@/lib/client";
  */
 
 /** A column of a sheet: the field it holds (as the backend names it), its heading, and the list it draws from. */
-type Column = { key: string; header: string; width: number; set?: string; values?: { code: string }[]; required?: boolean; note?: string };
+type Column = { key: string; header: string; width: number; values?: { code: string }[]; required?: boolean; note?: string };
 
 const HEADER_FILL = "FF102A43";
 const REQUIRED_FILL = "FFFDF3D7";
@@ -35,40 +30,19 @@ export const MARK = "deliverable-list";
 /** Excel refuses a sheet name carrying any of these. */
 const sheetName = (label: string) => label.replace(/[*?:\\/\[\]]/g, " ").replace(/\s{2,}/g, " ").slice(0, 31);
 
-/** The lists the document form may draw from, by its field. */
-const LISTED: { key: string; set: string; width: number }[] = [
-  { key: "subProject", set: "SUBPROJECTS", width: 14 },
-  { key: "phase", set: "PHASES", width: 12 },
-  { key: "contractRef", set: "PURCHASE_ORDERS", width: 16 },
-  { key: "criticality", set: "CRITICALITY", width: 14 },
-  { key: "confidentiality", set: "CONFIDENTIALITY", width: 16 },
-  { key: "retentionClass", set: "RETENTION_CLASSES", width: 18 },
-];
-/** The form's field names as the backend's document changes read them. */
-const BACKEND_KEY: Record<string, string> = { subProject: "subproject" };
+/** How wide each field's column is drawn. */
+const WIDTH: Record<string, number> = { title: 44, docType: 14, discipline: 14, originator: 14, subproject: 14, phase: 12, contractRef: 16,
+  criticality: 14, confidentiality: 16, retentionClass: 18, plannedDate: 16 };
 
 /**
  * The workbook, empty to start from, or (`filled`) with the register as it stands: each document on its deliverable
  * type's sheet, with its number, so a row changed and brought back updates that document.
  */
 export async function buildDeliverableWorkbook(t: Tenant, options: { filled?: boolean } = {}): Promise<Buffer> {
-  const value = (key: string) => getActiveSet(key);
-  const sets = ["DOCUMENT_TYPES", "DISCIPLINES", ...LISTED.map((l) => l.set)];
-  const [deliverableTypes, fieldMatrix, project, register, rules, labels, own, serving, parties, ...lists] = await Promise.all([
-    value("DELIVERABLE_TYPES"),
-    value("DELIVERABLE_TYPE_FIELDS"),
-    getMe().then((me) => me?.projects.find((one) => one.id === t.projectId) ?? null),
+  const [{ project, types }, register] = await Promise.all([
+    deliverableFields(t),
     options.filled ? registerRows(t) : Promise.resolve([]),
-    fieldRules(t, "DOCUMENT"),
-    fieldLabels(t, "DOCUMENT"),
-    ownFields(t, "DOCUMENT"),
-    servingOf(sets),
-    // Whose a document is: the outside organizations, as registering checks it.
-    api<{ code: string }[]>("/api/parties", { keep: { areas: [] } }).catch(() => []),
-    ...sets.map(value),
   ]);
-  const rowsOf = new Map(sets.map((set, index) => [set, lists[index]] as const));
-  const matrix = new Map(fieldMatrix.map((row) => [row.code, row.props] as const));
 
   const book = new ExcelJS.Workbook();
   book.creator = "DELIOS";
@@ -95,34 +69,12 @@ export async function buildDeliverableWorkbook(t: Tenant, options: { filled?: bo
     return ranges.get(id);
   };
 
-  for (const type of deliverableTypes) {
-    const props = matrix.get(type.code) ?? {};
-    const requires = Array.isArray(type.props.required) ? (type.props.required as unknown[]).map(String) : [];
-    const offered = (set: string) => forType(serving, set, type.code, (rowsOf.get(set) ?? []) as { code: string; setId?: string | null; props?: Record<string, unknown> }[]);
-    // A document type names the deliverable types it belongs to; one naming none falls back to who produces it.
-    const supplied = requires.includes("originator");
-    const docTypes = offered("DOCUMENT_TYPES").filter((one) => {
-      const of = Array.isArray(one.props?.deliverables) ? (one.props!.deliverables as unknown[]).map(String) : [];
-      if (of.length) return of.includes(type.code);
-      const applies = typeof one.props?.appliesTo === "string" ? one.props.appliesTo : null;
-      return !applies || applies === "Unclassified" || applies === (supplied ? "Supplier" : "Non-supplier");
-    });
-    const asked = (key: string) => (rules[key] ?? "OPTIONAL") !== "OFF";
+  for (const type of types) {
     const columns: Column[] = [
       ...(options.filled ? [{ key: "number", header: "Document Number", width: 26, note: "Its number, given when it was registered: keep it to update this document. A new document has none." }] : []),
-      { key: "title", header: labels.title ?? "Title", width: 44, required: true },
-      { key: "docType", header: labels.docType ?? "Document type", width: 14, values: docTypes, required: true },
-      { key: "discipline", header: labels.discipline ?? "Discipline", width: 14, values: offered("DISCIPLINES"), required: true },
-      ...(supplied || (props.originator ?? "na") !== "na"
-        ? [{ key: "originator", header: labels.originator ?? "Supplier", width: 14, values: parties, required: supplied || props.originator === "required" }] : []),
-      ...LISTED.filter((l) => asked(l.key) && (l.key !== "contractRef" || (props.po ?? "") !== "na")).map((l) => ({
-        key: BACKEND_KEY[l.key] ?? l.key, header: labels[l.key] ?? l.key, width: l.width, values: offered(l.set),
-        required: rules[l.key] === "REQUIRED" || (l.key === "contractRef" && props.po === "required"),
-      })),
-      ...(asked("plannedDate") ? [{ key: "plannedDate", header: labels.plannedDate ?? "Planned date", width: 16, required: rules.plannedDate === "REQUIRED", note: "YYYY-MM-DD. For a document no action of the schedule needs: the schedule plans the others." }] : []),
-      ...own.map((field) => ({
-        key: `extra:${field.key}`, header: field.label, width: 18, required: field.rule === "REQUIRED", note: field.help ?? undefined,
-        values: field.setKey ? forType(serving, field.setKey, type.code, field.options ?? []) : undefined,
+      ...type.fields.map((field) => ({
+        key: field.key, header: field.label, width: WIDTH[field.key] ?? 18, values: field.values, required: field.required,
+        note: field.kind === "date" ? `YYYY-MM-DD.${field.note ? ` ${field.note}` : ""}` : field.note,
       })),
     ];
 
