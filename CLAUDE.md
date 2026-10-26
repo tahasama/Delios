@@ -1345,8 +1345,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   create/update document form"): its pencil opens the form under the line (`LineForm`; fields read once for the template
   and the form, `lib/documents/deliverable-fields.ts`: the same fields, order and names as registering, each list
   offering only the values for its deliverable type, a field the backend names outlined; on an update what the number is
-  made of shown locked). Lines ticked are changed together (the same form, empty: only what is filled in changes; lines
-  of one deliverable type) or taken off together. Every change is checked again at once (no "check again" button); then
+  made of shown locked). The table is the register's (`DataTable`, its head ticking all, owner); lines ticked bring up the register's dock
+  at the bottom (owner: "use the bottom bar like we have in register"): Change them together (the same form, empty:
+  only what is filled in changes; lines of one deliverable type, opened just above the dock), Take them off the list,
+  Tick the problems, and clear. Every change is checked again at once (no "check again" button); then
   one act writes the whole list, or nothing (a line that no longer passes undoes the rest, said line by line). A new document has **no number** (numbering is never
   manual): it is given one when registered; a line with a number updates that document of this project, never creates
   one (a number not in the register, or on two lines, is a problem). What the number is built from never changes, and a

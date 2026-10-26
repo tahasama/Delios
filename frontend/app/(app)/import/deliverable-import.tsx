@@ -6,7 +6,7 @@ import {
   type ListLine, type ListView, type LineView,
 } from "@/lib/documents/forms-deliverables";
 import type { DeliverableFields, DocumentField } from "@/lib/documents/deliverable-fields";
-import { btn } from "@/components/ui";
+import { btn, DataTable, Th, Td } from "@/components/ui";
 import { Select } from "@/components/select";
 import { FileSpreadsheet, Pencil, Undo2, X } from "lucide-react";
 
@@ -17,6 +17,10 @@ const OUTCOME: Record<LineView["outcome"], { word: string; ink: string }> = {
   SAME: { word: "No change", ink: "text-slate-500" },
   PROBLEM: { word: "Problem", ink: "text-red-700" },
 };
+
+/** The register's dock: its first act in the brand's gold, the others light on the dark bar. */
+const DOCK_FIRST = "inline-flex items-center gap-1.5 rounded-sm bg-gold px-3 py-2 text-xs font-semibold text-brand-ink";
+const DOCK_ACT = "inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -217,77 +221,87 @@ export function DeliverableImport() {
             </p>
           </div>
 
-          {/* Several lines at once, once some are ticked. */}
-          {tickedLines.length ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-md bg-tint-soft px-3 py-2 text-xs ring-1 ring-line">
-              <span className="font-semibold text-slate-700">{plural(tickedLines.length, "line")} ticked</span>
-              {tickedTypes.size === 1
-                ? <button type="button" className={btn("secondary", "sm")} onClick={() => setEditing("many")}><Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Change them together</button>
-                : <span className="text-slate-500">To change them together, tick lines of one deliverable type.</span>}
-              <button type="button" className={btn("secondary", "sm")} onClick={() => takeOff(tickedLines.map((l) => l.at))}><X className="h-3.5 w-3.5" aria-hidden="true" /> Take them off the list</button>
-              <button type="button" className="ml-auto text-link hover:underline" onClick={() => setTicked(new Set())}>Untick all</button>
-            </div>
-          ) : null}
+
+          <DataTable
+            id="deliverable-import"
+            toolbar={false}
+            head={
+              <tr>
+                <Th className="w-10">
+                  <input type="checkbox" aria-label={`Tick all ${shown.length} lines`} checked={!!shown.length && shown.every((l) => ticked.has(l.at))}
+                    onChange={(e) => setTicked(e.target.checked ? new Set(shown.map((l) => l.at)) : new Set())} />
+                </Th>
+                <Th label="It will be">It will be</Th>
+                <Th label="Document" className="min-w-60">Document</Th>
+                <Th label="What changes, or what is wrong">What changes, or what is wrong</Th>
+                <Th label="Where in the file">Where in the file</Th>
+                <Th className="w-16"><span className="sr-only">Correct or take off</span></Th>
+              </tr>
+            }
+          >
+            {shown.map((line) => {
+              const one = said.get(line.at);
+              return [
+                <tr key={line.at}>
+                  <Td><input type="checkbox" aria-label={`Tick ${line.at}`} checked={ticked.has(line.at)} onChange={() => toggle(line.at)} /></Td>
+                  <Td className={`whitespace-nowrap text-xs font-semibold ${one ? OUTCOME[one.outcome].ink : "text-slate-500"}`}>{one ? OUTCOME[one.outcome].word : "—"}</Td>
+                  <Td>
+                    {one?.documentId ? <a href={`/documents/${one.documentId}`} className="doc-number">{one.number}</a>
+                      : <span className="doc-number">{one?.number ?? line.number ?? "number given when registered"}</span>}
+                    <span className="doc-title block max-w-80 truncate" title={line.values.title ?? one?.title ?? ""}>{line.values.title ?? one?.title ?? ""}</span>
+                  </Td>
+                  <Td className="text-xs leading-5 whitespace-normal">
+                    {one?.problems.length ? <span className="block text-red-700">{one.problems.join(" ")}</span> : null}
+                    {one?.changes.map((c) => <span key={c.field} className="block">{nameOf(c.field)}: {c.was ?? "—"} → {c.now ?? "—"}</span>)}
+                    {one?.outcome === "NEW" ? <span className="text-slate-500">Registered as listed, given its number.</span> : null}
+                    {one?.outcome === "SAME" ? <span className="text-slate-500">Already reads so in the register: nothing to write.</span> : null}
+                  </Td>
+                  <Td className="whitespace-nowrap text-[11px] text-slate-500">{line.at}</Td>
+                  <Td>
+                    <span className="flex items-center gap-2">
+                      <button type="button" title="Correct this line" aria-label={`Correct ${line.at}`} onClick={() => setEditing(editing === line.at ? null : line.at)} className="text-slate-500 hover:text-brand-ink">
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                      <button type="button" title="Take this line off the list: it is not brought in" aria-label={`Take ${line.at} off the list`} onClick={() => takeOff([line.at])} className="text-red-600 hover:text-red-800">
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </span>
+                  </Td>
+                </tr>,
+                editing === line.at ? (
+                  <tr key={`${line.at}-form`}>
+                    <td colSpan={6} className="p-0">
+                      <LineForm form={form} values={line.values} update={!!(one?.number ?? line.number)} faulty={one?.fields ?? []}
+                        onCancel={() => setEditing(null)} onSave={(values) => correct([line.at], values)} />
+                    </td>
+                  </tr>
+                ) : null,
+              ];
+            })}
+          </DataTable>
+
           {editing === "many" && tickedLines.length ? (
             <div className="overflow-hidden rounded-md ring-1 ring-line">
               <LineForm form={form} values={{ deliverableType: tickedLines[0].values.deliverableType ?? "" }} update={tickedLines.some((l) => said.get(l.at)?.outcome !== "NEW")}
                 faulty={[]} many={tickedLines.length} onCancel={() => setEditing(null)} onSave={(values) => correct(tickedLines.map((l) => l.at), values)} />
             </div>
           ) : null}
-
-          <div className="overflow-x-auto rounded-md ring-1 ring-line">
-            <table className="w-full table-fixed text-left text-xs">
-              <thead className="bg-tint-soft text-[11px] text-slate-500">
-                <tr>
-                  <th scope="col" className="w-8 px-2 py-2"><span className="sr-only">Tick</span></th>
-                  <th scope="col" className="w-28 px-2 py-2 font-semibold">It will be</th>
-                  <th scope="col" className="w-64 px-2 py-2 font-semibold">Document</th>
-                  <th scope="col" className="px-2 py-2 font-semibold">What changes, or what is wrong</th>
-                  <th scope="col" className="w-16 px-2 py-2"><span className="sr-only">Correct or take off</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {shown.map((line) => {
-                  const one = said.get(line.at);
-                  return [
-                    <tr key={line.at} className={one?.outcome === "PROBLEM" ? "bg-red-50/50" : ""}>
-                      <td className="px-2 py-1.5 align-top"><input type="checkbox" aria-label={`Tick ${line.at}`} checked={ticked.has(line.at)} onChange={() => toggle(line.at)} /></td>
-                      <td className={`px-2 py-1.5 align-top font-semibold ${one ? OUTCOME[one.outcome].ink : "text-slate-500"}`}>{one ? OUTCOME[one.outcome].word : "—"}</td>
-                      <td className="max-w-0 px-2 py-1.5 align-top leading-5 break-words">
-                        <span className="block font-mono text-slate-800">{one?.number ?? line.number ?? "number given when registered"}</span>
-                        <span className="block text-slate-700">{line.values.title ?? one?.title ?? ""}</span>
-                        <span className="block text-[11px] text-slate-500">{line.at}</span>
-                      </td>
-                      <td className="max-w-0 px-2 py-1.5 align-top leading-5 break-words text-slate-700">
-                        {one?.problems.length ? <span className="block text-red-700">{one.problems.join(" ")}</span> : null}
-                        {one?.changes.map((c) => <span key={c.field} className="block">{nameOf(c.field)}: {c.was ?? "—"} → {c.now ?? "—"}</span>)}
-                        {one?.outcome === "NEW" ? <span className="text-slate-500">Registered as listed, given its number.</span> : null}
-                        {one?.outcome === "SAME" ? <span className="text-slate-500">Already reads so in the register: nothing to write.</span> : null}
-                      </td>
-                      <td className="px-2 py-1.5 align-top">
-                        <span className="flex items-center gap-2">
-                          <button type="button" title="Correct this line" aria-label={`Correct ${line.at}`} onClick={() => setEditing(editing === line.at ? null : line.at)} className="text-slate-500 hover:text-brand-ink">
-                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                          </button>
-                          <button type="button" title="Take this line off the list: it is not brought in" aria-label={`Take ${line.at} off the list`} onClick={() => takeOff([line.at])} className="text-red-600 hover:text-red-800">
-                            <X className="h-3.5 w-3.5" aria-hidden="true" />
-                          </button>
-                        </span>
-                      </td>
-                    </tr>,
-                    editing === line.at ? (
-                      <tr key={`${line.at}-form`}>
-                        <td colSpan={5} className="p-0">
-                          <LineForm form={form} values={line.values} update={!!(one?.number ?? line.number)} faulty={one?.fields ?? []}
-                            onCancel={() => setEditing(null)} onSave={(values) => correct([line.at], values)} />
-                        </td>
-                      </tr>
-                    ) : null,
-                  ];
-                })}
-              </tbody>
-            </table>
-          </div>
+          {/* What can be done with the ticked lines: the register's dock, while something is ticked. */}
+          {tickedLines.length ? (
+            <div className="dock palette-light sticky bottom-4 z-30 mx-auto flex w-fit max-w-full flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+              <span className="px-2 font-mono text-sm tabular-nums">{tickedLines.length}<span className="ml-1.5 text-[11px] uppercase tracking-[0.12em] text-white/60">ticked</span></span>
+              {tickedTypes.size === 1 ? (
+                <button type="button" className={DOCK_FIRST} onClick={() => setEditing("many")}><Pencil className="h-4 w-4" aria-hidden="true" /> Change them together</button>
+              ) : <span className="px-1 text-[11px] text-white/60">To change them together, tick lines of one deliverable type</span>}
+              <button type="button" className={DOCK_ACT} onClick={() => takeOff(tickedLines.map((l) => l.at))}><X className="h-4 w-4" aria-hidden="true" /> Take them off the list</button>
+              {problems.length ? (
+                <button type="button" className={DOCK_ACT} onClick={() => setTicked(new Set(problems.map((l) => l.at)))}>Tick the {plural(problems.length, "problem")}</button>
+              ) : null}
+              <button type="button" onClick={() => setTicked(new Set())} className="ml-auto rounded-sm p-2 text-white/60 hover:bg-white/10 hover:text-white" aria-label="Clear the ticks" title="Clear the ticks">
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
 
           {off.size ? (
             <details className="rounded-md ring-1 ring-line">
