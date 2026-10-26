@@ -4,6 +4,7 @@ import { getActiveSet } from "@/lib/settings/config";
 import { scheduleSource } from "@/lib/actions/api";
 import { backendDocuments } from "@/lib/documents/api";
 import { controlledSets } from "@/lib/settings/api-admin";
+import { listSources, SCHEDULE_KIND, type ListSource } from "@/lib/actions/list-sources";
 
 /**
  * The three lists the schedule rests on, each a document in the register: the
@@ -36,6 +37,11 @@ export type PlanList = {
   documents: PlanListDocument[];
   /** The sheet to fill, with the headings the reader looks for. */
   template: string;
+  /**
+   * Where it is read from (owner: chosen by the control function from the register, never designated by the app): its
+   * register document, whether the app found it (none chosen yet), and what it was read from last.
+   */
+  source: ListSource | null;
   /** What is in force was uploaded here without a document, after any document's read: when, by whom, and why. */
   direct: { at: Date; by: string | null; why: string | null } | null;
 };
@@ -45,10 +51,14 @@ type Summary = { id: string; number: string; title: string; latestRevision: stri
 const flagged = (props: Record<string, unknown>, flag: string) => props[flag] === true;
 
 export async function planLists(scope: { projectId: string }): Promise<PlanList[]> {
-  const [types, source, uploaded] = await Promise.all([getActiveSet("DOCUMENT_TYPES"), scheduleSource(scope), controlledSets(scope).catch(() => [])]);
-  const ofTypes = async (codes: string[]): Promise<PlanListDocument[]> => {
-    const pages = await Promise.all(codes.map((docType) =>
-      api<{ items: Summary[] }>(projectPath(scope, "/documents"), { query: { docType, limit: 50 }, keep: { areas: ["docs"] } }).then((page) => page.items).catch(() => [] as Summary[])));
+  const [types, source, uploaded, sources] = await Promise.all([getActiveSet("DOCUMENT_TYPES"), scheduleSource(scope), controlledSets(scope).catch(() => []), listSources(scope)]);
+  const sourceOf = (kind: PlanListKind) => sources.find((one) => one.kind === SCHEDULE_KIND[kind]) ?? null;
+  // The document the control function chose for a list, whatever its type; else every document of the types marked for it.
+  const ofTypes = async (codes: string[], kind: PlanListKind): Promise<PlanListDocument[]> => {
+    const chosen = sourceOf(kind)?.document;
+    const pages: Summary[][] = chosen && !chosen.chosenByApp ? [[{ id: chosen.id, number: chosen.number, title: chosen.title, latestRevision: null, latestRevisionState: null }]]
+      : await Promise.all(codes.map((docType) =>
+        api<{ items: Summary[] }>(projectPath(scope, "/documents"), { query: { docType, limit: 50 }, keep: { areas: ["docs"] } }).then((page) => page.items).catch(() => [] as Summary[])));
     // Every document of these types in one read, not recorded as opened (nobody opened them).
     const views = new Map((await backendDocuments(scope, pages.flat().map((one) => one.id)).catch(() => [])).map((one) => [one.id, one]));
     return pages.flat().map((one) => {
@@ -57,7 +67,8 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
       const released = [...revisions].reverse().find((r) => r.state === "RELEASED") ?? null;
       const last = revisions.at(-1) ?? null;
       return {
-        id: one.id, number: one.number, title: one.title, latestRevisionValue: one.latestRevision, latestRevisionState: one.latestRevisionState,
+        id: one.id, number: one.number, title: one.title,
+        latestRevisionValue: one.latestRevision ?? last?.value ?? null, latestRevisionState: one.latestRevisionState ?? last?.state ?? null,
         released: released ? { id: released.id, value: released.value } : null,
         read: false,
         differs: null,
@@ -73,9 +84,9 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
   const departmentTypes = pick("readsDepartments", "DPA");
   const requirementTypes = pick("readsRequirements", "RQL");
   const [schedules, departments, requirements] = await Promise.all([
-    ofTypes(scheduleTypes.map((one) => one.code)),
-    ofTypes(departmentTypes.map((one) => one.code)),
-    ofTypes(requirementTypes.map((one) => one.code)),
+    ofTypes(scheduleTypes.map((one) => one.code), "SCHEDULE"),
+    ofTypes(departmentTypes.map((one) => one.code), "DEPARTMENTS"),
+    ofTypes(requirementTypes.map((one) => one.code), "REQUIREMENTS"),
   ]);
   // Which released revisions have had their list read: the schedule's reads, and the other lists' records.
   const readLabels = new Set(uploaded.flatMap((set) => set.versions).filter((v) => v.state === "APPROVED" && v.sourceName).map((v) => v.sourceName!));
@@ -112,6 +123,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
       types: scheduleTypes,
       documents: named.length ? named : schedules,
       template: "/api/plan-template/SCHEDULE",
+      source: sourceOf("SCHEDULE"),
       direct: direct("SCHEDULE", scheduleRead),
     },
     {
@@ -121,6 +133,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
       types: departmentTypes,
       documents: departments,
       template: "/api/plan-template/DEPARTMENTS",
+      source: sourceOf("DEPARTMENTS"),
       direct: direct("ACTION_DEPARTMENTS", null),
     },
     {
@@ -130,6 +143,7 @@ export async function planLists(scope: { projectId: string }): Promise<PlanList[
       types: requirementTypes,
       documents: requirements,
       template: "/api/plan-template/REQUIREMENTS",
+      source: sourceOf("REQUIREMENTS"),
       direct: direct("DOCUMENT_REQUIREMENTS", null),
     },
   ];

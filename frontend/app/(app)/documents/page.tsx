@@ -1,4 +1,5 @@
 import { plannedState, plannedProgress } from "@/lib/actions/planned-state";
+import { listSources } from "@/lib/actions/list-sources";
 import { projectAsset } from "@/lib/records/api";
 import { packageByNumber } from "@/lib/packages/api";
 import type { SupplierStage } from "@/lib/core/state-names";
@@ -303,7 +304,14 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         locked: pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId),
       } : null).catch(() => null)
     : null;
-  const picking = formPick ?? assetPick ?? packagePick ?? (sp.pick && !formPick && !sp.pick.startsWith("pkg:") && !sp.pick.startsWith("asset:") && (scope.can("CONTROL") || own)
+  // Opened to choose the register document a list is read from ("src:<list>"), by the control function: one tick.
+  const sourcePick = sp.pick?.startsWith("src:") && scope.can("CONTROL")
+    ? await listSources(scope).then((all) => all.find((one) => one.kind === sp.pick!.slice(4))).then((found) => found ? {
+        kind: "source" as const, actionId: "", packageId: "", code: found.kind, name: found.title, back: undefined, returnTo: found.where === "IMPORT" ? "/import" : "/schedule",
+        linked: found.document && !found.document.chosenByApp ? [found.document.id] : [], disciplines: [] as { code: string; label: string }[], locked: [] as string[],
+      } : null)
+    : null;
+  const picking = formPick ?? assetPick ?? packagePick ?? sourcePick ?? (sp.pick && !formPick && !sp.pick.startsWith("pkg:") && !sp.pick.startsWith("asset:") && !sp.pick.startsWith("src:") && (scope.can("CONTROL") || own)
     ? await (async () => {
         const one = activities.find((a) => a.code === sp.pick);
         const detail = one ? await activityDetail(scope, one.id) : null;
@@ -316,7 +324,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         };
       })()
     : null);
-  const pickKey = !picking ? "" : picking.kind === "asset" ? `asset:${picking.packageId}` : picking.kind === "package" ? `pkg:${picking.code}` : picking.kind === "transmittal" || picking.kind === "review" ? sp.pick! : picking.code;
+  const pickKey = !picking ? "" : picking.kind === "asset" ? `asset:${picking.packageId}` : picking.kind === "package" ? `pkg:${picking.code}` : picking.kind === "source" ? `src:${picking.code}` : picking.kind === "transmittal" || picking.kind === "review" ? sp.pick! : picking.code;
   if (picking) query.set("pick", pickKey);
 
 

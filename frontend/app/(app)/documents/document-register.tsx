@@ -19,6 +19,7 @@ import { stateLook, stateHref } from "@/lib/core/state-look";
 import { useCardHeight } from "@/components/card-height";
 import { ActionForm } from "@/components/form";
 import { setActionDocumentsAction } from "@/lib/actions/forms-links";
+import { chooseListSourceAction } from "@/lib/actions/forms-lists";
 import { CalendarCheck } from "lucide-react";
 
 /** Available from the Columns menu; off until someone wants them. */
@@ -123,9 +124,11 @@ type Column = {
 
 /** The register opened for one action: what it needs now, ticked; its disciplines, for what is added. */
 /** The register opened for something to choose documents for: an action (tick to add, untick to take off), or a supplier's package (tick to add). */
-type Picking = { kind: "action" | "package" | "transmittal" | "review" | "asset"; actionId: string; packageId: string; code: string; name: string; linked: string[]; disciplines: { code: string; label: string }[];
+type Picking = { kind: "action" | "package" | "transmittal" | "review" | "asset" | "source"; actionId: string; packageId: string; code: string; name: string; linked: string[]; disciplines: { code: string; label: string }[];
   /** For a form being filled (a transmittal, a review): where "Continue" goes back to, with the ticks as `docs`. */
   back?: string;
+  /** For a list's register document: the page the list is brought in on, gone back to once chosen. */
+  returnTo?: string;
   /** In a supplier's package and already sent to the supplier: they stay, so they cannot be unticked. */
   locked?: string[] };
 
@@ -278,6 +281,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   function toggle(id: string) {
     if (picking?.locked?.includes(id)) return;
     setAllMatching(false);
+    // A list is read from one document: ticking one unticks the other.
+    if (picking?.kind === "source") { setSelected((current) => current.includes(id) ? [] : [id]); return; }
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   }
 
@@ -352,8 +357,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   return <>
     {picking ? (
       <section className="register register-sheet register-sheet-open mb-4 px-5 py-3.5 sm:px-6">
-        {picking.back ? (
-          <p className="text-sm font-semibold text-slate-800">{picking.name}</p>
+        {picking.back || picking.kind === "source" ? (
+          <p className="text-sm font-semibold text-slate-800">{picking.kind === "source" ? `The register document the ${picking.name.toLowerCase()} is read from` : picking.name}</p>
         ) : (
           <p className="text-sm font-semibold text-slate-800">
             Documents for <Link href={picking.kind === "asset" ? `/assets/${picking.packageId}` : picking.kind === "package" ? `/packages/${picking.code}` : `/actions/${picking.code}`} className="font-mono text-brand-ink hover:underline">{picking.code}</Link>
@@ -361,7 +366,9 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           </p>
         )}
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          {picking.back
+          {picking.kind === "source"
+            ? "Tick the one document that holds it: its released revision's file is what the list is read from, unless a file uploaded since stands. Search and filter freely, the tick stays. Then save below."
+            : picking.back
             ? "Tick what goes with it; search and filter freely, the ticks stay. Then continue below."
             : picking.kind === "asset"
             ? "Ticked are the documents that describe it. Tick a document to link it, untick one to unlink it; search and filter freely, the ticks stay. Then save below."
@@ -548,6 +555,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
               onChange={() => {
                 setAllMatching(false);
                 const page = rows.map((row) => row.id);
+                if (picking?.kind === "source") return;
                 if (picking) setSelected((now) => pageSelected ? now.filter((id) => !page.includes(id) || !!picking.locked?.includes(id)) : [...new Set([...now, ...page])]);
                 else setSelected(pageSelected ? [] : page);
               }}
@@ -653,6 +661,18 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         </span>
         <Link href={withDocs(picking.back, selected)} className="inline-flex items-center gap-1.5 rounded-sm bg-gold px-3 py-2 text-xs font-semibold text-brand-ink">Continue with {selected.length}</Link>
         <Link href={withDocs(picking.back, picking.linked)} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without changing</Link>
+      </div>
+    ) : picking?.kind === "source" ? (
+      <div className="dock palette-light sticky bottom-4 z-30 mx-auto w-fit max-w-full rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+        <ActionForm action={chooseListSourceAction} submitLabel={`Use it for the ${picking.name.toLowerCase()}`} size="sm"
+          hidden={{ kind: picking.code, documentId: selected[0] ?? "", back: picking.returnTo === "/import" ? "import" : "schedule" }} className="flex flex-wrap items-center gap-2 space-y-0">
+          <span className="px-2 text-xs">
+            <span className="font-mono text-sm tabular-nums">{selected.length}</span>
+            <span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked</span>
+            {selected.length ? null : <span className="ml-2 text-white/60">tick the document that holds it</span>}
+          </span>
+          <Link href={picking.returnTo ?? "/schedule"} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without saving</Link>
+        </ActionForm>
       </div>
     ) : picking?.kind === "asset" ? (
       <div className="dock palette-light sticky bottom-4 z-30 mx-auto w-fit max-w-full rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">

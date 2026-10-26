@@ -71,8 +71,10 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
   const keyed = under.map((node, i) => <Fragment key={i}>{node}</Fragment>);
   // Whoever plans the project opens each list's upload from its own stage.
   const STAGE: Record<string, number> = { SCHEDULE: 0, DEPARTMENTS: 1, REQUIREMENTS: 2 };
-  const panels = plans
-    ? lists.map((list) => ({ stage: STAGE[list.kind], kind: list.kind, panel: <PlanListPanel list={list} control projectCode={ctx.project.code} /> }))
+  // Whoever holds Manage opens them too: to read a list again from its other source, never to upload one.
+  const switcher = ctx.user.isInternal && (ctx.can("CONTROL") || ctx.can("MANAGE"));
+  const panels = plans || switcher
+    ? lists.map((list) => ({ stage: STAGE[list.kind], kind: list.kind, panel: <PlanListPanel list={list} control={plans} switcher={switcher} projectCode={ctx.project.code} /> }))
     : [];
   return <UploadSwitch stages={PLAN_STAGES} at={progress.at} under={keyed} panels={panels} />;
 }
