@@ -14,6 +14,11 @@ namespace Delios.Host.Documents;
 /// <param name="Code">The value's code; with <paramref name="NewCode"/>, the one it had.</param>
 /// <param name="NewCode">A new code: only for a value never used.</param>
 /// <param name="SetId">The set it goes in (none: the list's default set); moved to another only while never used.</param>
+/// <summary>A line of the Settings lists' workbook: where it is, its list, and the value as the person changes it by hand.</summary>
+public sealed record ProjectValueLine(string At, string Set, ProjectValueRequest Value);
+/// <summary>The Settings lists' workbook, checked (<paramref name="Dry"/>: everything undone) or written whole.</summary>
+public sealed record ProjectValuesRequest(ProjectValueLine[]? Values, bool Dry = false);
+
 public sealed record ProjectValueRequest(string? Code, string? NewCode = null, string? Label = null, string? Status = null, int? Sort = null,
     JsonElement? Props = null, Guid? SetId = null);
 
@@ -49,6 +54,7 @@ public static class ProjectLists
         lists.MapPut("/{set}", UpdateListAsync);
         lists.MapDelete("/{set}", DeleteListAsync);
         lists.MapPut("/{set}/values", ValueAsync);
+        lists.MapPost("/values/many", ValuesAsync);
         lists.MapDelete("/{set}/values/{code}", DeleteValueAsync);
         lists.MapPost("/{set}/sets", CreateSetAsync);
         lists.MapPut("/{set}/sets/{setId:guid}", UpdateSetAsync);
@@ -561,6 +567,21 @@ public static class ProjectLists
     /// <c>PUT /lists/{set}/values</c>: adds a value to a set (the default one unless named), or changes one: anything while it
     /// was never used, only its name (and retired or not, its place) once used.
     /// </summary>
+    /// <summary>
+    /// POST <c>/lists/values/many</c>: the Settings lists' workbook, every value written as one through the same change as
+    /// by hand (a list the organization keeps the same everywhere is refused, its first change copies it to the
+    /// project); a check (<c>dry</c>) undoes it all.
+    /// </summary>
+    private static async Task<IResult> ValuesAsync(ProjectValuesRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        CancellationToken cancellationToken)
+    {
+        if (request.Values is not { Length: > 0 } values) return Problems.Invalid("NO_LINES", "The workbook changes no value.");
+        if (values.Length > 5000) return Problems.Invalid("TOO_MANY_LINES", "Bring in at most 5000 values at a time.");
+        var lines = await Batch.RunAsync(db, values.Select(v => v.At).ToList(), i => ValueAsync(values[i].Set, values[i].Value, http, db, audit, cancellationToken),
+            request.Dry, cancellationToken);
+        return Batch.Answer(lines, request.Dry);
+    }
+
     private static async Task<IResult> ValueAsync(string set, ProjectValueRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
         CancellationToken cancellationToken)
     {

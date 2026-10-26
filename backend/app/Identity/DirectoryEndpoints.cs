@@ -31,6 +31,14 @@ public sealed record UpdateProjectRequest(
     string? Kind = null, string? Reason = null, string? Country = null);
 
 /// <summary>Body of putting a person on a project, or changing their place on it: one function per person per project.</summary>
+/// <summary>A line of the team list: where it is in the file, the person, and what they do on the project.</summary>
+public sealed record TeamLine(string At, string? Name, string? Email, Guid? PartyId, Guid? FunctionId, string? Department);
+/// <summary>The team list, checked (<paramref name="Dry"/>: everything undone) or written whole.</summary>
+public sealed record TeamLinesRequest(TeamLine[]? People, bool Dry = false);
+/// <summary>A function's rules as a filled-in matrix leaves them, for writing several functions as one.</summary>
+public sealed record FunctionRulesLine(string At, Guid FunctionId, RuleRequest[] Rules);
+public sealed record FunctionRulesRequest(FunctionRulesLine[]? Functions, bool Dry = false);
+
 public sealed record MembershipRequest(Guid UserId, Guid? FunctionId, string? Department = null, bool Active = true, Guid? ConfirmerId = null);
 
 /// <summary>Body of creating a function.</summary>
@@ -89,6 +97,7 @@ public static class DirectoryEndpoints
         people.MapPost("/users", CreateUserAsync);
         people.MapPut("/users/{userId:guid}", UpdateUserAsync);
         people.MapPut("/projects/{projectId:guid}/members", MemberAsync);
+        people.MapPost("/projects/{projectId:guid}/members/many", TeamAsync);
         // Reading the functions and organizations is open to whoever holds Manage too: People & access chooses from them.
         people.MapGet("/functions", FunctionsAsync);
         keepers.MapGet("/users/{userId:guid}/activity", ActivityAsync);
@@ -99,6 +108,7 @@ public static class DirectoryEndpoints
             .AddEndpointFilter(Keepers.Configurers("An administrator changes the organization's functions, in its Settings, for every project."));
         functions.MapPost("/functions", CreateFunctionAsync);
         functions.MapPut("/functions/{functionId:guid}", UpdateFunctionAsync);
+        functions.MapPost("/functions/rules/many", FunctionRulesAsync);
         people.MapGet("/parties", PartiesAsync);
         keepers.MapPost("/parties", CreatePartyAsync);
         keepers.MapPut("/parties/{partyId:guid}", UpdatePartyAsync);
@@ -624,6 +634,38 @@ public static class DirectoryEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// POST <c>/api/admin/projects/{projectId}/members/many</c>: the team list (owner: written whole, or not at all). Each
+    /// line goes the way adding someone by hand goes: a new account is invited to choose its password, then put on the
+    /// project with its function and department (held for confirmation where the project asks it); someone with an
+    /// account already is put on it, or their function and department changed. A check (<c>dry</c>) undoes it all.
+    /// </summary>
+    private static async Task<IResult> TeamAsync(Guid projectId, TeamLinesRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        IPasswordHasher<User> hasher, PasswordPolicy passwords, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider protection, Notifications.Notifier notifier,
+        CancellationToken cancellationToken)
+    {
+        if (request.People is not { Length: > 0 } people) return Problems.Invalid("NO_LINES", "The list has nobody on it.");
+        if (people.Length > 2000) return Problems.Invalid("TOO_MANY_LINES", "Bring in at most 2000 people at a time.");
+        var lines = await Batch.RunAsync(db, people.Select(p => p.At).ToList(), async i =>
+        {
+            var one = people[i];
+            var email = Blank(one.Email)?.ToLowerInvariant();
+            var known = email is null ? null : await db.Users.AsNoTracking().Where(u => u.Email == email).Select(u => (Guid?)u.Id).FirstOrDefaultAsync(cancellationToken);
+            object? made = null;
+            if (known is null)
+            {
+                var created = await CreateUserAsync(new CreateUserRequest(one.Name, email, null, one.PartyId, Invite: true), http, db, audit, hasher, passwords, protection, notifier, cancellationToken);
+                if (created is IStatusCodeHttpResult { StatusCode: >= 400 }) return created;
+                known = Batch.IdOf(created);
+                made = (created as IValueHttpResult)?.Value;
+            }
+            if (one.FunctionId is null) return Problems.Invalid("FUNCTION_REQUIRED", "Give the function they have on the project.");
+            var member = await MemberAsync(projectId, new MembershipRequest(known!.Value, one.FunctionId, Blank(one.Department)), http, db, audit, cancellationToken);
+            return member is IStatusCodeHttpResult { StatusCode: >= 400 } ? member : Results.Ok(made ?? new { Id = known });
+        }, request.Dry, cancellationToken);
+        return Batch.Answer(lines, request.Dry);
+    }
+
     private static async Task<IResult> MemberAsync(
         Guid projectId, MembershipRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
@@ -773,6 +815,20 @@ public static class DirectoryEndpoints
     }
 
     /// <summary><c>PUT /api/admin/functions/{id}</c>: name, in use or not, and its matrix rows (replaced as a whole).</summary>
+    /// <summary>
+    /// POST <c>/api/admin/functions/rules/many</c>: a filled-in distribution matrix, every function it changes written as
+    /// one, through the same change as by hand; a check (<c>dry</c>) undoes it all.
+    /// </summary>
+    private static async Task<IResult> FunctionRulesAsync(FunctionRulesRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        CancellationToken cancellationToken)
+    {
+        if (request.Functions is not { Length: > 0 } functions) return Problems.Invalid("NO_LINES", "The matrix changes nothing.");
+        var lines = await Batch.RunAsync(db, functions.Select(f => f.At).ToList(),
+            i => UpdateFunctionAsync(functions[i].FunctionId, new UpdateFunctionRequest(Rules: functions[i].Rules), http, db, audit, cancellationToken),
+            request.Dry, cancellationToken);
+        return Batch.Answer(lines, request.Dry);
+    }
+
     private static async Task<IResult> UpdateFunctionAsync(
         Guid functionId, UpdateFunctionRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {

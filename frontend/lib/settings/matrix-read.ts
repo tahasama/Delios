@@ -31,7 +31,7 @@ const CELL_VERBS: Record<string, Verb[]> = {
 /** Every letter a cell may carry, including the empty one. */
 const CELL_LETTERS = [...Object.keys(CELL_VERBS), EMPTY_CELL];
 
-type CellChange = {
+export type CellChange = {
   /** The line in the file, for the report. */
   line: number;
   functionCode: string;
@@ -75,9 +75,18 @@ function scopeOf(change: Pick<CellChange, "deliverableType" | "docType" | "disci
 export async function readSheet(t: Tenant, text: string): Promise<ReadResult> {
   // The comment lines are dropped but their line numbers are not: a report that
   // says "line 40" has to mean line 40 of the file the person is looking at.
-  const kept = parseCsv(text)
+  return readRows(t, matrixRows(text));
+}
+
+/** The file's rows with the line each is on, its comment lines left out. */
+export function matrixRows(text: string): { row: string[]; line: number }[] {
+  return parseCsv(text)
     .map((row, index) => ({ row, line: index + 1 }))
     .filter((one) => !(one.row[0] ?? "").trimStart().startsWith("#"));
+}
+
+/** The same reading, from rows already read (the first is the header), each with the line it is on. */
+export async function readRows(t: Tenant, kept: { row: string[]; line: number }[]): Promise<ReadResult> {
   const problems: { line: number; message: string }[] = [];
   if (!kept.length) return { changes: [], problems: [{ line: 0, message: "The file has no rows." }], unchanged: 0 };
 
@@ -161,6 +170,8 @@ async function familyTypes(): Promise<Map<string, string[]>> {
 }
 
 type ApplyReport = { line: number; ok: boolean; message: string; wrote: boolean };
+/** Each function the changes touch, its rules as they will be written back, and the reports it carries. */
+export type MatrixWrite = { functionId: string; code: string; rules: ReturnType<typeof rulesBody>; reports: number[] };
 
 /**
  * Write the changes.
@@ -172,6 +183,20 @@ type ApplyReport = { line: number; ok: boolean; message: string; wrote: boolean 
  * — and it is the same reason a blanket rule swamps a role's starting matrix.
  */
 export async function applyChanges(t: Tenant, changes: CellChange[]): Promise<ApplyReport[]> {
+  const { out, writes } = await planChanges(t, changes);
+  // Every function written as one (owner: all or nothing); a refusal names the function and marks every line it carried.
+  if (!writes.length) return out;
+  try {
+    await api("/api/admin/functions/rules/many", { body: { functions: writes.map((w) => ({ at: w.code, functionId: w.functionId, rules: w.rules })) } });
+  } catch (e) {
+    const { message } = refusal(e);
+    for (const w of writes) for (const index of w.reports) out[index] = { ...out[index], ok: false, wrote: false, message: `Nothing was written: ${message}` };
+  }
+  return out;
+}
+
+/** What the changes would write, function by function, and what each line says; nothing is written. */
+export async function planChanges(t: Tenant, changes: CellChange[]): Promise<{ out: ApplyReport[]; writes: MatrixWrite[] }> {
   const me = await getMe();
   const role = me?.projects.find((p) => p.id === t.projectId)?.contractRole ?? null;
   const projectRole = role && role !== "GENERIC" ? role : null;
@@ -253,18 +278,8 @@ export async function applyChanges(t: Tenant, changes: CellChange[]): Promise<Ap
     });
   }
 
-  // One write per function changed; a refusal marks every line it carried.
-  for (const [code, fn] of rowsOf) {
-    if (!fn.reports.length) continue;
-    try {
-      await api(`/api/admin/functions/${fn.id}`, { method: "PUT", body: { rules: rulesBody(fn.rules) } });
-    } catch (e) {
-      const { message } = refusal(e);
-      for (const index of fn.reports) out[index] = { ...out[index], ok: false, wrote: false, message: `${code}: ${message}` };
-    }
-  }
-
-  return out;
+  const writes = [...rowsOf].filter(([, fn]) => fn.reports.length).map(([code, fn]) => ({ functionId: fn.id, code, rules: rulesBody(fn.rules), reports: fn.reports }));
+  return { out, writes };
 }
 
 /** What each function grants today, as the matrix reads it. */

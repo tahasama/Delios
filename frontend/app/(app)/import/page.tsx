@@ -3,6 +3,7 @@ import { Tip } from "@/components/ui";
 import { isAdmin } from "@/lib/core/auth";
 import { Download } from "lucide-react";
 import { BulkImportForm } from "./bulk-import-form";
+import { listSources } from "@/lib/actions/list-sources";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Import & export" };
@@ -49,6 +50,8 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   const keeps = ctx.can("CONTROL") || ctx.can("CONFIGURE");
   const allowed = keeps || ctx.can("CREATE");
   const chosen = sp.kind ?? "deliverables";
+  // Each list's register document and what it was brought in from last.
+  const sources = allowed ? (await listSources(ctx)).filter((one) => one.where === "IMPORT") : [];
 
   return (
     <div className="space-y-4">
@@ -80,7 +83,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
       {allowed ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
           {/* A step chosen above opens its import: the form starts again on that kind. */}
-          <BulkImportForm key={chosen} initialKind={chosen} admin={isAdmin(ctx.user)} keeps={keeps} />
+          <BulkImportForm key={chosen} initialKind={chosen} admin={isAdmin(ctx.user)} keeps={keeps} sources={sources} />
 
           <aside className="min-w-0">
             <section className="register register-sheet register-sheet-open" aria-labelledby="export-head">

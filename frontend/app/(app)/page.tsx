@@ -251,6 +251,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         ? { href: `/actions/${w.code}#your-confirmation`, code: w.code ?? "", title: `${w.name}: ${w.ask === "DISCIPLINE" ? "a discipline" : "a document"} to add, checked by ${w.from ?? "the control function"} (${w.number})`, tag: "to confirm", tone: "amber", at: at(w.since), cta: "Confirm" }
         : w.kind === "ADD_TO_ACTION"
         ? { href: `/actions/${w.code}#asked`, code: w.code ?? "", title: `${w.name}: ${w.from ?? "someone"} asks for ${w.ask === "DISCIPLINE" ? "a missing discipline" : "a document"} to be added (${w.number})`, tag: "asked", tone: "sky", at: at(w.since), cta: "Answer" }
+        : w.kind === "LIST_TO_BRING_IN"
+        ? { href: `/import?kind=${({ DELIVERABLES: "deliverables", TEAM: "people", MATRIX: "matrix", LISTS: "sets" } as Record<string, string>)[w.department ?? ""] ?? "deliverables"}`, code: w.name ?? "", title: `${w.code ?? "a list"}: released since it was last brought in`, tag: "list released", tone: "sky", at: at(w.since), cta: "Bring it in" }
         : w.kind === "UNTAGGED"
           ? { href: "/schedule?view=table&untagged=1", code: `${w.count}`, title: `action${w.count === 1 ? "" : "s"} with no discipline tagged`, tag: "untagged", tone: "amber", at: null, cta: "Tag them" }
           : { href: "/schedule", code: w.code ?? "", title: `the schedule could not be read${w.name ? `: ${w.name}` : ""}`, tag: "read failed", tone: "amber", at: at(w.since), cta: "Upload" }),

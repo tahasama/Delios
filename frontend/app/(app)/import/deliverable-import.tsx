@@ -100,7 +100,7 @@ function LineForm({ form, values, update, faulty, many, onSave, onCancel }: {
  * several lines ticked are changed together or taken off together. Every change is checked again at once. Then one
  * act writes the whole list, or nothing.
  */
-export function DeliverableImport() {
+export function DeliverableImport({ fromDocument }: { fromDocument?: { label: string } | null } = {}) {
   const [read, readFile, reading] = useActionState(readDeliverableListAction, undefined);
   const [file, setFile] = useState<File | null>(null);
   const [lines, setLines] = useState<ListLine[] | null>(null);
@@ -157,7 +157,7 @@ export function DeliverableImport() {
   const takeOff = (ats: string[]) => { const away = new Set([...off, ...ats]); setOff(away); setTicked(new Set()); setEditing(null); recheck(lines ?? [], away); };
   const putBack = (at: string) => { const away = new Set([...off].filter((one) => one !== at)); setOff(away); recheck(lines ?? [], away); };
   const write = () => run(async () => {
-    const answer = await writeDeliverableLinesAction(read?.project ?? null, onList.filter((l) => said.get(l.at)?.outcome !== "SAME"));
+    const answer = await writeDeliverableLinesAction(read?.project ?? null, onList.filter((l) => said.get(l.at)?.outcome !== "SAME"), read?.from ?? null);
     if (answer.view && !answer.view.written) setView(answer.view);
     if (answer.error) { setError(answer.error); return; }
     setDone(answer.view ?? null); setError(null);
@@ -206,8 +206,14 @@ export function DeliverableImport() {
           <button type="button" disabled={!file || reading} onClick={() => { if (!file) return; const data = new FormData(); data.set("file", file); startTransition(() => readFile(data)); }} className={btn("primary")}>
             {reading ? "Checking…" : "Check the list"}
           </button>
+          {fromDocument ? (
+            <button type="button" disabled={reading} className={btn("secondary")} onClick={() => { const data = new FormData(); data.set("fromDocument", "1"); setFile(null); startTransition(() => readFile(data)); }}>
+              Bring in {fromDocument.label}
+            </button>
+          ) : null}
           <span className="text-xs text-slate-500">Nothing is written yet: you see every line first.</span>
         </div>
+        {read?.from ? <p className="text-xs text-slate-600">Read from {read.from.label}, as released.</p> : null}
         {read?.error ? <p role="alert" className="rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-800 ring-1 ring-red-200">{read.error}</p> : null}
       </div>
 

@@ -162,6 +162,25 @@ public static partial class ScheduleEndpoints
             if (last is { Status: ScheduleImportStatuses.Failed })
                 work.Add(new ActionWork("SCHEDULE_READ_FAILED", null, $"rev {last.RevisionValue}", last.Error, null, null, 1, last.ImportedAt.ToDateTimeOffset()));
         }
+        // A list of Import & export whose register document was released since it was last brought in: whoever brings it in
+        // (the deliverable list anyone of ours who registers documents; the others the control function).
+        if (access.IsInternal && (access.Holds(Verbs.Control) || access.Holds(Verbs.Create)))
+        {
+            var sources = await db.Set<ListSource>().AsNoTracking().Where(s => s.ProjectId == projectId && s.DocumentId != null).ToListAsync(cancellationToken);
+            var ids = sources.Select(s => s.DocumentId!.Value).ToList();
+            var released = (await db.Revisions.AsNoTracking().Where(r => ids.Contains(r.DocumentId) && r.State == RevisionStates.Released)
+                    .Join(db.Documents.AsNoTracking(), r => r.DocumentId, d => d.Id, (r, d) => new { r.DocumentId, r.Id, r.Value, r.ReleasedAt, d.Number })
+                    .ToListAsync(cancellationToken))
+                .GroupBy(r => r.DocumentId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ReleasedAt).First());
+            foreach (var source in sources)
+            {
+                var kind = ListSources.Kinds.FirstOrDefault(k => k.Kind == source.Kind);
+                if (kind.Where != "IMPORT" || !released.TryGetValue(source.DocumentId!.Value, out var rev)) continue;
+                if (source.Kind != ListSources.Deliverables && !access.Holds(Verbs.Control)) continue;
+                if (source.LastRevisionId == rev.Id || (source.LastAt is { } at && rev.ReleasedAt is { } on && on <= at)) continue;
+                work.Add(new ActionWork("LIST_TO_BRING_IN", null, kind.Title, $"{rev.Number} rev {rev.Value}", null, source.Kind, 1, rev.ReleasedAt?.ToDateTimeOffset()));
+            }
+        }
         return Results.Ok(work);
     }
 

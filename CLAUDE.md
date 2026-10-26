@@ -1367,6 +1367,19 @@ a screen only words it. A new rule goes in the backend, never in a page.
   until the project changes it, by hand or by import, its first change making the project's own copy of that list; a
   list the organization keeps the same on every project is left as it is, said once per sheet. The control function
   brings it in (CONTROL_ONLY), as it changes the lists by hand.
+- **Every import on two pages** (owner: "not just deliverables, all of imports"): the team list, the distribution matrix
+  and the Settings lists go the deliverable list's way (`app/(app)/import/lines-import.tsx`, `lib/documents/forms-lines.ts`):
+  every line listed (New · Update with "was → now" · No change · Problem with why), its pencil correcting it in place, its
+  × taking it off the list, the register's tick-all and dock (change them together, take them off, tick the problems),
+  checked again at once; one act writes the whole list or nothing. The backend writes it whole: each line through the
+  very endpoint used by hand, in one transaction (`Platform/Batch.cs`; `POST /admin/projects/{id}/members/many`,
+  `/admin/functions/rules/many`, `/projects/{id}/lists/values/many`), the check being the same run undone (`dry`). The old
+  way (write the rows that pass, leave the others out, download the rows with problems) is gone: a line with a problem
+  is corrected or taken off. A person on the team list who has an account already is put on the project, or their
+  function and department changed. Each kind shows its register document (chosen in the register as the schedule's
+  lists) and "Bring in <number> rev X" reads its released revision's file into the same second page; what was brought in
+  last, and from where, is kept (`POST /lists/sources/{kind}/brought`), and a revision released since is on Home ("list
+  released", LIST_TO_BRING_IN) for whoever brings it in.
 - A person added is never given a password chosen by someone else: Team list (and `POST /api/admin/users` with `invite`)
   emails a link to choose their own (7 days, once); with email off, the link is handed back to whoever added them.
   **An administrator may set someone's password** (owner: "as apps like this do"), on the organization's People, in the
@@ -1595,8 +1608,23 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Released revision: "this file is rev X as released" is ticked by default;
   only when unticked is a reason obligatory. No released revision: a reason is
   obligatory. Always logged. Same on all three uploads.
+- **Each list's register document is chosen, never designated by the app** (owner): the control function ticks it in
+  the register, opened for it (`/documents?pick=src:<list>`, one tick, "Use it for the …"; backend `Actions/ListSources.cs`,
+  `list_sources`, `PUT /lists/sources/{kind}`, LIST_SOURCE_SET; one document holds one list, DOCUMENT_HOLDS_ANOTHER_LIST).
+  The same for the schedule's three lists and Import & export's four (deliverable list, team, matrix, Settings lists).
+  Until one is chosen, the app's old rule finds it (the schedule document named, else type SCH; DPA and RQL by their
+  type), said "found by its type, not chosen yet". **The latest stands**: a list comes from its register document's
+  released revision or from a file uploaded, whichever came last; whoever uploads vouches it matches the released
+  revision, or says why. **The control function or whoever holds Manage reads it again from the other source**
+  ("Read it again from the other source", always with why; `ListUploadRequest.From` DOCUMENT / UPLOAD, LIST_SOURCE_SWITCHED;
+  Manage sees the Schedule's list panels for this only, never to upload).
+- **Every schedule upload is checked before it is applied** (owner: every import shows what it would do first):
+  `POST /schedule/lists/check` reads the list exactly as applying it would, in a transaction always undone, and lists
+  every line (an action new, changed field by field "was → now", removed, or no change; for the requirements, each
+  discipline's need), with why the file cannot be read; then "Apply it" sends the same file (`CheckedListForm`). Lines
+  are not corrected or taken off here: the planner's file is the planner's word, corrected in the file and sent again.
 - Releasing a list document reads its Excel automatically (the schedule, when it
-  is the project's schedule; DPA and RQL by their type). The three uploads stay,
+  is the project's schedule; DPA and RQL by their type, or the document chosen for them). The three uploads stay,
   for no document, not released, no Excel attached, or a failed read. They are
   the stages Schedule, Disciplines and Requirements themselves, clickable (with
   an upload icon) only for whoever may upload; "open" is an underline, the fill

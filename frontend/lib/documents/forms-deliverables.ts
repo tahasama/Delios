@@ -8,6 +8,7 @@ import { sheetRefusal } from "@/lib/documents/sheet-check";
 import { fieldLabels, ownFields } from "@/lib/settings/field-policy";
 import { MARK, MARK_SHEET } from "@/lib/documents/deliverable-workbook";
 import { deliverableFields, type DeliverableFields } from "@/lib/documents/deliverable-fields";
+import { releasedFile, type ListFrom } from "@/lib/actions/list-files";
 
 // The deliverable list: the screens read the file into lines, the backend checks and writes them, one call each
 // (`DeliverableImport`). Every rule is the backend's; the screens only show what each line would do and let the person
@@ -24,7 +25,9 @@ export type LineView = {
 export type ListView = { lines: LineView[]; new: number; updates: number; same: number; problems: number; written: boolean };
 
 /** The read file: its lines, what each would do, and the document form per deliverable type to correct a line with. */
-export type ListAnswer = { error?: string; project?: string | null; lines?: ListLine[]; view?: ListView; form?: DeliverableFields[] };
+export type ListAnswer = { error?: string; project?: string | null; lines?: ListLine[]; view?: ListView; form?: DeliverableFields[];
+  /** Read from the list's register document as released (else from a file chosen). */
+  from?: ListFrom | null };
 
 /** The headings a CSV may carry, by the field they hold (a workbook says it itself, on its hidden DELIOS sheet). */
 const ALIASES: Record<string, string[]> = {
@@ -129,7 +132,14 @@ async function backend(project: string | null, lines: ListLine[]): Promise<ListV
 export async function readDeliverableListAction(_prev: ListAnswer | undefined, formData: FormData): Promise<ListAnswer> {
   const ctx = await requireScope();
   if (isReadOnly(ctx.user)) return { error: "You can read this project, not change it, so you cannot bring a list in." };
-  const file = formData.get("file") as File | null;
+  let file = formData.get("file") as File | null;
+  let from: ListFrom | null = null;
+  // Its register document's released revision (owner: a list comes from it, or from a file uploaded; the latest stands).
+  if (formData.get("fromDocument") === "1") {
+    const got = await releasedFile(ctx, "DELIVERABLES", /\.(xlsx|csv)$/i);
+    if ("error" in got) return { error: got.error };
+    file = got.file; from = got.from;
+  }
   if (!file || file.size === 0) return { error: "Choose the filled-in file first." };
   if (!/\.(xlsx|csv)$/i.test(file.name)) return { error: `The deliverable list is the workbook (.xlsx) or a CSV; ${file.name} is neither.` };
   const refused = await sheetRefusal(ctx, file);
@@ -139,7 +149,7 @@ export async function readDeliverableListAction(_prev: ListAnswer | undefined, f
   if ("error" in read) return { error: read.error };
   if (!read.lines.length) return { error: "No filled-in lines in that file: they start under the headings." };
   try {
-    return { project: read.project, lines: read.lines, view: await backend(read.project, read.lines), form: types };
+    return { project: read.project, lines: read.lines, view: await backend(read.project, read.lines), form: types, from };
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -156,11 +166,16 @@ export async function checkDeliverableLinesAction(project: string | null, lines:
 }
 
 /** Write the lines left in: all of them, or none if one no longer passes (each line then says why). */
-export async function writeDeliverableLinesAction(project: string | null, lines: ListLine[]): Promise<{ error?: string; view?: ListView }> {
+export async function writeDeliverableLinesAction(project: string | null, lines: ListLine[], from: ListFrom | null = null): Promise<{ error?: string; view?: ListView }> {
   if (!lines.length) return { error: "Every line is left out: nothing to write." };
   const ctx = await requireScope();
   try {
-    return { view: await api<ListView>(projectPath(ctx, "/imports/deliverables/write"), { body: { project, lines } }) };
+    const view = await api<ListView>(projectPath(ctx, "/imports/deliverables/write"), { body: { project, lines } });
+    // What it was brought in from, so the page and Home can say when a newer revision waits.
+    await api(projectPath(ctx, "/lists/sources/DELIVERABLES/brought"), {
+      body: from ? { from: "DOCUMENT", revisionId: from.revisionId, label: from.label } : { from: "UPLOAD", revisionId: null, label: null },
+    }).catch(() => undefined);
+    return { view };
   } catch (e) {
     // Refused whole: the backend answers with every line, as a check, and nothing is written.
     if (e instanceof ApiProblem && e.status === 409) {

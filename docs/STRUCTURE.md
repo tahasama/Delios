@@ -42,7 +42,7 @@ backend/
 │   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs); what a request asks and where it is decided (Asks.cs); matching what arrived
 │   │                     to one of ours and packages taking documents as they come (IncomingService.Taking.cs)
 │   ├── Packages/         delivery packages and supplier packages; how other organizations' documents come in (Intake.cs: by placeholder or as they come)
-│   ├── Actions/          the schedule, its actions, what each needs, notices; ScheduleDays (the days around an action, on two levels); XerReader (the schedule read from a P6 .xer); NoticeDays (the days notices fall on, written by what changes them)
+│   ├── Actions/          the schedule, its actions, what each needs, notices; ScheduleDays (the days around an action, on two levels); XerReader (the schedule read from a P6 .xer); NoticeDays (the days notices fall on, written by what changes them); ListSources (each list's register document, chosen in the register, and what it was read from last)
 │   ├── Records/          assets, number ranges, readiness answers
 │   ├── Checks/           conformance checks
 │   ├── Reports/          reports
@@ -61,7 +61,7 @@ backend/
 │   ├── Messaging/        the queue between the API and the worker; the outbox relay, woken by the acts that fill it (OutboxWake)
 │   ├── Tenancy/          keeping each organization's data apart
 │   ├── Seeding/          the demo data
-│   ├── Platform/         the database, Migrations/, shared plumbing; ScreenChanges (what a save tells the screens), AccessVersions (access and shared answers kept until the organization's way of working changes)
+│   ├── Platform/         the database, Migrations/, shared plumbing; ScreenChanges (what a save tells the screens), AccessVersions (access and shared answers kept until the organization's way of working changes); Batch (several writes as one: each line through its own endpoint, in one transaction)
 │   ├── Resources/        files built into the program (fonts for stamped PDFs)
 │   └── appsettings.json  default settings (.env overrides them)
 ├── tests/                the automated tests, one file per area (DocumentTests.cs…)
@@ -101,12 +101,12 @@ frontend/
 │   ├── (app)/            inside a project
 │   │   ├── layout.tsx    the frame: menu, project switcher, theme
 │   │   ├── page.tsx      Home (with home-parts.tsx, tally.tsx)
-│   │   ├── documents/    + import/
+│   │   ├── documents/    + import/ (deliverable-import.tsx, lines-import.tsx: every import on two pages)
 │   │   ├── reviews/
 │   │   ├── transmittals/ + exposures/
 │   │   ├── packages/     arborescence.tsx: packages in packages (the path, "Packages in it", where it sits, the tree)
 │   │   ├── schedule/     the schedule list (/schedule), the same page for everyone
-│   │   ├── actions/      each action's page (/actions/<code>); /actions and needed/ are old addresses, redirect
+│   │   ├── actions/      each action's page (/actions/<code>); the schedule's list panels (plan-list-panel.tsx, checked-list-form.tsx: checked before applied); /actions and needed/ are old addresses, redirect
 │   │   ├── assets/
 │   │   ├── conformance/  + reports/
 │   │   ├── notifications/
