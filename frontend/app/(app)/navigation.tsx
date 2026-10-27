@@ -298,22 +298,12 @@ export function Sidebar({ perms, moreOpen }: { perms: NavPermissions; moreOpen: 
   };
 
   return (
+    <>
     <aside
       className="sidebar-desktop palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-67 flex-col border-r border-[#254663] bg-[#102a43] px-4 pb-4 text-slate-200 short:pb-3 lg:flex rail:px-2.5 dark:border-white/5 dark:bg-[#0c1522]"
       style={{ width: "var(--sidebar-w)" }}
     >
       <SidebarBody perms={perms} moreOpen={moreOpen} onTip={(t) => { if (!dragging.current) setTip(t); }} />
-      {/* Folding to icons sits on the menu's edge, taking no room in it (owner), in the menu's own navy in either mode:
-          inside `palette-light` a surface colour would stay white in the dark. */}
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={rail ? "Expand the menu" : "Fold the menu to icons"}
-        title={rail ? "Expand the menu" : "Fold the menu to icons"}
-        className="absolute top-16 -right-3 z-40 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-[#254663] bg-[#102a43] text-slate-300 shadow-[0_1px_3px_rgb(16_42_67/0.25)] transition hover:border-white/40 hover:text-white focus-visible:ring-2 focus-visible:ring-gold/70 outline-none dark:border-white/15 dark:bg-[#0c1522]"
-      >
-        {rail ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
-      </button>
       {/* Drag to resize; double-click to switch between icons and full width. */}
       <div
         role="separator"
@@ -336,6 +326,19 @@ export function Sidebar({ perms, moreOpen }: { perms: NavPermissions; moreOpen: 
         </span>
       ) : null}
     </aside>
+    {/* Folding to icons sits on the menu's edge, taking no room in it (owner), in the page's own colours, a shade
+        greyer and bluer (owner: not the menu's): drawn outside the menu, whose colours stay light in the dark. */}
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={rail ? "Expand the menu" : "Fold the menu to icons"}
+      title={rail ? "Expand the menu" : "Fold the menu to icons"}
+      className="no-print fixed top-16 z-30 hidden h-6 w-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-line-strong bg-canvas text-slate-500 shadow-[0_1px_3px_rgb(16_42_67/0.18)] outline-none transition hover:bg-tint hover:text-brand-ink focus-visible:ring-2 focus-visible:ring-gold/70 lg:grid"
+      style={{ left: "var(--sidebar-w)" }}
+    >
+      {rail ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+    </button>
+    </>
   );
 }
 

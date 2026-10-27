@@ -125,7 +125,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   menu stays as it is (owner: no regrouping of its entries), but for Reviews and Packages, daily work, moved above
   "+ More" (owner: "the separator should be after packages"). **One frame** (owner: "both side and top bar need a proper
   update"): the menu's mark and the top bar are the same height (`h-16`) and closed by one line, the fold button sitting
-  where they meet. **The page you are on is a light row** (owner: the gold, larger tile was bad), its icon the size of
+  where they meet, in the page's colours a shade greyer (owner: not the menu's navy), light or dark with the page. **The page you are on is a light row** (owner: the gold, larger tile was bad), its icon the size of
   every other; faint words at least slate-400 on the navy. **"+ More"** is one small line taking almost no room (owner:
   no separator), "− Less" once open, remembered as it was left (cookie `nav-more`, read by the server), open by itself
   while you are on one of its pages, named on hover when the menu is folded. **The top bar** (owner: "icon's order makes
