@@ -205,10 +205,10 @@ export function LinesImport({ kind, fromDocument }: { kind: LinesKind; fromDocum
         <div className="space-y-3 border-t border-line px-5 py-4 first:border-t-0 sm:px-6" aria-live="polite">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-sm font-semibold text-slate-800">What this list will do</h2>
-            <div role="tablist" className="tabs w-full" aria-label="Which lines">
+            <div role="tablist" className="seg w-fit max-w-full" aria-label="Which lines">
               {([["ALL", "All", listed.length], ["NEW", "New", count("NEW")], ["UPDATE", "Update", count("UPDATE")], ["SAME", "No change", count("SAME")], ["PROBLEM", "Problem", count("PROBLEM")]] as const).map(([key, word, n]) => (
-                <button key={key} type="button" role="tab" aria-selected={only === key} className="tab" onClick={() => setOnly(key)}>
-                  {word} <span className="tab-n">{n.toLocaleString("en-GB")}</span>
+                <button key={key} type="button" role="tab" aria-selected={only === key} className="segment" onClick={() => setOnly(key)}>
+                  {word} <span className="segment-n">{n.toLocaleString("en-GB")}</span>
                 </button>
               ))}
               {busy ? <span className="ml-2 self-center text-xs text-slate-500">checking…</span> : null}

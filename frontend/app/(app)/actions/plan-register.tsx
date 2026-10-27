@@ -5,11 +5,11 @@ import Link from "next/link";
 import { TONE } from "./plan-timeline";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarDays, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { DateWindow } from "@/components/date-window";
 import { FilterMenu } from "@/components/filter-menu";
-import { FilterOptions } from "@/components/filter-options";
+import { Narrow } from "@/components/narrow";
 
 /**
  * The schedule, asked about once and answered two ways.
@@ -302,17 +302,19 @@ export function PlanRegister({
       </form>
     </section>
 
-    {/* How to look at the schedule: the app's one tab design (globals.css `.tabs`), its words beside it. */}
-    <nav ref={tabs} className="tabs mb-4" aria-label="How to look at the schedule">
+    {/* The views stand on their own between the question and the answer: one frame, split in equal sides, the
+        chosen side lit (globals.css `.views`), the others carrying the arrow that says they can be gone to. */}
+    <nav ref={tabs} className="views mb-4" aria-label="How to look at the schedule">
       {([
         { id: "calendar", label: "The calendar", hint: "month by month", icon: CalendarDays },
         { id: "plan", label: "The plan", hint: "drawn on a timeline", icon: CalendarRange },
         { id: "table", label: "The table", hint: "one line per action", icon: Rows3 },
       ] as const).map((tab) => (
-        <Link key={tab.id} href={viewHref(tab.id)} scroll={false} aria-current={view === tab.id ? "page" : undefined} className="tab">
+        <Link key={tab.id} href={viewHref(tab.id)} scroll={false} aria-current={view === tab.id ? "page" : undefined} className="view">
           <tab.icon />
           {tab.label}
-          <span className="tab-hint hidden sm:inline">· {tab.hint}</span>
+          <span className="view-hint hidden lg:inline">· {tab.hint}</span>
+          <ArrowRight className="view-go" />
         </Link>
       ))}
     </nav>
@@ -627,41 +629,6 @@ export function PlanRegister({
       )}
     </section>
   </>;
-}
-
-/** One narrowing choice, drawn as the register draws them. */
-function Narrow({ name, value, empty, options }: { name: string; value: string; empty: string; options: Opt[] }) {
-  // A choice made with the pointer applies at once, like the colour key. One
-  // made with the keyboard applies on leaving the box, so stepping through the
-  // options with the arrow keys does not reload the page at every step.
-  const pointer = useRef(false);
-  const waiting = useRef(false);
-  return (
-    <label className="min-w-0 flex-1">
-      <span className="sr-only">{empty}</span>
-      <Select
-        name={name}
-        defaultValue={value}
-        data-on={value ? "true" : "false"}
-        data-instant="true"
-        className="plain w-full"
-        onPointerDown={() => { pointer.current = true; }}
-        onKeyDown={() => { pointer.current = false; }}
-        onChange={(event) => {
-          if (pointer.current) event.currentTarget.form?.requestSubmit();
-          else waiting.current = true;
-        }}
-        onBlur={(event) => {
-          if (!waiting.current) return;
-          waiting.current = false;
-          event.currentTarget.form?.requestSubmit();
-        }}
-      >
-        <option value="">{empty}</option>
-        <FilterOptions options={options} />
-      </Select>
-    </label>
-  );
 }
 
 /** One step through the register. A step that leads nowhere is shown, and dead. */

@@ -115,9 +115,9 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
         </div>
         <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{supplierOnly ? "What your company is asked to send, and where each document stands." : here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
         <div className="mt-3 flex flex-wrap items-end gap-2 border-b border-line">
-          <nav className="tabs border-b-0" aria-label="Which packages">
+          <nav className="seg w-fit max-w-full" aria-label="Which packages">
             {tabs.map((c) => (
-              <Link key={c.code} href={`/packages?category=${c.code}${view === "tree" ? "&view=tree" : ""}`} aria-current={category === c.code ? "page" : undefined} className="tab">{c.label}</Link>
+              <Link key={c.code} href={`/packages?category=${c.code}${view === "tree" ? "&view=tree" : ""}`} aria-current={category === c.code ? "page" : undefined} className="segment">{c.label}</Link>
             ))}
           </nav>
           {/* The list of packages at the top, or the whole tree (owner: both). */}

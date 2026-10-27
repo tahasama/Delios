@@ -137,13 +137,13 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
           the first card begin on the same line. */}
       <div className="grid gap-x-5 gap-y-3 md:grid-cols-[11rem_minmax(0,1fr)] md:items-start">
         <div className="max-w-4xl md:col-start-2">
-          <nav aria-label="When it is checked" className="tabs">
-            <Link href={href({ phase: null })} scroll={false} aria-current={!phase ? "page" : undefined} className="tab">
-              All <span className="tab-n">{CATALOG.filter(narrowedBy).length}</span>
+          <nav aria-label="When it is checked" className="seg w-fit max-w-full">
+            <Link href={href({ phase: null })} scroll={false} aria-current={!phase ? "page" : undefined} className="segment">
+              All <span className="segment-n">{CATALOG.filter(narrowedBy).length}</span>
             </Link>
             {PHASES.map((p) => (
-              <Link key={p} href={href({ phase: p, family: null })} scroll={false} aria-current={phase === p ? "page" : undefined} className="tab">
-                {PHASE_LABEL[p]} <span className="tab-n">{countOf(p)}</span>
+              <Link key={p} href={href({ phase: p, family: null })} scroll={false} aria-current={phase === p ? "page" : undefined} className="segment">
+                {PHASE_LABEL[p]} <span className="segment-n">{countOf(p)}</span>
               </Link>
             ))}
           </nav>

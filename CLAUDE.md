@@ -147,14 +147,21 @@ a screen only words it. A new rule goes in the backend, never in a page.
   handful of each (`quickFindAction`, `lib/core/forms-find.ts`: documents by number and title only, never their files;
   each read as the person may read it). Arrows, Enter, Escape, a click beside it. The top bar's search shows the key
   ("Ctrl K"), a click on it opening the box; typing in the search and Enter still searches the register.
-- **One tab design everywhere** (owner: three designs were in use, "one simple, chic and elegant, but swallowed up by
-  surroundings", one loud, one between; "the best of all applied everywhere"): `.tabs` / `.tab` (`globals.css`), words at
-  reading size (14px) on a quiet line, the open tab lit (a tint behind it, the brand's ink) with the brand's gold bar along
-  its foot; `.tab-n` a count, `.tab-hint` words after it. Every row of tabs takes it: Reports, the Schedule's views,
-  Assurance and its checks' groups and rules' areas, a document's tabs, the organization's tabs, Home's "What is waiting",
-  Packages' kinds, the organization's People, Types & sets' groups, Help's roles, the imports' "Which lines". The
-  segmented control (`.seg`) stays for choosing a value inside a view (light or dark, list or tree, a project's state,
-  in use · retired · all, a form's steps, what a preview shows); the Control room's navy console keeps its own tabs.
+- **Two tab designs, no third** (owner, after a new tab design was tried and refused: "standing out does not mean bigger
+  fonts, but better fonts… go back to previous"): **the Schedule's views** (`.views` / `.view`, `globals.css`: one frame
+  split in equal sides, each with its icon, its words and a short hint, the chosen side lit with the brand's line along
+  its foot, the others carrying an arrow) for the few views a page is read in: the Schedule's three, the organization's
+  four (`org-tabs.tsx`). **The segmented switch** (`.seg` / `.segment`, `.segment-n` a count, `.segment-late`,
+  `.segment-hint`; `aria-current`, `aria-pressed` or `aria-selected` on the chosen one) for every other row of tabs:
+  Reports, Assurance and its checks' groups and rules' areas, a document's tabs, Home's "What is waiting", Packages'
+  kinds, the organization's People, Types & sets' groups, Help's roles, the imports' "Which lines", and any choice of a
+  value inside a view. The Control room's navy console keeps its own tabs.
+- **The distribution matrix's "Who gets what"** (owner, "needs improving"): one sheet, the register's way: its band
+  (what is shown: disciplines × functions, which deliverable type, which document type), the narrowing on one line
+  (`matrix-filters.tsx`, `components/narrow.tsx` `Narrow` shared with the Schedule: Discipline · Deliverable type ·
+  Document type applying on pick, "Only the disciplines in use here" a switch applying at once, the Filters menu; no
+  Apply), then the key, strongest first, each letter with how many cells carry it in this view; the matrix in its own
+  sheet under it.
 - Long titles wrap into lines of even length (`text-wrap: balance` on headings, `globals.css`); body text is left as it is.
 - A card's side colour is its own left edge (`border-l-[3px] border-l-(--rail)`), never a bar laid over it: it
   follows the rounded corners. A sheet left open (`register-sheet-open`) rounds its first and last strip seen (a hidden field or a
@@ -1544,9 +1551,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   that day". Nothing registered by then and nothing since: no chart, said so.
 
 ### Home
-- "N need you today" names them under the figure ("2 to decide · 1 to release…") and opens them (`/?view=today`, a tab
-  "Today" beside All): decisions, releases, what came back, what is owed, what must go out, the schedule (owner: "I see 3
-  need you today but I don't know which ones").
+- "N need you today" opens them (`/?view=today`, a tab "Today" beside All): decisions, releases, what came back, what is
+  owed, what must go out, the schedule (owner: "I see 3 need you today but I don't know which ones"; nothing listed under
+  the figure, "the tab is enough"). Every figure of Home's band opens what it counts (owner): all → every kind, the
+  longest wait → the kind it waits in, the fourth → Assurance or the Schedule.
 - Home's to-do lists everything the signed-in person has to do, whatever it
   is: reviews to decide or advise, releases, documents returned, things to send
   (asked for, left to them to say who, to dispatch), transmittals to check or
@@ -1707,7 +1715,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   from the file is asked (no longer "as released"). Read again from the other source, it is applied as it is.
 - **Each list's source is a card of its own on the Schedule** (owner: "more visible"; `components/list-source-card.tsx`); on
   Import & export it is one button in the explanation box (owner: "a card inside a card… it should be just a button";
-  `ListSourceButton`), the box across the whole width and the same height whichever kind is chosen, its words short: its register document with its side colour (released emerald, nothing released amber,
+  `ListSourceButton`, on the box's left under "Checked first: you see every line; then you edit freely", a primary
+  "Choose its register document" while none is chosen), the box across the whole width and the same height whichever kind is chosen, its words short: its register document with its side colour (released emerald, nothing released amber,
   none chosen grey), "found by its type, not chosen yet", what it was read from last, and "Choose it in the register".
   The download of what a list was read from finds the released revision's file for reads kept before the file was named
   (`LatestAsync`, by "<number> rev <value>"); with no file it says so in plain words, never as data.

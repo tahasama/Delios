@@ -181,16 +181,16 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
           <span className="stencil mr-1 text-slate-500">Roles on a project</span>
           <span className="text-[11px] text-slate-500">what an organization can be contracted to do, on any project: what it does, where approval sits, what its verdict is worth</span>
         </div>
-        <div className="border-b border-line px-3">
-        {/* Plain tabs on one line (owner: "simplistic tabs, inline"), the document page's: the chosen one underlined. */}
-        <nav aria-label="Roles" className="tabs border-b-0 pt-1">
+        <div className="border-b border-line px-5 py-3 sm:px-6">
+        {/* The roles on one line, the segmented switch (owner: "simplistic tabs, inline"). */}
+        <nav aria-label="Roles" className="seg w-fit max-w-full">
           {roleOptions.map((r) => {
             const us = r.code === project.role;
             const here = playing.has(r.code);
             const on = shown?.code === r.code;
             return (
               <Link key={r.code} href={`/guide?role=${r.code}#roles`} scroll={false} title={r.label} aria-current={on ? "page" : undefined}
-                className="tab">
+                className="segment">
                 {r.code}
                 {us ? <span className="rounded-sm bg-brand px-1 text-[10px] font-bold uppercase leading-4 text-white">us</span>
                   : here ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-label={`on ${project.code}`} /> : null}

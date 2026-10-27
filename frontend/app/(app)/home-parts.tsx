@@ -186,12 +186,10 @@ export function greeting(): string {
 }
 
 /** One figure in the band. It counts up once, from a value already rendered. */
-export function Fig({ value, unit, label, index, href, note }: {
+export function Fig({ value, unit, label, index, href }: {
   value: number;
   unit?: string;
   label: string;
-  /** What the figure is made of, in a few words under it (owner: "3 need you today, but which ones?"). */
-  note?: string;
   /** Its place in the row, which is also when it starts counting. */
   index: number;
   href?: string;
@@ -200,7 +198,6 @@ export function Fig({ value, unit, label, index, href, note }: {
     <>
       <Count value={value} unit={unit} delay={index * 60} />
       <span className={`home-soft mt-1.5 block text-[12.5px] ${href ? "group-hover:underline group-hover:underline-offset-[3px]" : ""}`}>{label}</span>
-      {note ? <span className="home-faint mt-0.5 block truncate text-[11.5px]" title={note}>{note}</span> : null}
     </>
   );
   const frame = "home-rule block border-r pr-4 last:border-r-0 even:border-r-0 md:even:border-r md:last:border-r-0";

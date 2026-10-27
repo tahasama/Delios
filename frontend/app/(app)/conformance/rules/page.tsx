@@ -78,11 +78,11 @@ export default async function DefaultRulesPage({ searchParams }: { searchParams:
             <span className="stencil mr-1 text-slate-500">Refused on every project</span>
             <span className="text-[11px] text-slate-500">not a setting: the act that would cause it does not go through, with the answer it gets</span>
           </div>
-          <nav aria-label="Where it happens" className="tabs px-3 pt-1.5 sm:px-4">
-            <Link href="/conformance/rules" scroll={false} aria-current={!area ? "page" : undefined} className="tab">All <span className="tab-n">{PREVENTED.length}</span></Link>
+          <nav aria-label="Where it happens" className="seg mx-5 my-3 w-fit max-w-full sm:mx-6">
+            <Link href="/conformance/rules" scroll={false} aria-current={!area ? "page" : undefined} className="segment">All <span className="segment-n">{PREVENTED.length}</span></Link>
             {areas.map((one) => (
-              <Link key={one} href={`/conformance/rules?${new URLSearchParams({ area: one })}`} scroll={false} aria-current={area === one ? "page" : undefined} className="tab">
-                {one} <span className="tab-n">{PREVENTED.filter((r) => r.where === one).length}</span>
+              <Link key={one} href={`/conformance/rules?${new URLSearchParams({ area: one })}`} scroll={false} aria-current={area === one ? "page" : undefined} className="segment">
+                {one} <span className="segment-n">{PREVENTED.filter((r) => r.where === one).length}</span>
               </Link>
             ))}
           </nav>

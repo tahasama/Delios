@@ -138,7 +138,9 @@ export function BulkImportForm({ initialKind, admin, keeps, sources }: { initial
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-slate-800">{k.title}</p>
                     <p className="mt-1 text-slate-600">{k.blurb}</p>
-                    <p className="mt-1 text-slate-500">Checked first: you see every line; then the whole list is written, or nothing.</p>
+                    <p className="mt-1 text-slate-500">Checked first: you see every line; then you edit freely.</p>
+                    {/* Where the list comes from (owner): its register document, the box's call to act, on the left. */}
+                    {its ? <div className="mt-2.5"><ListSourceButton source={its} inert={!on} newer={on && newer && fromDocument ? `${fromDocument.label} was released since it was last brought in: bring it in below.` : null} /></div> : null}
                   </div>
                   <div className="min-w-0 space-y-1.5">
                     <p className="text-slate-600"><span className="font-semibold text-slate-700">The file: </span>{k.columns}</p>
@@ -149,8 +151,6 @@ export function BulkImportForm({ initialKind, admin, keeps, sources }: { initial
                         </a>
                       ))}
                     </p>
-                    {/* Where the list comes from (owner): one button to its register document, never a card in the card. */}
-                    {its ? <ListSourceButton source={its} inert={!on} newer={on && newer && fromDocument ? `${fromDocument.label} was released since it was last brought in: bring it in below.` : null} /> : null}
                   </div>
                 </div>
               );

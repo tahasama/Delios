@@ -30,7 +30,7 @@ export function DocTabs({ tabs }: { tabs: DocTab[] }) {
 
   return (
     <section className="register register-sheet register-sheet-open overflow-hidden">
-      <nav role="tablist" aria-label="Document" className="tabs px-2 pt-1">
+      <nav role="tablist" aria-label="Document" className="seg m-3 w-fit max-w-full">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -38,10 +38,10 @@ export function DocTabs({ tabs }: { tabs: DocTab[] }) {
             type="button"
             aria-selected={active === t.id}
             onClick={() => select(t.id)}
-            className="tab"
+            className="segment"
           >
             {t.label}
-            {t.count ? <span className="tab-n">{t.count}</span> : null}
+            {t.count ? <span className="segment-n">{t.count}</span> : null}
           </button>
         ))}
       </nav>

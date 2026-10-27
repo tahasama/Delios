@@ -603,83 +603,60 @@ summary::-webkit-details-marker {
     color: var(--color-amber-700);
   }
 
-  /* ── Tabs: one design for every set of tabs (owner: three tab designs were in use, one swallowed by its
-     surroundings, one loud, one between; "the best of all applied everywhere") ─────────────────────────
-     A tab changes what the page shows below it (a report, a view, a part of a document); choosing a value
-     inside a view stays the segmented control above. Words at a reading size on a quiet line, so they never
-     shout; the open tab is lit (a tint behind it, its words in the brand's ink) and carries the brand's gold
-     bar along its foot, so it is the first thing the eye finds without the row turning into buttons.
-     `.tabs` is the row (a `nav`, or a `role="tablist"`), `.tab` each one (`aria-current="page"` or
-     `aria-selected="true"` on the open one), `.tab-n` a count beside a name, `.tab-hint` a few words after it. */
-  .tabs {
-    display: flex;
-    gap: 0.25rem;
-    border-bottom: 1px solid var(--color-line);
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
-  }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab {
-    position: relative;
-    display: inline-flex;
-    flex-shrink: 0;
-    align-items: center;
-    gap: 0.5rem;
-    white-space: nowrap;
-    margin-bottom: -1px;
-    padding: 0.7rem 0.95rem 0.8rem;
-    border-radius: 0.5rem 0.5rem 0 0;
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 1.25rem;
-    color: var(--color-slate-500);
-    transition: color 160ms, background-color 160ms;
-  }
-  .tab svg { width: 1rem; height: 1rem; color: var(--color-slate-400); transition: color 160ms; }
-  .tab:hover { color: var(--color-slate-900); background: var(--color-tint-soft); }
-  .tab:hover svg { color: var(--color-slate-600); }
-  .tab::after {
-    content: "";
-    position: absolute;
-    left: 0.6rem;
-    right: 0.6rem;
-    bottom: 0;
-    height: 3px;
-    border-radius: 3px 3px 0 0;
-    background: transparent;
-    transition: background-color 160ms;
-  }
-  .tab:hover::after { background: var(--color-line-strong); }
-  .tab[aria-current="page"], .tab[aria-current="true"], .tab[aria-selected="true"] {
-    color: var(--color-brand-ink);
-    background: color-mix(in srgb, var(--color-brand) 7%, var(--color-surface));
-  }
-  .tab[aria-current="page"] svg, .tab[aria-current="true"] svg, .tab[aria-selected="true"] svg { color: var(--color-brand-ink); }
-  .tab[aria-current="page"]::after, .tab[aria-current="true"]::after, .tab[aria-selected="true"]::after { background: var(--color-gold); }
-  :root.dark .tab { color: var(--color-slate-400); }
-  :root.dark .tab:hover { color: var(--color-slate-900); }
-  :root.dark .tab[aria-current="page"], :root.dark .tab[aria-current="true"], :root.dark .tab[aria-selected="true"] {
+  /* A tablist's open tab reads as the chosen segment too (`aria-selected`), as does a link marked current. */
+  .segment[aria-selected="true"], .segment[aria-current="true"] {
+    background: var(--color-surface);
     color: var(--color-slate-900);
-    background: color-mix(in srgb, var(--color-slate-900) 9%, var(--color-surface));
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1), 0 1px 1px rgba(15, 23, 42, 0.06);
   }
-  :root.dark .tab[aria-current="page"]::after, :root.dark .tab[aria-current="true"]::after, :root.dark .tab[aria-selected="true"]::after { background: var(--color-gold-bright); }
-  .tab-n {
-    font-family: var(--font-mono);
-    font-size: 11px;
+  :root.dark .segment[aria-selected="true"], :root.dark .segment[aria-current="true"] {
+    background: var(--color-slate-300);
+    color: var(--color-slate-950);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong), 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+  .segment[aria-selected="true"] .segment-n, .segment[aria-current="true"] .segment-n { background: var(--color-tint); color: var(--color-brand-ink); }
+  .segment-hint { font-size: 11px; font-weight: 400; color: var(--color-slate-500); }
+
+  /* ── The Schedule's views (owner: the panel tabs of before, "the one we had previously on schedule"): one frame
+     split into equal sides, the chosen side lit with the brand's line along its foot, the others drawn as the
+     controls they are, each carrying its icon, a few words, and an arrow saying it can be gone to. For the few
+     views a page is read in (the Schedule's three, the organization's four); every other row of tabs is `.seg`. */
+  .views {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    overflow: hidden;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-surface);
+  }
+  .view {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 0;
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    line-height: 1.25rem;
-    min-width: 1.25rem;
-    text-align: center;
-    border-radius: 99px;
-    padding: 0 0.35rem;
-    background: color-mix(in srgb, var(--color-slate-400) 22%, transparent);
+    background: var(--color-slate-100);
     color: var(--color-slate-600);
+    box-shadow: inset 0 -3px 0 0 color-mix(in srgb, var(--color-brand) 20%, transparent);
+    transition: color 160ms, background-color 160ms, box-shadow 160ms;
   }
-  .tab[aria-current="page"] .tab-n, .tab[aria-current="true"] .tab-n, .tab[aria-selected="true"] .tab-n { background: var(--color-tint); color: var(--color-brand-ink); }
-  .tab-n.tab-late { background: color-mix(in srgb, var(--color-amber-500) 26%, transparent); color: var(--color-amber-700); }
-  .tab-hint { font-size: 12px; font-weight: 400; color: var(--color-slate-500); }
+  .view + .view { border-left: 1px solid var(--color-line); }
+  .view svg { width: 1rem; height: 1rem; flex-shrink: 0; }
+  .view:hover { background: var(--color-surface); color: var(--color-brand-ink); }
+  .view[aria-current="page"] {
+    background: var(--color-surface);
+    color: var(--color-brand-ink);
+    box-shadow: inset 0 -3px 0 0 var(--color-brand);
+  }
+  .view-hint { font-size: 11px; font-weight: 400; color: var(--color-slate-500); }
+  .view .view-go { width: 0.875rem; height: 0.875rem; color: var(--color-slate-400); transition: transform 160ms; }
+  .view:hover .view-go { transform: translateX(2px); }
+  .view[aria-current="page"] .view-go { display: none; }
 }
 
 

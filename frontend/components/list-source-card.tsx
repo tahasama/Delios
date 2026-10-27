@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { btn } from "@/components/ui";
 import { chooseHref, type ListSource } from "@/lib/actions/list-source-kinds";
 
 /**
@@ -69,7 +70,8 @@ export function ListSourceButton({ source, newer, inert }: { source: ListSource;
   return (
     <div className="space-y-1 pt-0.5">
       {source.mayChoose ? (
-        <Link href={chooseHref(source.kind, source.where)} title={title} tabIndex={inert ? -1 : undefined} className="ask inline-flex max-w-full items-center gap-2">
+        <Link href={chooseHref(source.kind, source.where)} title={title} tabIndex={inert ? -1 : undefined}
+          className={doc ? "ask inline-flex max-w-full items-center gap-2" : cn(btn("primary", "sm"), "max-w-full gap-2")}>
           <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> <span className="flex min-w-0 items-baseline gap-2 truncate">{words}</span>
         </Link>
       ) : doc ? (

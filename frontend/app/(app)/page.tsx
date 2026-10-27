@@ -304,9 +304,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const TODAY = ["verdict", "release", "returned", "unsent", "owed", "requirements"];
   const today = TODAY.flatMap((id) => rows[id]);
   const todayAspects = ASPECTS.filter((one) => TODAY.includes(one.id) && rows[one.id].length);
-  const TODAY_WORD: Record<string, string> = { verdict: "to decide", release: "to release", returned: "came back", unsent: "to send", owed: "to upload", requirements: "on the schedule" };
-  const todayNote = todayAspects.map((one) => `${rows[one.id].length} ${TODAY_WORD[one.id]}`).join(" · ");
-  const longest = Math.max(0, ...all.map((one) => daysOf(one.at) ?? 0));
+  // The longest wait, and the kind it is in: its figure opens that kind (folded, never spread over a long list).
+  const oldest = ASPECTS.reduce<{ id: string | null; days: number }>((best, one) => rows[one.id].reduce(
+    (b, row) => ((daysOf(row.at) ?? 0) > b.days ? { id: one.id, days: daysOf(row.at) ?? 0 } : b), best), { id: null, days: 0 });
+  const longest = oldest.days;
   // Asked for one kind, the page becomes that one kind, in full.
   const opened = view ? ASPECTS.find((one) => one.id === view) : null;
 
@@ -341,9 +342,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
         <div className="home-rule mt-4 grid grid-cols-2 gap-4 border-t pt-3.5 md:grid-cols-4">
           <Fig value={today.length} label={today.length === 1 ? "needs you today" : "need you today"} index={0}
-            href={today.length ? "/?view=today" : undefined} note={todayNote || undefined} />
-          <Fig value={all.length} label="waiting on you in all" index={1} />
-          <Fig value={longest} unit="d" label={longest ? "the longest has waited" : "nothing has been left"} index={2} />
+            href={today.length ? "/?view=today" : undefined} />
+          <Fig value={all.length} label="waiting on you in all" index={1} href={all.length ? "/" : undefined} />
+          <Fig value={longest} unit="d" label={longest ? "the longest has waited" : "nothing has been left"} index={2}
+            href={oldest.id ? `/?view=${oldest.id}` : undefined} />
           {controller ? (
             <Fig
               href="/conformance"
@@ -359,15 +361,15 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       </header>
 
-      <nav aria-label="What is waiting" className="tabs mt-4">
+      <nav aria-label="What is waiting" className="seg mt-4">
         {/* Navigation keeps the reader where they were: switching aspect is a
             filter, not a new page, so the scroll position is left alone. */}
-        <Link href="/" scroll={false} aria-current={!view ? "page" : undefined} className="tab">
-          All <span className="tab-n">{all.length}</span>
+        <Link href="/" scroll={false} aria-current={!view ? "page" : undefined} className="segment">
+          All <span className="segment-n">{all.length}</span>
         </Link>
         {today.length ? (
-          <Link href="/?view=today" scroll={false} aria-current={view === "today" ? "page" : undefined} className="tab">
-            Today <span className="tab-n">{today.length}</span>
+          <Link href="/?view=today" scroll={false} aria-current={view === "today" ? "page" : undefined} className="segment">
+            Today <span className="segment-n">{today.length}</span>
           </Link>
         ) : null}
         {ASPECTS.filter((one) => rows[one.id].length).map((one) => {
@@ -378,10 +380,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               href={`/?view=${one.id}`}
               scroll={false}
               aria-current={view === one.id ? "page" : undefined}
-              className="tab"
+              className="segment"
             >
               {one.tab}
-              <span className={`tab-n ${stale ? "tab-late" : ""}`}>{rows[one.id].length}</span>
+              <span className={`segment-n ${stale ? "segment-late" : ""}`}>{rows[one.id].length}</span>
             </Link>
           );
         })}
@@ -393,7 +395,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             href="/?view=log"
             scroll={false}
             aria-current={view === "log" ? "page" : undefined}
-            className="tab ml-auto"
+            className="segment ml-auto"
           >
             The log
           </Link>
