@@ -118,14 +118,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (owner: "fields are the same colour as the background").
 - **The menu never scrolls** (owner: "we can't have a scrolled menu, it should be fixed at all times";
   `app/(app)/navigation.tsx`): it fits the window, tightening on a shorter one (`short:` under 880 pixels high: the lines
-  under the names go, smaller marks; `tiny:` under 740: tighter still; variants in `globals.css`), scrolling only as a
+  under the names go, smaller marks; `tiny:` under 740: tighter still; `tight:` under 680, rows and marks at their closest; variants in `globals.css`;
+  checked in a browser to fit, "+ More" open, down to about 540 pixels; owner, after rows too close: "add some space"), scrolling only as a
   last resort on a very small screen. It holds the work only: no "Create document" (the register's "New document" does
   it), no Settings and no Help (owner: both are in the top bar, Settings as a gear beside Help, for whoever a Settings
-  page opens to); folding it to icons is a small round button on its right edge, taking no room in it. The rest of the
+  page opens to); folding it to icons is the menu's last line, "Fold the menu" (owner: "now we can squeeze the expand
+  button into the bar"; it was a round button on the menu's edge). The rest of the
   menu stays as it is (owner: no regrouping of its entries), but for Reviews and Packages, daily work, moved above
   "+ More" (owner: "the separator should be after packages"). **One frame** (owner: "both side and top bar need a proper
-  update"): the menu's mark and the top bar are the same height (`h-16`) and closed by one line, the fold button sitting
-  where they meet, in the page's colours a shade greyer (owner: not the menu's navy), light or dark with the page. **The page you are on is a light row** (owner: the gold, larger tile was bad), its icon the size of
+  update"): the menu's mark and the top bar are the same height (`h-16`) and closed by one line. **The page you are on is a light row** (owner: the gold, larger tile was bad), its icon the size of
   every other; faint words at least slate-400 on the navy. **"+ More"** is one small line taking almost no room (owner:
   no separator), "− Less" once open, remembered as it was left (cookie `nav-more`, read by the server), open by itself
   while you are on one of its pages, named on hover when the menu is folded. **The top bar** (owner: "icon's order makes

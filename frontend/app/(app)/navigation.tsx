@@ -159,13 +159,13 @@ function NavLink({
       className={cn(
         // One row per entry, the same height folded or open; the page you are on is a light row, its icon as any other.
         "group flex rounded-lg outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-gold/70 rail:justify-center rail:px-0",
-        compact ? "items-center gap-3 px-2 py-1 tiny:py-0" : "items-start gap-3 px-2 py-2 short:items-center short:py-1 rail:py-1 tiny:py-0.5",
+        compact ? "items-center gap-3 px-2 py-1 tight:py-0" : "items-start gap-3 px-2 py-2 short:items-center short:py-1 rail:py-1.5 tight:py-0.5",
         active ? "bg-white/12 text-white" : "text-slate-300 hover:bg-white/6 hover:text-white",
       )}
     >
       <span
         className={cn(
-          "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors rail:mt-0 short:mt-0 tiny:h-7 tiny:w-7",
+          "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors rail:mt-0 short:mt-0 tight:h-7 tight:w-7",
           active ? "text-white" : "text-slate-400 group-hover:text-white",
         )}
       >
@@ -217,8 +217,8 @@ function SidebarBody({ perms, moreOpen, onNavigate, onTip, drawer = false }: {
       {drawer ? <SearchBox className="mt-3" dark onSearch={onNavigate} /> : null}
 
       {/* Never scrolled (owner): everything is laid out to fit the window; scrolling is only a last resort on a very small screen. */}
-      <nav className="scroll-thin -mx-1 min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-1 pt-4 short:pt-3 tiny:pt-2" aria-label="Primary navigation">
-        <ul className="space-y-0.5">
+      <nav className="scroll-thin -mx-1 min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-1 pt-4 short:pt-3 tight:pt-2" aria-label="Primary navigation">
+        <ul className="space-y-1 tight:space-y-0.5">
           {primary.map((item) => (
             <li key={item.href}>
               <NavLink item={item} pathname={pathname} onNavigate={onNavigate} onTip={onTip} />
@@ -244,7 +244,7 @@ function SidebarBody({ perms, moreOpen, onNavigate, onTip, drawer = false }: {
               {open ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
               <span className="rail:hidden">{open ? "Less" : "More"}</span>
             </summary>
-            <ul className="mt-0.5 space-y-0.5">
+            <ul className="mt-0.5 space-y-1 tight:space-y-0.5">
               {more.map((item) => (
                 <li key={item.href}>
                   <NavLink item={item} pathname={pathname} compact onNavigate={onNavigate} onTip={onTip} />
@@ -298,12 +298,25 @@ export function Sidebar({ perms, moreOpen }: { perms: NavPermissions; moreOpen: 
   };
 
   return (
-    <>
     <aside
       className="sidebar-desktop palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-67 flex-col border-r border-[#254663] bg-[#102a43] px-4 pb-4 text-slate-200 short:pb-3 lg:flex rail:px-2.5 dark:border-white/5 dark:bg-[#0c1522]"
       style={{ width: "var(--sidebar-w)" }}
     >
       <SidebarBody perms={perms} moreOpen={moreOpen} onTip={(t) => { if (!dragging.current) setTip(t); }} />
+      {/* Folding to icons is the menu's last line (owner: now that the menu has room, inside it). */}
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={rail ? "Expand the menu" : "Fold the menu to icons"}
+        onMouseEnter={(e) => tipFor(e, "Expand the menu", (t) => { if (!dragging.current) setTip(t); })}
+        onMouseLeave={() => setTip(null)}
+        className="mt-2 flex shrink-0 items-center gap-3 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-400 outline-none transition-colors hover:bg-white/6 hover:text-white focus-visible:ring-2 focus-visible:ring-gold/70 rail:justify-center rail:px-0"
+      >
+        <span className="grid h-6 w-8 shrink-0 place-items-center">
+          {rail ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </span>
+        <span className="rail:hidden">Fold the menu</span>
+      </button>
       {/* Drag to resize; double-click to switch between icons and full width. */}
       <div
         role="separator"
@@ -326,19 +339,6 @@ export function Sidebar({ perms, moreOpen }: { perms: NavPermissions; moreOpen: 
         </span>
       ) : null}
     </aside>
-    {/* Folding to icons sits on the menu's edge, taking no room in it (owner), in the page's own colours, a shade
-        greyer and bluer (owner: not the menu's): drawn outside the menu, whose colours stay light in the dark. */}
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label={rail ? "Expand the menu" : "Fold the menu to icons"}
-      title={rail ? "Expand the menu" : "Fold the menu to icons"}
-      className="no-print fixed top-16 z-30 hidden h-6 w-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-line-strong bg-canvas text-slate-500 shadow-[0_1px_3px_rgb(16_42_67/0.18)] outline-none transition hover:bg-tint hover:text-brand-ink focus-visible:ring-2 focus-visible:ring-gold/70 lg:grid"
-      style={{ left: "var(--sidebar-w)" }}
-    >
-      {rail ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
-    </button>
-    </>
   );
 }
 

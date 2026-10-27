@@ -7,6 +7,7 @@
 /* The menu fits the window, never scrolls (owner): on a shorter screen it tightens, then drops the lines under the names. */
 @custom-variant short (@media (max-height: 880px));
 @custom-variant tiny (@media (max-height: 740px));
+@custom-variant tight (@media (max-height: 680px));
 
 :root {
   --sidebar-w: 268px;
