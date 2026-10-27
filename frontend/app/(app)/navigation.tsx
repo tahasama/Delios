@@ -159,7 +159,7 @@ function NavLink({
       className={cn(
         // One row per entry, the same height folded or open; the page you are on is a light row, its icon as any other.
         "group flex rounded-lg outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-gold/70 rail:justify-center rail:px-0",
-        compact ? "items-center gap-3 px-2 py-1 tight:py-0" : "items-start gap-3 px-2 py-2 short:items-center short:py-1 rail:py-1.5 tight:py-0.5",
+        compact ? "items-center gap-3 px-2 py-1.5 short:py-1 tight:py-0.5" : "items-start gap-3 px-2 py-2 short:items-center short:py-1 rail:py-1.5 tight:py-0.5",
         active ? "bg-white/12 text-white" : "text-slate-300 hover:bg-white/6 hover:text-white",
       )}
     >
