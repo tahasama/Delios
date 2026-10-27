@@ -1404,7 +1404,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   administrators; `LinesImport kind="org-sets"`, `POST /api/admin/lists/values/many`, the workbook `template-sets?level=organization`):
   the same two pages, written whole or not at all, every project reading a list getting the change, a project's own copy
   never touched.
-- Import & export (owner): the import takes the page's whole width, "Take a copy out" under it; the setup Tip's steps
+- Import & export (owner): the import (what is brought in, the file) and "Take a copy out" side by side; once a list is
+  checked, its lines take the page's whole width in a card of their own under them (`#import-results`, filled by
+  `InSlot`, `components/slot.tsx`); the setup Tip's steps
   stand side by side as a path (`Tip row`); every import's lines in tabs by outcome (All · New · Update · No change ·
   Problem), as the Schedule's check.
 - Every spreadsheet read (Schedule lists, Import & export) first passes `SheetGuard` (backend):

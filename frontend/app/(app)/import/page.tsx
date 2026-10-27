@@ -82,38 +82,46 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
 
       {allowed ? (
         <>
-          {/* A step chosen above opens its import, the whole width of the page: the form starts again on that kind. */}
-          <BulkImportForm key={chosen} initialKind={chosen} admin={isAdmin(ctx.user)} keeps={keeps} sources={sources} />
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+            {/* A step chosen above opens its import: the form starts again on that kind. */}
+            <BulkImportForm key={chosen} initialKind={chosen} admin={isAdmin(ctx.user)} keeps={keeps} sources={sources} />
 
-          <section className="register register-sheet register-sheet-open" aria-labelledby="export-head">
-            <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5">
-              <span id="export-head" className="stencil mr-1 text-slate-500">Take a copy out</span>
-              <span className="text-[11px] text-slate-500">as it stands now (CSV); each file is named with the day and time it was made</span>
-            </div>
-            <div className="grid divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0">
-              {EXPORTS.map((group) => (
-                <div key={group.group} className="px-5 py-3">
-                  <p className="mb-1 text-xs font-semibold text-slate-800">{group.group}</p>
-                  <ul>
-                    {group.items.map((item) => (
-                      <li key={item.kind}>
-                        <a
-                          href={`/api/export/${item.kind}`}
-                          className="-mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-[13px] text-slate-700 hover:bg-tint-soft hover:text-brand-ink"
-                        >
-                          <span className="min-w-0">
-                            {item.label}
-                            {item.note ? <span className="ml-1.5 text-xs text-slate-500">{item.note}</span> : null}
-                          </span>
-                          <Download className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
+            <aside className="min-w-0">
+              <section className="register register-sheet register-sheet-open" aria-labelledby="export-head">
+                <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5">
+                  <span id="export-head" className="stencil mr-1 text-slate-500">Take a copy out</span>
+                  <span className="text-[11px] text-slate-500">as it stands now (CSV)</span>
                 </div>
-              ))}
-            </div>
-          </section>
+                <ul className="divide-y divide-line">
+                  {EXPORTS.map((group) => (
+                    <li key={group.group} className="px-5 py-3">
+                      <p className="mb-1 text-xs font-semibold text-slate-800">{group.group}</p>
+                      <ul>
+                        {group.items.map((item) => (
+                          <li key={item.kind}>
+                            <a
+                              href={`/api/export/${item.kind}`}
+                              className="-mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-[13px] text-slate-700 hover:bg-tint-soft hover:text-brand-ink"
+                            >
+                              <span className="min-w-0">
+                                {item.label}
+                                {item.note ? <span className="ml-1.5 text-xs text-slate-500">{item.note}</span> : null}
+                              </span>
+                              <Download className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+                <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500">Each file is named with the day and time it was made.</p>
+              </section>
+            </aside>
+          </div>
+
+          {/* Once a list is checked, its lines come here, the page's whole width (owner): `InSlot` in the imports. */}
+          <section id="import-results" className="register register-sheet register-sheet-open empty:hidden" />
         </>
       ) : null}
     </div>

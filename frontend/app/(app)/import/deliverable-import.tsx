@@ -7,6 +7,7 @@ import {
 } from "@/lib/documents/forms-deliverables";
 import type { DeliverableFields, DocumentField } from "@/lib/documents/deliverable-fields";
 import { btn, DataTable, Th, Td } from "@/components/ui";
+import { InSlot } from "@/components/slot";
 import { Select } from "@/components/select";
 import { FileSpreadsheet, Pencil, Undo2, X } from "lucide-react";
 
@@ -220,7 +221,9 @@ export function DeliverableImport({ fromDocument }: { fromDocument?: { label: st
       </div>
 
       {lines && view ? (
-        <div className="space-y-3 border-t border-line px-5 py-4 sm:px-6" aria-live="polite">
+        // The lines take the page's whole width, in a card of their own under the upload (owner).
+        <InSlot id="import-results">
+        <div className="space-y-3 border-t border-line px-5 py-4 first:border-t-0 sm:px-6" aria-live="polite">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-sm font-semibold text-slate-800">What this list will do</h2>
             <div className="seg" aria-label="Which lines">
@@ -349,6 +352,7 @@ export function DeliverableImport({ fromDocument }: { fromDocument?: { label: st
             ) : <span className="text-slate-700">Nothing to bring in: every line on the list already reads as in the register.</span>}
           </div>
         </div>
+        </InSlot>
       ) : null}
     </div>
   );
