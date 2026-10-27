@@ -3,6 +3,7 @@
 import { Children, Fragment, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { Floating } from "@/components/floating";
 
 type Option = { value: string; label: string; disabled: boolean; group: string | null };
 
@@ -35,18 +36,6 @@ function optionsOf(children: React.ReactNode, group: string | null = null, into:
   return into;
 }
 
-/** The room under a box before the window's edge or the first box around it that cuts what overflows it, whichever comes first. */
-function roomBelow(el: HTMLElement | null): number {
-  if (!el) return Infinity;
-  const bottom = el.getBoundingClientRect().bottom;
-  let limit = window.innerHeight;
-  for (let at = el.parentElement; at; at = at.parentElement) {
-    const style = getComputedStyle(at);
-    if (/(hidden|auto|scroll|clip)/.test(style.overflowY + style.overflow)) { limit = Math.min(limit, at.getBoundingClientRect().bottom); break; }
-  }
-  return limit - bottom;
-}
-
 type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement> & { children?: React.ReactNode };
 
 /**
@@ -61,11 +50,10 @@ export function Select({ children, className, style, disabled, title, id, ...res
   const native = useRef<HTMLSelectElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const narrowRef = useRef<HTMLInputElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const list = useId();
   const [value, setValue] = useState<string>(String(rest.value ?? rest.defaultValue ?? options[0]?.value ?? ""));
   const [open, setOpen] = useState(false);
-  // Opens upward when there is not room under it (the window's edge, or a card that cuts what overflows it).
-  const [up, setUp] = useState(false);
   const [active, setActive] = useState(0);
   const [words, setWords] = useState("");
   const chosen = options.find((one) => one.value === value);
@@ -90,7 +78,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
 
   useEffect(() => {
     if (!open) return;
-    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
+    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", away);
     if (long) narrowRef.current?.focus();
     return () => document.removeEventListener("mousedown", away);
@@ -100,7 +88,6 @@ export function Select({ children, className, style, disabled, title, id, ...res
     if (disabled) return;
     setWords("");
     setActive(Math.max(0, options.findIndex((one) => one.value === value && !one.disabled)));
-    setUp(roomBelow(box.current) < Math.min(320, options.length * 32 + (long ? 44 : 12)));
     setOpen(true);
   }
   /** Chooses as the browser would: the select takes the value and says so (a filter applies at once with the pointer). */
@@ -151,7 +138,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
         onKeyDown={key}
         onBlur={(event) => {
           // Leaving the box is when a choice made with the keys applies (as on the register's filters).
-          if (!box.current?.contains(event.relatedTarget as Node)) native.current?.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+          if (!box.current?.contains(event.relatedTarget as Node) && !panel.current?.contains(event.relatedTarget as Node)) native.current?.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
         }}
         className={cn(className, "flex items-center justify-between gap-2 text-left", plain ? "" : "pr-0.5")}
       >
@@ -159,7 +146,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
         {plain ? null : <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform duration-150", open && "rotate-180")} aria-hidden="true" />}
       </button>
       {open ? (
-        <div className={cn("absolute left-0 z-40 min-w-full max-w-[28rem] rounded-md bg-surface py-1 shadow-lg ring-1 ring-line", up ? "bottom-full mb-1" : "mt-1")}>
+        <Floating anchor={box} panel={panel} width="at-least" room={Math.min(320, options.length * 32 + (long ? 44 : 12))} className="py-1">
           {long ? (
             <div className="relative border-b border-line px-2 pb-1">
               <Search className="pointer-events-none absolute top-1/2 left-3.5 h-3.5 w-3.5 -translate-y-[60%] text-slate-400" aria-hidden />
@@ -168,7 +155,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
                 className="h-7 w-full bg-transparent pl-7 text-[13px] text-slate-800 outline-none placeholder:text-slate-400" />
             </div>
           ) : null}
-          <ul id={list} role="listbox" className="scroll-thin max-h-80 overflow-y-auto">
+          <ul id={list} role="listbox" className="scroll-thin min-h-0 flex-1 overflow-y-auto">
             {shown.length === 0 ? <li className="px-3 py-2 text-xs text-slate-400">Nothing matches that.</li> : null}
             {shown.map((one, index) => {
               const on = one.value === value;
@@ -188,7 +175,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
               );
             })}
           </ul>
-        </div>
+        </Floating>
       ) : null}
     </div>
   );

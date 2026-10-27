@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { inputCls } from "@/components/ui";
 import { cn } from "@/lib/core/utils";
+import { Floating } from "@/components/floating";
 import { findOursAction } from "@/lib/documents/forms-numbers";
 
 type Found = { id: string; number: string; title: string; revision: string | null };
@@ -19,6 +20,7 @@ export function MatchDocument({ proposed }: { proposed?: Found | null }) {
   // Lists on a click and narrows as one types (owner), like every search field.
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (chosen || !open) { setFound([]); return; }
     let live = true;
@@ -26,7 +28,7 @@ export function MatchDocument({ proposed }: { proposed?: Found | null }) {
     return () => { live = false; clearTimeout(wait); };
   }, [words, chosen, open]);
   useEffect(() => {
-    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
+    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", away);
     return () => document.removeEventListener("mousedown", away);
   }, []);
@@ -48,7 +50,8 @@ export function MatchDocument({ proposed }: { proposed?: Found | null }) {
         onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} autoComplete="off" placeholder="Choose, or type to narrow" aria-label="Find our document in the register"
         className={cn(inputCls, "w-full pl-8")} />
       {open && found.length ? (
-        <ul className="scroll-thin absolute z-30 mt-1 max-h-80 w-[28rem] overflow-y-auto rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
+        <Floating anchor={box} panel={panel} width={448}>
+        <ul className="scroll-thin min-h-0 flex-1 overflow-y-auto py-1">
           {found.map((one) => (
             <li key={one.id}>
               <button type="button" onClick={() => setChosen(one)} className="block w-full px-3 py-1.5 text-left text-xs hover:bg-tint-soft">
@@ -58,6 +61,7 @@ export function MatchDocument({ proposed }: { proposed?: Found | null }) {
             </li>
           ))}
         </ul>
+        </Floating>
       ) : null}
     </span>
   );

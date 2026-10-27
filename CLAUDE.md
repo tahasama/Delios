@@ -879,8 +879,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   The bottom bar for ticked values: Retire, Bring back, and for those never used, Move to another set and Delete.
 - **Every dropdown is the app's** (owner: "all drawers, lists of choices adopt this styling", the numbering's): `Select`
   (`components/select.tsx`) replaces every `<select>`: the chosen one ticked and bold, the one under the keys shaded,
-  groups under their names, a field to narrow a list longer than 12, opening upward when there is no room under it (the
-  window's edge or a card cutting what overflows it, `roomBelow`). The native select stays hidden in the form holding
+  groups under their names, a field to narrow a list longer than 12. **Every list that opens from a field is drawn over
+  the page** (owner: "drawers are blocked by their card… some show to the side and create an horizontal scroll";
+  `components/floating.tsx`, `Floating`, on the page's body): under its field, or above it when the window has no room,
+  held inside the window's width, followed as the page scrolls; a click outside it or Escape closes it. `Select`,
+  `JumpPick`, `Choice`, the recipient picker, "One of ours?", the date filter and the Filters menu use it (`SearchPick`
+  and the register's column menu were already so). Never an `absolute` list under a field again. The native select stays hidden in the form holding
   the value (name, `form`, `required`, `defaultValue`, `value`, `onChange` work as before; a pointer pick applies a
   filter at once, a keyboard one on leaving). Never a bare `<select>` again. The search fields' lists (`SearchPick`,
   `JumpPick`, the recipient picker, "One of ours?") take the same look, and every one lists on a click and narrows as

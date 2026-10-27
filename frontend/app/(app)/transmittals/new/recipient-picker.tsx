@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { Floating } from "@/components/floating";
 
 /**
  * `offline` is set for an organization with no accounts here: who of ours sends
@@ -115,11 +116,13 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
   const box = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const listId = copy ? "cc-options" : "to-options";
 
   // Clicking anywhere else closes the list.
   useEffect(() => {
-    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
+    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", away);
     return () => document.removeEventListener("mousedown", away);
   }, []);
@@ -160,7 +163,7 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
       </p>
 
       <div className="relative">
-        <div className="relative">
+        <div ref={field} className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <label className="block min-w-0">
             <span className="sr-only">{copy ? "Find somebody to copy in" : "Find a person"}</span>
@@ -188,7 +191,8 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
 
         {/* It opens on a click and narrows as one types (owner, everywhere). */}
         {open ? (
-          <ul id={listId} role="listbox" className="scroll-thin absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
+          <Floating anchor={field} panel={panel} width="anchor">
+          <ul id={listId} role="listbox" className="scroll-thin min-h-0 flex-1 overflow-y-auto py-1">
             {options.length === 0 ? (
               <li className="px-3 py-2 text-xs text-slate-400">Nobody matches that.</li>
             ) : options.map((option, i) => (
@@ -211,6 +215,7 @@ function Block({ label, hint, required, copy, everyone, companies, chosen, onAdd
               </li>
             ))}
           </ul>
+          </Floating>
         ) : null}
       </div>
 
