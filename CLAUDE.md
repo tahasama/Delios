@@ -1935,6 +1935,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   download watch still tells the administrators). A refusal is said in plain words (429, TOO_MANY_REQUESTS, "Too many
   requests in a short time. Wait a moment and try again.", with Retry-After). Tests raise both (`DeliosFactory`). A new
   call that sends files or many lines takes `.RequireRateLimiting("heavy")`.
+- **What the code scan (Semgrep) found is answered in the file** (owner, 27 Oct 2026): base images and CI actions are
+  pinned (Node at a patched release, `node:22.23.4-alpine`; each GitHub action at its commit, its version beside it),
+  every container runs as a user of its own or says why not beside it (`# nosemgrep: <rule>` with the reason: Postgres
+  and ClamAV start as root only to drop to their own user), and the assistant's skills are left out of the scan
+  (`.semgrepignore`).
 - **Known weaknesses in our packages are checked by themselves** (owner, "security checks"; `.github/workflows/security.yml`):
   on every push touching the server or the screens' packages, and once a week (a weakness may be published about a
   package already in use; the build's clock, not the app's). A high or critical one stops the check; moderate and low

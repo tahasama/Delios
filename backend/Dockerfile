@@ -16,4 +16,6 @@ EXPOSE 8080 9091
 # Each check starts the app once more to ask it: often while starting, then every 5 minutes.
 HEALTHCHECK --interval=5m --timeout=10s --start-period=60s --start-interval=3s --retries=3 \
   CMD ["dotnet", "Delios.Host.dll", "healthcheck"]
+# Said outright, though the chiseled image already runs as this user (1654).
+USER $APP_UID
 ENTRYPOINT ["dotnet", "Delios.Host.dll"]

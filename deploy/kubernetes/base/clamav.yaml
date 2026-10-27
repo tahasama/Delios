@@ -11,6 +11,10 @@ spec:
     metadata:
       labels: { app.kubernetes.io/name: clamav }
     spec:
+      # Not runAsNonRoot: the image starts as root only to write its settings, then runs clamd and freshclam as its own
+      # clamav user. What a container may gain is still closed: no privilege escalation, the runtime's system-call filter.
+      # nosemgrep: yaml.kubernetes.security.run-as-non-root.run-as-non-root
+      securityContext: { seccompProfile: { type: RuntimeDefault } }
       containers:
         - name: clamav
           image: clamav/clamav:stable
@@ -22,6 +26,7 @@ spec:
               grep -q '^StreamMaxLength' /etc/clamav/clamd.conf ||
               printf 'StreamMaxLength 2048M\nMaxFileSize 2048M\nMaxScanSize 4096M\nAlertEncrypted yes\nAlertExceedsMax yes\n' >> /etc/clamav/clamd.conf;
               exec /init
+          securityContext: { allowPrivilegeEscalation: false }
           ports: [{ name: clamd, containerPort: 3310 }]
           readinessProbe:
             tcpSocket: { port: clamd }

@@ -12,5 +12,9 @@ COPY --chmod=755 initdb/ /docker-entrypoint-initdb.d/
 # fails to start ("No such file or directory"). Strip them whatever the checkout.
 RUN sed -i 's/\r$//' /usr/local/bin/delios-entrypoint.sh /usr/local/bin/pgbackrest-conf.sh \
       /usr/local/bin/backup-loop.sh /usr/local/bin/restore-drill.sh /docker-entrypoint-initdb.d/*
+# No USER on purpose: as in the official image, the entrypoint starts as root only to set up its folders, then
+# runs Postgres and the backups as the postgres user (gosu). A USER here would stop it from starting.
+# nosemgrep: dockerfile.security.missing-user-entrypoint.missing-user-entrypoint
 ENTRYPOINT ["delios-entrypoint.sh"]
+# nosemgrep: dockerfile.security.missing-user.missing-user
 CMD ["postgres"]

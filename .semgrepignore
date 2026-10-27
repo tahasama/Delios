@@ -1,0 +1,5 @@
+# Skills installed for the assistant (third-party guidance and helper scripts): never part of the app, never shipped.
+:include .gitignore
+node_modules/
+.claude/skills/
+.agents/skills/
