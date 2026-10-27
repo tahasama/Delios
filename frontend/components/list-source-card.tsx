@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import { cn } from "@/lib/core/utils";
-import { chooseHref, type ListSource } from "@/lib/actions/list-sources";
+import { chooseHref, type ListSource } from "@/lib/actions/list-source-kinds";
 
 /**
  * Where a list comes from (owner: "make it more visible"), the same card on the Schedule and on Import & export: its

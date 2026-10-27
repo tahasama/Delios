@@ -6,11 +6,11 @@ import { isAdmin, isReadOnly } from "@/lib/core/auth";
 import { parseCsv, toObjects } from "@/lib/core/csv";
 import { api, apiFetch, problemOf, projectPath, refusal } from "@/lib/client";
 import { sheetRefusal } from "@/lib/documents/sheet-check";
-import { getSet, getSets, organizationSet, organizationSets } from "@/lib/settings/config";
+import { getActiveSet, getSet, getSets, organizationSet, organizationSets } from "@/lib/settings/config";
 import { propFieldsFor } from "@/lib/settings/set-props";
 import { adminFunctions, adminParties, adminUsers } from "@/lib/settings/api-admin";
 import { matrixRows, planChanges, readRows } from "@/lib/settings/matrix-read";
-import type { ListSourceKind } from "@/lib/actions/list-sources";
+import type { ListSourceKind } from "@/lib/actions/list-source-kinds";
 import { releasedFile } from "@/lib/actions/list-files";
 
 /**
@@ -130,13 +130,14 @@ async function linesOf(kind: LinesKind, file: File): Promise<{ lines: Line[] } |
 /** What each line is asked, for correcting it in place: the form's fields, each list offering what applies. */
 async function fieldsOf(kind: LinesKind): Promise<LineField[]> {
   if (kind === "people") {
-    const [functions, parties] = await Promise.all([adminFunctions().then((all) => all.filter((f) => f.active)), adminParties()]);
+    const [functions, parties, disciplines] = await Promise.all([adminFunctions().then((all) => all.filter((f) => f.active)), adminParties(), getActiveSet("DISCIPLINES")]);
     return [
       { key: "name", label: "Name", kind: "text", required: true },
       { key: "email", label: "Email", kind: "text", required: true },
       { key: "company", label: "Company", kind: "choice", values: parties.map((p) => ({ code: p.code, label: p.name })), note: "none: ours" },
       { key: "function", label: "Function", kind: "choice", values: functions.map((f) => ({ code: f.name, label: f.name })), required: true },
-      { key: "department", label: "Department", kind: "text" },
+      // Chosen from the project's disciplines, never typed (owner), as People & access asks it.
+      { key: "department", label: "Department", kind: "choice", values: disciplines.map((d) => ({ code: d.code, label: d.label })), note: "their discipline" },
     ];
   }
   if (kind === "matrix") {
@@ -172,7 +173,7 @@ async function fieldsOf(kind: LinesKind): Promise<LineField[]> {
 
 /** The team: each line against who has an account and is on the project, then through the backend's own adding. */
 async function people(ctx: Ctx, lines: Line[], write: boolean): Promise<{ checks: LineCheck[]; written: boolean }> {
-  const [functions, parties, users] = await Promise.all([adminFunctions().then((all) => all.filter((f) => f.active)), adminParties(), adminUsers()]);
+  const [functions, parties, users, disciplines] = await Promise.all([adminFunctions().then((all) => all.filter((f) => f.active)), adminParties(), adminUsers(), getActiveSet("DISCIPLINES")]);
   const seen = new Map<string, number>();
   for (const l of lines) seen.set(l.values.email ?? "", (seen.get(l.values.email ?? "") ?? 0) + 1);
   const sent: { at: string; name: string; email: string; partyId: string | null; functionId: string | null; department: string | null }[] = [];
@@ -183,6 +184,9 @@ async function people(ctx: Ctx, lines: Line[], write: boolean): Promise<{ checks
     if (!v.name) problems.push("No name.");
     if (!v.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) problems.push("The email is not a valid address.");
     if ((seen.get(v.email ?? "") ?? 0) > 1) problems.push("The same email is on the list twice.");
+    // A department is one of the project's disciplines, by its code or its name.
+    const discipline = v.department ? disciplines.find((d) => d.code.toLowerCase() === v.department!.toLowerCase() || d.label.toLowerCase() === v.department!.toLowerCase()) : null;
+    if (v.department && !discipline) problems.push(`"${v.department}" is not a discipline of this project: choose one from the list.`);
     const fn = functions.find((f) => f.name.toLowerCase() === (v.function ?? "").toLowerCase() || f.code.toLowerCase() === (v.function ?? "").toLowerCase());
     if (!fn) problems.push(v.function ? `No function called "${v.function}" (Settings → Functions & permissions).` : "No function.");
     const party = v.company ? parties.find((p) => p.code.toLowerCase() === v.company!.toLowerCase() || p.name.toLowerCase() === v.company!.toLowerCase()) : null;
@@ -190,7 +194,7 @@ async function people(ctx: Ctx, lines: Line[], write: boolean): Promise<{ checks
     if (problems.length) return { at: l.at, outcome: "PROBLEM", title, changes: [], problems };
     const known = users.find((u) => u.email.toLowerCase() === v.email);
     const here = known?.memberships.find((m) => m.projectId === ctx.projectId && m.active);
-    const department = v.department || null;
+    const department = discipline?.code ?? null;
     if (here && here.functionId === fn!.id && (here.department ?? null) === department) return { at: l.at, outcome: "SAME", title, changes: [], problems: [] };
     sent.push({ at: l.at, name: v.name!, email: v.email!, partyId: party?.id ?? null, functionId: fn!.id, department });
     if (!known) return { at: l.at, outcome: "NEW", title, changes: [], problems: [] };

@@ -676,6 +676,15 @@ public static class DirectoryEndpoints
         var function = request.FunctionId is { } fid ? await db.Functions.AsNoTracking().SingleOrDefaultAsync(f => f.Id == fid && f.Active, cancellationToken) : null;
         if (request.FunctionId is not null && function is null) return Problems.Invalid("FUNCTION_UNKNOWN", "Choose one of the organization's functions.");
         var membership = await db.Memberships.SingleOrDefaultAsync(m => m.ProjectId == projectId && m.UserId == request.UserId, cancellationToken);
+        // A department is a discipline of the project's list, chosen, never typed (owner): a new one is refused unless it is
+        // one; what someone already held stays as it is until changed.
+        if (Blank(request.Department) is { } asked && asked != membership?.Department)
+        {
+            var catalog = await Documents.Catalog.LoadAsync(db, cancellationToken);
+            if (catalog.Find(ValueSets.Disciplines, asked) is not { } discipline)
+                return Problems.Invalid("DEPARTMENT_UNKNOWN", $"\"{asked}\" is not a discipline of this project: choose one from its list (Settings → Types & sets).");
+            request = request with { Department = discipline };
+        }
         // Who keeps the people here: the control function; where the project lets everyone add, whoever holds Manage
         // too (everyone else adds from the project directory). An administrator always may, and is never held for
         // confirmation: they set the project up.

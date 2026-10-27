@@ -7,7 +7,7 @@ import { requireScope } from "@/lib/core/scope";
 import { api, projectPath, refusal } from "@/lib/client";
 import { filesOf } from "@/lib/documents/api-uploads";
 import { planLists, type PlanListKind } from "@/lib/actions/plan-lists";
-import type { ListSourceKind } from "@/lib/actions/list-sources";
+import type { ListSourceKind } from "@/lib/actions/list-source-kinds";
 
 type Result = { error?: string; ok?: string; link?: { href: string; label: string } };
 

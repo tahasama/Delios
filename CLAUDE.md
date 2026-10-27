@@ -1376,7 +1376,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `/admin/functions/rules/many`, `/projects/{id}/lists/values/many`), the check being the same run undone (`dry`). The old
   way (write the rows that pass, leave the others out, download the rows with problems) is gone: a line with a problem
   is corrected or taken off. A person on the team list who has an account already is put on the project, or their
-  function and department changed. Each kind shows its register document (chosen in the register as the schedule's
+  function and department changed. **A department is always chosen from the project's disciplines, never typed**
+  (owner): the team list's line offers them as a dropdown, a value that is none (by code or name) is a problem, and the
+  backend refuses it everywhere a membership is set (`MemberAsync`, DEPARTMENT_UNKNOWN; what someone already held stays
+  until changed). Each kind shows its register document (chosen in the register as the schedule's
   lists) and "Bring in <number> rev X" reads its released revision's file into the same second page; what was brought in
   last, and from where, is kept (`POST /lists/sources/{kind}/brought`), and a revision released since is on Home ("list
   released", LIST_TO_BRING_IN) for whoever brings it in.
@@ -1407,7 +1410,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `csvSafe` (frontend), `ReportEndpoints.Csv` (backend).
 - A tip is `Tip` (`components/ui.tsx`): dashed frame on the page's surface (light and dark), yellow bulb, "Tip", bold
   lead; an order that works is numbered `steps`, each a link to where it is done, the current one marked. Never a rule
-  or a warning. On Import & export it sits right of the title: the setup order, each step opening its import.
+  or a warning. On Import & export it sits under the title, its steps side by side (`row`): the setup order, each step
+  opening its import.
 
 ### Reports
 - No overview tab: a page repeating the tabs' figures was removed (the owner: no use to anyone). Every tab adds
@@ -1823,6 +1827,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`POST /activities/{id}/needs/many`). An action's page reads only its own action (`planActionRead`), never the whole plan.
   Every check run on each opening has its index (whether someone opened a document in the last half hour: `audit_events`
   actor · entity · at; the audit trail by act: action · id).
+- **A file the browser runs never imports `lib/client.ts`** (it is server-only: the production build fails, `npx tsc`
+  does not see it): types and plain helpers a client component needs live in a module of their own (the list sources'
+  in `lib/actions/list-source-kinds.ts`, re-exported by `list-sources.ts`). Before pushing a client component that
+  imports from `lib/`, check the chain.
 - **Kept answers, cleared by what changed** (owner: "huge misuse of Next.js built-in functions… whatever and whenever an
   activity happens, it triggers whatever needed to be updated, partially"): a read that says what it depends on
   (`api(path, { keep: { areas, doc?, fallback? } })`, `lib/core/kept.ts`) is kept by Next.js (`force-cache` with

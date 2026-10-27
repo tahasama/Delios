@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Download } from "lucide-react";
-import type { ListSource } from "@/lib/actions/list-sources";
+import type { ListSource } from "@/lib/actions/list-source-kinds";
 import { ListSourceCard } from "@/components/list-source-card";
 import { DeliverableImport } from "./deliverable-import";
 import { LinesImport } from "./lines-import";
