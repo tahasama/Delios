@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/core/utils";
 
 /** The top bar's tools share one size and one look; the one whose pages you are on stays lit. */
-export const TOOL = "relative grid h-9 w-9 place-items-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-link/30";
+export const TOOL = "relative grid h-(--control-h) w-(--control-h) place-items-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-link/30";
 const LIT = "bg-tint text-brand-ink hover:bg-tint hover:text-brand-ink";
 
 export function ToolLink({ href, label, children, also = [], wide }: {

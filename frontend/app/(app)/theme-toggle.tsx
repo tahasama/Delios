@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { PREF, savePreference } from "@/lib/core/preferences";
-import { TOOL } from "./top-tools";
 
 type Theme = "light" | "dark" | "system";
 const ORDER: Theme[] = ["light", "dark", "system"];
@@ -25,7 +24,8 @@ function savedTheme(): Theme {
   return found && ORDER.includes(found) ? found : "system";
 }
 
-export function ThemeToggle() {
+/** Light · Dark · Same as device, three plain choices in the account menu (owner: not a cycling button in the bar). */
+export function ThemeChoice() {
   const [theme, setTheme] = useState<Theme>("system");
 
   useEffect(() => {
@@ -43,21 +43,27 @@ export function ThemeToggle() {
     return () => mq.removeEventListener("change", onChange);
   }, [theme]);
 
-  const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
-  const Icon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
   return (
-    <button
-      type="button"
-      onClick={() => {
-        setTheme(next);
-        savePreference(PREF.theme, next);
-        apply(next);
-      }}
-      title={`Theme: ${LABEL[theme]} — switch to ${LABEL[next]}`}
-      aria-label={`Theme: ${LABEL[theme]}. Switch to ${LABEL[next]}`}
-      className={TOOL}
-    >
-      <Icon className="h-4.5 w-4.5" />
-    </button>
+    <div role="group" aria-label="Theme" className="seg flex w-full">
+      {ORDER.map((one) => {
+        const Icon = one === "dark" ? Moon : one === "light" ? Sun : Monitor;
+        return (
+          <button
+            key={one}
+            type="button"
+            aria-pressed={theme === one}
+            onClick={() => {
+              setTheme(one);
+              savePreference(PREF.theme, one);
+              apply(one);
+            }}
+            className="segment flex-1 justify-center gap-1 px-2 text-xs"
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {LABEL[one]}
+          </button>
+        );
+      })}
+    </div>
   );
 }

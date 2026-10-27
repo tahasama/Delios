@@ -10,6 +10,8 @@ export const PREF = {
   deviceDark: "theme-device-dark",
   /** The desktop sidebar's width in pixels. */
   sidebar: "sidebar",
+  /** "1" while "More" is left open in the menu. */
+  navMore: "nav-more",
   /** The review page's document column, in pixels (dragged wider, the side cards go under it). */
   reviewPane: "pane-review",
   /** The stamp card's preview, in pixels. */

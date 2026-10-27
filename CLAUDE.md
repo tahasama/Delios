@@ -124,9 +124,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
   page opens to); folding it to icons is a small round button on its right edge, taking no room in it. The rest of the
   menu stays as it is (owner: no regrouping of its entries). **One frame** (owner: "both side and top bar need a proper
   update"): the menu's mark and the top bar are the same height (`h-16`) and closed by one line, the fold button sitting
-  where they meet; an entry's icon has no box until it is the page you are on (then gold); the top bar's tools are one
-  size and look (`top-tools.tsx`, `TOOL` / `ToolLink`: Help, Settings lit while in them, theme, notifications), then your
-  name without a frame; the role reads in words ("we are supplier"), never its code.
+  where they meet. **The page you are on is a light row** (owner: the gold, larger tile was bad), its icon the size of
+  every other; faint words at least slate-400 on the navy. **"+ More"** is one small line taking almost no room (owner:
+  no separator), "− Less" once open, remembered as it was left (cookie `nav-more`, read by the server), open by itself
+  while you are on one of its pages, named on hover when the menu is folded. **The top bar** (owner: "icon's order makes
+  no sense"): the project's name with its code faded beside it, nothing more (no function, no "we are …": who you are
+  and what we are on it, you know already), its width capped; then search · Help · Settings (lit while in them) · the
+  bell · your name alone with a small arrow (no initial disc), every tool and the search at the control height
+  (`top-tools.tsx`, `TOOL` / `ToolLink`). Light or dark is chosen in your name's menu, three plain choices, Light · Dark ·
+  Same as device (`ThemeChoice`); Help is not repeated there. The top bar's menus (`details[data-menu]`, your name's,
+  the project list) close on picking, on Escape and on a click outside (`components/menu-closer.tsx`); the project list
+  scrolls past a height; the phone's menu closes the same way and carries the search.
 - A card's side colour is its own left edge (`border-l-[3px] border-l-(--rail)`), never a bar laid over it: it
   follows the rounded corners. A sheet left open (`register-sheet-open`) rounds its first and last strip seen (a hidden field or a
   mark before it does not count; a form wrapping the strips passes it on), so no band's square corner stands out.

@@ -14,6 +14,8 @@ import {
   LayoutDashboard,
   ListChecks,
   Menu,
+  Minus,
+  Plus,
   PanelLeftClose,
   PanelLeftOpen,
   Network,
@@ -154,16 +156,16 @@ function NavLink({
       onMouseEnter={(e) => tipFor(e, item.label, onTip)}
       onMouseLeave={() => onTip?.(null)}
       className={cn(
-        // One row per entry, the same height folded or open; the page you are on carries the brand's gold.
+        // One row per entry, the same height folded or open; the page you are on is a light row, its icon as any other.
         "group flex rounded-lg outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-gold/70 rail:justify-center rail:px-0",
         compact ? "items-center gap-3 px-2 py-1 tiny:py-0.5" : "items-start gap-3 px-2 py-2 short:items-center short:py-1 rail:py-1",
-        active ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/6 hover:text-white",
+        active ? "bg-white/12 text-white" : "text-slate-300 hover:bg-white/6 hover:text-white",
       )}
     >
       <span
         className={cn(
           "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors rail:mt-0 short:mt-0",
-          active ? "bg-gold text-[#102a43]" : "text-slate-400 group-hover:text-white",
+          active ? "text-white" : "text-slate-400 group-hover:text-white",
         )}
       >
         <item.icon className="h-4.5 w-4.5" />
@@ -171,7 +173,7 @@ function NavLink({
       <span className="min-w-0 rail:hidden">
         <span className={cn("block text-sm leading-5", active ? "font-semibold" : "font-medium")}>{item.label}</span>
         {!compact && item.description ? (
-          <span className={cn("block text-[11px] leading-4 short:hidden", active ? "text-slate-300" : "text-slate-500 group-hover:text-slate-400")}>
+          <span className={cn("block text-[11px] leading-4 short:hidden", active ? "text-slate-300" : "text-slate-400 group-hover:text-slate-300")}>
             {item.description}
           </span>
         ) : null}
@@ -180,17 +182,28 @@ function NavLink({
   );
 }
 
-function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNavigate?: () => void; onTip?: (t: Tip) => void }) {
+function SidebarBody({ perms, moreOpen, onNavigate, onTip, drawer = false }: {
+  perms: NavPermissions;
+  /** Whether "More" was left open (its cookie, read by the server). */
+  moreOpen: boolean;
+  onNavigate?: () => void;
+  onTip?: (t: Tip) => void;
+  /** The phone's drawer: room for its close button, and the search under the mark. */
+  drawer?: boolean;
+}) {
   const pathname = usePathname();
   const primary = primaryNav(perms);
   const more = moreNav(perms);
-  // Keep "More" open while the person is inside it, so they can see where they are.
+  // Open while the person is inside it, so they can see where they are; else as they left it.
   const insideMore = more.some((item) => isActive(pathname, item));
+  const [open, setOpen] = useState(moreOpen || insideMore);
+  useEffect(() => { if (insideMore) setOpen(true); }, [insideMore]);
+  const moreLabel = open ? "Fewer entries" : `${more.length} more entries`;
 
   return (
     <>
       {/* The mark, as tall as the top bar and closed by the same line, so the two bars read as one frame. */}
-      <div className="-mx-4 flex h-16 shrink-0 items-center border-b border-white/8 px-4 rail:-mx-2.5 rail:justify-center rail:px-0">
+      <div className={cn("-mx-4 flex h-16 shrink-0 items-center border-b border-white/8 px-4 rail:-mx-2.5 rail:justify-center rail:px-0", drawer && "pr-12")}>
         <Link href="/" onClick={onNavigate} className="flex min-w-0 items-center gap-3 rounded-lg px-1 text-white outline-none focus-visible:ring-2 focus-visible:ring-gold/70 rail:px-0">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gold text-sm font-black text-[#102a43]">D</span>
           <span className="min-w-0 rail:hidden">
@@ -200,8 +213,10 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
         </Link>
       </div>
 
+      {drawer ? <SearchBox className="mt-3" dark onSearch={onNavigate} /> : null}
+
       {/* Never scrolled (owner): everything is laid out to fit the window; scrolling is only a last resort on a very small screen. */}
-      <nav className="scroll-thin -mx-1 min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden px-1 pt-4 short:space-y-2 short:pt-3" aria-label="Primary navigation">
+      <nav className="scroll-thin -mx-1 min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-1 pt-4 short:pt-3" aria-label="Primary navigation">
         <ul className="space-y-0.5">
           {primary.map((item) => (
             <li key={item.href}>
@@ -211,14 +226,24 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
         </ul>
 
         {more.length ? (
-          <details open={insideMore} className="group/more">
-            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-500 transition hover:text-slate-200 rail:justify-center rail:px-0">
-              <span className="rail:hidden">More</span>
-              <span aria-hidden className="hidden h-px flex-1 bg-white/8 rail:hidden group-open/more:block" />
-              <span aria-hidden className="hidden w-6 border-t border-white/20 rail:block" />
-              <span className="ml-auto text-[10px] font-normal tracking-normal text-slate-600 group-open/more:hidden rail:hidden">{more.length}</span>
+          <details open={open} className="group/more">
+            {/* A small "+ More" taking almost no room (owner), remembered as it was left (cookie, read by the server). */}
+            <summary
+              aria-label={moreLabel}
+              onClick={(e) => {
+                e.preventDefault();
+                setOpen(!open);
+                savePreference(PREF.navMore, open ? "0" : "1");
+                onTip?.(null);
+              }}
+              onMouseEnter={(e) => tipFor(e, moreLabel, onTip)}
+              onMouseLeave={() => onTip?.(null)}
+              className="flex cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium text-slate-400 outline-none transition hover:text-white focus-visible:ring-2 focus-visible:ring-gold/70 rail:justify-center rail:px-0 rail:py-1"
+            >
+              {open ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+              <span className="rail:hidden">{open ? "Less" : "More"}</span>
             </summary>
-            <ul className="mt-1 space-y-0.5">
+            <ul className="mt-0.5 space-y-0.5">
               {more.map((item) => (
                 <li key={item.href}>
                   <NavLink item={item} pathname={pathname} compact onNavigate={onNavigate} onTip={onTip} />
@@ -233,7 +258,7 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
   );
 }
 
-export function Sidebar({ perms }: { perms: NavPermissions }) {
+export function Sidebar({ perms, moreOpen }: { perms: NavPermissions; moreOpen: boolean }) {
   const [tip, setTip] = useState<Tip>(null);
   const [rail, setRail] = useState(false);
   const dragging = useRef(false);
@@ -276,7 +301,7 @@ export function Sidebar({ perms }: { perms: NavPermissions }) {
       className="sidebar-desktop palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-67 flex-col border-r border-[#254663] bg-[#102a43] px-4 pb-4 text-slate-200 short:pb-3 lg:flex rail:px-2.5 dark:border-white/5 dark:bg-[#0c1522]"
       style={{ width: "var(--sidebar-w)" }}
     >
-      <SidebarBody perms={perms} onTip={(t) => { if (!dragging.current) setTip(t); }} />
+      <SidebarBody perms={perms} moreOpen={moreOpen} onTip={(t) => { if (!dragging.current) setTip(t); }} />
       {/* Folding to icons sits on the menu's edge, taking no room in it (owner). */}
       <button
         type="button"
@@ -313,8 +338,15 @@ export function Sidebar({ perms }: { perms: NavPermissions }) {
 }
 
 /** The same navigation as a drawer, for widths where the sidebar does not fit. */
-export function MobileNav({ perms }: { perms: NavPermissions }) {
+export function MobileNav({ perms, moreOpen }: { perms: NavPermissions; moreOpen: boolean }) {
   const [open, setOpen] = useState(false);
+  // Escape closes it, as a picked entry and a click beside it do.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
   return (
     <>
       <button
@@ -334,11 +366,11 @@ export function MobileNav({ perms }: { perms: NavPermissions }) {
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close navigation"
-              className="absolute right-3 top-4 grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white"
+              className="absolute right-3 top-4 z-10 grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
-            <SidebarBody perms={perms} onNavigate={() => setOpen(false)} />
+            <SidebarBody perms={perms} moreOpen={moreOpen} drawer onNavigate={() => setOpen(false)} />
           </div>
         </div>
       ) : null}
@@ -346,15 +378,25 @@ export function MobileNav({ perms }: { perms: NavPermissions }) {
   );
 }
 
-export function SearchBox({ className }: { className?: string }) {
+export function SearchBox({ className, dark = false, onSearch }: {
+  className?: string;
+  /** On the menu's navy (the phone's drawer). */
+  dark?: boolean;
+  onSearch?: () => void;
+}) {
   return (
-    <form action="/documents" className={cn("relative", className)}>
+    <form action="/documents" onSubmit={onSearch} className={cn("relative", className)}>
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       <input
         name="q"
         aria-label="Search documents"
         placeholder="Search by number, title or tag"
-        className="h-9 w-full rounded-lg border border-line bg-slate-50 pl-9 pr-3 text-[13px] text-slate-800 outline-none transition placeholder:text-slate-500 hover:border-line-strong focus:border-[#5e7f9d] focus:bg-surface focus:ring-3 focus:ring-[#5e7f9d]/10"
+        className={cn(
+          "h-(--control-h) w-full rounded-(--control-radius) border pl-9 pr-3 text-(length:--control-text) outline-none transition",
+          dark
+            ? "border-white/12 bg-white/8 text-white placeholder:text-slate-400 focus:border-white/30 focus:bg-white/12"
+            : "border-line bg-slate-50 text-slate-800 placeholder:text-slate-500 hover:border-line-strong focus:border-brand-line focus:bg-surface focus:ring-3 focus:ring-brand-line/15",
+        )}
       />
     </form>
   );
