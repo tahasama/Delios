@@ -147,15 +147,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   handful of each (`quickFindAction`, `lib/core/forms-find.ts`: documents by number and title only, never their files;
   each read as the person may read it). Arrows, Enter, Escape, a click beside it. The top bar's search shows the key
   ("Ctrl K"), a click on it opening the box; typing in the search and Enter still searches the register.
-- **Two tab designs, no third** (owner, after a new tab design was tried and refused: "standing out does not mean bigger
-  fonts, but better fonts… go back to previous"): **the Schedule's views** (`.views` / `.view`, `globals.css`: one frame
-  split in equal sides, each with its icon, its words and a short hint, the chosen side lit with the brand's line along
-  its foot, the others carrying an arrow) for the few views a page is read in: the Schedule's three, the organization's
-  four (`org-tabs.tsx`). **The segmented switch** (`.seg` / `.segment`, `.segment-n` a count, `.segment-late`,
-  `.segment-hint`; `aria-current`, `aria-pressed` or `aria-selected` on the chosen one) for every other row of tabs:
-  Reports, Assurance and its checks' groups and rules' areas, a document's tabs, Home's "What is waiting", Packages'
-  kinds, the organization's People, Types & sets' groups, Help's roles, the imports' "Which lines", and any choice of a
-  value inside a view. The Control room's navy console keeps its own tabs.
+- **Two tab designs, no third** (owner, after a new tab design was tried and refused: "revert all the tabs… the switch
+  like tabs are for small things and decisions… the Schedule's tab design is what should be applied for actual TABS, like
+  assurance, reports"): **real tabs are the Schedule's** (`.views` / `.view`, `.view-n` a count, `.view-hint`, `.view-go`
+  the arrow; `globals.css`: one frame split in equal sides, the chosen side lit with the brand's line along its foot, the
+  others greyed and carrying an arrow, scrolling sideways when they do not fit): the Schedule's three, Assurance,
+  Reports, a document's tabs, the organization's four (`org-tabs.tsx`), Packages' two kinds. **The switch** (`.seg` /
+  `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Home's "What is waiting",
+  the checks' groups and the rules' areas, Types & sets' groups, Help's roles, the organization's People, the imports'
+  "Which lines", list or tree, light or dark, in use · retired · all. The Control room's navy console keeps its own tabs.
 - **The distribution matrix's "Who gets what"** (owner, "needs improving"): one sheet, the register's way: its band
   (what is shown: disciplines × functions, which deliverable type, which document type), the narrowing on one line
   (`matrix-filters.tsx`, `components/narrow.tsx` `Narrow` shared with the Schedule: Discipline · Deliverable type ·

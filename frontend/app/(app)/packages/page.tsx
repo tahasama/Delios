@@ -11,7 +11,7 @@ import { supplierRows, packageCounts, packageStage } from "@/lib/packages/suppli
 import { isController, isAdmin, standsInForControl } from "@/lib/core/auth";
 import { getActiveSet } from "@/lib/settings/config";
 import { fmtDate } from "@/lib/core/utils";
-import { Download } from "lucide-react";
+import { ArrowRight, Download, FolderClosed, Truck } from "lucide-react";
 import { isReadOnly } from "@/lib/core/auth";
 import { SearchPick } from "@/components/search-pick";
 import { RuleFields } from "./rule-fields";
@@ -126,14 +126,14 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
           ) : null}
         </div>
         <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
-        <div className="mt-3 flex flex-wrap items-end gap-2 border-b border-line">
-          <nav className="seg mb-1.5 w-fit max-w-full" aria-label="Which packages">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <nav className="views" aria-label="Which packages">
             {shownTabs.map((c) => (
-              <Link key={c.code} href={`/packages?category=${c.code}${view === "tree" ? "&view=tree" : ""}`} aria-current={category === c.code ? "page" : undefined} className="segment">{c.label}</Link>
+              <Link key={c.code} href={`/packages?category=${c.code}${view === "tree" ? "&view=tree" : ""}`} aria-current={category === c.code ? "page" : undefined} className="view">{c.code === "SUPPLIER" ? <Truck /> : <FolderClosed />}{c.label}<ArrowRight className="view-go" /></Link>
             ))}
           </nav>
           {/* The list of packages at the top, or the whole tree (owner: both). */}
-          <nav className="seg mb-1.5 ml-auto w-fit" aria-label="How the packages read">
+          <nav className="seg ml-auto w-fit" aria-label="How the packages read">
             <Link href={`/packages?category=${category}`} aria-current={view === "list" ? "page" : undefined} className="segment">List</Link>
             <Link href={`/packages?category=${category}&view=tree`} aria-current={view === "tree" ? "page" : undefined} className="segment">Tree</Link>
           </nav>

@@ -313,7 +313,7 @@ export function PlanRegister({
         <Link key={tab.id} href={viewHref(tab.id)} scroll={false} aria-current={view === tab.id ? "page" : undefined} className="view">
           <tab.icon />
           {tab.label}
-          <span className="view-hint hidden lg:inline">· {tab.hint}</span>
+          <span className="view-hint hidden sm:inline">· {tab.hint}</span>
           <ArrowRight className="view-go" />
         </Link>
       ))}

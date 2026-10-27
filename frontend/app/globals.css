@@ -620,12 +620,14 @@ summary::-webkit-details-marker {
   /* ── The Schedule's views (owner: the panel tabs of before, "the one we had previously on schedule"): one frame
      split into equal sides, the chosen side lit with the brand's line along its foot, the others drawn as the
      controls they are, each carrying its icon, a few words, and an arrow saying it can be gone to. For the few
-     views a page is read in (the Schedule's three, the organization's four); every other row of tabs is `.seg`. */
+     tabs a page is read in (the Schedule, Assurance, Reports, a document, the organization, Packages); the switch
+     (`.seg`) is for small choices and decisions inside them. */
   .views {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    overflow: hidden;
+    grid-auto-columns: minmax(max-content, 1fr);
+    overflow-x: auto;
+    scrollbar-width: none;
     border-radius: 0.75rem;
     border: 1px solid var(--color-line);
     background: var(--color-surface);
@@ -648,15 +650,30 @@ summary::-webkit-details-marker {
   .view + .view { border-left: 1px solid var(--color-line); }
   .view svg { width: 1rem; height: 1rem; flex-shrink: 0; }
   .view:hover { background: var(--color-surface); color: var(--color-brand-ink); }
-  .view[aria-current="page"] {
+  .view[aria-current="page"], .view[aria-selected="true"] {
     background: var(--color-surface);
     color: var(--color-brand-ink);
     box-shadow: inset 0 -3px 0 0 var(--color-brand);
   }
+  .views::-webkit-scrollbar { display: none; }
   .view-hint { font-size: 11px; font-weight: 400; color: var(--color-slate-500); }
+  .view-n {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25rem;
+    min-width: 1.25rem;
+    text-align: center;
+    border-radius: 99px;
+    padding: 0 0.3rem;
+    background: color-mix(in srgb, var(--color-slate-400) 22%, transparent);
+    color: var(--color-slate-600);
+  }
+  .view[aria-current="page"] .view-n, .view[aria-selected="true"] .view-n { background: var(--color-tint); color: var(--color-brand-ink); }
   .view .view-go { width: 0.875rem; height: 0.875rem; color: var(--color-slate-400); transition: transform 160ms; }
   .view:hover .view-go { transform: translateX(2px); }
-  .view[aria-current="page"] .view-go { display: none; }
+  .view[aria-current="page"] .view-go, .view[aria-selected="true"] .view-go { display: none; }
 }
 
 

@@ -25,9 +25,9 @@ const DOCK_ACT = "inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 p
 /** Which lines show: every one, or those of one outcome (the segmented choice, with counts). */
 function Shown<T extends string>({ choices, show, onShow }: { choices: { key: T; word: string; count: number }[]; show: T; onShow: (key: T) => void }) {
   return (
-    <div role="tablist" className="seg w-fit max-w-full" aria-label="Which lines">
+    <div className="seg" aria-label="Which lines">
       {choices.map((one) => (
-        <button key={one.key} type="button" role="tab" aria-selected={show === one.key} className="segment" onClick={() => onShow(one.key)}>
+        <button key={one.key} type="button" aria-pressed={show === one.key} className="segment" onClick={() => onShow(one.key)}>
           {one.word} <span className="segment-n">{one.count.toLocaleString("en-GB")}</span>
         </button>
       ))}

@@ -37,9 +37,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const needsDay = current === "asof" && !asked.on;
   const tabs = offered.map((id) => ({ id, title: REPORT_TITLES[id] }));
   const nav = (on: string) => tabs.length > 1 ? (
-    <nav aria-label="Reports" className="seg no-print mx-5 mb-4 w-fit max-w-full sm:mx-6">
+    <nav aria-label="Reports" className="views no-print mx-5 mb-4 sm:mx-6">
       {tabs.map((t) => (
-        <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className="segment">
+        <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className="view">
           {t.title}
         </Link>
       ))}
