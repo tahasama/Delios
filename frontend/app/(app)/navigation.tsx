@@ -303,13 +303,14 @@ export function Sidebar({ perms, moreOpen }: { perms: NavPermissions; moreOpen: 
       style={{ width: "var(--sidebar-w)" }}
     >
       <SidebarBody perms={perms} moreOpen={moreOpen} onTip={(t) => { if (!dragging.current) setTip(t); }} />
-      {/* Folding to icons sits on the menu's edge, taking no room in it (owner). */}
+      {/* Folding to icons sits on the menu's edge, taking no room in it (owner), in the menu's own navy in either mode:
+          inside `palette-light` a surface colour would stay white in the dark. */}
       <button
         type="button"
         onClick={toggle}
         aria-label={rail ? "Expand the menu" : "Fold the menu to icons"}
         title={rail ? "Expand the menu" : "Fold the menu to icons"}
-        className="absolute top-16 -right-3 z-40 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-line bg-surface text-slate-500 shadow-[0_1px_3px_rgb(16_42_67/0.18)] transition hover:border-line-strong hover:text-brand-ink focus-visible:ring-2 focus-visible:ring-gold/70 outline-none"
+        className="absolute top-16 -right-3 z-40 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-[#254663] bg-[#102a43] text-slate-300 shadow-[0_1px_3px_rgb(16_42_67/0.25)] transition hover:border-white/40 hover:text-white focus-visible:ring-2 focus-visible:ring-gold/70 outline-none dark:border-white/15 dark:bg-[#0c1522]"
       >
         {rail ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
       </button>
