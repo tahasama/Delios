@@ -36,14 +36,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // A day to come is refused by the backend; the page asks for one before it counts.
   const needsDay = current === "asof" && !asked.on;
   const tabs = offered.map((id) => ({ id, title: REPORT_TITLES[id] }));
-  const tabClass = (on: boolean) =>
-    `-mb-px shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 text-[12px] leading-4 transition ${
-      on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"
-    }`;
   const nav = (on: string) => tabs.length > 1 ? (
-    <nav aria-label="Reports" className="no-print scroll-thin flex gap-x-5 overflow-x-auto border-t border-line px-5 pt-3 sm:px-6">
+    <nav aria-label="Reports" className="tabs no-print border-t border-line px-3 pt-1.5 sm:px-4">
       {tabs.map((t) => (
-        <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className={tabClass(on === t.id)}>
+        <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className="tab">
           {t.title}
         </Link>
       ))}

@@ -147,6 +147,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   handful of each (`quickFindAction`, `lib/core/forms-find.ts`: documents by number and title only, never their files;
   each read as the person may read it). Arrows, Enter, Escape, a click beside it. The top bar's search shows the key
   ("Ctrl K"), a click on it opening the box; typing in the search and Enter still searches the register.
+- **One tab design everywhere** (owner: three designs were in use, "one simple, chic and elegant, but swallowed up by
+  surroundings", one loud, one between; "the best of all applied everywhere"): `.tabs` / `.tab` (`globals.css`), words at
+  reading size (14px) on a quiet line, the open tab lit (a tint behind it, the brand's ink) with the brand's gold bar along
+  its foot; `.tab-n` a count, `.tab-hint` words after it. Every row of tabs takes it: Reports, the Schedule's views,
+  Assurance and its checks' groups and rules' areas, a document's tabs, the organization's tabs, Home's "What is waiting",
+  Packages' kinds, the organization's People, Types & sets' groups, Help's roles, the imports' "Which lines". The
+  segmented control (`.seg`) stays for choosing a value inside a view (light or dark, list or tree, a project's state,
+  in use · retired · all, a form's steps, what a preview shows); the Control room's navy console keeps its own tabs.
 - Long titles wrap into lines of even length (`text-wrap: balance` on headings, `globals.css`); body text is left as it is.
 - A card's side colour is its own left edge (`border-l-[3px] border-l-(--rail)`), never a bar laid over it: it
   follows the rounded corners. A sheet left open (`register-sheet-open`) rounds its first and last strip seen (a hidden field or a
@@ -416,6 +424,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   opens these: see Settings → Viewing files". The viewers' WebAssembly and font are
   copied from their packages at build (`scripts/copy-vendor.mjs` → `public/vendor`, not committed). The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
   the side cards going under it once there is no room beside it (owner; `ResizablePane`, cookie `pane-review`; a double-click puts it back).
+- **Not every type has a source file** (owner: "a calculation note" is a PDF only): each document type says "Source file"
+  (Types & sets, on the type, `native`: comes with one, or a PDF only); REV-03, released with no native file, asks it only
+  of types that come with one.
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
   every project" (Default rules, tabs by area, `prevented.ts`), never checked.
 - Assurance: each finding points to the exact spot where it is put right: a document's tab, or else the thing
@@ -457,8 +468,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   its documents is refused (IN_BOTH); a supplier's branch deleted hands its documents back to the package it sat in.
   Two separate delivery trees may still share a document.
   Another organization reads only the packages shared with it, and in them only what was asked of it.
-- A supplier package is delivered by "Deliver" (The package): a new delivery package opens with its documents
-  in it (or they are added to one already open), then goes the delivery way (check, deliver, accept).
+- **A package is delivered on a data transmittal** (owner: "it shall be just a transmittal but for package"): a supplier's
+  package's "Deliver" and a delivery package's "Deliver to …" open the New transmittal form filled from the package
+  (`/transmittals/new?package=<number>`: its documents at their released revisions, a delivery package's ready ones only,
+  its reason and the people it names, locked; the subject "<number> <title>: N documents"), sent now (no draft). The
+  transmittal names its package (`ComposeRequest.PackageId`); the backend refuses a document not in it (NOT_IN_PACKAGE)
+  and, for a delivery package, the same checks as before (readiness checked, a shortfall let go: `PackageService.
+  DeliverableAsync`); sent, a delivery package is delivered and its contents fixed (`DeliveredAsync`, PACKAGE_DELIVERED).
+  No new package is made to deliver a supplier's (it was before). A delivery package naming nobody is only closed.
 - "Delivery list" downloads the package's own lines (`/api/packages/<n>/list`),
   never the schedule's requirements list.
 - "Share with <supplier>" is pressed once, for good: until then the supplier
@@ -1527,6 +1544,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   that day". Nothing registered by then and nothing since: no chart, said so.
 
 ### Home
+- "N need you today" names them under the figure ("2 to decide · 1 to release…") and opens them (`/?view=today`, a tab
+  "Today" beside All): decisions, releases, what came back, what is owed, what must go out, the schedule (owner: "I see 3
+  need you today but I don't know which ones").
 - Home's to-do lists everything the signed-in person has to do, whatever it
   is: reviews to decide or advise, releases, documents returned, things to send
   (asked for, left to them to say who, to dispatch), transmittals to check or
@@ -1571,6 +1591,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
 ### Assets & tags
 - A tag is numbered by itself, as a package is: its scheme (Settings → Numbering, "Asset tags", `@ASSET`), by
   default P1001-TAG-0001; nobody types it, and it never changes. Tags made before keep theirs.
+- **Which documents describe an asset is said on the document type** (owner; Types & sets, on the type, "Describes
+  equipment — link it to an asset", `describesAsset`, also read by the requirements list): a tag's "Add or take out" opens
+  the register on those types (`docType=<a>,<b>`, the register's filter accepting several, offered as "Types that describe
+  equipment"), the tag page names them, and a linked document of another type reads "not a type that describes equipment".
+  None marked: every document is offered, and the page says where to mark them.
 - Assets & tags is a register, the Schedule's way: plate with counts, search and filters (area, system), the table
   (tag, name, area, system, unit, documents), "New tag" folded under it. Each tag has its own page, the action page's
   way: plate, "Documents that describe it" with "Add or take out" opening the register for it
@@ -1680,8 +1705,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   once; applied, the list as corrected is sent as a CSV (a row taken off left blank so every row keeps its line; the
   requirements' inherited action and department written out on every row), kept as the file read, and why it differs
   from the file is asked (no longer "as released"). Read again from the other source, it is applied as it is.
-- **Each list's source is a card of its own** (owner: "more visible"; `components/list-source-card.tsx`, the same on the
-  Schedule and Import & export): its register document with its side colour (released emerald, nothing released amber,
+- **Each list's source is a card of its own on the Schedule** (owner: "more visible"; `components/list-source-card.tsx`); on
+  Import & export it is one button in the explanation box (owner: "a card inside a card… it should be just a button";
+  `ListSourceButton`), the box across the whole width and the same height whichever kind is chosen, its words short: its register document with its side colour (released emerald, nothing released amber,
   none chosen grey), "found by its type, not chosen yet", what it was read from last, and "Choose it in the register".
   The download of what a list was read from finds the released revision's file for reads kept before the file was named
   (`LatestAsync`, by "<number> rev <value>"); with no file it says so in plain words, never as data.

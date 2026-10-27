@@ -10,11 +10,12 @@ import { api, projectPath } from "@/lib/client";
 import { backendDocuments } from "@/lib/documents/api";
 import { addressees, backendTransmittal, ourOrganizationName } from "@/lib/transmittals/api";
 import type { RegisterPage } from "@/lib/types";
+import { packageByNumber } from "@/lib/packages/api";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };
 
-type Search = { step?: string; answer?: string; due?: string; doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string; askBack?: string; pkg?: string; join?: string };
+type Search = { step?: string; answer?: string; due?: string; doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string; askBack?: string; pkg?: string; join?: string; package?: string };
 
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -83,7 +84,12 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
 
   // Asking for a document to be added to a schedule action.
   const asked = sp.activity ? await activityDetail(ctx, sp.activity).catch(() => null) : null;
-  const selectedDocumentIds = [...new Set([...(sp.docs ?? "").split(","), ...(sp.doc ? [sp.doc] : [])].map((value) => value.trim()).filter(Boolean))];
+  // A package's documents going out (owner: delivering a package is a data transmittal): a package we deliver sends what
+  // is ready, to whom it names; a supplier's package, its documents, to whom the sender chooses. Sent, the backend
+  // checks they are the package's and delivers a package of ours (PackageService.SendableAsync / DeliveredAsync).
+  const forPkg = sp.package && ctx.user.isInternal ? await packageByNumber(ctx, sp.package).catch(() => null) : null;
+  const pkgDocs = forPkg ? (forPkg.kind === "DELIVERY" ? forPkg.members.filter((m) => m.ready) : forPkg.members).map((m) => m.documentId) : [];
+  const selectedDocumentIds = [...new Set([...(sp.docs ?? "").split(","), ...(sp.doc ? [sp.doc] : []), ...pkgDocs].map((value) => value.trim()).filter(Boolean))];
   const askedIds = ctx.can("CONTROL") ? [...new Set((sp.placeholders ?? "").split(",").map((one) => one.trim()).filter(Boolean))] : [];
   const backIds = ctx.can("CONTROL") && !askedIds.length ? [...new Set((sp.askBack ?? "").split(",").map((one) => one.trim()).filter(Boolean))] : [];
   // Every document the form starts with, in one read.
@@ -123,6 +129,16 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   // Sent to that supplier: its people on this project, or the organization itself when none has an account.
   const supplierPeople = supplier ? found.people.filter((one) => one.organization === supplier.name).map((one) => one.id) : [];
   const supplierTo = supplier ? (supplierPeople.length ? supplierPeople : [`party:${supplier.id}`]) : [];
+  // A package we deliver goes to whom it names: each organization's people (or the organization), and inside our own
+  // organization to whoever accepts it.
+  const deliverTo = forPkg?.kind === "DELIVERY"
+    ? [...new Set(forPkg.recipientPartyIds.flatMap((id) => {
+        const party = found.parties.find((p) => p.id === id);
+        if (!party) return forPkg.acceptorIds;
+        const people = found.people.filter((one) => one.organization === party.name).map((one) => one.id);
+        return people.length ? people : [`party:${party.id}`];
+      }))]
+    : [];
 
   // Someone new asked to join (People & access, the directory): the person's fields, and who confirms. Only where it is
   // asked of someone; put on at once, it is no letter and stays where it was.
@@ -177,6 +193,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         preselectedRevisionIds={preselected}
         unsent={unsent}
         parties={found.parties.map((p) => ({ id: p.id, code: p.code, name: p.name }))}
+        forPackage={forPkg ? { id: forPkg.id, number: forPkg.number, title: forPkg.title, delivers: forPkg.kind === "DELIVERY", to: forPkg.names.to } : undefined}
         joining={joining}
         placeholders={placeholders.length ? { to: supplier!.name, items: placeholders, mixed: owners.length > 1 } : askedIds.length && owners.length > 1 ? { to: "", items: [], mixed: true } : undefined}
         prefill={{
@@ -184,17 +201,20 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
           answer: sp.answer === "1" ? true : sp.answer === "0" ? false : undefined,
           due: sp.due,
           revisionIds: following ? following.items.map((one) => one.revisionId) : (sp.revisions ?? "").split(",").filter(Boolean),
-          userIds: following ? followTo : answering ? answerTo : supplierTo.length ? supplierTo : (sp.users ?? "").split(",").filter(Boolean),
+          userIds: following ? followTo : answering ? answerTo : supplierTo.length ? supplierTo : deliverTo.length ? deliverTo : (sp.users ?? "").split(",").filter(Boolean),
           copyIds: following ? followCopies : answerCopies,
           outsiders: sp.to,
           reason: (following && !following.items.length && isData(following.reasonForIssue) ? answerReason?.code : following?.reasonForIssue) ?? (askingBack.length ? requestReason?.code : undefined)
-            ?? (placeholders.length && reasons.some((r) => r.code === "IFU") ? "IFU" : undefined) ?? (joining ? requestReason?.code : undefined) ?? sp.reason,
+            ?? (placeholders.length && reasons.some((r) => r.code === "IFU") ? "IFU" : undefined) ?? (joining ? requestReason?.code : undefined)
+            ?? (forPkg?.kind === "DELIVERY" ? forPkg.reason : undefined) ?? sp.reason,
           party: answering && answering.direction === "INCOMING" ? answering.issuingParty : sp.party,
           // One short line whatever the count: the package, how many, to whom. The documents are listed on it.
           subject: askingBack.length && !sp.subject
             ? `${sp.pkg ? `${sp.pkg} — ` : ""}${askingBack.length} document${askingBack.length === 1 ? "" : "s"} asked back from ${supplier!.name}`
             : placeholders.length && !following && !answering && !sp.subject
             ? `${sp.pkg ? `${sp.pkg} — ` : ""}${placeholders.length} document${placeholders.length === 1 ? "" : "s"} submitted to ${supplier!.name}`
+            : forPkg && !sp.subject
+            ? `${forPkg.number} ${forPkg.title}: ${pkgDocs.length} document${pkgDocs.length === 1 ? "" : "s"}`
             // The subject stays the first one's: the mention says what it follows, no prefix needed.
             : following
               ? following.subject ?? undefined

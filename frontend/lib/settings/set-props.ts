@@ -51,13 +51,21 @@ const REVIEW_NEED: ChoiceOption[] = [
   { value: "NO", label: "Not reviewed — from Prepare straight to release", sets: { review: false } },
 ];
 
+/** Whether a document type comes with an editable source file beside its PDF (owner: a calculation note is a PDF only,
+ *  so a check must not call its source file missing). */
+const NATIVE_FILE: ChoiceOption[] = [
+  { value: "YES", label: "Comes with a source file — the editable original beside its PDF", sets: { native: true } },
+  { value: "NO", label: "A PDF only — no source file is kept", sets: { native: false } },
+];
+
 export const SET_PROP_FIELDS: Record<string, PropField[]> = {
   DOCUMENT_TYPES: [
     { key: "review", label: "Reviewed before release", type: "choice", options: REVIEW_NEED, read: (props) => (props.review === false ? "NO" : "YES"), hint: "asked when the type is published; a type that is not reviewed goes from Prepare straight to release" },
     { key: "deliverables", label: "Deliverable types", type: "sets", setKey: "DELIVERABLE_TYPES", hint: "the deliverable types this document type belongs to; the new-document form offers it only for those. None ticked: read from \"Who produces it\"" },
     { key: "appliesTo", label: "Who produces it", type: "select", options: ["Supplier", "Non-supplier", "Unclassified"], hint: "used when no deliverable type is ticked; supplier documents carry the supplier fields in their number" },
     { key: "record", label: "A record — fixed once confirmed, never revised", type: "bool", hint: "minutes, a test result, a photo: documents of this type are registered as records, nobody is asked" },
- { key: "describesAsset", label: "Describes equipment — link it to an asset", type: "bool", hint: "" },
+    { key: "native", label: "Source file", type: "choice", options: NATIVE_FILE, read: (props) => (props.native === false ? "NO" : "YES"), hint: "a type made as a PDF only (a calculation note) has none: no check asks for its source file" },
+    { key: "describesAsset", label: "Describes equipment — link it to an asset", type: "bool", hint: "a datasheet, a manual, an equipment drawing: an asset's page offers documents of these types first" },
     { key: "readsRequirements", label: "Is a document requirements list — read when released", type: "bool", hint: "the spreadsheet on each released revision becomes what the activities need" },
     { key: "criticality", label: "Recommended criticality", type: "set", setKey: "CRITICALITY", hint: "filled in when a document of this type is created; whoever creates it may choose another" },
   ],

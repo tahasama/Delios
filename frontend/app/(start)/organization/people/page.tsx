@@ -63,10 +63,10 @@ export default async function OrganizationPeoplePage({ searchParams }: { searchP
             {counts.ours} of ours · {counts.guests} with accounts from us · {counts.linked} from their own DELIOS · {signingIn} can sign in here
           </p>
         </div>
-        <nav aria-label="Whose people" className="seg mx-5 mb-4 w-fit max-w-full sm:mx-6">
+        <nav aria-label="Whose people" className="tabs border-b-0 border-t border-line px-3 pt-1.5 sm:px-4">
           {TABS.map((t) => (
-            <Link key={t.key} href={href({ who: t.key })} aria-current={who === t.key ? "page" : undefined} className="segment">
-              {t.label}<span className="segment-n">{counts[t.key]}</span>
+            <Link key={t.key} href={href({ who: t.key })} aria-current={who === t.key ? "page" : undefined} className="tab">
+              {t.label}<span className="tab-n">{counts[t.key]}</span>
             </Link>
           ))}
         </nav>

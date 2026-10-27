@@ -84,8 +84,11 @@ const field = "plain w-full py-1.5 text-[13px]";
  * only released revisions, and a received transmittal has no subject of ours.
  */
 export function NewTransmittalForm({
-  reasons, revisions, companies, ourOrganization, parties = [], defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askingBack, mayRecordReceived, outsider = false, unsent, joining,
+  reasons, revisions, companies, ourOrganization, parties = [], defaultDirection, preselectedRevisionIds, prefill, fields, labels, ownFields, placeholders, askingBack, mayRecordReceived, outsider = false, unsent, joining, forPackage,
 }: {
+  /** A package's documents going out on this transmittal (owner: delivering a package is a data transmittal); a package
+   *  we deliver goes to whom it names and is delivered once sent. */
+  forPackage?: { id: string; number: string; title: string; delivers: boolean; to: string };
   /** Asking for someone new to join: the person's fields in place of what it carries, and who confirms in place of who gets it. */
   joining?: Joining;
   /** The organizations set up on the project, with their codes: who something was received from. */
@@ -134,13 +137,14 @@ export function NewTransmittalForm({
   const [message, setMessage] = useState(prefill?.message ?? "");
   // Already about something of ours going out: chosen in the register or a package, asked back, or followed up.
   const sendingOurs = !!placeholders || !!askingBack || !!preselectedRevisionIds?.length || !!prefill?.revisionIds?.length || !!prefill?.following
-    || !!prefill?.activity || !!joining;
+    || !!prefill?.activity || !!joining || !!forPackage;
   // What it asks sets its kind and type (owner: "prefill what is obvious, to prevent mistakes"): a request about an
   // action, asking documents back, someone to join. Shown, never chosen.
   const fixedAsk = (!!prefill?.activity || !!askingBack || !!joining) && reasons.some((r) => r.code === prefill?.reason);
   // Who it goes to is set by it too: those who answer it. Copies stay free.
   const lockedTo = prefill?.activity && prefill.userIds?.length ? `the control function: they answer it on ${prefill.activity.code}`
     : askingBack && prefill?.userIds?.length ? `${askingBack.to}: it holds ${askingBack.items.length === 1 ? "the document" : "the documents"}`
+    : forPackage?.delivers && prefill?.userIds?.length ? `${forPackage.to}: the package ${forPackage.number} goes to them`
     : undefined;
   const [joiner, setJoiner] = useState("");
   const joinStep = useRef<HTMLElement>(null);
@@ -293,6 +297,19 @@ export function NewTransmittalForm({
               Follows <Link href={`/transmittals/${prefill.answering.id}`} className="font-mono font-semibold text-link hover:underline">{prefill.answering.number}</Link>
               {prefill.answering.subject ? <> &mdash; {prefill.answering.subject}</> : null}.
               {" "}The people it was sent to and copied in are carried over; change any of them in step 3.
+            </p>
+          </>
+        ) : null}
+
+        {/* A package's documents: the package travels with them; one of ours is delivered once this is sent. */}
+        {forPackage ? (
+          <>
+            <input type="hidden" name="packageId" value={forPackage.id} />
+            <p className="mb-4 rounded-lg border border-line bg-tint-soft px-4 py-2.5 text-xs text-slate-600">
+              Sends the documents of <Link href={`/packages/${forPackage.number}`} className="font-mono font-semibold text-link hover:underline">{forPackage.number}</Link> {forPackage.title}.
+              {" "}{forPackage.delivers
+                ? `What is ready goes, at its released revision, to ${forPackage.to}; once sent, the package is delivered and its contents fixed.`
+                : "Each goes at its released revision; choose who receives them in step 3."}
             </p>
           </>
         ) : null}

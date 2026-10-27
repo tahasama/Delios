@@ -114,14 +114,14 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
           ) : null}
         </div>
         <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{supplierOnly ? "What your company is asked to send, and where each document stands." : here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <nav className="seg w-fit max-w-full">
+        <div className="mt-3 flex flex-wrap items-end gap-2 border-b border-line">
+          <nav className="tabs border-b-0" aria-label="Which packages">
             {tabs.map((c) => (
-              <Link key={c.code} href={`/packages?category=${c.code}${view === "tree" ? "&view=tree" : ""}`} aria-current={category === c.code ? "page" : undefined} className="segment">{c.label}</Link>
+              <Link key={c.code} href={`/packages?category=${c.code}${view === "tree" ? "&view=tree" : ""}`} aria-current={category === c.code ? "page" : undefined} className="tab">{c.label}</Link>
             ))}
           </nav>
           {/* The list of packages at the top, or the whole tree (owner: both). */}
-          <nav className="seg ml-auto w-fit" aria-label="How the packages read">
+          <nav className="seg mb-1.5 ml-auto w-fit" aria-label="How the packages read">
             <Link href={`/packages?category=${category}`} aria-current={view === "list" ? "page" : undefined} className="segment">List</Link>
             <Link href={`/packages?category=${category}&view=tree`} aria-current={view === "tree" ? "page" : undefined} className="segment">Tree</Link>
           </nav>

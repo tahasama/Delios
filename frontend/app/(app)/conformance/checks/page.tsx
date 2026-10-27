@@ -113,11 +113,6 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
 
   const filterBase = href({}).split("?")[1] ?? "";
 
-  const tabCls = (on: boolean) =>
-    `-mb-px shrink-0 border-b-2 px-0.5 pb-2 text-[12px] leading-4 transition ${
-      on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"
-    }`;
-
   return (
     <div className="space-y-4">
       <AssuranceHead
@@ -142,13 +137,13 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
           the first card begin on the same line. */}
       <div className="grid gap-x-5 gap-y-3 md:grid-cols-[11rem_minmax(0,1fr)] md:items-start">
         <div className="max-w-4xl md:col-start-2">
-          <nav aria-label="When it is checked" className="flex flex-wrap items-center gap-x-6 border-b border-line">
-            <Link href={href({ phase: null })} scroll={false} aria-current={!phase ? "page" : undefined} className={tabCls(!phase)}>
-              All <span className="ml-1 tabular-nums text-slate-400">{CATALOG.filter(narrowedBy).length}</span>
+          <nav aria-label="When it is checked" className="tabs">
+            <Link href={href({ phase: null })} scroll={false} aria-current={!phase ? "page" : undefined} className="tab">
+              All <span className="tab-n">{CATALOG.filter(narrowedBy).length}</span>
             </Link>
             {PHASES.map((p) => (
-              <Link key={p} href={href({ phase: p, family: null })} scroll={false} aria-current={phase === p ? "page" : undefined} className={tabCls(phase === p)}>
-                {PHASE_LABEL[p]} <span className="ml-1 tabular-nums text-slate-400">{countOf(p)}</span>
+              <Link key={p} href={href({ phase: p, family: null })} scroll={false} aria-current={phase === p ? "page" : undefined} className="tab">
+                {PHASE_LABEL[p]} <span className="tab-n">{countOf(p)}</span>
               </Link>
             ))}
           </nav>

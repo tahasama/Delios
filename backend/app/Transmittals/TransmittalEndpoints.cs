@@ -247,7 +247,8 @@ public static class TransmittalEndpoints
 
     /// <summary><c>POST /transmittals</c>: The control function issues released revisions directly; one transmittal per destination.</summary>
     private static async Task<IResult> ComposeAsync(
-        TransmittalService.ComposeRequest request, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
+        TransmittalService.ComposeRequest request, HttpContext http, TransmittalService transmittals, Packages.PackageService packages,
+        DeliosDbContext db, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (request.Draft)
@@ -256,7 +257,15 @@ public static class TransmittalEndpoints
             return refused ?? Results.Ok(new[] { new { draft!.Id, Number = "Draft", ToName = draft.Subject } });
         }
         if (await transmittals.FormProblemAsync(access, request, cancellationToken) is { } formProblem) return formProblem;
+        // For a package: its documents only, and a package we deliver passes Deliver's checks first, then is delivered.
+        if (request.PackageId is { } packageId)
+        {
+            var documentIds = await db.Revisions.AsNoTracking().Where(r => (request.RevisionIds ?? Array.Empty<Guid>()).Contains(r.Id))
+                .Select(r => r.DocumentId).Distinct().ToListAsync(cancellationToken);
+            if (await packages.SendableAsync(access, packageId, documentIds, cancellationToken) is { } packageProblem) return packageProblem;
+        }
         var (sent, problem) = await transmittals.ComposeAsync(access, request, cancellationToken);
+        if (problem is null && request.PackageId is { } delivered) await packages.DeliveredAsync(access, delivered, sent, cancellationToken);
         return problem ?? Results.Ok(sent.Select(t => new { t.Id, t.Number, t.ToName }));
     }
 

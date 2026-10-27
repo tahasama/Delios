@@ -185,12 +185,14 @@ public static class CheckCatalog
                     .Select(c => new Failure($"comment:{c.Id}", "Comment", c.Id, c.DocumentId, c.Number, $"Its weight {c.Class} is no longer published.")));
             }),
         new("REV-03", Phases.Running, "Released with no native file",
-            "Released revisions with no native file beside the PDF (it is optional; the editable original helps the next revision)", Severities.Advisory, "OR", async ctx =>
+            "Released revisions with no native file beside the PDF, of types that come with one (it is optional; the editable original helps the next revision)", Severities.Advisory, "OR", async ctx =>
             {
                 var released = ctx.Released.Select(r => r.Id).ToList();
                 var withNative = (await ctx.Db.StoredFiles.Where(f => f.RevisionId != null && released.Contains(f.RevisionId.Value)
                     && f.Kind == FileKinds.Native).Select(f => f.RevisionId!.Value).Distinct().ToListAsync(ctx.CancellationToken)).ToHashSet();
-                return Fail(ctx.Released.Where(r => !withNative.Contains(r.Id)).Select(r => Rev(ctx.DocumentOf(r), r)));
+                // A type made as a PDF only (Types & sets, on the type: "A PDF only") never has one: not asked of it.
+                bool pdfOnly(Document d) => ctx.Values.Prop(ValueSets.DocumentTypes, d.DocType, "native") is { ValueKind: JsonValueKind.False };
+                return Fail(ctx.Released.Where(r => !withNative.Contains(r.Id) && !pdfOnly(ctx.DocumentOf(r))).Select(r => Rev(ctx.DocumentOf(r), r)));
             }),
         new("STO-01", Phases.Running, "A file the register lists is missing from storage (outside the app)",
             "Asks storage for a sample of current files, 25 a run", Severities.Critical, "CF", async ctx =>

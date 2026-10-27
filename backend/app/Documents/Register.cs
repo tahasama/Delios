@@ -292,7 +292,12 @@ public static class RegisterEndpoints
         if (Has(f.Supplier)) query = query.Where(d => d.Originator == f.Supplier);
         if (Has(f.Po)) query = query.Where(d => d.ContractRef == f.Po);
         if (Has(f.Discipline)) query = query.Where(d => d.Discipline == f.Discipline);
-        if (Has(f.DocType)) query = query.Where(d => d.DocType == f.DocType);
+        // Several types at once, comma-separated: the types that describe equipment, for an asset's documents (owner).
+        if (Has(f.DocType))
+        {
+            var docTypes = f.DocType!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            query = docTypes.Length > 1 ? query.Where(d => docTypes.Contains(d.DocType)) : query.Where(d => d.DocType == f.DocType);
+        }
         if (Has(f.Criticality)) query = query.Where(d => d.Criticality == f.Criticality);
         if (Has(f.Confidentiality)) query = query.Where(d => d.Confidentiality == f.Confidentiality);
         if (Has(f.Deliverable)) query = query.Where(d => d.DeliverableType == f.Deliverable);

@@ -15,9 +15,9 @@ const TABS = [
 
 export function AssuranceTabs({ current, internal = true }: { current: string; internal?: boolean }) {
   return (
-    <nav className="seg w-fit max-w-full" aria-label="Assurance">
+    <nav className="tabs" aria-label="Assurance">
       {TABS.filter((t) => internal || !t.internal).map((t) => (
-        <Link key={t.href} href={t.href} aria-current={current === t.href ? "page" : undefined} className="segment">
+        <Link key={t.href} href={t.href} aria-current={current === t.href ? "page" : undefined} className="tab">
           {t.label}
         </Link>
       ))}

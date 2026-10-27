@@ -318,9 +318,10 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
                 </Act>
               ) : null}
               {listLink}
-              {/* Handed over to whoever gets them (the client, operations): a delivery package holding its documents. */}
+              {/* Handed over to whoever gets them (the client, operations): a data transmittal carrying the package's
+                  documents at their released revisions (owner: "just a transmittal but for package"), never a new package. */}
               {rows.length ? (
-                <Link href={`/packages?${new URLSearchParams({ category: "DELIVERY", from: pkg.number, docs: rows.map((r) => r.doc.id).join(",") })}#new`}
+                <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number })}`}
                   className="ask inline-flex items-center gap-1.5"><PackageCheck className="h-3.5 w-3.5" /> Deliver</Link>
               ) : null}
             </div>

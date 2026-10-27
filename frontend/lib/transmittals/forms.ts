@@ -48,12 +48,14 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const followKind = String(formData.get("followKind") ?? "").trim() || null;
   const activityId = String(formData.get("activityId") ?? "").trim() || null;
   const activityAsk = String(formData.get("activityAsk") ?? "").trim() || null;
+  const packageId = String(formData.get("packageId") ?? "").trim() || null;
 
   if (!reasonForIssue) return { error: "Every transmittal states its reason for issue." };
   if (!dateOfIssue) return { error: "Date of issue is required." };
   if (!revisionIds.length && !placeholderIds.length && !attachments.length && !message && !subject) return { error: "Enclose at least one revision, or write a subject and a message — a transmittal cannot be empty of both." };
   if (direction === "OUTGOING" && !recipientUsers.length && !partyTo.length) return { error: "Name at least one person to send it to — a company on its own is not a recipient." };
   if (direction === "OUTGOING" && !subject) return { error: "Give the transmittal a subject — it is the first thing the recipient reads." };
+  if (packageId && !issueNow) return { error: "A package's documents go when the transmittal is sent: send it now rather than keeping a draft." };
   if (askBackIds.length && !issueNow) return { error: "Asking for documents back goes with the transmittal: send it now rather than keeping a draft." };
   if (askBackIds.length && !message) return { error: "Say in the message why you need them back: the supplier reads it with the ask." };
   // Copies are our own people; an organization is sent to, never copied.
@@ -108,7 +110,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
         body: {
           revisionIds, userIds: recipientUsers, partyIds: partyTo, reason: reasonForIssue, subject, message, copyUserIds: chosenCc,
           draft: !issueNow, inReplyToId, followsId, followKind, issuedOn: dayOf(dateOfIssue), extras: Object.keys(extras).length ? extras : null, activityId, activityAsk,
-          placeholderIds: placeholderIds.length ? placeholderIds : null,
+          placeholderIds: placeholderIds.length ? placeholderIds : null, packageId,
           // Asked for an answer: by the day given, else as the reason allows. Not ticked: none asked.
           responseRequired: formData.get("answerRequired") === "on",
           responseDue: formData.get("answerRequired") === "on" ? String(formData.get("responseDue") ?? "") || null : null,

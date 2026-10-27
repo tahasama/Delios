@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
 import type { ListSource } from "@/lib/actions/list-source-kinds";
-import { ListSourceCard } from "@/components/list-source-card";
+import { ListSourceButton } from "@/components/list-source-card";
 import { DeliverableImport } from "./deliverable-import";
 import { LinesImport } from "./lines-import";
 
@@ -36,8 +36,8 @@ const KINDS: Kind[] = [
     name: "Deliverable list",
     hint: "the register in one go",
     title: "Register documents from a list",
-    blurb: "One line per document. A new document has no number: it is given one when it is registered. To update documents, download the register as it stands: each line carries its number, and only what you change is updated, while its revision is being prepared (once it is out of preparation, a change takes a new revision). What the number is made of (type, discipline, sub-project, supplier) never changes. The file is this project's: a list made for another project is refused.",
-    columns: "A sheet per deliverable type, with the fields the document form asks and only the values offered for that type as dropdowns. Shaded headings must be filled. You see every line, and may take some off the list or correct them, before anything is written; then the whole list is written, or nothing.",
+    blurb: "One line per document. A new line is registered and numbered; a line with a number updates that document while its revision is prepared. What the number is made of never changes.",
+    columns: "A sheet per deliverable type, the document form's fields, shaded ones required. This project's file only.",
     now: { href: "/api/export/template-deliverables?filled=1", label: "The register as it stands (.xlsx)" },
     template: { href: "/api/export/template-deliverables", label: "An empty template (.xlsx)" },
     accept: ".xlsx,.csv,text/csv",
@@ -48,8 +48,8 @@ const KINDS: Kind[] = [
     name: "Team list",
     hint: "people on this project",
     title: "Put a team on this project",
-    blurb: "One row per person. Each gets an account on this project in the function named, and an email asking them to choose their own password. Someone who has an account already is put on the project, or their function and department changed. Where whoever holds Manage confirms who joins, they wait under People to confirm. You see every line first; then the whole list is written, or nothing.",
-    columns: "Name, Email, Company (an organization's code or name; empty for our own people), Function (as in Settings → Functions & permissions), Department.",
+    blurb: "One row per person, put on this project in the function named; someone new is emailed to choose a password. Where joining is confirmed, they wait under People to confirm.",
+    columns: "Name, Email, Company (empty for ours), Function, Department.",
     now: { href: "/api/export/people", label: "The team as it stands (.csv)" },
     template: { href: "/api/export/template-people", label: "An empty template, with an example (.csv)" },
     accept: ".csv,text/csv",
@@ -61,8 +61,8 @@ const KINDS: Kind[] = [
     name: "Distribution matrix",
     hint: "who does what",
     title: "Change the distribution matrix",
-    blurb: "Take the matrix as it stands, change the letters, and bring it back; or fill an empty one with only the letters to change (an empty cell changes nothing). Every row is listed with the cells that differ from today; writing it changes those cells only, every function at once, or nothing.",
-    columns: "Keep the headings and the first four columns. Letters: A approves, R reviews, C controls, T issues, I receives, · may read, - not sent.",
+    blurb: "Take the matrix as it stands, change the letters, bring it back. Only the cells that differ from today change; an empty cell changes nothing.",
+    columns: "A approves, R reviews, C controls, T issues, I receives, · may read, - not sent.",
     now: { href: "/api/export/matrix", label: "The matrix as it stands (.csv)" },
     template: { href: "/api/export/matrix?blank=1", label: "An empty template (.csv)" },
     accept: ".csv,text/csv",
@@ -74,8 +74,8 @@ const KINDS: Kind[] = [
     name: "Settings lists",
     hint: "disciplines, types, statuses…",
     title: "Update this project's Settings lists",
-    blurb: "One workbook, a sheet per list, as this project reads them. Change the sheets you need and bring it back once. A code already there is updated; a new code is added. A row you delete is left as it is: a value is retired on its list's own page. Each list is the organization's until this project changes it: the first change makes this project's own copy of that list, and a value of a list the organization keeps the same on every project reads as a problem. You see every value first; then the whole workbook is written, or nothing.",
-    columns: "Code, Label, Status, then whatever that list carries.",
+    blurb: "A sheet per list, as this project reads them. A code there is updated, a new one added; a deleted row stays. The first change to a list makes this project's own copy of it.",
+    columns: "Code, Label, Status, then what the list carries.",
     now: { href: "/api/export/template-sets", label: "Every list as it stands (.xlsx)" },
     template: { href: "/api/export/template-sets?blank=1", label: "An empty template (.xlsx)" },
     accept: ".xlsx",
@@ -127,23 +127,35 @@ export function BulkImportForm({ initialKind, admin, keeps, sources }: { initial
             </div>
           </fieldset>
 
-          {/* What it does and the file it starts from, together. */}
-          <div className="rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 ring-1 ring-line">
-            <p className="text-[13px] font-semibold text-slate-800">{chosen.title}</p>
-            <p className="mt-1 max-w-[70ch] text-slate-600">{chosen.blurb}</p>
-            <p className="mt-1.5 max-w-[70ch] text-slate-600">{chosen.columns}</p>
-            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-              <span className="text-slate-600">Download:</span>
-              {[chosen.now, chosen.template].map((one) => (
-                <a key={one.href} href={one.href} className="inline-flex items-center gap-1.5 font-semibold text-link hover:underline">
-                  <Download className="h-3.5 w-3.5" aria-hidden="true" /> {one.label}
-                </a>
-              ))}
-            </p>
+          {/* What it does and the file it starts from, together, across the whole width. Every kind's box is laid in the
+              same place, the others kept invisible, so the box stands the same height whichever kind is chosen (owner). */}
+          <div className="grid">
+            {KINDS.map((k) => {
+              const on = k.key === kind;
+              const its = sources.find((one) => one.kind === SOURCE_KIND[k.key]) ?? null;
+              return (
+                <div key={k.key} aria-hidden={!on} className={`col-start-1 row-start-1 grid gap-x-8 gap-y-2 rounded-md bg-tint-soft px-4 py-3 text-xs leading-5 ring-1 ring-line md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] ${on ? "" : "invisible"}`}>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-slate-800">{k.title}</p>
+                    <p className="mt-1 text-slate-600">{k.blurb}</p>
+                    <p className="mt-1 text-slate-500">Checked first: you see every line; then the whole list is written, or nothing.</p>
+                  </div>
+                  <div className="min-w-0 space-y-1.5">
+                    <p className="text-slate-600"><span className="font-semibold text-slate-700">The file: </span>{k.columns}</p>
+                    <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      {[k.now, k.template].map((one) => (
+                        <a key={one.href} href={one.href} tabIndex={on ? undefined : -1} className="inline-flex items-center gap-1.5 font-semibold text-link hover:underline">
+                          <Download className="h-3.5 w-3.5" aria-hidden="true" /> {one.label}
+                        </a>
+                      ))}
+                    </p>
+                    {/* Where the list comes from (owner): one button to its register document, never a card in the card. */}
+                    {its ? <ListSourceButton source={its} inert={!on} newer={on && newer && fromDocument ? `${fromDocument.label} was released since it was last brought in: bring it in below.` : null} /> : null}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
-          {/* Where the list comes from (owner): its register document, chosen in the register by the control function, or a file. */}
-          {source ? <ListSourceCard source={source} newer={newer && fromDocument ? `${fromDocument.label} was released since it was last brought in: bring it in below.` : null} /> : null}
         </li>
 
         <li>{kind === "deliverables" ? <DeliverableImport key={kind} fromDocument={fromDocument} /> : <LinesImport key={kind} kind={kind as "people" | "matrix" | "sets"} fromDocument={fromDocument} />}</li>

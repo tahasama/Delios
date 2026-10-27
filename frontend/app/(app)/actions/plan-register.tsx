@@ -5,7 +5,7 @@ import Link from "next/link";
 import { TONE } from "./plan-timeline";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarDays, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { DateWindow } from "@/components/date-window";
 import { FilterMenu } from "@/components/filter-menu";
@@ -302,39 +302,19 @@ export function PlanRegister({
       </form>
     </section>
 
-    {/* The two views stand on their own between the question and the answer.
-        One frame, split down the middle: the chosen side is the lit one, and
-        the other is drawn as the control it is rather than left as plain text. */}
-    <nav ref={tabs} className="mb-4 grid grid-cols-3 space overflow-hidden rounded-xl border border-line bg-surface" aria-label="How to look at the schedule">
+    {/* How to look at the schedule: the app's one tab design (globals.css `.tabs`), its words beside it. */}
+    <nav ref={tabs} className="tabs mb-4" aria-label="How to look at the schedule">
       {([
         { id: "calendar", label: "The calendar", hint: "month by month", icon: CalendarDays },
         { id: "plan", label: "The plan", hint: "drawn on a timeline", icon: CalendarRange },
         { id: "table", label: "The table", hint: "one line per action", icon: Rows3 },
-      ] as const).map((tab, at) => {
-        const on = view === tab.id;
-        return (
-          <Link
-            key={tab.id}
-            href={viewHref(tab.id)}
-            scroll={false}
-            aria-current={on ? "page" : undefined}
-            className={`group flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition ${
-              at < 2 ? "border-r border-line" : ""
-            } ${
-              on
-                ? "bg-surface text-brand-ink shadow-[inset_0_-3px_0_0_var(--color-brand)]"
-                : "bg-slate-100 text-slate-600 hover:bg-surface hover:text-brand-ink shadow-[inset_0_-3px_0_0_var(--color-brand)]/20"
-            }`}
-          >
-            <tab.icon className="h-4 w-4" />
-            {tab.label}
-            <span className={`hidden text-[11px] font-normal sm:inline ${on ? "text-slate-500" : "text-slate-500"}`}>· {tab.hint}</span>
-            {/* The side you are not on is the one you can go to, so it is the
-                one that carries the arrow. */}
-            {on ? null : <ArrowRight className="h-3.5 w-3.5 text-slate-400 transition group-hover:translate-x-0.5" />}
-          </Link>
-        );
-      })}
+      ] as const).map((tab) => (
+        <Link key={tab.id} href={viewHref(tab.id)} scroll={false} aria-current={view === tab.id ? "page" : undefined} className="tab">
+          <tab.icon />
+          {tab.label}
+          <span className="tab-hint hidden sm:inline">· {tab.hint}</span>
+        </Link>
+      ))}
     </nav>
 
     <section

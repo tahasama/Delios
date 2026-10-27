@@ -49,3 +49,41 @@ export function ListSourceCard({ source, children, newer }: { source: ListSource
     </section>
   );
 }
+
+/**
+ * The same facts as one button and one line (owner, on Import & export: "a card inside a card… it should be just a
+ * button"): the button names the register document (or asks for one) and opens the register to choose it, for whoever
+ * may; the line under it says what the list was read from last. `inert` draws it without taking focus (a box kept
+ * invisible to hold the height).
+ */
+export function ListSourceButton({ source, newer, inert }: { source: ListSource; newer?: string | null; inert?: boolean }) {
+  const doc = source.document;
+  const last = source.last;
+  const day = (at: string) => new Date(at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const words = doc
+    ? <><span className="font-mono">{doc.number}</span><span className="font-normal text-slate-500">{doc.releasedValue ? `rev ${doc.releasedValue} released` : "nothing released yet"}</span></>
+    : <>Choose its register document</>;
+  const title = doc
+    ? `Its register document${doc.chosenByApp ? ", found by its type, not chosen yet" : ""}.${source.mayChoose ? " Choose another in the register." : ""}`
+    : "No register document yet: the control function chooses one in the register.";
+  return (
+    <div className="space-y-1 pt-0.5">
+      {source.mayChoose ? (
+        <Link href={chooseHref(source.kind, source.where)} title={title} tabIndex={inert ? -1 : undefined} className="ask inline-flex max-w-full items-center gap-2">
+          <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> <span className="flex min-w-0 items-baseline gap-2 truncate">{words}</span>
+        </Link>
+      ) : doc ? (
+        <Link href={`/documents/${doc.id}`} title={title} tabIndex={inert ? -1 : undefined} className="ask inline-flex max-w-full items-center gap-2">
+          <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> <span className="flex min-w-0 items-baseline gap-2 truncate">{words}</span>
+        </Link>
+      ) : <p className="text-slate-500">No register document chosen yet.</p>}
+      <p className={cn("text-slate-500", doc?.chosenByApp && "text-amber-800")}>
+        {doc?.chosenByApp ? "Found by its type, not chosen yet. " : ""}
+        {last
+          ? <>Read last from {last.from === "DOCUMENT" ? `its register document${last.label ? `, ${last.label}` : ""}` : `a file uploaded${last.label ? ` (${last.label})` : ""}`}{last.at ? `, ${day(last.at)}` : ""}. The latest stands.</>
+          : "Not read yet: its released revision or a file uploaded, the latest stands."}
+      </p>
+      {newer ? <p className="font-semibold text-amber-800">{newer}</p> : null}
+    </div>
+  );
+}

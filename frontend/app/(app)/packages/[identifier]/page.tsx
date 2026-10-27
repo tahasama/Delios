@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
 import { Timeline } from "@/components/timeline";
-import { Card, Info, ToneChip, type TONE, Field, inputCls, Banner } from "@/components/ui";
+import { Card, Info, ToneChip, type TONE, Field, inputCls, Banner, btn } from "@/components/ui";
 import { DeliveryLines } from "./delivery-lines";
 import { ActionForm } from "@/components/form";
 import { setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction, acceptPackageAction } from "@/lib/packages/forms";
@@ -122,19 +122,24 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   if (canAct) {
     if (!pkg.assessedAt) items.push({ key: "check", primary: total > 0, label: "Check readiness", body: <ActionForm action={assessPackageAction} submitLabel="Check readiness now" size="sm" hidden={{ packageId: pkg.id }}><p className="text-xs text-slate-500">Records which documents are released at the status the package needs, and what is missing.</p></ActionForm> });
     if (shortfall && !pkg.shortfallIssuedAt) items.push({ key: "shortfall", primary: true, label: "Send what is missing", body: <ActionForm action={issueShortfallAction} submitLabel={`Ask ${pkg.names.acceptors}`} size="sm" hidden={{ packageId: pkg.id }}><p className="text-xs text-slate-500">A transmittal asks {pkg.names.acceptors} whether the package may go without them, listing each one and where it stands; those putting it together are copied in. Their answer comes back the same way.</p></ActionForm> });
+    // Delivered on a data transmittal written on the New transmittal form, filled from the package (owner: "just a
+    // transmittal but for package"): what is ready, to whom it names. Naming nobody, it is only closed here.
     if (mayDeliver) items.push({
       key: "deliver",
       primary: true,
       label: sendsTo.length ? `Deliver to ${pkg.names.to}` : "Close the package",
-      body: (
-        <ActionForm action={closePackageAction} submitLabel={sendsTo.length ? `Send ${readyCount} document${readyCount === 1 ? "" : "s"}` : "Close package"} size="sm" hidden={{ packageId: pkg.id }}>
+      body: sendsTo.length ? (
+        <div className="space-y-2">
           <p className="text-xs text-slate-500">
-            {sendsTo.length
-              ? `Every ready document goes out on one transmittal to each of ${pkg.names.to}, ${purpose.toLowerCase()}. Within our own organization it goes to ${pkg.names.acceptors}. Then ${pkg.names.acceptors} accepts the package.`
-              : "This package names no organization, so nothing is sent: closing records that it was handed over."}
+            {`A data transmittal carries every ready document (${readyCount}), ${purpose.toLowerCase()}, to ${pkg.names.to}; within our own organization to ${pkg.names.acceptors}. Sent, the package is delivered and its contents fixed${pkg.rule ? ": nothing more joins by its rule" : ""}; then ${pkg.names.acceptors} accepts it.`}
           </p>
+          <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number })}`} className={btn("primary", "sm")}>Write the transmittal</Link>
+        </div>
+      ) : (
+        <ActionForm action={closePackageAction} submitLabel="Close package" size="sm" hidden={{ packageId: pkg.id }}>
+          <p className="text-xs text-slate-500">This package names no organization, so nothing is sent: closing records that it was handed over.</p>
           {pkg.rule ? <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="ruleCeased" /> No more documents will be added</label> : null}
-          <Field label="Message" hint="optional — it goes on the transmittal"><input name="closureNote" className={inputCls} /></Field>
+          <Field label="Note" hint="optional"><input name="closureNote" className={inputCls} /></Field>
         </ActionForm>
       ),
     });

@@ -901,33 +901,79 @@ public sealed partial class PackageService(
     public async Task<(Package? Package, IReadOnlyList<Transmittal> Sent, IResult? Problem)> DeliverAsync(
         ProjectAccess access, Guid id, DeliverRequest request, CancellationToken cancellationToken)
     {
-        var (package, problem) = await ComposableAsync(access, id, cancellationToken);
+        var (package, readiness, problem) = await DeliverableAsync(access, id, request.RuleCeased, cancellationToken);
         if (problem is not null) return (null, [], problem);
+        var (sent, failed) = await DeliverNowAsync(access, package!, readiness!, Blank(request.Note), null, cancellationToken);
+        return failed is null ? (package, sent, null) : (null, [], failed);
+    }
+
+    /// <summary>
+    /// What Deliver checks, whichever way the package goes out: open and kept by the caller, readiness checked, nothing
+    /// missing the acceptance authority has not let go, and no rule still admitting (unless the caller says it ceased).
+    /// </summary>
+    public async Task<(Package? Package, List<Readiness>? Readiness, IResult? Problem)> DeliverableAsync(
+        ProjectAccess access, Guid id, bool ruleCeased, CancellationToken cancellationToken)
+    {
+        var (package, problem) = await ComposableAsync(access, id, cancellationToken);
+        if (problem is not null) return (null, null, problem);
         await SyncAsync(package!, cancellationToken);
         if (package!.AssessedAt is null)
-            return (null, [], Problems.Conflict("NOT_ASSESSED", "Check readiness first.", new { }));
+            return (null, null, Problems.Conflict("NOT_ASSESSED", "Check readiness first.", new { }));
         var readiness = await ReadinessAsync(package, cancellationToken);
         var missing = readiness.Where(r => !r.Ready).ToList();
         var recorded = package.Shortfall.Select(s => s.DocumentId).ToHashSet();
         if (missing.Any(r => !recorded.Contains(r.Member.DocumentId)))
         {
-            return (null, [], Problems.Conflict("SHORTFALL_CHANGED",
+            return (null, null, Problems.Conflict("SHORTFALL_CHANGED",
                 "Something is missing that the last assessment did not find. Assess it again.",
                 new { documents = missing.Where(r => !recorded.Contains(r.Member.DocumentId)).Select(r => r.DocumentNumber) }));
         }
         if (missing.Count > 0 && package.ShortfallAcceptedAt is null)
         {
-            return (null, [], package.ShortfallIssuedAt is null
+            return (null, null, package.ShortfallIssuedAt is null
                 ? Problems.Conflict("SHORTFALL_NOT_ISSUED", "Some documents are not ready. Send what is missing to the acceptance authority first.")
                 : Problems.Conflict("SHORTFALL_NOT_ACCEPTED", "Delivery waits for the acceptance authority to accept what is missing."));
         }
-        if (package.Rule is not null && !request.RuleCeased)
+        if (package.Rule is not null && !ruleCeased)
         {
-            return (null, [], Problems.Conflict("RULE_STILL_ADMITTING",
+            return (null, null, Problems.Conflict("RULE_STILL_ADMITTING",
                 "The package fills itself by a rule. Say that nothing more will join before it goes."));
         }
-        var (sent, failed) = await DeliverNowAsync(access, package, readiness, Blank(request.Note), null, cancellationToken);
-        return failed is null ? (package, sent, null) : (null, [], failed);
+        return (package, readiness, null);
+    }
+
+    /// <summary>
+    /// A package's documents sent on a transmittal written on the New transmittal form (owner: delivering a package is a
+    /// data transmittal, "a transmittal but for package"): it carries only the package's documents. Of a package we
+    /// deliver, the checks of Deliver hold first; sent, it is delivered and its contents fixed (<see cref="DeliveredAsync"/>).
+    /// A supplier's package is only named on the transmittal.
+    /// </summary>
+    public async Task<IResult?> SendableAsync(ProjectAccess access, Guid id, IReadOnlyCollection<Guid> documentIds, CancellationToken cancellationToken)
+    {
+        var package = await db.Packages.AsNoTracking().Include(p => p.Members)
+            .FirstOrDefaultAsync(p => p.Id == id && p.ProjectId == access.Project.Id, cancellationToken);
+        if (package is null) return Problems.NotFound("PACKAGE_NOT_FOUND", "That package is not on this project.");
+        var members = package.Members.Select(m => m.DocumentId).ToHashSet();
+        if (documentIds.Count == 0 || documentIds.Any(d => !members.Contains(d)))
+            return Problems.Invalid("NOT_IN_PACKAGE", $"A transmittal for {package.Number} carries its documents only.");
+        if (package.Kind != PackageKinds.Delivery) return null;
+        var (_, _, problem) = await DeliverableAsync(access, id, ruleCeased: true, cancellationToken);
+        return problem;
+    }
+
+    /// <summary>A package we deliver, sent on <paramref name="sent"/>: delivered, its contents fixed, recorded.</summary>
+    public async Task DeliveredAsync(ProjectAccess access, Guid id, IReadOnlyList<Transmittal> sent, CancellationToken cancellationToken)
+    {
+        var package = await db.Packages.FirstOrDefaultAsync(p => p.Id == id && p.ProjectId == access.Project.Id, cancellationToken);
+        if (package is null || package.Kind != PackageKinds.Delivery || package.ClosedAt is not null) return;
+        var now = clock.GetCurrentInstant();
+        package.State = PackageStates.Delivered;
+        package.ClosedAt = now;
+        package.ClosedByName = access.UserName;
+        if (package.Rule is not null) package.RuleCeasedAt = now;
+        await audit.WriteAsync(Actor(access), "PACKAGE_DELIVERED", "Package", package.Id, package.Number,
+            $"Sent on {string.Join(", ", sent.Select(t => t.Number))}.", package.ProjectId, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>

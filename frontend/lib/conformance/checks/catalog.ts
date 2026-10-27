@@ -96,7 +96,7 @@ export const CATALOG: CheckDef[] = [
   c("REV-02", "RUNNING", "Released at a status since retired", "The status of each released revision against the statuses as published now", "Register + settings", "MAJOR", "CF"),
   c("RVW-01", "RUNNING", "Decided with a verdict since retired", "Reviews decided and not yet released, whose verdict was retired since", "Register + settings", "MAJOR", "CF"),
   c("RVW-02", "RUNNING", "An open comment whose weight was retired", "Open comments whose weight (comment, blocking comment…) is no longer published", "Register + settings", "MAJOR", "RV"),
-  c("REV-03", "RUNNING", "Released with no native file", "Released revisions with no native file beside the PDF (it is optional; the editable original helps the next revision)", "Files", "ADVISORY", "OR"),
+  c("REV-03", "RUNNING", "Released with no native file", "Released revisions with no native file beside the PDF, of types that come with one (it is optional; the editable original helps the next revision)", "Files", "ADVISORY", "OR"),
   c("STO-01", "RUNNING", "A file the register lists is missing from storage (outside the app)", "Asks storage for a sample of current files, 25 a run", "Files", "CRITICAL", "CF"),
   c("STO-02", "RUNNING", "A file changed in storage after it was kept (outside the app)", "Re-reads a sample of current files, 5 a run, against the fingerprint taken on arrival", "Files", "CRITICAL", "CF"),
   c("REV-04", "RUNNING", "Released and never sent", "Released revisions no transmittal carried (other than for review): only when the project releases and issues separately, or a type released with no review", "Register + transmittals", "ADVISORY", "CF"),
