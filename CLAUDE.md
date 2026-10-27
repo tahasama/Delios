@@ -119,8 +119,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **The menu never scrolls** (owner: "we can't have a scrolled menu, it should be fixed at all times";
   `app/(app)/navigation.tsx`): it fits the window, tightening on a shorter one (`short:` under 880 pixels high: the lines
   under the names go, smaller marks; `tiny:` under 740: tighter still; variants in `globals.css`), scrolling only as a
-  last resort on a very small screen. No "Create document" in it (the register's "New document" does it); the fold to
-  icons is a small button beside the logo, not a row of its own; Settings and Help share one line at its foot.
+  last resort on a very small screen. It holds the work only: no "Create document" (the register's "New document" does
+  it), no Settings and no Help (owner: both are in the top bar, Settings as a gear beside Help, for whoever a Settings
+  page opens to); folding it to icons is a small round button on its right edge, taking no room in it. The rest of the
+  menu stays as it is (owner: no regrouping of its entries).
 - A card's side colour is its own left edge (`border-l-[3px] border-l-(--rail)`), never a bar laid over it: it
   follows the rounded corners. A sheet left open (`register-sheet-open`) rounds its first and last strip seen (a hidden field or a
   mark before it does not count; a form wrapping the strips passes it on), so no band's square corner stands out.

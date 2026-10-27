@@ -8,7 +8,7 @@ import { Sidebar, MobileNav, SearchBox } from "@/app/(app)/navigation";
 import { ProjectSwitcher } from "@/app/(app)/project-switcher";
 import { elsewhere } from "@/lib/organization/api";
 import { logoutAction } from "@/lib/account/forms-sign-in";
-import { Bell, BookOpen, Building2, ChevronDown, LogOut, UserRound, KeyRound } from "lucide-react";
+import { Bell, BookOpen, Building2, ChevronDown, LogOut, Settings, UserRound, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { ThemeToggle } from "@/app/(app)/theme-toggle";
 import { ROLE_LABEL } from "@/lib/core/standard";
@@ -64,6 +64,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link href="/guide" className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800">
               <BookOpen className="h-4 w-4" /> <span className="hidden sm:inline">Explore</span>
             </Link>
+            {/* Settings sit in the top bar (owner), for whoever a Settings page opens to. */}
+            {perms.canSettings ? (
+              <Link href="/settings" className="rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" title="Settings" aria-label="Settings">
+                <Settings className="h-5 w-5" />
+              </Link>
+            ) : null}
             <ThemeToggle />
             <Link href="/notifications" className="relative rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" title="Notifications">
               <Bell className="h-5 w-5" />
