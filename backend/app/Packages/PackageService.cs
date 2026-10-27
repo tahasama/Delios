@@ -71,11 +71,11 @@ public sealed partial class PackageService(
         // What the project's package form insists on (Settings, Forms & fields). A supplier's package has no due day of
         // its own (each document is due on its planned date), so it is never asked one.
         if (await Settings.FormRules.CheckAsync(db, access.Project.Id, "PACKAGE", new Dictionary<string, bool>
-            {
-                ["description"] = !string.IsNullOrWhiteSpace(request.Description),
-                ["completionDate"] = request.CompletionDate is not null || request.Kind == PackageKinds.Supply,
-                ["po"] = !string.IsNullOrWhiteSpace(request.PurchaseOrder),
-            }, request.Extras, cancellationToken) is { } formProblem) return Fail(formProblem);
+        {
+            ["description"] = !string.IsNullOrWhiteSpace(request.Description),
+            ["completionDate"] = request.CompletionDate is not null || request.Kind == PackageKinds.Supply,
+            ["po"] = !string.IsNullOrWhiteSpace(request.PurchaseOrder),
+        }, request.Extras, cancellationToken) is { } formProblem) return Fail(formProblem);
 
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         var kind = request.Kind ?? PackageKinds.Delivery;
