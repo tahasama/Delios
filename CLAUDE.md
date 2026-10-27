@@ -122,7 +122,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   last resort on a very small screen. It holds the work only: no "Create document" (the register's "New document" does
   it), no Settings and no Help (owner: both are in the top bar, Settings as a gear beside Help, for whoever a Settings
   page opens to); folding it to icons is a small round button on its right edge, taking no room in it. The rest of the
-  menu stays as it is (owner: no regrouping of its entries).
+  menu stays as it is (owner: no regrouping of its entries). **One frame** (owner: "both side and top bar need a proper
+  update"): the menu's mark and the top bar are the same height (`h-16`) and closed by one line, the fold button sitting
+  where they meet; an entry's icon has no box until it is the page you are on (then gold); the top bar's tools are one
+  size and look (`top-tools.tsx`, `TOOL` / `ToolLink`: Help, Settings lit while in them, theme, notifications), then your
+  name without a frame; the role reads in words ("we are supplier"), never its code.
 - A card's side colour is its own left edge (`border-l-[3px] border-l-(--rail)`), never a bar laid over it: it
   follows the rounded corners. A sheet left open (`register-sheet-open`) rounds its first and last strip seen (a hidden field or a
   mark before it does not count; a form wrapping the strips passes it on), so no band's square corner stands out.

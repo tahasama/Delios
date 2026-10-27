@@ -36,9 +36,9 @@ export function SetNav({ page = "/settings/config", groups, current, currentSet,
     : groups[tab]?.sets ?? [];
 
   return (
-    // As tall as the window under the top bar (h-18) less the page's margins above and below it (py-6): the title above
+    // As tall as the window under the top bar (h-16) less the page's margins above and below it (py-6): the title above
     // scrolls away, then this sheet fills the window and only its table and its list of lists scroll. A narrow screen flows.
-    <div className="register register-sheet register-sheet-open flex flex-col lg:h-[calc(100dvh-7rem)]">
+    <div className="register register-sheet register-sheet-open flex flex-col lg:h-[calc(100dvh-6.5rem)]">
       <div className="asking flex shrink-0 flex-wrap items-stretch justify-between gap-x-4 border-b border-line px-5 sm:px-6">
         <div role="tablist" className="-mb-px flex flex-wrap items-stretch gap-x-5">
           {groups.map((g, i) => {

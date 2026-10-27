@@ -34,10 +34,10 @@ export function ProjectSwitcher({
   if (single) {
     return (
       <div className="min-w-0 flex-1 border-line sm:min-w-52.5 sm:flex-none sm:border-r sm:pr-5">
-        <p className="truncate text-sm font-semibold text-slate-800">{current.name}</p>
-        <p className="truncate text-xs text-slate-400">
+        <p className="truncate text-sm font-semibold leading-5 text-slate-900">{current.name}</p>
+        <p className="truncate text-xs leading-4 text-slate-500">
           {organizationName} · {functionName ?? ROLE_LABEL[role] ?? role}
-          {current.role !== "GENERIC" ? ` · we are ${current.role}` : ""}
+          {current.role !== "GENERIC" ? ` · we are ${(roleFor(current.role)?.label ?? current.role).toLowerCase()}` : ""}
         </p>
       </div>
     );
@@ -51,9 +51,9 @@ export function ProjectSwitcher({
         </span>
         <span className="min-w-0 flex-1 text-left">
           <span className="block truncate text-sm font-semibold leading-tight text-slate-800">{current.name}</span>
-          <span className="block truncate text-[11px] leading-tight text-slate-400">
+          <span className="block truncate text-[11px] leading-tight text-slate-500">
             {current.code} · {functionName ?? ROLE_LABEL[role] ?? role}
-            {current.role !== "GENERIC" ? ` · we are ${current.role}` : ""}
+            {current.role !== "GENERIC" ? ` · we are ${(roleFor(current.role)?.label ?? current.role).toLowerCase()}` : ""}
           </span>
         </span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-open:rotate-180" />

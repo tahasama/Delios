@@ -154,26 +154,24 @@ function NavLink({
       onMouseEnter={(e) => tipFor(e, item.label, onTip)}
       onMouseLeave={() => onTip?.(null)}
       className={cn(
-        "group flex rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/70 rail:justify-center rail:px-0",
-        compact ? "items-center gap-3 px-3 py-1.5 tiny:py-1" : "items-start gap-3 px-3 py-2.5 short:items-center short:py-1.5 rail:py-1.5",
-        active
-          ? "bg-surface text-brand-ink shadow-sm dark:bg-white/10 dark:text-white dark:shadow-none"
-          : "text-slate-300 hover:bg-white/7 hover:text-white",
+        // One row per entry, the same height folded or open; the page you are on carries the brand's gold.
+        "group flex rounded-lg outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-gold/70 rail:justify-center rail:px-0",
+        compact ? "items-center gap-3 px-2 py-1 tiny:py-0.5" : "items-start gap-3 px-2 py-2 short:items-center short:py-1 rail:py-1",
+        active ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/6 hover:text-white",
       )}
     >
       <span
         className={cn(
-          "mt-0.5 grid shrink-0 place-items-center rounded-lg rail:mt-0 short:mt-0",
-          compact ? "h-7 w-7" : "h-8 w-8 short:h-7 short:w-7",
-          active ? "bg-tint text-brand-ink dark:bg-gold/20 dark:text-gold-bright" : "bg-white/7 text-slate-300",
+          "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors rail:mt-0 short:mt-0",
+          active ? "bg-gold text-[#102a43]" : "text-slate-400 group-hover:text-white",
         )}
       >
-        <item.icon className="h-4 w-4" />
+        <item.icon className="h-4.5 w-4.5" />
       </span>
       <span className="min-w-0 rail:hidden">
-        <span className="block text-sm font-semibold leading-5">{item.label}</span>
+        <span className={cn("block text-sm leading-5", active ? "font-semibold" : "font-medium")}>{item.label}</span>
         {!compact && item.description ? (
-          <span className={cn("mt-0.5 block text-[11px] leading-4 short:hidden", active ? "text-slate-500" : "text-slate-500 group-hover:text-slate-400")}>
+          <span className={cn("block text-[11px] leading-4 short:hidden", active ? "text-slate-300" : "text-slate-500 group-hover:text-slate-400")}>
             {item.description}
           </span>
         ) : null}
@@ -191,19 +189,20 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
 
   return (
     <>
-      <div className="mb-5 flex items-center gap-2 short:mb-3">
-        <Link href="/" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-3 px-2 text-white rail:flex-none rail:justify-center rail:px-0">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gold text-sm font-black text-[#102a43] shadow-sm short:h-9 short:w-9">D</span>
+      {/* The mark, as tall as the top bar and closed by the same line, so the two bars read as one frame. */}
+      <div className="-mx-4 flex h-16 shrink-0 items-center border-b border-white/8 px-4 rail:-mx-2.5 rail:justify-center rail:px-0">
+        <Link href="/" onClick={onNavigate} className="flex min-w-0 items-center gap-3 rounded-lg px-1 text-white outline-none focus-visible:ring-2 focus-visible:ring-gold/70 rail:px-0">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gold text-sm font-black text-[#102a43]">D</span>
           <span className="min-w-0 rail:hidden">
-            <span className="block text-[15px] font-bold tracking-[0.08em]">DELIOS</span>
-            <span className="block truncate text-[11px] text-slate-400 short:hidden">Project information, controlled</span>
+            <span className="block text-[15px] font-bold leading-5 tracking-[0.08em]">DELIOS</span>
+            <span className="block truncate text-[11px] leading-4 text-slate-400">Project information, controlled</span>
           </span>
         </Link>
       </div>
 
       {/* Never scrolled (owner): everything is laid out to fit the window; scrolling is only a last resort on a very small screen. */}
-      <nav className="scroll-thin min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden short:space-y-2" aria-label="Primary navigation">
-        <ul className="space-y-1">
+      <nav className="scroll-thin -mx-1 min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden px-1 pt-4 short:space-y-2 short:pt-3" aria-label="Primary navigation">
+        <ul className="space-y-0.5">
           {primary.map((item) => (
             <li key={item.href}>
               <NavLink item={item} pathname={pathname} onNavigate={onNavigate} onTip={onTip} />
@@ -213,8 +212,9 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
 
         {more.length ? (
           <details open={insideMore} className="group/more">
-            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 transition hover:text-slate-300 rail:justify-center rail:px-0">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-500 transition hover:text-slate-200 rail:justify-center rail:px-0">
               <span className="rail:hidden">More</span>
+              <span aria-hidden className="hidden h-px flex-1 bg-white/8 rail:hidden group-open/more:block" />
               <span aria-hidden className="hidden w-6 border-t border-white/20 rail:block" />
               <span className="ml-auto text-[10px] font-normal tracking-normal text-slate-600 group-open/more:hidden rail:hidden">{more.length}</span>
             </summary>
@@ -273,7 +273,7 @@ export function Sidebar({ perms }: { perms: NavPermissions }) {
 
   return (
     <aside
-      className="sidebar-desktop palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-67 flex-col border-r border-[#254663] bg-[#102a43] px-4 py-5 text-slate-200 short:py-3 lg:flex rail:px-2.5 dark:border-white/5 dark:bg-[#0c1522]"
+      className="sidebar-desktop palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-67 flex-col border-r border-[#254663] bg-[#102a43] px-4 pb-4 text-slate-200 short:pb-3 lg:flex rail:px-2.5 dark:border-white/5 dark:bg-[#0c1522]"
       style={{ width: "var(--sidebar-w)" }}
     >
       <SidebarBody perms={perms} onTip={(t) => { if (!dragging.current) setTip(t); }} />
@@ -283,7 +283,7 @@ export function Sidebar({ perms }: { perms: NavPermissions }) {
         onClick={toggle}
         aria-label={rail ? "Expand the menu" : "Fold the menu to icons"}
         title={rail ? "Expand the menu" : "Fold the menu to icons"}
-        className="absolute top-7 -right-3 z-40 grid h-6 w-6 place-items-center rounded-full border border-[#254663] bg-[#102a43] text-slate-400 shadow-sm transition hover:text-white dark:border-white/10 dark:bg-[#0c1522]"
+        className="absolute top-16 -right-3 z-40 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-line bg-surface text-slate-500 shadow-[0_1px_3px_rgb(16_42_67/0.18)] transition hover:border-line-strong hover:text-brand-ink focus-visible:ring-2 focus-visible:ring-gold/70 outline-none"
       >
         {rail ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
       </button>
@@ -329,7 +329,7 @@ export function MobileNav({ perms }: { perms: NavPermissions }) {
       {open ? (
         <div className="no-print fixed inset-0 z-40 lg:hidden">
           <button type="button" aria-label="Close navigation" onClick={() => setOpen(false)} className="absolute inset-0 bg-slate-900/50" />
-          <div className="palette-light absolute inset-y-0 left-0 flex w-67 max-w-[85vw] flex-col bg-[#102a43] px-4 py-5 text-slate-200 shadow-2xl">
+          <div className="palette-light absolute inset-y-0 left-0 flex w-67 max-w-[85vw] flex-col bg-[#102a43] px-4 pb-4 text-slate-200 shadow-2xl">
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -354,7 +354,7 @@ export function SearchBox({ className }: { className?: string }) {
         name="q"
         aria-label="Search documents"
         placeholder="Search by number, title or tag"
-        className="h-10 w-full rounded-xl border border-line bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#5e7f9d] focus:bg-surface focus:ring-3 focus:ring-[#5e7f9d]/10"
+        className="h-9 w-full rounded-lg border border-line bg-slate-50 pl-9 pr-3 text-[13px] text-slate-800 outline-none transition placeholder:text-slate-500 hover:border-line-strong focus:border-[#5e7f9d] focus:bg-surface focus:ring-3 focus:ring-[#5e7f9d]/10"
       />
     </form>
   );

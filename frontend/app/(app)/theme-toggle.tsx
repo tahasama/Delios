@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { PREF, savePreference } from "@/lib/core/preferences";
+import { TOOL } from "./top-tools";
 
 type Theme = "light" | "dark" | "system";
 const ORDER: Theme[] = ["light", "dark", "system"];
@@ -54,9 +55,9 @@ export function ThemeToggle() {
       }}
       title={`Theme: ${LABEL[theme]} — switch to ${LABEL[next]}`}
       aria-label={`Theme: ${LABEL[theme]}. Switch to ${LABEL[next]}`}
-      className="rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+      className={TOOL}
     >
-      <Icon className="h-5 w-5" />
+      <Icon className="h-4.5 w-4.5" />
     </button>
   );
 }
