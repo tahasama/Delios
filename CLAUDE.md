@@ -1943,8 +1943,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Known weaknesses in our packages are checked by themselves** (owner, "security checks"; `.github/workflows/security.yml`):
   on every push touching the server or the screens' packages, and once a week (a weakness may be published about a
   package already in use; the build's clock, not the app's). A high or critical one stops the check; moderate and low
-  ones are listed in its log (today: `uuid` under `exceljs`, moderate, in a use of it we do not make; its fix would
-  downgrade `exceljs`, so it waits for `exceljs`).
+  ones are listed in its log. A weak package brought by another is raised under `overrides` in `package.json` when its
+  newer version still works for it (today `uuid` ^11.1.1 under `exceljs`, whose own fix would have downgraded it; drop the
+  override once `exceljs` asks for a safe `uuid` itself). Today: none found.
 - An outbox routing key is at most 16 characters; `ControlledVersion.VersionLabel` too.
 - Migrations: `dotnet ef migrations add Name -p app -s app -o Platform/Migrations`
   (from `backend/`). Each new table gets `RowLevelSecurity.Enable(migrationBuilder, "<table>")`.
