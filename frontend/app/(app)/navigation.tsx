@@ -159,13 +159,13 @@ function NavLink({
       className={cn(
         // One row per entry, the same height folded or open; the page you are on is a light row, its icon as any other.
         "group flex rounded-lg outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-gold/70 rail:justify-center rail:px-0",
-        compact ? "items-center gap-3 px-2 py-1 tiny:py-0.5" : "items-start gap-3 px-2 py-2 short:items-center short:py-1 rail:py-1",
+        compact ? "items-center gap-3 px-2 py-1 tiny:py-0" : "items-start gap-3 px-2 py-2 short:items-center short:py-1 rail:py-1 tiny:py-0.5",
         active ? "bg-white/12 text-white" : "text-slate-300 hover:bg-white/6 hover:text-white",
       )}
     >
       <span
         className={cn(
-          "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors rail:mt-0 short:mt-0",
+          "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md transition-colors rail:mt-0 short:mt-0 tiny:h-7 tiny:w-7",
           active ? "text-white" : "text-slate-400 group-hover:text-white",
         )}
       >
@@ -217,7 +217,7 @@ function SidebarBody({ perms, moreOpen, onNavigate, onTip, drawer = false }: {
       {drawer ? <SearchBox className="mt-3" dark onSearch={onNavigate} /> : null}
 
       {/* Never scrolled (owner): everything is laid out to fit the window; scrolling is only a last resort on a very small screen. */}
-      <nav className="scroll-thin -mx-1 min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-1 pt-4 short:pt-3" aria-label="Primary navigation">
+      <nav className="scroll-thin -mx-1 min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-1 pt-4 short:pt-3 tiny:pt-2" aria-label="Primary navigation">
         <ul className="space-y-0.5">
           {primary.map((item) => (
             <li key={item.href}>
