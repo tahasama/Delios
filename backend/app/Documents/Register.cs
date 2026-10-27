@@ -91,7 +91,7 @@ public static class RegisterEndpoints
                 ? await next(context)
                 : Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register."));
         project.MapGet("", PageAsync);
-        project.MapGet("/export", ExportAsync);
+        project.MapGet("/export", ExportAsync).RequireRateLimiting("heavy");
         project.MapGet("/usage", UsageAsync);
         project.MapGet("/used", UsedAsync);
         project.MapGet("/views", ViewsAsync);

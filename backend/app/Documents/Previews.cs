@@ -42,10 +42,11 @@ public static class Previews
 
     public static void Map(RouteGroupBuilder project)
     {
-        project.MapGet("/files/{fileId:guid}/as-pdf", AsPdfAsync);
-        project.MapGet("/files/{fileId:guid}/as-dxf", AsDxfAsync);
-        project.MapGet("/files/{fileId:guid}/text", TextAsync);
-        project.MapGet("/files/{fileId:guid}/page.png", FirstPageAsync);
+        // The heavy calls are limited per person (PlatformSetup, "heavy").
+        project.MapGet("/files/{fileId:guid}/as-pdf", AsPdfAsync).RequireRateLimiting("heavy");
+        project.MapGet("/files/{fileId:guid}/as-dxf", AsDxfAsync).RequireRateLimiting("heavy");
+        project.MapGet("/files/{fileId:guid}/text", TextAsync).RequireRateLimiting("heavy");
+        project.MapGet("/files/{fileId:guid}/page.png", FirstPageAsync).RequireRateLimiting("heavy");
     }
 
     /// <summary><c>GET /files/{fileId}/as-pdf</c>: a Word, PowerPoint or other office file as a PDF, made once.</summary>

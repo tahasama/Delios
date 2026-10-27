@@ -64,7 +64,7 @@ public static class ListUploadEndpoints
             .MapGet("/schedule/lists/{kind}/source", SourceAsync);
         app.MapGroup("/api/projects/{projectId:guid}").WithTags("Schedule")
             .AddEndpointFilter<ProjectAccessFilter>()
-            .MapGet("/schedule/lists/{kind}/source/file", SourceFileAsync);
+            .MapGet("/schedule/lists/{kind}/source/file", SourceFileAsync).RequireRateLimiting("heavy");
         // Checked first (owner: every import shows what it would do before anything is written): read in a transaction
         // that is always undone, what the project holds compared before and after.
         app.MapGroup("/api/projects/{projectId:guid}").WithTags("Schedule")

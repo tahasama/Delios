@@ -32,6 +32,10 @@ public sealed class DeliosFactory(IDictionary<string, string?> overrides, Action
         ["ClamAv:Port"] = "1",
         // Tests never reach the breached-password list on the internet.
         ["Passwords:CheckBreached"] = "false",
+        // A test runs many calls as one person within a minute: the per-person limits stay out of its way
+        // (the sign-in limit, which tests check, is not one of these).
+        ["RateLimits:PerMinute"] = "1000000",
+        ["RateLimits:HeavyPerMinute"] = "1000000",
     };
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

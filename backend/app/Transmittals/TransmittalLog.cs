@@ -60,7 +60,7 @@ public static class TransmittalLogEndpoints
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter<ProjectAccessFilter>();
         project.MapGet("/log", PageAsync);
-        project.MapGet("/log/export", ExportAsync);
+        project.MapGet("/log/export", ExportAsync).RequireRateLimiting("heavy");
     }
 
     /// <summary><c>GET /transmittals/log</c>: one page of matching transmittals and how many match.</summary>

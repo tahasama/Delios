@@ -48,7 +48,7 @@ public static class ReportEndpoints
             .Select(id => new { id, title = Catalogue[id].Title, question = Catalogue[id].Question })));
         project.MapGet("/{reportId}", ReportAsync);
         project.MapPost("/{reportId}/count", CountAsync);
-        project.MapGet("/{reportId}/export", ExportAsync);
+        project.MapGet("/{reportId}/export", ExportAsync).RequireRateLimiting("heavy");
     }
 
     /// <summary>

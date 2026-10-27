@@ -35,7 +35,7 @@ public static class DocumentEndpoints
         project.MapPost("/documents/{documentId:guid}/viewed", ViewedAsync);
         project.MapPost("/documents", RegisterAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/documents/check", CheckRegisterAsync);
-        project.MapPost("/documents/{documentId:guid}/uploads", RequestUploadAsync);
+        project.MapPost("/documents/{documentId:guid}/uploads", RequestUploadAsync).RequireRateLimiting("heavy");
         project.MapGet("/revisions/{revisionId:guid}", async (Guid revisionId, HttpContext h, DeliosDbContext db, DocumentService documents, CancellationToken c) =>
         {
             // A revision on its own, with the document it belongs to: for screens that hold only a revision's id.
@@ -57,9 +57,9 @@ public static class DocumentEndpoints
         project.MapPut("/documents/{documentId:guid}", UpdateAsync);
         project.MapPost("/documents/{documentId:guid}/end", EndAsync);
         project.MapPost("/documents/{documentId:guid}/reinstate", ReinstateAsync);
-        project.MapGet("/files/{fileId:guid}/download", DownloadAsync);
-        project.MapGet("/files/{fileId:guid}/workbook", WorkbookAsync);
-        project.MapGet("/files/{fileId:guid}/schedule", ScheduleFileAsync);
+        project.MapGet("/files/{fileId:guid}/download", DownloadAsync).RequireRateLimiting("heavy");
+        project.MapGet("/files/{fileId:guid}/workbook", WorkbookAsync).RequireRateLimiting("heavy");
+        project.MapGet("/files/{fileId:guid}/schedule", ScheduleFileAsync).RequireRateLimiting("heavy");
         Previews.Map(project);
     }
 

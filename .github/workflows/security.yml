@@ -1,0 +1,54 @@
+name: security
+
+# Known weaknesses in the packages we use (owner, "security checks"): checked on every push, and once a week, since a
+# weakness can be published about a package we already have without a line of ours changing. A high or critical one
+# stops the check; moderate and low ones are listed in its log, to be read.
+on:
+  push:
+    paths: ["backend/**", "frontend/package.json", "frontend/package-lock.json", ".github/workflows/security.yml"]
+  pull_request:
+    paths: ["backend/**", "frontend/package.json", "frontend/package-lock.json", ".github/workflows/security.yml"]
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore
+      - name: Known weaknesses in the server's packages (and the packages they bring)
+        run: |
+          dotnet list package --vulnerable --include-transitive 2>&1 | tee packages.txt
+          if grep -qiE "^\s*>.*\b(High|Critical)\b" packages.txt; then
+            echo "A package carries a high or critical weakness: update it." >&2
+            exit 1
+          fi
+
+  frontend-packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Every known weakness in the screens' packages, for the log
+        run: npm audit --omit=dev || true
+      - name: Stop on a high or critical one
+        run: npm audit --omit=dev --audit-level=high

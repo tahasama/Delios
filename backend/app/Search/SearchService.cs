@@ -96,5 +96,5 @@ public static class SearchEndpoints
                 if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
                     return Problems.Invalid("SEARCH_TOO_SHORT", "Type at least two characters.");
                 return Results.Ok(await search.SearchAsync(access, q.Trim(), limit ?? 25, cancellationToken));
-            });
+            }).RequireRateLimiting("heavy");
 }

@@ -1927,6 +1927,19 @@ a screen only words it. A new rule goes in the backend, never in a page.
   confirmations, requests' check / confirm / answer, notices, asking someone to join. The same key on a different
   request is refused in plain words (IDEMPOTENCY_KEY_REUSED: "This was already sent from this form…"). A new act that
   must never happen twice gets the filter and the key.
+- **Limits per person** (owner, "rate limiting"; `PlatformSetup`, `AddRateLimiter`): beside the doors (sign-in,
+  password reset, email links, two-step codes, the organization's own sign-in), every call is counted per person signed in
+  (else per address), 600 a minute (`RateLimits:PerMinute`), and the heavy ones tighter, 120 a minute
+  (`RateLimits:HeavyPerMinute`, policy `heavy`): a file's bytes and every preview of it, exports, list files, uploads
+  asked, search (the quick find). Work never feels them; a runaway script or a stolen session is slowed at once (the
+  download watch still tells the administrators). A refusal is said in plain words (429, TOO_MANY_REQUESTS, "Too many
+  requests in a short time. Wait a moment and try again.", with Retry-After). Tests raise both (`DeliosFactory`). A new
+  call that sends files or many lines takes `.RequireRateLimiting("heavy")`.
+- **Known weaknesses in our packages are checked by themselves** (owner, "security checks"; `.github/workflows/security.yml`):
+  on every push touching the server or the screens' packages, and once a week (a weakness may be published about a
+  package already in use; the build's clock, not the app's). A high or critical one stops the check; moderate and low
+  ones are listed in its log (today: `uuid` under `exceljs`, moderate, in a use of it we do not make; its fix would
+  downgrade `exceljs`, so it waits for `exceljs`).
 - An outbox routing key is at most 16 characters; `ControlledVersion.VersionLabel` too.
 - Migrations: `dotnet ef migrations add Name -p app -s app -o Platform/Migrations`
   (from `backend/`). Each new table gets `RowLevelSecurity.Enable(migrationBuilder, "<table>")`.

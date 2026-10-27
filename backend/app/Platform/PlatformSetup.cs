@@ -221,6 +221,9 @@ public static class PlatformSetup
         // Every endpoint requires a signed-in person unless it says otherwise.
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+        // Calls per person per minute: every call, and the heavy ones (`RateLimits:PerMinute`, `RateLimits:HeavyPerMinute`).
+        var perMinute = Math.Max(1, config.GetValue("RateLimits:PerMinute", 600));
+        var heavyPerMinute = Math.Max(1, config.GetValue("RateLimits:HeavyPerMinute", 120));
         services.AddRateLimiter(o =>
         {
             o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -235,6 +238,30 @@ public static class PlatformSetup
             o.AddPolicy("my-codes", http => RateLimitPartition.GetFixedWindowLimiter(
                 http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+            // Every call, per person (owner, "rate limiting"): generous enough that work never feels it (a page is a
+            // dozen calls), close enough that a runaway script or a stolen session is slowed down at once.
+            o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
+                http.Request.Path.StartsWithSegments("/health") || http.Request.Path.StartsWithSegments("/metrics")
+                    ? RateLimitPartition.GetNoLimiter("probe")
+                    : RateLimitPartition.GetTokenBucketLimiter(Caller(http), _ => new TokenBucketRateLimiterOptions
+                    {
+                        TokenLimit = perMinute, TokensPerPeriod = perMinute, ReplenishmentPeriod = TimeSpan.FromMinutes(1), QueueLimit = 0,
+                    }));
+            // The heavy calls, per person: a file's bytes or its preview, an export, an upload asked, a search. A person
+            // reading files one by one never reaches it; a whole project pulled out in a loop does (DownloadWatch still
+            // tells the administrators past 200 files in an hour).
+            o.AddPolicy("heavy", http => RateLimitPartition.GetTokenBucketLimiter(Caller(http), _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = heavyPerMinute, TokensPerPeriod = heavyPerMinute, ReplenishmentPeriod = TimeSpan.FromMinutes(1), QueueLimit = 0,
+            }));
+            // Said in plain words, as every refusal is; the screens show it as it is.
+            o.OnRejected = async (context, cancellationToken) =>
+            {
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var wait))
+                    context.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString();
+                await Problems.Problem(StatusCodes.Status429TooManyRequests, "TOO_MANY_REQUESTS",
+                    "Too many requests in a short time. Wait a moment and try again.", null).ExecuteAsync(context.HttpContext);
+            };
         });
         // The proxy in front (Caddy, the load balancer) sits on a private network.
         services.Configure<ForwardedHeadersOptions>(o =>
@@ -456,6 +483,12 @@ public static class PlatformSetup
     /// </summary>
     private static void AddValidated<T>(IServiceCollection services, string section) where T : class =>
         services.AddOptions<T>().BindConfiguration(section).ValidateDataAnnotations().ValidateOnStart();
+
+    /// <summary>Who a limit counts: the person signed in, else the address the request came from (walked back through our proxies).</summary>
+    private static string Caller(HttpContext http) =>
+        http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value is { } person
+            ? "u:" + person
+            : "a:" + (http.Connection.RemoteIpAddress?.ToString() ?? "unknown");
 }
 
 /// <summary>Which lists a project reads (its own copies), as every request sets them.</summary>

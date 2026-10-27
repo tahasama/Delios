@@ -155,7 +155,7 @@ public static class TransmittalEndpoints
         {
             var (ticket, problem) = await s.UploadAsync(ProjectAccessFilter.Of(h), r, c);
             return problem ?? Results.Ok(ticket);
-        });
+        }).RequireRateLimiting("heavy");
         project.MapPost("/transmittals/incoming", SendIncomingAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/transmittals/{transmittalId:guid}/attachments",
             async (Guid transmittalId, AttachFilesRequest r, HttpContext h, IncomingService s, TransmittalService t, CancellationToken c) =>

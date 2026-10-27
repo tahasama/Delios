@@ -50,7 +50,7 @@ public static class ReviewListEndpoints
                 ? await next(context)
                 : Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register."));
         project.MapGet("", PageAsync);
-        project.MapGet("/export", ExportAsync);
+        project.MapGet("/export", ExportAsync).RequireRateLimiting("heavy");
     }
 
     /// <summary><c>GET /reviews</c>: one page of matching reviews and how many match.</summary>
