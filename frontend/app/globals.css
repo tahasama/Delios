@@ -61,6 +61,10 @@ table {
    cursor set on the element itself — grab on a row being dragged, help on a
    hover note — still wins. */
 @layer base {
+  /* Long titles wrap into lines of even length, never one word left alone on the last (owner, "balanced headlines");
+     body text is left as it is. */
+  h1, h2, h3, h4 { text-wrap: balance; }
+
   /* Every native field takes the control size unless a component sets it. */
   input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="hidden"]),
   select {

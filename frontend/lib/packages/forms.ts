@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/core/scope";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
+import { once } from "@/lib/core/once";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";
 import { isReadOnly } from "@/lib/core/auth";
 import { filterFromForm, isEmpty } from "@/lib/packages/package-rule";
@@ -65,7 +66,7 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
         parentId: String(formData.get("parentId") ?? "") || null,
         rule: isEmpty(filter) ? null : { disciplines: filter.disciplines ?? [], docTypes: filter.docTypes ?? [], originators: filter.originators ?? [], assetIds: filter.assetIds ?? [] },
       },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "create") ?? randomUUID(),
     });
     number = created.number;
     // Started from a supplier package (Deliver): it holds that package's documents.

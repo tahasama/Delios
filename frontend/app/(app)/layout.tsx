@@ -13,6 +13,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { ThemeChoice } from "@/app/(app)/theme-toggle";
 import { MenuCloser } from "@/components/menu-closer";
+import { CommandMenu } from "@/components/command-menu";
 import { PREF } from "@/lib/core/preferences";
 import { ToolLink } from "@/app/(app)/top-tools";
 import { SETUP_PAGES, maySetup } from "@/app/(app)/settings/setup-pages";
@@ -49,6 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-canvas">
       <DateFormatKeeper value={dateFormat()} />
       <MenuCloser />
+      <CommandMenu perms={perms} />
       <Sidebar perms={perms} moreOpen={moreOpen} />
       {/* The content starts where the sidebar ends, whatever width it has been
           dragged or collapsed to. One class: --sidebar-w defaults to 268px in

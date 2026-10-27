@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/core/scope";
 import { randomUUID } from "node:crypto";
+import { once } from "@/lib/core/once";
 import { isController, isAdmin, hasVerb } from "@/lib/core/auth";
 import { supplyReason, submittedFor } from "@/lib/packages/supplier-status";
 import { api, projectPath, refusal } from "@/lib/client";
@@ -39,7 +40,7 @@ export async function createSupplierPackageAction(_prev: { error?: string } | un
         reason: (await supplyReason()).code, requiredStatuses: requiredStatus ? [requiredStatus] : [],
         ownerIds: [user.id], acceptorIds: [],
       },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "send") ?? randomUUID(),
     });
     number = created.number;
   } catch (e) {
@@ -78,7 +79,7 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
     })));
     sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
       body: { reason: pkg.reason, subject: `${pkg.number}: ${planned.length} document${planned.length === 1 ? "" : "s"}`, planned, fromPartyId: onBehalf ? pkg.supplierPartyId : null },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "send") ?? randomUUID(),
     });
   } catch (e) {
     return { error: refusal(e).message };
@@ -115,7 +116,7 @@ export async function sendAsReceivedAction(_prev: { error?: string; ok?: string 
         reason: pkg.reason, subject: `${pkg.number}: ${[number, revision && `rev ${revision}`].filter(Boolean).join(" ") || title}`, packageId: pkg.id,
         unplanned: [{ title, reference: number || null, revision: revision || null, status: text("status") || null, outcome: text("outcome") || null, fileIds }],
       },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "send") ?? randomUUID(),
     });
     revalidatePath(`/packages/${pkg.number}`);
     return { ok: `Sent on ${sent.number}. It is checked, then in the register as you sent it.` };
@@ -145,7 +146,7 @@ export async function attachSupplierFileAction(_prev: { error?: string; ok?: str
     const fileIds = [await upload(ctx, { documentId }, file)];
     const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
       body: { reason: reason.code, planned: [{ documentId, fileIds, status }], fromPartyId },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "send") ?? randomUUID(),
     });
     revalidatePath(`/documents/${documentId}`);
     return { ok: `Sent on ${sent.number}. The control function has been notified.` };
@@ -177,7 +178,7 @@ async function sendSupplierDocumentsAction(_prev: { error?: string; ok?: string 
   try {
     const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
       body: { reason: (await supplyReason()).code, revisionIds: ready.map((one) => one.r.id), fromPartyId: await partyIdFor(ctx, user, parties[0]) },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "send") ?? randomUUID(),
     });
     number = sent.number;
   } catch (e) {

@@ -7,6 +7,7 @@ import { carrierRefusal, actIsOff } from "@/lib/settings/control-activities";
 import { api, projectPath, refusal } from "@/lib/client";
 import { activityDetail, type ActivityDetail } from "@/lib/actions/api";
 import { addressees } from "@/lib/transmittals/api";
+import { once } from "@/lib/core/once";
 
 /**
  * What was decided about an action that did not have its documents.
@@ -52,6 +53,7 @@ export async function recordActionNoteAction(_prev: State | undefined, formData:
     await api<ActivityDetail>(projectPath(ctx, `/activities/${actionId}/decisions`), {
       method: "POST",
       body: { decision, responsibleName, reason, delayOwedBy: delayResponsible, delayReason },
+      idempotencyKey: once(formData, "decision"),
     });
   } catch (e) {
     return { error: refusal(e).message };
@@ -68,7 +70,7 @@ export async function confirmPostponementAction(_prev: State | undefined, formDa
   const note = String(formData.get("note") ?? "").trim();
   if (!note) return { error: "Say what changes, so the next schedule revision can follow." };
   try {
-    const detail = await api<ActivityDetail>(projectPath(ctx, `/activities/${actionId}/decisions/${String(formData.get("decisionId") ?? "")}/confirm`), { body: { note } });
+    const detail = await api<ActivityDetail>(projectPath(ctx, `/activities/${actionId}/decisions/${String(formData.get("decisionId") ?? "")}/confirm`), { body: { note }, idempotencyKey: once(formData, "confirm") });
     revalidatePath(`/actions/${detail.activity.code}`);
   } catch (e) {
     return { error: refusal(e).message };

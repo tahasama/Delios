@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { PREF, savePreference } from "@/lib/core/preferences";
+import { Kbd, openCommandMenu, useShortcutWords } from "@/components/command-menu";
 
 /**
  * Five jobs, then two doors.
@@ -389,6 +390,7 @@ export function SearchBox({ className, dark = false, onSearch }: {
   dark?: boolean;
   onSearch?: () => void;
 }) {
+  const shortcut = useShortcutWords();
   return (
     <form action="/documents" onSubmit={onSearch} className={cn("relative", className)}>
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -397,12 +399,19 @@ export function SearchBox({ className, dark = false, onSearch }: {
         aria-label="Search documents"
         placeholder="Search by number, title or tag"
         className={cn(
-          "h-(--control-h) w-full rounded-(--control-radius) border pl-9 pr-3 text-(length:--control-text) outline-none transition",
+          "h-(--control-h) w-full rounded-(--control-radius) border pl-9 text-(length:--control-text) outline-none transition",
           dark
-            ? "border-white/12 bg-white/8 text-white placeholder:text-slate-400 focus:border-white/30 focus:bg-white/12"
-            : "border-line bg-slate-50 text-slate-800 placeholder:text-slate-500 hover:border-line-strong focus:border-brand-line focus:bg-surface focus:ring-3 focus:ring-brand-line/15",
+            ? "border-white/12 bg-white/8 pr-3 text-white placeholder:text-slate-400 focus:border-white/30 focus:bg-white/12"
+            : "border-line bg-slate-50 pr-16 text-slate-800 placeholder:text-slate-500 hover:border-line-strong focus:border-brand-line focus:bg-surface focus:ring-3 focus:ring-brand-line/15",
         )}
       />
+      {/* The quick find's key, shown where people already look for things (owner, "shortcut hints"); a click opens it. */}
+      {dark ? null : (
+        <button type="button" onClick={openCommandMenu} title="Find anything: pages, documents, transmittals, actions, packages"
+          className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded outline-none focus-visible:ring-2 focus-visible:ring-link/30">
+          <Kbd>{shortcut}</Kbd>
+        </button>
+      )}
     </form>
   );
 }

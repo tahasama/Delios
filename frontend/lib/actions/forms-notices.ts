@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath, refusal } from "@/lib/client";
+import { once } from "@/lib/core/once";
 
 type State = { error?: string; ok?: string };
 
@@ -23,6 +24,7 @@ export async function sendNoticeAction(_prev: State | undefined, formData: FormD
         outsideLink: String(formData.get("outsideLink") ?? "") || null,
         people,
       },
+      idempotencyKey: once(formData, "notice"),
     });
   } catch (e) {
     return { error: refusal(e).message };

@@ -53,7 +53,7 @@ public static class DocumentEndpoints
         project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/submissions", ResubmitAsync);
         project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/files", AttachAsync);
         project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/update", UpdateFilesAsync);
-        project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/withdraw", WithdrawAsync);
+        project.MapPost("/documents/{documentId:guid}/revisions/{revisionId:guid}/withdraw", WithdrawAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPut("/documents/{documentId:guid}", UpdateAsync);
         project.MapPost("/documents/{documentId:guid}/end", EndAsync);
         project.MapPost("/documents/{documentId:guid}/reinstate", ReinstateAsync);

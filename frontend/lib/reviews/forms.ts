@@ -8,6 +8,7 @@ import { backendRevision, backendReview } from "@/lib/documents/api";
 import { upload, filesOf } from "@/lib/documents/api-uploads";
 import { requestFromForm, issueAsk } from "@/lib/transmittals/issue-requests";
 import { backendRoute, type EditorRouteStep } from "@/lib/settings/api-admin";
+import { once } from "@/lib/core/once";
 
 /**
  * Review routes and the answers given on them. A run on these screens is the
@@ -103,7 +104,7 @@ export async function sendForReviewAction(_prev: Result | undefined, formData: F
   // One key per press of Send: a revision sent again later is a new review, not a replay of the old one.
   // Copied in (cc): told it went out for review and of what comes of it, never asked to answer.
   const copies = [...new Set(formData.getAll("copyUsers").map(String).filter(Boolean))];
-  const attempt = text(formData, "attempt") || crypto.randomUUID();
+  const attempt = text(formData, "attempt") || text(formData, "formKey") || crypto.randomUUID();
   const sent: string[] = [];
   const opened: string[] = [];
   const refused: string[] = [];
@@ -157,6 +158,7 @@ async function answer(runId: string, formData: FormData, note: string | null): P
       : null;
     await api(projectPath(ctx, `/reviews/${runId}/answer`), {
       body: { verdict: open.deciding ? text(formData, "outcome") || null : null, status: open.deciding ? text(formData, "issuedFor") || null : null, note, issue },
+      idempotencyKey: once(formData, "answer"),
     });
     revalidatePath(`/documents/${review.documentId}`);
   } catch (e) {
@@ -185,7 +187,7 @@ export async function markDispatchedAction(_prev: Result | undefined, formData: 
   if (!proof) return { error: "Attach the proof it was sent — the email, or the receipt their system gave you." };
   try {
     const proofFileId = await upload(ctx, { reviewId: cycleId }, proof);
-    await api(projectPath(ctx, `/reviews/${cycleId}/dispatch`), { body: { channel, reference: text(formData, "reference") || null, proofFileId } });
+    await api(projectPath(ctx, `/reviews/${cycleId}/dispatch`), { body: { channel, reference: text(formData, "reference") || null, proofFileId }, idempotencyKey: once(formData, "dispatch") });
   } catch (e) {
     return failed(e);
   }

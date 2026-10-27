@@ -9,6 +9,7 @@ import { api, projectPath, refusal } from "@/lib/client";
 import { filesOf, upload } from "@/lib/documents/api-uploads";
 import { addressees, dispatchOf, transmittalPage } from "@/lib/transmittals/api";
 import type { TransmittalView } from "@/lib/types";
+import { once } from "@/lib/core/once";
 
 /** A day the form says, as the backend takes it: empty when today's, which the backend stamps itself. */
 function dayOf(value: string): string | null {
@@ -98,7 +99,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
           reason: reasonForIssue, message, revisionIds, unplanned, fromPartyId, note: notes || null, userIds: recipientUsers,
           receivedOn: dayOf(dateOfIssue), inReplyToId, extras: Object.keys(extras).length ? extras : null,
         },
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: once(formData, "incoming") ?? crypto.randomUUID(),
       });
       landing = `/transmittals/${t.id}`;
     } else {
@@ -112,7 +113,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
           responseRequired: formData.get("answerRequired") === "on",
           responseDue: formData.get("answerRequired") === "on" ? String(formData.get("responseDue") ?? "") || null : null,
         },
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: once(formData, "compose") ?? crypto.randomUUID(),
       });
       landing = sent.length === 1 ? `/transmittals/${sent[0].id}` : `/transmittals?q=${encodeURIComponent(sent.map((one) => one.number).join(","))}`;
       // The ask itself, on each document: the supplier accepts or refuses it there, and the transmittal is its record.
@@ -133,7 +134,7 @@ export async function issueTransmittalAction(_prev: { error?: string } | undefin
   const id = String(formData.get("transmittalId") ?? "");
   let sent: { id: string; number: string }[];
   try {
-    sent = await api(projectPath(ctx, `/transmittals/${id}/issue`), { method: "POST" });
+    sent = await api(projectPath(ctx, `/transmittals/${id}/issue`), { method: "POST", idempotencyKey: once(formData, "issue") });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -168,7 +169,7 @@ export async function acceptTransmittalAction(_prev: { error?: string } | undefi
   // Where the organization published no return outcome, it is returned to the sender all the same.
   try {
     for (const item of waiting) {
-      await api(projectPath(ctx, `/revisions/${item.revisionId}/arrival`), { body: { outcome, note: notes || null, return: reject && !outcome } });
+      await api(projectPath(ctx, `/revisions/${item.revisionId}/arrival`), { body: { outcome, note: notes || null, return: reject && !outcome }, idempotencyKey: once(formData, `arrival-${item.revisionId}`) });
     }
   } catch (e) {
     return { error: refusal(e).message };
@@ -244,7 +245,7 @@ export async function chaseTransmittalAction(_prev: { error?: string } | undefin
   const id = String(formData.get("transmittalId") ?? "");
   const recipientIds = formData.getAll("recipientIds").map(String).filter(Boolean);
   try {
-    await api(projectPath(ctx, `/transmittals/${id}/notify-again`), { body: { recipientIds } });
+    await api(projectPath(ctx, `/transmittals/${id}/notify-again`), { body: { recipientIds }, idempotencyKey: once(formData, "notify") });
   } catch (e) {
     return { error: refusal(e).message };
   }

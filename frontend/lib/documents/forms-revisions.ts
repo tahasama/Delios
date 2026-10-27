@@ -8,6 +8,7 @@ import { api, projectPath, refusal } from "@/lib/client";
 import { backendRevision, backendReview, reviewOfRevision } from "@/lib/documents/api";
 import { upload, filesOf, uploadRevisionFiles } from "@/lib/documents/api-uploads";
 import { requestFromForm, issueAsk } from "@/lib/transmittals/issue-requests";
+import { once } from "@/lib/core/once";
 
 /**
  * A revision's acts. The backend decides who may and whether the revision is
@@ -85,7 +86,7 @@ export async function withdrawRevisionAction(_prev: Result | undefined, formData
   let documentId: string;
   try {
     documentId = (await backendRevision(ctx, revisionId)).documentId;
-    await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/withdraw`), { body: { changeDescription: reason } });
+    await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/withdraw`), { body: { changeDescription: reason }, idempotencyKey: once(formData, "withdraw") });
   } catch (e) {
     return failed(e);
   }
@@ -99,7 +100,7 @@ export async function issueToReviewAction(_prev: Result | undefined, formData: F
   const ctx = await requireScope();
   const cycleId = text(formData, "cycleId");
   try {
-    await api(projectPath(ctx, `/reviews/${cycleId}/issue`), { method: "POST" });
+    await api(projectPath(ctx, `/reviews/${cycleId}/issue`), { method: "POST", idempotencyKey: once(formData, "issue") });
   } catch (e) {
     return failed(e);
   }
@@ -169,6 +170,7 @@ export async function recordOutcomeAction(_prev: Result | undefined, formData: F
         note, issue, foreignAnswer: text(formData, "theirCode") || null, evidenceFileId,
         closesWithStep: Number(text(formData, "closesWithStep")) || null,
       },
+      idempotencyKey: once(formData, "answer"),
     });
   } catch (e) {
     return failed(e);
@@ -183,7 +185,7 @@ export async function returnToOriginatorAction(_prev: Result | undefined, formDa
   const ctx = await requireScope();
   const cycleId = text(formData, "cycleId");
   try {
-    await api(projectPath(ctx, `/reviews/${cycleId}/return`), { body: { note: text(formData, "reason") || text(formData, "note") || "Returned to its author." } });
+    await api(projectPath(ctx, `/reviews/${cycleId}/return`), { body: { note: text(formData, "reason") || text(formData, "note") || "Returned to its author." }, idempotencyKey: once(formData, "return") });
   } catch (e) {
     return failed(e);
   }
@@ -216,17 +218,17 @@ export async function releaseRevisionAction(_prev: Result | undefined, formData:
     if (!review) {
       // Never reviewed: only a type released without a review goes straight to release, at the status chosen.
       try {
-        review = await api<{ id: string; documentId: string; state: string }>(projectPath(ctx, `/revisions/${revisionId}/send-on`), { body: { status: statusCode } });
+        review = await api<{ id: string; documentId: string; state: string }>(projectPath(ctx, `/revisions/${revisionId}/send-on`), { body: { status: statusCode }, idempotencyKey: once(formData, "send-on") });
       } catch (e) {
         if (refusal(e).code === "TYPE_IS_REVIEWED") return { error: "This type of document is reviewed: send it for review first." };
         throw e;
       }
       documentId = review.documentId;
       // Where nobody acts as the control function it is already released.
-      if (review.state !== "RELEASED") await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue, kept } });
+      if (review.state !== "RELEASED") await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue, kept }, idempotencyKey: once(formData, "release") });
     } else {
       documentId = review.documentId;
-      await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue, kept } });
+      await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue, kept }, idempotencyKey: once(formData, "release") });
     }
   } catch (e) {
     return failed(e);
@@ -250,6 +252,7 @@ export async function returnAtGateAction(_prev: Result | undefined, formData: Fo
         note: reason || null, toStep: Number(formData.get("toStep") ?? "") || null,
         reason: text(formData, "returnReason") || null, outcome: text(formData, "outcome") || null,
       },
+      idempotencyKey: once(formData, "return"),
     });
   } catch (e) {
     return failed(e);

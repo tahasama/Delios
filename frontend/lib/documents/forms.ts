@@ -11,6 +11,7 @@ import { api, ApiProblem, refusalForForm, projectPath, refusal } from "@/lib/cli
 import { backendDocument } from "@/lib/documents/api";
 import { filesOf, uploadRevisionFiles } from "@/lib/documents/api-uploads";
 import type { TransmittalView } from "@/lib/types";
+import { once } from "@/lib/core/once";
 
 // G.1 — Creating a new document. "No controlled information shall be produced
 // without a register entry" (§3.9). Number is system-generated (§3.7).
@@ -95,7 +96,7 @@ export async function createDocumentAction(_prev: { error?: string; fields?: str
   try {
     doc = await api<{ id: string; number: string }>(projectPath(ctx, "/documents"), {
       body,
-      idempotencyKey: String(formData.get("formKey") ?? "") || undefined,
+      idempotencyKey: once(formData, "register"),
     });
   } catch (e) {
     return refusalForForm(e);

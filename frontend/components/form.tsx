@@ -28,6 +28,14 @@ export function MissingSummary({ missing }: { missing: MissingField[] }) {
   );
 }
 
+/** A key no other form will hold; `crypto.randomUUID` is offered only on https or this computer, so not leaned on. */
+function newKey() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto && window.isSecureContext) return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /** Puts what was written back into a form's fields, after React emptied it. */
 function restore(form: HTMLFormElement, data: FormData) {
   for (const field of Array.from(form.elements)) {
@@ -78,6 +86,14 @@ export function ActionForm({
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const [missing, setMissing] = useState<MissingField[]>([]);
+  // One key per form, made when it is drawn and sent with it as `formKey` (owner, "idempotency keys"): a second press or
+  // a retry of the same form gets the first answer instead of doing the act twice (`once`, lib/core/once.ts; backend
+  // IdempotencyFilter). Renewed once the form went through (an answer with no refusal), so the next thing sent from it is
+  // a new act; a refusal keeps it, the backend having kept nothing.
+  // Made in the browser once the page is drawn (the server's drawing and the browser's must match).
+  const [formKey, setFormKey] = useState("");
+  useEffect(() => { setFormKey(newKey()); }, []);
+  useEffect(() => { if (state && !state.error && !state.fields?.length) setFormKey(newKey()); }, [state]);
   const formRef = useRef<HTMLFormElement>(null);
   /** What was written when it was sent: React empties a form once its action answers, a refusal included. */
   const written = useRef<FormData | null>(null);
@@ -113,6 +129,7 @@ export function ActionForm({
       }}
       key={resetOnSuccess && state?.ok ? String(state.ok) : "form"}
     >
+      <input type="hidden" name="formKey" value={formKey} />
       {hidden
         ? Object.entries(hidden).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)
         : null}

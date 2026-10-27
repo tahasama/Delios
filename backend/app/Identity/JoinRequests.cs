@@ -32,7 +32,7 @@ public static class JoinRequests
     {
         var project = app.MapGroup("/api/projects/{projectId:guid}").WithTags("People")
             .AddEndpointFilter<TransactionFilter>().AddEndpointFilter<ProjectAccessFilter>();
-        project.MapPost("/people/requests", AskAsync);
+        project.MapPost("/people/requests", AskAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapGet("/people/join-options", OptionsAsync);
     }
 

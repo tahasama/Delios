@@ -9,6 +9,7 @@ import { needDefaults } from "@/lib/actions/schedule";
 import { activityDetail } from "@/lib/actions/api";
 import { controlDoes } from "@/lib/settings/control-activities";
 import { backendDocuments } from "@/lib/documents/api";
+import { once } from "@/lib/core/once";
 
 /** Each document's own discipline: an action needs a document for that discipline, never another. */
 async function disciplinesOf(ctx: Awaited<ReturnType<typeof requireScope>>, ids: string[]): Promise<Map<string, string>> {
@@ -148,7 +149,7 @@ export async function answerActionRequestAction(_prev: State | undefined, formDa
   const note = String(formData.get("note") ?? "").trim();
   if (!note) return { error: "Say why nothing is added; whoever asked reads it." };
   try {
-    await api(projectPath(ctx, `/transmittals/${transmittalId}/activity-answer`), { body: { note } });
+    await api(projectPath(ctx, `/transmittals/${transmittalId}/activity-answer`), { body: { note }, idempotencyKey: once(formData, "answer") });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -179,6 +180,7 @@ export async function checkActionRequestAction(_prev: State | undefined, formDat
         departments: formData.has("departmentsGiven") ? formData.getAll("departments").map(String).filter(Boolean) : null,
         purpose, statuses: status ? [status] : [],
       },
+      idempotencyKey: once(formData, "check"),
     });
   } catch (e) {
     return { error: refusal(e).message };
@@ -193,7 +195,7 @@ export async function confirmActionRequestAction(_prev: State | undefined, formD
   const transmittalId = String(formData.get("transmittalId") ?? "");
   const code = String(formData.get("code") ?? "");
   try {
-    await api(projectPath(ctx, `/transmittals/${transmittalId}/activity-confirm`), { method: "POST" });
+    await api(projectPath(ctx, `/transmittals/${transmittalId}/activity-confirm`), { method: "POST", idempotencyKey: once(formData, "confirm") });
   } catch (e) {
     return { error: refusal(e).message };
   }

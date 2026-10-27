@@ -77,14 +77,16 @@ public static class ReviewEndpoints
             await r.LiftHoldAsync(ProjectAccessFilter.Of(h), revisionId, c) ?? Results.NoContent());
         project.MapPost("/revisions/{revisionId:guid}/hold/return", async (Guid revisionId, ReturnHeldRequest body, HttpContext h, ReviewService r, CancellationToken c) =>
             await r.ReturnHeldAsync(ProjectAccessFilter.Of(h), revisionId, body.Reason, c) ?? Results.NoContent());
-        project.MapPost("/reviews/{reviewId:guid}/answer", AnswerAsync);
-        project.MapPost("/reviews/{reviewId:guid}/release", ReleaseAsync);
-        project.MapPost("/reviews/{reviewId:guid}/return", ReturnAsync);
+        // The acts that must never happen twice: a form's key, made once when the form is drawn, answers a second press
+        // or a retry with the first answer (IdempotencyFilter).
+        project.MapPost("/reviews/{reviewId:guid}/answer", AnswerAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/reviews/{reviewId:guid}/release", ReleaseAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/reviews/{reviewId:guid}/return", ReturnAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/reviews/{reviewId:guid}/rewind", RewindAsync);
-        project.MapPost("/reviews/{reviewId:guid}/dispatch", DispatchAsync);
-        project.MapPost("/reviews/{reviewId:guid}/issue", IssueAsync);
+        project.MapPost("/reviews/{reviewId:guid}/dispatch", DispatchAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/reviews/{reviewId:guid}/issue", IssueAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/reviews/{reviewId:guid}/evidence", EvidenceAsync);
-        project.MapPost("/revisions/{revisionId:guid}/arrival", ArrivalAsync);
+        project.MapPost("/revisions/{revisionId:guid}/arrival", ArrivalAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapGet("/work", WorkAsync);
     }
 

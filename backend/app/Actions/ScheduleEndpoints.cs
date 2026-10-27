@@ -141,17 +141,18 @@ public static partial class ScheduleEndpoints
         project.MapDelete("/activities/{activityId:guid}/needs/{needId:guid}", RemoveNeedAsync);
         project.MapPost("/activities/{activityId:guid}/needs/{needId:guid}/waive", WaiveAsync);
         project.MapDelete("/activities/{activityId:guid}/needs/{needId:guid}/waive", UnwaiveAsync);
-        project.MapPost("/activities/{activityId:guid}/decisions", DecideAsync);
+        // Confirmations, postponements, notices and answers are never made twice by a second press or a retry.
+        project.MapPost("/activities/{activityId:guid}/decisions", DecideAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapGet("/notices", NoticesAsync);
         project.MapGet("/activities-work", ActionWorkAsync);
-        project.MapPost("/notices", SendNoticeAsync);
-        project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/confirm", ConfirmPostponementAsync);
+        project.MapPost("/notices", SendNoticeAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/confirm", ConfirmPostponementAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/reverse", ReverseDecisionAsync);
-        project.MapPost("/transmittals/{transmittalId:guid}/activity-answer", AnswerActivityAskAsync);
+        project.MapPost("/transmittals/{transmittalId:guid}/activity-answer", AnswerActivityAskAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapGet("/activities/{activityId:guid}/requests", ActivityRequestsAsync);
         project.MapPost("/activities/{activityId:guid}/departments/own", AddOwnDepartmentAsync);
-        project.MapPost("/transmittals/{transmittalId:guid}/activity-check", CheckActivityAskAsync);
-        project.MapPost("/transmittals/{transmittalId:guid}/activity-confirm", ConfirmActivityAskAsync);
+        project.MapPost("/transmittals/{transmittalId:guid}/activity-check", CheckActivityAskAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/transmittals/{transmittalId:guid}/activity-confirm", ConfirmActivityAskAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/transmittals/{transmittalId:guid}/activity-refuse", RefuseActivityAskAsync);
     }
 }

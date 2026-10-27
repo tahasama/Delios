@@ -137,6 +137,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Same as device (`ThemeChoice`); Help is not repeated there. The top bar's menus (`details[data-menu]`, your name's,
   the project list) close on picking, on Escape and on a click outside (`components/menu-closer.tsx`); the project list
   scrolls past a height; the phone's menu closes the same way and carries the search.
+- **A page never stands blank while it is read** (owner, "skeleton loaders"): each area's `loading.tsx` draws its outline
+  in quiet grey (`components/skeleton.tsx`: `RegisterSkeleton` for the registers, `DetailSkeleton` for one thing's page,
+  `PageSkeleton` for the rest, `(app)/loading.tsx` for any page without its own), saying "Reading …" to screen readers,
+  still for whoever asked for less motion. A filter changed on the same page keeps what is shown until the new answer.
+- **The quick find** (owner, "command menu" with its "shortcut hint"): Ctrl K (⌘ K on a Mac) anywhere opens one box
+  (`components/command-menu.tsx`, mounted once in the layout): pages by their name at once (only those the person may
+  open, as the menu), and documents, transmittals, actions and packages by number or name through the backend, a
+  handful of each (`quickFindAction`, `lib/core/forms-find.ts`: documents by number and title only, never their files;
+  each read as the person may read it). Arrows, Enter, Escape, a click beside it. The top bar's search shows the key
+  ("Ctrl K"), a click on it opening the box; typing in the search and Enter still searches the register.
+- Long titles wrap into lines of even length (`text-wrap: balance` on headings, `globals.css`); body text is left as it is.
 - A card's side colour is its own left edge (`border-l-[3px] border-l-(--rail)`), never a bar laid over it: it
   follows the rounded corners. A sheet left open (`register-sheet-open`) rounds its first and last strip seen (a hidden field or a
   mark before it does not count; a form wrapping the strips passes it on), so no band's square corner stands out.
@@ -1906,6 +1917,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   every hop of ours (`ForwardLimit = null`). Lost, every sign-in came from the screens' address: one limit for everybody.
 - An import reads what it compares once, never once a line, and keeps what it adds in hand: a query does not see what
   this request added and has not saved (two lines naming one new tag made it twice, and the save failed).
+- **An act is done once, however often it is sent** (owner, "idempotency keys"): every `ActionForm` carries a `formKey`
+  made in the browser when the form is drawn, renewed once it went through (kept after a refusal, the backend having
+  kept nothing); server actions pass it on as `idempotencyKey: once(formData, "<act>")` (`lib/core/once.ts`, one name
+  per call when a form makes several), and the backend's `IdempotencyFilter` answers a second press or a retry with the
+  first answer. On: registering a document, starting a revision or a review, the review's answer, release, send-back,
+  sending to reviewers, the dispatch outside, withdrawing from review, the check on arrival, transmittals (composed,
+  received, issued, notified again), packages and a supplier's sendings, an action's decisions, postponement
+  confirmations, requests' check / confirm / answer, notices, asking someone to join. The same key on a different
+  request is refused in plain words (IDEMPOTENCY_KEY_REUSED: "This was already sent from this form…"). A new act that
+  must never happen twice gets the filter and the key.
 - An outbox routing key is at most 16 characters; `ControlledVersion.VersionLabel` too.
 - Migrations: `dotnet ef migrations add Name -p app -s app -o Platform/Migrations`
   (from `backend/`). Each new table gets `RowLevelSecurity.Enable(migrationBuilder, "<table>")`.

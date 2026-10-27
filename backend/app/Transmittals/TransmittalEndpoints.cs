@@ -142,13 +142,13 @@ public static class TransmittalEndpoints
         {
             var (sent, problem) = await s.IssueDraftAsync(ProjectAccessFilter.Of(h), transmittalId, c);
             return problem ?? Results.Ok(sent.Select(t => new { t.Id, t.Number, t.ToName }));
-        });
+        }).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/transmittals/{transmittalId:guid}/notify-again",
             async (Guid transmittalId, NotifyAgainRequest r, HttpContext h, TransmittalService s, CancellationToken c) =>
             {
                 var (t, problem) = await s.NotifyAgainAsync(ProjectAccessFilter.Of(h), transmittalId, r.RecipientIds, c);
                 return problem ?? Results.Ok(View(t!, await s.ItemFilesAsync(t!, c)));
-            });
+            }).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/transmittals/{transmittalId:guid}/recipients/{recipientId:guid}/dispatch", DispatchAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/evidence", EvidenceAsync);
         project.MapPost("/incoming/uploads", async (LooseUploadRequest r, HttpContext h, IncomingService s, CancellationToken c) =>
