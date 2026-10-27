@@ -4,6 +4,9 @@
 @custom-variant dark (&:where(.dark, .dark *));
 /* The desktop sidebar collapsed to icons (SIDEBAR in navigation.tsx). */
 @custom-variant rail (&:where([data-sidebar="rail"] .sidebar-desktop, [data-sidebar="rail"] .sidebar-desktop *));
+/* The menu fits the window, never scrolls (owner): on a shorter screen it tightens, then drops the lines under the names. */
+@custom-variant short (@media (max-height: 880px));
+@custom-variant tiny (@media (max-height: 740px));
 
 :root {
   --sidebar-w: 268px;

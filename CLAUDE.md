@@ -116,6 +116,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   only under the pointer: no grey behind it, a dashed rule, muted words, no caret, the pointer saying no (`globals.css`,
   `.register .plain:disabled`; `inputCls` likewise). A form opened under a line sits on white, so its grey fields show
   (owner: "fields are the same colour as the background").
+- **The menu never scrolls** (owner: "we can't have a scrolled menu, it should be fixed at all times";
+  `app/(app)/navigation.tsx`): it fits the window, tightening on a shorter one (`short:` under 880 pixels high: the lines
+  under the names go, smaller marks; `tiny:` under 740: tighter still; variants in `globals.css`), scrolling only as a
+  last resort on a very small screen. No "Create document" in it (the register's "New document" does it); the fold to
+  icons is a small button beside the logo, not a row of its own; Settings and Help share one line at its foot.
 - A card's side colour is its own left edge (`border-l-[3px] border-l-(--rail)`), never a bar laid over it: it
   follows the rounded corners. A sheet left open (`register-sheet-open`) rounds its first and last strip seen (a hidden field or a
   mark before it does not count; a form wrapping the strips passes it on), so no band's square corner stands out.

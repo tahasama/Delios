@@ -9,7 +9,6 @@ import {
   Boxes,
   CalendarRange,
   ClipboardCheck,
-  FilePlus2,
   FileText,
   FolderKanban,
   Import,
@@ -158,7 +157,7 @@ function NavLink({
       onMouseLeave={() => onTip?.(null)}
       className={cn(
         "group flex rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold/70 rail:justify-center rail:px-0",
-        compact ? "items-center gap-3 px-3 py-2" : "items-start gap-3 px-3 py-3 rail:py-1.5",
+        compact ? "items-center gap-3 px-3 py-1.5 tiny:py-1" : "items-start gap-3 px-3 py-2.5 short:items-center short:py-1.5 rail:py-1.5",
         active
           ? "bg-surface text-brand-ink shadow-sm dark:bg-white/10 dark:text-white dark:shadow-none"
           : "text-slate-300 hover:bg-white/7 hover:text-white",
@@ -166,7 +165,8 @@ function NavLink({
     >
       <span
         className={cn(
-          "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg rail:mt-0",
+          "mt-0.5 grid shrink-0 place-items-center rounded-lg rail:mt-0 short:mt-0",
+          compact ? "h-7 w-7" : "h-8 w-8 short:h-7 short:w-7",
           active ? "bg-tint text-brand-ink dark:bg-gold/20 dark:text-gold-bright" : "bg-white/7 text-slate-300",
         )}
       >
@@ -175,7 +175,7 @@ function NavLink({
       <span className="min-w-0 rail:hidden">
         <span className="block text-sm font-semibold leading-5">{item.label}</span>
         {!compact && item.description ? (
-          <span className={cn("mt-0.5 block text-[11px] leading-4", active ? "text-slate-500" : "text-slate-500 group-hover:text-slate-400")}>
+          <span className={cn("mt-0.5 block text-[11px] leading-4 short:hidden", active ? "text-slate-500" : "text-slate-500 group-hover:text-slate-400")}>
             {item.description}
           </span>
         ) : null}
@@ -184,7 +184,7 @@ function NavLink({
   );
 }
 
-function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNavigate?: () => void; onTip?: (t: Tip) => void }) {
+function SidebarBody({ perms, onNavigate, onTip, fold }: { perms: NavPermissions; onNavigate?: () => void; onTip?: (t: Tip) => void; fold?: React.ReactNode }) {
   const pathname = usePathname();
   const primary = primaryNav(perms);
   const more = moreNav(perms);
@@ -193,15 +193,20 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
 
   return (
     <>
-      <Link href="/" onClick={onNavigate} className="mb-6 flex items-center gap-3 px-2 text-white rail:justify-center rail:px-0">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gold text-sm font-black text-[#102a43] shadow-sm">D</span>
-        <span className="rail:hidden">
-          <span className="block text-[15px] font-bold tracking-[0.08em]">DELIOS</span>
-          <span className="block text-[11px] text-slate-400">Project information, controlled</span>
-        </span>
-      </Link>
+      {/* The logo, and beside it the way to fold the menu to icons (owner: no row of its own for it). */}
+      <div className="mb-5 flex items-center gap-2 short:mb-3 rail:flex-col rail:gap-2">
+        <Link href="/" onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-3 px-2 text-white rail:flex-none rail:justify-center rail:px-0">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gold text-sm font-black text-[#102a43] shadow-sm short:h-9 short:w-9">D</span>
+          <span className="min-w-0 rail:hidden">
+            <span className="block text-[15px] font-bold tracking-[0.08em]">DELIOS</span>
+            <span className="block truncate text-[11px] text-slate-400 short:hidden">Project information, controlled</span>
+          </span>
+        </Link>
+        {fold}
+      </div>
 
-      <nav className="scroll-thin flex-1 space-y-4 overflow-y-auto overflow-x-hidden pr-1 rail:pr-0" aria-label="Primary navigation">
+      {/* Never scrolled (owner): everything is laid out to fit the window; scrolling is only a last resort on a very small screen. */}
+      <nav className="scroll-thin min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden short:space-y-2" aria-label="Primary navigation">
         <ul className="space-y-1">
           {primary.map((item) => (
             <li key={item.href}>
@@ -212,7 +217,7 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
 
         {more.length ? (
           <details open={insideMore} className="group/more">
-            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 transition hover:text-slate-300 rail:justify-center rail:px-0">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 transition hover:text-slate-300 rail:justify-center rail:px-0">
               <span className="rail:hidden">More</span>
               <span aria-hidden className="hidden w-6 border-t border-white/20 rail:block" />
               <span className="ml-auto text-[10px] font-normal tracking-normal text-slate-600 group-open/more:hidden rail:hidden">{more.length}</span>
@@ -228,7 +233,9 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
         ) : null}
       </nav>
 
-      <div className="mt-4 space-y-2">
+      {/* Settings and Help on one line (owner: the menu must fit). Creating a document is the register's own act
+          ("New document" on Documents), no longer a button here. */}
+      <div className="mt-3 flex gap-1 border-t border-white/10 pt-3 rail:flex-col">
         {perms.canSettings ? (
           <Link
             href="/settings"
@@ -237,7 +244,7 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
             onMouseEnter={(e) => tipFor(e, "Settings", onTip)}
             onMouseLeave={() => onTip?.(null)}
             className={cn(
-              "flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold transition rail:justify-center rail:px-0",
+              "flex flex-1 items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition rail:justify-center rail:px-0",
               pathname.startsWith("/settings") ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white",
             )}
           >
@@ -248,28 +255,16 @@ function SidebarBody({ perms, onNavigate, onTip }: { perms: NavPermissions; onNa
           href="/guide"
           onClick={onNavigate}
           aria-label="Help and orientation"
+          title="Help & orientation"
           onMouseEnter={(e) => tipFor(e, "Help & orientation", onTip)}
           onMouseLeave={() => onTip?.(null)}
           className={cn(
-            "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition rail:justify-center rail:px-0",
+            "flex flex-1 items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition rail:justify-center rail:px-0",
             pathname.startsWith("/guide") ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white",
           )}
         >
-          <BookOpen className="h-4 w-4 shrink-0" /> <span className="rail:hidden">Help &amp; orientation</span>
+          <BookOpen className="h-4 w-4 shrink-0" /> <span className="rail:hidden">Help</span>
         </Link>
-
-        {perms.canCreate ? (
-          <Link
-            href="/documents/new"
-            onClick={onNavigate}
-            aria-label="Create document"
-            onMouseEnter={(e) => tipFor(e, "Create document", onTip)}
-            onMouseLeave={() => onTip?.(null)}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-gold px-3 py-2.5 text-xs font-bold text-[#102a43] transition hover:bg-gold-bright rail:px-0"
-          >
-            <FilePlus2 className="h-3.5 w-3.5 shrink-0" /> <span className="rail:hidden">Create document</span>
-          </Link>
-        ) : null}
       </div>
     </>
   );
@@ -315,21 +310,26 @@ export function Sidebar({ perms }: { perms: NavPermissions }) {
 
   return (
     <aside
-      className="sidebar-desktop palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-67 flex-col border-r border-[#254663] bg-[#102a43] px-4 py-5 text-slate-200 lg:flex rail:px-2.5 dark:border-white/5 dark:bg-[#0c1522]"
+      className="sidebar-desktop palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-67 flex-col border-r border-[#254663] bg-[#102a43] px-4 py-5 text-slate-200 short:py-3 lg:flex rail:px-2.5 dark:border-white/5 dark:bg-[#0c1522]"
       style={{ width: "var(--sidebar-w)" }}
     >
-      <SidebarBody perms={perms} onTip={(t) => { if (!dragging.current) setTip(t); }} />
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={rail ? "Expand the menu" : "Collapse the menu to icons"}
-        onMouseEnter={(e) => tipFor(e, "Expand the menu", setTip)}
-        onMouseLeave={() => setTip(null)}
-        className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-white/5 hover:text-slate-200 rail:justify-center rail:px-0"
-      >
-        {rail ? <PanelLeftOpen className="h-4 w-4 shrink-0" /> : <PanelLeftClose className="h-4 w-4 shrink-0" />}
-        <span className="rail:hidden">Collapse menu</span>
-      </button>
+      <SidebarBody
+        perms={perms}
+        onTip={(t) => { if (!dragging.current) setTip(t); }}
+        fold={
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={rail ? "Expand the menu" : "Fold the menu to icons"}
+            title={rail ? "Expand the menu" : "Fold the menu to icons"}
+            onMouseEnter={(e) => tipFor(e, "Expand the menu", setTip)}
+            onMouseLeave={() => setTip(null)}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-white/7 hover:text-slate-200"
+          >
+            {rail ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
+        }
+      />
       {/* Drag to resize; double-click to switch between icons and full width. */}
       <div
         role="separator"
