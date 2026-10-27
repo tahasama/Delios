@@ -96,3 +96,22 @@ export type PackageLine = {
  */
 export const packageLines = cache(async (scope: Scope, packageId: string): Promise<PackageLine[]> =>
   api<PackageLine[]>(projectPath(scope, `/packages/${packageId}/lines`), { keep: { areas: ["packages", "docs", "transmittals", "reviews"] } }));
+
+/** One document a delivery carries, at the revision that goes (PackageService.cs GoingLine). */
+export type GoingLine = { documentId: string; number: string; title: string; revisionId: string; revision: string; status: string | null; ready: boolean; package: string };
+
+/**
+ * What delivering a package carries (PackageService.GoingAsync): the package and every package under it, each document
+ * once at the revision that goes, what has no revision yet, and the words saying what went short. Or why it cannot go.
+ */
+export type Going = { packageId: string; number: string; title: string; kind: "DELIVERY" | "SUPPLY"; reason: string; lines: GoingLine[]; left: string[]; note: string | null; packages: string[] };
+
+/** What delivering this package would carry, or the backend's refusal in its words. Read fresh: it waits on readiness. */
+export async function packageGoing(scope: Scope, packageId: string): Promise<{ going: Going | null; why: string | null }> {
+  try {
+    return { going: await api<Going>(projectPath(scope, `/packages/${packageId}/going`)), why: null };
+  } catch (e) {
+    if (e instanceof ApiProblem) return { going: null, why: e.message };
+    throw e;
+  }
+}

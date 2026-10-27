@@ -538,7 +538,7 @@ public sealed partial class PackageService(
         var package = await LoadAsync(access, id, cancellationToken);
         if (package is null) return null;
         var members = package.Members.AsEnumerable();
-        if (!access.IsInternal && !(package.Kind == PackageKinds.Supply && (await IntakeAsync(package.ProjectId, cancellationToken)).Mode == Intake.AsReceived))
+        if (!ReadsWhole(access, package) && !(package.Kind == PackageKinds.Supply && (await IntakeAsync(package.ProjectId, cancellationToken)).Mode == Intake.AsReceived))
             members = members.Where(m => m.RequestedAt is not null);
         var wanted = members.Select(m => m.DocumentId).ToList();
         var docs = await DocumentQueries.Visible(db, access).AsNoTracking().Where(d => wanted.Contains(d.Id))
@@ -664,7 +664,7 @@ public sealed partial class PackageService(
         // A package in no tree (most): its own documents only, with no other package read.
         if (package.ParentId is null && !await db.Packages.AnyAsync(p => p.ParentId == package.Id, cancellationToken))
         {
-            var own = package.Members.Where(m => access.IsInternal || m.RequestedAt != null).ToList();
+            var own = package.Members.Where(m => ReadsWhole(access, package) || m.RequestedAt != null).ToList();
             var ownIds = own.Select(m => m.DocumentId).Distinct().ToList();
             var at = (await db.Revisions.AsNoTracking().Where(r => ownIds.Contains(r.DocumentId) && r.State == RevisionStates.Released)
                 .Select(r => new { r.DocumentId, r.StatusCode }).ToListAsync(cancellationToken))
@@ -698,8 +698,9 @@ public sealed partial class PackageService(
         var counted = new HashSet<Guid>();
         foreach (var id in packageIds) { counted.Add(id); counted.UnionWith(Under(children, id)); }
         var ids = counted.ToList();
+        var party = access.PartyId ?? Guid.Empty;
         var members = await db.PackageMembers.AsNoTracking().Where(m => ids.Contains(m.PackageId))
-            .Where(m => access.IsInternal || m.RequestedAt != null)
+            .Where(m => access.IsInternal || m.RequestedAt != null || db.Packages.Any(p => p.Id == m.PackageId && p.DeliveredTo.Contains(party)))
             .Select(m => new TreeMember(m.PackageId, m.DocumentId, m.RequiredStatuses)).ToListAsync(cancellationToken);
         var documentIds = members.Select(m => m.DocumentId).Distinct().ToList();
         var released = (await db.Revisions.AsNoTracking().Where(r => documentIds.Contains(r.DocumentId) && r.State == RevisionStates.Released)
@@ -850,8 +851,8 @@ public sealed partial class PackageService(
 
     /// <summary>
     /// The acceptance authority agrees it goes without what is missing, on their responsibility: their confirmation
-    /// answers the request on a transmittal, and the package is delivered at once, the documents not ready going as
-    /// they stand (their released revision, else their newest). Recorded with their name.
+    /// answers the request on a transmittal. Delivered later on a transmittal, the documents not ready go as they stand
+    /// (their released revision, else their newest), said on it with their name.
     /// </summary>
     public async Task<(Package? Package, IResult? Problem)> AcceptShortfallAsync(
         ProjectAccess access, Guid id, NoteRequest request, CancellationToken cancellationToken)
@@ -886,25 +887,34 @@ public sealed partial class PackageService(
             $"{package.Number} — goes without what is missing, on my responsibility",
             $"{package.Title} is delivered as it stands: {package.Shortfall.Count} document(s) not at the status it needs ({string.Join(", ", package.Shortfall.Select(s => s.DocumentNumber))}).{(note is null ? "" : $"\n\n{note}")}",
             question?.IssuedById is { } asker ? new[] { asker } : package.OwnerIds, package.OwnerIds, question?.Id, cancellationToken, packageId: package.Id);
-        var (_, problem) = await DeliverNowAsync(access, package, readiness, note, access.UserName, cancellationToken);
-        if (problem is not null) return Fail(problem);
+        // It goes once delivered on a transmittal, to whom whoever delivers it chooses (owner): nothing is sent here.
+        await db.SaveChangesAsync(cancellationToken);
         return (package, null);
     }
 
     // ── Delivering and accepting ──────────────────────────────────────────────
 
     /// <summary>
-    /// Deliver: one transmittal per organization, carrying every member that is
-    /// ready. Not while anything is missing that the acceptance authority has not
-    /// accepted (accepting it delivers it), and not while a rule is still admitting. Its contents are then fixed.
+    /// Close a package of ours handed over without a transmittal (outside the system): its contents fixed, recorded. A
+    /// delivery goes on a transmittal written on the New transmittal form (<see cref="GoingAsync"/>), never from here.
     /// </summary>
     public async Task<(Package? Package, IReadOnlyList<Transmittal> Sent, IResult? Problem)> DeliverAsync(
         ProjectAccess access, Guid id, DeliverRequest request, CancellationToken cancellationToken)
     {
         var (package, readiness, problem) = await DeliverableAsync(access, id, request.RuleCeased, cancellationToken);
         if (problem is not null) return (null, [], problem);
-        var (sent, failed) = await DeliverNowAsync(access, package!, readiness!, Blank(request.Note), null, cancellationToken);
-        return failed is null ? (package, sent, null) : (null, [], failed);
+        var now = clock.GetCurrentInstant();
+        var note = Blank(request.Note);
+        package!.State = PackageStates.Closed;
+        package.ClosedAt = now;
+        package.ClosedByName = access.UserName;
+        package.ClosureNote = note;
+        if (package.Rule is not null) package.RuleCeasedAt = now;
+        await audit.WriteAsync(Actor(access), "PACKAGE_CLOSED", "Package", package.Id, package.Number,
+            $"Closed with {readiness!.Count(r => r.Ready)} of {readiness!.Count} document(s) ready, handed over outside the system. {note}".Trim(),
+            package.ProjectId, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return (package, [], null);
     }
 
     /// <summary>
@@ -942,108 +952,150 @@ public sealed partial class PackageService(
         return (package, readiness, null);
     }
 
-    /// <summary>
-    /// A package's documents sent on a transmittal written on the New transmittal form (owner: delivering a package is a
-    /// data transmittal, "a transmittal but for package"): it carries only the package's documents. Of a package we
-    /// deliver, the checks of Deliver hold first; sent, it is delivered and its contents fixed (<see cref="DeliveredAsync"/>).
-    /// A supplier's package is only named on the transmittal.
-    /// </summary>
-    public async Task<IResult?> SendableAsync(ProjectAccess access, Guid id, IReadOnlyCollection<Guid> documentIds, CancellationToken cancellationToken)
-    {
-        var package = await db.Packages.AsNoTracking().Include(p => p.Members)
-            .FirstOrDefaultAsync(p => p.Id == id && p.ProjectId == access.Project.Id, cancellationToken);
-        if (package is null) return Problems.NotFound("PACKAGE_NOT_FOUND", "That package is not on this project.");
-        var members = package.Members.Select(m => m.DocumentId).ToHashSet();
-        if (documentIds.Count == 0 || documentIds.Any(d => !members.Contains(d)))
-            return Problems.Invalid("NOT_IN_PACKAGE", $"A transmittal for {package.Number} carries its documents only.");
-        if (package.Kind != PackageKinds.Delivery) return null;
-        var (_, _, problem) = await DeliverableAsync(access, id, ruleCeased: true, cancellationToken);
-        return problem;
-    }
-
-    /// <summary>A package we deliver, sent on <paramref name="sent"/>: delivered, its contents fixed, recorded.</summary>
-    public async Task DeliveredAsync(ProjectAccess access, Guid id, IReadOnlyList<Transmittal> sent, CancellationToken cancellationToken)
-    {
-        var package = await db.Packages.FirstOrDefaultAsync(p => p.Id == id && p.ProjectId == access.Project.Id, cancellationToken);
-        if (package is null || package.Kind != PackageKinds.Delivery || package.ClosedAt is not null) return;
-        var now = clock.GetCurrentInstant();
-        package.State = PackageStates.Delivered;
-        package.ClosedAt = now;
-        package.ClosedByName = access.UserName;
-        if (package.Rule is not null) package.RuleCeasedAt = now;
-        await audit.WriteAsync(Actor(access), "PACKAGE_DELIVERED", "Package", package.Id, package.Number,
-            $"Sent on {string.Join(", ", sent.Select(t => t.Number))}.", package.ProjectId, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
-    }
+    /// <summary>One document a delivery carries: the revision that goes, and the package of the tree it sits in.</summary>
+    public sealed record GoingLine(Guid DocumentId, string Number, string Title, Guid RevisionId, string Revision, string? Status,
+        bool Ready, string Package);
 
     /// <summary>
-    /// Sends the package: one transmittal per organization it goes to, with every ready document at its released
-    /// revision; with <paramref name="onResponsibilityOf"/>, the documents not ready go too as they stand (their released
-    /// revision, else their newest), said on the transmittal. A document with no revision at all cannot go and is named.
-    /// Then the package is delivered (closed when it names nobody) and its contents are fixed.
+    /// What delivering a package carries (owner: "both packages may be delivered if they are complete… recorded as a
+    /// transmittal so we decide at the end to whom"): the package and every package under it ("the same view of the
+    /// package the sender has, the tree and all"), each document once, at its released revision; of a package of ours
+    /// whose acceptance authority let it go without what is missing, those not ready as they stand (released, else
+    /// newest). A note says what went short. Nothing is added to it and nothing taken out on the transmittal.
     /// </summary>
-    private async Task<(IReadOnlyList<Transmittal> Sent, IResult? Problem)> DeliverNowAsync(ProjectAccess access, Package package,
-        List<Readiness> readiness, string? note, string? onResponsibilityOf, CancellationToken cancellationToken)
-    {
-        var ready = readiness.Where(r => r.Ready).ToList();
-        var notReady = onResponsibilityOf is null ? [] : readiness.Where(r => !r.Ready).ToList();
-        var ids = ready.Concat(notReady).Select(r => r.Member.DocumentId).ToList();
-        var documents = await db.Documents.Where(d => ids.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);
-        var candidates = await db.Revisions.Where(r => ids.Contains(r.DocumentId) && r.VoidedAt == null).ToListAsync(cancellationToken);
-        // The released revision when there is one; else, on the acceptor's responsibility, the newest.
-        Revision? Going(Readiness r) =>
-            (r.RevisionId is { } released ? candidates.FirstOrDefault(c => c.Id == released) : null)
-            ?? (onResponsibilityOf is null ? null
-                : candidates.Where(c => c.DocumentId == r.Member.DocumentId).OrderByDescending(c => c.CreatedAt).FirstOrDefault());
-        var going = ready.Concat(notReady).Select(r => (Line: r, Revision: Going(r))).ToList();
-        var items = going.Where(g => g.Revision is not null).Select(g => (documents[g.Line.Member.DocumentId], g.Revision!)).ToList();
-        var left = going.Where(g => g.Revision is null).Select(g => g.Line.DocumentNumber).ToList();
-        if (package.RecipientPartyIds.Length > 0 && items.Count == 0)
-        {
-            return ([], onResponsibilityOf is null
-                ? Problems.Conflict("NOTHING_READY", "Nothing is ready to deliver.")
-                : Problems.Conflict("NOTHING_TO_SEND", "None of its documents has a revision to send yet: there is nothing to deliver."));
-        }
-        var message = AlsoFor(package, note);
-        if (onResponsibilityOf is not null && notReady.Count > 0)
-        {
-            var said = $"Delivered with {notReady.Count} document(s) not at the status asked ({string.Join(", ", notReady.Select(r => r.DocumentNumber))}), on the responsibility of {onResponsibilityOf}."
-                + (left.Count > 0 ? $" Not sent, no revision yet: {string.Join(", ", left)}." : "");
-            message = message is null ? said : $"{said}\n\n{message}";
-        }
+    public sealed record Going(Guid PackageId, string Number, string Title, string Kind, string Reason, IReadOnlyList<GoingLine> Lines,
+        IReadOnlyList<string> Left, string? Note, IReadOnlyList<string> Packages);
 
-        var now = clock.GetCurrentInstant();
-        var actor = Actor(access);
-        var sent = new List<Transmittal>();
-        if (package.RecipientPartyIds.Length > 0)
+    /// <summary>
+    /// What a delivery of the package carries, or why it cannot go yet. Its keepers only (as Deliver); a package already
+    /// delivered may be delivered again, to someone else, as it stands. Every package of ours still open in the tree
+    /// passes Deliver's checks (readiness checked, a shortfall let go); a supplier's goes complete: every document of
+    /// its tree released (at the status asked, where one is).
+    /// </summary>
+    public async Task<(Going? Going, IResult? Problem)> GoingAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
+    {
+        var (root, problem) = await ComposableAsync(access, id, cancellationToken, anyState: true);
+        if (problem is not null) return (null, problem);
+        var tree = await TreeOfAsync(root!, cancellationToken);
+        var lines = new List<GoingLine>();
+        var left = new List<string>();
+        var short_ = new List<string>();
+        var seen = new HashSet<Guid>();
+        foreach (var package in tree)
         {
-            var members = await transmittals.MembersAsync(access.Project, cancellationToken);
-            var parties = await db.Parties.AsNoTracking().Where(p => package.RecipientPartyIds.Contains(p.Id)).OrderBy(p => p.Name)
-                .ToListAsync(cancellationToken);
-            foreach (var party in parties)
+            string Named(string message) => package.Id == root!.Id ? message : $"{package.Number}: {message}";
+            var open = package.State == PackageStates.Open;
+            if (open) await SyncAsync(package, cancellationToken);
+            var readiness = await ReadinessAsync(package, cancellationToken);
+            var letGo = false;
+            if (package.Kind == PackageKinds.Delivery && open)
             {
-                // Handed over inside our own organization: to whoever accepts it, not to everyone.
-                var addressees = party.IsInternal
-                    ? members.Where(m => package.AcceptorIds.Contains(m.UserId))
-                        .Select(m => new TransmittalService.Addressee(m.UserId, null, m.Name, party.Name)).ToList()
-                    : TransmittalService.AddresseesOf(party, members);
-                sent.Add(await transmittals.RaiseAsync(new TransmittalService.Raise(access.Project, actor, package.Reason,
-                    $"{package.Number} {package.Title}: {items.Count} document(s)", message, party, party.Name,
-                    items, addressees, PackageId: package.Id), cancellationToken));
+                if (package.AssessedAt is null) return (null, Problems.Conflict("NOT_ASSESSED", Named("Check readiness first.")));
+                var recorded = package.Shortfall.Select(x => x.DocumentId).ToHashSet();
+                var missing = readiness.Where(r => !r.Ready).ToList();
+                if (missing.Any(r => !recorded.Contains(r.Member.DocumentId)))
+                    return (null, Problems.Conflict("SHORTFALL_CHANGED", Named("Something is missing that the last assessment did not find. Assess it again."),
+                        new { documents = missing.Where(r => !recorded.Contains(r.Member.DocumentId)).Select(r => r.DocumentNumber) }));
+                if (missing.Count > 0 && package.ShortfallAcceptedAt is null)
+                    return (null, package.ShortfallIssuedAt is null
+                        ? Problems.Conflict("SHORTFALL_NOT_ISSUED", Named("Some documents are not ready. Send what is missing to the acceptance authority first."))
+                        : Problems.Conflict("SHORTFALL_NOT_ACCEPTED", Named("Delivery waits for the acceptance authority to accept what is missing.")));
+                letGo = missing.Count > 0;
+            }
+            else if (package.Kind == PackageKinds.Delivery) letGo = package.ShortfallAcceptedAt is not null;
+            else
+            {
+                // A supplier's package goes complete: every document released, at the status asked where one is.
+                var notYet = readiness.Where(r => r.RevisionId is null || (r.Required.Length > 0 && !r.Ready)).ToList();
+                if (notYet.Count > 0)
+                    return (null, Problems.Conflict("NOT_COMPLETE",
+                        Named($"Not complete: {notYet.Count} document{(notYet.Count == 1 ? " is" : "s are")} not released yet ({string.Join(", ", notYet.Take(8).Select(r => r.DocumentNumber))}{(notYet.Count > 8 ? "…" : "")})."),
+                        new { documents = notYet.Select(r => r.DocumentNumber) }));
+            }
+            var memberIds = package.Members.Select(m => m.DocumentId).ToList();
+            var newest = letGo
+                ? (await db.Revisions.AsNoTracking().Where(r => memberIds.Contains(r.DocumentId) && r.VoidedAt == null)
+                    .Select(r => new { r.Id, r.DocumentId, r.Value, r.StatusCode, r.CreatedAt }).ToListAsync(cancellationToken))
+                    .GroupBy(r => r.DocumentId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.CreatedAt).First())
+                : null;
+            foreach (var r in readiness)
+            {
+                if (!seen.Add(r.Member.DocumentId)) continue;
+                if (r.RevisionId is { } released && (r.Ready || letGo || package.Kind == PackageKinds.Supply))
+                {
+                    lines.Add(new GoingLine(r.Member.DocumentId, r.DocumentNumber, r.Title, released, r.Revision!, r.Status, r.Ready, package.Number));
+                    if (!r.Ready) short_.Add(r.DocumentNumber);
+                }
+                else if (letGo && newest?.GetValueOrDefault(r.Member.DocumentId) is { } latest)
+                {
+                    lines.Add(new GoingLine(r.Member.DocumentId, r.DocumentNumber, r.Title, latest.Id, latest.Value, latest.StatusCode, false, package.Number));
+                    short_.Add(r.DocumentNumber);
+                }
+                else if (letGo) left.Add(r.DocumentNumber);
             }
         }
+        if (lines.Count == 0) return (null, Problems.Conflict("NOTHING_READY", "Nothing is ready to deliver."));
+        var by = tree.Where(p => p.ShortfallAcceptedByName is not null).Select(p => p.ShortfallAcceptedByName!).Distinct().ToList();
+        var note = short_.Count == 0 ? null
+            : $"Delivered with {short_.Count} document(s) not at the status asked ({string.Join(", ", short_)}), on the responsibility of {string.Join(", ", by)}."
+                + (left.Count > 0 ? $" Not sent, no revision yet: {string.Join(", ", left)}." : "");
+        var r0 = root!;
+        note = AlsoFor(r0, note);
+        return (new Going(r0.Id, r0.Number, r0.Title, r0.Kind, r0.Reason, lines.OrderBy(l => l.Number).ToList(), left, note,
+            tree.Select(p => p.Number).ToList()), null);
+    }
 
-        package.State = sent.Count > 0 ? PackageStates.Delivered : PackageStates.Closed;
-        package.ClosedAt = now;
-        package.ClosedByName = access.UserName;
-        package.ClosureNote = note;
-        if (package.Rule is not null) package.RuleCeasedAt = now;
-        await audit.WriteAsync(actor, sent.Count > 0 ? "PACKAGE_DELIVERED" : "PACKAGE_CLOSED", "Package", package.Id, package.Number,
-            sent.Count > 0 ? $"{items.Count} of {readiness.Count} document(s) on {string.Join(", ", sent.Select(t => t.Number))}{(onResponsibilityOf is null ? "" : $", on the responsibility of {onResponsibilityOf}")}."
-                : $"Closed with {ready.Count} of {readiness.Count} document(s) ready; nobody to deliver it to.",
-            package.ProjectId, cancellationToken);
+    /// <summary>A package and every package under it, the package first: tracked, with their documents.</summary>
+    private async Task<List<Package>> TreeOfAsync(Package root, CancellationToken cancellationToken)
+    {
+        var links = await db.Packages.AsNoTracking().Where(p => p.ProjectId == root.ProjectId && p.Kind == root.Kind && p.ParentId != null)
+            .Select(p => new { p.Id, Parent = p.ParentId!.Value }).ToListAsync(cancellationToken);
+        var children = links.GroupBy(l => l.Parent).ToDictionary(g => g.Key, g => g.Select(l => l.Id).ToList());
+        var under = Under(children, root.Id);
+        if (under.Count == 0) return [root];
+        var below = await db.Packages.Include(p => p.Members).Where(p => under.Contains(p.Id)).OrderBy(p => p.Number).ToListAsync(cancellationToken);
+        return [root, .. below];
+    }
+
+    /// <summary>
+    /// A package delivered on a transmittal written on the New transmittal form (owner: "the action of deliver should be
+    /// recorded as transmittal"): it carries exactly what <see cref="GoingAsync"/> says, none added and none taken out
+    /// (PACKAGE_CONTENTS). Its recipients are chosen there.
+    /// </summary>
+    public async Task<IResult?> SendableAsync(ProjectAccess access, Guid id, IReadOnlyCollection<Guid> revisionIds, CancellationToken cancellationToken)
+    {
+        var (going, problem) = await GoingAsync(access, id, cancellationToken);
+        if (problem is not null) return problem;
+        var expected = going!.Lines.Select(l => l.RevisionId).ToHashSet();
+        if (!expected.SetEquals(revisionIds))
+            return Problems.Invalid("PACKAGE_CONTENTS",
+                $"A delivery of {going.Number} carries exactly its documents, at the revisions shown: none added, none taken out.");
+        return null;
+    }
+
+    /// <summary>
+    /// A package sent on <paramref name="sent"/>: it and every package under it recorded as delivered to the organizations
+    /// the transmittals went to (their people then read it as we do, and change nothing); every package of ours still
+    /// open in the tree delivered, its contents fixed.
+    /// </summary>
+    public async Task DeliveredAsync(ProjectAccess access, Guid id, IReadOnlyList<Transmittal> sent, CancellationToken cancellationToken)
+    {
+        var root = await db.Packages.Include(p => p.Members).FirstOrDefaultAsync(p => p.Id == id && p.ProjectId == access.Project.Id, cancellationToken);
+        if (root is null || sent.Count == 0) return;
+        var to = sent.Where(t => t.ToPartyId is not null).Select(t => t.ToPartyId!.Value).Distinct().ToList();
+        var now = clock.GetCurrentInstant();
+        foreach (var package in await TreeOfAsync(root, cancellationToken))
+        {
+            package.DeliveredTo = [.. package.DeliveredTo.Union(to)];
+            if (package.Kind != PackageKinds.Delivery || package.State != PackageStates.Open) continue;
+            package.State = PackageStates.Delivered;
+            package.ClosedAt = now;
+            package.ClosedByName = access.UserName;
+            if (package.Rule is not null) package.RuleCeasedAt = now;
+        }
+        await audit.WriteAsync(Actor(access), "PACKAGE_DELIVERED", "Package", root.Id, root.Number,
+            $"Sent on {string.Join(", ", sent.Select(t => $"{t.Number} to {t.ToName}"))}.", root.ProjectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        return (sent, null);
     }
 
     /// <summary>The acceptance authority accepts a delivered or closed package. Never one of its owners.</summary>
@@ -1173,13 +1225,19 @@ public sealed partial class PackageService(
     /// The transmittals of a package, in the order they were raised: what delivered it, or, for a supply package, what
     /// asked its supplier and what the supplier sent back with any of its documents in it.
     /// </summary>
-    public async Task<IReadOnlyList<PackageTransmittal>> TransmittalsAsync(Package package, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<PackageTransmittal>> TransmittalsAsync(Package package, CancellationToken cancellationToken, ProjectAccess? reader = null)
     {
         var ids = package.Members.Select(m => m.DocumentId).ToList();
         var query = package.Kind == PackageKinds.Supply
             ? db.Transmittals.Where(t => t.PackageId == package.Id || (t.Direction == TransmittalDirections.Incoming
                 && t.FromPartyId == package.SupplierPartyId && t.Items.Any(i => i.DocumentId != null && ids.Contains(i.DocumentId.Value))))
             : db.Transmittals.Where(t => t.PackageId == package.Id);
+        // Another organization reads only what went to it or came from it: never a delivery to someone else, nor our letters.
+        if (reader is { IsInternal: false })
+        {
+            var party = reader.PartyId ?? Guid.Empty;
+            query = query.Where(t => t.ToPartyId == party || t.FromPartyId == party);
+        }
         return await query.AsNoTracking().OrderBy(t => t.IssuedAt)
             .Select(t => new PackageTransmittal(t.Id, t.Number, t.Direction, t.IssuedAt.ToDateTimeOffset(), t.Items.Count))
             .ToListAsync(cancellationToken);
@@ -1211,7 +1269,7 @@ public sealed partial class PackageService(
     {
         var people = package.OwnerIds.Concat(package.AcceptorIds).ToList();
         var names = await db.Users.AsNoTracking().Where(u => people.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, cancellationToken);
-        var partyIds = package.RecipientPartyIds.Append(package.SupplierPartyId ?? Guid.Empty).ToList();
+        var partyIds = package.RecipientPartyIds.Concat(package.DeliveredTo).Append(package.SupplierPartyId ?? Guid.Empty).ToList();
         var parties = await db.Parties.AsNoTracking().Where(p => partyIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
         var us = await db.Tenants.AsNoTracking().Where(t => t.Id == package.TenantId).Select(t => t.Name).FirstOrDefaultAsync(cancellationToken) ?? "us";
         return NamesOf(package, transmittals, names, parties, us);
@@ -1222,8 +1280,10 @@ public sealed partial class PackageService(
     {
         string Names(IEnumerable<Guid> ids) => string.Join(", ", ids.Select(id => names.GetValueOrDefault(id)).OfType<string>());
         var supplier = package.SupplierPartyId is { } s ? parties.GetValueOrDefault(s) : null;
+        // Ours goes to whom it was delivered (chosen when it is delivered, owner); a package named recipients before, to them.
         var to = package.Kind == PackageKinds.Supply ? supplier?.Name ?? ""
-            : string.Join(", ", package.RecipientPartyIds.Select(id => parties.GetValueOrDefault(id) is { IsInternal: false } p ? p.Name : us));
+            : string.Join(", ", (package.DeliveredTo.Length > 0 ? package.DeliveredTo : package.RecipientPartyIds)
+                .Select(id => parties.GetValueOrDefault(id) is { IsInternal: false } p ? p.Name : us));
         var owners = Names(package.OwnerIds);
         var delivered = package.State == PackageStates.Delivered
             || (package.State == PackageStates.Accepted && transmittals.Any(t => t.Direction == Transmittals.TransmittalDirections.Outgoing));
@@ -1320,7 +1380,8 @@ public sealed partial class PackageService(
     /// together), and it must still be open.
     /// Otherwise returns the problem to answer with.
     /// </summary>
-    private async Task<(Package?, IResult?)> ComposableAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken, bool members = false)
+    private async Task<(Package?, IResult?)> ComposableAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken, bool members = false,
+        bool anyState = false)
     {
         var package = await LoadAsync(access, id, cancellationToken);
         if (package is null) return (null, NotFound());
@@ -1338,7 +1399,7 @@ public sealed partial class PackageService(
         // A supplier's package is the control function's alone.
         if (package.Kind == PackageKinds.Supply && !access.Holds(Verbs.Control) && !standsIn)
             return (null, Problems.Forbidden("CONTROL_ONLY", "The control function looks after a supplier's package."));
-        if (package.State != PackageStates.Open) return (null, Closed(package));
+        if (!anyState && package.State != PackageStates.Open) return (null, Closed(package));
         return (package, null);
     }
 
@@ -1360,9 +1421,18 @@ public sealed partial class PackageService(
         var query = db.Packages.Where(p => p.ProjectId == access.Project.Id);
         if (access.IsInternal) return query;
         var code = access.PartyCode;
-        // Shared with them, once and for good; until then the package is ours alone.
-        return query.Where(p => p.Kind == PackageKinds.Supply && p.SharedAt != null && db.Parties.Any(x => x.Id == p.SupplierPartyId && x.Code == code));
+        var party = access.PartyId ?? Guid.Empty;
+        // Shared with them, once and for good (until then the package is ours alone); or delivered to them, read only.
+        return query.Where(p => (p.Kind == PackageKinds.Supply && p.SharedAt != null && db.Parties.Any(x => x.Id == p.SupplierPartyId && x.Code == code))
+            || p.DeliveredTo.Contains(party));
     }
+
+    /// <summary>
+    /// Whether the reader reads all of a package's documents: our own people, and another organization's people once it
+    /// was delivered to them (as we read it, owner). Otherwise they read only what was asked of them on a transmittal.
+    /// </summary>
+    internal static bool ReadsWhole(ProjectAccess access, Package package) =>
+        access.IsInternal || (access.PartyId is { } party && package.DeliveredTo.Contains(party));
 
     /// <summary>The supplier's code for a supply package; null for a delivery package.</summary>
     private async Task<string?> SupplierCodeAsync(Package package, CancellationToken cancellationToken) =>

@@ -53,8 +53,15 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
     // Anyone on the project may put a package together or accept it.
     ourPeople(ctx),
   ]);
-  const more = paged && read.length > shown;
-  const pkgs = more ? read.slice(0, shown) : read;
+  // Another organization's people: what is asked of them (a supplier's package shared with them), and what was
+  // delivered to them, of either kind, read only (owner: "the same view of the package the sender has").
+  const theirs = supplierOnly
+    ? category === "DELIVERY"
+      ? [...read, ...(await packagesOf(ctx, "SUPPLY"))].filter((one) => one.deliveredToUs)
+      : read.filter((one) => !one.deliveredToUs)
+    : read;
+  const more = paged && theirs.length > shown;
+  const pkgs = more ? theirs.slice(0, shown) : theirs;
   // A status code on its own says nothing to a newcomer: AB is "as-built".
   const statusMeaning = new Map(statuses.map((s) => [s.code, typeof s.props.may === "string" ? `${s.label}: ${s.props.may}` : s.label]));
   // Our own organization first: a package may be an internal handover.
@@ -95,10 +102,15 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
   const inside = (count: number) => count ? <span className="block text-[11px] text-slate-500">{count} package{count === 1 ? "" : "s"} in it</span> : null;
 
   const tabs = [
-    { code: "SUPPLIER", label: "From suppliers", says: "everything a supplier owes us; they send from it" },
-    { code: "DELIVERY", label: "To deliver", says: "documents we hand to an organization by a date, on one transmittal" },
+    { code: "SUPPLIER", label: "Supplier packages", says: "exchanged with a supplier: its placeholders, what it sends, our check and review, handed back and forth; delivered on a transmittal once complete" },
+    { code: "DELIVERY", label: "Our packages", says: "our documents filed together, made, reviewed and released in our space; delivered on a transmittal once complete, to whom we choose then" },
   ] as const;
-  const here = tabs.find((one) => one.code === category)!;
+  const outsideTabs = [
+    { code: "SUPPLIER", label: "Asked of you", says: "what your company is asked to send, and where each document stands" },
+    { code: "DELIVERY", label: "Delivered to you", says: "packages delivered to your company: read as their sender reads them; ask about them by an information transmittal" },
+  ] as const;
+  const shownTabs = supplierOnly ? outsideTabs : tabs;
+  const here = shownTabs.find((one) => one.code === category)!;
 
   return <div className="space-y-4">
     <section data-dt-frame className="register register-sheet">
@@ -113,10 +125,10 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
             </form>
           ) : null}
         </div>
-        <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{supplierOnly ? "What your company is asked to send, and where each document stands." : here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
+        <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
         <div className="mt-3 flex flex-wrap items-end gap-2 border-b border-line">
-          <nav className="seg w-fit max-w-full" aria-label="Which packages">
-            {tabs.map((c) => (
+          <nav className="seg mb-1.5 w-fit max-w-full" aria-label="Which packages">
+            {shownTabs.map((c) => (
               <Link key={c.code} href={`/packages?category=${c.code}${view === "tree" ? "&view=tree" : ""}`} aria-current={category === c.code ? "page" : undefined} className="segment">{c.label}</Link>
             ))}
           </nav>
@@ -174,7 +186,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                 );
               })}
         </DataTable>
-      ) : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">No delivery packages yet. One groups documents we hand to an organization together by a date.</p>}
+      ) : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">No packages of ours yet. One files our documents together, to deliver them once complete.</p>}
       {more ? (
         <div className="border-t border-line px-5 py-2.5 text-xs text-slate-500 sm:px-6">
           {`The first ${pkgs.length}, soonest due first. `}
@@ -206,16 +218,16 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
       </details>
     ) : null}
 
-    {!isReadOnly(user) && category === "DELIVERY" ? (
+    {!isReadOnly(user) && !supplierOnly && category === "DELIVERY" ? (
       <details id="new" className="register register-sheet register-sheet-open" open={carried.length > 0 || !!parent}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6">
-          <span className="text-[13px] text-slate-600">{parent ? <>A package inside <span className="font-mono font-semibold">{parent.number}</span> · {parent.title}.</> : fromPackage ? `Deliver ${fromPackage}: its ${carried.length} document${carried.length === 1 ? "" : "s"} go in this delivery package.` : "Documents to hand over together?"}</span>
-          <span className="ask">New delivery package</span>
+          <span className="text-[13px] text-slate-600">{parent ? <>A package inside <span className="font-mono font-semibold">{parent.number}</span> · {parent.title}.</> : fromPackage ? `Deliver ${fromPackage}: its ${carried.length} document${carried.length === 1 ? "" : "s"} go in this delivery package.` : "Documents to file together?"}</span>
+          <span className="ask">New package</span>
         </summary>
         <div className="border-t border-line px-5 py-4 sm:px-6">
           {fromPackage ? (
             <p className="mb-3 text-[12px] text-slate-600">
-              Or add them to a delivery package already open:{" "}
+              Or add them to a package of ours already open:{" "}
               <Link href={`/packages/add?${new URLSearchParams({ docs: carried.join(",") })}`} className="font-semibold text-link hover:underline">choose it</Link>.
               Each is delivered at the status the package needs, checked as any delivery is.
             </p>
@@ -234,7 +246,6 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
               </Asked>
               {/* Under "Due": what it needs, beside the description. */}
               <SearchPick browse name="requiredStatus" initial={parent?.requiredStatuses} required label="Needed at" hint="ready at any of them; it also says why they get it" items={statuses.map((item) => ({ id: item.code, name: item.code, detail: item.label }))} />
-              <SearchPick browse name="recipientPartyIds" initial={parent?.recipientPartyIds} required label="Delivered to" hint="one or several — us too, for an internal handover" items={parties.map((p) => ({ id: p.id, name: p.isInternal ? `${p.name} (us)` : p.name }))} />
               <SearchPick name="compositionOwnerId" initial={parent?.ownerIds} required label="Put together by" hint="one or several — they add and take out its documents; the control function does the rest" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
               <SearchPick name="acceptanceAuthorityId" initial={parent?.acceptorIds} required label="Accepted by" hint="one or several, not those putting it together — any one of them accepts at the end and decides on anything missing" items={users.map((person) => ({ id: person.id, name: person.name, detail: person.functionName }))} />
               <Added fields={packagePolicy.own} />

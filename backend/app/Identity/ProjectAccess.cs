@@ -24,6 +24,8 @@ public sealed class ProjectAccess
     public required bool IsInternal { get; init; }
     /// <summary>Code of the party this person represents. Null: our own organization.</summary>
     public string? PartyCode { get; init; }
+    /// <summary>The party this person represents. Null: our own organization.</summary>
+    public Guid? PartyId { get; init; }
     /// <summary>Confidentiality levels above this person's clearance: read only where they are named on the document.</summary>
     public IReadOnlyList<string> AboveClearance { get; init; } = [];
 
@@ -45,14 +47,14 @@ public sealed class ProjectAccess
     /// <summary>What a function may do on a project, whoever holds it: for asking about someone other than the caller.</summary>
     public static ProjectAccess OfFunction(Project project, Function function, Guid userId = default, string userName = "",
         bool actsAsControl = false) => new()
-    {
-        Project = project,
-        UserId = userId,
-        UserName = userName,
-        Function = function,
-        IsInternal = true,
-        Rules = WithControl(function.Rules.Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole).ToList(), actsAsControl),
-    };
+        {
+            Project = project,
+            UserId = userId,
+            UserName = userName,
+            Function = function,
+            IsInternal = true,
+            Rules = WithControl(function.Rules.Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole).ToList(), actsAsControl),
+        };
 
     /// <summary>
     /// Someone named on the project to act as the control function holds CONTROL on every document of it, whatever
@@ -116,7 +118,7 @@ public sealed class ProjectAccessLoader(DeliosDbContext db, AccessVersions versi
         if (membership is null) return null;
 
         var party = await db.Users.AsNoTracking().Where(u => u.Id == userId)
-            .Select(u => u.Party == null ? null : new { u.Party.Code, u.Party.IsInternal })
+            .Select(u => u.Party == null ? null : new { u.Party.Id, u.Party.Code, u.Party.IsInternal })
             .SingleAsync(cancellationToken);
         var project = membership.Project!;
         // Its lists from here on: its own copy once it has one, else the organization's.
@@ -136,6 +138,7 @@ public sealed class ProjectAccessLoader(DeliosDbContext db, AccessVersions versi
                 .ToList(), membership.ActsAsControl),
             IsInternal = party is null || party.IsInternal,
             PartyCode = party?.Code,
+            PartyId = party?.Id,
             AboveClearance = above,
         };
     }

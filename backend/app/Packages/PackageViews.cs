@@ -14,7 +14,7 @@ public sealed partial class PackageService
     public async Task<PackageParts> PartsAsync(Package p, bool outside, ProjectAccess? access, CancellationToken cancellationToken)
     {
         var readiness = await ReadinessAsync(p, cancellationToken);
-        var transmittals = await TransmittalsAsync(p, cancellationToken);
+        var transmittals = await TransmittalsAsync(p, cancellationToken, outside ? access : null);
         var intake = p.Kind == PackageKinds.Supply ? await IntakeAsync(p.ProjectId, cancellationToken) : null;
         return new PackageParts(readiness, transmittals, intake, await SupplierNameAsync(p, cancellationToken),
             outside ? null : (await SupplierPeopleAsync(p, cancellationToken)).Select(x => x.Name).ToList(),
@@ -51,7 +51,9 @@ public sealed partial class PackageService
 
         // Transmittals: those made for each package, and for a supplier's, what that supplier sent carrying its documents.
         var ids = packages.Select(p => p.Id).ToList();
+        var reader = access.IsInternal ? (Guid?)null : access.PartyId ?? Guid.Empty;
         var own = await db.Transmittals.AsNoTracking().Where(t => t.PackageId != null && ids.Contains(t.PackageId.Value))
+            .Where(t => reader == null || t.ToPartyId == reader || t.FromPartyId == reader)
             .Select(t => new { Package = t.PackageId!.Value, Line = new PackageTransmittal(t.Id, t.Number, t.Direction, t.IssuedAt.ToDateTimeOffset(), t.Items.Count) })
             .ToListAsync(cancellationToken);
         var suppliers = packages.Where(p => p.Kind == PackageKinds.Supply && p.SupplierPartyId != null).Select(p => p.SupplierPartyId!.Value).Distinct().ToList();
@@ -67,14 +69,14 @@ public sealed partial class PackageService
         var intake = packages.Any(p => p.Kind == PackageKinds.Supply) ? await IntakeAsync(access.Project.Id, cancellationToken) : null;
         var people = packages.SelectMany(p => p.OwnerIds.Concat(p.AcceptorIds)).Distinct().ToList();
         var names = await db.Users.AsNoTracking().Where(u => people.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, cancellationToken);
-        var partyIds = packages.SelectMany(p => p.RecipientPartyIds).Concat(suppliers).Distinct().ToList();
+        var partyIds = packages.SelectMany(p => p.RecipientPartyIds.Concat(p.DeliveredTo)).Concat(suppliers).Distinct().ToList();
         var parties = await db.Parties.AsNoTracking().Where(p => partyIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
         var us = await db.Tenants.AsNoTracking().Where(t => t.Id == packages[0].TenantId).Select(t => t.Name).FirstOrDefaultAsync(cancellationToken) ?? "us";
         // The supplier's people on the project (active, not waiting for confirmation), for our own readers.
         var supplierPeople = outside || suppliers.Count == 0 ? [] : (await (from u in db.Users
-                    join m in db.Memberships on u.Id equals m.UserId
-                    where u.PartyId != null && suppliers.Contains(u.PartyId.Value) && u.Active && m.ProjectId == access.Project.Id && m.Active && m.PendingSince == null
-                    select new { Party = u.PartyId!.Value, u.Id, u.Name }).Distinct().AsNoTracking().ToListAsync(cancellationToken))
+                                                                            join m in db.Memberships on u.Id equals m.UserId
+                                                                            where u.PartyId != null && suppliers.Contains(u.PartyId.Value) && u.Active && m.ProjectId == access.Project.Id && m.Active && m.PendingSince == null
+                                                                            select new { Party = u.PartyId!.Value, u.Id, u.Name }).Distinct().AsNoTracking().ToListAsync(cancellationToken))
             .GroupBy(x => x.Party).ToDictionary(g => g.Key, g => g.Select(x => x.Name).ToList());
 
         // The trees read once for the whole list, one kind at a time (owner: "a page never reads its lines one by one").
@@ -90,7 +92,7 @@ public sealed partial class PackageService
             var transmittals = own.Where(t => t.Package == p.Id).Select(t => t.Line)
                 .Concat(p.Kind == PackageKinds.Supply ? incoming.Where(t => t.From == p.SupplierPartyId && t.Documents.Any(members.Contains)).Select(t => t.Line) : [])
                 .DistinctBy(t => t.Id).OrderBy(t => t.IssuedAt).ToList();
-            var place = inTree.Contains(p.Id) ? PlaceOf(p, trees[p.Kind]) : Alone(p, readiness, outside);
+            var place = inTree.Contains(p.Id) ? PlaceOf(p, trees[p.Kind]) : Alone(p, readiness, outside && !ReadsWhole(access, p));
             listed.Add((p, new PackageParts(readiness, transmittals, p.Kind == PackageKinds.Supply ? intake : null,
                 p.SupplierPartyId is { } s ? parties.GetValueOrDefault(s)?.Name : null,
                 outside ? null : p.SupplierPartyId is { } sp ? supplierPeople.GetValueOrDefault(sp) ?? [] : [],

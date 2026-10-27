@@ -54,6 +54,11 @@ public sealed class Package
     public Guid[] Excluded { get; set; } = [];
     /// <summary>The organizations it is delivered to; one transmittal each. Empty: handed over without one.</summary>
     public Guid[] RecipientPartyIds { get; set; } = [];
+    /// <summary>
+    /// The organizations it was delivered to, on a transmittal naming it or a package above it (owner: whoever delivers
+    /// chooses to whom, at the end): their people read it as we do, its tree and lines, and change nothing.
+    /// </summary>
+    public Guid[] DeliveredTo { get; set; } = [];
     /// <summary>The people (user ids) who put the package together and deliver it.</summary>
     public Guid[] OwnerIds { get; set; } = [];
     /// <summary>Any one of them accepts. Never one of the owners.</summary>

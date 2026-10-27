@@ -1558,3 +1558,16 @@ The Standard asks that controlled information be kept safe; it says nothing of t
   one person takes more than 200 files in an hour (owner).
 - **What opens drawings and office files is shut in**: on a network of its own, it reaches neither the register, the
   store nor the internet.
+
+## 84 · A package is delivered at the end, to whom we choose, and read only by whoever receives it
+
+The Standard has a package name its recipients when it is made and go to them on its delivery. Real projects decide
+whom a package goes to at the end, and may hand the same package to more than one party.
+
+- Two kinds: a **supplier package** is an exchange with that supplier (placeholders, uploads, checks, reviews); **our
+  package** files our own documents, managed in our space. Either may be delivered once complete.
+- Delivering is a **data transmittal**, its recipients chosen when it is written; nobody is named when the package is
+  made. It carries the package **and every package under it**, each document at the revision that goes, and nothing
+  else: none can be added or taken out on the transmittal. It may be delivered again, as it stands, to someone else.
+- A package delivered is the **receiver's to read, never to change or return**: they see it as its sender does (its
+  tree and lines) and ask what they need by an information transmittal.

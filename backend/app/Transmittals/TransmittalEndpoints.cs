@@ -257,13 +257,16 @@ public static class TransmittalEndpoints
             return refused ?? Results.Ok(new[] { new { draft!.Id, Number = "Draft", ToName = draft.Subject } });
         }
         if (await transmittals.FormProblemAsync(access, request, cancellationToken) is { } formProblem) return formProblem;
-        // For a package: its documents only, and a package we deliver passes Deliver's checks first, then is delivered.
-        if (request.PackageId is { } packageId)
-        {
-            var documentIds = await db.Revisions.AsNoTracking().Where(r => (request.RevisionIds ?? Array.Empty<Guid>()).Contains(r.Id))
-                .Select(r => r.DocumentId).Distinct().ToListAsync(cancellationToken);
-            if (await packages.SendableAsync(access, packageId, documentIds, cancellationToken) is { } packageProblem) return packageProblem;
-        }
+        // For a package: exactly what delivering it carries (none added, none taken out); sent, it is delivered.
+        if (request.PackageId is { } packageId
+            && await packages.SendableAsync(access, packageId, request.RevisionIds ?? [], cancellationToken) is { } packageProblem) return packageProblem;
+        // A package delivered to another organization is theirs to read, never to change or return (owner): what they send
+        // following its delivery asks by words alone, an information transmittal.
+        if (!access.IsInternal && (request.RevisionIds?.Length ?? 0) > 0 && (request.FollowsId ?? request.InReplyToId) is { } follows
+            && await db.Transmittals.AsNoTracking().AnyAsync(t => t.Id == follows && t.PackageId != null && t.ToPartyId == access.PartyId
+                && db.Packages.Any(p => p.Id == t.PackageId && p.DeliveredTo.Contains(t.ToPartyId!.Value)), cancellationToken))
+            return Problems.Invalid("DELIVERED_READ_ONLY",
+                "A package delivered to you is not returned or changed: ask what you need by an information transmittal, with no document.");
         var (sent, problem) = await transmittals.ComposeAsync(access, request, cancellationToken);
         if (problem is null && request.PackageId is { } delivered) await packages.DeliveredAsync(access, delivered, sent, cancellationToken);
         return problem ?? Results.Ok(sent.Select(t => new { t.Id, t.Number, t.ToName }));

@@ -4126,6 +4126,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("created_by_name");
 
+                    b.PrimitiveCollection<Guid[]>("DeliveredTo")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("delivered_to");
+
                     b.Property<string>("Description")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)")

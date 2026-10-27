@@ -318,12 +318,19 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
                 </Act>
               ) : null}
               {listLink}
-              {/* Handed over to whoever gets them (the client, operations): a data transmittal carrying the package's
-                  documents at their released revisions (owner: "just a transmittal but for package"), never a new package. */}
-              {rows.length ? (
-                <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number })}`}
-                  className="ask inline-flex items-center gap-1.5"><PackageCheck className="h-3.5 w-3.5" /> Deliver</Link>
-              ) : null}
+              {/* Delivered once complete, to whom we choose then (owner): a data transmittal carrying the package and every
+                  package in it, each document at its released revision, nothing added or taken out. Not complete, it says so. */}
+              {rows.length ? (() => {
+                const whole = pkg.place?.whole ?? { documents: pkg.members.length, released: pkg.members.filter((m) => m.revision).length };
+                return whole.documents > 0 && whole.released === whole.documents ? (
+                  <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number })}`}
+                    className="ask inline-flex items-center gap-1.5"><PackageCheck className="h-3.5 w-3.5" /> Deliver</Link>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500" title="A supplier's package is delivered once every document in it is released">
+                    <PackageCheck className="h-3.5 w-3.5" /> Deliver once complete · {whole.released} of {whole.documents} released
+                  </span>
+                );
+              })() : null}
             </div>
             {shared ? <p className="text-[11px] text-slate-500">Shared: it can no longer be renamed, have its rule changed or be deleted.</p> : null}
           </div>

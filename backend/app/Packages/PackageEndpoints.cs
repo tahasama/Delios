@@ -59,7 +59,7 @@ public sealed record PackageView(Guid Id, string Number, string Title, string? D
     IReadOnlyList<PackageTransmittal> Transmittals, string Kind, Guid? SupplierPartyId, string? Supplier, string? PurchaseOrder,
     IReadOnlyList<string>? Reasons = null, System.Text.Json.JsonElement? Extras = null, string? AcceptNote = null,
     DateTimeOffset? SharedAt = null, string? SharedBy = null, bool AutoCreated = false, IReadOnlyList<string>? SupplierPeople = null,
-    PackageNames? Names = null, AsReceivedView? AsReceived = null, PackagePlace? Place = null);
+    PackageNames? Names = null, AsReceivedView? AsReceived = null, PackagePlace? Place = null, bool DeliveredToUs = false);
 
 /// <summary>A supplier's package on a project taking documents as they come (<see cref="Intake"/>): what they are filed under.</summary>
 public sealed record AsReceivedView(string DeliverableType, string DocType, string Discipline);
@@ -97,6 +97,9 @@ public static class PackageEndpoints
         project.MapGet("/by-number/{number}", ByNumberAsync);
         project.MapGet("/{packageId:guid}/lines", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
             await s.LinesAsync(ProjectAccessFilter.Of(h), packageId, c) is { } lines ? Results.Ok(lines) : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package."));
+        // What delivering it carries, for the New transmittal form; nothing is written.
+        project.MapGet("/{packageId:guid}/going", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
+            await s.GoingAsync(ProjectAccessFilter.Of(h), packageId, c) is var (going, problem) && problem is null ? Results.Ok(going) : problem!);
         project.MapPost("/{packageId:guid}/members", (Guid packageId, MembersRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.AddAsync(a, packageId, r, c)));
         project.MapPost("/{packageId:guid}/members/remove", (Guid packageId, MembersRequest r, HttpContext h, PackageService s, CancellationToken c) =>
@@ -157,7 +160,7 @@ public static class PackageEndpoints
         var access = ProjectAccessFilter.Of(http);
         // The list shows the packages at the top, a page at a time (owner: only what is seen first); the tree asks for all.
         var views = (await packages.ListedAsync(access, kind, cancellationToken, top, take))
-            .Select(x => ViewOf(x.Package, x.Parts, outside: !access.IsInternal)).ToList();
+            .Select(x => ViewOf(x.Package, x.Parts, outside: !access.IsInternal, access)).ToList();
         return Results.Ok(views.OrderBy(v => v.CompletionDate is null).ThenBy(v => v.CompletionDate).ToList());
     }
 
@@ -194,15 +197,16 @@ public static class PackageEndpoints
     /// </summary>
     private static async Task<PackageView> ViewAsync(PackageService packages, Package p, CancellationToken cancellationToken, bool outside = false,
         ProjectAccess? access = null) =>
-        ViewOf(p, await packages.PartsAsync(p, outside, access, cancellationToken), outside);
+        ViewOf(p, await packages.PartsAsync(p, outside, access, cancellationToken), outside, access);
 
     /// <summary>The package view from its parts.</summary>
-    private static PackageView ViewOf(Package p, PackageParts parts, bool outside)
+    private static PackageView ViewOf(Package p, PackageParts parts, bool outside, ProjectAccess? access = null)
     {
         var intake = parts.Intake;
         var asReceived = intake?.Mode == Intake.AsReceived;
         // Its supplier sees what was asked of it on a transmittal, and in a package taking documents as they come, what they sent.
-        var readiness = outside ? parts.Readiness.Where(r => r.Member.RequestedAt is not null || asReceived).ToList() : parts.Readiness;
+        var whole = !outside || (access is not null && PackageService.ReadsWhole(access, p));
+        var readiness = whole ? parts.Readiness : parts.Readiness.Where(r => r.Member.RequestedAt is not null || asReceived).ToList();
         return new PackageView(p.Id, p.Number, p.Title, p.Description, p.Reason, p.RequiredStatuses, p.CompletionDate?.ToDateOnly(),
             p.Rule, p.Excluded, p.RecipientPartyIds, p.OwnerIds, p.AcceptorIds, p.State, p.AssessedAt?.ToDateTimeOffset(), p.Shortfall,
             p.ShortfallIssuedAt?.ToDateTimeOffset(), p.ShortfallAcceptedAt?.ToDateTimeOffset(), p.ShortfallAcceptedByName,
@@ -214,8 +218,8 @@ public static class PackageEndpoints
             parts.Transmittals, p.Kind, p.SupplierPartyId, parts.SupplierName, p.PurchaseOrder, [p.Reason, .. p.OtherReasons],
             p.Extras is null ? null : System.Text.Json.JsonDocument.Parse(p.Extras).RootElement.Clone(), p.AcceptNote,
             p.SharedAt?.ToDateTimeOffset(), p.SharedByName, p.AutoCreated,
-            outside ? null : parts.SupplierPeople, parts.Names,
+            outside ? null : parts.SupplierPeople, outside && whole && parts.Names is { } named ? named with { To = "" } : parts.Names,
             asReceived ? new AsReceivedView(intake!.DeliverableType ?? "", intake.DocType ?? "", intake.Discipline ?? "") : null,
-            parts.Place);
+            parts.Place, DeliveredToUs: outside && whole);
     }
 }

@@ -475,14 +475,28 @@ a screen only words it. A new rule goes in the backend, never in a page.
   its documents is refused (IN_BOTH); a supplier's branch deleted hands its documents back to the package it sat in.
   Two separate delivery trees may still share a document.
   Another organization reads only the packages shared with it, and in them only what was asked of it.
-- **A package is delivered on a data transmittal** (owner: "it shall be just a transmittal but for package"): a supplier's
-  package's "Deliver" and a delivery package's "Deliver to …" open the New transmittal form filled from the package
-  (`/transmittals/new?package=<number>`: its documents at their released revisions, a delivery package's ready ones only,
-  its reason and the people it names, locked; the subject "<number> <title>: N documents"), sent now (no draft). The
-  transmittal names its package (`ComposeRequest.PackageId`); the backend refuses a document not in it (NOT_IN_PACKAGE)
-  and, for a delivery package, the same checks as before (readiness checked, a shortfall let go: `PackageService.
-  DeliverableAsync`); sent, a delivery package is delivered and its contents fixed (`DeliveredAsync`, PACKAGE_DELIVERED).
-  No new package is made to deliver a supplier's (it was before). A delivery package naming nobody is only closed.
+- **Two kinds of package, both delivered the same way** (owner: "the naming 'to deliver' is confusing"): **Supplier
+  packages** (`SUPPLY`) are an exchange with a supplier (placeholders, its uploads, our check and review, handed back and
+  forth); **Our packages** (`DELIVERY`) file our documents, made, reviewed and released in our space. The codes stay;
+  only their names changed. **Either is delivered once complete, on a data transmittal, to whom we choose then**
+  (owner: "we reserve the right to deliver to whom we want… decide at the end, not at the package creation"): no
+  "Delivered to" is asked when a package is made or edited (an older package's recipients are only read). "Deliver"
+  (ours: once readiness is checked and any shortfall let go; a supplier's: once every document of its tree is released,
+  NOT_COMPLETE otherwise) opens the New transmittal form (`/transmittals/new?package=<number>`) with what goes, worked
+  out by the backend (`PackageService.GoingAsync`, `GET /packages/{id}/going`): **the package and every package under
+  it** ("the tree and all"), each document once, at its released revision, and, where the acceptance authority let it
+  go short, those not ready as they stand (named in the message, with whose responsibility); **fixed on the form**
+  (owner: "it is not possible to add documents to a package in transmittal": no "Add documents", no ×; the backend
+  refuses any other set, PACKAGE_CONTENTS); whom it goes to chosen there. Sent (`DeliveredAsync`, PACKAGE_DELIVERED),
+  every package of the tree records the organizations it went to (`Package.DeliveredTo`) and each open package of ours
+  is delivered, its contents fixed. It may be delivered again to someone else, as it stands ("Deliver it to someone
+  else"). Handed over outside the system, a package of ours is closed instead (`/deliver`, PACKAGE_CLOSED); the
+  acceptance authority letting a shortfall go no longer sends anything by itself. **Delivered, it is the receiver's to
+  read, never to change or return** (owner): their people read it as we do, its tree and every line
+  (`PackageService.ReadsWhole`, `Visible`; `PackageView.DeliveredToUs`; Packages' "Delivered to you" beside "Asked of
+  you"; the package page read only, "Ask about it" following the delivery), and what they send following it carries no
+  document (DELIVERED_READ_ONLY: an information transmittal). Another organization reads only the package's
+  transmittals to or from it.
 - "Delivery list" downloads the package's own lines (`/api/packages/<n>/list`),
   never the schedule's requirements list.
 - "Share with <supplier>" is pressed once, for good: until then the supplier
@@ -510,13 +524,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Document Control (and above) only, on supplier packages. A new supplier package asks the supplier and
   its order, and a status only if wanted: no single due date (each document is due on its own planned date)
   and nobody accepts it.
-- Delivery packages: "Needed at" (statuses) also says why they get it (`ReasonFor`, backend: the reason with
+- Our packages (delivery): "Needed at" (statuses) also says why they get it (`ReasonFor`, backend: the reason with
   the same purpose, else one for execution); no separate reason is asked. Those putting it together only add
   and take out its documents (and delete it while empty and never sent); Document Control (and above) does
   everything else and edits every field while it is open (backend CONTROL_ONLY / OWNER_ONLY). Ticked
   documents are taken out from the bar under the list. What is missing is asked on a transmittal (Request) to
   whoever accepts it; their confirmation (a warning first) answers it on a transmittal (Confirmation) and
-  delivers it at once on their responsibility, the documents not ready going as they stand (released
+  lets it go on their responsibility: delivered then (above), the documents not ready go as they stand (released
   revision, else the newest), said on the delivery transmittal. "Export CSV" on Packages exports the one
   package ticked.
 - The side that does not hold it asks the holder to hand it back for an update

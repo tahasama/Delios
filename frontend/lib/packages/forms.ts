@@ -30,8 +30,6 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
 
   // A package filled by a rule states it as a filter.
   const filter = filterFromForm(formData);
-  // Handed to one or more organizations on the project.
-  const partyIds = formData.getAll("recipientPartyIds").map(String).filter(Boolean);
   const completionDate = String(formData.get("completionDate") ?? "");
   // One status or several: a document is ready at any of them.
   const requiredStatuses = formData.getAll("requiredStatus").map(String).filter(Boolean);
@@ -39,7 +37,6 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   const ownerList = formData.getAll("compositionOwnerId").map(String).filter(Boolean);
   const acceptorList = formData.getAll("acceptanceAuthorityId").map(String).filter(Boolean);
  if (!title) return { error: "Give the package a title." };
- if (!partyIds.length) return { error: "Choose who it is delivered to — another organization, or us." };
  if (!completionDate) return { error: "The completion date is required — it triggers assessment." };
  if (!requiredStatuses.length) return { error: "State the status members shall have reached." };
  if (!ownerList.length || !acceptorList.length) return { error: "Say who puts it together and who accepts it." };
@@ -60,7 +57,7 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   try {
     const created = await api<PackageView>(projectPath(ctx, "/packages"), {
       body: {
-        title, description, reasons: purposes.length ? purposes : null, requiredStatuses, ownerIds: ownerList, acceptorIds: acceptorList, recipientPartyIds: partyIds,
+        title, description, reasons: purposes.length ? purposes : null, requiredStatuses, ownerIds: ownerList, acceptorIds: acceptorList,
         completionDate, kind: "DELIVERY", extras: Object.keys(extras).length ? extras : null,
         // Inside another package: a branch of its arborescence.
         parentId: String(formData.get("parentId") ?? "") || null,
@@ -189,12 +186,11 @@ export async function updatePackageAction(_prev: { error?: string } | undefined,
     ? {
         title, description, number,
         completionDate: date || null, clearCompletionDate: !date,
-        requiredStatuses: list("requiredStatus"), recipientPartyIds: list("recipientPartyIds"),
+        requiredStatuses: list("requiredStatus"),
         ownerIds: list("compositionOwnerId"), acceptorIds: list("acceptanceAuthorityId"),
       }
     : { title, description, number };
   if (full && !body.requiredStatuses?.length) return { error: "Say the status its documents need." };
-  if (full && !body.recipientPartyIds?.length) return { error: "Say who it is delivered to." };
   if (full && (!body.ownerIds?.length || !body.acceptorIds?.length)) return { error: "Say who puts it together and who accepts it." };
   const { error, number: now } = await onPackage(String(formData.get("packageId") ?? ""), "", body, "PUT");
   if (error) return { error };

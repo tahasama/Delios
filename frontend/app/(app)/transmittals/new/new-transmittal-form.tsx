@@ -88,7 +88,8 @@ export function NewTransmittalForm({
 }: {
   /** A package's documents going out on this transmittal (owner: delivering a package is a data transmittal); a package
    *  we deliver goes to whom it names and is delivered once sent. */
-  forPackage?: { id: string; number: string; title: string; delivers: boolean; to: string };
+  /** A package delivered: its contents fixed (the backend's), the packages its tree holds, what had no revision, or why it cannot go. */
+  forPackage?: { id: string; number: string; title: string; packages: number; left: string[]; why: string | null };
   /** Asking for someone new to join: the person's fields in place of what it carries, and who confirms in place of who gets it. */
   joining?: Joining;
   /** The organizations set up on the project, with their codes: who something was received from. */
@@ -144,7 +145,6 @@ export function NewTransmittalForm({
   // Who it goes to is set by it too: those who answer it. Copies stay free.
   const lockedTo = prefill?.activity && prefill.userIds?.length ? `the control function: they answer it on ${prefill.activity.code}`
     : askingBack && prefill?.userIds?.length ? `${askingBack.to}: it holds ${askingBack.items.length === 1 ? "the document" : "the documents"}`
-    : forPackage?.delivers && prefill?.userIds?.length ? `${forPackage.to}: the package ${forPackage.number} goes to them`
     : undefined;
   const [joiner, setJoiner] = useState("");
   const joinStep = useRef<HTMLElement>(null);
@@ -301,15 +301,16 @@ export function NewTransmittalForm({
           </>
         ) : null}
 
-        {/* A package's documents: the package travels with them; one of ours is delivered once this is sent. */}
+        {/* A package delivered: the package travels with its documents, fixed; whom it goes to is chosen in step 3. */}
         {forPackage ? (
           <>
             <input type="hidden" name="packageId" value={forPackage.id} />
-            <p className="mb-4 rounded-lg border border-line bg-tint-soft px-4 py-2.5 text-xs text-slate-600">
-              Sends the documents of <Link href={`/packages/${forPackage.number}`} className="font-mono font-semibold text-link hover:underline">{forPackage.number}</Link> {forPackage.title}.
-              {" "}{forPackage.delivers
-                ? `What is ready goes, at its released revision, to ${forPackage.to}; once sent, the package is delivered and its contents fixed.`
-                : "Each goes at its released revision; choose who receives them in step 3."}
+            <p className={cn("mb-4 rounded-md px-4 py-2.5 text-xs ring-1", forPackage.why ? "bg-amber-50 text-amber-900 ring-amber-200" : "bg-tint-soft text-slate-600 ring-line")}>
+              Delivers <Link href={`/packages/${forPackage.number}`} className="font-mono font-semibold text-link hover:underline">{forPackage.number}</Link> {forPackage.title}
+              {forPackage.packages > 1 ? ` and the ${forPackage.packages - 1} package${forPackage.packages === 2 ? "" : "s"} in it` : ""}.
+              {" "}{forPackage.why
+                ? <>It cannot go yet: {forPackage.why}</>
+                : "Its documents go as the package holds them, nothing added or taken out; choose who receives it in step 3. They read the package as you do, its tree and lines, and change nothing: they ask by an information transmittal."}
             </p>
           </>
         ) : null}
@@ -549,7 +550,7 @@ export function NewTransmittalForm({
                     <span className="font-mono text-slate-600">{r.rev}</span>
                     {r.status ? <span className="code-chip">{r.status}</span> : null}
                     <span className="min-w-0 flex-1 truncate text-slate-500">{r.title}</span>
-                    <button type="button" onClick={() => toggle(r.id)} className="rounded-sm p-0.5 text-slate-400 hover:text-red-700" aria-label={`Take ${r.number} out`}><X className="h-3.5 w-3.5" /></button>
+                    {forPackage ? null : <button type="button" onClick={() => toggle(r.id)} className="rounded-sm p-0.5 text-slate-400 hover:text-red-700" aria-label={`Take ${r.number} out`}><X className="h-3.5 w-3.5" /></button>}
                   </li>
                 ))}
               </ul>
@@ -557,7 +558,11 @@ export function NewTransmittalForm({
               <p className="w-full text-xs text-slate-500">No document enclosed yet{outgoing ? (mustCarry ? " — a data transmittal carries at least one" : " — a letter alone is fine too") : ""}.</p>
             )}
             {unsent?.length ? <p className="w-full text-[11px] text-amber-800">Not enclosed, nothing of {unsent.length === 1 ? "it" : "them"} released: {unsent.join(", ")}.</p> : null}
-            <Link href={pickHref()} className="ask inline-flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Add documents</Link>
+            {forPackage ? (
+              <p className="w-full text-[11px] text-slate-500">
+                The package&rsquo;s documents, fixed.{forPackage.left.length ? ` Not sent, no revision yet: ${forPackage.left.join(", ")}.` : ""}
+              </p>
+            ) : <Link href={pickHref()} className="ask inline-flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Add documents</Link>}
           </div>
           {/* What is enclosed travels in fields of its own. */}
           {chosen.map((id) => <input key={id} type="hidden" name="revisionIds" value={id} />)}
