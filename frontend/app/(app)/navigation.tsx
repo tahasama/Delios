@@ -82,6 +82,9 @@ function primaryNav(p: NavPermissions): NavItem[] {
         // An outside reader always has the transmittals addressed to them.
         when: p.canTransmit || p.canControl || p.external,
       },
+      // Daily work too, so above "+ More" (owner).
+      { href: "/reviews", label: "Reviews", description: "Advise, decide, follow", icon: ClipboardCheck },
+      { href: "/packages", label: "Packages", description: "What goes and comes together", icon: FolderKanban },
     ] as NavItem[]
   ).filter((i) => i.when !== false);
 }
@@ -89,8 +92,6 @@ function primaryNav(p: NavPermissions): NavItem[] {
 function moreNav(p: NavPermissions): NavItem[] {
   return (
     [
-      { href: "/reviews", label: "Reviews", icon: ClipboardCheck },
-      { href: "/packages", label: "Packages", icon: FolderKanban },
       { href: "/assets", label: "Assets & tags", icon: Boxes, when: !p.external },
       { href: "/distribution", label: "Distribution matrix", icon: Network, when: p.canRead && !p.external },
       { href: "/reports", label: "Reports", icon: ListChecks, when: p.canRead },

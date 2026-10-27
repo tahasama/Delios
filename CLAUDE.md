@@ -122,7 +122,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   last resort on a very small screen. It holds the work only: no "Create document" (the register's "New document" does
   it), no Settings and no Help (owner: both are in the top bar, Settings as a gear beside Help, for whoever a Settings
   page opens to); folding it to icons is a small round button on its right edge, taking no room in it. The rest of the
-  menu stays as it is (owner: no regrouping of its entries). **One frame** (owner: "both side and top bar need a proper
+  menu stays as it is (owner: no regrouping of its entries), but for Reviews and Packages, daily work, moved above
+  "+ More" (owner: "the separator should be after packages"). **One frame** (owner: "both side and top bar need a proper
   update"): the menu's mark and the top bar are the same height (`h-16`) and closed by one line, the fold button sitting
   where they meet. **The page you are on is a light row** (owner: the gold, larger tile was bad), its icon the size of
   every other; faint words at least slate-400 on the navy. **"+ More"** is one small line taking almost no room (owner:
