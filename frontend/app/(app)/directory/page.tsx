@@ -56,29 +56,31 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
   const control = (directory?.people ?? []).filter((p) => p.control);
   const confirmers = (options?.confirmers ?? []).map((c) => ({ id: c.id, name: c.name, detail: c.function, note: c.manager ? "recommended" : null }));
 
+  const plate = (
+    <>
+      <h1 className="plate-title text-slate-950">Project directory</h1>
+      <p className="plate-meta mt-2">
+        {project.code} · {directory ? `${directory.organizations.length} organization${directory.organizations.length === 1 ? "" : "s"} · ${directory.people.length} ${directory.people.length === 1 ? "person" : "people"}` : "—"}
+      </p>
+      <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+        Who takes part in {project.code}, and who is on it.
+        {control.length ? ` The control function: ${control.map((p) => p.name).join(", ")}.` : ""}
+      </p>
+      {!directory ? (
+        <p role="alert" className="mt-2 w-fit rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-800 ring-1 ring-red-200">The directory could not be read just now. Try again in a moment.</p>
+      ) : null}
+    </>
+  );
+
   return (
     <div className="space-y-4">
-      {/* The plate: who takes part, and the one way to ask for someone new. */}
-      <section className="register register-sheet register-sheet-open">
-        <div className="px-5 pt-6 pb-4 sm:px-6">
-          <h1 className="plate-title text-slate-950">Project directory</h1>
-          <p className="plate-meta mt-2">
-            {project.code} · {directory ? `${directory.organizations.length} organization${directory.organizations.length === 1 ? "" : "s"} · ${directory.people.length} ${directory.people.length === 1 ? "person" : "people"}` : "—"}
-          </p>
-          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-            Who takes part in {project.code}, and who is on it.
-            {control.length ? ` The control function: ${control.map((p) => p.name).join(", ")}.` : ""}
-          </p>
-          {!directory ? (
-            <p role="alert" className="mt-2 w-fit rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-800 ring-1 ring-red-200">The directory could not be read just now. Try again in a moment.</p>
-          ) : null}
-        </div>
-      </section>
-
-      {/* The one act here: a sheet of its own, never inside the plate. */}
+      {/* The plate: who takes part, and the one way to ask for someone new, on its right (owner: "a button in the title
+          card"); the form opens under it. */}
       {options ? (
         <SomeoneJoins
           projectCode={project.code}
+          projectName={project.name}
+          plate={plate}
           sentence={options.asks ? "it goes as a request; once confirmed they are put on and told, and you read the answer on the same thread" : "they are put on at once, and told"}
           mayAdd={options.everyone && options.mayAdd}
           people={options.people.map((p) => ({ id: p.id, name: p.name, detail: p.organization }))}
@@ -90,7 +92,9 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
           asks={options.asks}
           mayKeepProof={false}
         />
-      ) : null}
+      ) : (
+        <section className="register register-sheet register-sheet-open"><div className="px-5 pt-6 pb-4 sm:px-6">{plate}</div></section>
+      )}
 
       {directory ? (
         <>

@@ -152,10 +152,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   like tabs are for small things and decisions… the Schedule's tab design is what should be applied for actual TABS, like
   assurance, reports"): **real tabs are the Schedule's** (`.views` / `.view`, `.view-n` a count, `.view-hint`, `.view-go`
   the arrow; `globals.css`: one frame split in equal sides, the chosen side lit with the brand's line along its foot, the
-  others greyed and carrying an arrow, scrolling sideways when they do not fit): the Schedule's three, Assurance (its
-  icon and name only, no small words after, owner), a document's tabs, the organization's four (`org-tabs.tsx`).
-  **Reports keeps the tabs it had at first** (owner, after two tries: "the report tabs" back to what they were): plain
-  underlined names on one line inside its plate (`tabClass`). **The switch** (`.seg` /
+  others greyed and carrying an arrow, scrolling sideways when they do not fit): a document's tabs, the organization's
+  four (`org-tabs.tsx`). **The tab strip** (owner: "a subtle greyish bg on tabs and a separator between each", then the
+  same on Assurance and the Schedule "to gain more vertical space"; `.strip` / `.strip-tab`, `globals.css`): one low
+  greyish band, a line between each tab, the chosen one on the surface with the brand's line along its foot. Reports'
+  tabs on one line inside its plate; Assurance and the Schedule's three in a frame of their own (`.strip-card`), the
+  whole width shared equally (`.strip-full`), each its icon and name, no small words after. **The switch** (`.seg` /
   `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Packages' two kinds beside
   List · Tree (put back as they were: two designs side by side in one row read as inconsistent), Home's "What is waiting",
   the organization's People, the imports' "Which lines", list or tree, light or dark, in use · retired · all. The checks'
@@ -910,7 +912,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   forth, replies by email) is anyone of ours who may send or register; a delivery package is those putting it
   together. Ending a document is already its registrar's too; legal hold an administrator's.
 - People & access, in the reference style: masthead (on the project · waiting · refused, and how joining works here),
-  "Someone joins <project>" ("Add someone", "Ask for someone to join"), "Waiting to be confirmed" (with Remind), and
+  "Add someone" and "Ask for someone to join" as buttons on the plate's right (owner: "a button in the title card"; the
+  Project directory the same), the form opening under it (`SomeoneJoins` `plate`), the ask's message written already as
+  an invitation ("This is an invitation to <project>. From now on you have access to it as <function>: reading its
+  documents, …", from the function's rights, `lib/settings/access-words.ts`), changed as one likes, "Waiting to be confirmed" (with Remind), and
   Everyone (organization and project as search fields that apply at once, `JumpPick`, owner: chips grow with every
   organization; a field to find a name or email; "Other projects" only when someone shown
   is on another; acts as icons: activity, change, ask for them to join; each person's Change: function, department, name and email unless

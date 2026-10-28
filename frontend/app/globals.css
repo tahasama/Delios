@@ -657,6 +657,46 @@ summary::-webkit-details-marker {
   }
   .views::-webkit-scrollbar { display: none; }
 
+  /* ── The tab strip (owner: Reports' plain tabs "with a subtle greyish background and a separator between each";
+     Assurance and the Schedule the same, full width with their icons, "to gain vertical space"): one quiet band, every
+     tab parted from the next by a hairline, the open one standing on the page's surface with the brand's ink line at its
+     foot. `.strip` inside a card (Reports, across its plate); `.strip-card` a band of its own, framed and rounded;
+     `.strip-full` shares the width out between the tabs. */
+  .strip {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: color-mix(in srgb, var(--color-slate-500) 6%, var(--color-surface));
+    border-top: 1px solid var(--color-line);
+    border-bottom: 1px solid var(--color-line);
+  }
+  .strip::-webkit-scrollbar { display: none; }
+  .strip-card { border: 1px solid var(--color-line); border-radius: 0.75rem; overflow: hidden; }
+  .strip-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    white-space: nowrap;
+    padding: 0.55rem 1rem;
+    font-size: 12.5px;
+    line-height: 1.25rem;
+    color: var(--color-slate-500);
+    border-right: 1px solid var(--color-line);
+    box-shadow: inset 0 -2px 0 0 transparent;
+    transition: color 140ms, background-color 140ms, box-shadow 140ms;
+  }
+  .strip-tab svg { width: 0.95rem; height: 0.95rem; flex-shrink: 0; color: var(--color-slate-400); }
+  .strip-tab:hover { color: var(--color-slate-800); background: color-mix(in srgb, var(--color-surface) 60%, transparent); }
+  .strip-tab[aria-current="page"] {
+    color: var(--color-slate-900);
+    font-weight: 600;
+    background: var(--color-surface);
+    box-shadow: inset 0 -2px 0 0 var(--color-brand-ink);
+  }
+  .strip-tab[aria-current="page"] svg { color: var(--color-brand-ink); }
+  .strip-full .strip-tab { flex: 1 1 0; justify-content: center; }
+  .strip-full .strip-tab:last-child { border-right: 0; }
+
   .view-hint { font-size: 11px; font-weight: 400; color: var(--color-slate-500); }
   .view-n {
     font-family: var(--font-mono);
