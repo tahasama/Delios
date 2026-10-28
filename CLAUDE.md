@@ -883,7 +883,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   in its audit trail under that name (SUPPORT_ENTERED…), and its session ends with the access (`SessionStore` refuses it
   once the access ended or ran out; ending it switches the account off).
 - **Need support** (owner: "just have them write a message with object, we already know which org and which project,
-  and have a drawer with main type of requests"): a gold "Need support" button on the right of Help's plate and of the
+  and have a drawer with main type of requests"): a "Need support" button (the app's plain button, a gold outline and a gold mark, owner: the gold fill fitted neither light nor dark) on the right of Help's plate and of the
   organization's band opens a drawer from the right (`components/support.tsx`, `support-panel.tsx`): what it is about
   (`SupportKinds`, codes provisional: SIGN_IN, OPEN_FILE, UPLOAD, ACCESS, ERROR, SETUP, BILLING, OTHER), a subject, a
   message, then what the person asked before and its answer; who, the organization and the project are known

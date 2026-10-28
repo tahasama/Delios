@@ -15,8 +15,8 @@ export function SupportPanel({ children, startOpen = false }: { children: React.
   }, [open]);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={`${btn("ghost")} bg-gold! text-brand-ink! hover:bg-gold-bright!`}>
-        <LifeBuoy className="h-4 w-4" /> Need support
+      <button type="button" onClick={() => setOpen(true)} className={`${btn("secondary")} border-gold/70! hover:border-gold! hover:bg-gold/10!`}>
+        <LifeBuoy className="h-4 w-4 text-gold" /> Need support
       </button>
       {open ? (
         <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Need support">
