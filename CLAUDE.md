@@ -9,6 +9,7 @@ conversation, write it into the right one in the same commit as the code.
 |---|---|
 | `CLAUDE.md` (this file) | How to work with the owner, and the rules that must never break |
 | `docs/STANDARD-CHANGES.md` | What the original Document Management Standard must change to match what we built. Every new rule about controlling information goes here. |
+| `docs/APP-DECISIONS.md` | What used to sit in STANDARD-CHANGES but concerns only the app (settings levels, accounts, sign-in, storage, screens, code names), and what code each Standard change depends on. Nothing about the app goes into STANDARD-CHANGES (owner). |
 | `docs/REVIEW-MODEL.md` | The review model: routes, steps, advice, verdicts, release |
 | `docs/STRUCTURE.md` | Where everything is, by area; where to look when debugging or adding a feature |
 | `docs/ORGANIZATIONS.md` | Organizations working together (collaborator, guest, not on DELIOS), linked accounts, the organization's admin page |
@@ -737,7 +738,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   row ringed, Refuse's why open); anyone else reads who it waits for, or the answer with its reply. Postponements and a
   package's shortfall are still sent by their own acts (their letter is written by the app).
 
-### Organizations working together (docs/ORGANIZATIONS.md, Standard §55)
+### Organizations working together (docs/ORGANIZATIONS.md; docs/APP-DECISIONS.md §55)
 - Another organization works on our project in one of three ways: **collaborator** (its own DELIOS,
   linked; its people use their own sign-in), **guest** (accounts we make), **not on DELIOS** (a code; one of
   ours records for them). Nobody is forced to register. A collaborator is never chosen by hand: it is a party
@@ -2153,7 +2154,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Row-level security is forced, even for the table owner: a data backfill loops over
   `tenants` and sets `set_config('app.tenant_id', …)` for each.
 - Organization defaults are added through `DemoSeed.Ensure*SetupAsync`, which adds only what is missing.
-- **Only our own people keep the organization** (security review, Standard-changes §79): an account of another
+- **Only our own people keep the organization** (security review, docs/APP-DECISIONS.md §79): an account of another
   organization never counts as administrator, control function or Manage holder for `/api/admin` and `/api/organization`
   (`Keepers.OursAsync`); a function holding Configure is given by an administrator only (ADMIN_ONLY,
   `Keepers.FunctionConfiguresAsync`: memberships and join requests); only an administrator sets someone's password (the person told, signed out).
