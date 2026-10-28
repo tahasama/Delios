@@ -52,14 +52,14 @@ public sealed class ConsoleTests(Infrastructure infrastructure) : IClassFixture<
 
         // Reading only: every change refused, reading goes on, every page is told.
         var (refused, refusedBody) = await Flow.PostAsync(admin, "/api/admin/product-requests", new { what = "DWG_READER" });
-        Assert.Equal((HttpStatusCode.Forbidden, "READ_ONLY"), (refused, Flow.Code(refusedBody)));
+        Assert.True((refused, Flow.Code(refusedBody)) == (HttpStatusCode.Forbidden, "READ_ONLY"), $"{refused} {refusedBody}");
         var standing = await admin.GetFromJsonAsync<JsonElement>("/api/standing");
         Assert.True(standing.GetProperty("readsOnly").GetBoolean());
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/api/organization/contract")).StatusCode);
 
-        var (paid, _) = await PutAsync(ops, $"/api/console/organizations/{id}/subscription",
-            new { state = "ACTIVE", paidUntil = DateTimeOffset.UtcNow.AddDays(30), why = "Paid by transfer" });
-        Assert.Equal(HttpStatusCode.NoContent, paid);
+        var (paid, paidBody) = await PutAsync(ops, $"/api/console/organizations/{id}/subscription",
+            new { state = "ACTIVE", paidUntil = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd"), why = "Paid by transfer" });
+        Assert.True(paid == HttpStatusCode.NoContent, paidBody.ToString());
         var (asked, askedBody) = await Flow.PostAsync(admin, "/api/admin/product-requests", new { what = "DWG_READER" });
         Assert.True(asked == HttpStatusCode.OK, askedBody.ToString());
 

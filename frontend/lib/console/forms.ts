@@ -9,8 +9,8 @@ import { CONSOLE_COOKIE, consoleApi, consoleFetch } from "@/lib/console/client";
 type Result = { error?: string; ok?: string; fields?: string[] };
 const text = (formData: FormData, name: string) => String(formData.get(name) ?? "").trim();
 const failed = (e: unknown): Result => refusalForForm(e);
-/** A day typed on a form as the backend's moment: the end of that day, UTC. */
-const instant = (day: string) => (day ? `${day}T23:59:59Z` : null);
+/** A day typed on a form, as the backend reads it (it counts to the end of that day). */
+const day = (value: string) => value || null;
 
 /** The DELIOS team signs in: email, password and the code of their authenticator app, always. */
 export async function consoleSignInAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
@@ -42,8 +42,8 @@ export async function setSubscriptionAction(_prev: Result | undefined, formData:
     await consoleApi(`/api/console/organizations/${id}/subscription`, {
       method: "PUT",
       body: {
-        plan: text(formData, "plan") || null, state: text(formData, "state"), trialEndsAt: instant(text(formData, "trialEndsAt")),
-        paidUntil: instant(text(formData, "paidUntil")), billing: text(formData, "billing") || null, seats: seats ? Number(seats) : null,
+        plan: text(formData, "plan") || null, state: text(formData, "state"), trialEndsAt: day(text(formData, "trialEndsAt")),
+        paidUntil: day(text(formData, "paidUntil")), billing: text(formData, "billing") || null, seats: seats ? Number(seats) : null,
         contractRef: text(formData, "contractRef") || null, contractSignedOn: text(formData, "contractSignedOn") || null,
         providerRef: text(formData, "providerRef") || null, notes: text(formData, "notes") || null, why,
       },

@@ -17,8 +17,8 @@ namespace Delios.Host.Operators;
 /// </summary>
 public static class ConsoleEndpoints
 {
-    public sealed record SubscriptionRequest(string? Plan, string? State, Instant? TrialEndsAt, Instant? PaidUntil, string? Billing, int? Seats,
-        string? ContractRef, LocalDate? ContractSignedOn, string? ProviderRef, string? Notes, string? Why);
+    public sealed record SubscriptionRequest(string? Plan, string? State, DateOnly? TrialEndsAt, DateOnly? PaidUntil, string? Billing, int? Seats,
+        string? ContractRef, DateOnly? ContractSignedOn, string? ProviderRef, string? Notes, string? Why);
     public sealed record ActiveRequest(bool Active, string? Why);
     public sealed record PlanRequest(string? Code, string? Name, decimal? PricePerUser, string? Currency, string? Notes, bool? Active);
     public sealed record PublishRequest(string? Title, string? Body, string? Note);
@@ -189,12 +189,12 @@ public static class ConsoleEndpoints
         if (row is null) db.Add(row = new Subscription { TenantId = id });
         row.Plan = plan;
         row.State = state;
-        row.TrialEndsAt = request.TrialEndsAt;
-        row.PaidUntil = request.PaidUntil;
+        row.TrialEndsAt = EndOf(request.TrialEndsAt);
+        row.PaidUntil = EndOf(request.PaidUntil);
         row.Billing = billing;
         row.Seats = request.Seats;
         row.ContractRef = Clip(request.ContractRef, 100);
-        row.ContractSignedOn = request.ContractSignedOn;
+        row.ContractSignedOn = request.ContractSignedOn is { } signed ? LocalDate.FromDateOnly(signed) : null;
         row.ProviderRef = Clip(request.ProviderRef, 200);
         row.Notes = Clip(request.Notes, 4000);
         row.UpdatedAt = clock.GetCurrentInstant();
@@ -415,6 +415,10 @@ public static class ConsoleEndpoints
             }, cancellationToken);
         return told;
     }
+
+    /// <summary>A day typed on a form: until its last moment, UTC.</summary>
+    private static Instant? EndOf(DateOnly? day) =>
+        day is { } d ? Instant.FromDateTimeOffset(new DateTimeOffset(d.ToDateTime(new TimeOnly(23, 59, 59)), TimeSpan.Zero)) : null;
 
     private static string? Clip(string? text, int max) =>
         string.IsNullOrWhiteSpace(text) ? null : text.Trim() is var t && t.Length > max ? t[..max] : text.Trim();
