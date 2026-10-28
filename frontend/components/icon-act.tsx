@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import type { LucideIcon } from "lucide-react";
+import { ArrowUpLeft, Trash2 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 
 type State = { error?: string; message?: string } | undefined;
@@ -10,15 +10,19 @@ type State = { error?: string; message?: string } | undefined;
  * An act an icon says plainly (owner: "proper separate icons like a normal sane organisation does"): one press, asked
  * first when it changes much (`confirm`), its words on hover and for screen readers, a refusal said beside it.
  */
-export function IconAct({ action, icon: Icon, label, confirm, hidden, danger }: {
+/** The icons it draws, named: a server page may not hand a component itself to the browser. */
+const ICONS = { "move-out": ArrowUpLeft, remove: Trash2 } as const;
+
+export function IconAct({ action, icon, label, confirm, hidden, danger }: {
   action: (prev: State, formData: FormData) => Promise<State>;
-  icon: LucideIcon;
+  icon: keyof typeof ICONS;
   label: string;
   confirm?: string;
   hidden: Record<string, string>;
   danger?: boolean;
 }) {
   const [state, act, pending] = useActionState(action, undefined);
+  const Icon = ICONS[icon];
   return (
     <form action={act} onSubmit={(event) => { if (confirm && !window.confirm(confirm)) event.preventDefault(); }} className="inline-flex items-center gap-1.5">
       {Object.entries(hidden).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}

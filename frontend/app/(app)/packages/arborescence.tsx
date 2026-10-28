@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpLeft, ChevronRight, FolderTree, Trash2 } from "lucide-react";
+import { ChevronRight, FolderTree } from "lucide-react";
 import { Field, inputCls, ToneChip } from "@/components/ui";
 import { Select } from "@/components/select";
 import { ActionForm } from "@/components/form";
@@ -79,9 +79,9 @@ export function Branches({ pkg, newHref, manage = false }: {
                 {pkg.kind === "DELIVERY" ? <ToneChip inRegister tone={s.tone}>{s.word}</ToneChip> : null}
                 {manage && b.state === "OPEN" ? (
                   <span className="flex items-center gap-1">
-                    <IconAct action={movePackageAction} icon={ArrowUpLeft} hidden={{ packageId: b.id, parentId: place?.parentId ?? "TOP" }}
+                    <IconAct action={movePackageAction} icon="move-out" hidden={{ packageId: b.id, parentId: place?.parentId ?? "TOP" }}
                       label={place?.parentId ? `Move ${b.number} out, beside ${pkg.number}` : `Move ${b.number} out, to the top`} />
-                    <IconAct action={deletePackageAction} icon={Trash2} danger hidden={{ packageId: b.id, back: `/packages/${encodeURIComponent(pkg.number)}` }}
+                    <IconAct action={deletePackageAction} icon="remove" danger hidden={{ packageId: b.id, back: `/packages/${encodeURIComponent(pkg.number)}` }}
                       label={`Remove ${b.number}`}
                       confirm={`${b.number} is removed. Its documents and the packages in it come back into ${pkg.number}. Continue?`} />
                   </span>
