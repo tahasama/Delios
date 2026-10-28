@@ -10,7 +10,7 @@
 @custom-variant tight (@media (max-height: 680px));
 
 :root {
-  --sidebar-w: 268px;
+  --sidebar-w: 258px;
   /* The one control size, used everywhere: every field, dropdown, button and
      file field in the app stands this height, with this text and these
      corners. Locked in: change it here, never per page. */

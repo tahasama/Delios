@@ -121,9 +121,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `app/(app)/navigation.tsx`): it fits the window, tightening on a shorter one (`short:` under 880 pixels high: the lines
   under the names go, smaller marks; `tiny:` under 740: tighter still; `tight:` under 680, rows and marks at their closest; variants in `globals.css`;
   checked in a browser to fit, "+ More" open, down to about 540 pixels; owner, after rows too close: "add some space"), scrolling only as a
-  last resort on a very small screen. It holds the work only: no "Create document" (the register's "New document" does
-  it), no Settings and no Help (owner: both are in the top bar, Settings as a gear beside Help, for whoever a Settings
-  page opens to); folding it to icons is the menu's last line, "Fold the menu" (owner: "now we can squeeze the expand
+  last resort on a very small screen. Opened, it is 258 pixels wide (owner: "10px less"; a width of 268 kept from
+  before reads as 258). It holds the work only: no "Create document" (the register's "New document" does
+  it), no Help (owner: in the top bar); **Settings at the menu's foot**, above "Fold the menu", for whoever a Settings page
+  opens to (owner: "setting should be back in the side bar menu"; it was a gear in the top bar, taken out of it); folding it to icons is the menu's last line, "Fold the menu" (owner: "now we can squeeze the expand
   button into the bar"; it was a round button on the menu's edge). The rest of the
   menu stays as it is (owner: no regrouping of its entries), but for Reviews and Packages, daily work, moved above
   "+ More" (owner: "the separator should be after packages"). **One frame** (owner: "both side and top bar need a proper
@@ -132,7 +133,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   no separator), "− Less" once open, remembered as it was left (cookie `nav-more`, read by the server), open by itself
   while you are on one of its pages, named on hover when the menu is folded. **The top bar** (owner: "icon's order makes
   no sense"): the project's name with its code faded beside it, nothing more (no function, no "we are …": who you are
-  and what we are on it, you know already), its width capped; then search · Help · Settings (lit while in them) · the
+  and what we are on it, you know already), its width capped; then search · Help · the
   bell · your name alone with a small arrow (no initial disc), every tool and the search at the control height
   (`top-tools.tsx`, `TOOL` / `ToolLink`). Light or dark is chosen in your name's menu, three plain choices, Light · Dark ·
   Same as device (`ThemeChoice`); Help is not repeated there. The top bar's menus (`details[data-menu]`, your name's,

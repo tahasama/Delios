@@ -32,7 +32,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = jar.get(PREF.theme)?.value;
   const dark = theme === "dark" || (theme !== "light" && jar.get(PREF.deviceDark)?.value === "1");
   const width = Number.parseInt(jar.get(PREF.sidebar)?.value ?? "", 10);
-  const sidebar = width >= SIDEBAR_LIMITS.min && width <= SIDEBAR_LIMITS.max ? width : null;
+  // 268 was the width the menu opened at before (owner: "10px less"); kept by an expand, it reads as the new 258.
+  const kept = width === 268 ? 258 : width;
+  const sidebar = kept >= SIDEBAR_LIMITS.min && kept <= SIDEBAR_LIMITS.max ? kept : null;
   return (
     <html
       lang="en"

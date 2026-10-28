@@ -8,7 +8,7 @@ import { Sidebar, MobileNav, SearchBox } from "@/app/(app)/navigation";
 import { ProjectSwitcher } from "@/app/(app)/project-switcher";
 import { elsewhere } from "@/lib/organization/api";
 import { logoutAction } from "@/lib/account/forms-sign-in";
-import { Bell, BookOpen, Building2, ChevronDown, LogOut, Settings, KeyRound } from "lucide-react";
+import { Bell, BookOpen, Building2, ChevronDown, LogOut, KeyRound } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { ThemeChoice } from "@/app/(app)/theme-toggle";
@@ -53,7 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <CommandMenu perms={perms} />
       <Sidebar perms={perms} moreOpen={moreOpen} />
       {/* The content starts where the sidebar ends, whatever width it has been
-          dragged or collapsed to. One class: --sidebar-w defaults to 268px in
+          dragged or collapsed to. One class: --sidebar-w defaults to 258px in
           globals.css, so there is no second, fixed width to compete with it. */}
       <div className="lg:pl-(--sidebar-w) print:pl-0">
         {/* As tall as the menu's mark and closed by the same line: the two bars read as one frame. */}
@@ -68,8 +68,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <SearchBox className="hidden max-w-lg flex-1 md:block" />
           <div className="ml-auto flex items-center gap-1">
             <ToolLink href="/guide" label="Help & orientation" wide="Help"><BookOpen className="h-4.5 w-4.5" /></ToolLink>
-            {/* Settings, for whoever a Settings page opens to (owner: in the top bar), lit while you are in them. */}
-            {perms.canSettings ? <ToolLink href="/settings" label="Settings"><Settings className="h-4.5 w-4.5" /></ToolLink> : null}
             <ToolLink href="/notifications" label={unread ? `Notifications: ${unread} unread` : "Notifications"}>
               <Bell className="h-4.5 w-4.5" />
               {unread > 0 ? (

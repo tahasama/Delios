@@ -18,6 +18,7 @@ import {
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
+  Settings,
   Network,
   Search,
   ShieldCheck,
@@ -38,7 +39,7 @@ import { Kbd, openCommandMenu, useShortcutWords } from "@/components/command-men
  * job.
  *
  * So: the five things people actually come here to do, everything else behind
- * "More", and configuration behind "Settings". Both doors are filtered by what
+ * "More", and configuration behind "Settings", at the menu's foot. Both doors are filtered by what
  * the person's function permits, so nobody is shown a list of things that will
  * refuse them.
  */
@@ -104,6 +105,8 @@ function moreNav(p: NavPermissions): NavItem[] {
   ).filter((i) => i.when !== false);
 }
 
+const SETTINGS: NavItem = { href: "/settings", label: "Settings", description: "How the project works", icon: Settings };
+
 function isActive(pathname: string, item: NavItem) {
   if (item.exclude?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) return false;
   if (item.also?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) return true;
@@ -114,7 +117,7 @@ function isActive(pathname: string, item: NavItem) {
    railBelow it snaps to an icon rail, where labels show as tooltips. The width
    lives in a CSS variable on <html> and in a cookie, which the server reads to
    send every page at that width (app/layout.tsx), so the layout never jumps. */
-const SIDEBAR = { default: 268, rail: 76, min: 76, max: 360, railBelow: 180 } as const;
+const SIDEBAR = { default: 258, rail: 76, min: 76, max: 360, railBelow: 180 } as const;
 
 function setSidebarWidth(w: number, persist: boolean) {
   const root = document.documentElement;
@@ -256,6 +259,12 @@ function SidebarBody({ perms, moreOpen, onNavigate, onTip, drawer = false }: {
         ) : null}
       </nav>
 
+      {/* Settings back in the menu (owner), at its foot above "Fold the menu", for whoever a Settings page opens to. */}
+      {perms.canSettings ? (
+        <div className="mt-2 shrink-0">
+          <NavLink item={SETTINGS} pathname={pathname} onNavigate={onNavigate} onTip={onTip} />
+        </div>
+      ) : null}
     </>
   );
 }
@@ -300,7 +309,7 @@ export function Sidebar({ perms, moreOpen }: { perms: NavPermissions; moreOpen: 
 
   return (
     <aside
-      className="sidebar-desktop palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-67 flex-col border-r border-[#254663] bg-[#102a43] px-4 pb-4 text-slate-200 short:pb-3 lg:flex rail:px-2.5 dark:border-white/5 dark:bg-[#0c1522]"
+      className="sidebar-desktop palette-light no-print fixed inset-y-0 left-0 z-20 hidden w-64.5 flex-col border-r border-[#254663] bg-[#102a43] px-4 pb-4 text-slate-200 short:pb-3 lg:flex rail:px-2.5 dark:border-white/5 dark:bg-[#0c1522]"
       style={{ width: "var(--sidebar-w)" }}
     >
       <SidebarBody perms={perms} moreOpen={moreOpen} onTip={(t) => { if (!dragging.current) setTip(t); }} />
@@ -367,7 +376,7 @@ export function MobileNav({ perms, moreOpen }: { perms: NavPermissions; moreOpen
       {open ? (
         <div className="no-print fixed inset-0 z-40 lg:hidden">
           <button type="button" aria-label="Close navigation" onClick={() => setOpen(false)} className="absolute inset-0 bg-slate-900/50" />
-          <div className="palette-light absolute inset-y-0 left-0 flex w-67 max-w-[85vw] flex-col bg-[#102a43] px-4 pb-4 text-slate-200 shadow-2xl">
+          <div className="palette-light absolute inset-y-0 left-0 flex w-64.5 max-w-[85vw] flex-col bg-[#102a43] px-4 pb-4 text-slate-200 shadow-2xl">
             <button
               type="button"
               onClick={() => setOpen(false)}
