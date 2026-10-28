@@ -114,7 +114,7 @@ export function SetNav({ page = "/settings/config", groups, current, currentSet,
         </nav>
       </div>
       <div className="flex min-h-0 min-w-0 flex-col">
-        <div role="tablist" className="flex shrink-0 flex-wrap items-stretch gap-x-5 border-b border-line px-5 sm:px-6">
+        <div role="tablist" className="strip strip-full shrink-0 border-b border-line">
           {groups.map((g, i) => {
             const on = !needle && i === tab;
             return (
@@ -123,10 +123,11 @@ export function SetNav({ page = "/settings/config", groups, current, currentSet,
                 type="button"
                 role="tab"
                 aria-selected={on}
+                aria-current={on ? "page" : undefined}
                 onClick={() => { setTab(i); setQ(""); }}
-                className={`-mb-px inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-0.5 text-[12px] leading-4 transition ${on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"}`}
+                className="strip-tab"
               >
-                {g.title} <span className="ml-1 font-normal tabular-nums text-slate-500">{g.sets.length}</span>
+                {g.title} <span className="font-normal tabular-nums text-slate-500">{g.sets.length}</span>
               </button>
             );
           })}

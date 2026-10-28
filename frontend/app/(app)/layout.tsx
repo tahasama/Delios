@@ -8,7 +8,7 @@ import { Sidebar, MobileNav, SearchBox } from "@/app/(app)/navigation";
 import { ProjectSwitcher } from "@/app/(app)/project-switcher";
 import { elsewhere } from "@/lib/organization/api";
 import { logoutAction } from "@/lib/account/forms-sign-in";
-import { Bell, BookOpen, Building2, ChevronDown, LogOut, Settings, KeyRound } from "lucide-react";
+import { Bell, BookOpen, Building2, ChevronDown, LogOut, Settings, KeyRound, Scale } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { ThemeChoice } from "@/app/(app)/theme-toggle";
@@ -93,6 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 <div className="border-b border-line px-2.5 pb-2.5 pt-1.5"><p className="truncate text-xs font-semibold text-slate-800">{user.name}</p><p className="truncate text-[11px] text-slate-500">{user.organization}</p></div>
                 <Link href="/account" className="mt-1 flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><KeyRound className="h-4 w-4 text-slate-500"/> Your sign-in</Link>
                 {isAdmin(user) ? <Link href="/organization" className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><Building2 className="h-4 w-4 text-slate-500"/> {user.organization}</Link> : null}
+                <Link href="/legal" className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><Scale className="h-4 w-4 text-slate-500"/> Terms, privacy &amp; legal</Link>
                 <div className="mt-1 border-t border-line px-1 pb-1 pt-2"><ThemeChoice /></div>
                 <form action={logoutAction} className="mt-1 border-t border-line pt-1"><button type="submit" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-red-50 hover:text-red-700"><LogOut className="h-4 w-4"/> Sign out</button></form>
               </div>

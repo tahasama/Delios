@@ -176,47 +176,34 @@ export default async function AdminPage() {
         )}
       </section>
 
-      <div className="space-y-5">
-        {SETUP_GROUPS.map((group) => {
-          const pages = open.filter((p) => p.group === group && p.href !== CONTROL_ROOM);
-          if (!pages.length) return null;
-          return (
-            <section key={group}>
-              <h2 className="stencil mb-2 text-slate-600">{group}</h2>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {pages.map((page) => {
-                  const Icon = ICON[page.href] ?? Tags;
-                  const f = figure[page.href];
-                  return (
-                    <Link
-                      key={page.href}
-                      href={page.href}
-                      className="register register-sheet group flex gap-3 px-4 py-3.5 transition hover:border-brand-line/50"
-                    >
-                      {/* One neutral tint for every group: the state colours (green, amber) mean done and waiting elsewhere. */}
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-tint text-brand-ink">
-                        <Icon className="h-4.5 w-4.5" aria-hidden="true" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="text-[13px] font-semibold leading-5 text-slate-900">{page.title}</span>
-                          <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-500 transition group-hover:text-link" aria-hidden="true" />
-                        </span>
-                        <span className="mt-0.5 block text-xs leading-[1.45] text-slate-600">{page.text}</span>
-                        {f?.text ? (
-                          <Chip className={`mt-2 ${f.attention ? "bg-amber-50 text-amber-900 ring-amber-200" : "bg-slate-100 text-slate-600 ring-slate-200"}`}>
-                            {f.attention ? "To do · " : ""}{f.text}
-                          </Chip>
-                        ) : null}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
-      </div>
+      {/* Where each page stands, in one sheet (the side menu opens them; owner: a menu rather than cards). */}
+      <section className="register register-sheet register-sheet-open">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span className="stencil mr-1 text-slate-500">Where each stands</span>
+          <span className="text-[11px] text-slate-500">what still needs doing reads “To do”</span>
+        </div>
+        <ul className="divide-y divide-line">
+          {SETUP_GROUPS.flatMap((group) => open.filter((p) => p.group === group && p.href !== CONTROL_ROOM)).map((page) => {
+            const Icon = ICON[page.href] ?? Tags;
+            const f = figure[page.href];
+            return (
+              <li key={page.href}>
+                <Link href={page.href} className="group flex items-center gap-3 px-5 py-2.5 hover:bg-tint-soft sm:px-6">
+                  <Icon className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                  <span className="w-44 shrink-0 text-[13px] font-semibold text-slate-900">{page.title}</span>
+                  <span className="hidden min-w-0 flex-1 truncate text-xs text-slate-500 md:block">{page.text}</span>
+                  {f?.text ? (
+                    <Chip className={`ml-auto shrink-0 ${f.attention ? "bg-amber-50 text-amber-900 ring-amber-200" : "bg-slate-100 text-slate-600 ring-slate-200"}`}>
+                      {f.attention ? "To do · " : ""}{f.text}
+                    </Chip>
+                  ) : null}
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-400 group-hover:text-link" aria-hidden="true" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
     </div>
   );
 }

@@ -141,45 +141,36 @@ export default async function OrganizationSettingsPage({ searchParams }: { searc
 
       <OneProject projects={projects} chosen={chosen} differences={differences} />
 
-      <div className="space-y-5">
-        {SETUP_GROUPS.map((group) => {
-          const cards = ORG_CARDS.filter((card) => card.slug !== "flow" && groupOf(card) === group);
-          if (!cards.length) return null;
-          return (
-            <section key={group}>
-              <h2 className="stencil mb-2 text-slate-600">{group}</h2>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {cards.map((card) => {
-                  const Icon = SETUP_ICON[card.project] ?? (card.slug === "identity" ? BadgeCheck : card.slug === "contract" ? Handshake : card.slug === "tracking" ? FileClock : card.slug === "calendar" ? CalendarDays : card.project === "defaults" ? SlidersHorizontal : card.project === "may-change" ? ToggleRight : Tags);
-                  const state = said(card.area);
-                  const href = card.slug ? `/organization/settings/${card.slug}` : card.elsewhere!;
-                  return (
-                    <Link key={card.project} href={href} className="register register-sheet group flex gap-3 px-4 py-3.5 transition hover:border-brand-line/50">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-tint text-brand-ink">
-                        <Icon className="h-4.5 w-4.5" aria-hidden="true" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="text-[13px] font-semibold leading-5 text-slate-900">{card.title}</span>
-                          <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-500 transition group-hover:text-link" aria-hidden="true" />
-                        </span>
-                        <span className="mt-0.5 block text-xs leading-[1.45] text-slate-600">{card.text}</span>
-                        <Chip className="mt-2 whitespace-normal bg-slate-100 text-slate-600 ring-slate-200">
-                          {card.project === "defaults"
-                            ? defaults ? (defaults.fromProject ? `Taken from ${defaults.fromProject}` : `Changed ${fmtDate(defaults.at)}`) : "The app's own"
-                            : card.project === "may-change" ? `${switches.length - free} fixed · ${free} free`
-                            : card.project === "/settings/calendar" ? `${state?.text ?? ""}${state?.text ? " · " : ""}dates read ${formatDay(new Date(2026, 2, 5))}`
-                            : state?.text ?? "The organization's only"}
-                        </Chip>
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
-      </div>
+      {/* Where each card stands, in one sheet: the side menu opens them (owner: a menu rather than cards). */}
+      <section className="register register-sheet register-sheet-open">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span className="stencil mr-1 text-slate-500">Where each stands</span>
+          <span className="text-[11px] text-slate-500">what each card holds, and whether projects may change it</span>
+        </div>
+        <ul className="divide-y divide-line">
+          {SETUP_GROUPS.flatMap((group) => ORG_CARDS.filter((card) => card.slug !== "flow" && groupOf(card) === group)).map((card) => {
+            const Icon = SETUP_ICON[card.project] ?? (card.slug === "identity" ? BadgeCheck : card.slug === "contract" ? Handshake : card.slug === "tracking" ? FileClock : card.slug === "calendar" ? CalendarDays : card.project === "defaults" ? SlidersHorizontal : card.project === "may-change" ? ToggleRight : Tags);
+            const state = said(card.area);
+            const href = card.slug ? `/organization/settings/${card.slug}` : card.elsewhere!;
+            const chip = card.project === "defaults"
+              ? defaults ? (defaults.fromProject ? `Taken from ${defaults.fromProject}` : `Changed ${fmtDate(defaults.at)}`) : "The app's own"
+              : card.project === "may-change" ? `${switches.length - free} fixed · ${free} free`
+              : card.project === "/settings/calendar" ? `${state?.text ?? ""}${state?.text ? " · " : ""}dates read ${formatDay(new Date(2026, 2, 5))}`
+              : state?.text ?? "The organization's only";
+            return (
+              <li key={card.project}>
+                <Link href={href} className="group flex items-center gap-3 px-5 py-2.5 hover:bg-tint-soft sm:px-6">
+                  <Icon className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                  <span className="w-48 shrink-0 text-[13px] font-semibold text-slate-900">{card.title}</span>
+                  <span className="hidden min-w-0 flex-1 truncate text-xs text-slate-500 md:block">{card.text}</span>
+                  <Chip className="ml-auto shrink-0 bg-slate-100 text-slate-600 ring-slate-200">{chip}</Chip>
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-400 group-hover:text-link" aria-hidden="true" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
     </>
   );
 }
