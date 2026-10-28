@@ -76,7 +76,7 @@ public static class Subscriptions
     }
 
     private static readonly string[] Allowed =
-        ["/api/auth", "/api/organization/contract", "/api/organization/support", "/api/notifications", "/api/push", "/api/legal", "/api/console", "/api/screens"];
+        ["/api/auth", "/api/organization/contract", "/api/organization/support", "/api/notifications", "/api/push", "/api/legal", "/api/console", "/api/screens", "/api/support"];
 }
 
 /// <summary>

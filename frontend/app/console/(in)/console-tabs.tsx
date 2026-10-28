@@ -10,9 +10,9 @@ const TABS = [
   { href: "/console/requests", label: "Requests", icon: Inbox },
   { href: "/console/payments", label: "Plans & payments", icon: CreditCard },
   { href: "/console/legal", label: "Legal", icon: Scale },
-  { href: "/console/support", label: "Support access", icon: LifeBuoy },
+  { href: "/console/support", label: "Support", icon: LifeBuoy },
   { href: "/console/notices", label: "Notices", icon: Megaphone },
-  { href: "/console/team", label: "Team & support", icon: UsersRound },
+  { href: "/console/team", label: "Team", icon: UsersRound },
   { href: "/console/log", label: "Log", icon: ScrollText },
 ];
 

@@ -425,6 +425,7 @@ public static class PlatformSetup
             Operators.OperatorAuth.MapOperatorAuthEndpoints(app);
             Operators.ConsoleEndpoints.MapConsoleEndpoints(app);
             Operators.ContractEndpoints.MapContractEndpoints(app);
+            Operators.SupportEndpoints.MapSupportEndpoints(app);
             Operators.BillingEndpoints.MapBillingEndpoints(app);
             Identity.ForgetPerson.MapForgetEndpoints(app);
             app.MapSsoEndpoints();

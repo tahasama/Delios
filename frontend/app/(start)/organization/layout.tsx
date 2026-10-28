@@ -8,6 +8,7 @@ import { organizationLinks, claims, merges } from "@/lib/organization/api";
 import { acceptLinkAction, refuseLinkAction } from "@/lib/organization/forms";
 import { fmtDate } from "@/lib/core/utils";
 import { OrgHeader } from "./org-header";
+import { Support, SupportLine, supportContact } from "@/components/support";
 import { OrgTabs } from "./org-tabs";
 
 /**
@@ -17,7 +18,7 @@ import { OrgTabs } from "./org-tabs";
  */
 export default async function OrganizationLayout({ children }: { children: React.ReactNode }) {
   const scope = await requireOrgAdmin();
-  const [links, claimable, mergeList] = await Promise.all([organizationLinks(), claims(), merges()]);
+  const [links, claimable, mergeList, contact] = await Promise.all([organizationLinks(), claims(), merges(), supportContact()]);
   const received = links.filter((one) => one.side === "GUEST" && one.state === "INVITED");
   const mergesWaiting = mergeList.filter((m) => m.waitsOnUs).length;
   const claimsWaiting = claimable.incoming.length;
@@ -25,7 +26,10 @@ export default async function OrganizationLayout({ children }: { children: React
   return (
     <div className="min-h-screen bg-canvas">
       <DateFormatKeeper value={dateFormat()} />
-      <OrgHeader scope={scope} />
+      <OrgHeader scope={scope} support={<>
+        <div className="hidden lg:block"><SupportLine contact={contact} /></div>
+        <Support contact={contact} />
+      </>} />
       <OrgTabs />
       <main className="mx-auto max-w-7xl space-y-4 px-4 py-5 sm:px-6">
         {received.length || mergesWaiting || claimsWaiting ? (

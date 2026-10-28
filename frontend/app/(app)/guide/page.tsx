@@ -1,4 +1,4 @@
-import { TroubleList } from "@/components/trouble";
+import { Support, SupportLine, supportContact } from "@/components/support";
 import Link from "next/link";
 import { RAILS } from "@/lib/core/rails";
 import { requireScope } from "@/lib/core/scope";
@@ -70,7 +70,7 @@ const CODES: (Place & { list?: string })[] = [
  * read a document number, then where each thing is done. How the project is set up is not repeated here (owner: "no more
  * redundancies"): the Settings pages are read by everyone of ours, and listed here as they open for the person.
  */
-export default async function GuidePage({ searchParams }: { searchParams: Promise<{ role?: string }> }) {
+export default async function GuidePage({ searchParams }: { searchParams: Promise<{ role?: string; support?: string }> }) {
   const ctx = await requireScope();
   const { user, project } = ctx;
   const sp = await searchParams;
@@ -113,16 +113,17 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
     { href: "#roles", label: "Roles on a project" },
     { href: "#families", label: "Document families" },
     { href: "#places", label: "Where things are done" },
-    { href: "#trouble", label: "Something went wrong?" },
   ];
-  const contact = await api<{ email: string | null; hours: string | null; phone: string | null }>("/api/legal/support-contact")
-    .catch(() => ({ email: null, hours: null, phone: null }));
+  const contact = await supportContact();
 
   return (
     <div className="space-y-4">
       <section className="register register-sheet register-sheet-open">
         <div className="px-5 pt-6 pb-4 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="plate-title text-slate-950">Help &amp; orientation</h1>
+          <Support projectId={project.id} contact={contact} startOpen={sp.support === "1"} />
+          </div>
           <p className="plate-meta mt-2">{project.code} · {ours ? `we are ${ours.label}` : "our role is not stated"}</p>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
             What the colours down the side of a line say, what the codes mean, the roles an organization plays on a project, how this
@@ -131,6 +132,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
           <nav aria-label="On this page" className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
             {jumps.map((one) => <a key={one.href} href={one.href} className="font-semibold text-link hover:underline">{one.label}</a>)}
           </nav>
+          <div className="mt-3"><SupportLine contact={contact} /></div>
         </div>
       </section>
 
@@ -289,13 +291,6 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
         {setup.length ? <Places title="How it is set up" said="read by everyone of ours; changed by whoever each page names" places={setup} /> : null}
       </div>
 
-      <section id="trouble" className="register register-sheet register-sheet-open scroll-mt-24">
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-          <span className="stencil mr-1 text-slate-500">Something went wrong?</span>
-          <span className="text-[11px] text-slate-500">the usual cases, why they happen, what to try</span>
-        </div>
-        <TroubleList contact={contact} where={`Organization: ${user.organization}\nProject: ${project.code}\nWho: ${user.name}`} />
-      </section>
     </div>
   );
 }

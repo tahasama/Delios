@@ -47,6 +47,16 @@ public static class ConsoleEndpoints
         g.MapPost("/legal/{kind}", PublishAsync);
         g.MapPut("/matters/{key}", SetMatterAsync);
         g.MapGet("/support", SupportAsync);
+        g.MapGet("/support/requests", async (DeliosDbContext db, CancellationToken c) => Results.Ok(await SupportEndpoints.AllAsync(db, c)));
+        g.MapPost("/support/requests/{id:guid}/answer", async (Guid id, SupportEndpoints.AnswerRequest request, HttpContext http, DeliosDbContext db,
+            IServiceScopeFactory scopes, IClock clock, CancellationToken c) =>
+        {
+            var said = await SupportEndpoints.AnswerAsync(id, request, http.Current().Name, db, scopes, clock, c);
+            if (said is not Microsoft.AspNetCore.Http.HttpResults.NoContent) return said;
+            Log(db, http, "SUPPORT_ANSWERED", null, request.Answer?.Trim(), clock);
+            await db.SaveChangesAsync(c);
+            return said;
+        });
         g.MapPost("/organizations/{id:guid}/enter", EnterAsync);
         g.MapGet("/platform", async (DeliosDbContext db, CancellationToken c) =>
             Results.Ok(await db.Set<PlatformSetting>().AsNoTracking().ToDictionaryAsync(p => p.Key, p => p.Value, c)));

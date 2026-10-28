@@ -268,6 +268,19 @@ export async function setTrialDaysAction(_prev: Result | undefined, formData: Fo
   return { ok: Number(days) === 0 ? "Saved: organizations signing up from now on try DELIOS with no end." : `Saved: organizations signing up from now on try DELIOS for ${days} days.` };
 }
 
+/** Answers a request to support: the person is told. */
+export async function answerSupportAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const answer = String(formData.get("answer") ?? "").trim();
+  if (!answer) return { error: "Write the answer.", fields: ["answer"] };
+  try {
+    await consoleApi(`/api/console/support/requests/${text(formData, "requestId")}/answer`, { body: { answer } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/console/support");
+  return { ok: "Answered: they are told." };
+}
+
 /** How organizations reach DELIOS support. */
 export async function setSupportContactAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   try {
@@ -277,6 +290,6 @@ export async function setSupportContactAction(_prev: Result | undefined, formDat
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/console/team");
-  return { ok: "Saved: shown to every organization on Help and Contract & plan." };
+  revalidatePath("/console/support");
+  return { ok: "Saved: shown on Help, at the top of the organization's page and on the sign-in page." };
 }

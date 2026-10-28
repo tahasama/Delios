@@ -58,7 +58,8 @@ backend/
 │   │                     sign-in): Entities (operators, sessions, subscriptions, plans, legal texts and acceptances,
 │   │                     legal matters, support access, the team's log); OperatorAuth (sign-in with password and code,
 │   │                     command create-operator); ConsoleEndpoints (/api/console); Trials (the free trial, its
-│   │                     reminders, TrialReminders in the worker); Contracts (what an organization has
+│   │                     reminders, TrialReminders in the worker); SupportRequests (Need support: /api/support,
+│   │                     answered in the console); Contracts (what an organization has
 │   │                     with us read as it applies today, Subscriptions.Effective; read only when not paid; /api/legal,
 │   │                     /api/organization/contract, /api/organization/support, /api/standing); LegalTexts (the kinds
 │   │                     of legal text, their starting text, every legal matter must or may)
