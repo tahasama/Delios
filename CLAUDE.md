@@ -947,7 +947,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (each with its name and the country it is kept in, or every country) and a project's **own days off** (a site
   shutdown, a local holiday; where the switch `CALENDAR`, area "Calendar", Free by default, leaves it free, ROOM_FIXED
   otherwise). **One month at a time** (owner: "dont add a calendar for each month, apply the regular calendar", the date
-  picker's way): ‹ month › stepping through the span, "This month" back to today's, the organization's arrows going on into the
+  picker's way): ‹ month › stepping through the span, « year » a year at a time and the year itself chosen beside
+  the month (owner: "a way to go by years easily"), "This month" back to today's, the organization's arrows going on into the
   year before or after (`components/calendar.tsx`, `MonthsCalendar`): days off each week shaded,
   holidays rose, a project's own amber, the schedule's action days highlighted (a bar under the day), today ringed; each
   day is a square (96 pixels by default, 40–200) (owner: "double the height", then "we forgot the width"), each month exactly its seven
@@ -1848,7 +1849,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   start, it starts on the first's), and "Show every date" draws the actions' own days only, never stretched to today; says "the schedule
   runs <first month> → <last month>" on hover of the days drawn (owner: "date is repeated 3 times"; the head one line,
   "today" its date on hover, the foot one line), and draws today only when inside; a read says its months too. The calendar tab
-  opens the same way. The Schedule's heading says the days around an action in force (a document needed N days before
+  opens the same way (`calendarOpening`: today's month held inside the actions' first and last days). The Schedule's heading says the days around an action in force (a document needed N days before
   its action's day, at risk from M), linking the Control room where they are set.
 - Their Excel is uploaded on Schedule & actions only by Document Control or a
   function with the Plan permission.

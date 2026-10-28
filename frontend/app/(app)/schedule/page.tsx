@@ -31,6 +31,24 @@ export const metadata = { title: "Schedule" };
 
 type Readiness = PlanTableRow["readiness"];
 
+/**
+ * The month the calendar opens on, as the plan's window (owner: "the same date rule as the plan"): today's, held inside
+ * the schedule's own span: past its last action, the month of that action; before its first, the month of the first.
+ */
+function calendarOpening(today: string | null | undefined, actions: { start: string | null; finish: string | null }[]): string | undefined {
+  if (!today) return undefined;
+  let first: string | null = null;
+  let last: string | null = null;
+  for (const a of actions) {
+    const start = a.start ?? a.finish;
+    const end = a.finish ?? a.start;
+    if (start && (!first || start < first)) first = start;
+    if (end && (!last || end > last)) last = end;
+  }
+  const day = first && today < first ? first : last && today > last ? last : today;
+  return day.slice(0, 7);
+}
+
 /** What became of the work, as against whether its documents arrived. */
 type Happened = "POSTPONED" | "CARRIED" | "DONE" | "NONE" | "AHEAD";
 
@@ -361,7 +379,7 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
           />
         }
         calendar={calendar ? (
-          <MonthsCalendar daySize={calendarDay(jar.get(PREF.calendarDay)?.value)} namesShown={jar.get(PREF.calendarNames)?.value !== "0"}
+          <MonthsCalendar month={calendarOpening(calendar.today, plan.calendar)} daySize={calendarDay(jar.get(PREF.calendarDay)?.value)} namesShown={jar.get(PREF.calendarNames)?.value !== "0"}
             from={calendar.from} to={calendar.to} weekend={calendar.place.weekendDays} today={calendar.today} daysOff={calendar.daysOff}
             country={calendar.place.country ?? ""} known={knownBetween(calendar.place.country, calendar.from, calendar.to)}
             actions={plan.calendar.map((a) => ({ code: a.code, name: a.name, start: a.start, finish: a.finish }))}

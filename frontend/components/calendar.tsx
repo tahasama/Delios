@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Minus, MoveDiagonal2, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Minus, MoveDiagonal2, Plus, X } from "lucide-react";
 import { ActionForm } from "@/components/form";
 import { Field } from "@/components/ui";
 import { Select } from "@/components/select";
@@ -130,6 +130,17 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
   useEffect(() => { setAt(opening); }, [opening]);
   const here = months[Math.min(at, months.length - 1)];
   const onToday = indexOf(today?.slice(0, 7));
+  // By years too (owner: "a way to go by years easily"): a year back or on, or straight to a year of the span, the same
+  // month there (else the nearest month the span holds).
+  const years = [...new Set(months.map(({ y }) => y))];
+  const toYear = (y: number) => {
+    const same = months.findIndex((one) => one.y === y && one.m === here.m);
+    if (same >= 0) return setAt(same);
+    const first = months.findIndex((one) => one.y === y);
+    let last = first;
+    months.forEach((one, i) => { if (one.y === y) last = i; });
+    setAt(y < here.y ? last : first);
+  };
 
   const openDays = open ? byDay.get(open) ?? [] : [];
   const openActions = open ? actionsOn(open) : [];
@@ -175,9 +186,18 @@ export function MonthsCalendar({ from, to, weekend, today, daysOff, actions = []
           return (
             <section key={`${y}-${m}`} className="rounded-md bg-surface p-2.5 ring-1 ring-line">
               <div className="mb-2 flex items-center gap-1 px-0.5">
+                <Step to={at > 0 ? () => setAt(Math.max(0, at - 12)) : before} label="A year back"><ChevronsLeft className="h-4 w-4" aria-hidden /></Step>
                 <Step to={at > 0 ? () => setAt(at - 1) : before} label="Previous month"><ChevronLeft className="h-4 w-4" aria-hidden /></Step>
-                <h3 className="min-w-36 text-center text-[13px] font-semibold text-slate-800">{MONTHS[m]} {y}</h3>
+                <h3 className="min-w-28 text-center text-[13px] font-semibold text-slate-800">{MONTHS[m]}{years.length > 1 ? "" : ` ${y}`}</h3>
+                {years.length > 1 ? (
+                  <div className="w-24">
+                    <Select value={String(y)} onChange={(e) => toYear(Number(e.target.value))} aria-label="Year" className="plain w-full">
+                      {years.map((one) => <option key={one} value={one}>{one}</option>)}
+                    </Select>
+                  </div>
+                ) : null}
                 <Step to={at < months.length - 1 ? () => setAt(at + 1) : after} label="Next month"><ChevronRight className="h-4 w-4" aria-hidden /></Step>
+                <Step to={at < months.length - 1 ? () => setAt(Math.min(months.length - 1, at + 12)) : after} label="A year on"><ChevronsRight className="h-4 w-4" aria-hidden /></Step>
                 {onToday >= 0 && onToday !== at ? (
                   <button type="button" onClick={() => setAt(onToday)} className="ml-1 text-xs font-semibold text-link hover:underline">This month</button>
                 ) : null}
