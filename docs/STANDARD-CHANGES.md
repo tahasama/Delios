@@ -1571,3 +1571,24 @@ whom a package goes to at the end, and may hand the same package to more than on
   else: none can be added or taken out on the transmittal. It may be delivered again, as it stands, to someone else.
 - A package delivered is the **receiver's to read, never to change or return**: they see it as its sender does (its
   tree and lines) and ask what they need by an information transmittal.
+
+## 85 · The register when the service around it changes: support, unpaid, a person forgotten, reading kept
+
+The Standard assumes the register is run by the organization itself, forever. Run as a service, four things touch the
+record that the Standard never names; each is settled so the record stays whole and its custody clear.
+
+- **The service provider reads nothing by default.** Whoever runs the register (DELIOS's team) sees counts only and
+  who answers for the organization. To help, it is let in by one of the organization's administrators, for a set time
+  (1 to 30 days), with why, ended whenever they choose; it then acts as a named administrator ("DELIOS support:
+  <name>"), the administrators are told when it enters, and every act and every reading is in the organization's own
+  audit trail under that name. Access ends by itself when the time is over.
+- **An unpaid or ended contract never touches the record.** The organization reads only: everyone keeps reading and
+  exporting, nobody adds or changes, nothing is deleted. Handing the data back and deleting it after an agreed time is
+  a contractual act, written in the data processing agreement, never a consequence of non-payment.
+- **A person forgotten leaves the record whole.** At their request (data protection law), their name and email are
+  replaced ("Former user …") and their account closed; what they did stays in the record under the name it was done
+  by, because the register must prove who did what (the law's own exception for keeping records).
+- **Reading and changing are kept differently.** Every act that changes the record is kept for good, in a chain that
+  proves nothing was altered. Who opened or downloaded a document is kept for as long as the organization chooses
+  (3 months to the life of the register), then removed; it never enters the chain. Downloads are always kept for that
+  period and watched (one person past 200 files in an hour: the administrators are told).
