@@ -158,12 +158,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the background, not the text"; `.strip` / `.strip-tab`, `globals.css`): one low greyish band, the tabs plain words on
   it at their old size, a short hairline between each (never a box round a tab), the words in ink, the chosen one bold
   with the brand's line along its foot. Reports'
-  tabs on one line inside its plate; Assurance and the Schedule's three in a frame of their own (`.strip-card`), the
+  tabs on one line inside its plate; Assurance and the Schedule's three on a white sheet of their own (`.strip-card`: on the grey page a
+  band stands on white, owner), the
   whole width shared equally (`.strip-full`), each its icon and name, no small words after. **The switch** (`.seg` /
   `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Packages' two kinds beside
   List · Tree (put back as they were: two designs side by side in one row read as inconsistent), Home's "What is waiting",
   the organization's People, the imports' "Which lines", list or tree, light or dark, in use · retired · all. The checks'
-  groups, the rules' areas, Types & sets' groups and Help's roles keep the plain underlined tabs they always had (put back
+  groups (with their families' list beside them, each on a white sheet, owner: on the grey page they were "eaten up"), the rules' areas, Types & sets' groups and Help's roles keep the plain underlined tabs they always had (put back
   as they were). The Control room's navy console keeps its own tabs.
 - **The distribution matrix's "Who gets what"** (owner, "needs improving"): one sheet, the register's way: its band
   (what is shown: disciplines × functions, which deliverable type, which document type), the narrowing on one line

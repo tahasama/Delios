@@ -671,7 +671,15 @@ summary::-webkit-details-marker {
     background: color-mix(in srgb, var(--color-slate-500) 8%, var(--color-surface));
   }
   .strip::-webkit-scrollbar { display: none; }
-  .strip-card { border-radius: 0.5rem; }
+  /* On the grey page a band of its own stands on white, as every sheet does (owner: the grey band "works because it
+     sits on a white background"): the sheet's surface, frame and shadow, the hairlines between the tabs kept. */
+  .strip-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 0.875rem;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 12px 28px -24px rgb(15 23 42 / 45%);
+    overflow: hidden;
+  }
   .strip-tab {
     position: relative;
     display: inline-flex;

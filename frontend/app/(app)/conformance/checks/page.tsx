@@ -142,7 +142,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
           the first card begin on the same line. */}
       <div className="grid gap-x-5 gap-y-3 md:grid-cols-[11rem_minmax(0,1fr)] md:items-start">
         <div className="max-w-4xl md:col-start-2">
-          <nav aria-label="When it is checked" className="flex flex-wrap items-center gap-x-6 border-b border-line">
+          <nav aria-label="When it is checked" className="register register-sheet flex flex-wrap items-center gap-x-6 px-4 pt-2.5">
             <Link href={href({ phase: null })} scroll={false} aria-current={!phase ? "page" : undefined} className={tabCls(!phase)}>
               All <span className="ml-1 tabular-nums text-slate-400">{CATALOG.filter(narrowedBy).length}</span>
             </Link>
@@ -156,7 +156,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
 
         <nav
           aria-label="Family of checks"
-          className="scroll-thin md:col-start-1 md:row-start-1 md:row-span-2 md:sticky md:top-20 md:max-h-[calc(100vh-5.5rem)] md:overflow-y-auto"
+          className="register register-sheet scroll-thin p-1.5 md:col-start-1 md:row-start-1 md:row-span-2 md:sticky md:top-20 md:max-h-[calc(100vh-5.5rem)] md:overflow-y-auto"
         >
           <Family href={href({ family: null })} label="All families" count={inPhase.length} active={!family} />
           {familiesHere.map((f) => (
