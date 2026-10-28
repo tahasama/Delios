@@ -9,6 +9,13 @@ const WORDS: Record<string, string> = {
   DOWNLOADS_MANY: "Downloaded many files in an hour (administrators told)",
   ACTIVITY_READ: "Read someone's activity",
   PRODUCT_REQUESTED: "Asked DELIOS for a reader",
+  SUPPORT_GRANTED: "Let DELIOS in to help",
+  SUPPORT_ENDED: "Ended DELIOS's access",
+  SUPPORT_READ: "DELIOS support read the projects and people",
+  LEGAL_ACCEPTED: "Accepted DELIOS's terms",
+  SUBSCRIPTION_CANCELLED: "Cancelled the plan",
+  SUBSCRIPTION_RESUMED: "Kept the plan after all",
+  PERSON_FORGOTTEN: "Forgot a person, as they asked",
   VIEWER_SWITCHED: "Switched a reader on or off",
   TRANSMITTAL_OPENED: "Opened a transmittal",
   // Sign-ins and security

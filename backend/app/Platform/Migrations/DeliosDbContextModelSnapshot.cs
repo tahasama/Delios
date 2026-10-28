@@ -3450,6 +3450,470 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("push_subscriptions", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Operators.LegalAcceptance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("address");
+
+                    b.Property<Instant>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("UserEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("user_email");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("user_name");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_legal_acceptances");
+
+                    b.HasIndex("TenantId", "Kind", "Version")
+                        .HasDatabaseName("ix_legal_acceptances_tenant_id_kind_version");
+
+                    b.ToTable("legal_acceptances", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Operators.LegalDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("note");
+
+                    b.Property<Instant>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("PublishedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("published_by");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_legal_documents");
+
+                    b.HasIndex("Kind", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_legal_documents_kind_version");
+
+                    b.ToTable("legal_documents", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Operators.LegalMatterState", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Instant>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Key")
+                        .HasName("pk_legal_matters");
+
+                    b.ToTable("legal_matters", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Operators.Operator", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.Property<Instant>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.Property<int>("FailedSignIns")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_sign_ins");
+
+                    b.Property<Instant?>("LastSignInAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_sign_in_at");
+
+                    b.Property<Instant?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_until");
+
+                    b.Property<long?>("MfaLastStep")
+                        .HasColumnType("bigint")
+                        .HasColumnName("mfa_last_step");
+
+                    b.Property<string>("MfaSecretProtected")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("mfa_secret_protected");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("normalized_email");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("password_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_operators");
+
+                    b.HasIndex("NormalizedEmail")
+                        .IsUnique()
+                        .HasDatabaseName("ix_operators_normalized_email");
+
+                    b.ToTable("operators", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Operators.OperatorEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("action");
+
+                    b.Property<Instant>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("detail");
+
+                    b.Property<Guid>("OperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operator_id");
+
+                    b.Property<string>("OperatorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("operator_name");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_operator_events");
+
+                    b.HasIndex("At")
+                        .HasDatabaseName("ix_operator_events_at");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_operator_events_tenant_id");
+
+                    b.ToTable("operator_events", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Operators.OperatorSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Instant>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("OperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operator_id");
+
+                    b.Property<Instant?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<byte[]>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_operator_sessions");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_operator_sessions_token_hash");
+
+                    b.ToTable("operator_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Operators.Plan", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("code");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<decimal?>("PricePerUser")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("price_per_user");
+
+                    b.HasKey("Code")
+                        .HasName("pk_plans");
+
+                    b.ToTable("plans", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Operators.Subscription", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Billing")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("billing");
+
+                    b.Property<Instant?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<string>("CancelledBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("cancelled_by");
+
+                    b.Property<string>("ContractRef")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("contract_ref");
+
+                    b.Property<LocalDate?>("ContractSignedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("contract_signed_on");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Instant?>("PaidUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_until");
+
+                    b.Property<string>("Plan")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("plan");
+
+                    b.Property<string>("ProviderRef")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("provider_ref");
+
+                    b.Property<int?>("Seats")
+                        .HasColumnType("integer")
+                        .HasColumnName("seats");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.Property<Instant?>("TrialEndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("trial_ends_at");
+
+                    b.Property<Instant>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("TenantId")
+                        .HasName("pk_subscriptions");
+
+                    b.ToTable("subscriptions", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Operators.SupportGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
+
+                    b.Property<string>("EndedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("ended_by_name");
+
+                    b.Property<Instant>("From")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("from");
+
+                    b.Property<Guid>("GrantedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("granted_by_id");
+
+                    b.Property<string>("GrantedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("granted_by_name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Instant>("Until")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("until");
+
+                    b.Property<string>("Why")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("why");
+
+                    b.HasKey("Id")
+                        .HasName("pk_support_grants");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_support_grants_tenant_id");
+
+                    b.ToTable("support_grants", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Organizations.AccountLink", b =>
                 {
                     b.Property<Guid>("Id")

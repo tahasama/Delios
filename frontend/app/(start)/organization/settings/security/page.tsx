@@ -163,7 +163,7 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
         </p>
       </section>
       {/* What is kept about people's activity: privacy, on the same card (owner: it did not deserve one of its own). */}
-      <TrackingSheet reading={settings.get("TRACK_READING") !== "OFF"} signIns={settings.get("TRACK_SIGN_INS") === "ON"} />
+      <TrackingSheet reading={settings.get("TRACK_READING") !== "OFF"} signIns={settings.get("TRACK_SIGN_INS") === "ON"} keepDays={settings.get("TRACK_KEEP_DAYS") ?? ""} />
     </div>
   );
 }

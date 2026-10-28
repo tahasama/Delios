@@ -18,6 +18,7 @@ import { PREF } from "@/lib/core/preferences";
 import { ToolLink } from "@/app/(app)/top-tools";
 import { SETUP_PAGES, maySetup } from "@/app/(app)/settings/setup-pages";
 import { controlDoes } from "@/lib/settings/control-activities";
+import { api } from "@/lib/client";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireScope();
@@ -25,8 +26,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Whether "More" was left open in the menu, so the page arrives as it was left.
   const moreOpen = (await cookies()).get(PREF.navMore)?.value === "1";
   // The organization's name is the account's.
-  const [unread, others, managementAddsPeople] = await Promise.all([
+  const [unread, others, managementAddsPeople, standing] = await Promise.all([
     unreadNotifications(), elsewhere(), controlDoes(ctx, "PROJECT_PEOPLE").then((dc) => !dc).catch(() => false),
+    // Read fresh: an organization reads only once a trial or a period paid ends, which no change announces.
+    api<{ readsOnly: boolean; why: string }>("/api/standing").catch(() => null),
   ]);
   const scope = { organizationName: user.organization };
 
@@ -96,7 +99,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </details>
           </div>
         </header>
-        <main className="mx-auto max-w-[1560px] px-4 py-5 lg:px-7 lg:py-6">{children}</main>
+        <main className="mx-auto max-w-[1560px] px-4 py-5 lg:px-7 lg:py-6">
+          {standing?.readsOnly ? (
+            <p role="status" className="no-print mb-4 rounded-md bg-amber-50 px-4 py-2.5 text-[13px] text-amber-900 ring-1 ring-amber-200">
+              <strong>The organization reads only.</strong> {standing.why} Everyone keeps reading and exporting; nothing is deleted.{" "}
+              {isAdmin(user) ? <Link href="/organization/settings/contract" className="font-semibold text-link hover:underline">Contract &amp; plan</Link> : "An administrator puts it right."}
+            </p>
+          ) : null}
+          {children}
+        </main>
         <Downloads />
       </div>
     </div>

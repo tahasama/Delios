@@ -6,7 +6,7 @@ import { setTrackingAction } from "@/lib/organization/forms";
  * sheet, the new-document form's way — band, the two questions, then the strip with the act. Acts on documents are
  * always kept and say so; reading and sign-ins are the two switches.
  */
-export function TrackingSheet({ reading, signIns }: { reading: boolean; signIns: boolean }) {
+export function TrackingSheet({ reading, signIns, keepDays }: { reading: boolean; signIns: boolean; keepDays: string }) {
   return (
     <section id="tracking" className="register register-sheet register-sheet-open scroll-mt-24" aria-labelledby="tracking-head">
       <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
@@ -33,6 +33,17 @@ export function TrackingSheet({ reading, signIns }: { reading: boolean; signIns:
             <label className="flex items-center gap-1.5"><input type="radio" name="signIns" value="OFF" defaultChecked={!signIns} required /> Keep them for security only, not shown</label>
           </div>
           <p className="text-[11px] leading-4 text-slate-500">Sign-ins, failed ones and locked accounts are always kept, to protect every account.</p>
+        </fieldset>
+        <fieldset className="space-y-2">
+          <legend className="stencil mb-1.5 text-slate-500">How long is what was opened and downloaded kept?</legend>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-700">
+            {[["90", "3 months"], ["180", "6 months"], ["365", "A year"], ["730", "Two years"], ["", "As long as the register"]].map(([days, label]) => (
+              <label key={days || "always"} className="flex items-center gap-1.5"><input type="radio" name="keepDays" value={days} defaultChecked={keepDays === days} /> {label}</label>
+            ))}
+          </div>
+          <p className="text-[11px] leading-4 text-slate-500">
+            Past it, those records are removed by themselves (GDPR: kept no longer than needed). What people did to documents stays with the register.
+          </p>
         </fieldset>
       </ActionForm>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">

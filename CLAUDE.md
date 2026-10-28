@@ -831,6 +831,44 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Roles stay exactly as they are (owner, settled): our role does not shift the project's starting defaults, no new
   roles are added, and what a role's verdict is worth is not a setting.
 
+### Running DELIOS: our console, contracts, legal (docs/RUNNING-DELIOS.md, owner: "I'd like all of that")
+- **We run DELIOS** for every organization (one platform: they link, claim and merge across it). **Our console**
+  (`/console`, backend `Operators/`, tables without row-level security) is the DELIOS team's space above every
+  organization: its own accounts only (`create-operator <email> <name>`, `DELIOS_OPERATOR_PASSWORD`), always password and
+  authenticator code, its own cookie (`delios_console`, screens `console_session`, `lib/console/client.ts`), every act in
+  its own log (`operator_events`). Tabs: Overview · Organizations · Requests · Plans & payments · Legal · Support access ·
+  Notices · Team · Log, in the app's design (plates, sheets, `.views` tabs).
+- **We never read an organization's documents.** The console counts (paid users, projects, storage, last active) and
+  names its administrators; its projects and people only while one of its administrators lets us in (Settings →
+  Contract & plan, 1 to 30 days, with why, ended whenever; `SupportGrant`), each reading written in its audit trail
+  (SUPPORT_READ).
+- **Where an organization stands is read when looked at** (`Subscriptions.Effective`, never a clock): Trying · Active ·
+  Reads only (trial over, 14 days past the period paid, cancelled and past it, or set by us) · Ended. Reading only, the
+  backend refuses every change (READ_ONLY) but signing in, notifications and the contract; every page says so
+  (`/api/standing`); **nothing is deleted**. Set in the console with why (SUBSCRIPTION_SET). Codes provisional (TRIAL,
+  ACTIVE, READ_ONLY, ENDED; CARD, INVOICE): the owner confirms them.
+- **Paid per organization, per user working in it** (its own people; guests and linked accounts free), plans named and
+  priced in the console (a plan's code kept once used). Businesses only. Cancelling is one click (Contract & plan), no
+  harder than signing up, ending with the period paid. The seller of record is not connected yet: payments recorded by
+  hand (docs/gaps/running.md).
+- **Legal texts are DELIOS's, versioned** (`Operators/LegalTexts.cs`, `/api/legal`, public `/legal/<slug>`, linked under
+  every sign-in page): written as the app works, **what only a lawyer may write marked `[[LAWYER: …]]` and drawn in red**
+  everywhere (`components/legal-text.tsx`; a public page with such parts says it is a draft binding nobody). A new
+  version is published, never an old one changed; the terms and the data processing agreement are accepted at sign-up
+  (backend TERMS_NOT_ACCEPTED) and again at each new version by an administrator (LEGAL_ACCEPTED), every acceptance kept.
+- **Every legal matter, must or may** (`LegalMatters.All`, console → Legal): by when (before the first paying customer,
+  while running, as it grows), each with where it stands (to do, placeholder text, with the lawyer, in force, not needed;
+  a must is never "not needed") and our notes. A new legal matter goes in that list.
+- **Forget a person** (organization's People, an administrator of ours, with why; `ForgetPerson`, PERSON_FORGOTTEN): name
+  and email replaced ("Former user …"), account closed, sign-in, devices and pop-ups gone; what they did stays under the
+  name it was done by (GDPR 17(3)). A linked account is forgotten at home.
+- **How long activity is kept** (`TRACK_KEEP_DAYS`, Security & privacy): what was opened and downloaded past it is
+  removed by the next reading written (`audit_prune`, once a day per organization, rows outside the chain only).
+- **The shared tables are fenced too** (migration FenceSharedTables): inside an organization's transaction, sessions,
+  product requests, notice alarms and reply addresses show and take only its rows; sign-in names, reserved values and
+  organizations' identities and holders are read by all, written only for itself; across, only through
+  `Tenancy/Crossing.OpenAsync`, said where it is used.
+
 ### Settings
 - **Settings are read by everyone of ours** (owner: "access without the editing liberty"): the Control room, Types &
   sets, Numbering, Revisions, Review routes, Forms & fields and Functions & permissions open read only for whoever may

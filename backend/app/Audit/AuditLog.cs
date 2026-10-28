@@ -34,15 +34,34 @@ public sealed class AuditLog(DeliosDbContext db, TenantContext tenant, Documents
         // Reading (opened, downloaded) changes nothing: kept outside the locked chain, so a reader never waits behind
         // every other act of the organization (owner). Every other act extends the chain, one writer at a time.
         if (OutsideChain.Contains(action))
+        {
+            await PruneOnceADayAsync(cancellationToken);
             await db.Database.ExecuteSqlAsync($"""
                 SELECT audit_note({tenant.Required}::uuid, {projectId}::uuid, {actor.Id}::uuid, {actor.Name}::text,
                     {action}::text, {entityType}::text, {entityId}::uuid, {entityLabel}::text, {detail}::text)
                 """, cancellationToken);
+        }
         else
             await db.Database.ExecuteSqlAsync($"""
                 SELECT audit_append({tenant.Required}::uuid, {projectId}::uuid, {actor.Id}::uuid, {actor.Name}::text,
                     {action}::text, {entityType}::text, {entityId}::uuid, {entityLabel}::text, {detail}::text)
                 """, cancellationToken);
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, DateOnly> Pruned = new();
+
+    /// <summary>
+    /// How long activity is kept (<c>TRACK_KEEP_DAYS</c>, the organization's): what was opened and downloaded past it is
+    /// removed by the act of reading itself, once a day per organization in each process, never by a clock. Only those
+    /// rows, outside the chain and each sealed alone, may go (<c>audit_prune</c>); every act that changed something stays.
+    /// </summary>
+    private async Task PruneOnceADayAsync(CancellationToken cancellationToken)
+    {
+        var id = tenant.Required;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (Pruned.TryGetValue(id, out var last) && last == today) return;
+        Pruned[id] = today;
+        await db.Database.ExecuteSqlAsync($"SELECT audit_prune({id}::uuid)", cancellationToken);
     }
 
     /// <summary>The acts of reading, kept outside the chain: the kinds Opened and Downloaded (<see cref="AuditKinds"/>).</summary>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, CalendarDays, FileClock, Route, SlidersHorizontal, Tags, ToggleRight } from "lucide-react";
+import { ArrowRight, BadgeCheck, CalendarDays, FileClock, Route, SlidersHorizontal, Tags, ToggleRight, Handshake } from "lucide-react";
 import { formatDay } from "@/lib/core/date-format";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { Chip } from "@/components/ui";
@@ -150,7 +150,7 @@ export default async function OrganizationSettingsPage({ searchParams }: { searc
               <h2 className="stencil mb-2 text-slate-600">{group}</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {cards.map((card) => {
-                  const Icon = SETUP_ICON[card.project] ?? (card.slug === "identity" ? BadgeCheck : card.slug === "tracking" ? FileClock : card.slug === "calendar" ? CalendarDays : card.project === "defaults" ? SlidersHorizontal : card.project === "may-change" ? ToggleRight : Tags);
+                  const Icon = SETUP_ICON[card.project] ?? (card.slug === "identity" ? BadgeCheck : card.slug === "contract" ? Handshake : card.slug === "tracking" ? FileClock : card.slug === "calendar" ? CalendarDays : card.project === "defaults" ? SlidersHorizontal : card.project === "may-change" ? ToggleRight : Tags);
                   const state = said(card.area);
                   const href = card.slug ? `/organization/settings/${card.slug}` : card.elsewhere!;
                   return (

@@ -1,7 +1,8 @@
-# Running DELIOS for many organizations: the advice (not decided yet)
+# Running DELIOS for many organizations
 
-Written 28 Oct 2026 after research, for the owner to decide. Nothing here is built until the owner says so; once a
-choice is made it moves into CLAUDE.md and this file says what was chosen.
+Written 28 Oct 2026 after research. **The owner chose all of it** ("I'd like all of that"), the same day: we run it, our
+console, payments, the legal texts as placeholders until a lawyer writes them (marked in red), and the in-app pieces.
+What was built is in **Built** at the end; the rules are in CLAUDE.md, "Running DELIOS".
 
 ## 1. Who runs it: us, as a service (recommended)
 
@@ -84,6 +85,41 @@ date and version, the subprocessor list, the export and the deletion at the end)
 2. Before the first customer: the legal texts (lawyer), their places in the app, the export and deletion at contract end.
 3. Then: our console, plans and payments through a merchant of record.
 4. Later, on demand: a dedicated copy run by us for a large client.
+
+## Built (28 Oct 2026)
+
+- **The console** (`/console`, backend `Operators/`): the DELIOS team's own accounts (`create-operator <email> <name>`,
+  password from `DELIOS_OPERATOR_PASSWORD`, always a code from an authenticator app, locked 15 minutes after 5 wrong
+  tries, 8 hours at most, cookie `delios_console`), never an organization's. Tabs: Overview (what waits on us), Organizations
+  (each with where it stands, plan, paid until, paid users, projects, storage, last active; its page: plan & contract set
+  with why, its administrators, what it accepted, support access, what it asked, our log about it; switched off with why),
+  Requests (merges carried out here, claims, readers asked), Plans & payments, Legal (every legal matter, must or may, by
+  when, with where it stands and notes; the texts, versioned), Support access, Notices (to every administrator), Team, Log.
+- **Where an organization stands** (`Subscriptions.Effective`, read when looked at): Trying (no end, or until its trial's
+  last day) · Active · Reads only (trial over, 14 days past the period paid, cancelled and past it, or set by us) · Ended.
+  Reading only: every change refused (READ_ONLY) but signing in, notifications, the contract; a banner on every page
+  (`/api/standing`). Nothing is deleted. Codes provisional: TRIAL, ACTIVE, READ_ONLY, ENDED; CARD, INVOICE; the matter
+  states TO_DO, PLACEHOLDER, WITH_LAWYER, IN_FORCE, NOT_NEEDED (owner to confirm).
+- **Payments**: per organization per paid user (its own people; guests and linked accounts free), plans named and priced
+  in the console. The seller of record (Paddle or Stripe) is **not connected yet**: a payment is recorded by hand (Paid
+  until). Cancelling is one click in the organization's Settings → Contract & plan.
+- **Legal texts** (`Operators/LegalTexts.cs`): terms, data processing agreement, privacy notice, subprocessors, security,
+  service levels, acceptable use, cookies, legal notice. Each starts from a written text describing what the app does,
+  with `[[LAWYER: …]]` where only a lawyer may write, drawn in red everywhere. Public at `/legal`, linked under the
+  sign-in and sign-up pages. Published by new versions only; the terms and the data processing agreement are accepted
+  at sign-up (a tick) and again at each new version by an administrator, each acceptance kept (who, which version, when).
+- **Support access**: an administrator lets DELIOS in for 1 to 30 days with why, ends it whenever; without it the
+  console counts only, and names its administrators; with it, its projects and people, each reading written in its
+  audit trail (SUPPORT_READ).
+- **Forget a person** (organization's People, administrators): name and email replaced, account closed, sign-in,
+  devices and pop-ups gone; their acts stay under the name they were done by (Article 17(3)).
+- **How long activity is kept** (Security & privacy, `TRACK_KEEP_DAYS`: 3 months, 6, a year, two, or as long as the
+  register): what was opened and downloaded past it is removed by the next reading row (`audit_prune`, once a day per
+  organization); the chain is untouched.
+- **The last eight tables fenced** (migration FenceSharedTables, `Tenancy/Crossing.cs`).
+
+Still to do, outside the app: the company, the lawyer's texts, insurance, the seller of record's contract, hosting in
+the EU said in the contract. The export then deletion at a contract's end is a gap (docs/gaps).
 
 ## Sources
 

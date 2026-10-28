@@ -1,4 +1,5 @@
 import { APP_NAME } from "@/lib/core/standard";
+import { LegalLinks } from "@/app/(public)/legal/frame";
 
 /** The sign-in pages' frame: the brand panel, and the form beside it. */
 export function AuthShell({ children }: { children: React.ReactNode }) {
@@ -37,6 +38,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           {children}
+          <LegalLinks />
         </div>
       </div>
     </div>

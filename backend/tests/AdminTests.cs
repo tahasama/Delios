@@ -192,6 +192,7 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
         await using var app = await TestApp.StartAsync(infrastructure, settings => settings["SignUp:Enabled"] = "true");
         var (taken, takenBody) = await Flow.PostAsync(app.Factory.CreateClient(), "/api/auth/sign-up", new
         {
+            acceptTerms = true,
             organizationName = "Twin Ltd",
             name = "Twin",
             email = "engineer@demo.local",
@@ -201,6 +202,7 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
 
         var (made, madeBody) = await Flow.PostAsync(app.Factory.CreateClient(), "/api/auth/sign-up", new
         {
+            acceptTerms = true,
             organizationName = "Riverside Water",
             name = "Rita River",
             email = "rita@riverside.test",

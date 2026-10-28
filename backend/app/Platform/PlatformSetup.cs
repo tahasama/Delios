@@ -216,6 +216,8 @@ public static class PlatformSetup
         services.AddScoped<Organizations.MergeOrganizations>();
         services.AddScoped<Organizations.ListProductRequests>();
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+        services.AddSingleton<IPasswordHasher<Operators.Operator>, PasswordHasher<Operators.Operator>>();
+        services.AddScoped<Operators.CreateOperator>();
         services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null);
         // Every endpoint requires a signed-in person unless it says otherwise.
@@ -393,6 +395,8 @@ public static class PlatformSetup
             }
             await next(http);
         });
+        // An organization that reads only (not paid, trial ended, contract ended) changes nothing (Operators/Contracts.cs).
+        app.Use((http, next) => Operators.Subscriptions.ReadOnlyGateAsync(http, () => next(http)));
         app.UseRateLimiter();
 
         app.MapHealthChecks("/health/live", new HealthCheckOptions
@@ -414,6 +418,10 @@ public static class PlatformSetup
         if (role == Roles.Api)
         {
             app.MapIdentityEndpoints();
+            Operators.OperatorAuth.MapOperatorAuthEndpoints(app);
+            Operators.ConsoleEndpoints.MapConsoleEndpoints(app);
+            Operators.ContractEndpoints.MapContractEndpoints(app);
+            Identity.ForgetPerson.MapForgetEndpoints(app);
             app.MapSsoEndpoints();
             app.MapPasswordResetEndpoints();
             app.MapEmailConfirmationEndpoints();

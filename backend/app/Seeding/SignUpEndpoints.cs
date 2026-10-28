@@ -9,7 +9,7 @@ namespace Delios.Host.Seeding;
 /// <summary>Body of an organization registering itself. The project is optional: an organization exists before its projects do.</summary>
 public sealed record SignUpRequest(
     string? OrganizationName, string? Name, string? Email, string? Password, string? ProjectCode = null, string? ProjectName = null,
-    string? ContractRole = null, string? ProjectKind = null, string? Turnstile = null, bool TakeGuestAccount = false);
+    string? ContractRole = null, string? ProjectKind = null, string? Turnstile = null, bool TakeGuestAccount = false, bool AcceptTerms = false);
 
 /// <summary>
 /// The one self-service way in: an organization registers itself, with its first administrator and the recommended
@@ -37,6 +37,10 @@ public static class SignUpEndpoints
         var email = request.Email?.Trim().ToLowerInvariant() ?? "";
         var password = request.Password ?? "";
         if (organization.Length == 0) return Problems.Invalid("ORGANIZATION_REQUIRED", "Your organization needs a name.");
+        // The terms and the data processing agreement are accepted for the organization, by whoever registers it (kept for good).
+        if (!request.AcceptTerms)
+            return Problems.Invalid("TERMS_NOT_ACCEPTED", "Accept the terms of service and the data processing agreement to register your organization.",
+                new { field = "acceptTerms" });
         if (name.Length == 0 || !email.Contains('@')) return Problems.Invalid("NAME_AND_EMAIL_REQUIRED", "Your name and email are required.");
         // A guest's email (an account another organization made for them): they may take it into their own DELIOS.
         var normalizedEmail = email.ToUpperInvariant();
@@ -79,6 +83,8 @@ public static class SignUpEndpoints
         // Read back under the new organization's row-level security, which applies inside a transaction.
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var admin = await db.Users.SingleAsync(u => u.Id == adminId, cancellationToken);
+        await Operators.ContractEndpoints.AcceptAsync(db, admin.TenantId, admin.Id, admin.Name, admin.Email, http.Connection.RemoteIpAddress?.ToString(),
+            Operators.ContractEndpoints.ToAccept, NodaTime.SystemClock.Instance.GetCurrentInstant(), cancellationToken);
         // With email on, the address is proved before anyone signs in with it.
         if (mail.Value.Enabled)
         {
@@ -140,6 +146,8 @@ public static class SignUpEndpoints
             admin.EmailToConfirm = false;
             var keep = await home.Parties.AsNoTracking().Where(p => p.TenantId == tenant.Id && p.IsInternal).Select(p => p.OrganizationId).FirstOrDefaultAsync(cancellationToken);
             await home.SaveChangesAsync(cancellationToken);
+            await Operators.ContractEndpoints.AcceptAsync(home, tenant.Id, admin.Id, admin.Name, admin.Email, null, Operators.ContractEndpoints.ToAccept,
+                NodaTime.SystemClock.Instance.GetCurrentInstant(), cancellationToken);
             await services.GetRequiredService<AuditLog>().WriteAsync(new Actor(admin.Id, admin.Name), "SIGN_UP", "User", admin.Id, admin.Email,
                 $"Made {organization}'s own DELIOS with the account {hostName} had made for them.", cancellationToken: cancellationToken);
             return keep;

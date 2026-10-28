@@ -54,12 +54,19 @@ backend/
 │   │                     claims, merges; command merge-organizations), ProductRequests (what an organization
 │   │                     asks of DELIOS, a certified DWG reader: kept above every organization, emailed, command
 │   │                     requests; asked from the card organization/settings/viewers)
+│   ├── Operators/        the DELIOS team's console, above every organization (no row-level security, its own
+│   │                     sign-in): Entities (operators, sessions, subscriptions, plans, legal texts and acceptances,
+│   │                     legal matters, support access, the team's log); OperatorAuth (sign-in with password and code,
+│   │                     command create-operator); ConsoleEndpoints (/api/console); Contracts (what an organization has
+│   │                     with us read as it applies today, Subscriptions.Effective; read only when not paid; /api/legal,
+│   │                     /api/organization/contract, /api/organization/support, /api/standing); LegalTexts (the kinds
+│   │                     of legal text, their starting text, every legal matter must or may)
 │   ├── Settings/         the organization's and the project's settings and lists; KeptCopies (a project's own copy kept when reset, put back from the organization's card); FormRules (Forms & fields: what each form asks, checked on save); Liberty (what projects may change: Fixed or Free per setting, and the projects a fixed one leaves free); ProjectDifferences (what one project changed, for the organization's Settings); OrganizationDefaults (the defaults for new projects replaced as a whole, a copy kept); ProjectPlace (where a new project's site starts: time zone, days off, country); Calendar (public holidays and a project's own days off, the calendars' endpoints); DateFormat (how dates read, carried to the screens on every answer)
 │   ├── Notifications/    notifications, email, pop-ups
 │   ├── Audit/            the audit trail; DownloadWatch (every download recorded, administrators told past 200 an hour)
 │   ├── Extraction/       reading text out of files
 │   ├── Messaging/        the queue between the API and the worker; the outbox relay, woken by the acts that fill it (OutboxWake)
-│   ├── Tenancy/          keeping each organization's data apart
+│   ├── Tenancy/          keeping each organization's data apart; Crossing (the one door across, on the shared tables)
 │   ├── Seeding/          the demo data
 │   ├── Platform/         the database, Migrations/, shared plumbing; ScreenChanges (what a save tells the screens), AccessVersions (access and shared answers kept until the organization's way of working changes); Batch (several writes as one: each line through its own endpoint, in one transaction)
 │   ├── Resources/        files built into the program (fonts for stamped PDFs)
@@ -92,12 +99,15 @@ frontend/
 │   ├── layout.tsx        the outer frame of every page
 │   ├── (public)/         pages for someone not signed in
 │   │   ├── login/  signup/  confirm-email/  forgot-password/  reset-password/
+│   │   ├── legal/        the legal texts, open to anyone (components/legal-text.tsx draws a lawyer's parts in red)
 │   │   └── bot-check.tsx, form-validation.ts   pieces only these pages use
 │   ├── (start)/          signed in, outside any project
 │   │   ├── setup/        after registering an organization: add people, open the first project
 │   │   ├── no-project/   on no project yet (lists other organizations' projects they work on)
 │   │   └── organization/ the organization's space (layout.tsx: its band, the waiting banner; org-tabs.tsx: Projects · People · Organizations · Settings) and admin page: projects (ours and joined), people,
 │   │                     organizations we work with, invitations; + defaults/ (defaults for new projects), settings/ (the organization's Settings: the same cards as a project's, each with its switch and the projects with their own copy; numbering/ built, [slug] for cards not moved yet)
+│   ├── console/          the DELIOS team's console (sign-in/, then (in)/: overview, organizations, requests,
+│   │                     payments, legal, support, notices, team, log), its own session (lib/console/client.ts)
 │   ├── (app)/            inside a project
 │   │   ├── layout.tsx    the frame: menu, project switcher, theme
 │   │   ├── page.tsx      Home (with home-parts.tsx, tally.tsx)
@@ -130,7 +140,9 @@ frontend/
 │   ├── records/          assets & tags (api.ts reads; forms.ts links a tag's documents)
 │   ├── conformance/      (checks/prevented.ts: what the app refuses, listed by area under Default rules)
 │   ├── account/
-│   ├── organization/      organizations working together, the admin page, defaults for new projects
+│   ├── organization/      organizations working together, the admin page, defaults for new projects; forms-contract.ts (Contract & plan)
+│   ├── console/          the console's own door to the backend (client.ts, its own session), its forms and types
+│   ├── legal/            the legal texts, read by anyone
 │   └── settings/         (forms-revisions.ts: Settings → Revisions; verdicts are the list Review outcomes, kept in Types & sets)
 │
 ├── components/           only the pieces several areas use
@@ -224,7 +236,7 @@ A new feature ....................... its area's folder in each part; a new area
 - **A new area gets one name**, the same in `backend/app/`, `frontend/app/(app)/` and `frontend/lib/`, and is
   added to this file.
 - **Only `lib/client.ts` calls the backend.** Pages read through their area's `api.ts`; forms send through
-  its `forms*.ts`.
+  its `forms*.ts`. The one exception is the console, which carries its own session: `lib/console/client.ts`.
 
 
 

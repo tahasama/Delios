@@ -219,6 +219,9 @@ export async function setTrackingAction(_prev: Result | undefined, formData: For
   try {
     await api(`/api/settings/TRACK_READING`, { method: "PUT", body: { value: reading } });
     await api(`/api/settings/TRACK_SIGN_INS`, { method: "PUT", body: { value: signIns } });
+    // How long what was opened and downloaded is kept (empty: as long as the register); removed past it by the backend.
+    const keepDays = text(formData, "keepDays");
+    if (/^\d{0,5}$/.test(keepDays)) await api(`/api/settings/TRACK_KEEP_DAYS`, { method: "PUT", body: { value: keepDays } });
   } catch (e) {
     return failed(e);
   }
@@ -502,6 +505,20 @@ export async function setPasswordAction(_prev: Result | undefined, formData: For
   }
   revalidatePath("/organization/people");
   return { ok: "Password set. They were told by email and signed out everywhere: give them the password yourself." };
+}
+
+/** A person asked to be forgotten: their name and email replaced, the account closed; their acts stay (backend ForgetPerson). */
+export async function forgetPersonAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const why = text(formData, "why");
+  if (!why) return { error: "Say why: who asked, and when.", fields: ["why"] };
+  let name = "";
+  try {
+    ({ name } = await api<{ name: string }>(`/api/admin/users/${text(formData, "userId")}/forget`, { body: { why } }));
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization/people");
+  return { ok: `Forgotten: the account reads "${name}" now, and is closed.` };
 }
 
 /** Puts one of a project's lists back to the organization's (its Settings only, for a mess): always with why. */

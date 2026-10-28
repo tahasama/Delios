@@ -8,7 +8,7 @@ import { ActionForm } from "@/components/form";
 import { Switch, SwitchControl } from "@/components/switch";
 import { getActiveSet } from "@/lib/settings/config";
 import { adminUsers, adminFunctions, adminProjects } from "@/lib/settings/api-admin";
-import { setSignInAction, savePersonEverywhereAction, setPasswordAction } from "@/lib/organization/forms";
+import { setSignInAction, savePersonEverywhereAction, setPasswordAction, forgetPersonAction } from "@/lib/organization/forms";
 import { cn, fmtDate, fmtDateTime, timeAgo } from "@/lib/core/utils";
 
 export const dynamic = "force-dynamic";
@@ -263,6 +263,22 @@ function PersonPanel({ user: u, me, functions, projects, disciplines, close }: {
             {u.name} is told at once, by email and on Notifications, and signed out everywhere. Give them the password yourself; they may choose their own with &ldquo;Forgot password&rdquo;.
           </p>
         </ActionForm>
+      ) : null}
+      {/* Asked to be forgotten (GDPR Article 17): their name and email replaced, the account closed; what they did stays. */}
+      {!u.linked && !me ? (
+        <details className="border-t border-line bg-surface">
+          <summary className="cursor-pointer px-5 py-3 text-xs font-semibold text-slate-500 hover:text-slate-800 sm:px-6">Forget {u.name}…</summary>
+          <ActionForm action={forgetPersonAction} hidden={{ userId: u.id }} submitLabel={`Forget ${u.name}`} variant="danger"
+            confirmText={`${u.name}'s name and email are replaced for good and the account is closed. It cannot be undone.`}
+            className="asking space-y-3 px-5 pb-4 sm:px-6">
+            <p className="text-[11px] leading-4 text-slate-500">
+              For a person who asked to be forgotten. Their name and email are replaced (&ldquo;Former user …&rdquo;), the account is closed, their sign-in,
+              devices and pop-ups go. What they did stays in the records, under the name it was done by: the register has to prove who did what (GDPR
+              Article 17(3)). Tell them so in your answer.
+            </p>
+            <Field label="Why" required hint="who asked, and when"><input name="why" required className={field} /></Field>
+          </ActionForm>
+        </details>
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
         <Link href={close} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Close</Link>
