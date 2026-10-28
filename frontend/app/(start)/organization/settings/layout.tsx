@@ -10,9 +10,12 @@ export default function OrgSettingsLayout({ children }: { children: React.ReactN
     title: card.title, text: card.text, group: groupOf(card), icon: card.project,
   }));
   return (
-    <div className="lg:flex lg:items-start lg:gap-5">
-      <SettingsNav home="/organization/settings" items={items} groups={SETUP_GROUPS} label="The organization's Settings" />
-      <div className="min-w-0 flex-1 space-y-4">{children}</div>
+    <div className="min-[1440px]:flex min-[1440px]:items-start min-[1440px]:gap-5">
+      <SettingsNav mode="column" top="none" home="/organization/settings" items={items} groups={SETUP_GROUPS} label="The organization's Settings" />
+      <div className="min-w-0 flex-1 space-y-4">
+        <SettingsNav mode="switcher" top="none" home="/organization/settings" items={items} groups={SETUP_GROUPS} label="The organization's Settings" />
+        {children}
+      </div>
     </div>
   );
 }

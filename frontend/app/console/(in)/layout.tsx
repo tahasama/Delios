@@ -29,6 +29,11 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
           </form>
         </div>
       </header>
+      {me.authenticatorOff ? (
+        <p role="alert" className="border-b border-red-300 bg-red-50 px-4 py-2 text-center text-[13px] font-semibold text-red-800">
+          The authenticator is switched off: the console opens with a password alone. For testing only: set CONSOLE_AUTHENTICATOR=true in .env (or remove the line) before real use.
+        </p>
+      ) : null}
       <ConsoleTabs />
       <main className="mx-auto max-w-7xl space-y-4 px-4 py-5 sm:px-6">{children}</main>
     </div>

@@ -15,9 +15,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const items = SETUP_PAGES.filter((p) => maySetup(ctx.user, p, managementAddsPeople))
     .map((p) => ({ href: p.href, title: p.title, text: p.text, group: p.group }));
   return (
-    <div className="lg:flex lg:items-start lg:gap-5">
-      <SettingsNav home="/settings" items={items} groups={SETUP_GROUPS} label="Settings" />
+    <div className="min-[1440px]:flex min-[1440px]:items-start min-[1440px]:gap-5">
+      <SettingsNav mode="column" top="bar" home="/settings" items={items} groups={SETUP_GROUPS} label="Settings" />
       <div className="min-w-0 flex-1 space-y-3">
+        <SettingsNav mode="switcher" top="bar" home="/settings" items={items} groups={SETUP_GROUPS} label="Settings" />
         <SettingsCrumb pages={SETUP_PAGES.map((p) => ({ href: p.href, title: p.title }))} />
         {children}
       </div>

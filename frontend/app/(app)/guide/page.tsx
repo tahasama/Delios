@@ -185,17 +185,16 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
           <span className="stencil mr-1 text-slate-500">Roles on a project</span>
           <span className="text-[11px] text-slate-500">what an organization can be contracted to do, on any project: what it does, where approval sits, what its verdict is worth</span>
         </div>
-        <div className="border-b border-line px-3">
-        {/* Plain tabs on one line (owner: "simplistic tabs, inline"), the document page's: the chosen one underlined. */}
-        <nav aria-label="Roles" className="scroll-thin flex gap-1 overflow-x-auto overflow-y-hidden">
+        <div className="border-b border-line">
+        {/* On the tab strip, as every real tab (owner: "you forgot to update the tabs styling"). */}
+        <nav aria-label="Roles" className="strip">
           {roleOptions.map((r) => {
             const us = r.code === project.role;
             const here = playing.has(r.code);
             const on = shown?.code === r.code;
             return (
               <Link key={r.code} href={`/guide?role=${r.code}#roles`} scroll={false} title={r.label} aria-current={on ? "page" : undefined}
-                className={cn("-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold transition",
-                  on ? "border-brand-line text-brand-ink" : "border-transparent text-slate-500 hover:text-slate-800")}>
+                className="strip-tab">
                 {r.code}
                 {us ? <span className="rounded-sm bg-brand px-1 text-[10px] font-bold uppercase leading-4 text-white">us</span>
                   : here ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-label={`on ${project.code}`} /> : null}

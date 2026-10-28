@@ -32,7 +32,8 @@ public sealed class TransmittalTests(Infrastructure infrastructure) : IClassFixt
         Assert.True(status == HttpStatusCode.OK, decided.ToString());
         if (controller is not null)
         {
-            var (released, body) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), await Flow.ReleaseBodyAsync(controller));
+            // The decider said who receives it: the release sends it there; else whoever releases names someone.
+            var (released, body) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), issue is null ? await Flow.ReleaseBodyAsync(controller) : new { });
             Assert.True(released == HttpStatusCode.OK, body.ToString());
         }
         return id;
@@ -61,7 +62,16 @@ public sealed class TransmittalTests(Infrastructure infrastructure) : IClassFixt
         var controller = await app.SignedInAsync("controller@demo.local");
         var viewer = await app.SignedInAsync("viewer@demo.local");
         var p = await Flow.RevisionAsync(engineer);
-        await ReleasedAsync(engineer, approver, controller, p);
+        // Here released and issued are kept apart (POLICY_RELEASE = SEPARATE): released, it waits to be asked for.
+        var keeper = await app.SignedInAsync("admin@demo.local");
+        using (var separate = await keeper.PutAsJsonAsync($"/api/projects/{p.Project}/settings/POLICY_RELEASE", new { value = "SEPARATE" }))
+            Assert.True(separate.IsSuccessStatusCode, await separate.Content.ReadAsStringAsync());
+        var (_, review) = await Flow.PostAsync(engineer, P(p, $"/revisions/{p.Revision}/reviews"), new { });
+        var reviewId = review.GetProperty("id").GetGuid();
+        await Flow.PostAsync(engineer, P(p, $"/reviews/{reviewId}/answer"), new { });
+        await Flow.PostAsync(approver, P(p, $"/reviews/{reviewId}/answer"), new { verdict = "C1", status = "IFC" });
+        var (releasedApart, releasedApartBody) = await Flow.PostAsync(controller, P(p, $"/reviews/{reviewId}/release"), new { });
+        Assert.True(releasedApart == HttpStatusCode.OK, releasedApartBody.ToString());
 
         // Released, never sent: in use, and nobody told.
         var notIssued = await GetAsync(controller, P(p, "/not-issued"));

@@ -114,10 +114,8 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
 
   const filterBase = href({}).split("?")[1] ?? "";
 
-  const tabCls = (on: boolean) =>
-    `-mb-px inline-flex min-h-11 shrink-0 items-center border-b-2 px-0.5 text-[12px] leading-4 transition ${
-      on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"
-    }`;
+  // The tab strip, as every real tab (globals.css .strip-tab; TabLink lights the chosen one).
+  const tabCls = (_on: boolean) => "strip-tab";
 
   return (
     <div className="space-y-4">
@@ -156,7 +154,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
             ))}
           </nav>
           <div className="flex min-h-0 min-w-0 flex-col">
-            <nav aria-label="When it is checked" className="flex shrink-0 flex-wrap items-stretch gap-x-5 border-b border-line px-5 sm:px-6">
+            <nav aria-label="When it is checked" className="strip shrink-0 border-b border-line">
               <TabLink href={href({ phase: null })} active={!phase} className={tabCls(!phase)}>
                 All <span className="ml-1 tabular-nums text-slate-400">{CATALOG.filter(narrowedBy).length}</span>
               </TabLink>

@@ -173,8 +173,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Packages' two kinds beside
   List · Tree (put back as they were: two designs side by side in one row read as inconsistent), Home's "What is waiting",
   the organization's People, the imports' "Which lines", list or tree, light or dark, in use · retired · all. The checks'
-  groups, the rules' areas, Types & sets' groups and Help's roles keep the plain underlined tabs they always had (put back
-  as they were). The Control room's navy console keeps its own tabs.
+  moments, the rules' areas, Types & sets' groups and Help's roles are on the tab strip too (owner: "you forgot to update
+  the tabs styling"; the plain underlined tabs are gone). The Control room's navy console keeps its own tabs.
 - **The distribution matrix's "Who gets what"** (owner, "needs improving"): one sheet, the register's way: its band
   (what is shown: disciplines × functions, which deliverable type, which document type), the narrowing on one line
   (`matrix-filters.tsx`, `components/narrow.tsx` `Narrow` shared with the Schedule: Discipline · Deliverable type ·
@@ -888,8 +888,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   invoice must carry marked for an accountant. CMI and Paddle are not connected (docs/gaps/running.md).
 - **Settings is a side menu** (owner: "settings would be better as side menu, than cards"), a project's and the
   organization's alike (`components/settings-nav.tsx`): the overview, then every page the person opens by group, the one
-  you are on lit; the overview lists where each stands ("To do" in amber) in one sheet. Types & sets' groups are on the
-  tab strip.
+  you are on lit, standing in place the window's full height; the overview lists where each stands ("To do" in amber) in
+  one sheet. **Never a third column** (owner: "ended up with 3 side menus, back to back and few space for actual
+  thing"): on a page with a side menu of its own (the Audit trail, a person's activity, Types & sets, Forms & fields:
+  `OWN_MENU`) and on a window under 1440 pixels wide, it is one button above the page, "Settings · <page>", opening the
+  same list.
+- **The console's authenticator can be switched off for testing** (owner: "give me control over activating it or not"):
+  `CONSOLE_AUTHENTICATOR=false` in .env (`Console:RequireAuthenticator`, on by default) lets the password alone sign in,
+  and every console page says so in red until it is on again.
 - Moments and days go out and come in as ISO text (`Platform/NodaJson.cs`); before, a moment went out as an empty object.
 - **The shared tables are fenced too** (migration FenceSharedTables): inside an organization's transaction, sessions,
   product requests, notice alarms and reply addresses show and take only its rows; sign-in names, reserved values and
@@ -1362,8 +1368,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   organization's people never. The project's work only: sign-ins, opened and downloaded, and people and
   settings are left out (the administrators' trail). Its menu is on the left (`LogbookSide categoriesOnly`: the kinds,
   not every act; then Find), the days beside it, the page's right column away while the log is open.
-  The log's menu: Find first, on a white box (words; the day and Show on one line; no labels), then the kinds, which
-  scroll on their own without a bar; on the Audit trail and a person's page each kind folds open on its acts.
+  The log's menu: Find first, on a white box (words; the day and Show on one line; no labels), then every kind, Opened,
+  Downloaded and Sign-ins included (owner: kinds scrolled out of sight without a bar went unseen), the whole side
+  scrolling with a thin bar only when taller than the window; on the Audit trail and a person's page each kind folds open
+  on its acts.
 - A form never sits in a box inside a box: a sheet that opens a form becomes that form (`SomeoneJoins`), and a line
   of a table opened for editing goes on as the row itself (grey fields, then the strip with Cancel and the act), the
   new-document form's way.

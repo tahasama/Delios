@@ -25,10 +25,7 @@ export default async function DefaultRulesPage({ searchParams }: { searchParams:
   const area = askedArea && areas.includes(askedArea) ? askedArea : null;
   const refused = area ? PREVENTED.filter((r) => r.where === area) : PREVENTED;
   // The tabs as the checks page draws them.
-  const tab = (on: boolean) =>
-    `-mb-px shrink-0 border-b-2 px-0.5 pb-2 text-[12px] leading-4 transition ${
-      on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"
-    }`;
+  const tab = (_on: boolean) => "strip-tab";
   const ctx = await requireScope();
 
   const settled = await Promise.all(
@@ -83,7 +80,7 @@ export default async function DefaultRulesPage({ searchParams }: { searchParams:
             <span className="stencil mr-1 text-slate-500">Refused on every project</span>
             <span className="text-[11px] text-slate-500">not a setting: the act that would cause it does not go through, with the answer it gets</span>
           </div>
-          <nav aria-label="Where it happens" className="scroll-thin flex gap-x-5 overflow-x-auto border-b border-line px-5 pt-3 sm:px-6">
+          <nav aria-label="Where it happens" className="strip border-b border-line">
             <Link href="/conformance/rules" scroll={false} aria-current={!area ? "page" : undefined} className={tab(!area)}>All · {PREVENTED.length}</Link>
             {areas.map((one) => (
               <Link key={one} href={`/conformance/rules?${new URLSearchParams({ area: one })}`} scroll={false} aria-current={area === one ? "page" : undefined} className={tab(area === one)}>

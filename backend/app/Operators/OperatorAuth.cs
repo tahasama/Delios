@@ -33,7 +33,13 @@ public static class OperatorAuth
     /// </summary>
     public sealed record SignInAnswer(string Step, Me? Me = null, string? Secret = null, string? Uri = null, string? Challenge = null,
         IReadOnlyList<string>? RecoveryCodes = null);
-    public sealed record Me(Guid Id, string Name, string Email);
+    public sealed record Me(Guid Id, string Name, string Email, bool AuthenticatorOff = false);
+
+    /// <summary>
+    /// Whether the console asks the authenticator's code (<c>Console:RequireAuthenticator</c>, CONSOLE_AUTHENTICATOR in
+    /// .env, on unless set to false): off, for testing only, the password alone signs in, and every console page says so.
+    /// </summary>
+    public static bool AuthenticatorOn(IConfiguration configuration) => configuration.GetValue("Console:RequireAuthenticator", true);
 
     public static byte[] Hash(string token) => SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
 
@@ -67,12 +73,17 @@ public static class OperatorAuth
         open.MapPost("/setup", SetupAsync).RequireRateLimiting("sign-in");
         open.MapPost("/sign-out", SignOutAsync);
         app.MapGroup("/api/console").WithTags("Console").AllowAnonymous().AddEndpointFilter(Gate)
-            .MapGet("/me", (HttpContext http) => { var o = http.Current(); return Results.Ok(new Me(o.Id, o.Name, o.Email)); });
+            .MapGet("/me", (HttpContext http, IConfiguration configuration) =>
+            {
+                var o = http.Current();
+                return Results.Ok(new Me(o.Id, o.Name, o.Email, !AuthenticatorOn(configuration)));
+            });
     }
 
     private static async Task<IResult> SignInAsync(SignInRequest request, HttpContext http, DeliosDbContext db, IPasswordHasher<Operator> hasher,
-        IDataProtectionProvider protection, IClock clock, IOptions<SessionCookieOptions> cookie, CancellationToken cancellationToken)
+        IDataProtectionProvider protection, IClock clock, IOptions<SessionCookieOptions> cookie, IConfiguration configuration, CancellationToken cancellationToken)
     {
+        var withCode = AuthenticatorOn(configuration);
         var refused = Problems.Invalid("CONSOLE_SIGN_IN_REFUSED", "That email, password and code do not sign anyone in.");
         var normalized = request.Email?.Trim().ToUpperInvariant() ?? "";
         var now = clock.GetCurrentInstant();
@@ -83,6 +94,16 @@ public static class OperatorAuth
         var passwordOk = hasher.VerifyHashedPassword(who, who.PasswordHash, request.Password ?? "") != PasswordVerificationResult.Failed;
         // The first sign-in: the password is right and no authenticator is set up yet. A new key is made each time until
         // a code confirms it; its QR code is drawn on the screen.
+        // Switched off for testing: the password alone signs in.
+        if (!withCode)
+        {
+            if (!passwordOk)
+            {
+                await FailedAsync(db, who, now, cancellationToken);
+                return refused;
+            }
+            return await SignedInAsync(http, db, who, now, cookie.Value, null, cancellationToken);
+        }
         if (passwordOk && who.MfaEnabledAt is null)
         {
             var secret = Totp.NewSecret();

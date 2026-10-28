@@ -53,7 +53,7 @@ export function Logbook({
       </header>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[248px_minmax(0,1fr)] lg:items-start">
-        <aside className="lg:sticky lg:top-22">
+        <aside className="scroll-thin lg:sticky lg:top-22 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
           <LogbookSide counts={counts} chosen={chosen} href={href} find={find} />
         </aside>
         <main className="min-w-0 space-y-5">
@@ -94,8 +94,8 @@ export function LogbookSide({ counts, chosen, href, find, categoriesOnly = false
       {narrowed ? <Link href={find.clear} className="block text-[12px] font-semibold text-link hover:underline">Clear</Link> : null}
     </form>
 
-    {/* The menu scrolls on its own, without a bar, so the log beside it keeps its place. */}
-    <nav aria-label="Kinds of act" className="scroll-quiet mt-3 max-h-[calc(100vh-14rem)] overflow-y-auto">
+    {/* Every kind shown, its acts folded under it (owner: kinds hidden below a menu scrolling without a bar went unseen). */}
+    <nav aria-label="Kinds of act" className="mt-3">
       <Link
         href={href({})}
         aria-current={!chosen.kind && !chosen.action ? "page" : undefined}

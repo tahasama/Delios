@@ -37,7 +37,7 @@ export async function consoleApi<T>(path: string, options: { method?: "GET" | "P
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
-export type Operator = { id: string; name: string; email: string };
+export type Operator = { id: string; name: string; email: string; authenticatorOff?: boolean };
 
 /** Who is signed in to the console, or the sign-in page. */
 export async function requireOperator(): Promise<Operator> {

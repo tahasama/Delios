@@ -49,6 +49,9 @@ x-backend: &backend
     Auth__SecureCookie: ${SECURE_COOKIE:-false}
     # An organization may register itself from the sign-up page.
     SignUp__Enabled: ${SIGN_UP_ENABLED:-true}
+    # The console asks the authenticator's code at every sign-in; CONSOLE_AUTHENTICATOR=false in .env turns it off, for
+    # testing only (the console then says so in red on every page).
+    Console__RequireAuthenticator: ${CONSOLE_AUTHENTICATOR:-true}
     # Email stays off until a mail server is named. Each kind has its own switch;
     # with email off every message is still recorded in the outbox, marked OFF.
     Email__Enabled: ${EMAIL_ENABLED:-false}
