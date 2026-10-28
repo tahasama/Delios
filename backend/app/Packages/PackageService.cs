@@ -942,24 +942,16 @@ public sealed partial class PackageService(
         var (package, problem) = await ComposableAsync(access, id, cancellationToken);
         if (problem is not null) return (null, null, problem);
         await SyncAsync(package!, cancellationToken);
-        if (package!.AssessedAt is null)
-            return (null, null, Problems.Conflict("NOT_ASSESSED", "Check readiness first.", new { }));
-        var readiness = await ReadinessAsync(package, cancellationToken);
+        // Readiness is read as it stands (no separate check first): complete, or what is missing let go before.
+        var readiness = await ReadinessAsync(package!, cancellationToken);
         var missing = readiness.Where(r => !r.Ready).ToList();
-        var recorded = package.Shortfall.Select(s => s.DocumentId).ToHashSet();
-        if (missing.Any(r => !recorded.Contains(r.Member.DocumentId)))
+        if (missing.Count > 0 && package!.ShortfallAcceptedAt is null)
         {
-            return (null, null, Problems.Conflict("SHORTFALL_CHANGED",
-                "Something is missing that the last assessment did not find. Assess it again.",
-                new { documents = missing.Where(r => !recorded.Contains(r.Member.DocumentId)).Select(r => r.DocumentNumber) }));
+            return (null, null, Problems.Conflict("NOT_COMPLETE",
+                $"{missing.Count} of {readiness.Count} not ready yet: close it once they are released at the status it needs.",
+                new { documents = missing.Select(r => r.DocumentNumber) }));
         }
-        if (missing.Count > 0 && package.ShortfallAcceptedAt is null)
-        {
-            return (null, null, package.ShortfallIssuedAt is null
-                ? Problems.Conflict("SHORTFALL_NOT_ISSUED", "Some documents are not ready. Send what is missing to the acceptance authority first.")
-                : Problems.Conflict("SHORTFALL_NOT_ACCEPTED", "Delivery waits for the acceptance authority to accept what is missing."));
-        }
-        if (package.Rule is not null && !ruleCeased)
+        if (package!.Rule is not null && !ruleCeased)
         {
             return (null, null, Problems.Conflict("RULE_STILL_ADMITTING",
                 "The package fills itself by a rule. Say that nothing more will join before it goes."));
@@ -987,7 +979,8 @@ public sealed partial class PackageService(
     /// passes Deliver's checks (readiness checked, a shortfall let go); a supplier's goes complete: every document of
     /// its tree released (at the status asked, where one is).
     /// </summary>
-    public async Task<(Going? Going, IResult? Problem)> GoingAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)
+    public async Task<(Going? Going, IResult? Problem)> GoingAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken,
+        bool goShort = false)
     {
         var (root, problem) = await ComposableAsync(access, id, cancellationToken, anyState: true);
         if (problem is not null) return (null, problem);
@@ -1003,18 +996,15 @@ public sealed partial class PackageService(
             if (open) await SyncAsync(package, cancellationToken);
             var readiness = await ReadinessAsync(package, cancellationToken);
             var letGo = false;
+            // Not complete, it goes only when whoever delivers ticks "Deliver without what is missing" (owner: "could've
+            // been just a check box inside deliver"), on their responsibility, or what is missing was let go before.
+            const string Tick = "deliver it once they are, or tick “Deliver without what is missing”.";
             if (package.Kind == PackageKinds.Delivery && open)
             {
-                if (package.AssessedAt is null) return (null, Problems.Conflict("NOT_ASSESSED", Named("Check readiness first.")));
-                var recorded = package.Shortfall.Select(x => x.DocumentId).ToHashSet();
                 var missing = readiness.Where(r => !r.Ready).ToList();
-                if (missing.Any(r => !recorded.Contains(r.Member.DocumentId)))
-                    return (null, Problems.Conflict("SHORTFALL_CHANGED", Named("Something is missing that the last assessment did not find. Assess it again."),
-                        new { documents = missing.Where(r => !recorded.Contains(r.Member.DocumentId)).Select(r => r.DocumentNumber) }));
-                if (missing.Count > 0 && package.ShortfallAcceptedAt is null)
-                    return (null, package.ShortfallIssuedAt is null
-                        ? Problems.Conflict("SHORTFALL_NOT_ISSUED", Named("Some documents are not ready. Send what is missing to the acceptance authority first."))
-                        : Problems.Conflict("SHORTFALL_NOT_ACCEPTED", Named("Delivery waits for the acceptance authority to accept what is missing.")));
+                if (missing.Count > 0 && package.ShortfallAcceptedAt is null && !goShort)
+                    return (null, Problems.Conflict("NOT_COMPLETE", Named($"{missing.Count} of {readiness.Count} not ready yet: {Tick}"),
+                        new { documents = missing.Select(r => r.DocumentNumber) }));
                 letGo = missing.Count > 0;
             }
             else if (package.Kind == PackageKinds.Delivery) letGo = package.ShortfallAcceptedAt is not null;
@@ -1022,10 +1012,11 @@ public sealed partial class PackageService(
             {
                 // A supplier's package goes complete: every document released, at the status asked where one is.
                 var notYet = readiness.Where(r => r.RevisionId is null || (r.Required.Length > 0 && !r.Ready)).ToList();
-                if (notYet.Count > 0)
+                if (notYet.Count > 0 && !goShort)
                     return (null, Problems.Conflict("NOT_COMPLETE",
-                        Named($"Not complete: {notYet.Count} document{(notYet.Count == 1 ? " is" : "s are")} not released yet ({string.Join(", ", notYet.Take(8).Select(r => r.DocumentNumber))}{(notYet.Count > 8 ? "…" : "")})."),
+                        Named($"{notYet.Count} of {readiness.Count} not released yet ({string.Join(", ", notYet.Take(8).Select(r => r.DocumentNumber))}{(notYet.Count > 8 ? "…" : "")}): {Tick}"),
                         new { documents = notYet.Select(r => r.DocumentNumber) }));
+                letGo = notYet.Count > 0;
             }
             var memberIds = package.Members.Select(m => m.DocumentId).ToList();
             var newest = letGo
@@ -1036,7 +1027,7 @@ public sealed partial class PackageService(
             foreach (var r in readiness)
             {
                 if (!seen.Add(r.Member.DocumentId)) continue;
-                if (r.RevisionId is { } released && (r.Ready || letGo || package.Kind == PackageKinds.Supply))
+                if (r.RevisionId is { } released && (r.Ready || letGo))
                 {
                     lines.Add(new GoingLine(r.Member.DocumentId, r.DocumentNumber, r.Title, released, r.Revision!, r.Status, r.Ready, package.Number));
                     if (!r.Ready) short_.Add(r.DocumentNumber);
@@ -1050,7 +1041,8 @@ public sealed partial class PackageService(
             }
         }
         if (lines.Count == 0) return (null, Problems.Conflict("NOTHING_READY", "Nothing is ready to deliver."));
-        var by = tree.Where(p => p.ShortfallAcceptedByName is not null).Select(p => p.ShortfallAcceptedByName!).Distinct().ToList();
+        var by = tree.Where(p => p.ShortfallAcceptedByName is not null).Select(p => p.ShortfallAcceptedByName!)
+            .Concat(goShort ? [access.UserName] : []).Distinct().ToList();
         var note = short_.Count == 0 ? null
             : $"Delivered with {short_.Count} document(s) not at the status asked ({string.Join(", ", short_)}), on the responsibility of {string.Join(", ", by)}."
                 + (left.Count > 0 ? $" Not sent, no revision yet: {string.Join(", ", left)}." : "");
@@ -1077,9 +1069,10 @@ public sealed partial class PackageService(
     /// recorded as transmittal"): it carries exactly what <see cref="GoingAsync"/> says, none added and none taken out
     /// (PACKAGE_CONTENTS). Its recipients are chosen there.
     /// </summary>
-    public async Task<IResult?> SendableAsync(ProjectAccess access, Guid id, IReadOnlyCollection<Guid> revisionIds, CancellationToken cancellationToken)
+    public async Task<IResult?> SendableAsync(ProjectAccess access, Guid id, IReadOnlyCollection<Guid> revisionIds, CancellationToken cancellationToken,
+        bool goShort = false)
     {
-        var (going, problem) = await GoingAsync(access, id, cancellationToken);
+        var (going, problem) = await GoingAsync(access, id, cancellationToken, goShort);
         if (problem is not null) return problem;
         var expected = going!.Lines.Select(l => l.RevisionId).ToHashSet();
         if (!expected.SetEquals(revisionIds))
@@ -1093,7 +1086,8 @@ public sealed partial class PackageService(
     /// the transmittals went to (their people then read it as we do, and change nothing); every package of ours still
     /// open in the tree delivered, its contents fixed.
     /// </summary>
-    public async Task DeliveredAsync(ProjectAccess access, Guid id, IReadOnlyList<Transmittal> sent, CancellationToken cancellationToken)
+    public async Task DeliveredAsync(ProjectAccess access, Guid id, IReadOnlyList<Transmittal> sent, CancellationToken cancellationToken,
+        bool goShort = false)
     {
         var root = await db.Packages.Include(p => p.Members).FirstOrDefaultAsync(p => p.Id == id && p.ProjectId == access.Project.Id, cancellationToken);
         if (root is null || sent.Count == 0) return;
@@ -1102,6 +1096,12 @@ public sealed partial class PackageService(
         foreach (var package in await TreeOfAsync(root, cancellationToken))
         {
             package.DeliveredTo = [.. package.DeliveredTo.Union(to)];
+            // Gone without what was missing: on the responsibility of whoever delivered it, recorded with their name.
+            if (goShort && package.ShortfallAcceptedAt is null)
+            {
+                package.ShortfallAcceptedAt = now;
+                package.ShortfallAcceptedByName = access.UserName;
+            }
             if (package.Kind != PackageKinds.Delivery || package.State != PackageStates.Open) continue;
             package.State = PackageStates.Delivered;
             package.ClosedAt = now;
@@ -1109,7 +1109,8 @@ public sealed partial class PackageService(
             if (package.Rule is not null) package.RuleCeasedAt = now;
         }
         await audit.WriteAsync(Actor(access), "PACKAGE_DELIVERED", "Package", root.Id, root.Number,
-            $"Sent on {string.Join(", ", sent.Select(t => $"{t.Number} to {t.ToName}"))}.", root.ProjectId, cancellationToken);
+            $"Sent on {string.Join(", ", sent.Select(t => $"{t.Number} to {t.ToName}"))}{(goShort ? $", without what was missing, on the responsibility of {access.UserName}" : "")}.",
+            root.ProjectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
     }
 

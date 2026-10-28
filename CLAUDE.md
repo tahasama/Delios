@@ -516,9 +516,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   about it stay, no longer naming it).
 - **Ready at the status a package needs** (`PackageService.IsReady`): a package asking no status takes a document
   released at any; a line not ready says why ("released at IFR; the package needs IFC", "nothing released yet").
-- **"Deliver the package" is always on our package while it is open** (owner: "there is no deliver button"): ready, it
-  opens the delivery transmittal; not yet, it holds the step it waits on (check readiness, ask about what is missing, or
-  waiting on the acceptance authority). Handed over outside the system, "Close it" stays beside it.
+- **"Deliver the package" is always on our package while it is open** (owner: "there is no deliver button"), and
+  **going short is a tick in it** (owner: "let it go without what is missing could've been just a check box inside
+  deliver, available if the package is not complete, else greyed"): "Deliver without what is missing", greyed when
+  nothing is missing; ticked, the transmittal carries what is not ready as it stands (released, else newest; none yet,
+  named as not sent), on the responsibility of whoever delivers it, said on the transmittal and recorded with their name
+  (`GoingAsync(…, goShort)`, `?short=1`, `ComposeRequest.GoShort`; NOT_COMPLETE otherwise). A supplier's package not
+  complete offers "Deliver without what is missing" the same way. Readiness is read as it stands: no separate "Check
+  readiness" step, no asking the acceptance authority first (that flow is gone from the page; the acceptance authority
+  still accepts the delivered package). Handed over outside the system, "Close it" stays beside it, once complete.
+- **Delete is its own red button, one press, asked first** (owner: "is it good UX if delete is inside edit? … at least
+  make it one button instead of 2 nested"): never inside Edit and never opening a panel (`StepItem.act`; a supplier's
+  package's red bin, `IconAct`).
 - "Delivery list" downloads the package's own lines (`/api/packages/<n>/list`),
   never the schedule's requirements list.
 - "Share with <supplier>" is pressed once, for good: until then the supplier
@@ -550,11 +559,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the same purpose, else one for execution); no separate reason is asked. Those putting it together only add
   and take out its documents (and delete it while empty and never sent); Document Control (and above) does
   everything else and edits every field while it is open (backend CONTROL_ONLY / OWNER_ONLY). Ticked
-  documents are taken out from the bar under the list. What is missing is asked on a transmittal (Request) to
-  whoever accepts it; their confirmation (a warning first) answers it on a transmittal (Confirmation) and
-  lets it go on their responsibility: delivered then (above), the documents not ready go as they stand (released
-  revision, else the newest), said on the delivery transmittal. "Export CSV" on Packages exports the one
-  package ticked.
+  documents are taken out from the bar under the list. What is missing goes, when the package is delivered with
+  "Deliver without what is missing" ticked (above), as it stands (released revision, else the newest), said on the
+  delivery transmittal with the deliverer's name. "Export CSV" on Packages exports the one package ticked.
 - The side that does not hold it asks the holder to hand it back for an update
   (RETURN_FOR_UPDATE, with why): Document Control on our side, whoever of the
   supplier may upload on theirs. The holder accepts or refuses with why; the

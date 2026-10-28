@@ -15,7 +15,7 @@ import { packageByNumber, packageGoing } from "@/lib/packages/api";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "New transmittal" };
 
-type Search = { step?: string; answer?: string; due?: string; doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string; askBack?: string; pkg?: string; join?: string; package?: string };
+type Search = { step?: string; answer?: string; due?: string; doc?: string; docs?: string; direction?: string; revisions?: string; users?: string; to?: string; reason?: string; party?: string; subject?: string; message?: string; replyTo?: string; follows?: string; kind?: string; activity?: string; ask?: string; placeholders?: string; askBack?: string; pkg?: string; join?: string; package?: string; short?: string };
 
 export default async function NewTransmittalPage({ searchParams }: { searchParams: Promise<Search> }) {
   const ctx = await requireScope();
@@ -89,7 +89,9 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
   // goes), fixed on the form; whom it goes to is chosen here. Sent, the backend checks it carries exactly that and
   // records the package delivered to them (PackageService.GoingAsync / SendableAsync / DeliveredAsync).
   const forPkg = sp.package && ctx.user.isInternal ? await packageByNumber(ctx, sp.package).catch(() => null) : null;
-  const pkgGoing = forPkg ? await packageGoing(ctx, forPkg.id) : null;
+  // "Deliver without what is missing", ticked on the package's Deliver: what is not ready goes as it stands.
+  const goShort = sp.short === "1";
+  const pkgGoing = forPkg ? await packageGoing(ctx, forPkg.id, goShort) : null;
   const pkgLines = pkgGoing?.going?.lines ?? [];
   const selectedDocumentIds = [...new Set([...(sp.docs ?? "").split(","), ...(sp.doc ? [sp.doc] : [])].map((value) => value.trim()).filter(Boolean))];
   const askedIds = ctx.can("CONTROL") ? [...new Set((sp.placeholders ?? "").split(",").map((one) => one.trim()).filter(Boolean))] : [];
@@ -190,7 +192,7 @@ export default async function NewTransmittalPage({ searchParams }: { searchParam
         unsent={unsent}
         parties={found.parties.map((p) => ({ id: p.id, code: p.code, name: p.name }))}
         forPackage={forPkg ? { id: forPkg.id, number: forPkg.number, title: forPkg.title, packages: pkgGoing?.going?.packages.length ?? 1,
-          left: pkgGoing?.going?.left ?? [], why: pkgGoing?.why ?? null } : undefined}
+          left: pkgGoing?.going?.left ?? [], why: pkgGoing?.why ?? null, short: goShort } : undefined}
         joining={joining}
         placeholders={placeholders.length ? { to: supplier!.name, items: placeholders, mixed: owners.length > 1 } : askedIds.length && owners.length > 1 ? { to: "", items: [], mixed: true } : undefined}
         prefill={{

@@ -259,7 +259,7 @@ public static class TransmittalEndpoints
         if (await transmittals.FormProblemAsync(access, request, cancellationToken) is { } formProblem) return formProblem;
         // For a package: exactly what delivering it carries (none added, none taken out); sent, it is delivered.
         if (request.PackageId is { } packageId
-            && await packages.SendableAsync(access, packageId, request.RevisionIds ?? [], cancellationToken) is { } packageProblem) return packageProblem;
+            && await packages.SendableAsync(access, packageId, request.RevisionIds ?? [], cancellationToken, request.GoShort == true) is { } packageProblem) return packageProblem;
         // A package delivered to another organization is theirs to read, never to change or return (owner): what they send
         // following its delivery asks by words alone, an information transmittal.
         if (!access.IsInternal && (request.RevisionIds?.Length ?? 0) > 0 && (request.FollowsId ?? request.InReplyToId) is { } follows
@@ -268,7 +268,7 @@ public static class TransmittalEndpoints
             return Problems.Invalid("DELIVERED_READ_ONLY",
                 "A package delivered to you is not returned or changed: ask what you need by an information transmittal, with no document.");
         var (sent, problem) = await transmittals.ComposeAsync(access, request, cancellationToken);
-        if (problem is null && request.PackageId is { } delivered) await packages.DeliveredAsync(access, delivered, sent, cancellationToken);
+        if (problem is null && request.PackageId is { } delivered) await packages.DeliveredAsync(access, delivered, sent, cancellationToken, request.GoShort == true);
         return problem ?? Results.Ok(sent.Select(t => new { t.Id, t.Number, t.ToName }));
     }
 

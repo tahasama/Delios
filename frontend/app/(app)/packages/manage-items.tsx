@@ -43,21 +43,16 @@ export function manageItems(pkg: PackageView, { mayEdit, mayDelete, mayRenumber 
       </ActionForm>
     ),
   });
+  // One red button, asked first (owner: never a delete nested in another opening); its documents are never lost.
   if (mayDelete) items.push({
     key: "delete",
     label: "Delete the package",
-    body: (
-      <ActionForm action={deletePackageAction} submitLabel="Delete package" size="sm" variant="danger"
+    act: (
+      <ActionForm action={deletePackageAction} submitLabel="Delete the package" size="sm" variant="danger" className="space-y-0"
         hidden={{ packageId: pkg.id, ...(back ? { back: `/packages/${encodeURIComponent(back)}` } : {}) }}
-        confirmText={back ? `The package is deleted. Its documents and the packages in it go back into ${back}. Continue?`
-          : pkg.members.length ? `The package is deleted with its ${pkg.members.length} document(s) in it: they stay in the register, out of any package. Continue?`
-          : "The package is deleted. Continue?"}>
-        <p className="text-xs text-slate-500">{back
-          ? `Its documents and the packages in it go back into ${back}: nothing of them is lost. Its number is not given out again.`
-          : pkg.members.length
-          ? `It holds ${pkg.members.length} document${pkg.members.length === 1 ? "" : "s"}: they leave it and stay in the register. Its number is not given out again.`
-          : "It is empty, so nothing of content goes with it. Its number is not given out again."}</p>
-      </ActionForm>
+        confirmText={back ? `${pkg.number} is deleted. Its documents and the packages in it go back into ${back}: nothing of them is lost. Continue?`
+          : pkg.members.length ? `${pkg.number} is deleted with its ${pkg.members.length} document(s) in it: they stay in the register, out of any package. Continue?`
+          : `${pkg.number} is deleted. Continue?`} />
     ),
   });
   return items;

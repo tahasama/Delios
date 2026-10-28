@@ -49,6 +49,8 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const activityId = String(formData.get("activityId") ?? "").trim() || null;
   const activityAsk = String(formData.get("activityAsk") ?? "").trim() || null;
   const packageId = String(formData.get("packageId") ?? "").trim() || null;
+  // Delivered without what is missing, on the sender's responsibility (the tick on the package's Deliver).
+  const goShort = formData.get("goShort") === "1";
 
   if (!reasonForIssue) return { error: "Every transmittal states its reason for issue." };
   if (!dateOfIssue) return { error: "Date of issue is required." };
@@ -110,7 +112,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
         body: {
           revisionIds, userIds: recipientUsers, partyIds: partyTo, reason: reasonForIssue, subject, message, copyUserIds: chosenCc,
           draft: !issueNow, inReplyToId, followsId, followKind, issuedOn: dayOf(dateOfIssue), extras: Object.keys(extras).length ? extras : null, activityId, activityAsk,
-          placeholderIds: placeholderIds.length ? placeholderIds : null, packageId,
+          placeholderIds: placeholderIds.length ? placeholderIds : null, packageId, goShort: packageId && goShort ? true : null,
           // Asked for an answer: by the day given, else as the reason allows. Not ticked: none asked.
           responseRequired: formData.get("answerRequired") === "on",
           responseDue: formData.get("answerRequired") === "on" ? String(formData.get("responseDue") ?? "") || null : null,

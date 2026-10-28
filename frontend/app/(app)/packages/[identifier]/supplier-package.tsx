@@ -9,12 +9,13 @@ import { ruleFilter, ruleWords } from "@/lib/packages/package-rule";
 import { RuleFields } from "../rule-fields";
 import { manageItems } from "../manage-items";
 import { ActionForm } from "@/components/form";
+import { IconAct } from "@/components/icon-act";
 import { submitSupplierPackageAction, sendAsReceivedAction } from "@/lib/packages/forms-supplier";
 import { AsReceivedWarning } from "@/components/as-received-warning";
 import { supplierRows, supplierFigures, packageStage, packageCounts, lineStage, WITH_SUPPLIER, type SupplierRow } from "@/lib/packages/supplier";
 import { fmtDate } from "@/lib/core/utils";
 import { plannedState } from "@/lib/actions/planned-state";
-import { ArrowLeft, Download, Filter, FolderInput, PackageCheck, Pencil, Send, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Filter, FolderInput, PackageCheck, Pencil, Send, Share2 } from "lucide-react";
 import { getMe } from "@/lib/account/api";
 import type { PackageView } from "@/lib/types";
 import { Branches, MovePackage, PackagePath, moveTargets } from "../arborescence";
@@ -308,13 +309,8 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
               ) : null}
               {edit ? <Act icon={Pencil} label={typeof edit.label === "string" ? edit.label : "Edit"}>{edit.body}</Act> : null}
               {!shared && !sentAny ? (
-                <Act icon={Trash2} label="Delete the package">
-                  <ActionForm action={deletePackageAction} submitLabel="Delete the package" size="sm" variant="danger" hidden={{ packageId: pkg.id }} confirmText="The package is deleted. Its documents stay in the register. Continue?">
-                    <p className="text-xs leading-5 text-slate-600">
-                      Its documents stay in the register{rows.length ? ` (${rows.length})` : ""} and are filed again: into another package of {supplierName} when there is one, else into one made by itself. Its number is not given out again.
-                    </p>
-                  </ActionForm>
-                </Act>
+                <IconAct action={deletePackageAction} icon="remove" danger label="Delete the package" hidden={{ packageId: pkg.id }}
+                  confirm={`${pkg.number} is deleted. Its documents stay in the register${rows.length ? ` (${rows.length})` : ""} and are filed again with ${supplierName}. Continue?`} />
               ) : null}
               {listLink}
               {/* Delivered once complete, to whom we choose then (owner): a data transmittal carrying the package and every
@@ -325,9 +321,10 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
                   <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number })}`}
                     className="ask inline-flex items-center gap-1.5"><PackageCheck className="h-3.5 w-3.5" /> Deliver</Link>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500" title="A supplier's package is delivered once every document in it is released">
-                    <PackageCheck className="h-3.5 w-3.5" /> Deliver once complete · {whole.released} of {whole.documents} released
-                  </span>
+                  // Not complete: delivered without what is missing, on the deliverer's responsibility (owner).
+                  <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number, short: "1" })}`}
+                    title={`${whole.documents - whole.released} not released yet: they are named on the transmittal, on your responsibility`}
+                    className="ask inline-flex items-center gap-1.5"><PackageCheck className="h-3.5 w-3.5" /> Deliver without what is missing · {whole.released} of {whole.documents} released</Link>
                 );
               })() : null}
             </div>

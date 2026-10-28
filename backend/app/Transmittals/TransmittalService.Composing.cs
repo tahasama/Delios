@@ -25,7 +25,8 @@ public sealed partial class TransmittalService
         Guid[]? RevisionIds, Guid[]? UserIds, Guid[]? PartyIds, string? Reason, string? Subject = null, string? Message = null,
         DateOnly? ResponseDue = null, Guid[]? CopyUserIds = null, bool Draft = false, Guid? InReplyToId = null, Guid? FollowsId = null,
         string? FollowKind = null, DateOnly? IssuedOn = null, Dictionary<string, string?>? Extras = null, Guid? ActivityId = null,
-        string? ActivityAsk = null, Guid[]? PlaceholderIds = null, bool? ResponseRequired = null, Guid? PackageId = null);
+        string? ActivityAsk = null, Guid[]? PlaceholderIds = null, bool? ResponseRequired = null, Guid? PackageId = null,
+        bool? GoShort = null);
 
     /// <summary>A compose request checked: what it carries, to whom, and when it is dated.</summary>
     private sealed record Prepared(

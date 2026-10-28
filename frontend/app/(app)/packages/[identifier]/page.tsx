@@ -5,7 +5,7 @@ import { Timeline } from "@/components/timeline";
 import { Card, Info, ToneChip, type TONE, Field, inputCls, Banner, btn } from "@/components/ui";
 import { DeliveryLines } from "./delivery-lines";
 import { ActionForm } from "@/components/form";
-import { setPackageRuleAction, assessPackageAction, issueShortfallAction, closePackageAction, acceptShortfallAction, acceptPackageAction } from "@/lib/packages/forms";
+import { setPackageRuleAction, closePackageAction, acceptPackageAction } from "@/lib/packages/forms";
 import { ruleFilter, ruleWords, statusList, reasonsOf, shortfallOf } from "@/lib/packages/package-rule";
 import { packageByNumber, ourPeople, packageParties, packageLines } from "@/lib/packages/api";
 import { isAdmin } from "@/lib/core/auth";
@@ -73,8 +73,8 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   const canAct = open && staff;
   const branchCount = pkg.place?.whole.packages ?? 0;
   const missing = new Set((shortfall ?? []).map((s) => s.documentId));
-  const waitingAcceptance = !!shortfall && !!pkg.shortfallIssuedAt && !pkg.shortfallAcceptedBy;
-  const mayDeliver = !!pkg.assessedAt && (!shortfall || !!pkg.shortfallAcceptedBy);
+  // Closed, handed over outside the system: once complete, or what is missing let go.
+  const mayClose = (total > 0 && readyCount === total) || !!pkg.shortfallAcceptedBy;
 
   const state = pkg.acceptedAt ? "accepted" : pkg.closedAt ? "delivered" : shortfall ? "shortfall" : pkg.assessedAt ? "ready" : overdue ? "overdue" : "open";
   const stateTone: Record<string, keyof typeof TONE> = { accepted: "done", delivered: "moving", ready: "done", shortfall: "waiting", overdue: "refused", open: "idle" };
@@ -82,16 +82,13 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   // How ready it is, in the schedule's colours: all there green, none red, anything between at risk.
   const readyTone = total && readyCount === total ? "text-emerald-700" : readyCount === 0 ? "text-red-700" : "text-amber-700";
   const count = <span className={readyTone}>{readyCount} of {total} ready</span>;
-  const asked = letters.length ? <> (asked on {letters.map((one, i) => <span key={one.id}>{i ? ", " : ""}<Link href={`/transmittals/${one.id}`} className="font-mono font-semibold text-link hover:underline">{one.number}</Link></span>)})</> : null;
   const sentOn = delivery.length ? <> on {delivery.map((one, i) => <span key={one.id}>{i ? ", " : ""}<Link href={`/transmittals/${one.id}`} className="font-mono font-semibold text-link hover:underline">{one.number}</Link></span>)}</> : null;
   const note = pkg.acceptedAt
     ? <>{delivery.length ? "Delivered" : "Closed"} {fmtDate(pkg.names.deliveredAt ?? pkg.closedAt!)}{sentOn}, accepted by <strong className="text-slate-800">{pkg.acceptedBy}</strong> {fmtDate(pkg.acceptedAt)}{pkg.acceptNote ? <>: <span className="whitespace-pre-line">{pkg.acceptNote}</span></> : "."}</>
     : pkg.closedAt
     ? <>{delivery.length ? <>Delivered to {pkg.names.to}</> : "Closed"} {fmtDate(pkg.names.deliveredAt ?? pkg.closedAt)}{sentOn}. Waiting for <strong className="text-slate-800">{pkg.names.acceptors}</strong> to accept it.</>
-    : waitingAcceptance ? <>{count}. Waiting for <strong className="text-slate-800">{pkg.names.acceptors}</strong> to say it may go without what is missing{asked}.</>
-    : shortfall && !pkg.shortfallIssuedAt ? <>{count}. Ask <strong className="text-slate-800">{pkg.names.acceptors}</strong> whether it may go without what is missing.</>
-    : mayDeliver ? <>{count}. Deliver it on a transmittal, to whom you choose.</>
-    : <>{count}. Get every document released at {spell(pkg.requiredStatuses.join(","))}, then check readiness.</>;
+    : readyCount === total && total ? <>{count}. Deliver it on a transmittal, to whom you choose.</>
+    : <>{count}. Deliver it once every document is released at {spell(pkg.requiredStatuses.join(",")) || "a status"}, or without what is missing, on your responsibility.</>;
 
   const items: StepItem[] = [];
   if (pkg.closedAt && !pkg.acceptedAt && (isAcceptor || isAdmin(user))) items.push({
@@ -106,50 +103,38 @@ export default async function PackageDetailPage({ params, searchParams }: { para
       </ActionForm>
     ),
   });
-  if (waitingAcceptance && isAcceptor && !pkg.closedAt) items.push({
-    key: "accept",
-    primary: true,
-    open: true,
-    label: "Let it go without what is missing",
-    body: (
-      <ActionForm action={acceptShortfallAction} submitLabel="Confirm — it may go as it stands" size="sm" hidden={{ packageId: pkg.id }}
-        confirmText={`It may go with ${shortfall?.length ?? 0} document(s) not at the status asked, on your responsibility. Go ahead?`}>
-        <Banner tone="warn" title="On your responsibility">
-          It may then be delivered: what is ready, and the {shortfall?.length ?? 0} not ready as they stand (their released revision, else their newest; one with no revision yet cannot go). The delivery transmittal says so, with your name.
-        </Banner>
-        <Field label="Why it may go" hint="optional — it goes on your confirmation"><input name="note" className={inputCls} /></Field>
-      </ActionForm>
-    ),
-  });
   if (canAct) {
-    // "Deliver the package" is always there while it is open (owner: "there is no deliver button"): ready, it opens the
+    // "Deliver the package" is always there while it is open (owner: "there is no deliver button"). Complete, it opens the
     // delivery transmittal (its documents fixed there, whom it goes to chosen there: owner, "recorded as transmittal so
-    // we can decide at the end to whom"); not yet, it holds the step it waits on.
+    // we can decide at the end to whom"). Not complete, "Deliver without what is missing" is a tick in it, greyed when
+    // nothing is missing (owner: "could've been just a check box inside deliver"): what is not ready goes as it stands,
+    // on the responsibility of whoever delivers it, said on the transmittal with their name.
+    const short = total - readyCount;
+    const goneShort = !!pkg.shortfallAcceptedBy;
     items.push({
       key: "deliver",
       primary: true,
-      open: mayDeliver,
+      open: !short || goneShort,
       label: "Deliver the package",
-      body: mayDeliver ? (
-        <div className="space-y-2">
+      body: (
+        <form action="/transmittals/new" method="get" className="space-y-3">
+          <input type="hidden" name="package" value={pkg.number} />
           <p className="text-xs text-slate-500">
-            {`A data transmittal carries what is ready (${readyCount})${branchCount ? `, and what the ${branchCount} package${branchCount === 1 ? "" : "s"} in it hold` : ""}, ${purpose.toLowerCase()}, as it stands: nothing added or taken out. You choose who receives it there. Sent, the package is delivered and its contents fixed${pkg.rule ? ": nothing more joins by its rule" : ""}; they read it as you do and change nothing; then ${pkg.names.acceptors} accepts it.`}
+            {`A data transmittal carries the package${branchCount ? ` and the ${branchCount} package${branchCount === 1 ? "" : "s"} in it` : ""}, ${purpose.toLowerCase()}, as it stands: nothing added or taken out. You choose who receives it there. Sent, it is delivered and its contents fixed${pkg.rule ? ": nothing more joins by its rule" : ""}; they read it as you do and change nothing; then ${pkg.names.acceptors} accepts it.`}
           </p>
-          <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number })}`} className={btn("primary", "sm")}>Write the transmittal</Link>
-        </div>
-      ) : !pkg.assessedAt ? (
-        <ActionForm action={assessPackageAction} submitLabel="Check readiness now" size="sm" hidden={{ packageId: pkg.id }}>
-          <p className="text-xs text-slate-500">First, its readiness is checked: which documents are released at the status it needs ({spell(pkg.requiredStatuses.join(",")) || "any status"}), and what is missing. Once all is ready (or what is missing let go), you deliver it from here.</p>
-        </ActionForm>
-      ) : shortfall && !pkg.shortfallIssuedAt ? (
-        <ActionForm action={issueShortfallAction} submitLabel={`Ask ${pkg.names.acceptors}`} size="sm" hidden={{ packageId: pkg.id }}>
-          <p className="text-xs text-slate-500">{shortfall.length} document{shortfall.length === 1 ? " is" : "s are"} not ready. A transmittal asks {pkg.names.acceptors} whether it may go without them, listing each one and where it stands; those putting it together are copied in. Or wait until they are released, and check readiness again.</p>
-        </ActionForm>
-      ) : (
-        <p className="text-xs text-slate-500">Waiting for {pkg.names.acceptors} to say it may go without what is missing{asked}.</p>
+          <label className={cn("flex items-start gap-2 text-xs leading-5", short && !goneShort ? "text-slate-700" : "cursor-not-allowed text-slate-400")}>
+            <input type="checkbox" name="short" value="1" disabled={!short || goneShort} defaultChecked={false} className="mt-0.5" />
+            <span>
+              <span className="font-semibold">Deliver without what is missing</span>
+              {" · "}{!short ? "nothing is missing" : goneShort ? `already let go by ${pkg.shortfallAcceptedBy}`
+                : `${short} of ${total} not ready: they go as they stand (released, else their newest), on your responsibility, said on the transmittal with your name`}
+            </span>
+          </label>
+          <button type="submit" className={btn("primary", "sm")}>Write the transmittal</button>
+        </form>
       ),
     });
-    if (mayDeliver) items.push({
+    if (mayClose) items.push({
       key: "close",
       label: "Close it, handed over outside the system",
       body: (
@@ -243,7 +228,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
         </div>
         <NextStepBody
           items={items}
-          status={<StagePath stages={["Compose", "Check", "Deliver", "Accept"]} at={pkg.acceptedAt ? 4 : pkg.closedAt ? 3 : pkg.assessedAt ? 2 : total ? 1 : 0} note={note} />}
+          status={<StagePath stages={["Compose", "Check", "Deliver", "Accept"]} at={pkg.acceptedAt ? 4 : pkg.closedAt ? 3 : total ? 2 : 0} note={note} />}
         />
       </section>}
 
@@ -278,9 +263,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
               { label: "Delivered to you", at: pkg.transmittals.find((one) => one.items > 0)?.issuedAt ?? null, holder: delivery.map((one) => one.number).join(", ") || null },
             ] : [
               { label: "Package opened", at: pkg.names.createdAt, holder: pkg.names.owners },
-              { label: "Readiness checked", at: pkg.assessedAt, holder: pkg.assessedAt ? `${readyCount} of ${total} ready` : null },
-              { label: "Acceptor asked about what is missing", at: pkg.shortfallIssuedAt, holder: letters[0]?.number ?? pkg.names.acceptors, skipped: !!pkg.assessedAt && !shortfall },
-              { label: "Goes without it, on their responsibility", at: pkg.shortfallAcceptedAt ?? null, holder: pkg.shortfallAcceptedBy ?? null, skipped: !!pkg.assessedAt && !shortfall },
+              ...(pkg.shortfallAcceptedAt ? [{ label: "Without what was missing, on their responsibility", at: pkg.shortfallAcceptedAt, holder: pkg.shortfallAcceptedBy ?? null }] : []),
               { label: delivery.length ? `Delivered to ${pkg.names.to}` : pkg.closedAt ? "Closed" : "Delivered", at: pkg.closedAt, holder: delivery.map((one) => one.number).join(", ") || (pkg.closedAt ? fmtDateTime(pkg.closedAt) : null) },
               { label: "Accepted", at: pkg.acceptedAt, holder: pkg.acceptedBy ?? pkg.names.acceptors },
             ]}
