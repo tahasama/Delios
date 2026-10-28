@@ -38,9 +38,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Never send screenshots or pictures.
 - Never quote a bare document number as a reference.
 - Ask before choosing any code (status, verdict, type…). A code never changes once used.
-- Nothing is deleted except by the app owner. Exception: an empty package
-  that never went out may be deleted by whoever composes it (it holds no content;
-  removing a package never removes documents).
+- Nothing is deleted except by the app owner. Exception: a package never delivered or shared with anyone may be
+  removed by whoever looks after it, filled or not (owner: "even if it is filled, with a warning"), why not asked;
+  removing a package never removes documents (they stay in the register, go back into the package it sat in, or a
+  supplier's are filed again with that supplier).
 - **Two levels of settings** (owner, for every setting): the organization's level is everything the app gives by
   default, adapted by its administrator, and it is the default of every project; the project's level inherits it and
   changes only what the organization left free. **Two Settings with the same cards** (owner): the organization's
@@ -152,8 +153,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   assurance, reports"): **real tabs are the Schedule's** (`.views` / `.view`, `.view-n` a count, `.view-hint`, `.view-go`
   the arrow; `globals.css`: one frame split in equal sides, the chosen side lit with the brand's line along its foot, the
   others greyed and carrying an arrow, scrolling sideways when they do not fit): the Schedule's three, Assurance,
-  Reports, a document's tabs, the organization's four (`org-tabs.tsx`), Packages' two kinds. **The switch** (`.seg` /
-  `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Home's "What is waiting",
+  Reports, a document's tabs, the organization's four (`org-tabs.tsx`). **The switch** (`.seg` /
+  `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Packages' two kinds beside
+  List · Tree (put back as they were: two designs side by side in one row read as inconsistent), Home's "What is waiting",
   the organization's People, the imports' "Which lines", list or tree, light or dark, in use · retired · all. The checks'
   groups, the rules' areas, Types & sets' groups and Help's roles keep the plain underlined tabs they always had (put back
   as they were). The Control room's navy console keeps its own tabs.
@@ -500,13 +502,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   transmittals to or from it.
 - **Packages' ticks bring up the bottom bar** (owner: "a check box for every package that does absolutely nothing"):
   `package-dock.tsx`, the register's dock: Open and Deliver (one ticked), Export (each ticked, its list), and for whoever
-  looks after them Move (inside another open package of the kind, or to the top) and Remove (with why), each as its own
-  page does it, the backend checking each.
-- **Taking a package out of a tree** (owner: "I can't remove packages in a tree, or move them out; I might not want them
-  anymore"): "Packages in it" gives each open package "Move out or remove": moved up beside the package it sat in (or to
-  the top), or removed, never delivered: a package inside another gives its documents and the packages in it back to the
-  package it sat in, nothing of them lost (PARENT_CLOSED when that one is closed); one at the top still goes only empty,
-  the packages in it moving to the top. Its own page's Delete does the same.
+  looks after them Move, only where there is somewhere to go (owner: "what good does move do here?": inside another open
+  package of the kind, a supplier's of the same supplier, or to the top for one sitting in another), and Remove (those
+  never delivered or shared; warned of the documents they hold; no why asked), the backend checking each.
+- **Taking a package out of a tree** (owner: "proper separate icons like a normal sane organisation does"): "Packages in
+  it" gives each open package two icons (`components/icon-act.tsx`, asked first, no why): move it out (up beside the
+  package it sat in, or to the top) and remove it (its documents and the packages in it back into the package it sat in,
+  nothing lost; PARENT_CLOSED when that one is closed). Any package never delivered or shared is removed the same way
+  from its own page, filled or not, with a warning (PACKAGE_HAS_GONE_OUT once a transmittal carried it; the letters
+  about it stay, no longer naming it).
 - **Ready at the status a package needs** (`PackageService.IsReady`): a package asking no status takes a document
   released at any; a line not ready says why ("released at IFR; the package needs IFC", "nothing released yet").
 - **"Deliver the package" is always on our package while it is open** (owner: "there is no deliver button"): ready, it

@@ -49,11 +49,14 @@ export function manageItems(pkg: PackageView, { mayEdit, mayDelete, mayRenumber 
     body: (
       <ActionForm action={deletePackageAction} submitLabel="Delete package" size="sm" variant="danger"
         hidden={{ packageId: pkg.id, ...(back ? { back: `/packages/${encodeURIComponent(back)}` } : {}) }}
-        confirmText={back ? `The package is deleted. Its documents and the packages in it go back into ${back}. Continue?` : "The package is deleted. Its documents stay in the register. Continue?"}>
+        confirmText={back ? `The package is deleted. Its documents and the packages in it go back into ${back}. Continue?`
+          : pkg.members.length ? `The package is deleted with its ${pkg.members.length} document(s) in it: they stay in the register, out of any package. Continue?`
+          : "The package is deleted. Continue?"}>
         <p className="text-xs text-slate-500">{back
           ? `Its documents and the packages in it go back into ${back}: nothing of them is lost. Its number is not given out again.`
+          : pkg.members.length
+          ? `It holds ${pkg.members.length} document${pkg.members.length === 1 ? "" : "s"}: they leave it and stay in the register. Its number is not given out again.`
           : "It is empty, so nothing of content goes with it. Its number is not given out again."}</p>
-        <Field label="Why" required hint="goes on the record"><input name="reason" required className={inputCls} /></Field>
       </ActionForm>
     ),
   });

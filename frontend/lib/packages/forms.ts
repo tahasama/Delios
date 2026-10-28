@@ -217,12 +217,12 @@ export async function fillPackageAction(_prev: { error?: string } | undefined, f
 export async function deletePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const packageId = String(formData.get("packageId") ?? "");
+  // Why is not asked (owner: "remove obligatory why, we don't care"); written, it goes on the record.
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!reason) return { error: "Say why it is deleted — it goes on the record." };
   const pkg = await packageView(ctx, packageId);
   if (!pkg) return { error: "That package no longer exists." };
   try {
-    await api(projectPath(ctx, `/packages/${packageId}`), { method: "DELETE", query: { reason } });
+    await api(projectPath(ctx, `/packages/${packageId}`), { method: "DELETE", query: reason ? { reason } : {} });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -300,11 +300,10 @@ export async function deletePackagesAction(_prev: { error?: string; message?: st
   const ctx = await requireScope();
   const ids = formData.getAll("packageId").map(String).filter(Boolean);
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!reason) return { error: "Say why they are removed — it goes on the record." };
   let removed = 0;
   for (const id of ids) {
     try {
-      await api(projectPath(ctx, `/packages/${id}`), { method: "DELETE", query: { reason } });
+      await api(projectPath(ctx, `/packages/${id}`), { method: "DELETE", query: reason ? { reason } : {} });
       removed++;
     } catch (e) {
       revalidatePath("/packages", "layout");

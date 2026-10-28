@@ -487,14 +487,13 @@ public sealed partial class PackageService(
         var supply = package!.Kind == PackageKinds.Supply;
         // Inside another package (owner: "I can't remove packages in a tree… I might not want them anymore"), it is taken
         // out of the tree: its documents go back to the package it sits in, the packages in it move up there too. Nothing
-        // of its documents is lost. At the top, a package of ours still goes only once empty, and packages in it move to the top.
-        var branch = package.ParentId is not null;
+        // of its documents is lost. At the top, its documents stay in the register, and packages in it move to the top.
         if (supply && package.Members.Any(m => m.RequestedAt is not null))
             return Problems.Conflict("SENT_TO_SUPPLIER", "Some of its documents were sent to the supplier on a transmittal; it is kept.");
-        if (!supply && !branch && package.Members.Count > 0)
-            return Problems.Conflict("PACKAGE_NOT_EMPTY", "Take its documents out first: only an empty package is deleted.");
-        if (await db.Transmittals.AnyAsync(t => t.PackageId == package.Id, cancellationToken))
-            return Problems.Conflict("PACKAGE_HAS_GONE_OUT", "A transmittal went out for it; it is kept.");
+        // Never delivered to anyone (owner: "I should be able to remove a package if it is not shared with anyone yet, whatever
+        // the type, even if it is filled"): its documents leave it and stay in the register.
+        if (package.DeliveredTo.Length > 0 || await db.Transmittals.AnyAsync(t => t.PackageId == package.Id && t.Items.Any(), cancellationToken))
+            return Problems.Conflict("PACKAGE_HAS_GONE_OUT", "It was delivered on a transmittal; it is kept.");
         if (package.SharedAt is not null)
             return Problems.Conflict("PACKAGE_SHARED", "It was shared with its supplier; it is kept.");
         var held = package.Members.Count;
@@ -514,6 +513,8 @@ public sealed partial class PackageService(
                 ResetAssessment(up);
             }
         }
+        // A letter written about it (asking whether it may go short, and the answer) stays, no longer naming it.
+        foreach (var letter in await db.Transmittals.Where(t => t.PackageId == package.Id).ToListAsync(cancellationToken)) letter.PackageId = null;
         // The packages in it move up to where it sat (the top when it sat there), their numbers kept.
         var inside = await db.Packages.Where(p => p.ParentId == package.Id).ToListAsync(cancellationToken);
         foreach (var child in inside) child.ParentId = package.ParentId;

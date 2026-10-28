@@ -11,7 +11,6 @@ import { supplierRows, packageCounts, packageStage } from "@/lib/packages/suppli
 import { isController, isAdmin, standsInForControl } from "@/lib/core/auth";
 import { getActiveSet } from "@/lib/settings/config";
 import { fmtDate } from "@/lib/core/utils";
-import { ArrowRight, FolderClosed, Truck } from "lucide-react";
 import { isReadOnly } from "@/lib/core/auth";
 import { SearchPick } from "@/components/search-pick";
 import { RuleFields } from "./rule-fields";
@@ -121,9 +120,9 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
         </div>
         <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <nav className="views" aria-label="Which packages">
+          <nav className="seg w-fit max-w-full">
             {shownTabs.map((c) => (
-              <Link key={c.code} href={`/packages?category=${c.code}${view === "tree" ? "&view=tree" : ""}`} aria-current={category === c.code ? "page" : undefined} className="view">{c.code === "SUPPLIER" ? <Truck /> : <FolderClosed />}{c.label}<ArrowRight className="view-go" /></Link>
+              <Link key={c.code} href={`/packages?category=${c.code}${view === "tree" ? "&view=tree" : ""}`} aria-current={category === c.code ? "page" : undefined} className="segment">{c.label}</Link>
             ))}
           </nav>
           {/* The list of packages at the top, or the whole tree (owner: both). */}
@@ -193,8 +192,9 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
     {view === "list" && shownRows.length ? (
       <PackageDock
         packages={shownRows.map((one) => ({ id: one.id, number: one.number, title: one.title ?? one.names.to, open: !one.closedAt && one.state === "OPEN",
-          inTree: !!one.place?.parentId, empty: one.members.length === 0, sent: one.transmittals.length > 0 || !!one.sharedAt }))}
-        targets={pkgs.filter((one) => !one.closedAt && one.state === "OPEN").map((one) => ({ id: one.id, number: one.number, title: one.title ?? one.names.to }))}
+          inTree: !!one.place?.parentId, members: one.members.length, supplier: one.supplierPartyId,
+          sent: one.transmittals.some((t) => t.items > 0) || !!one.sharedAt }))}
+        targets={pkgs.filter((one) => !one.closedAt && one.state === "OPEN").map((one) => ({ id: one.id, number: one.number, title: one.title ?? one.names.to, supplier: one.supplierPartyId }))}
         manage={staff && !supplierOnly}
         deliver={staff && !supplierOnly}
       />

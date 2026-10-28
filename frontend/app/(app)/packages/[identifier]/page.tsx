@@ -185,8 +185,9 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   });
   if (mayCompose) {
     // Only an empty package that never went out is deleted: it holds no content.
-    // An empty package that never went out; or one sitting in another, whose documents go back up there (owner).
-    items.push(...manageItems(pkg, { mayEdit: false, mayDelete: (total === 0 || !!pkg.place?.parentId) && !pkg.transmittals.length,
+    // Any package never delivered to anyone (owner: "even if it is filled, with a warning"): its documents stay in the
+    // register, or go back up into the package it sat in.
+    items.push(...manageItems(pkg, { mayEdit: false, mayDelete: !pkg.transmittals.some((one) => one.items > 0),
       back: pkg.place?.path.at(-1)?.number }));
   }
 

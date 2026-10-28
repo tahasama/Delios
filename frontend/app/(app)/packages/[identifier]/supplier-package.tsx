@@ -313,7 +313,6 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
                     <p className="text-xs leading-5 text-slate-600">
                       Its documents stay in the register{rows.length ? ` (${rows.length})` : ""} and are filed again: into another package of {supplierName} when there is one, else into one made by itself. Its number is not given out again.
                     </p>
-                    <Field label="Why" required hint="goes on the record"><input name="reason" required className={inputCls} /></Field>
                   </ActionForm>
                 </Act>
               ) : null}

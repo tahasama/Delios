@@ -3,6 +3,7 @@ import { ArrowUpLeft, ChevronRight, FolderTree, Trash2 } from "lucide-react";
 import { Field, inputCls, ToneChip } from "@/components/ui";
 import { Select } from "@/components/select";
 import { ActionForm } from "@/components/form";
+import { IconAct } from "@/components/icon-act";
 import { deletePackageAction, movePackageAction } from "@/lib/packages/forms";
 import type { PackageTally, PackageView } from "@/lib/types";
 
@@ -77,23 +78,13 @@ export function Branches({ pkg, newHref, manage = false }: {
                 <span className="text-xs text-slate-600">{tallyWords(pkg.kind, b.tally)}</span>
                 {pkg.kind === "DELIVERY" ? <ToneChip inRegister tone={s.tone}>{s.word}</ToneChip> : null}
                 {manage && b.state === "OPEN" ? (
-                  <details className="group basis-full sm:basis-auto [&[open]]:basis-full">
-                    <summary className="ask cursor-pointer list-none py-1! text-xs! [&::-webkit-details-marker]:hidden">Move out or remove</summary>
-                    <div className="mt-2 grid gap-3 rounded-md bg-tint-soft p-3 ring-1 ring-line md:grid-cols-2">
-                      <ActionForm action={movePackageAction} submitLabel={place?.parentId ? `Move it up, beside ${pkg.number}` : "Move it to the top"} size="sm" variant="secondary"
-                        hidden={{ packageId: b.id, parentId: place?.parentId ?? "TOP" }}>
-                        <p className="flex items-start gap-1.5 text-xs leading-5 text-slate-600"><ArrowUpLeft className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-                          Out of {pkg.number}, with its documents and the packages in it; its number stays.</p>
-                      </ActionForm>
-                      <ActionForm action={deletePackageAction} submitLabel="Remove it" size="sm" variant="danger"
-                        hidden={{ packageId: b.id, back: `/packages/${encodeURIComponent(pkg.number)}` }}
-                        confirmText={`${b.number} is removed. Its documents and the packages in it come back into ${pkg.number}. Continue?`}>
-                        <p className="flex items-start gap-1.5 text-xs leading-5 text-slate-600"><Trash2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-                          Its documents and the packages in it come back into {pkg.number}: nothing of them is lost. Its number is not given out again.</p>
-                        <Field label="Why" required hint="goes on the record"><input name="reason" required className={inputCls} /></Field>
-                      </ActionForm>
-                    </div>
-                  </details>
+                  <span className="flex items-center gap-1">
+                    <IconAct action={movePackageAction} icon={ArrowUpLeft} hidden={{ packageId: b.id, parentId: place?.parentId ?? "TOP" }}
+                      label={place?.parentId ? `Move ${b.number} out, beside ${pkg.number}` : `Move ${b.number} out, to the top`} />
+                    <IconAct action={deletePackageAction} icon={Trash2} danger hidden={{ packageId: b.id, back: `/packages/${encodeURIComponent(pkg.number)}` }}
+                      label={`Remove ${b.number}`}
+                      confirm={`${b.number} is removed. Its documents and the packages in it come back into ${pkg.number}. Continue?`} />
+                  </span>
                 ) : null}
               </li>
             );
