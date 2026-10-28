@@ -1325,6 +1325,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   manual and belongs in Help. It includes what each form asks where the organization decided otherwise (Forms &
   fields: made required, left out, added), the acts left out, each reason's expected answer, delivery packages, and
   how fine the matrix is cut. A setting the app does not apply is never stated.
+  **A hint of colour, nothing more** (owner: the chapters "look hard on the eye"): each part's title in the brand's ink
+  with a short mark, a table's head on a light tint in the brand's ink, its rows striped, its first column in ink, a
+  fact's label in ink, the cover's figures in ink (the target reads "95% target"); who does an act reads the control
+  function in ink, whoever does the work in green (`plan/parts.tsx`).
   **Plan v1** (owner: "I like it; if the next one doesn't work we fall back to it") is commit `ef95589`
   (`frontend/app/(app)/conformance/plan/`, `backend/app/Checks/PlanEndpoints.cs`): restore those files from it.
 - **Assurance tabs share one top** (owner: tabs must not jump): `conformance/head.tsx` (`AssuranceHead`): the same plate

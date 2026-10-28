@@ -224,10 +224,10 @@ export async function DocumentManagementPlan() {
               [hasControl ? String(control.length) : "none", hasControl ? "act as the control function" : "control function: the work does it"],
               [String(plan.numbering.length), plan.numbering.length === 1 ? "numbering" : "numberings"],
               [String(plan.routes.length), plan.routes.length === 1 ? "review route" : "review routes"],
-              [`${scope.integrityThreshold}%`, "of documents clear: the target"],
+              [`${scope.integrityThreshold}%`, "target"],
             ].map(([figure, words]) => (
               <div key={words} className="rounded-md bg-tint-soft px-3 py-2.5 ring-1 ring-line">
-                <p className="text-xl font-semibold leading-none tabular-nums text-slate-900">{figure}</p>
+                <p className="text-xl font-semibold leading-none tabular-nums text-brand-ink">{figure}</p>
                 <p className="mt-1 text-[11px] leading-4 text-slate-600">{words}</p>
               </div>
             ))}
@@ -295,11 +295,11 @@ export async function DocumentManagementPlan() {
           {/* Who first, in a word, so the column reads at a glance; how it is done after it, in a lighter voice. */}
           <Grid head={["Act", "Who", "How"]}
             rows={reading.rows.map((row) => [
-              <span key="a" className="font-semibold text-slate-800">{row.activity.title}</span>,
+              <span key="a" className="font-semibold">{row.activity.title}</span>,
               row.off
                 ? <span key="w" className="whitespace-nowrap text-slate-500">Nobody: left out</span>
                 : <span key="w" className="flex flex-col gap-0.5 whitespace-nowrap">
-                    <span className="font-semibold text-slate-800">{row.controlDoes ? "The control function" : "Whoever does the work"}</span>
+                    <span className={`font-semibold ${row.controlDoes ? "text-brand-ink" : "text-emerald-800 dark:text-emerald-300"}`}>{row.controlDoes ? "The control function" : "Whoever does the work"}</span>
                     {row.confirm ? <span className="text-[11px] text-slate-500">after whoever holds Manage confirms</span> : null}
                   </span>,
               row.off
