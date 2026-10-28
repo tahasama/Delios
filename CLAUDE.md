@@ -153,9 +153,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   assurance, reports"): **real tabs are the Schedule's** (`.views` / `.view`, `.view-n` a count, `.view-hint`, `.view-go`
   the arrow; `globals.css`: one frame split in equal sides, the chosen side lit with the brand's line along its foot, the
   others greyed and carrying an arrow, scrolling sideways when they do not fit): the Schedule's three, Assurance,
-  Reports, a document's tabs, the organization's four (`org-tabs.tsx`); more than a row holds (Reports' eight, owner:
-  "performed badly on Reports", the last one cut) are laid as a block, 2 across, 4 on a wide screen (`.views-grid`), each
-  with its icon as Assurance's (`REPORT_ICON`). **The switch** (`.seg` /
+  Reports, a document's tabs, the organization's four (`org-tabs.tsx`). Reports' eight sit on one line under the
+  plate, out of its card, as Assurance's (owner: "they fitted before, they should fit now in one line, and bring them out
+  of the card"), each with its icon (`REPORT_ICON`), a little less room beside the words (`.views-tight`; about 1,450
+  pixels wide, sideways below that). **The switch** (`.seg` /
   `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Packages' two kinds beside
   List · Tree (put back as they were: two designs side by side in one row read as inconsistent), Home's "What is waiting",
   the organization's People, the imports' "Which lines", list or tree, light or dark, in use · retired · all. The checks'

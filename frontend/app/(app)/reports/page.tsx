@@ -44,14 +44,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const needsDay = current === "asof" && !asked.on;
   const tabs = offered.map((id) => ({ id, title: REPORT_TITLES[id] }));
   const nav = (on: string) => tabs.length > 1 ? (
-    <nav aria-label="Reports" className={`${tabs.length > 4 ? "views-grid" : "views"} no-print mx-5 mb-4 sm:mx-6`}>
+    <nav aria-label="Reports" className="views views-tight no-print">
       {tabs.map((t) => {
         const Icon = REPORT_ICON[t.id] ?? FileText;
         return (
           <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className="view">
             <Icon />
-            <span className="truncate">{t.title}</span>
-            <ArrowRight className="view-go ml-auto" />
+            {t.title}
+            <ArrowRight className="view-go" />
           </Link>
         );
       })}
@@ -113,8 +113,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           ) : null}
         </div>
 
-        {nav(current)}
-
         {/* Register on a date asks its day; nothing is counted before one is chosen. */}
         {current === "asof" ? (
           <form className="no-print flex flex-wrap items-end gap-3 border-t border-line px-5 py-3 sm:px-6">
@@ -139,6 +137,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </div>
         ) : null}
       </section>
+
+      {/* The reports' tabs under the plate, on one line, as Assurance's. */}
+      {nav(current)}
 
       {needsDay ? (
         <p className="rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
