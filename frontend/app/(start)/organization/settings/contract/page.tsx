@@ -85,7 +85,7 @@ export default async function ContractPage() {
         </Banner>
       ) : null}
 
-      {(c.state === "TRIAL" || c.readsOnly || !c.plan) && c.plans.length ? (
+      {c.state === "TRIAL" || c.readsOnly || !c.plan ? (
         <section id="choose" className="register register-sheet register-sheet-open">
           {band("Choose a plan", c.asked ? "sent to DELIOS" : c.state === "TRIAL" ? "to keep working after the trial" : "to work again")}
           {c.asked ? (
@@ -99,6 +99,7 @@ export default async function ContractPage() {
               organizations working with you are free.
             </p>
           )}
+          {c.plans.length ? (
           <ActionForm action={choosePlanAction} submitLabel={c.asked ? "Change my choice" : "Send my choice to DELIOS"}
             className="asking grid grid-cols-1 items-end gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_10rem] sm:px-6" footerClassName="sm:col-span-2">
             <Field label="Plan" required>
@@ -113,6 +114,11 @@ export default async function ContractPage() {
             <Field label="Users" required hint={`${c.users} today`}><input name="users" type="number" min={1} required defaultValue={c.asked?.users ?? Math.max(c.users, 1)} className="plain w-full" /></Field>
             <Field label="Anything to add" hint="optional: yearly payment, a question…" className="sm:col-span-2"><input name="note" defaultValue={c.asked?.note ?? ""} className="plain w-full" /></Field>
           </ActionForm>
+          ) : (
+            <p className="px-5 py-3 text-[13px] text-slate-700 sm:px-6">
+              DELIOS has no plans on offer yet. Write to DELIOS support{contact.email ? <> at <a href={`mailto:${contact.email}`} className="font-semibold text-link hover:underline">{contact.email}</a></> : null} to agree one.
+            </p>
+          )}
         </section>
       ) : null}
 
