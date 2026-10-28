@@ -119,15 +119,14 @@ export default async function Payments() {
           ) : <Nothing>No plan yet. Add the first one beside.</Nothing>}
         </Sheet>
         <Sheet title="Add or change a plan" said="by its code">
-          <ActionForm action={savePlanAction} submitLabel="Save the plan" resetOnSuccess className="asking space-y-4 px-5 py-4 sm:px-6">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-              <Field label="Code" required hint="kept once used"><input name="code" required className="plain w-full uppercase" placeholder="TEAM" /></Field>
-              <Field label="Name" required><input name="name" required className="plain w-full" placeholder="Team" /></Field>
-              <Field label="Per user a month" hint="empty: on request"><input name="pricePerUser" type="number" min={0} step="0.01" className="plain w-full" /></Field>
-              <Field label="Currency"><input name="currency" defaultValue="EUR" maxLength={3} className="plain w-full uppercase" /></Field>
-              <Field label="Notes" className="col-span-2"><textarea name="notes" rows={2} className={inputCls} /></Field>
-            </div>
-            <SwitchField name="active" defaultChecked>Sold now</SwitchField>
+          <ActionForm action={savePlanAction} submitLabel="Save the plan" resetOnSuccess
+            className="asking grid grid-cols-2 gap-x-4 gap-y-4 px-5 py-4 sm:px-6" footerClassName="col-span-2">
+            <Field label="Code" required hint="kept once used"><input name="code" required className="plain w-full uppercase" /></Field>
+            <Field label="Name" required><input name="name" required className="plain w-full" /></Field>
+            <Field label="Price per user" hint="a month; empty: on request"><input name="pricePerUser" type="number" min={0} step="0.01" className="plain w-full" /></Field>
+            <Field label="Currency"><input name="currency" defaultValue="EUR" maxLength={3} className="plain w-full uppercase" /></Field>
+            <Field label="Notes" hint="shown to organizations beside the price" className="col-span-2"><textarea name="notes" rows={2} className={inputCls} /></Field>
+            <div className="col-span-2"><SwitchField name="active" defaultChecked>Sold now: organizations can choose it</SwitchField></div>
           </ActionForm>
         </Sheet>
       </div>
