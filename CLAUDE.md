@@ -1509,6 +1509,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   person's opened panel ("Set a password", typed twice; `setPasswordAction`, `PUT /api/admin/users/{id}` `password`):
   administrators only (ADMIN_ONLY), never one's own (OWN_PASSWORD: "Forgot password"), never a linked account; the person
   is told at once by email and on Notifications, signed out everywhere, logged (PASSWORD_SET).
+- **A table's paging is in its bar, above the rows** (owner: "for all tables for consistency"): which rows of how many,
+  the steps, and Rows per page sit where the count was, beside the column and export icons (`components/table-paging.tsx`,
+  `TablePaging`, DataTable `paging`); no strip under the rows. The register, transmittals, reviews, the Schedule's table,
+  an action's documents, a transmittal's documents. The plan keeps its foot (its "Load more" adds bars at the end).
 - **Every register's card but the schedule's is 40 pixels taller than the plan's** (owner, after trying it on the
   document register; `components/card-height.ts`).
 - Import & export follows the Schedule look; exports are grouped (the register, Assurance, the record).

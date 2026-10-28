@@ -6,7 +6,8 @@ import { TabLink } from "@/components/tab-link";
 import { TONE } from "./plan-timeline";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CalendarRange, ChevronDown, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
+import { TablePaging } from "@/components/table-paging";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { DateWindow } from "@/components/date-window";
 import { FilterMenu } from "@/components/filter-menu";
@@ -508,6 +509,7 @@ export function PlanRegister({
               <DataTable
                 id="actions"
                 className="rounded-none border-0 shadow-none"
+                paging={total > 0 ? <TablePaging from={paging.from} to={paging.to} total={total} page={paging.page} pages={paging.pages} onPage={(page) => go(step(page))} perPage={paging.perPage} sizes={paging.sizes} onSize={(per) => go(sized(per))} /> : undefined}
                 defaultHidden={["Confirmed"]}
                 fill
                 stretch
@@ -599,47 +601,12 @@ export function PlanRegister({
             )}
           </div>
 
-          {total > 0 ? (
-            <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
-              <p className="font-mono text-[11px] tabular-nums text-slate-500">
-                {paging.from.toLocaleString("en-GB")}–{paging.to.toLocaleString("en-GB")}
-                <span className="ml-1.5 font-sans text-slate-500">of {total.toLocaleString("en-GB")}</span>
-              </p>
-              {paging.pages > 1 ? (
-                <span className="flex items-center gap-2">
-                  <PageStep onClick={() => go(step(paging.page - 1))} disabled={paging.page === 1} label="Previous page"><ChevronLeft className="h-4 w-4" /></PageStep>
-                  <span className="font-mono text-[11px] tabular-nums text-slate-500">{paging.page} of {paging.pages}</span>
-                  <PageStep onClick={() => go(step(paging.page + 1))} disabled={paging.page === paging.pages} label="Next page"><ChevronRight className="h-4 w-4" /></PageStep>
-                </span>
-              ) : <span />}
-              <label className="flex items-center justify-end gap-1.5">
-                <span className="stencil text-slate-500">Rows</span>
-                <Select className="plain" value={paging.perPage} onChange={(event) => go(sized(Number(event.target.value)))}>
-                  {paging.sizes.map((size) => <option key={size} value={size}>{size}</option>)}
-                </Select>
-              </label>
-            </div>
-          ) : null}
         </div>
       )}
     </section>
   </>;
 }
 
-/** One step through the register. A step that leads nowhere is shown, and dead. */
-function PageStep({ onClick, disabled, label, children }: { onClick: () => void; disabled: boolean; label: string; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className="rounded-sm p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-ink disabled:cursor-default disabled:text-slate-300 disabled:hover:bg-transparent"
-    >
-      {children}
-    </button>
-  );
-}
 
 /** Where this browser keeps the order its reader dragged the columns into. */
 const ORDER_KEY = "actions:columns";

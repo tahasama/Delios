@@ -8,10 +8,11 @@ import Link from "next/link";
 import { saveRegisterView, deleteRegisterView } from "@/lib/documents/forms-register-views";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, GitPullRequestArrow, PackagePlus, Pin, PinOff, Search, Send, X } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, Download, GitPullRequestArrow, PackagePlus, Pin, PinOff, Search, Send, X } from "lucide-react";
 import { FilterMenu } from "@/components/filter-menu";
 import { FilterOptions } from "@/components/filter-options";
 import { sendSupplierFromRegisterAction as sendFromRegister } from "@/lib/packages/forms-supplier";
+import { TablePaging } from "@/components/table-paging";
 import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
 import { Th, Td, Info } from "@/components/ui";
@@ -536,7 +537,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       ) : null}
 
       <div className={`${cardHeight ? "flex min-h-0 flex-1 flex-col" : ""} ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
-        {rows.length ? <DataTable id="register" className="rounded-none border-0 shadow-none" stretch={!!cardHeight} defaultHidden={OPTIONAL} onMove={move} onReorder={moveTo} forced={forced} fill tools={
+        {rows.length ? <DataTable id="register" className="rounded-none border-0 shadow-none" stretch={!!cardHeight} paging={paging && total > 0 ? <TablePaging from={paging.from} to={paging.to} total={total} page={paging.page} pages={paging.pages} onPage={(page) => go(pageHref({ page }))} perPage={paging.perPage} sizes={paging.sizes} onSize={(per) => go(pageHref({ per, page: 1 }))} /> : undefined} defaultHidden={OPTIONAL} onMove={move} onReorder={moveTo} forced={forced} fill tools={
           <a
             href={exportHref}
             onClick={(event) => { event.preventDefault(); startDownload(exportWith(exportHref), "The register"); }}
@@ -628,29 +629,6 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
         </div>}
       </div>
 
-      {paging && total > 0 ? (
-        <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line bg-surface px-5 py-2.5 sm:px-6">
-          <p className="font-mono text-[11px] tabular-nums text-slate-500">
-            {paging.from.toLocaleString("en-GB")}–{paging.to.toLocaleString("en-GB")}
-            <span className="ml-1.5 font-sans text-slate-400">of {total.toLocaleString("en-GB")}</span>
-          </p>
-
-          {paging.pages > 1 ? (
-            <span className="flex items-center justify-center gap-1">
-              <PageStep onClick={() => go(pageHref({ page: paging.page - 1 }))} disabled={paging.page === 1} label="Previous page"><ChevronLeft className="h-4 w-4" /></PageStep>
-              <span className="px-2 font-mono text-[11px] tabular-nums text-slate-600">{paging.page} <span className="text-slate-400">/ {paging.pages}</span></span>
-              <PageStep onClick={() => go(pageHref({ page: paging.page + 1 }))} disabled={paging.page === paging.pages} label="Next page"><ChevronRight className="h-4 w-4" /></PageStep>
-            </span>
-          ) : <span />}
-
-          <label className="flex items-center justify-end gap-1.5">
-            <span className="stencil text-slate-400">Rows</span>
-            <Select className="plain" value={paging.perPage} onChange={(event) => go(pageHref({ per: Number(event.target.value), page: 1 }))}>
-              {paging.sizes.map((size) => <option key={size} value={size}>{size}</option>)}
-            </Select>
-          </label>
-        </div>
-      ) : null}
     </section>
 
     {picking?.back ? (
@@ -943,10 +921,5 @@ function SortButton({ label, on, onClick }: { label: string; on: "asc" | "desc" 
 
 function Muted() { return <span className="text-slate-300">·</span>; }
 
-/** One step through the register. A step that leads nowhere is shown, and dead. */
-function PageStep({ onClick, disabled, label, children }: { onClick: () => void; disabled: boolean; label: string; children: React.ReactNode }) {
-  if (disabled) return <span aria-disabled className="rounded-sm p-1 text-slate-300">{children}</span>;
-  return <button type="button" onClick={onClick} aria-label={label} className="rounded-sm p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-ink">{children}</button>;
-}
 
 function date(value: string | null) { return value ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value)) : "—"; }

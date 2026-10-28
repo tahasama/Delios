@@ -60,6 +60,7 @@ export function DataTable({
   onReorder,
   forced,
   tools,
+  paging,
   fill,
   capHeight,
   stretch,
@@ -98,6 +99,9 @@ export function DataTable({
    * looking for what they can do to a table looks.
    */
   tools?: React.ReactNode;
+  /** Where the table stands in its rows (`TablePaging`), in its bar above them instead of the count (owner: paging
+   *  at the top, no strip under the rows). */
+  paging?: React.ReactNode;
   /**
    * Makes the rows the only thing that scrolls: the table stands 85% of the
    * window tall, its bar holds under the application header and its paging
@@ -263,6 +267,7 @@ export function DataTable({
   const shown = hideable.filter((l) => !prefs.hidden.includes(l)).length;
   const customised = !same(prefs, base);
   const withBar = toolbar && hideable.length >= 3;
+  const bar = withBar || !!paging;
   const sticky = rows > STICKY_AFTER;
 
   // How tall the rows are: the window, less everything that will still be on
@@ -323,12 +328,12 @@ export function DataTable({
   return (
     <div className={cn("dt rounded-2xl border border-line bg-surface shadow-sm", stretch && "flex min-h-0 flex-1 flex-col", className)} data-dt={scope}>
       {css ? <style>{css}</style> : null}
-      {withBar ? (
+      {bar ? (
         <div className={cn(
           "dt-bar no-print flex items-center justify-between gap-2 rounded-t-[inherit] border-b border-line bg-surface px-3 py-1.5",
         )}>
-          <p className="px-1 text-[11px] font-medium tabular-nums text-slate-400">{rows} {rows === 1 ? "row" : "rows"}</p>
-          <div className="flex items-center gap-0.5">
+          {paging ?? <p className="px-1 text-[11px] font-medium tabular-nums text-slate-400">{rows} {rows === 1 ? "row" : "rows"}</p>}
+          {withBar ? <div className="flex items-center gap-0.5">
             {customised ? (
               <button type="button" onClick={() => update(() => base)} className="dt-tool" title="Back to the standard columns and widths">
                 <RotateCcw className="h-3.5 w-3.5" /> Reset
@@ -429,7 +434,7 @@ export function DataTable({
                 document.body,
               ) : null}
             </div>
-          </div>
+          </div> : null}
         </div>
       ) : null}
       <div
@@ -437,7 +442,7 @@ export function DataTable({
         style={!stretch && fill && height ? { maxHeight: height } : undefined}
         className={cn(
           "scroll-thin overflow-x-auto",
-          withBar ? "rounded-b-[inherit]" : "rounded-[inherit]",
+          bar ? "rounded-b-[inherit]" : "rounded-[inherit]",
           (sticky || fill) && "dt-sticky overflow-y-auto",
           sticky && !fill && "max-h-[72vh]",
           stretch && "min-h-0 flex-1",

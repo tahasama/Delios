@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, ExternalLink, Printer, Search } from "lucide-react";
+import { TablePaging } from "@/components/table-paging";
 import { DataTable, Th, Td, Info } from "@/components/ui";
 import { useCardHeight } from "@/components/card-height";
 
@@ -106,6 +107,7 @@ export function CarriedTable({ plate, rows, exportHref }: {
       <div className={cardHeight ? "flex min-h-0 flex-1 flex-col" : undefined}>
         {shown.length ? (
           <DataTable
+            paging={rows.length ? <TablePaging from={1} to={shown.length} total={rows.length} hint="A document sent more than once has been round this way before — the count says how often." /> : undefined}
             id="transmittal-carried"
             className="rounded-none border-0 shadow-none"
             defaultHidden={["Sent before"]}
@@ -214,15 +216,6 @@ export function CarriedTable({ plate, rows, exportHref }: {
         )}
       </div>
 
-      {rows.length ? (
-        <div data-dt-foot className="flex items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
-          <p className="font-mono text-[11px] tabular-nums text-slate-500">
-            1&ndash;{shown.length}
-            <span className="ml-1.5 font-sans text-slate-400">of {rows.length}</span>
-          </p>
-          <p className="ml-auto text-[11px] text-slate-400">A document sent more than once has been round this way before — the count says how often.</p>
-        </div>
-      ) : null}
     </section>
   </>;
 }
