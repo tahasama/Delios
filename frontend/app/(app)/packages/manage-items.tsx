@@ -16,7 +16,9 @@ export type DeliveryChoices = {
  * Editing and deleting a package — the same on a delivery and a supplier package. A delivery package edits every field
  * while it is open (date, what it needs, who it goes to, who puts it together, who accepts it).
  */
-export function manageItems(pkg: PackageView, { mayEdit, mayDelete, mayRenumber = false, delivery }: { mayEdit: boolean; mayDelete: boolean; mayRenumber?: boolean; delivery?: DeliveryChoices }): StepItem[] {
+export function manageItems(pkg: PackageView, { mayEdit, mayDelete, mayRenumber = false, delivery, back }: { mayEdit: boolean; mayDelete: boolean; mayRenumber?: boolean; delivery?: DeliveryChoices;
+  /** The package it sits in: removed, its documents go back there, and the page opens on it. */
+  back?: string }): StepItem[] {
   const items: StepItem[] = [];
   if (mayEdit) items.push({
     key: "edit",
@@ -45,8 +47,12 @@ export function manageItems(pkg: PackageView, { mayEdit, mayDelete, mayRenumber 
     key: "delete",
     label: "Delete the package",
     body: (
-      <ActionForm action={deletePackageAction} submitLabel="Delete package" size="sm" variant="danger" hidden={{ packageId: pkg.id }} confirmText="The package is deleted. Its documents stay in the register. Continue?">
-        <p className="text-xs text-slate-500">It is empty, so nothing of content goes with it. Its number is not given out again.</p>
+      <ActionForm action={deletePackageAction} submitLabel="Delete package" size="sm" variant="danger"
+        hidden={{ packageId: pkg.id, ...(back ? { back: `/packages/${encodeURIComponent(back)}` } : {}) }}
+        confirmText={back ? `The package is deleted. Its documents and the packages in it go back into ${back}. Continue?` : "The package is deleted. Its documents stay in the register. Continue?"}>
+        <p className="text-xs text-slate-500">{back
+          ? `Its documents and the packages in it go back into ${back}: nothing of them is lost. Its number is not given out again.`
+          : "It is empty, so nothing of content goes with it. Its number is not given out again."}</p>
         <Field label="Why" required hint="goes on the record"><input name="reason" required className={inputCls} /></Field>
       </ActionForm>
     ),

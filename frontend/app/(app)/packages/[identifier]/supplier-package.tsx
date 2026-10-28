@@ -244,7 +244,7 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
       </section>
 
       {/* The arborescence: its packages, a new one in it, and where it sits (moved until it is shared). */}
-      <Branches pkg={pkg} newHref={staff ? `/packages?category=SUPPLIER&parent=${encodeURIComponent(pkg.number)}#new` : null} />
+      <Branches pkg={pkg} newHref={staff ? `/packages?category=SUPPLIER&parent=${encodeURIComponent(pkg.number)}#new` : null} manage={staff && !pkg.sharedAt} />
       {staff && !pkg.sharedAt ? <MovePackage pkg={pkg} targets={moveTargets(pkg, await packagesOf(ctx, "SUPPLY"))} /> : null}
 
       {staff ? (

@@ -226,8 +226,10 @@ export async function deletePackageAction(_prev: { error?: string } | undefined,
   } catch (e) {
     return { error: refusal(e).message };
   }
-  revalidatePath("/packages");
-  redirect(`/packages?category=${pkg.kind === "SUPPLY" ? "SUPPLIER" : "DELIVERY"}`);
+  revalidatePath("/packages", "layout");
+  // Removed from the package it sat in (its "Packages in it"), the page stays on that package.
+  const back = String(formData.get("back") ?? "");
+  redirect(back.startsWith("/packages/") ? back : `/packages?category=${pkg.kind === "SUPPLY" ? "SUPPLIER" : "DELIVERY"}`);
 }
 
 /** The acceptance authority accepts the delivered package: the last step. */
@@ -266,4 +268,49 @@ export async function movePackageAction(_prev: { error?: string; message?: strin
   }
   revalidatePath("/packages", "layout");
   return { message: parentId && parentId !== "TOP" ? "Moved." : "Moved to the top." };
+}
+
+/**
+ * Several packages ticked on Packages, moved inside another (or to the top) at once, each as "Where it sits" does it;
+ * the backend checks each. Stops at the first it refuses, naming it.
+ */
+export async function movePackagesAction(_prev: { error?: string; message?: string } | undefined, formData: FormData): Promise<{ error?: string; message?: string }> {
+  const ctx = await requireScope();
+  const ids = formData.getAll("packageId").map(String).filter(Boolean);
+  const parentId = String(formData.get("parentId") ?? "");
+  let moved = 0;
+  for (const id of ids) {
+    try {
+      await api(projectPath(ctx, `/packages/${id}/place`), { method: "PUT", body: { parentId: parentId && parentId !== "TOP" ? parentId : null, reason: null } });
+      moved++;
+    } catch (e) {
+      revalidatePath("/packages", "layout");
+      return { error: `${moved ? `${moved} moved; then ` : ""}${refusal(e).message}` };
+    }
+  }
+  revalidatePath("/packages", "layout");
+  return { message: `${moved} moved.` };
+}
+
+/**
+ * Several packages ticked on Packages, removed at once with one why, each as its own page's Delete does it (a package in
+ * another hands its documents and packages back up there; one at the top goes only empty). Stops at the first refused.
+ */
+export async function deletePackagesAction(_prev: { error?: string; message?: string } | undefined, formData: FormData): Promise<{ error?: string; message?: string }> {
+  const ctx = await requireScope();
+  const ids = formData.getAll("packageId").map(String).filter(Boolean);
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { error: "Say why they are removed — it goes on the record." };
+  let removed = 0;
+  for (const id of ids) {
+    try {
+      await api(projectPath(ctx, `/packages/${id}`), { method: "DELETE", query: { reason } });
+      removed++;
+    } catch (e) {
+      revalidatePath("/packages", "layout");
+      return { error: `${removed ? `${removed} removed; then ` : ""}${refusal(e).message}` };
+    }
+  }
+  revalidatePath("/packages", "layout");
+  return { message: `${removed} removed.` };
 }

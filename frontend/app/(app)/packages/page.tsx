@@ -11,13 +11,14 @@ import { supplierRows, packageCounts, packageStage } from "@/lib/packages/suppli
 import { isController, isAdmin, standsInForControl } from "@/lib/core/auth";
 import { getActiveSet } from "@/lib/settings/config";
 import { fmtDate } from "@/lib/core/utils";
-import { ArrowRight, Download, FolderClosed, Truck } from "lucide-react";
+import { ArrowRight, FolderClosed, Truck } from "lucide-react";
 import { isReadOnly } from "@/lib/core/auth";
 import { SearchPick } from "@/components/search-pick";
 import { RuleFields } from "./rule-fields";
 import { statusList, shortfallOf } from "@/lib/packages/package-rule";
 import { packagesOf, ourPeople, packageParties, packagesAtTop, packageByNumber } from "@/lib/packages/api";
 import { PackageTree, treeOf } from "./arborescence";
+import { PackageDock, PackageTick, PackageTickAll } from "./package-dock";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Packages" };
@@ -117,13 +118,6 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
       <div className="border-b border-line px-5 pt-5 pb-2.5 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="plate-title min-w-0 text-slate-950">Packages</h1>
-          {/* One package at a time: the one ticked in the list. */}
-          {rows.length ? (
-            <form id="package-export" action="/api/export/packages" method="get" className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-500">tick a package, then</span>
-              <button type="submit" className="ask inline-flex items-center" title="Export the ticked package as CSV" aria-label="Export the ticked package as CSV"><Download className="h-3.5 w-3.5" aria-hidden /></button>
-            </form>
-          ) : null}
         </div>
         <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -147,14 +141,14 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
       ) : category === "SUPPLIER" ? (
         shownRows.length ? (
           <DataTable className="rounded-none border-0 shadow-none" id="supplier-packages" exportName="supplier-packages" head={supplierOnly
-            ? <tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Package</Th><Th>Where it stands</Th><Th>With you</Th><Th>With us</Th><Th>Released</Th><Th>Overdue</Th><Th>Next due</Th></tr>
-            : <tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Supplier</Th><Th>Where it stands</Th><Th title="Ours to send to the supplier">Not sent yet</Th><Th title="The supplier holds them: to send, correct or revise">With the supplier</Th><Th title="We hold them: to check, to send for review, or in review">With us</Th><Th>Released</Th><Th>Overdue</Th><Th>Next due</Th></tr>}>
+            ? <tr><Th className="w-10"><PackageTickAll ids={shownRows.map((one) => one.id)} /></Th><Th>Package</Th><Th>Where it stands</Th><Th>With you</Th><Th>With us</Th><Th>Released</Th><Th>Overdue</Th><Th>Next due</Th></tr>
+            : <tr><Th className="w-10"><PackageTickAll ids={shownRows.map((one) => one.id)} /></Th><Th>Supplier</Th><Th>Where it stands</Th><Th title="Ours to send to the supplier">Not sent yet</Th><Th title="The supplier holds them: to send, correct or revise">With the supplier</Th><Th title="We hold them: to check, to send for review, or in review">With us</Th><Th>Released</Th><Th>Overdue</Th><Th>Next due</Th></tr>}>
                 {shownRows.map((pkg) => {
                   const f = supplierStats.get(pkg.id)!;
                   const where = supplierStages.get(pkg.id)!;
                   return (
                     <tr key={pkg.id}>
-                      <Td className="w-10"><input type="radio" name="number" value={pkg.number} form="package-export" required aria-label={`Tick ${pkg.number} to export it`} /></Td>
+                      <Td className="w-10"><PackageTick id={pkg.id} number={pkg.number} /></Td>
                       <Td><Link href={`/packages/${pkg.number}`} className="font-semibold text-brand-ink hover:underline">{pkg.title ?? pkg.names.to}</Link><span className="block font-mono text-[11px] text-slate-400">{pkg.number}</span>{inside(pkg.place?.branches.length ?? 0)}</Td>
                       <Td className={`text-xs`}>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ${where.tone}`}>{where.word}</span>
@@ -171,12 +165,12 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
           </DataTable>
         ) : <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">{supplierOnly ? "Nothing is expected from you yet. When documents are requested from your company they appear here." : "No supplier packages yet. One lists every document you expect from one supplier; they send from it."}</p>
       ) : shownRows.length ? (
-        <DataTable className="rounded-none border-0 shadow-none" id="delivery-packages" exportName="delivery-packages" head={<tr><Th className="w-10"><span className="sr-only">Tick</span></Th><Th>Package</Th><Th>State</Th><Th title="Ready: the document's current released revision carries the status the package asks for.">Ready</Th><Th>Due</Th><Th>Accepted by</Th></tr>}>
+        <DataTable className="rounded-none border-0 shadow-none" id="delivery-packages" exportName="delivery-packages" head={<tr><Th className="w-10"><PackageTickAll ids={shownRows.map((one) => one.id)} /></Th><Th>Package</Th><Th>State</Th><Th title="Ready: the document's current released revision carries the status the package asks for.">Ready</Th><Th>Due</Th><Th>Accepted by</Th></tr>}>
               {shownRows.map((pkg) => {
                 const percent = pkg.total ? Math.round(pkg.ready / pkg.total * 100) : 0;
                 return (
                   <tr key={pkg.id}>
-                    <Td className="w-10"><input type="radio" name="number" value={pkg.number} form="package-export" required aria-label={`Tick ${pkg.number} to export it`} /></Td>
+                    <Td className="w-10"><PackageTick id={pkg.id} number={pkg.number} /></Td>
                     <Td><Link href={`/packages/${pkg.number}`} className="font-mono text-[13px] font-semibold text-brand-ink hover:underline">{pkg.number}</Link><span className="block max-w-80 truncate text-[13px] text-slate-800">{pkg.title ?? `Delivery to ${pkg.names.to}`}</span><span className="block max-w-80 truncate text-xs text-slate-500">to {pkg.names.to}</span>{inside(pkg.place?.branches.length ?? 0)}</Td>
                     <Td><Status state={pkg.state}/></Td>
                     <Td><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-canvas-deep"><div className={`h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-gold"}`} style={{ width: `${percent}%` }}/></div><span className="text-xs text-slate-600">{pkg.ready} of {pkg.total} at {pkg.requiredStatuses.join(" or ")}<Info>{pkg.requiredStatuses.map((code) => `${code} — ${statusMeaning.get(code) ?? code}`).join("\n")}</Info></span></div></Td>
@@ -194,6 +188,17 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
         </div>
       ) : null}
     </section>
+
+    {/* The bottom bar for the packages ticked (owner: the ticks did nothing). */}
+    {view === "list" && shownRows.length ? (
+      <PackageDock
+        packages={shownRows.map((one) => ({ id: one.id, number: one.number, title: one.title ?? one.names.to, open: !one.closedAt && one.state === "OPEN",
+          inTree: !!one.place?.parentId, empty: one.members.length === 0, sent: one.transmittals.length > 0 || !!one.sharedAt }))}
+        targets={pkgs.filter((one) => !one.closedAt && one.state === "OPEN").map((one) => ({ id: one.id, number: one.number, title: one.title ?? one.names.to }))}
+        manage={staff && !supplierOnly}
+        deliver={staff && !supplierOnly}
+      />
+    ) : null}
 
     {staff && category === "SUPPLIER" ? (
       <details id="new" className="register register-sheet register-sheet-open" open={!!parent}>

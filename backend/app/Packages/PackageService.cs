@@ -485,11 +485,13 @@ public sealed partial class PackageService(
         // was sent to the supplier: its documents leave it (they stay in the register) and are filed again, into
         // another package of that supplier when there is one.
         var supply = package!.Kind == PackageKinds.Supply;
-        if (await db.Packages.AnyAsync(p => p.ParentId == package.Id, cancellationToken))
-            return Problems.Conflict("HAS_BRANCHES", "Packages sit inside it: move them out first; it is deleted once it holds no package.");
+        // Inside another package (owner: "I can't remove packages in a tree… I might not want them anymore"), it is taken
+        // out of the tree: its documents go back to the package it sits in, the packages in it move up there too. Nothing
+        // of its documents is lost. At the top, a package of ours still goes only once empty, and packages in it move to the top.
+        var branch = package.ParentId is not null;
         if (supply && package.Members.Any(m => m.RequestedAt is not null))
             return Problems.Conflict("SENT_TO_SUPPLIER", "Some of its documents were sent to the supplier on a transmittal; it is kept.");
-        if (!supply && package.Members.Count > 0)
+        if (!supply && !branch && package.Members.Count > 0)
             return Problems.Conflict("PACKAGE_NOT_EMPTY", "Take its documents out first: only an empty package is deleted.");
         if (await db.Transmittals.AnyAsync(t => t.PackageId == package.Id, cancellationToken))
             return Problems.Conflict("PACKAGE_HAS_GONE_OUT", "A transmittal went out for it; it is kept.");
@@ -497,11 +499,13 @@ public sealed partial class PackageService(
             return Problems.Conflict("PACKAGE_SHARED", "It was shared with its supplier; it is kept.");
         var held = package.Members.Count;
         var heldIds = package.Members.Select(m => m.DocumentId).ToList();
-        // A supplier's branch hands its documents back to the package it sits in, which takes them again.
+        // A branch hands its documents back to the package it sits in, which takes them again.
         Package? up = null;
-        if (supply && held > 0 && package.ParentId is { } parentId)
+        if (held > 0 && package.ParentId is { } parentId)
         {
             up = await db.Packages.Include(p => p.Members).SingleOrDefaultAsync(p => p.Id == parentId, cancellationToken);
+            if (up is not null && up.State != PackageStates.Open)
+                return Problems.Conflict("PARENT_CLOSED", $"{up.Number}, which it sits in, is closed: its documents cannot go back there.");
             if (up is not null)
             {
                 var back = package.Members.Select(m => m.DocumentId).Where(d => up.Members.All(m => m.DocumentId != d)).ToList();
@@ -510,18 +514,21 @@ public sealed partial class PackageService(
                 ResetAssessment(up);
             }
         }
-        if (held > 0)
+        // The packages in it move up to where it sat (the top when it sat there), their numbers kept.
+        var inside = await db.Packages.Where(p => p.ParentId == package.Id).ToListAsync(cancellationToken);
+        foreach (var child in inside) child.ParentId = package.ParentId;
+        if (held > 0 || inside.Count > 0)
         {
             db.PackageMembers.RemoveRange(package.Members);
             await db.SaveChangesAsync(cancellationToken);
         }
         db.Packages.Remove(package);
         await audit.WriteAsync(Actor(access), "PACKAGE_DELETED", "Package", package.Id, package.Number,
-            $"{package.Title}: deleted before it was shared{(held > 0 ? up is not null ? $"; its {held} document(s) go back to {up.Number}" : $"; its {held} document(s) stay in the register" : ", empty")}.{(Blank(reason) is { } why ? $" {why}" : "")}",
+            $"{package.Title}: deleted before it went out{(held > 0 ? up is not null ? $"; its {held} document(s) go back to {up.Number}" : $"; its {held} document(s) stay in the register" : ", empty")}{(inside.Count > 0 ? $"; {string.Join(", ", inside.Select(c => c.Number))} moved {(up is not null ? $"into {up.Number}" : "up")}" : "")}.{(Blank(reason) is { } why ? $" {why}" : "")}",
             package.ProjectId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        // Its documents only, filed where a new one would go.
-        if (held > 0) await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken, documentIds: heldIds);
+        // Its documents only, filed where a new one would go (a supplier's left with no package above).
+        if (held > 0 && supply && up is null) await filing.FileUnfiledAsync(access.Project, Actor(access), cancellationToken, documentIds: heldIds);
         return null;
     }
 
@@ -669,8 +676,8 @@ public sealed partial class PackageService(
             var at = (await db.Revisions.AsNoTracking().Where(r => ownIds.Contains(r.DocumentId) && r.State == RevisionStates.Released)
                 .Select(r => new { r.DocumentId, r.StatusCode }).ToListAsync(cancellationToken))
                 .GroupBy(r => r.DocumentId).ToDictionary(g => g.Key, g => g.First().StatusCode);
-            var ready = own.Count(m => at.TryGetValue(m.DocumentId, out var status) && status is not null
-                && (m.RequiredStatuses.Length > 0 ? m.RequiredStatuses : package.RequiredStatuses).Contains(status));
+            var ready = own.Count(m => at.TryGetValue(m.DocumentId, out var status)
+                && IsReady(status, m.RequiredStatuses.Length > 0 ? m.RequiredStatuses : package.RequiredStatuses));
             return new PackagePlace(null, [], [], new PackageTally(0, 0, ownIds.Count, ready, ownIds.Count(at.ContainsKey)));
         }
         var facts = await TreeFactsAsync(access, package.Kind, [package.Id], cancellationToken);
@@ -731,8 +738,8 @@ public sealed partial class PackageService(
         {
             var lines = under.Append(root).Distinct().SelectMany(id => byPackage.GetValueOrDefault(id) ?? []).ToList();
             bool Ready(Guid packageId, Guid documentId, string[] own) =>
-                released.TryGetValue(documentId, out var status) && status is not null
-                && (own.Length > 0 ? own : all.TryGetValue(packageId, out var p) ? p.RequiredStatuses : []).Contains(status);
+                released.TryGetValue(documentId, out var status)
+                && IsReady(status, own.Length > 0 ? own : all.TryGetValue(packageId, out var p) ? p.RequiredStatuses : []);
             return new PackageTally(
                 Packages: under.Count,
                 Open: under.Count(i => all.TryGetValue(i, out var p) && p.State == PackageStates.Open),
@@ -791,11 +798,18 @@ public sealed partial class PackageService(
         {
             var current = released.GetValueOrDefault(m.DocumentId);
             var required = m.RequiredStatuses.Length > 0 ? m.RequiredStatuses : package.RequiredStatuses;
-            var ready = current?.StatusCode is { } status && required.Contains(status);
+            var ready = current is not null && IsReady(current.StatusCode, required);
             var d = documents[m.DocumentId];
             return new Readiness(m, d.Number, d.Title, current?.Value, current?.StatusCode, required, ready, current?.Id,
                 d.LatestRevisionValue, d.LatestRevisionState, d.PlannedDate ?? package.CompletionDate);
         }).OrderBy(r => r.DocumentNumber).ToList();
+
+    /// <summary>
+    /// A released document is ready at any of the statuses its package needs; a package asking no status takes it
+    /// released at any (it read "not ready" for ever before, the owner seeing a released document so).
+    /// </summary>
+    internal static bool IsReady(string? releasedStatus, string[] required) =>
+        required.Length == 0 || (releasedStatus is not null && required.Contains(releasedStatus));
 
     /// <summary>Check every member; what is not ready is the shortfall.</summary>
     public async Task<(Package? Package, IResult? Problem)> AssessAsync(ProjectAccess access, Guid id, CancellationToken cancellationToken)

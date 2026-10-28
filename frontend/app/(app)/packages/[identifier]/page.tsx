@@ -122,22 +122,31 @@ export default async function PackageDetailPage({ params, searchParams }: { para
     ),
   });
   if (canAct) {
-    if (!pkg.assessedAt) items.push({ key: "check", primary: total > 0, label: "Check readiness", body: <ActionForm action={assessPackageAction} submitLabel="Check readiness now" size="sm" hidden={{ packageId: pkg.id }}><p className="text-xs text-slate-500">Records which documents are released at the status the package needs, and what is missing.</p></ActionForm> });
-    if (shortfall && !pkg.shortfallIssuedAt) items.push({ key: "shortfall", primary: true, label: "Send what is missing", body: <ActionForm action={issueShortfallAction} submitLabel={`Ask ${pkg.names.acceptors}`} size="sm" hidden={{ packageId: pkg.id }}><p className="text-xs text-slate-500">A transmittal asks {pkg.names.acceptors} whether the package may go without them, listing each one and where it stands; those putting it together are copied in. Their answer comes back the same way.</p></ActionForm> });
-    // Delivered on a data transmittal written on the New transmittal form (owner: "recorded as transmittal so we can
-    // decide at the end to whom"): its documents fixed there, whom it goes to chosen there. Handed over outside the
-    // system, it is closed instead.
-    if (mayDeliver) items.push({
+    // "Deliver the package" is always there while it is open (owner: "there is no deliver button"): ready, it opens the
+    // delivery transmittal (its documents fixed there, whom it goes to chosen there: owner, "recorded as transmittal so
+    // we can decide at the end to whom"); not yet, it holds the step it waits on.
+    items.push({
       key: "deliver",
       primary: true,
+      open: mayDeliver,
       label: "Deliver the package",
-      body: (
+      body: mayDeliver ? (
         <div className="space-y-2">
           <p className="text-xs text-slate-500">
             {`A data transmittal carries what is ready (${readyCount})${branchCount ? `, and what the ${branchCount} package${branchCount === 1 ? "" : "s"} in it hold` : ""}, ${purpose.toLowerCase()}, as it stands: nothing added or taken out. You choose who receives it there. Sent, the package is delivered and its contents fixed${pkg.rule ? ": nothing more joins by its rule" : ""}; they read it as you do and change nothing; then ${pkg.names.acceptors} accepts it.`}
           </p>
           <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number })}`} className={btn("primary", "sm")}>Write the transmittal</Link>
         </div>
+      ) : !pkg.assessedAt ? (
+        <ActionForm action={assessPackageAction} submitLabel="Check readiness now" size="sm" hidden={{ packageId: pkg.id }}>
+          <p className="text-xs text-slate-500">First, its readiness is checked: which documents are released at the status it needs ({spell(pkg.requiredStatuses.join(",")) || "any status"}), and what is missing. Once all is ready (or what is missing let go), you deliver it from here.</p>
+        </ActionForm>
+      ) : shortfall && !pkg.shortfallIssuedAt ? (
+        <ActionForm action={issueShortfallAction} submitLabel={`Ask ${pkg.names.acceptors}`} size="sm" hidden={{ packageId: pkg.id }}>
+          <p className="text-xs text-slate-500">{shortfall.length} document{shortfall.length === 1 ? " is" : "s are"} not ready. A transmittal asks {pkg.names.acceptors} whether it may go without them, listing each one and where it stands; those putting it together are copied in. Or wait until they are released, and check readiness again.</p>
+        </ActionForm>
+      ) : (
+        <p className="text-xs text-slate-500">Waiting for {pkg.names.acceptors} to say it may go without what is missing{asked}.</p>
       ),
     });
     if (mayDeliver) items.push({
@@ -176,7 +185,9 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   });
   if (mayCompose) {
     // Only an empty package that never went out is deleted: it holds no content.
-    items.push(...manageItems(pkg, { mayEdit: false, mayDelete: total === 0 && !pkg.transmittals.length }));
+    // An empty package that never went out; or one sitting in another, whose documents go back up there (owner).
+    items.push(...manageItems(pkg, { mayEdit: false, mayDelete: (total === 0 || !!pkg.place?.parentId) && !pkg.transmittals.length,
+      back: pkg.place?.path.at(-1)?.number }));
   }
 
   // The arborescence: a package in it is opened here by whoever may put packages together; moved by the control function.
@@ -235,7 +246,7 @@ export default async function PackageDetailPage({ params, searchParams }: { para
         />
       </section>}
 
-      <Branches pkg={pkg} newHref={newInside} />
+      <Branches pkg={pkg} newHref={newInside} manage={canAct} />
       {targets ? <MovePackage pkg={pkg} targets={targets} /> : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">

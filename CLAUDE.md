@@ -154,8 +154,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   others greyed and carrying an arrow, scrolling sideways when they do not fit): the Schedule's three, Assurance,
   Reports, a document's tabs, the organization's four (`org-tabs.tsx`), Packages' two kinds. **The switch** (`.seg` /
   `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Home's "What is waiting",
-  the checks' groups and the rules' areas, Types & sets' groups, Help's roles, the organization's People, the imports'
-  "Which lines", list or tree, light or dark, in use · retired · all. The Control room's navy console keeps its own tabs.
+  the organization's People, the imports' "Which lines", list or tree, light or dark, in use · retired · all. The checks'
+  groups, the rules' areas, Types & sets' groups and Help's roles keep the plain underlined tabs they always had (put back
+  as they were). The Control room's navy console keeps its own tabs.
 - **The distribution matrix's "Who gets what"** (owner, "needs improving"): one sheet, the register's way: its band
   (what is shown: disciplines × functions, which deliverable type, which document type), the narrowing on one line
   (`matrix-filters.tsx`, `components/narrow.tsx` `Narrow` shared with the Schedule: Discipline · Deliverable type ·
@@ -497,6 +498,20 @@ a screen only words it. A new rule goes in the backend, never in a page.
   you"; the package page read only, "Ask about it" following the delivery), and what they send following it carries no
   document (DELIVERED_READ_ONLY: an information transmittal). Another organization reads only the package's
   transmittals to or from it.
+- **Packages' ticks bring up the bottom bar** (owner: "a check box for every package that does absolutely nothing"):
+  `package-dock.tsx`, the register's dock: Open and Deliver (one ticked), Export (each ticked, its list), and for whoever
+  looks after them Move (inside another open package of the kind, or to the top) and Remove (with why), each as its own
+  page does it, the backend checking each.
+- **Taking a package out of a tree** (owner: "I can't remove packages in a tree, or move them out; I might not want them
+  anymore"): "Packages in it" gives each open package "Move out or remove": moved up beside the package it sat in (or to
+  the top), or removed, never delivered: a package inside another gives its documents and the packages in it back to the
+  package it sat in, nothing of them lost (PARENT_CLOSED when that one is closed); one at the top still goes only empty,
+  the packages in it moving to the top. Its own page's Delete does the same.
+- **Ready at the status a package needs** (`PackageService.IsReady`): a package asking no status takes a document
+  released at any; a line not ready says why ("released at IFR; the package needs IFC", "nothing released yet").
+- **"Deliver the package" is always on our package while it is open** (owner: "there is no deliver button"): ready, it
+  opens the delivery transmittal; not yet, it holds the step it waits on (check readiness, ask about what is missing, or
+  waiting on the acceptance authority). Handed over outside the system, "Close it" stays beside it.
 - "Delivery list" downloads the package's own lines (`/api/packages/<n>/list`),
   never the schedule's requirements list.
 - "Share with <supplier>" is pressed once, for good: until then the supplier

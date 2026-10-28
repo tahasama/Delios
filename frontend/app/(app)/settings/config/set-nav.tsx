@@ -40,7 +40,7 @@ export function SetNav({ page = "/settings/config", groups, current, currentSet,
     // scrolls away, then this sheet fills the window and only its table and its list of lists scroll. A narrow screen flows.
     <div className="register register-sheet register-sheet-open flex flex-col lg:h-[calc(100dvh-6.5rem)]">
       <div className="asking flex shrink-0 flex-wrap items-stretch justify-between gap-x-4 border-b border-line px-5 sm:px-6">
-        <div role="tablist" className="seg my-2 w-fit max-w-full self-center">
+        <div role="tablist" className="-mb-px flex flex-wrap items-stretch gap-x-5">
           {groups.map((g, i) => {
             const on = !needle && i === tab;
             return (
@@ -50,9 +50,9 @@ export function SetNav({ page = "/settings/config", groups, current, currentSet,
                 role="tab"
                 aria-selected={on}
                 onClick={() => { setTab(i); setQ(""); }}
-                className="segment"
+                className={`inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-0.5 text-[12px] leading-4 transition ${on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"}`}
               >
-                {g.title} <span className="segment-n">{g.sets.length}</span>
+                {g.title} <span className="ml-1 font-normal tabular-nums text-slate-500">{g.sets.length}</span>
               </button>
             );
           })}
