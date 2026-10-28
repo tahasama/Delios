@@ -14,6 +14,7 @@ conversation, write it into the right one in the same commit as the code.
 | `docs/ORGANIZATIONS.md` | Organizations working together (collaborator, guest, not on DELIOS), linked accounts, the organization's admin page |
 | `docs/BEHAVIOUR-CHANGES.md` | What behaves differently since the screens moved onto the backend |
 | `docs/DETAIL-STYLE.md` | The reference style (Schedule & actions, the action page): what "apply the same" means |
+| `docs/RUNNING-DELIOS.md` | Running DELIOS for many organizations: who runs it, our space, payments, legal (advice, not decided yet) |
 | `docs/gaps/*.md` | Known gaps per area |
 | `PRODUCT.md` | Product context and users |
 
