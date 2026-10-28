@@ -122,7 +122,7 @@ export function PlanTimeline({ rows, window, fit }: {
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col px-5 pt-4 pb-3 sm:px-6">
+    <section className="flex min-h-0 flex-1 flex-col px-5 pt-2 pb-2 sm:px-6">
       {/* The dates are written once, above everything, and stay there: the bars
           scroll under them rather than taking the calendar with them.
           The band and the grid below it cover exactly the track the bars are
@@ -139,8 +139,9 @@ export function PlanTimeline({ rows, window, fit }: {
           <span
             className="absolute top-0 whitespace-nowrap rounded bg-brand px-1 text-[10px] leading-4 font-semibold text-white"
             style={{ left: `${at(now)}%`, marginLeft: "0.25rem" }}
+            title={fmtDate(new Date(now))}
           >
-            today · {fmtDate(new Date(now))}
+            today
           </span>
         ) : null}
       </div>

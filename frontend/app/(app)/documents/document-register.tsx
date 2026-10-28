@@ -170,8 +170,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
 }) {
   const router = useRouter();
   // Every register is the height the schedule's plan set.
-  // The register stands 40 pixels taller than the other registers' card (owner: "add like 10px", "add 10 more", "add 20").
-  const cardHeight = useCardHeight() + 40;
+  const cardHeight = useCardHeight();
   const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<string[]>(() => picking?.linked ?? []);
   const [allMatching, setAllMatching] = useState(false);

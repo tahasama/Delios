@@ -27,5 +27,7 @@ export function useCardHeight(): number {
       // A browser that refuses storage simply takes the standard height.
     }
   }, []);
-  return height;
+  // Every register but the schedule stands 40 pixels taller than the plan's card (owner, on the document register:
+  // "we will apply that same height to other tables except from the schedule").
+  return height + 40;
 }

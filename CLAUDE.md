@@ -1509,6 +1509,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   person's opened panel ("Set a password", typed twice; `setPasswordAction`, `PUT /api/admin/users/{id}` `password`):
   administrators only (ADMIN_ONLY), never one's own (OWN_PASSWORD: "Forgot password"), never a linked account; the person
   is told at once by email and on Notifications, signed out everywhere, logged (PASSWORD_SET).
+- **Every register's card but the schedule's is 40 pixels taller than the plan's** (owner, after trying it on the
+  document register; `components/card-height.ts`).
 - Import & export follows the Schedule look; exports are grouped (the register, Assurance, the record).
 - Each import kind offers two downloads: the list as it stands now (the register, the team, the matrix, every Settings
   list) and an empty template. A register taken out and brought back corrects only what changed; what the number is
@@ -1742,7 +1744,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Excel schedule carries none), and offers "Group by WBS" when sorted another way. The plan opens on two months around today, held inside the schedule's own span
   (owner, "that applies as general": near or past its end, the window ends on the last action's day; near or before its
   start, it starts on the first's), and "Show every date" draws the actions' own days only, never stretched to today; says "the schedule
-  runs <first month> → <last month>", and draws today only when inside; a read says its months too. The calendar tab
+  runs <first month> → <last month>" on hover of the days drawn (owner: "date is repeated 3 times"; the head one line,
+  "today" its date on hover, the foot one line), and draws today only when inside; a read says its months too. The calendar tab
   opens the same way. The Schedule's heading says the days around an action in force (a document needed N days before
   its action's day, at risk from M), linking the Control room where they are set.
 - Their Excel is uploaded on Schedule & actions only by Document Control or a

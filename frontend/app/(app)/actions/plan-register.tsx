@@ -351,18 +351,14 @@ export function PlanRegister({
         <div className={`flex min-h-0 flex-1 flex-col ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
           {/* What the plan covers, and what its colours mean: the two things a
               reader needs before the bars, at the two corners above them. */}
-          <div className="flex items-start justify-between gap-4 px-5 pt-4 sm:px-6">
-            <span className="font-mono text-xs font-semibold tracking-tight text-slate-700 tabular-nums">
+          <div className="flex items-center justify-between gap-4 px-5 pt-3 sm:px-6">
+            {/* The days drawn, once (owner: "date is repeated 3 times"): where the schedule runs is said on hover. */}
+            <span className="font-mono text-xs font-semibold tracking-tight text-slate-700 tabular-nums" title={more?.span ? `The schedule runs ${more.span}` : undefined}>
               {more?.window && !more.window.wide ? more.window.label : filters.from || filters.to ? `${filters.from || "…"} → ${filters.to || "…"}` : "Every date in the schedule"}
-              {more?.span ? <span className="ml-2 font-sans font-normal text-slate-500">· the schedule runs {more.span}</span> : null}
               {more?.wbs?.none ? (
-                <span className="mt-1 block font-sans text-[11px] font-normal text-slate-500">
-                  No WBS: it comes only from a P6 export (.xer).
-                </span>
+                <span className="ml-2 font-sans text-[11px] font-normal text-slate-500" title="The WBS comes only from a P6 export (.xer).">· no WBS</span>
               ) : more?.wbs?.href ? (
-                <span className="mt-1 block font-sans text-[11px] font-normal text-slate-500">
-                  <Link href={more.wbs.href} className="font-semibold text-link hover:underline">Group by WBS</Link>
-                </span>
+                <Link href={more.wbs.href} className="ml-2 font-sans text-[11px] font-semibold text-link hover:underline">Group by WBS</Link>
               ) : null}
             </span>
             <span
@@ -424,7 +420,7 @@ export function PlanRegister({
           ) : plan}
 
           {more && more.total ? (
-            <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
+            <div data-dt-foot className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-2 sm:px-6">
               {/* How much of the schedule is in front of you, and the way out of
                   the window — one line, on the left where counts are read. */}
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
@@ -469,7 +465,7 @@ export function PlanRegister({
                   {pending ? "Loading…" : `Load ${Math.min(more.step, more.total - more.shown)} more`}
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
-              ) : <span className="text-[11px] text-slate-500">all of them drawn</span>}
+              ) : null}
 
               {/* How many more each press draws. */}
               <label className="flex items-center justify-end gap-1.5 leading-none">
