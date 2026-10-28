@@ -17,8 +17,14 @@ public sealed class Operator
     public required string NormalizedEmail { get; set; }
     public required string Name { get; set; }
     public required string PasswordHash { get; set; }
-    /// <summary>The authenticator secret, encrypted (Data Protection). Two-step sign-in is always asked of an operator.</summary>
-    public required string MfaSecretProtected { get; set; }
+    /// <summary>
+    /// The authenticator secret, encrypted (Data Protection). Two-step sign-in is always asked of an operator: set up on
+    /// the first sign-in by scanning a QR code, in force once a code confirms it (<see cref="MfaEnabledAt"/>).
+    /// </summary>
+    public string? MfaSecretProtected { get; set; }
+    public Instant? MfaEnabledAt { get; set; }
+    /// <summary>One-time codes for a lost phone, hashed; each is removed once used.</summary>
+    public string[] RecoveryCodeHashes { get; set; } = [];
     /// <summary>The last code step accepted: a code works once.</summary>
     public long? MfaLastStep { get; set; }
     public bool Active { get; set; } = true;
@@ -163,6 +169,21 @@ public sealed class SupportGrant
     public string? EndedByName { get; set; }
 }
 
+/// <summary>A setting of the DELIOS platform itself, set in the console (how organizations reach DELIOS support).</summary>
+public sealed class PlatformSetting
+{
+    public required string Key { get; set; }
+    public required string Value { get; set; }
+    public Instant UpdatedAt { get; set; }
+    public string? UpdatedBy { get; set; }
+}
+
+public static class PlatformKeys
+{
+    public const string SupportEmail = "SUPPORT_EMAIL", SupportHours = "SUPPORT_HOURS", SupportPhone = "SUPPORT_PHONE";
+    public static readonly string[] All = [SupportEmail, SupportHours, SupportPhone];
+}
+
 /// <summary>Every act of the DELIOS team in its console, kept for good.</summary>
 public sealed class OperatorEvent
 {
@@ -178,7 +199,8 @@ public sealed class OperatorEvent
 internal sealed class OperatorConfiguration :
     IEntityTypeConfiguration<Operator>, IEntityTypeConfiguration<OperatorSession>, IEntityTypeConfiguration<Subscription>,
     IEntityTypeConfiguration<Plan>, IEntityTypeConfiguration<LegalDocument>, IEntityTypeConfiguration<LegalAcceptance>,
-    IEntityTypeConfiguration<LegalMatterState>, IEntityTypeConfiguration<SupportGrant>, IEntityTypeConfiguration<OperatorEvent>
+    IEntityTypeConfiguration<LegalMatterState>, IEntityTypeConfiguration<SupportGrant>, IEntityTypeConfiguration<OperatorEvent>,
+    IEntityTypeConfiguration<PlatformSetting>
 {
     public void Configure(EntityTypeBuilder<Operator> b)
     {
@@ -259,6 +281,15 @@ internal sealed class OperatorConfiguration :
         b.Property(x => x.Why).HasMaxLength(2000);
         b.Property(x => x.EndedByName).HasMaxLength(200);
         b.HasIndex(x => x.TenantId);
+    }
+
+    public void Configure(EntityTypeBuilder<PlatformSetting> b)
+    {
+        b.ToTable("platform_settings");
+        b.HasKey(x => x.Key);
+        b.Property(x => x.Key).HasMaxLength(64);
+        b.Property(x => x.Value).HasMaxLength(1000);
+        b.Property(x => x.UpdatedBy).HasMaxLength(200);
     }
 
     public void Configure(EntityTypeBuilder<OperatorEvent> b)

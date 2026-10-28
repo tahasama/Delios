@@ -59,3 +59,19 @@ export async function endSupportAction(_prev: Result | undefined, formData: Form
   }
   return done("Ended: DELIOS no longer reads your projects and people.");
 }
+
+/** Who the organization's invoices are made out to. */
+export async function setBillingDetailsAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  try {
+    await api("/api/organization/billing", {
+      method: "PUT",
+      body: {
+        legalName: text(formData, "legalName"), address: String(formData.get("address") ?? "").trim() || null, country: text(formData, "country") || null,
+        taxNumber: text(formData, "taxNumber") || null, email: text(formData, "email") || null, reference: text(formData, "reference") || null,
+      },
+    });
+  } catch (e) {
+    return refusalForForm(e);
+  }
+  return done("Saved: the next invoices are made out so.");
+}

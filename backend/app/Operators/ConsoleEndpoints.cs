@@ -46,6 +46,10 @@ public static class ConsoleEndpoints
         g.MapPost("/legal/{kind}", PublishAsync);
         g.MapPut("/matters/{key}", SetMatterAsync);
         g.MapGet("/support", SupportAsync);
+        g.MapPost("/organizations/{id:guid}/enter", EnterAsync);
+        g.MapGet("/platform", async (DeliosDbContext db, CancellationToken c) =>
+            Results.Ok(await db.Set<PlatformSetting>().AsNoTracking().ToDictionaryAsync(p => p.Key, p => p.Value, c)));
+        g.MapPut("/platform", SetPlatformAsync);
         g.MapGet("/notices", async (DeliosDbContext db, CancellationToken c) => Results.Ok(await db.Set<OperatorEvent>().AsNoTracking()
             .Where(e => e.Action == "PLATFORM_NOTICE").OrderByDescending(e => e.At).Take(100).ToListAsync(c)));
         g.MapPost("/notices", NoticeAsync);
@@ -384,6 +388,79 @@ public static class ConsoleEndpoints
             g.Id, g.TenantId, organization = names.GetValueOrDefault(g.TenantId), g.GrantedByName, g.Why, g.From, g.Until, g.EndedAt, g.EndedByName,
             open = g.EndedAt == null && g.Until > now,
         }));
+    }
+
+    public sealed record PlatformRequest(string? SupportEmail, string? SupportHours, string? SupportPhone);
+
+    /// <summary>How organizations reach DELIOS support: shown on their Contract &amp; plan, on Help and wherever something went wrong.</summary>
+    private static async Task<IResult> SetPlatformAsync(PlatformRequest request, HttpContext http, DeliosDbContext db, IClock clock,
+        CancellationToken cancellationToken)
+    {
+        var email = request.SupportEmail?.Trim() ?? "";
+        if (email.Length > 0 && (!email.Contains('@') || email.Length > 254))
+            return Problems.Invalid("EMAIL_INVALID", "An email address.", new { field = "supportEmail" });
+        var values = new Dictionary<string, string?>
+        {
+            [PlatformKeys.SupportEmail] = email, [PlatformKeys.SupportHours] = request.SupportHours?.Trim(), [PlatformKeys.SupportPhone] = request.SupportPhone?.Trim(),
+        };
+        var now = clock.GetCurrentInstant();
+        foreach (var (key, value) in values)
+        {
+            var row = await db.Set<PlatformSetting>().SingleOrDefaultAsync(p => p.Key == key, cancellationToken);
+            if (string.IsNullOrWhiteSpace(value)) { if (row is not null) db.Remove(row); continue; }
+            if (row is null) db.Add(row = new PlatformSetting { Key = key, Value = "" });
+            row.Value = value.Length > 1000 ? value[..1000] : value;
+            row.UpdatedAt = now;
+            row.UpdatedBy = http.Current().Name;
+        }
+        Log(db, http, "SUPPORT_CONTACT_SET", null, $"{email} · {request.SupportHours} · {request.SupportPhone}", clock);
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
+    }
+
+    /// <summary>
+    /// The operator enters the organization as one of its administrators while it lets DELIOS in (owner: "we would be just
+    /// like an admin and that's it, and we inform them, and their trail will show them what happened"): an account of its
+    /// own, "DELIOS support: …", made or switched on, its session ending with the access at the latest. Its
+    /// administrators are told now; every act is in their audit trail under that name.
+    /// </summary>
+    private static async Task<IResult> EnterAsync(Guid id, HttpContext http, DeliosDbContext db, IServiceScopeFactory scopes, IClock clock,
+        CancellationToken cancellationToken)
+    {
+        var now = clock.GetCurrentInstant();
+        var grant = await db.Set<SupportGrant>().AsNoTracking()
+            .Where(g => g.TenantId == id && g.EndedAt == null && g.Until > now).OrderByDescending(g => g.Until).FirstOrDefaultAsync(cancellationToken);
+        if (grant is null) return Problems.Forbidden("NOT_LET_IN", "This organization does not let DELIOS in now: one of its administrators grants it from Contract & plan.");
+        var who = http.Current();
+        var (token, expires) = await TenantScope.RunAsync(scopes, id, async (services, there) =>
+        {
+            var email = $"support-{who.Id:N}@delios.invalid";
+            var normalized = email.ToUpperInvariant();
+            var user = await there.Users.SingleOrDefaultAsync(u => u.TenantId == id && u.NormalizedEmail == normalized, cancellationToken);
+            if (user is null)
+            {
+                user = new User { TenantId = id, Email = email, NormalizedEmail = normalized, Name = "", PasswordHash = "", IsSupport = true };
+                there.Users.Add(user);
+            }
+            user.Name = $"DELIOS support: {who.Name}";
+            user.IsAdmin = true;
+            user.IsSupport = true;
+            user.Active = true;
+            await there.SaveChangesAsync(cancellationToken);
+            var admins = await there.Users.AsNoTracking().Where(u => u.TenantId == id && u.IsAdmin && u.Active && !u.IsSupport && u.HomeTenantId == null)
+                .Select(u => u.Id).ToListAsync(cancellationToken);
+            await services.GetRequiredService<Notifications.Notifier>().NotifyAsync(id, null, admins, "PLATFORM", $"DELIOS support is in: {who.Name}",
+                $"{who.Name} of DELIOS entered as an administrator, under the access {grant.GrantedByName} granted until {grant.Until:yyyy-MM-dd HH:mm} UTC: {grant.Why}. "
+                + "Everything done is in the audit trail under \"DELIOS support\". End it whenever you want in Settings → Contract & plan.",
+                "/organization/settings/contract", cancellationToken);
+            await services.GetRequiredService<AuditLog>().WriteAsync(new Actor(user.Id, user.Name), "SUPPORT_ENTERED", "SupportGrant", grant.Id,
+                $"Until {grant.Until:yyyy-MM-dd HH:mm} UTC", grant.Why, cancellationToken: cancellationToken);
+            var (t, e) = await services.GetRequiredService<SessionStore>().CreateAsync(user, cancellationToken);
+            return (t, e < grant.Until ? e : grant.Until);
+        }, cancellationToken);
+        Log(db, http, "SUPPORT_ENTERED", id, $"Under {grant.GrantedByName}'s access: {grant.Why}", clock);
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.Ok(new { token, expires });
     }
 
     private static async Task<IResult> NoticeAsync(NoticeRequest request, HttpContext http, DeliosDbContext db, IServiceScopeFactory scopes, IClock clock,

@@ -5,7 +5,8 @@ import { Banner, Field } from "@/components/ui";
 import { Select } from "@/components/select";
 import { api } from "@/lib/client";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
-import { acceptTextAction, cancelPlanAction, endSupportAction, grantSupportAction, resumePlanAction } from "@/lib/organization/forms-contract";
+import { acceptTextAction, cancelPlanAction, endSupportAction, grantSupportAction, resumePlanAction, setBillingDetailsAction } from "@/lib/organization/forms-contract";
+import { Field as F2, inputCls } from "@/components/ui";
 import { cn, fmtDate, fmtDateTime } from "@/lib/core/utils";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,16 @@ type Contract = {
   acceptances: { kind: string; version: number; userName: string; userEmail: string; at: string }[];
   support: { id: string; grantedByName: string; why: string; from: string; until: string; endedAt: string | null; endedByName: string | null; active: boolean }[];
 };
+
+type Billing = {
+  details: { legalName: string; address: string | null; country: string | null; taxNumber: string | null; email: string | null; reference: string | null } | null;
+  invoices: { id: string; number: string; issuedOn: string; dueOn: string; periodFrom: string | null; periodTo: string | null; currency: string; total: number;
+    state: string; paidOn: string | null; voidReason: string | null }[];
+  payTo: { name: string | null; bank: string | null };
+};
+type Contact = { email: string | null; hours: string | null; phone: string | null };
+const INVOICE_WORDS: Record<string, string> = { ISSUED: "To pay", PAID: "Paid", VOID: "Voided" };
+const money = (v: number, c: string) => `${v.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${c}`;
 
 const STATE_WORDS: Record<string, string> = { TRIAL: "Trying DELIOS", ACTIVE: "Active", READ_ONLY: "Reads only", ENDED: "Ended" };
 const KIND_WORDS: Record<string, string> = { TERMS: "Terms of service", DPA: "Data processing agreement" };
@@ -37,7 +48,11 @@ const band = (title: string, said?: string) => (
  */
 export default async function ContractPage() {
   await requireOrgAdmin();
-  const c = await api<Contract>("/api/organization/contract");
+  const [c, billing, contact] = await Promise.all([
+    api<Contract>("/api/organization/contract"), api<Billing>("/api/organization/billing"),
+    api<Contact>("/api/legal/support-contact").catch(() => ({ email: null, hours: null, phone: null })),
+  ]);
+  const toPay = billing.invoices.filter((i) => i.state === "ISSUED");
   const open = c.support.find((g) => g.active);
   return (
     <div className="space-y-4">
@@ -69,6 +84,43 @@ export default async function ContractPage() {
       ) : null}
 
       <section className="register register-sheet register-sheet-open">
+        {band("Invoices", toPay.length ? `${toPay.length} to pay: ${toPay.map((i) => money(i.total, i.currency)).join(", ")}` : "nothing to pay")}
+        {billing.invoices.length ? (
+          <ul className="divide-y divide-line">
+            {billing.invoices.map((i) => (
+              <li key={i.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2.5 text-[13px] sm:px-6">
+                <a href={`/api/organization/invoices/${i.id}`} target="_blank" rel="noreferrer" className="font-mono font-semibold text-link hover:underline">{i.number}</a>
+                <span className="tabular-nums text-slate-900">{money(i.total, i.currency)}</span>
+                <span className={cn("text-[12px] font-semibold", i.state === "ISSUED" ? "text-amber-700" : i.state === "PAID" ? "text-emerald-700" : "text-slate-500")}>{INVOICE_WORDS[i.state] ?? i.state}</span>
+                <span className="text-[11px] text-slate-500">
+                  issued {fmtDate(i.issuedOn)} · due {fmtDate(i.dueOn)}{i.periodFrom ? ` · for ${fmtDate(i.periodFrom)} → ${fmtDate(i.periodTo)}` : ""}{i.paidOn ? ` · paid ${fmtDate(i.paidOn)}` : ""}{i.voidReason ? ` · ${i.voidReason}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="px-5 py-3 text-[13px] text-slate-500 sm:px-6">No invoice yet.</p>}
+        {toPay.length && billing.payTo.bank ? (
+          <div className="border-t border-line px-5 py-3 text-[12px] text-slate-700 sm:px-6">
+            <p className="stencil mb-1 text-slate-500">How to pay</p>
+            <p className="whitespace-pre-line">By bank transfer to {billing.payTo.name ?? "DELIOS"}, quoting the invoice number:{"\n"}{billing.payTo.bank}</p>
+            <p className="mt-1 text-[11px] text-slate-500">Once it arrives, DELIOS records it and the period it pays for is paid.</p>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="register register-sheet register-sheet-open">
+        {band("Who invoices are made out to", "your legal name, address and tax number, as invoices carry them")}
+        <ActionForm action={setBillingDetailsAction} submitLabel="Save" className="asking grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-3 sm:px-6" footerClassName="sm:col-span-3">
+          <F2 label="Legal name" required><input name="legalName" required defaultValue={billing.details?.legalName ?? ""} className="plain w-full" /></F2>
+          <F2 label="Tax number" hint="VAT, ICE…"><input name="taxNumber" defaultValue={billing.details?.taxNumber ?? ""} className="plain w-full" /></F2>
+          <F2 label="Country"><input name="country" defaultValue={billing.details?.country ?? ""} className="plain w-full" /></F2>
+          <F2 label="Address" className="sm:col-span-2"><textarea name="address" rows={2} defaultValue={billing.details?.address ?? ""} className={inputCls} /></F2>
+          <F2 label="Send invoices to" hint="empty: the administrators"><input name="email" type="email" defaultValue={billing.details?.email ?? ""} className="plain w-full" /></F2>
+          <F2 label="Your reference" hint="a purchase order, printed on invoices"><input name="reference" defaultValue={billing.details?.reference ?? ""} className="plain w-full" /></F2>
+        </ActionForm>
+      </section>
+
+      <section className="register register-sheet register-sheet-open">
         {band("What we accepted", "for the organization, by one of its administrators; a new version is accepted again")}
         <ul className="divide-y divide-line">
           {c.texts.map((t) => (
@@ -98,6 +150,14 @@ export default async function ContractPage() {
 
       <section className="register register-sheet register-sheet-open">
         {band("Let DELIOS in to help", "DELIOS never reads your projects and people unless you let it in, for a set time")}
+        <div className="border-b border-line px-5 py-3 text-[12px] leading-5 text-slate-600 sm:px-6">
+          <p>
+            <strong className="text-slate-800">How it works:</strong> write to DELIOS support{contact.email ? <> at <a href={`mailto:${contact.email}`} className="font-semibold text-link hover:underline">{contact.email}</a></> : null}
+            {contact.phone ? <> or call {contact.phone}</> : null}{contact.hours ? <> ({contact.hours})</> : null}. If they need to see it for themselves, let them in
+            below for as long as needed. They then enter as an administrator named &ldquo;DELIOS support: &lt;their name&gt;&rdquo;: you are told when they do,
+            everything they do is in your audit trail under that name, and their access stops at the end of the time you chose, or as soon as you end it.
+          </p>
+        </div>
         {open ? (
           <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
             <p className="flex-1 text-[13px] text-slate-700">

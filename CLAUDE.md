@@ -864,6 +864,33 @@ a screen only words it. A new rule goes in the backend, never in a page.
   name it was done by (GDPR 17(3)). A linked account is forgotten at home.
 - **How long activity is kept** (`TRACK_KEEP_DAYS`, Security & privacy): what was opened and downloaded past it is
   removed by the next reading written (`audit_prune`, once a day per organization, rows outside the chain only).
+- **The console's sign-in sets up the authenticator by itself** (owner: "the real authenticator app"): `create-operator`
+  makes the account with a password only; the first sign-in shows a QR code (made on the screens by `qrcode`, a picture,
+  nothing in it runs) and the key to type, asks the first code, then gives 10 recovery codes once; a reset of the same
+  email asks it all again (a lost phone). Later sign-ins: password and the app's code, or a recovery code.
+- **Support enters as an administrator, told and recorded** (owner: "we would be just like an admin and that's it, and we
+  inform them, and their trail will show them what happened"): while the organization lets DELIOS in, the console's
+  "Enter as its administrator" opens it in that browser as "DELIOS support: <name>" (`User.IsSupport`, made or switched on
+  in that organization, never paid for, no sign-in name or password): its administrators are told at once, every act is
+  in its audit trail under that name (SUPPORT_ENTERED…), and its session ends with the access (`SessionStore` refuses it
+  once the access ended or ran out; ending it switches the account off).
+- **How organizations reach support** is set in the console (Team & support, `platform_settings`: email, hours,
+  telephone; `/api/legal/support-contact`), shown on Help's "Something went wrong?" (`components/trouble.tsx`: each usual
+  case, why it happens, what to try, and an email to support with the case written in), on Contract & plan, and from an
+  error page.
+- **Billing, the cheapest and most reliable first** (owner: Morocco; "I don't think orgs would be paying by cards"):
+  invoices issued from the console (`Operators/Billing.cs`), numbered DLS-<year>-<n>, never deleted (voided with why),
+  buyer and seller written on them as they were, a PDF (PDFsharp) with how to pay by bank transfer; an organization's
+  administrators keep who they are made out to and download them on Contract & plan, and are told of each; a payment is
+  recorded when it arrives (bank transfer, CMI, Paddle, other: provisional codes TRANSFER, CMI, PADDLE, OTHER; states
+  ISSUED, PAID, VOID), the period it pays for then paid by itself. DELIOS's own details on every invoice (company, tax
+  and registration numbers, bank, tax rate, days to pay, mentions) set in the console's Plans & payments, what a Moroccan
+  invoice must carry marked for an accountant. CMI and Paddle are not connected (docs/gaps/running.md).
+- **Settings is a side menu** (owner: "settings would be better as side menu, than cards"), a project's and the
+  organization's alike (`components/settings-nav.tsx`): the overview, then every page the person opens by group, the one
+  you are on lit; the overview lists where each stands ("To do" in amber) in one sheet. Types & sets' groups are on the
+  tab strip.
+- Moments and days go out and come in as ISO text (`Platform/NodaJson.cs`); before, a moment went out as an empty object.
 - **The shared tables are fenced too** (migration FenceSharedTables): inside an organization's transaction, sessions,
   product requests, notice alarms and reply addresses show and take only its rows; sign-in names, reserved values and
   organizations' identities and holders are read by all, written only for itself; across, only through

@@ -146,6 +146,12 @@ public sealed class User
     public bool Active { get; set; } = true;
     /// <summary>Configures the tenant: people, projects, functions, the matrix.</summary>
     public bool IsAdmin { get; set; }
+    /// <summary>
+    /// An account of the DELIOS team, standing in this organization as one of its administrators only while it lets DELIOS in
+    /// (<c>Operators.SupportGrant</c>): named "DELIOS support: …", it signs in only from the console, and every act it does
+    /// is in the audit trail under that name. Never paid for, never signing in by password.
+    /// </summary>
+    public bool IsSupport { get; set; }
     /// <summary>The groups of notifications this person does not want popping up in their browsers (see <c>PushGroups</c>).</summary>
     public string[] PushOff { get; set; } = [];
     /// <summary>

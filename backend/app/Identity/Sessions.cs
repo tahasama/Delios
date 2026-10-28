@@ -132,7 +132,7 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var person = await db.Users.AsNoTracking()
             .Where(u => u.Id == session.UserId && u.Active && (u.Party == null || u.Party.Active))
-            .Select(u => new { u.Name, u.IsAdmin, u.HomeTenantId })
+            .Select(u => new { u.Name, u.IsAdmin, u.HomeTenantId, u.IsSupport })
             .SingleOrDefaultAsync(cancellationToken);
         var tenantActive = await db.Tenants.AnyAsync(t => t.Id == session.TenantId && t.Active, cancellationToken);
         // An account standing for someone of another organization holds only while the link between the two does.
@@ -141,6 +141,10 @@ public sealed class SessionStore(DeliosDbContext db, TenantContext tenant, Hybri
                                                         where a.HostUserId == session.UserId && a.EndedAt == null
                                                             && l.State == Organizations.LinkStates.Linked
                                                         select a.Id).AnyAsync(cancellationToken))
+            person = null;
+        // DELIOS support stands in the organization only while it lets DELIOS in: ended or run out, its session ends too.
+        if (person is { IsSupport: true } && !await db.Set<Operators.SupportGrant>()
+                .AnyAsync(g => g.TenantId == session.TenantId && g.EndedAt == null && g.Until > now, cancellationToken))
             person = null;
         await transaction.CommitAsync(cancellationToken);
 

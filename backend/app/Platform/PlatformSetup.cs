@@ -82,6 +82,8 @@ public static class PlatformSetup
         }
 
         services.AddSingleton<IClock>(NodaTime.SystemClock.Instance);
+        // Moments and days read and written as ISO text in every answer and request (NodaJson).
+        services.ConfigureHttpJsonOptions(o => NodaJson.Add(o.SerializerOptions.Converters));
         services.AddScoped<TenantContext>();
         services.AddScoped<TenantTransactionInterceptor>();
         services.AddScoped<ReadDatabase>();
@@ -421,6 +423,7 @@ public static class PlatformSetup
             Operators.OperatorAuth.MapOperatorAuthEndpoints(app);
             Operators.ConsoleEndpoints.MapConsoleEndpoints(app);
             Operators.ContractEndpoints.MapContractEndpoints(app);
+            Operators.BillingEndpoints.MapBillingEndpoints(app);
             Identity.ForgetPerson.MapForgetEndpoints(app);
             app.MapSsoEndpoints();
             app.MapPasswordResetEndpoints();

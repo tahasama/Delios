@@ -47,3 +47,17 @@ export function bytes(n: number): string {
   while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
   return `${v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`;
 }
+
+export type InvoiceRow = {
+  id: string; tenantId: string; organization: string | null; number: string; issuedOn: string; dueOn: string; periodFrom: string | null; periodTo: string | null;
+  currency: string; subtotal: number; taxRate: number; tax: number; total: number; state: "ISSUED" | "PAID" | "VOID"; paidOn: string | null; paidBy: string | null;
+  paymentReference: string | null; voidReason: string | null; note: string | null; issuedBy: string; createdAt: string;
+  lines: { description: string; quantity: number; unitPrice: number; amount: number }[];
+};
+export type BillingDetails = { legalName: string; address: string | null; country: string | null; taxNumber: string | null; email: string | null; reference: string | null; updatedAt: string; updatedBy: string | null };
+
+/** How an invoice was paid (provisional codes, the owner to confirm). */
+export const PAID_BY: Record<string, string> = { TRANSFER: "Bank transfer", CMI: "Card (CMI)", PADDLE: "Card (Paddle)", OTHER: "Other" };
+export const INVOICE_WORDS: Record<string, string> = { ISSUED: "Waiting for payment", PAID: "Paid", VOID: "Voided" };
+export const INVOICE_TONE: Record<string, string> = { ISSUED: "text-amber-700", PAID: "text-emerald-700", VOID: "text-slate-500" };
+export const money = (v: number, currency: string) => `${v.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;

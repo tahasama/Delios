@@ -28,6 +28,7 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
       >
         Try again
       </button>
+      <a href="/guide#trouble" className="ml-3 text-[13px] font-semibold text-link hover:underline">What to try, and how to reach support</a>
     </div>
   );
 }

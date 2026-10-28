@@ -46,7 +46,7 @@ public static class Subscriptions
 
     /// <summary>The people an organization pays for: its own, working in it. Guests and accounts standing for other organizations are free.</summary>
     public static IQueryable<User> Paid(DeliosDbContext db, Guid tenantId) =>
-        db.Users.Where(u => u.TenantId == tenantId && u.Active && u.HomeTenantId == null && (u.Party == null || u.Party.IsInternal));
+        db.Users.Where(u => u.TenantId == tenantId && u.Active && !u.IsSupport && u.HomeTenantId == null && (u.Party == null || u.Party.IsInternal));
 
     /// <summary>
     /// A signed-in person of an organization that reads only: anything but reading is refused, except signing in and out,
@@ -129,6 +129,16 @@ public static class ContractEndpoints
                 var d = latest.GetValueOrDefault(k.Code);
                 return new LegalListed(k.Code, k.Slug, d?.Title ?? k.Title, k.Lead, k.Accepted, d?.Version ?? 0, d?.PublishedAt);
             }));
+        });
+        // How to reach DELIOS support, for anyone (the sign-in page's trouble, Help, an error page).
+        legal.MapGet("/support-contact", async (DeliosDbContext db, CancellationToken c) =>
+        {
+            var all = await db.Set<PlatformSetting>().AsNoTracking().ToDictionaryAsync(p => p.Key, p => p.Value, c);
+            return Results.Ok(new
+            {
+                email = all.GetValueOrDefault(PlatformKeys.SupportEmail), hours = all.GetValueOrDefault(PlatformKeys.SupportHours),
+                phone = all.GetValueOrDefault(PlatformKeys.SupportPhone),
+            });
         });
         legal.MapGet("/{slug}", async (string slug, DeliosDbContext db, CancellationToken c) =>
         {
@@ -255,7 +265,7 @@ public static class ContractEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> EndGrantAsync(Guid id, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock,
+    private static async Task<IResult> EndGrantAsync(Guid id, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock, SessionStore sessions,
         CancellationToken cancellationToken)
     {
         var tenantId = http.User.TenantId();
@@ -264,7 +274,11 @@ public static class ContractEndpoints
         if (grant.EndedAt is not null) return Results.NoContent();
         grant.EndedAt = clock.GetCurrentInstant();
         grant.EndedByName = http.User.Identity?.Name;
+        // DELIOS support's accounts here stop at once, their sessions with them.
+        var support = await db.Users.Where(u => u.TenantId == tenantId && u.IsSupport && u.Active).ToListAsync(cancellationToken);
+        foreach (var one in support) one.Active = false;
         await db.SaveChangesAsync(cancellationToken);
+        foreach (var one in support) await sessions.ForgetAllAsync(one.Id, revoke: true, cancellationToken);
         await audit.WriteAsync(http.User.Actor(), "SUPPORT_ENDED", "SupportGrant", grant.Id, cancellationToken: cancellationToken);
         return Results.NoContent();
     }

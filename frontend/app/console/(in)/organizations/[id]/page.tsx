@@ -4,8 +4,9 @@ import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { Select } from "@/components/select";
 import { consoleApi } from "@/lib/console/client";
-import { setOrganizationActiveAction, setSubscriptionAction } from "@/lib/console/forms";
-import { bytes, STATE_TONE, STATE_WORDS, type Acceptance, type Grant, type OperatorEvent, type OrgRow, type Plan, type ProductRequest, type Subscription } from "@/lib/console/types";
+import { enterAsSupportAction, setOrganizationActiveAction, setSubscriptionAction } from "@/lib/console/forms";
+import { Billing } from "./billing";
+import { bytes, STATE_TONE, STATE_WORDS, type BillingDetails, type InvoiceRow, type Acceptance, type Grant, type OperatorEvent, type OrgRow, type Plan, type ProductRequest, type Subscription } from "@/lib/console/types";
 import { cn, fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { Nothing, Plate, Sheet } from "../../parts";
 
@@ -28,7 +29,10 @@ const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : "");
  */
 export default async function Organization({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [d, plans] = await Promise.all([consoleApi<Detail>(`/api/console/organizations/${id}`), consoleApi<Plan[]>("/api/console/plans")]);
+  const [d, plans, billing] = await Promise.all([
+    consoleApi<Detail>(`/api/console/organizations/${id}`), consoleApi<Plan[]>("/api/console/plans"),
+    consoleApi<{ details: BillingDetails | null; invoices: InvoiceRow[] }>(`/api/console/organizations/${id}/billing`),
+  ]);
   const o = d.organization;
   const s = d.subscription;
   return (
@@ -110,7 +114,13 @@ export default async function Organization({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      <Sheet title="Support access" said={d.supportOpen ? "it lets us in now: what we read below is written in its audit trail" : "we read its projects and people only once one of its administrators lets us in"}>
+      <Billing tenantId={o.id} details={billing.details} invoices={billing.invoices} plan={plans.find((p) => p.code === s?.plan) ?? null} users={o.users} />
+
+      <Sheet title="Support access" said={d.supportOpen ? "it lets us in now: what we read below is written in its audit trail" : "we read its projects and people only once one of its administrators lets us in"}
+        acts={d.supportOpen ? (
+          <ActionForm action={enterAsSupportAction} hidden={{ tenantId: o.id }} submitLabel="Enter as its administrator" size="sm"
+            confirmText={`You enter ${o.name} as "DELIOS support: you", an administrator. Its administrators are told now; everything you do is in its audit trail.`} />
+        ) : undefined}>
         {d.support.length ? (
           <ul className="divide-y divide-line">
             {d.support.map((g) => (

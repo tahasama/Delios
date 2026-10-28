@@ -12,7 +12,7 @@ const TABS = [
   { href: "/console/legal", label: "Legal", icon: Scale },
   { href: "/console/support", label: "Support access", icon: LifeBuoy },
   { href: "/console/notices", label: "Notices", icon: Megaphone },
-  { href: "/console/team", label: "Team", icon: UsersRound },
+  { href: "/console/team", label: "Team & support", icon: UsersRound },
   { href: "/console/log", label: "Log", icon: ScrollText },
 ];
 

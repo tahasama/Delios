@@ -19,15 +19,22 @@ public sealed class ConsoleTests(Infrastructure infrastructure) : IClassFixture<
 
     private static async Task<HttpClient> OperatorAsync(TestApp app)
     {
-        await using var scope = app.Factory.Services.CreateAsyncScope();
-        var said = await scope.ServiceProvider.GetRequiredService<CreateOperator>().RunAsync("ops@delios.test", "Olga Ops", "a-long-operator-secret");
-        var key = said.Split('\n')[1].Split(": ")[1].Trim();
-        var code = Totp.Code(Totp.FromBase32(key), Totp.StepAt(DateTimeOffset.UtcNow));
+        await using (var scope = app.Factory.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<CreateOperator>().RunAsync("ops@delios.test", "Olga Ops", "a-long-operator-secret");
         var client = app.Factory.CreateClient();
-        var (wrong, _) = await Flow.PostAsync(client, "/api/console/auth/sign-in", new { email = "ops@delios.test", password = "a-long-operator-secret", code = "000000" == code ? "111111" : "000000" });
+        // The first sign-in sets up the authenticator: its key (drawn as a QR code), then its first code.
+        var (first, setup) = await Flow.PostAsync(client, "/api/console/auth/sign-in", new { email = "ops@delios.test", password = "a-long-operator-secret" });
+        Assert.True(first == HttpStatusCode.OK && setup.GetProperty("step").GetString() == "SETUP", setup.ToString());
+        Assert.StartsWith("otpauth://totp/", setup.GetProperty("uri").GetString());
+        var code = Totp.Code(Totp.FromBase32(setup.GetProperty("secret").GetString()!), Totp.StepAt(DateTimeOffset.UtcNow));
+        var (wrong, _) = await Flow.PostAsync(client, "/api/console/auth/setup", new { challenge = setup.GetProperty("challenge").GetString(), code = code == "000000" ? "111111" : "000000" });
         Assert.Equal(HttpStatusCode.UnprocessableEntity, wrong);
-        var (signed, body) = await Flow.PostAsync(client, "/api/console/auth/sign-in", new { email = "ops@delios.test", password = "a-long-operator-secret", code });
+        var (signed, body) = await Flow.PostAsync(client, "/api/console/auth/setup", new { challenge = setup.GetProperty("challenge").GetString(), code });
         Assert.True(signed == HttpStatusCode.OK, body.ToString());
+        Assert.Equal(10, body.GetProperty("recoveryCodes").GetArrayLength());
+        // From now on, the password alone does not sign in.
+        var (alone, _) = await Flow.PostAsync(app.Factory.CreateClient(), "/api/console/auth/sign-in", new { email = "ops@delios.test", password = "a-long-operator-secret" });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, alone);
         return client;
     }
 
@@ -77,6 +84,34 @@ public sealed class ConsoleTests(Infrastructure infrastructure) : IClassFixture<
         Assert.True(granted == HttpStatusCode.NoContent, grantedBody.ToString());
         var after = await ops.GetFromJsonAsync<JsonElement>($"/api/console/organizations/{id}");
         Assert.True(after.GetProperty("people").GetArrayLength() > 0);
+
+        // Entering as its administrator: a session of "DELIOS support: …", which works there until the access ends.
+        var (entered, enteredBody) = await Flow.PostAsync(ops, $"/api/console/organizations/{id}/enter", new { });
+        Assert.True(entered == HttpStatusCode.OK, enteredBody.ToString());
+        var support = app.Factory.CreateClient();
+        support.DefaultRequestHeaders.Add("Cookie", $"delios_session={enteredBody.GetProperty("token").GetString()}");
+        var supportMe = await support.GetFromJsonAsync<JsonElement>("/api/me");
+        Assert.StartsWith("DELIOS support: ", supportMe.GetProperty("user").GetProperty("name").GetString());
+        var grants = await admin.GetFromJsonAsync<JsonElement>("/api/organization/contract");
+        var grantId = grants.GetProperty("support").EnumerateArray().First().GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.NoContent, (await Flow.PostAsync(admin, $"/api/organization/support/{grantId}/end", new { })).Status);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await support.GetAsync("/api/me")).StatusCode);
+
+        // An invoice issued, paid by transfer: the period it pays for is paid.
+        var (issued, issuedBody) = await Flow.PostAsync(ops, $"/api/console/organizations/{id}/invoices", new
+        {
+            periodFrom = "2027-01-01", periodTo = "2027-12-31", currency = "MAD", taxRate = 20,
+            lines = new[] { new { description = "Team plan, per user, a year", quantity = 5, unitPrice = 1000 } },
+        });
+        Assert.True(issued == HttpStatusCode.OK, issuedBody.ToString());
+        Assert.StartsWith("DLS-", issuedBody.GetProperty("number").GetString());
+        var invoiceId = issuedBody.GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.OK, (await ops.GetAsync($"/api/console/invoices/{invoiceId}/pdf")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await Flow.PostAsync(ops, $"/api/console/invoices/{invoiceId}/paid", new { paidBy = "TRANSFER", reference = "VIR-1" })).Status);
+        var contract = await admin.GetFromJsonAsync<JsonElement>("/api/organization/contract");
+        Assert.True(contract.GetProperty("paidUntil").ToString().StartsWith("2027-12-31"), contract.ToString());
+        var billing = await admin.GetFromJsonAsync<JsonElement>("/api/organization/billing");
+        Assert.Equal("PAID", billing.GetProperty("invoices").EnumerateArray().Single().GetProperty("state").GetString());
     }
 
     [Fact]
