@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TabLink } from "@/components/tab-link";
 import { Download, X, FileSpreadsheet } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
 import { DataTable, Th, Td, ToneChip, inputCls, btn } from "@/components/ui";
@@ -38,11 +39,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const tabs = offered.map((id) => ({ id, title: REPORT_TITLES[id] }));
   // The tabs as they were, on a quiet band with a hairline between each (owner); the open one on the page's surface.
   const nav = (on: string) => tabs.length > 1 ? (
-    <nav aria-label="Reports" className="strip no-print">
+    <nav aria-label="Reports" className="strip strip-full no-print">
       {tabs.map((t) => (
-        <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className="strip-tab">
+        <TabLink key={t.id} href={`/reports?r=${t.id}`} active={on === t.id} className="strip-tab">
           {t.title}
-        </Link>
+        </TabLink>
       ))}
     </nav>
   ) : null;

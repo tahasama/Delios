@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TabLink } from "@/components/tab-link";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin, isController } from "@/lib/core/auth";
 import { inputCls } from "@/components/ui";
@@ -141,18 +142,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
 
       {/* One sheet, Types & sets' way (owner): the moments across the top, the families down the side, the checks
           beside them, no space between. */}
-      <div className="register register-sheet register-sheet-open flex flex-col md:h-[calc(100dvh-6.5rem)]">
-        <nav aria-label="When it is checked" className="flex shrink-0 flex-wrap items-stretch gap-x-5 border-b border-line px-5 sm:px-6">
-          <Link href={href({ phase: null })} scroll={false} aria-current={!phase ? "page" : undefined} className={tabCls(!phase)}>
-            All <span className="ml-1 tabular-nums text-slate-400">{CATALOG.filter(narrowedBy).length}</span>
-          </Link>
-          {PHASES.map((p) => (
-            <Link key={p} href={href({ phase: p, family: null })} scroll={false} aria-current={phase === p ? "page" : undefined} className={tabCls(phase === p)}>
-              {PHASE_LABEL[p]} <span className="ml-1 tabular-nums text-slate-400">{countOf(p)}</span>
-            </Link>
-          ))}
-        </nav>
-        <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[13rem_minmax(0,1fr)]">
+      <div className="register register-sheet register-sheet-open grid grid-cols-1 md:h-[calc(100dvh-6.5rem)] md:grid-cols-[13rem_minmax(0,1fr)] md:grid-rows-1">
           <nav aria-label="Family of checks" className="scroll-quiet min-h-0 overflow-y-auto border-b border-line p-2 md:border-b-0 md:border-r">
             <Family href={href({ family: null })} label="All families" count={inPhase.length} active={!family} />
             {familiesHere.map((f) => (
@@ -165,7 +155,18 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
               />
             ))}
           </nav>
-          <div className="scroll-thin min-h-0 min-w-0 overflow-y-auto">
+          <div className="flex min-h-0 min-w-0 flex-col">
+            <nav aria-label="When it is checked" className="flex shrink-0 flex-wrap items-stretch gap-x-5 border-b border-line px-5 sm:px-6">
+              <TabLink href={href({ phase: null })} active={!phase} className={tabCls(!phase)}>
+                All <span className="ml-1 tabular-nums text-slate-400">{CATALOG.filter(narrowedBy).length}</span>
+              </TabLink>
+              {PHASES.map((p) => (
+                <TabLink key={p} href={href({ phase: p, family: null })} active={phase === p} className={tabCls(phase === p)}>
+                  {PHASE_LABEL[p]} <span className="ml-1 tabular-nums text-slate-400">{countOf(p)}</span>
+                </TabLink>
+              ))}
+            </nav>
+          <div className="scroll-thin min-h-0 min-w-0 flex-1 overflow-y-auto">
             {!shown.length ? (
               <p className="px-6 py-8 text-center text-[13px] text-slate-500">
                 No check matches that.{" "}
@@ -202,7 +203,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
               );
             })}
           </div>
-        </div>
+          </div>
       </div>
     </div>
   );

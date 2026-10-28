@@ -157,13 +157,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
   same on Assurance and the Schedule "to gain more vertical space"; then "not literal rectangles… not bigger… the grey on
   the background, not the text"; `.strip` / `.strip-tab`, `globals.css`): one low greyish band, the tabs plain words on
   it at its old height (owner: "bring back tabs original height"), a short hairline between each (never a box round a
-  tab), the words in ink, the chosen one bold with the brand's line along its foot. Reports' tabs on one line inside its
-  plate; the Schedule's three on white (`.strip-card`: on the grey page a band stands on white, owner), joined to the
+  tab), the words in ink, the chosen one bold with the brand's line along its foot, the band a light grey (owner:
+  "lighter"). Reports' tabs inside its plate, the whole width shared out; the Schedule's three framed as a sheet
+  (`.strip-card`), joined to the
   answer under it as its head (owner: "stick it to the table under it"); Assurance's at the head of one sheet with the
   line saying what the tab is and what the tab sets (`AssuranceHead` `children`: What is checked's measure and filters,
   owner: "merge the 3 skinny cards"); the whole width shared equally (`.strip-full`), each its icon and name, no small
-  words after. What is checked is then one sheet, Types & sets' way (owner): its moments across the top, its families
-  down the side, the checks beside them, no space between. **The switch** (`.seg` /
+  words after. What is checked is then one sheet, Types & sets' way (owner): its families down the side, its moments
+  as tabs above the checks, starting where they start, no space between. Types & sets the same: Find and the lists on
+  the left, the groups' tabs above the chosen list (owner: "match the content starting point"). **A tab never sends the
+  page back to its top** (owner: "fix the scroll reset on tabs"): `components/tab-link.tsx`, `TabLink`, notes where the
+  window stood and puts it back once the tab opened is lit (Reports, Assurance, its moments, the Schedule). **The switch** (`.seg` /
   `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Packages' two kinds beside
   List · Tree (put back as they were: two designs side by side in one row read as inconsistent), Home's "What is waiting",
   the organization's People, the imports' "Which lines", list or tree, light or dark, in use · retired · all. The checks'

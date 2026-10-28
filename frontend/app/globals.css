@@ -668,13 +668,12 @@ summary::-webkit-details-marker {
     align-items: stretch;
     overflow-x: auto;
     scrollbar-width: none;
-    background: color-mix(in srgb, var(--color-slate-500) 8%, var(--color-surface));
+    background: color-mix(in srgb, var(--color-slate-500) 4%, var(--color-surface));
   }
   .strip::-webkit-scrollbar { display: none; }
-  /* On the grey page a band of its own stands on white, as every sheet does (owner: the grey band "works because it
-     sits on a white background"): the sheet's surface, frame and shadow, the hairlines between the tabs kept. */
+  /* On the grey page a band of its own is framed as every sheet is (owner: the grey band "works because it sits on a
+     white background", then "a light subtle grey"): the band's own light grey, the sheet's frame and shadow. */
   .strip-card {
-    background: var(--color-surface);
     border: 1px solid var(--color-line);
     border-radius: 0.875rem;
     box-shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 12px 28px -24px rgb(15 23 42 / 45%);

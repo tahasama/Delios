@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TabLink } from "@/components/tab-link";
 import { BadgeCheck, Ban, BookOpen, ListChecks } from "lucide-react";
 
 /**
@@ -19,10 +19,10 @@ export function AssuranceTabs({ current, internal = true }: { current: string; i
   return (
     <nav className="strip strip-full" aria-label="Assurance">
       {TABS.filter((t) => internal || !t.internal).map((t) => (
-        <Link key={t.href} href={t.href} aria-current={current === t.href ? "page" : undefined} className="strip-tab">
+        <TabLink key={t.href} href={t.href} active={current === t.href} className="strip-tab">
           <t.icon />
           {t.label}
-        </Link>
+        </TabLink>
       ))}
     </nav>
   );

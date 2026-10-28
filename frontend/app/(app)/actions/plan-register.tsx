@@ -2,6 +2,7 @@
 import { Select } from "@/components/select";
 
 import Link from "next/link";
+import { TabLink } from "@/components/tab-link";
 import { TONE } from "./plan-timeline";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -310,10 +311,10 @@ export function PlanRegister({
         { id: "plan", label: "The plan", hint: "drawn on a timeline", icon: CalendarRange },
         { id: "table", label: "The table", hint: "one line per action", icon: Rows3 },
       ] as const).map((tab) => (
-        <Link key={tab.id} href={viewHref(tab.id)} scroll={false} aria-current={view === tab.id ? "page" : undefined} className="strip-tab">
+        <TabLink key={tab.id} href={viewHref(tab.id)} active={view === tab.id} className="strip-tab">
           <tab.icon />
           {tab.label}
-        </Link>
+        </TabLink>
       ))}
     </nav>
 
