@@ -61,7 +61,7 @@ public sealed class GovernanceTests(Infrastructure infrastructure) : IClassFixtu
 
         await Flow.PostAsync(engineer, $"{path}/reviews/{id}/answer", new { });
         await Flow.PostAsync(approver, $"{path}/reviews/{id}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"{path}/reviews/{id}/release", new { });
+        await Flow.PostAsync(controller, $"{path}/reviews/{id}/release", await Flow.ReleaseBodyAsync(controller));
 
         var (notTheirs, _) = await Flow.PostAsync(engineer, $"{path}/revisions/{p.Revision}/withdraw-approval", new { reason = "x" });
         Assert.Equal(HttpStatusCode.Forbidden, notTheirs);

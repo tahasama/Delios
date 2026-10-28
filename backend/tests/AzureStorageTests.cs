@@ -67,7 +67,7 @@ public sealed class AzureStorageTests(Infrastructure infrastructure, AzuriteFixt
         var id = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/reviews/{id}/answer", new { });
         await Flow.PostAsync(approver, $"/api/projects/{p.Project}/reviews/{id}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{id}/release", new { });
+        await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{id}/release", await Flow.ReleaseBodyAsync(controller));
 
         // The worker read the upload to scan it and wrote the stamped copy back.
         var document = await Flow.UntilAsync(engineer, p.Project, p.Document, d =>

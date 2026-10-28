@@ -15,7 +15,7 @@ public sealed class RecordKeepingTests(Infrastructure infrastructure) : IClassFi
         var id = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, P(p, $"/reviews/{id}/answer"), new { });
         await Flow.PostAsync(approver, P(p, $"/reviews/{id}/answer"), new { verdict = "C1", status = "IFC" });
-        var (released, body) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), new { });
+        var (released, body) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), await Flow.ReleaseBodyAsync(controller));
         Assert.True(released == HttpStatusCode.OK, body.ToString());
     }
 

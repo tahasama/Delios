@@ -32,7 +32,7 @@ public sealed class TransmittalTests(Infrastructure infrastructure) : IClassFixt
         Assert.True(status == HttpStatusCode.OK, decided.ToString());
         if (controller is not null)
         {
-            var (released, body) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), new { });
+            var (released, body) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), await Flow.ReleaseBodyAsync(controller));
             Assert.True(released == HttpStatusCode.OK, body.ToString());
         }
         return id;
@@ -229,7 +229,7 @@ public sealed class TransmittalTests(Infrastructure infrastructure) : IClassFixt
         Assert.Equal("Northwater Utility (recorded by Carla Control)", recorded.GetProperty("comments")[0].GetProperty("author").GetString());
         Assert.Equal("DECIDED", recorded.GetProperty("state").GetString());
 
-        var (_, released) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), new { });
+        var (_, released) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), await Flow.ReleaseBodyAsync(controller));
         Assert.Equal("RELEASED", released.GetProperty("state").GetString());
 
         // The proof is filed against the revision and scanned; the revision's own files are untouched.
@@ -288,7 +288,7 @@ public sealed class TransmittalTests(Infrastructure infrastructure) : IClassFixt
 
         // A review transmittal is not an issue: the release is still not sent.
         var controller = await app.SignedInAsync("controller@demo.local");
-        await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), new { });
+        await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), await Flow.ReleaseBodyAsync(controller));
         var notIssued = await GetAsync(controller, P(p, "/not-issued"));
         Assert.Contains(notIssued.EnumerateArray(), x => x.GetProperty("revisionId").GetGuid() == p.Revision);
     }

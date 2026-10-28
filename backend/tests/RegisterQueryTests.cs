@@ -34,7 +34,7 @@ public sealed class RegisterQueryTests(Infrastructure infrastructure) : IClassFi
         var reviewId = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"{p}/reviews/{reviewId}/answer", new { });
         await Flow.PostAsync(approver, $"{p}/reviews/{reviewId}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", new { });
+        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", await Flow.ReleaseBodyAsync(controller));
         await Api.RegisterAsync(engineer, released.Project, Api.Drawing("Switchroom layout", "EL"));
         await Api.RegisterAsync(engineer, released.Project, Api.Drawing("Pump bay sections"));
 

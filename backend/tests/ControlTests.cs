@@ -51,7 +51,7 @@ public sealed class ControlTests(Infrastructure infrastructure) : IClassFixture<
         // Starting a revision outside a transmittal is refused: what a supplier sends comes with a receipt.
         var direct = await Flow.UploadAsync(supplier, project, document, "datasheet.pdf", Flow.Pdf(), "application/pdf");
         var (outside, outsideBody) = await Flow.PostAsync(supplier, $"/api/projects/{project}/documents/{document}/revisions",
-            new { fileIds = new[] { direct } });
+            new { fileIds = new[] { direct } , changeDescription = "Next issue" });
         Assert.Equal((HttpStatusCode.Conflict, "SEND_ON_TRANSMITTAL"), (outside, Flow.Code(outsideBody)));
         var (_, sent) = await Supply.SendAsync(supplier, project, document, direct, "IFR");
         var p = new Prepared(project, document, Supply.RevisionOf(sent));
@@ -116,7 +116,7 @@ public sealed class ControlTests(Infrastructure infrastructure) : IClassFixture<
         // No new revision may start beside it; the correction comes back under A.
         var other = await Flow.UploadAsync(engineer, p.Project, p.Document, "B.pdf", Flow.Pdf(), "application/pdf");
         var (beside, besideBody) = await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/documents/{p.Document}/revisions",
-            new { fileIds = new[] { other } });
+            new { fileIds = new[] { other } , changeDescription = "Next issue" });
         Assert.Equal((HttpStatusCode.Conflict, "REVISION_IN_MOTION"), (beside, Flow.Code(besideBody)));
         await ResubmitAsync(engineer, p);
         revision = await RevisionAsync(engineer, p);
@@ -125,7 +125,7 @@ public sealed class ControlTests(Infrastructure infrastructure) : IClassFixture<
 
         // The route runs again from the start on the corrected file, which is the one stamped.
         var again = await DecidedAsync(engineer, approver, p, "C1", "IFC");
-        var (_, released) = await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{again.GetProperty("id").GetGuid()}/release", new { });
+        var (_, released) = await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{again.GetProperty("id").GetGuid()}/release", await Flow.ReleaseBodyAsync(controller));
         Assert.Equal("RELEASED", released.GetProperty("state").GetString());
         var document = await Flow.UntilAsync(engineer, p.Project, p.Document, d =>
             Flow.Revision(d, p.Revision).GetProperty("files").EnumerateArray().Any(f => f.GetProperty("kind").GetString() == "STAMPED"));

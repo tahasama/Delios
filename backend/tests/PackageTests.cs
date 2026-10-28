@@ -34,7 +34,7 @@ public sealed class PackageTests(Infrastructure infrastructure) : IClassFixture<
         var id = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/reviews/{id}/answer", new { });
         await Flow.PostAsync(approver, $"/api/projects/{p.Project}/reviews/{id}/answer", new { verdict = "C1", status = "IFC" });
-        var (status, body) = await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{id}/release", new { });
+        var (status, body) = await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{id}/release", await Flow.ReleaseBodyAsync(controller));
         Assert.True(status == HttpStatusCode.OK, body.ToString());
     }
 

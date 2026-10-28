@@ -44,7 +44,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var pdf = await Flow.UploadAsync(client, project, document, "Programme.pdf", Flow.Pdf(), "application/pdf");
         var export = await Flow.UploadAsync(client, project, document, "Programme.csv", Encoding.UTF8.GetBytes(csv), "text/csv");
         var (status, revision) = await Flow.PostAsync(client, $"/api/projects/{project}/documents/{document}/revisions",
-            new { fileIds = new[] { pdf, export } });
+            new { fileIds = new[] { pdf, export } , changeDescription = "Next issue" });
         Assert.True(status == HttpStatusCode.Created, revision.ToString());
         var id = revision.GetProperty("id").GetGuid();
         await Flow.UntilAsync(client, project, document, d => Flow.Revision(d, id).GetProperty("filesState").GetString() != "PROCESSING");
@@ -57,7 +57,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var id = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"/api/projects/{project}/reviews/{id}/answer", new { });
         await Flow.PostAsync(approver, $"/api/projects/{project}/reviews/{id}/answer", new { verdict = "C1", status });
-        var (released, body) = await Flow.PostAsync(controller, $"/api/projects/{project}/reviews/{id}/release", new { });
+        var (released, body) = await Flow.PostAsync(controller, $"/api/projects/{project}/reviews/{id}/release", await Flow.ReleaseBodyAsync(controller));
         Assert.True(released == HttpStatusCode.OK, body.ToString());
     }
 

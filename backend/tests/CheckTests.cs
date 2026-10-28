@@ -39,7 +39,7 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
         var id = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/reviews/{id}/answer", new { });
         await Flow.PostAsync(approver, $"/api/projects/{p.Project}/reviews/{id}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{id}/release", new { });
+        await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{id}/release", await Flow.ReleaseBodyAsync(controller));
     }
 
     [Fact]

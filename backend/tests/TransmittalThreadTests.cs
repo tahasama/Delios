@@ -15,7 +15,7 @@ public sealed class TransmittalThreadTests(Infrastructure infrastructure) : ICla
         var id = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, P(p, $"/reviews/{id}/answer"), new { });
         await Flow.PostAsync(approver, P(p, $"/reviews/{id}/answer"), new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), new { });
+        await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), await Flow.ReleaseBodyAsync(controller));
     }
 
     private static async Task<(Guid Viewer, Guid Approver, Guid Acme)> PeopleAsync(HttpClient client, Prepared p)

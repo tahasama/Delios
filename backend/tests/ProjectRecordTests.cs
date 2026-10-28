@@ -77,14 +77,14 @@ public sealed class ProjectRecordTests(Infrastructure infrastructure) : IClassFi
             "Activity ID,Activity Name,Start,Finish,Responsible,Departments\n"
             + $"A100,Pour inlet base slab,{Day(20)},{Day(25)},Site team,CI\n"
             + $"A200,Install switchgear,{Day(40)},{Day(45)},Electrical,\n"), "text/csv");
-        var (_, revision) = await Flow.PostAsync(engineer, $"{p}/documents/{schedule}/revisions", new { fileIds = new[] { pdf, csv } });
+        var (_, revision) = await Flow.PostAsync(engineer, $"{p}/documents/{schedule}/revisions", new { fileIds = new[] { pdf, csv } , changeDescription = "Next issue" });
         var revisionId = revision.GetProperty("id").GetGuid();
         await Flow.UntilAsync(engineer, project, schedule, d => Flow.Revision(d, revisionId).GetProperty("filesState").GetString() != "PROCESSING");
         var (_, review) = await Flow.PostAsync(engineer, $"{p}/revisions/{revisionId}/reviews", new { });
         var reviewId = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"{p}/reviews/{reviewId}/answer", new { });
         await Flow.PostAsync(approver, $"{p}/reviews/{reviewId}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", new { });
+        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", await Flow.ReleaseBodyAsync(controller));
         JsonElement activities = default;
         for (var i = 0; i < 150 && activities.ValueKind != JsonValueKind.Array | (activities.ValueKind == JsonValueKind.Array && activities.GetArrayLength() < 2); i++)
         {

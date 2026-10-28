@@ -66,7 +66,7 @@ public static class Flow
         var project = await Api.ProjectIdAsync(client);
         var doc = document ?? (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
         var file = await UploadAsync(client, project, doc, name, pdf ?? Pdf(), contentType);
-        using var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { file } });
+        using var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { file }, changeDescription = "As issued for review" });
         var revision = await started.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(started.StatusCode == HttpStatusCode.Created, revision.ToString());
         var id = revision.GetProperty("id").GetGuid();
@@ -93,6 +93,13 @@ public static class Flow
         using var response = await client.PostAsJsonAsync(path, body);
         var text = await response.Content.ReadAsStringAsync();
         return (response.StatusCode, text.Length == 0 ? default : JsonDocument.Parse(text).RootElement);
+    }
+
+    /// <summary>A release names who receives it (released and issued go together): here, whoever releases.</summary>
+    public static async Task<object> ReleaseBodyAsync(HttpClient client)
+    {
+        var me = await client.GetFromJsonAsync<JsonElement>("/api/me");
+        return new { issue = new { reason = "EXECUTION", userIds = new[] { me.GetProperty("user").GetProperty("id").GetGuid() } } };
     }
 
     public static string? Code(JsonElement problem) => problem.TryGetProperty("code", out var c) ? c.GetString() : null;
@@ -145,9 +152,9 @@ public sealed class ReviewTests(Infrastructure infrastructure) : IClassFixture<I
             decided.GetProperty("verdict").GetString(), decided.GetProperty("grantedStatus").GetString()));
 
         // Document Control releases; the people who reviewed may not.
-        var (notControl, notControlBody) = await Flow.PostAsync(approver, R(p, id, "/release"), new { });
+        var (notControl, notControlBody) = await Flow.PostAsync(approver, R(p, id, "/release"), await Flow.ReleaseBodyAsync(approver));
         Assert.Equal((HttpStatusCode.Forbidden, "CONTROL_ONLY"), (notControl, Flow.Code(notControlBody)));
-        var (released, _) = await Flow.PostAsync(controller, R(p, id, "/release"), new { });
+        var (released, _) = await Flow.PostAsync(controller, R(p, id, "/release"), await Flow.ReleaseBodyAsync(controller));
         Assert.Equal(HttpStatusCode.OK, released);
 
         var document = await Flow.UntilAsync(engineer, p.Project, p.Document, d =>
@@ -168,7 +175,7 @@ public sealed class ReviewTests(Infrastructure infrastructure) : IClassFixture<I
         var reviewB = (await StartAsync(engineer, b)).GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, R(b, reviewB, "/answer"), new { });
         await Flow.PostAsync(approver, R(b, reviewB, "/answer"), new { verdict = "C1", status = "AFC" });
-        await Flow.PostAsync(controller, R(b, reviewB, "/release"), new { });
+        await Flow.PostAsync(controller, R(b, reviewB, "/release"), await Flow.ReleaseBodyAsync(controller));
 
         document = await Flow.UntilAsync(engineer, p.Project, p.Document, d =>
             Flow.Revision(d, p.Revision).GetProperty("files").EnumerateArray().Any(f => f.GetProperty("kind").GetString() == "SUPERSEDED"));
@@ -194,13 +201,13 @@ public sealed class ReviewTests(Infrastructure infrastructure) : IClassFixture<I
         Assert.Equal("COMMENTS_BLOCKING", advised.GetProperty("steps")[0].GetProperty("answer").GetString());
         await Flow.PostAsync(approver, R(p, id, "/answer"), new { verdict = "C1", status = "IFC" });
 
-        var (held, heldBody) = await Flow.PostAsync(controller, R(p, id, "/release"), new { });
+        var (held, heldBody) = await Flow.PostAsync(controller, R(p, id, "/release"), await Flow.ReleaseBodyAsync(controller));
         Assert.Equal((HttpStatusCode.Conflict, "BLOCKING_COMMENTS_OPEN"), (held, Flow.Code(heldBody)));
 
         var (closed, _) = await Flow.PostAsync(engineer, R(p, id, $"/comments/{comment.GetProperty("id").GetGuid()}/close"),
             new { resolution = "Base enlarged on sheet 2; checked." });
         Assert.Equal(HttpStatusCode.NoContent, closed);
-        var (released, _) = await Flow.PostAsync(controller, R(p, id, "/release"), new { });
+        var (released, _) = await Flow.PostAsync(controller, R(p, id, "/release"), await Flow.ReleaseBodyAsync(controller));
         Assert.Equal(HttpStatusCode.OK, released);
     }
 
@@ -222,7 +229,7 @@ public sealed class ReviewTests(Infrastructure infrastructure) : IClassFixture<I
 
         var comment = decided.GetProperty("comments")[0];
         Assert.Equal("CLOSED", comment.GetProperty("status").GetString());
-        Assert.Equal(HttpStatusCode.OK, (await Flow.PostAsync(controller, R(p, id, "/release"), new { })).Status);
+        Assert.Equal(HttpStatusCode.OK, (await Flow.PostAsync(controller, R(p, id, "/release"), await Flow.ReleaseBodyAsync(controller))).Status);
     }
 
     [Fact]
@@ -240,7 +247,7 @@ public sealed class ReviewTests(Infrastructure infrastructure) : IClassFixture<I
 
         var work = await controller.GetFromJsonAsync<JsonElement>($"/api/projects/{p.Project}/work");
         Assert.Equal("SEND_BACK", work.GetProperty("gate")[0].GetProperty("kind").GetString());
-        var (refused, body) = await Flow.PostAsync(controller, R(p, id, "/release"), new { });
+        var (refused, body) = await Flow.PostAsync(controller, R(p, id, "/release"), await Flow.ReleaseBodyAsync(controller));
         Assert.Equal((HttpStatusCode.Conflict, "VERDICT_DOES_NOT_PROCEED"), (refused, Flow.Code(body)));
 
         var (_, returned) = await Flow.PostAsync(controller, R(p, id, "/return"), new { note = "C3 from the approver." });
@@ -307,7 +314,7 @@ public sealed class ReviewTests(Infrastructure infrastructure) : IClassFixture<I
         var id = (await StartAsync(engineer, p)).GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, R(p, id, "/answer"), new { });
         await Flow.PostAsync(approver, R(p, id, "/answer"), new { verdict = "C1", status = "IFC" });
-        Assert.Equal(HttpStatusCode.OK, (await Flow.PostAsync(controller, R(p, id, "/release"), new { })).Status);
+        Assert.Equal(HttpStatusCode.OK, (await Flow.PostAsync(controller, R(p, id, "/release"), await Flow.ReleaseBodyAsync(controller))).Status);
 
         await using var scope = app.Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
