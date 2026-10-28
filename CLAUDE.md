@@ -152,10 +152,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   ("Ctrl K"), a click on it opening the box; typing in the search and Enter still searches the register.
 - **Two tab designs, no third** (owner, after a new tab design was tried and refused: "revert all the tabs… the switch
   like tabs are for small things and decisions… the Schedule's tab design is what should be applied for actual TABS, like
-  assurance, reports"): **real tabs are the Schedule's** (`.views` / `.view`, `.view-n` a count, `.view-hint`, `.view-go`
-  the arrow; `globals.css`: one frame split in equal sides, the chosen side lit with the brand's line along its foot, the
-  others greyed and carrying an arrow, scrolling sideways when they do not fit): a document's tabs, the organization's
-  four (`org-tabs.tsx`). **The tab strip** (owner: "a subtle greyish bg on tabs and a separator between each", then the
+  assurance, reports"): the framed views (`.views` / `.view`) are no longer used (owner: "we do not use that anymore"):
+  a document's tabs, the organization's four (`org-tabs.tsx`) and the console's are on the tab strip, each its icon and
+  name, its line said on hover. **The tab strip** (owner: "a subtle greyish bg on tabs and a separator between each", then the
   same on Assurance and the Schedule "to gain more vertical space"; then "not literal rectangles… not bigger… the grey on
   the background, not the text"; `.strip` / `.strip-tab`, `globals.css`): one low greyish band, the tabs plain words on
   it at its old height (owner: "bring back tabs original height"), a short hairline between each (never a box round a
@@ -893,6 +892,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   thing"): on a page with a side menu of its own (the Audit trail, a person's activity, Types & sets, Forms & fields:
   `OWN_MENU`) and on a window under 1440 pixels wide, it is one button above the page, "Settings · <page>", opening the
   same list.
+- **The demo brings a console account** (owner: "console do not allow regular admin@demo.local"): the console never takes
+  an organization's account, so `seed-demo` adds `console@demo.local` with the demo password (`DemoSeed.ConsoleEmail`).
 - **The console's authenticator can be switched off for testing** (owner: "give me control over activating it or not"):
   `CONSOLE_AUTHENTICATOR=false` in .env (`Console:RequireAuthenticator`, on by default) lets the password alone sign in,
   and every console page says so in red until it is on again.

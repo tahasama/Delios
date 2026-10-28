@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowRight, Building2, FolderKanban, Settings, Users } from "lucide-react";
+import { Building2, FolderKanban, Settings, Users } from "lucide-react";
 
 /** Which pages each tab holds: the organization opens on Projects; Settings holds every card of how it works. */
 const TABS = [
@@ -14,20 +14,18 @@ const TABS = [
 
 /**
  * The organization's four tabs, under its band (owner: tabs across the top, never a side menu taking the page's
- * width), drawn as the Schedule's views (`.views`): one frame, the side you are on lit.
+ * width), on the tab strip (owner: the framed views are no longer used): one band, the tab you are on lit.
  */
 export function OrgTabs() {
   const path = usePathname();
   const on = (holds: string[]) => holds.some((h) => (h === "/organization" ? path === h : path === h || path.startsWith(`${h}/`)));
   return (
     <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
-      <nav aria-label="The organization" className="views">
+      <nav aria-label="The organization" className="strip strip-card strip-full">
         {TABS.map((tab) => (
-          <Link key={tab.href} href={tab.href} aria-current={on(tab.holds) ? "page" : undefined} className="view">
+          <Link key={tab.href} href={tab.href} aria-current={on(tab.holds) ? "page" : undefined} className="strip-tab" title={tab.hint}>
             <tab.icon />
             {tab.label}
-            <span className="view-hint hidden xl:inline">· {tab.hint}</span>
-            <ArrowRight className="view-go hidden sm:block" />
           </Link>
         ))}
       </nav>

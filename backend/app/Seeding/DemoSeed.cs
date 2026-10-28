@@ -11,8 +11,26 @@ namespace Delios.Host.Seeding;
 /// A demo tenant to try the system with: people in each function on one project.
 /// Every password is <c>demo1234</c>. Development only.
 /// </summary>
-public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.TenantContext tenantContext, ILogger<DemoSeed> logger)
+public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.TenantContext tenantContext, ILogger<DemoSeed> logger,
+    Microsoft.AspNetCore.Identity.IPasswordHasher<Operators.Operator> operatorHasher)
 {
+    /// <summary>The demo's account in the DELIOS console (console@demo.local, the demo password), to try it out.</summary>
+    public const string ConsoleEmail = "console@demo.local";
+
+    /// <summary>
+    /// A console account for the demo (owner: "console do not allow regular admin@demo.local"): the console never takes an
+    /// organization's account, so the demo brings one of its own. Demo data only: seed-demo refuses Production unless forced.
+    /// </summary>
+    private async Task EnsureConsoleAccountAsync(CancellationToken cancellationToken)
+    {
+        var normalized = ConsoleEmail.ToUpperInvariant();
+        if (await db.Set<Operators.Operator>().AnyAsync(o => o.NormalizedEmail == normalized, cancellationToken)) return;
+        var who = new Operators.Operator { Email = ConsoleEmail, NormalizedEmail = normalized, Name = "Demo console", PasswordHash = "" };
+        who.PasswordHash = operatorHasher.HashPassword(who, Password);
+        db.Add(who);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     /// <summary>The short name of the demo tenant.</summary>
     public const string Slug = "demo";
     /// <summary>The password of every demo user.</summary>
@@ -24,6 +42,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
     /// </summary>
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
+        await EnsureConsoleAccountAsync(cancellationToken);
         if (await db.Tenants.SingleOrDefaultAsync(t => t.Slug == Slug, cancellationToken) is { } existing)
         {
             // A demo created by an earlier version gains what it lacks; nothing it has is touched.
