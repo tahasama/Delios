@@ -154,8 +154,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the arrow; `globals.css`: one frame split in equal sides, the chosen side lit with the brand's line along its foot, the
   others greyed and carrying an arrow, scrolling sideways when they do not fit): a document's tabs, the organization's
   four (`org-tabs.tsx`). **The tab strip** (owner: "a subtle greyish bg on tabs and a separator between each", then the
-  same on Assurance and the Schedule "to gain more vertical space"; `.strip` / `.strip-tab`, `globals.css`): one low
-  greyish band, a line between each tab, the chosen one on the surface with the brand's line along its foot. Reports'
+  same on Assurance and the Schedule "to gain more vertical space"; then "not literal rectangles… not bigger… the grey on
+  the background, not the text"; `.strip` / `.strip-tab`, `globals.css`): one low greyish band, the tabs plain words on
+  it at their old size, a short hairline between each (never a box round a tab), the words in ink, the chosen one bold
+  with the brand's line along its foot. Reports'
   tabs on one line inside its plate; Assurance and the Schedule's three in a frame of their own (`.strip-card`), the
   whole width shared equally (`.strip-full`), each its icon and name, no small words after. **The switch** (`.seg` /
   `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Packages' two kinds beside
