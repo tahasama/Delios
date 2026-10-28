@@ -41,6 +41,7 @@ public static class ConsoleEndpoints
         g.MapPost("/merges/{id:guid}/carry-out", CarryOutAsync);
         g.MapGet("/plans", async (DeliosDbContext db, CancellationToken c) => Results.Ok(await PlansAsync(db, c)));
         g.MapPost("/plans", SavePlanAsync);
+        g.MapPost("/plans/{code}/remove", RemovePlanAsync);
         g.MapGet("/legal", LegalAsync);
         g.MapGet("/legal/{kind}", LegalKindAsync);
         g.MapPost("/legal/{kind}", PublishAsync);
@@ -295,6 +296,20 @@ public static class ConsoleEndpoints
         plan.Notes = Clip(request.Notes, 2000);
         plan.Active = request.Active ?? true;
         Log(db, http, isNew ? "PLAN_CREATED" : "PLAN_CHANGED", null, $"{code}: {name}, {request.PricePerUser} {currency} per user a month", clock);
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
+    }
+
+    /// <summary>A plan no organization carries or asked for is removed; one in use is only no longer sold (its code stays with the contracts).</summary>
+    private static async Task<IResult> RemovePlanAsync(string code, HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken)
+    {
+        code = code.Trim().ToUpperInvariant();
+        var plan = await db.Set<Plan>().SingleOrDefaultAsync(p => p.Code == code, cancellationToken);
+        if (plan is null) return Problems.NotFound("NO_SUCH_PLAN", "No such plan.");
+        if (await db.Set<Subscription>().AnyAsync(s => s.Plan == code || s.PlanAsked == code, cancellationToken))
+            return Problems.Conflict("PLAN_IN_USE", "An organization has this plan or asked for it: it cannot be removed. Switch off \"Sold now\" instead.");
+        db.Remove(plan);
+        Log(db, http, "PLAN_REMOVED", null, $"{code}: {plan.Name}", clock);
         await db.SaveChangesAsync(cancellationToken);
         return Results.NoContent();
     }

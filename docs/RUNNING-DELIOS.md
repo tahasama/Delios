@@ -103,6 +103,9 @@ date and version, the subprocessor list, the export and the deletion at the end)
 - **Payments**: per organization per paid user (its own people; guests and linked accounts free), plans named and priced
   in the console. The seller of record (Paddle or Stripe) is **not connected yet**: a payment is recorded by hand (Paid
   until). Cancelling is one click in the organization's Settings → Contract & plan.
+- **Plans** (console → Plans & payments): added, changed by their pencil (the code never changes), no longer sold by
+  switching off "Sold now" (organizations then cannot choose it; those that have it keep it), removed by their bin only
+  while no organization has it or asked for it (PLAN_IN_USE otherwise; PLAN_REMOVED).
 - **The free trial** (`Operators/Trials.cs`, owner): every organization that signs up tries DELIOS for the number of days
   set in the console (Plans & payments → Free trial, `TRIAL_DAYS`, 30 unless set, 0 for no end, with why,
   TRIAL_DAYS_SET); one already trying keeps its own end, changed on its page. Its administrators are reminded 7 days

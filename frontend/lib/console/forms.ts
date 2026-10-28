@@ -120,7 +120,18 @@ export async function savePlanAction(_prev: Result | undefined, formData: FormDa
     return failed(e);
   }
   revalidatePath("/console/payments");
-  return { ok: "Saved." };
+  redirect("/console/payments#plans");
+}
+
+/** Removes a plan nobody has or asked for. */
+export async function removePlanAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  try {
+    await consoleApi(`/api/console/plans/${encodeURIComponent(text(formData, "code"))}/remove`, { body: {} });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/console/payments");
+  return { ok: "Removed." };
 }
 
 export async function publishLegalAction(_prev: Result | undefined, formData: FormData): Promise<Result> {

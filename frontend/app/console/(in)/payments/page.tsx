@@ -2,7 +2,9 @@ import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { SwitchField } from "@/components/switch";
 import { consoleApi } from "@/lib/console/client";
-import { savePlanAction, setSellerAction, setTrialDaysAction } from "@/lib/console/forms";
+import { removePlanAction, savePlanAction, setSellerAction, setTrialDaysAction } from "@/lib/console/forms";
+import { Pencil } from "lucide-react";
+import { IconAct } from "@/components/icon-act";
 import { INVOICE_TONE, INVOICE_WORDS, money, type InvoiceRow, type OrgRow, type Plan } from "@/lib/console/types";
 import Link from "next/link";
 import { cn, fmtDate } from "@/lib/core/utils";
@@ -15,12 +17,14 @@ export const metadata = { title: "Plans & payments" };
  * or yearly; guests free; by card through a seller of record (not connected yet) or on invoice; not paid reads only,
  * never deleted.
  */
-export default async function Payments() {
+export default async function Payments({ searchParams }: { searchParams: Promise<{ plan?: string }> }) {
+  const { plan: editing } = await searchParams;
   const [plans, orgs, invoices, seller, trial] = await Promise.all([
     consoleApi<Plan[]>("/api/console/plans"), consoleApi<OrgRow[]>("/api/console/organizations"),
     consoleApi<InvoiceRow[]>("/api/console/invoices"), consoleApi<Record<string, string>>("/api/console/seller"),
     consoleApi<{ days: number }>("/api/console/trial-days"),
   ]);
+  const open = plans.find((p) => p.code === editing) ?? null;
   const waiting = invoices.filter((i) => i.state === "ISSUED");
   const late = waiting.filter((i) => i.dueOn < new Date().toISOString().slice(0, 10));
   const paying = orgs.filter((o) => o.state === "ACTIVE");
@@ -102,31 +106,42 @@ export default async function Payments() {
       </Sheet>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
-        <Sheet title="Plans" said="a plan's code stays once a contract carries it">
+        <Sheet id="plans" title="Plans" said="change one with its pencil; one nobody has can be removed">
           {plans.length ? (
             <ul className="divide-y divide-line">
               {plans.map((p) => (
-                <li key={p.code} className="px-5 py-3 text-[13px] sm:px-6">
+                <li key={p.code} className={cn("flex items-start gap-3 px-5 py-3 text-[13px] sm:px-6", p.code === editing && "bg-tint-soft")}>
+                  <div className="min-w-0 flex-1">
                   <code className="code-chip mr-1.5">{p.code}</code><span className="font-medium text-slate-900">{p.name}</span>
                   {p.active ? null : <span className="ml-1.5 text-[11px] text-slate-500">no longer sold</span>}
                   <span className="block text-[12px] text-slate-600">
                     {p.pricePerUser == null ? "Price on request" : `${p.pricePerUser} ${p.currency} per user a month`} · {p.organizations} organization{p.organizations === 1 ? "" : "s"}
                     {p.notes ? ` · ${p.notes}` : ""}
                   </span>
+                  </div>
+                  <Link href={`/console/payments?plan=${encodeURIComponent(p.code)}#plan-form`} title={`Change ${p.name}`} aria-label={`Change ${p.name}`}
+                    className="rounded p-1 text-slate-500 hover:bg-tint-soft hover:text-link"><Pencil className="h-4 w-4" /></Link>
+                  {p.organizations === 0 ? (
+                    <IconAct action={removePlanAction} icon="remove" label={`Remove ${p.name}`} hidden={{ code: p.code }} danger
+                      confirm={`${p.name} is removed for good. No organization has it.`} />
+                  ) : null}
                 </li>
               ))}
             </ul>
           ) : <Nothing>No plan yet. Add the first one beside.</Nothing>}
         </Sheet>
-        <Sheet title="Add or change a plan" said="by its code">
-          <ActionForm action={savePlanAction} submitLabel="Save the plan" resetOnSuccess
+        <Sheet id="plan-form" title={open ? `Change ${open.name}` : "Add a plan"} said={open ? "its code stays" : undefined}
+          acts={open ? <Link href="/console/payments#plans" className="text-[12px] font-semibold text-link hover:underline">Cancel</Link> : undefined}>
+          <ActionForm key={open?.code ?? "new"} action={savePlanAction} submitLabel={open ? "Save the changes" : "Add the plan"} resetOnSuccess={!open}
             className="asking grid grid-cols-2 gap-x-4 gap-y-4 px-5 py-4 sm:px-6" footerClassName="col-span-2">
-            <Field label="Code" required hint="kept once used"><input name="code" required className="plain w-full uppercase" /></Field>
-            <Field label="Name" required><input name="name" required className="plain w-full" /></Field>
-            <Field label="Price per user" hint="a month; empty: on request"><input name="pricePerUser" type="number" min={0} step="0.01" className="plain w-full" /></Field>
-            <Field label="Currency"><input name="currency" defaultValue="EUR" maxLength={3} className="plain w-full uppercase" /></Field>
-            <Field label="Notes" hint="shown to organizations beside the price" className="col-span-2"><textarea name="notes" rows={2} className={inputCls} /></Field>
-            <div className="col-span-2"><SwitchField name="active" defaultChecked>Sold now: organizations can choose it</SwitchField></div>
+            <Field label="Code" required hint={open ? "never changes" : "kept once used"}>
+              <input name="code" required readOnly={!!open} defaultValue={open?.code ?? ""} className="plain w-full uppercase read-only:border-dashed read-only:text-slate-500" />
+            </Field>
+            <Field label="Name" required><input name="name" required defaultValue={open?.name ?? ""} className="plain w-full" /></Field>
+            <Field label="Price per user" hint="a month; empty: on request"><input name="pricePerUser" type="number" min={0} step="0.01" defaultValue={open?.pricePerUser ?? ""} className="plain w-full" /></Field>
+            <Field label="Currency"><input name="currency" defaultValue={open?.currency ?? "EUR"} maxLength={3} className="plain w-full uppercase" /></Field>
+            <Field label="Notes" hint="shown to organizations beside the price" className="col-span-2"><textarea name="notes" rows={2} defaultValue={open?.notes ?? ""} className={inputCls} /></Field>
+            <div className="col-span-2"><SwitchField name="active" defaultChecked={open?.active ?? true}>Sold now: organizations can choose it</SwitchField></div>
           </ActionForm>
         </Sheet>
       </div>
