@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin, isController } from "@/lib/core/auth";
-import { Card, inputCls } from "@/components/ui";
+import { inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { FAMILY_TITLES, PHASE_LABEL, PHASE_BLURB, CATALOG, CHECK_BY_ID, type Phase, type CheckDef } from "@/lib/conformance/checks/catalog";
 import { latestResults } from "@/lib/conformance/checks/engine";
@@ -114,7 +114,7 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
   const filterBase = href({}).split("?")[1] ?? "";
 
   const tabCls = (on: boolean) =>
-    `-mb-px shrink-0 border-b-2 px-0.5 pb-2 text-[12px] leading-4 transition ${
+    `-mb-px inline-flex min-h-11 shrink-0 items-center border-b-2 px-0.5 text-[12px] leading-4 transition ${
       on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"
     }`;
 
@@ -123,83 +123,85 @@ export default async function ChecksPage({ searchParams }: { searchParams: Promi
       <AssuranceHead
         current="/conformance/checks"
         lead={`What the register is checked against, and how it stands: ${CATALOG.length} questions the application answers from the records it holds.`}
-      />
-      <HowMeasured scope={scope} mayChange={controller} />
+      >
+        <HowMeasured scope={scope} mayChange={controller} bare />
+        <CheckFilters
+          bare
+          base={filterBase}
+          narrowed={narrowed}
+          count={`${shown.length} of ${CATALOG.length} checks`}
+          choices={[
+            { name: "severity", value: severity ?? "", empty: "Any severity", options: SEVERITIES.map((sev) => ({ code: sev, label: sev[0] + sev.slice(1).toLowerCase() })) },
+            { name: "owner", value: owner ?? "", empty: "Anyone's to put right", options: Object.entries(OWNER_LABEL).map(([code, label]) => ({ code, label })) },
+            { name: "result", value: result ?? "", empty: "Any result", options: RESULTS },
+            { name: "show", value: show, empty: "Any subject", options: [{ code: "RISKS", label: "Out-of-date information" }] },
+          ]}
+        />
+      </AssuranceHead>
 
-      <CheckFilters
-        base={filterBase}
-        narrowed={narrowed}
-        count={`${shown.length} of ${CATALOG.length} checks`}
-        choices={[
-          { name: "severity", value: severity ?? "", empty: "Any severity", options: SEVERITIES.map((sev) => ({ code: sev, label: sev[0] + sev.slice(1).toLowerCase() })) },
-          { name: "owner", value: owner ?? "", empty: "Anyone's to put right", options: Object.entries(OWNER_LABEL).map(([code, label]) => ({ code, label })) },
-          { name: "result", value: result ?? "", empty: "Any result", options: RESULTS },
-          { name: "show", value: show, empty: "Any subject", options: [{ code: "RISKS", label: "Out-of-date information" }] },
-        ]}
-      />
-
-      {/* Two rows: the moment runs above the list only, so the family rail and
-          the first card begin on the same line. */}
-      <div className="grid gap-x-5 gap-y-3 md:grid-cols-[11rem_minmax(0,1fr)] md:items-start">
-        <div className="max-w-4xl md:col-start-2">
-          <nav aria-label="When it is checked" className="register register-sheet flex flex-wrap items-center gap-x-6 px-4 pt-2.5">
-            <Link href={href({ phase: null })} scroll={false} aria-current={!phase ? "page" : undefined} className={tabCls(!phase)}>
-              All <span className="ml-1 tabular-nums text-slate-400">{CATALOG.filter(narrowedBy).length}</span>
+      {/* One sheet, Types & sets' way (owner): the moments across the top, the families down the side, the checks
+          beside them, no space between. */}
+      <div className="register register-sheet register-sheet-open flex flex-col md:h-[calc(100dvh-6.5rem)]">
+        <nav aria-label="When it is checked" className="flex shrink-0 flex-wrap items-stretch gap-x-5 border-b border-line px-5 sm:px-6">
+          <Link href={href({ phase: null })} scroll={false} aria-current={!phase ? "page" : undefined} className={tabCls(!phase)}>
+            All <span className="ml-1 tabular-nums text-slate-400">{CATALOG.filter(narrowedBy).length}</span>
+          </Link>
+          {PHASES.map((p) => (
+            <Link key={p} href={href({ phase: p, family: null })} scroll={false} aria-current={phase === p ? "page" : undefined} className={tabCls(phase === p)}>
+              {PHASE_LABEL[p]} <span className="ml-1 tabular-nums text-slate-400">{countOf(p)}</span>
             </Link>
-            {PHASES.map((p) => (
-              <Link key={p} href={href({ phase: p, family: null })} scroll={false} aria-current={phase === p ? "page" : undefined} className={tabCls(phase === p)}>
-                {PHASE_LABEL[p]} <span className="ml-1 tabular-nums text-slate-400">{countOf(p)}</span>
-              </Link>
-            ))}
-          </nav>
-        </div>
-
-        <nav
-          aria-label="Family of checks"
-          className="register register-sheet scroll-thin p-1.5 md:col-start-1 md:row-start-1 md:row-span-2 md:sticky md:top-20 md:max-h-[calc(100vh-5.5rem)] md:overflow-y-auto"
-        >
-          <Family href={href({ family: null })} label="All families" count={inPhase.length} active={!family} />
-          {familiesHere.map((f) => (
-            <Family
-              key={f}
-              href={href({ family: f })}
-              label={FAMILY_TITLES[f] ?? f}
-              count={inPhase.filter((c) => c.id.split("-")[0] === f).length}
-              active={family === f}
-            />
           ))}
         </nav>
-
-        <div className="scroll-thin min-w-0 max-w-4xl space-y-4 md:col-start-2 md:row-start-2 md:max-h-[calc(100vh-9.5rem)] md:overflow-y-auto md:pr-1">
-          {!shown.length ? (
-            <p className="rounded-xl border border-dashed border-line-strong bg-slate-50 px-6 py-8 text-center text-[13px] text-slate-500">
-              No check matches that.{" "}
-              <Link href={href({ severity: null, owner: null, result: null })} className="font-semibold text-link hover:underline">
-                Clear the filters
-              </Link>
-            </p>
-          ) : null}
-          {PHASES.filter((p) => !phase || p === phase).map((p) => {
-            const rows = shown.filter((c) => c.phase === p);
-            if (!rows.length) return null;
-            const families = [...new Set(rows.map((c) => c.id.split("-")[0]))];
-            return (
-              <Card key={p} title={PHASE_LABEL[p]} description={PHASE_BLURB[p]}>
-                {families.map((f) => (
-                  <section key={f} className="mb-5 last:mb-0">
-                    {family ? null : <h3 className="stencil mb-2 text-slate-400">{FAMILY_TITLES[f] ?? f}</h3>}
-                    <ul className="divide-y divide-line">
-                      {rows
-                        .filter((c) => c.id.split("-")[0] === f)
-                        .map((c) => (
-                          <CheckRow key={c.id} check={c} result={results.get(c.id)} off={off.get(c.id)} admin={admin} />
-                        ))}
-                    </ul>
-                  </section>
-                ))}
-              </Card>
-            );
-          })}
+        <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[13rem_minmax(0,1fr)]">
+          <nav aria-label="Family of checks" className="scroll-quiet min-h-0 overflow-y-auto border-b border-line p-2 md:border-b-0 md:border-r">
+            <Family href={href({ family: null })} label="All families" count={inPhase.length} active={!family} />
+            {familiesHere.map((f) => (
+              <Family
+                key={f}
+                href={href({ family: f })}
+                label={FAMILY_TITLES[f] ?? f}
+                count={inPhase.filter((c) => c.id.split("-")[0] === f).length}
+                active={family === f}
+              />
+            ))}
+          </nav>
+          <div className="scroll-thin min-h-0 min-w-0 overflow-y-auto">
+            {!shown.length ? (
+              <p className="px-6 py-8 text-center text-[13px] text-slate-500">
+                No check matches that.{" "}
+                <Link href={href({ severity: null, owner: null, result: null })} className="font-semibold text-link hover:underline">
+                  Clear the filters
+                </Link>
+              </p>
+            ) : null}
+            {PHASES.filter((p) => !phase || p === phase).map((p) => {
+              const rows = shown.filter((c) => c.phase === p);
+              if (!rows.length) return null;
+              const families = [...new Set(rows.map((c) => c.id.split("-")[0]))];
+              return (
+                <section key={p} className="border-b border-line last:border-b-0">
+                  <header className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+                    <h2 className="stencil mr-1 shrink-0 text-slate-500">{PHASE_LABEL[p]}</h2>
+                    <p className="min-w-0 text-[11px] leading-4 text-slate-500">{PHASE_BLURB[p]}</p>
+                  </header>
+                  <div className="px-5 py-4 sm:px-6">
+                    {families.map((f) => (
+                      <section key={f} className="mb-5 last:mb-0">
+                        {family ? null : <h3 className="stencil mb-2 text-slate-400">{FAMILY_TITLES[f] ?? f}</h3>}
+                        <ul className="divide-y divide-line">
+                          {rows
+                            .filter((c) => c.id.split("-")[0] === f)
+                            .map((c) => (
+                              <CheckRow key={c.id} check={c} result={results.get(c.id)} off={off.get(c.id)} admin={admin} />
+                            ))}
+                        </ul>
+                      </section>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -212,8 +214,8 @@ function Family({ href, label, count, active }: { href: string; label: string; c
       href={href}
       scroll={false}
       aria-current={active ? "page" : undefined}
-      className={`flex items-baseline justify-between gap-2 rounded-r border-l-2 py-[5px] pl-2.5 pr-1.5 text-[12px] leading-4 transition ${
-        active ? "border-brand-ink bg-tint font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:bg-slate-50 hover:text-slate-800"
+      className={`flex items-baseline justify-between gap-2 rounded-sm py-2 pl-2.5 pr-1.5 text-[13px] leading-4 transition ${
+        active ? "bg-tint font-semibold text-brand-ink" : "text-slate-600 hover:bg-tint-soft hover:text-slate-900"
       }`}
     >
       <span className="min-w-0 truncate">{label}</span>

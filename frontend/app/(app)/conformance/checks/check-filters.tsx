@@ -14,7 +14,7 @@ import { useTransition } from "react";
  */
 type Choice = { name: string; value: string; empty: string; options: { code: string; label: string }[]; disabled?: boolean };
 
-export function CheckFilters({ base, choices, count, narrowed }: { base: string; choices: Choice[]; count: string; narrowed: boolean }) {
+export function CheckFilters({ base, choices, count, narrowed, bare = false }: { base: string; choices: Choice[]; count: string; narrowed: boolean; bare?: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -26,7 +26,7 @@ export function CheckFilters({ base, choices, count, narrowed }: { base: string;
   };
 
   return (
-    <section className="register register-sheet register-sheet-open">
+    <section className={bare ? "border-t border-line" : "register register-sheet register-sheet-open"}>
       <div className="asking flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-2.5 sm:px-6" data-busy={pending ? "true" : undefined}>
         <span className="stencil shrink-0 text-slate-400">Showing</span>
         {choices.map((choice) => (

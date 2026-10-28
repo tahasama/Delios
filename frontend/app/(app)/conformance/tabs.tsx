@@ -17,7 +17,7 @@ const TABS = [
 
 export function AssuranceTabs({ current, internal = true }: { current: string; internal?: boolean }) {
   return (
-    <nav className="strip strip-card strip-full" aria-label="Assurance">
+    <nav className="strip strip-full" aria-label="Assurance">
       {TABS.filter((t) => internal || !t.internal).map((t) => (
         <Link key={t.href} href={t.href} aria-current={current === t.href ? "page" : undefined} className="strip-tab">
           <t.icon />

@@ -130,7 +130,7 @@ export function PlanRegister({
   useEffect(() => {
     const measure = () => {
       const bar = document.querySelector<HTMLElement>("[data-app-header]")?.offsetHeight ?? 0;
-      const above = tabs.current ? tabs.current.offsetHeight + 16 : 0;
+      const above = tabs.current ? tabs.current.offsetHeight : 0;
       setFit(Math.max(360, Math.floor(window.innerHeight - bar - above - 24)));
     };
     measure();
@@ -302,8 +302,9 @@ export function PlanRegister({
       </form>
     </section>
 
-    {/* The views between the question and the answer: the tab strip (globals.css `.strip`), full width, as Assurance's. */}
-    <nav ref={tabs} className="strip strip-card strip-full mb-4" aria-label="How to look at the schedule">
+    {/* The views between the question and the answer: the tab strip (globals.css `.strip`), full width, joined to the
+        answer under it as its head (owner: "stick it to the table under it"). */}
+    <nav ref={tabs} className="strip strip-card strip-full rounded-b-none border-b-0 shadow-none" aria-label="How to look at the schedule">
       {([
         { id: "calendar", label: "The calendar", hint: "month by month", icon: CalendarDays },
         { id: "plan", label: "The plan", hint: "drawn on a timeline", icon: CalendarRange },
@@ -319,7 +320,7 @@ export function PlanRegister({
     <section
       ref={card}
       data-dt-frame
-      className="register register-sheet flex flex-col"
+      className="register register-sheet flex flex-col rounded-t-none"
       style={view === "calendar" ? undefined : { height: fit }}
     >
       {facets.length ? (
