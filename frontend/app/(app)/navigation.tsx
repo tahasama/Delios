@@ -18,7 +18,6 @@ import {
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
-  Settings,
   Network,
   Search,
   ShieldCheck,
@@ -39,7 +38,7 @@ import { Kbd, openCommandMenu, useShortcutWords } from "@/components/command-men
  * job.
  *
  * So: the five things people actually come here to do, everything else behind
- * "More", and configuration behind "Settings", at the menu's foot. Both doors are filtered by what
+ * "More", and configuration behind "Settings". Both doors are filtered by what
  * the person's function permits, so nobody is shown a list of things that will
  * refuse them.
  */
@@ -104,8 +103,6 @@ function moreNav(p: NavPermissions): NavItem[] {
     ] as NavItem[]
   ).filter((i) => i.when !== false);
 }
-
-const SETTINGS: NavItem = { href: "/settings", label: "Settings", description: "How the project works", icon: Settings };
 
 function isActive(pathname: string, item: NavItem) {
   if (item.exclude?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) return false;
@@ -258,13 +255,6 @@ function SidebarBody({ perms, moreOpen, onNavigate, onTip, drawer = false }: {
           </details>
         ) : null}
       </nav>
-
-      {/* Settings back in the menu (owner), at its foot above "Fold the menu", for whoever a Settings page opens to. */}
-      {perms.canSettings ? (
-        <div className="mt-2 shrink-0">
-          <NavLink item={SETTINGS} pathname={pathname} onNavigate={onNavigate} onTip={onTip} />
-        </div>
-      ) : null}
     </>
   );
 }
