@@ -51,11 +51,15 @@ public static class ConsoleEndpoints
         g.MapPost("/notices", NoticeAsync);
         g.MapGet("/team", async (DeliosDbContext db, CancellationToken c) => Results.Ok(await db.Set<Operator>().AsNoTracking().OrderBy(o => o.Name)
             .Select(o => new { o.Id, o.Name, o.Email, o.Active, o.CreatedAt, o.LastSignInAt, locked = o.LockedUntil }).ToListAsync(c)));
-        g.MapGet("/log", async (Guid? tenantId, Instant? before, DeliosDbContext db, CancellationToken c) =>
+        g.MapGet("/log", async (Guid? tenantId, string? before, DeliosDbContext db, CancellationToken c) =>
         {
             var q = db.Set<OperatorEvent>().AsNoTracking().AsQueryable();
             if (tenantId is { } t) q = q.Where(e => e.TenantId == t);
-            if (before is { } b) q = q.Where(e => e.At < b);
+            if (NodaTime.Text.InstantPattern.ExtendedIso.Parse(before ?? "") is { Success: true } parsed)
+            {
+                var b = parsed.Value;
+                q = q.Where(e => e.At < b);
+            }
             return Results.Ok(await q.OrderByDescending(e => e.At).Take(100).ToListAsync(c));
         });
     }
