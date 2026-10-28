@@ -98,8 +98,8 @@ public static class PackageEndpoints
         project.MapGet("/{packageId:guid}/lines", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
             await s.LinesAsync(ProjectAccessFilter.Of(h), packageId, c) is { } lines ? Results.Ok(lines) : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package."));
         // What delivering it carries, for the New transmittal form; nothing is written.
-        project.MapGet("/{packageId:guid}/going", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c, bool? @short) =>
-            await s.GoingAsync(ProjectAccessFilter.Of(h), packageId, c, @short == true) is var (going, problem) && problem is null ? Results.Ok(going) : problem!);
+        project.MapGet("/{packageId:guid}/going", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
+            await s.GoingAsync(ProjectAccessFilter.Of(h), packageId, c) is var (going, problem) && problem is null ? Results.Ok(going) : problem!);
         project.MapPost("/{packageId:guid}/members", (Guid packageId, MembersRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.AddAsync(a, packageId, r, c)));
         project.MapPost("/{packageId:guid}/members/remove", (Guid packageId, MembersRequest r, HttpContext h, PackageService s, CancellationToken c) =>

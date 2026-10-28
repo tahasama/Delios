@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, X, FileSpreadsheet, ArrowRight, FileText, ClipboardList, Truck, Hourglass, Send, CalendarCheck, TrendingUp, Scale, CalendarClock, type LucideIcon } from "lucide-react";
+import { Download, X, FileSpreadsheet } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
 import { DataTable, Th, Td, ToneChip, inputCls, btn } from "@/components/ui";
 import { when } from "@/app/(app)/home-parts";
@@ -12,13 +12,6 @@ import {
   type Bar, type Cell, type Chart, type ReportId, type ReportQuery, type Segment,
   reportQuery,
 } from "@/lib/conformance/reports";
-
-
-/** Each report's mark on its tab, as Assurance's tabs carry theirs. */
-const REPORT_ICON: Record<string, LucideIcon> = {
-  register: ClipboardList, deliveries: Truck, reviews: Hourglass, transmittals: Send,
-  readiness: CalendarCheck, progress: TrendingUp, exchange: Scale, asof: CalendarClock,
-};
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Reports" };
@@ -43,18 +36,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // A day to come is refused by the backend; the page asks for one before it counts.
   const needsDay = current === "asof" && !asked.on;
   const tabs = offered.map((id) => ({ id, title: REPORT_TITLES[id] }));
+  const tabClass = (on: boolean) =>
+    `-mb-px shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 text-[12px] leading-4 transition ${
+      on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"
+    }`;
   const nav = (on: string) => tabs.length > 1 ? (
-    <nav aria-label="Reports" className="views views-tight no-print">
-      {tabs.map((t) => {
-        const Icon = REPORT_ICON[t.id] ?? FileText;
-        return (
-          <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className="view">
-            <Icon />
-            {t.title}
-            <ArrowRight className="view-go" />
-          </Link>
-        );
-      })}
+    <nav aria-label="Reports" className="no-print scroll-thin flex gap-x-5 overflow-x-auto border-t border-line px-5 pt-3 sm:px-6">
+      {tabs.map((t) => (
+        <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className={tabClass(on === t.id)}>
+          {t.title}
+        </Link>
+      ))}
     </nav>
   ) : null;
 
@@ -113,6 +105,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           ) : null}
         </div>
 
+        {nav(current)}
+
         {/* Register on a date asks its day; nothing is counted before one is chosen. */}
         {current === "asof" ? (
           <form className="no-print flex flex-wrap items-end gap-3 border-t border-line px-5 py-3 sm:px-6">
@@ -137,9 +131,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </div>
         ) : null}
       </section>
-
-      {/* The reports' tabs under the plate, on one line, as Assurance's. */}
-      {nav(current)}
 
       {needsDay ? (
         <p className="rounded-md bg-tint-soft px-3 py-2.5 text-xs leading-5 text-slate-700 ring-1 ring-line">

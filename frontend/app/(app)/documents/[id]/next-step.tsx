@@ -60,7 +60,7 @@ export function NextStepBody({ status, items }: { status: React.ReactNode; items
                   {one.href ? <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-70" /> : <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 opacity-70 transition-transform", open === one.key && "rotate-90")} />}
                 </>
               );
-              if (one.act) return <div key={one.key} className="lg:w-full [&_button]:w-full [&_form]:w-full">{one.act}</div>;
+              if (one.act) return <div key={one.key} className="lg:w-full">{one.act}</div>;
               return one.href ? (
                 <Link key={one.key} href={one.href} data-on={one.primary ? "true" : undefined} className={cls}>{inner}</Link>
               ) : (

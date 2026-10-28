@@ -152,11 +152,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   like tabs are for small things and decisions… the Schedule's tab design is what should be applied for actual TABS, like
   assurance, reports"): **real tabs are the Schedule's** (`.views` / `.view`, `.view-n` a count, `.view-hint`, `.view-go`
   the arrow; `globals.css`: one frame split in equal sides, the chosen side lit with the brand's line along its foot, the
-  others greyed and carrying an arrow, scrolling sideways when they do not fit): the Schedule's three, Assurance,
-  Reports, a document's tabs, the organization's four (`org-tabs.tsx`). Reports' eight sit on one line under the
-  plate, out of its card, as Assurance's (owner: "they fitted before, they should fit now in one line, and bring them out
-  of the card"), each with its icon (`REPORT_ICON`), a little less room beside the words (`.views-tight`; about 1,450
-  pixels wide, sideways below that). **The switch** (`.seg` /
+  others greyed and carrying an arrow, scrolling sideways when they do not fit): the Schedule's three, Assurance (its
+  icon and name only, no small words after, owner), a document's tabs, the organization's four (`org-tabs.tsx`).
+  **Reports keeps the tabs it had at first** (owner, after two tries: "the report tabs" back to what they were): plain
+  underlined names on one line inside its plate (`tabClass`). **The switch** (`.seg` /
   `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Packages' two kinds beside
   List · Tree (put back as they were: two designs side by side in one row read as inconsistent), Home's "What is waiting",
   the organization's People, the imports' "Which lines", list or tree, light or dark, in use · retired · all. The checks'
@@ -516,18 +515,22 @@ a screen only words it. A new rule goes in the backend, never in a page.
   about it stay, no longer naming it).
 - **Ready at the status a package needs** (`PackageService.IsReady`): a package asking no status takes a document
   released at any; a line not ready says why ("released at IFR; the package needs IFC", "nothing released yet").
-- **"Deliver the package" is always on our package while it is open** (owner: "there is no deliver button"), and
-  **going short is a tick in it** (owner: "let it go without what is missing could've been just a check box inside
-  deliver, available if the package is not complete, else greyed"): "Deliver without what is missing", greyed when
-  nothing is missing; ticked, the transmittal carries what is not ready as it stands (released, else newest; none yet,
-  named as not sent), on the responsibility of whoever delivers it, said on the transmittal and recorded with their name
-  (`GoingAsync(…, goShort)`, `?short=1`, `ComposeRequest.GoShort`; NOT_COMPLETE otherwise). A supplier's package not
-  complete offers "Deliver without what is missing" the same way. Readiness is read as it stands: no separate "Check
-  readiness" step, no asking the acceptance authority first (that flow is gone from the page; the acceptance authority
-  still accepts the delivered package). Handed over outside the system, "Close it" stays beside it, once complete.
-- **Delete is its own red button, one press, asked first** (owner: "is it good UX if delete is inside edit? … at least
-  make it one button instead of 2 nested"): never inside Edit and never opening a panel (`StepItem.act`; a supplier's
-  package's red bin, `IconAct`).
+- **"Deliver the package" is always on our package while it is open** (owner: "there is no deliver button"). Complete,
+  it opens the delivery transmittal. **Not complete, it asks for a waiver first** (owner: "only the person who accepts
+  it… they can be requested that while trying to deliver it, thus the Ask first, keep it"; "keep the readiness check"):
+  "Ask <whoever accepts it> for a waiver" checks readiness now, freezing the list of what is missing, and sends it to them
+  on a transmittal (`askWaiverAction`: `/assess` then `/shortfall/issue`); until they answer, Deliver waits and says on
+  whom; they "Grant the waiver" on the package (recorded with their name and day); then Deliver opens the transmittal and
+  the outstanding documents go as they stand (released, else newest; none yet, named as not sent). Something else missing
+  since the waiver makes it stale: asked again (SHORTFALL_CHANGED). Worded as a waiver everywhere (owner: "on your
+  responsibility" was not professional): "Delivered with N document(s) outstanding (…), sent as they stand: waiver
+  granted by <name> on <day>." (`GoingAsync`). A supplier's package goes complete only (nobody accepts it, so nobody
+  waives): "Deliver once complete · n of m released". Handed over outside the system, "Close it" stays beside it, once
+  complete or under a waiver.
+- **Delete is its own button, one press, asked first** (owner: "is it good UX if delete is inside edit? … at least
+  make it one button instead of 2 nested"; then "should look like the others, not centered, outline red"): never inside
+  Edit and never opening a panel, drawn as the buttons beside it, left-aligned, in a red outline (`StepItem.act`,
+  `DangerAct`); a supplier's package's red bin (`IconAct`).
 - "Delivery list" downloads the package's own lines (`/api/packages/<n>/list`),
   never the schedule's requirements list.
 - "Share with <supplier>" is pressed once, for good: until then the supplier
@@ -559,9 +562,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the same purpose, else one for execution); no separate reason is asked. Those putting it together only add
   and take out its documents (and delete it while empty and never sent); Document Control (and above) does
   everything else and edits every field while it is open (backend CONTROL_ONLY / OWNER_ONLY). Ticked
-  documents are taken out from the bar under the list. What is missing goes, when the package is delivered with
-  "Deliver without what is missing" ticked (above), as it stands (released revision, else the newest), said on the
-  delivery transmittal with the deliverer's name. "Export CSV" on Packages exports the one package ticked.
+  documents are taken out from the bar under the list. What is missing goes, under a waiver from whoever accepts it
+  (above), as it stands (released revision, else the newest), said on the delivery transmittal with the waiver. "Export CSV" on Packages exports the one package ticked.
 - The side that does not hold it asks the holder to hand it back for an update
   (RETURN_FOR_UPDATE, with why): Document Control on our side, whoever of the
   supplier may upload on theirs. The holder accepts or refuses with why; the

@@ -313,3 +313,16 @@ export async function deletePackagesAction(_prev: { error?: string; message?: st
   revalidatePath("/packages", "layout");
   return { message: `${removed} removed.` };
 }
+
+/**
+ * Ask whoever accepts a package of ours for a waiver (owner: "they can be requested that while trying to deliver it,
+ * thus the Ask first"): its readiness is checked now, freezing the list of what is missing, and that list is sent to them
+ * on a transmittal. Granted, the package may be delivered with those outstanding.
+ */
+export async function askWaiverAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const id = String(formData.get("packageId") ?? "");
+  const checked = await onPackage(id, "/assess", {});
+  if (checked.error) return { error: checked.error };
+  const asked = await onPackage(id, "/shortfall/issue", {});
+  return asked.error ? { error: asked.error } : {};
+}

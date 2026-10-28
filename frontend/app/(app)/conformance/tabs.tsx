@@ -9,10 +9,10 @@ import { ArrowRight, BadgeCheck, Ban, BookOpen, ListChecks } from "lucide-react"
  * Schedule's tabs (`.views`), the owner's design for every set of real tabs.
  */
 const TABS = [
-  { href: "/conformance/checks", label: "What is checked", hint: "and what was found", icon: ListChecks, internal: true },
-  { href: "/conformance/rules", label: "Default rules", hint: "what the app refuses", icon: Ban, internal: true },
-  { href: "/conformance/statement", label: "Conformance", hint: "the statement", icon: BadgeCheck, internal: false },
-  { href: "/conformance/plan", label: "The plan", hint: "how it is done here", icon: BookOpen, internal: true },
+  { href: "/conformance/checks", label: "What is checked", icon: ListChecks, internal: true },
+  { href: "/conformance/rules", label: "Default rules", icon: Ban, internal: true },
+  { href: "/conformance/statement", label: "Conformance", icon: BadgeCheck, internal: false },
+  { href: "/conformance/plan", label: "The plan", icon: BookOpen, internal: true },
 ] as const;
 
 export function AssuranceTabs({ current, internal = true }: { current: string; internal?: boolean }) {
@@ -22,7 +22,6 @@ export function AssuranceTabs({ current, internal = true }: { current: string; i
         <Link key={t.href} href={t.href} aria-current={current === t.href ? "page" : undefined} className="view">
           <t.icon />
           {t.label}
-          <span className="view-hint hidden lg:inline">· {t.hint}</span>
           <ArrowRight className="view-go" />
         </Link>
       ))}

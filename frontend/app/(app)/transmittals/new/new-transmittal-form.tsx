@@ -89,7 +89,7 @@ export function NewTransmittalForm({
   /** A package's documents going out on this transmittal (owner: delivering a package is a data transmittal); a package
    *  we deliver goes to whom it names and is delivered once sent. */
   /** A package delivered: its contents fixed (the backend's), the packages its tree holds, what had no revision, or why it cannot go. */
-  forPackage?: { id: string; number: string; title: string; packages: number; left: string[]; why: string | null; short?: boolean };
+  forPackage?: { id: string; number: string; title: string; packages: number; left: string[]; why: string | null };
   /** Asking for someone new to join: the person's fields in place of what it carries, and who confirms in place of who gets it. */
   joining?: Joining;
   /** The organizations set up on the project, with their codes: who something was received from. */
@@ -305,7 +305,6 @@ export function NewTransmittalForm({
         {forPackage ? (
           <>
             <input type="hidden" name="packageId" value={forPackage.id} />
-            {forPackage.short ? <input type="hidden" name="goShort" value="1" /> : null}
             <p className={cn("mb-4 rounded-md px-4 py-2.5 text-xs ring-1", forPackage.why ? "bg-amber-50 text-amber-900 ring-amber-200" : "bg-tint-soft text-slate-600 ring-line")}>
               Delivers <Link href={`/packages/${forPackage.number}`} className="font-mono font-semibold text-link hover:underline">{forPackage.number}</Link> {forPackage.title}
               {forPackage.packages > 1 ? ` and the ${forPackage.packages - 1} package${forPackage.packages === 2 ? "" : "s"} in it` : ""}.

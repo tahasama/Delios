@@ -1,4 +1,5 @@
 import { ActionForm } from "@/components/form";
+import { DangerAct } from "@/components/icon-act";
 import type { PackageView } from "@/lib/types";
 import { Field, inputCls } from "@/components/ui";
 import { SearchPick } from "@/components/search-pick";
@@ -48,9 +49,9 @@ export function manageItems(pkg: PackageView, { mayEdit, mayDelete, mayRenumber 
     key: "delete",
     label: "Delete the package",
     act: (
-      <ActionForm action={deletePackageAction} submitLabel="Delete the package" size="sm" variant="danger" className="space-y-0"
+      <DangerAct action={deletePackageAction} label="Delete the package"
         hidden={{ packageId: pkg.id, ...(back ? { back: `/packages/${encodeURIComponent(back)}` } : {}) }}
-        confirmText={back ? `${pkg.number} is deleted. Its documents and the packages in it go back into ${back}: nothing of them is lost. Continue?`
+        confirm={back ? `${pkg.number} is deleted. Its documents and the packages in it go back into ${back}: nothing of them is lost. Continue?`
           : pkg.members.length ? `${pkg.number} is deleted with its ${pkg.members.length} document(s) in it: they stay in the register, out of any package. Continue?`
           : `${pkg.number} is deleted. Continue?`} />
     ),

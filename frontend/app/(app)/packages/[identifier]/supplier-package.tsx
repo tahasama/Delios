@@ -321,10 +321,10 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
                   <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number })}`}
                     className="ask inline-flex items-center gap-1.5"><PackageCheck className="h-3.5 w-3.5" /> Deliver</Link>
                 ) : (
-                  // Not complete: delivered without what is missing, on the deliverer's responsibility (owner).
-                  <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number, short: "1" })}`}
-                    title={`${whole.documents - whole.released} not released yet: they are named on the transmittal, on your responsibility`}
-                    className="ask inline-flex items-center gap-1.5"><PackageCheck className="h-3.5 w-3.5" /> Deliver without what is missing · {whole.released} of {whole.documents} released</Link>
+                  // A supplier's package goes complete: nobody accepts it, so nobody grants a waiver.
+                  <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500" title="A supplier's package is delivered once every document in it is released">
+                    <PackageCheck className="h-3.5 w-3.5" /> Deliver once complete · {whole.released} of {whole.documents} released
+                  </span>
                 );
               })() : null}
             </div>

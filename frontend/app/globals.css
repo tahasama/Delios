@@ -656,8 +656,7 @@ summary::-webkit-details-marker {
     box-shadow: inset 0 -3px 0 0 var(--color-brand);
   }
   .views::-webkit-scrollbar { display: none; }
-  /* Many tabs on one line (Reports' eight): the same sides, a little less room either side of the words. */
-  .views-tight .view { padding-inline: 0.75rem; gap: 0.4rem; }
+
   .view-hint { font-size: 11px; font-weight: 400; color: var(--color-slate-500); }
   .view-n {
     font-family: var(--font-mono);

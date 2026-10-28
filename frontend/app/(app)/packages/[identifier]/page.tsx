@@ -5,7 +5,7 @@ import { Timeline } from "@/components/timeline";
 import { Card, Info, ToneChip, type TONE, Field, inputCls, Banner, btn } from "@/components/ui";
 import { DeliveryLines } from "./delivery-lines";
 import { ActionForm } from "@/components/form";
-import { setPackageRuleAction, closePackageAction, acceptPackageAction } from "@/lib/packages/forms";
+import { setPackageRuleAction, closePackageAction, acceptPackageAction, acceptShortfallAction, askWaiverAction } from "@/lib/packages/forms";
 import { ruleFilter, ruleWords, statusList, reasonsOf, shortfallOf } from "@/lib/packages/package-rule";
 import { packageByNumber, ourPeople, packageParties, packageLines } from "@/lib/packages/api";
 import { isAdmin } from "@/lib/core/auth";
@@ -73,8 +73,15 @@ export default async function PackageDetailPage({ params, searchParams }: { para
   const canAct = open && staff;
   const branchCount = pkg.place?.whole.packages ?? 0;
   const missing = new Set((shortfall ?? []).map((s) => s.documentId));
-  // Closed, handed over outside the system: once complete, or what is missing let go.
-  const mayClose = (total > 0 && readyCount === total) || !!pkg.shortfallAcceptedBy;
+  // What is missing now, and the waiver asked or granted for it (owner: "only the person who accepts it… thus the Ask
+  // first"): asking froze the list; something else missing since makes it stale, to be asked again.
+  const outstanding = total - readyCount;
+  const stale = pkg.members.some((m) => !m.ready && !missing.has(m.documentId));
+  const waiverAsked = !!pkg.shortfallIssuedAt && !pkg.shortfallAcceptedBy && !stale;
+  const waived = !!pkg.shortfallAcceptedBy && !stale;
+  const asked = letters.length ? <> (asked on {letters.map((one, i) => <span key={one.id}>{i ? ", " : ""}<Link href={`/transmittals/${one.id}`} className="font-mono font-semibold text-link hover:underline">{one.number}</Link></span>)})</> : null;
+  // Closed, handed over outside the system: once complete, or under a waiver.
+  const mayClose = (total > 0 && outstanding === 0) || waived;
 
   const state = pkg.acceptedAt ? "accepted" : pkg.closedAt ? "delivered" : shortfall ? "shortfall" : pkg.assessedAt ? "ready" : overdue ? "overdue" : "open";
   const stateTone: Record<string, keyof typeof TONE> = { accepted: "done", delivered: "moving", ready: "done", shortfall: "waiting", overdue: "refused", open: "idle" };
@@ -87,8 +94,10 @@ export default async function PackageDetailPage({ params, searchParams }: { para
     ? <>{delivery.length ? "Delivered" : "Closed"} {fmtDate(pkg.names.deliveredAt ?? pkg.closedAt!)}{sentOn}, accepted by <strong className="text-slate-800">{pkg.acceptedBy}</strong> {fmtDate(pkg.acceptedAt)}{pkg.acceptNote ? <>: <span className="whitespace-pre-line">{pkg.acceptNote}</span></> : "."}</>
     : pkg.closedAt
     ? <>{delivery.length ? <>Delivered to {pkg.names.to}</> : "Closed"} {fmtDate(pkg.names.deliveredAt ?? pkg.closedAt)}{sentOn}. Waiting for <strong className="text-slate-800">{pkg.names.acceptors}</strong> to accept it.</>
-    : readyCount === total && total ? <>{count}. Deliver it on a transmittal, to whom you choose.</>
-    : <>{count}. Deliver it once every document is released at {spell(pkg.requiredStatuses.join(",")) || "a status"}, or without what is missing, on your responsibility.</>;
+    : total && !outstanding ? <>{count}. Deliver it on a transmittal, to whom you choose.</>
+    : waived ? <>{count}. Waiver granted by <strong className="text-slate-800">{pkg.shortfallAcceptedBy}</strong>{pkg.shortfallAcceptedAt ? <> {fmtDate(pkg.shortfallAcceptedAt)}</> : null}: it may be delivered with {outstanding} outstanding.</>
+    : waiverAsked ? <>{count}. Waiting for <strong className="text-slate-800">{pkg.names.acceptors}</strong> to grant a waiver{asked}.</>
+    : <>{count}. Deliver it once every document is released at {spell(pkg.requiredStatuses.join(",")) || "a status"}, or ask <strong className="text-slate-800">{pkg.names.acceptors}</strong> for a waiver.</>;
 
   const items: StepItem[] = [];
   if (pkg.closedAt && !pkg.acceptedAt && (isAcceptor || isAdmin(user))) items.push({
@@ -103,35 +112,51 @@ export default async function PackageDetailPage({ params, searchParams }: { para
       </ActionForm>
     ),
   });
+  // Whoever accepts it grants the waiver asked of them: the package may then be delivered with what was missing.
+  if (waiverAsked && isAcceptor && !pkg.closedAt) items.push({
+    key: "accept",
+    primary: true,
+    open: true,
+    label: "Grant the waiver",
+    body: (
+      <ActionForm action={acceptShortfallAction} submitLabel="Grant the waiver" size="sm" hidden={{ packageId: pkg.id }}
+        confirmText={`It may be delivered with ${shortfall?.length ?? 0} document(s) outstanding, recorded with your name. Go ahead?`}>
+        <p className="text-xs leading-5 text-slate-600">
+          {`${shortfall?.length ?? 0} document${shortfall?.length === 1 ? " is" : "s are"} not at the status it needs: ${(shortfall ?? []).map((one) => one.documentNumber).join(", ")}. Granted, they go as they stand (released, else their newest; one with no revision yet is not sent). The delivery transmittal names the waiver, with your name and the day.`}
+        </p>
+        <Field label="Why" hint="optional — written with the waiver"><input name="note" className={inputCls} /></Field>
+      </ActionForm>
+    ),
+  });
   if (canAct) {
-    // "Deliver the package" is always there while it is open (owner: "there is no deliver button"). Complete, it opens the
-    // delivery transmittal (its documents fixed there, whom it goes to chosen there: owner, "recorded as transmittal so
-    // we can decide at the end to whom"). Not complete, "Deliver without what is missing" is a tick in it, greyed when
-    // nothing is missing (owner: "could've been just a check box inside deliver"): what is not ready goes as it stands,
-    // on the responsibility of whoever delivers it, said on the transmittal with their name.
-    const short = total - readyCount;
-    const goneShort = !!pkg.shortfallAcceptedBy;
+    // "Deliver the package" is always there while it is open (owner: "there is no deliver button"). Complete, or under a
+    // waiver, it opens the delivery transmittal (its documents fixed there, whom it goes to chosen there). Not complete,
+    // it asks whoever accepts it for a waiver first, freezing what is missing (owner: "keep the Ask first").
     items.push({
       key: "deliver",
       primary: true,
-      open: !short || goneShort,
+      open: !outstanding || waived,
       label: "Deliver the package",
       body: (
-        <form action="/transmittals/new" method="get" className="space-y-3">
-          <input type="hidden" name="package" value={pkg.number} />
-          <p className="text-xs text-slate-500">
+        <div className="space-y-3">
+          <p className="text-xs leading-5 text-slate-500">
             {`A data transmittal carries the package${branchCount ? ` and the ${branchCount} package${branchCount === 1 ? "" : "s"} in it` : ""}, ${purpose.toLowerCase()}, as it stands: nothing added or taken out. You choose who receives it there. Sent, it is delivered and its contents fixed${pkg.rule ? ": nothing more joins by its rule" : ""}; they read it as you do and change nothing; then ${pkg.names.acceptors} accepts it.`}
           </p>
-          <label className={cn("flex items-start gap-2 text-xs leading-5", short && !goneShort ? "text-slate-700" : "cursor-not-allowed text-slate-400")}>
-            <input type="checkbox" name="short" value="1" disabled={!short || goneShort} defaultChecked={false} className="mt-0.5" />
-            <span>
-              <span className="font-semibold">Deliver without what is missing</span>
-              {" · "}{!short ? "nothing is missing" : goneShort ? `already let go by ${pkg.shortfallAcceptedBy}`
-                : `${short} of ${total} not ready: they go as they stand (released, else their newest), on your responsibility, said on the transmittal with your name`}
-            </span>
-          </label>
-          <button type="submit" className={btn("primary", "sm")}>Write the transmittal</button>
-        </form>
+          {!outstanding || waived ? (
+            <>
+              {waived ? <p className="text-xs leading-5 text-slate-600">{`Waiver granted by ${pkg.shortfallAcceptedBy}: the ${outstanding} outstanding go as they stand, named on the transmittal.`}</p> : null}
+              <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number })}`} className={btn("primary", "sm")}>Write the transmittal</Link>
+            </>
+          ) : waiverAsked ? (
+            <p className="text-xs leading-5 text-slate-600">Waiting for {pkg.names.acceptors} to grant a waiver{asked}. Until then it waits for its documents.</p>
+          ) : (
+            <ActionForm action={askWaiverAction} submitLabel={`Ask ${pkg.names.acceptors} for a waiver`} size="sm" hidden={{ packageId: pkg.id }}>
+              <p className="text-xs leading-5 text-slate-600">
+                {`${outstanding} of ${total} not ready${stale && pkg.shortfallAcceptedBy ? " (more than the waiver granted covers)" : ""}. A transmittal asks ${pkg.names.acceptors} for a waiver, listing each one and where it stands; those putting it together are copied in. Or wait until they are released.`}
+              </p>
+            </ActionForm>
+          )}
+        </div>
       ),
     });
     if (mayClose) items.push({
@@ -263,7 +288,8 @@ export default async function PackageDetailPage({ params, searchParams }: { para
               { label: "Delivered to you", at: pkg.transmittals.find((one) => one.items > 0)?.issuedAt ?? null, holder: delivery.map((one) => one.number).join(", ") || null },
             ] : [
               { label: "Package opened", at: pkg.names.createdAt, holder: pkg.names.owners },
-              ...(pkg.shortfallAcceptedAt ? [{ label: "Without what was missing, on their responsibility", at: pkg.shortfallAcceptedAt, holder: pkg.shortfallAcceptedBy ?? null }] : []),
+              ...(pkg.shortfallIssuedAt ? [{ label: "Waiver asked", at: pkg.shortfallIssuedAt, holder: letters[0]?.number ?? pkg.names.acceptors }] : []),
+              ...(pkg.shortfallAcceptedAt ? [{ label: "Waiver granted", at: pkg.shortfallAcceptedAt, holder: pkg.shortfallAcceptedBy ?? null }] : []),
               { label: delivery.length ? `Delivered to ${pkg.names.to}` : pkg.closedAt ? "Closed" : "Delivered", at: pkg.closedAt, holder: delivery.map((one) => one.number).join(", ") || (pkg.closedAt ? fmtDateTime(pkg.closedAt) : null) },
               { label: "Accepted", at: pkg.acceptedAt, holder: pkg.acceptedBy ?? pkg.names.acceptors },
             ]}
