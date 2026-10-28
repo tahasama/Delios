@@ -14,6 +14,7 @@ const WORDS: Record<string, string> = {
   SUPPORT_READ: "DELIOS support read the projects and people",
   LEGAL_ACCEPTED: "Accepted DELIOS's terms",
   SUBSCRIPTION_CANCELLED: "Cancelled the plan",
+  PLAN_ASKED: "Chose a plan",
   SUBSCRIPTION_RESUMED: "Kept the plan after all",
   PERSON_FORGOTTEN: "Forgot a person, as they asked",
   VIEWER_SWITCHED: "Switched a reader on or off",

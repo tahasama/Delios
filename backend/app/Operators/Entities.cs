@@ -68,6 +68,16 @@ public sealed class Subscription
     /// <summary>Cancelled by one of its administrators (one click): nothing renews; it reads only once paid up to.</summary>
     public Instant? CancelledAt { get; set; }
     public string? CancelledBy { get; set; }
+    /// <summary>The next moment its administrators are reminded the trial ends (<see cref="Trials.NextReminder"/>); none: nothing to tell.</summary>
+    public Instant? RemindAt { get; set; }
+    /// <summary>When they were last reminded of this trial's end; cleared when the end moves.</summary>
+    public Instant? TrialToldAt { get; set; }
+    /// <summary>A plan its administrator asked for on Contract &amp; plan, waiting for DELIOS to set it up; cleared once a plan is set.</summary>
+    public string? PlanAsked { get; set; }
+    public int? PlanAskedUsers { get; set; }
+    public string? PlanAskedNote { get; set; }
+    public Instant? PlanAskedAt { get; set; }
+    public string? PlanAskedBy { get; set; }
     public Instant UpdatedAt { get; set; }
     public string? UpdatedBy { get; set; }
 }
@@ -181,7 +191,9 @@ public sealed class PlatformSetting
 public static class PlatformKeys
 {
     public const string SupportEmail = "SUPPORT_EMAIL", SupportHours = "SUPPORT_HOURS", SupportPhone = "SUPPORT_PHONE";
-    public static readonly string[] All = [SupportEmail, SupportHours, SupportPhone];
+    /// <summary>How many days a new organization tries DELIOS; 0: no end.</summary>
+    public const string TrialDays = "TRIAL_DAYS";
+    public static readonly string[] All = [SupportEmail, SupportHours, SupportPhone, TrialDays];
 }
 
 /// <summary>Every act of the DELIOS team in its console, kept for good.</summary>
@@ -231,6 +243,10 @@ internal sealed class OperatorConfiguration :
         b.Property(x => x.Notes).HasMaxLength(4000);
         b.Property(x => x.UpdatedBy).HasMaxLength(200);
         b.Property(x => x.CancelledBy).HasMaxLength(200);
+        b.Property(x => x.PlanAsked).HasMaxLength(32);
+        b.Property(x => x.PlanAskedNote).HasMaxLength(2000);
+        b.Property(x => x.PlanAskedBy).HasMaxLength(200);
+        b.HasIndex(x => x.RemindAt);
     }
 
     public void Configure(EntityTypeBuilder<Plan> b)

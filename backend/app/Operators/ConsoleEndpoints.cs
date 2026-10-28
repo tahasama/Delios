@@ -50,6 +50,8 @@ public static class ConsoleEndpoints
         g.MapGet("/platform", async (DeliosDbContext db, CancellationToken c) =>
             Results.Ok(await db.Set<PlatformSetting>().AsNoTracking().ToDictionaryAsync(p => p.Key, p => p.Value, c)));
         g.MapPut("/platform", SetPlatformAsync);
+        g.MapGet("/trial-days", async (DeliosDbContext db, CancellationToken c) => Results.Ok(new { days = await Trials.DaysAsync(db, c) }));
+        g.MapPut("/trial-days", SetTrialDaysAsync);
         g.MapGet("/notices", async (DeliosDbContext db, CancellationToken c) => Results.Ok(await db.Set<OperatorEvent>().AsNoTracking()
             .Where(e => e.Action == "PLATFORM_NOTICE").OrderByDescending(e => e.At).Take(100).ToListAsync(c)));
         g.MapPost("/notices", NoticeAsync);
@@ -191,9 +193,18 @@ public static class ConsoleEndpoints
         var row = await db.Set<Subscription>().SingleOrDefaultAsync(s => s.TenantId == id, cancellationToken);
         var before = row is null ? "none" : $"{row.State} {row.Plan} paid until {row.PaidUntil}";
         if (row is null) db.Add(row = new Subscription { TenantId = id });
+        var trialEnd = EndOf(request.TrialEndsAt);
+        var trialMoved = row.State != state || row.TrialEndsAt != trialEnd;
         row.Plan = plan;
         row.State = state;
-        row.TrialEndsAt = EndOf(request.TrialEndsAt);
+        row.TrialEndsAt = trialEnd;
+        // A plan set answers the one its administrator asked for.
+        if (plan is not null) (row.PlanAsked, row.PlanAskedUsers, row.PlanAskedNote, row.PlanAskedAt, row.PlanAskedBy) = (null, null, null, null, null);
+        if (trialMoved)
+        {
+            row.TrialToldAt = null;
+            Trials.Moved(db, row);
+        }
         row.PaidUntil = EndOf(request.PaidUntil);
         row.Billing = billing;
         row.Seats = request.Seats;
@@ -231,6 +242,12 @@ public static class ConsoleEndpoints
         string Name(Guid g) => names.GetValueOrDefault(g) ?? "an organization no longer listed";
         return Results.Ok(new
         {
+            plans = await (from s in db.Set<Subscription>().AsNoTracking()
+                           join t in db.Tenants.AsNoTracking() on s.TenantId equals t.Id
+                           where s.PlanAsked != null
+                           orderby s.PlanAskedAt descending
+                           select new { tenantId = t.Id, organization = t.Name, plan = s.PlanAsked, users = s.PlanAskedUsers, note = s.PlanAskedNote,
+                               at = s.PlanAskedAt, askedBy = s.PlanAskedBy }).ToListAsync(cancellationToken),
             products = await db.Set<ProductRequest>().AsNoTracking().OrderByDescending(r => r.At).Take(200).ToListAsync(cancellationToken),
             merges = merges.Select(m => new { m.Id, keep = Name(m.KeepId), merge = Name(m.MergeId), m.RequestedByName, m.Why, m.RequestedAt, m.State,
                 m.RefusedByName, m.RefusedWhy, m.AnsweredAt, m.DoneAt }),
@@ -388,6 +405,29 @@ public static class ConsoleEndpoints
             g.Id, g.TenantId, organization = names.GetValueOrDefault(g.TenantId), g.GrantedByName, g.Why, g.From, g.Until, g.EndedAt, g.EndedByName,
             open = g.EndedAt == null && g.Until > now,
         }));
+    }
+
+    public sealed record TrialDaysRequest(int? Days, string? Why);
+
+    /// <summary>
+    /// How many days a new organization tries DELIOS (0: no end). Only organizations signing up from now on get it; one
+    /// already trying keeps its own end, changed on its page.
+    /// </summary>
+    private static async Task<IResult> SetTrialDaysAsync(TrialDaysRequest request, HttpContext http, DeliosDbContext db, IClock clock,
+        CancellationToken cancellationToken)
+    {
+        if (request.Days is not (>= 0 and <= 365)) return Problems.Invalid("DAYS_OUT_OF_RANGE", "From 0 (no end) to 365 days.", new { field = "days" });
+        var why = request.Why?.Trim() ?? "";
+        if (why.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why it changes.", new { field = "why" });
+        var before = await Trials.DaysAsync(db, cancellationToken);
+        var row = await db.Set<PlatformSetting>().SingleOrDefaultAsync(p => p.Key == PlatformKeys.TrialDays, cancellationToken);
+        if (row is null) db.Add(row = new PlatformSetting { Key = PlatformKeys.TrialDays, Value = "" });
+        row.Value = request.Days.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        row.UpdatedAt = clock.GetCurrentInstant();
+        row.UpdatedBy = http.Current().Name;
+        Log(db, http, "TRIAL_DAYS_SET", null, $"{before} → {request.Days} days. Why: {why}", clock);
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
     }
 
     public sealed record PlatformRequest(string? SupportEmail, string? SupportHours, string? SupportPhone);

@@ -20,6 +20,19 @@ export async function acceptTextAction(_prev: Result | undefined, formData: Form
   return done("Accepted, for the organization. Kept with its version and today's date.");
 }
 
+/** An administrator chooses a plan: DELIOS is told, sets it up and sends the first invoice. */
+export async function choosePlanAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const users = Number(text(formData, "users") || "0");
+  if (!text(formData, "plan")) return { error: "Choose a plan.", fields: ["plan"] };
+  if (!(users >= 1)) return { error: "Say how many people will work in it.", fields: ["users"] };
+  try {
+    await api("/api/organization/contract/plan", { body: { plan: text(formData, "plan"), users, note: text(formData, "note") || null } });
+  } catch (e) {
+    return refusalForForm(e);
+  }
+  return done("Sent to DELIOS. They set it up and send your first invoice; you will be told, and it will be here.");
+}
+
 /** Cancelling is one click (owner, as such apps do): nothing renews; it ends with the period paid. */
 export async function cancelPlanAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   try {

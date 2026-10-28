@@ -103,6 +103,17 @@ date and version, the subprocessor list, the export and the deletion at the end)
 - **Payments**: per organization per paid user (its own people; guests and linked accounts free), plans named and priced
   in the console. The seller of record (Paddle or Stripe) is **not connected yet**: a payment is recorded by hand (Paid
   until). Cancelling is one click in the organization's Settings → Contract & plan.
+- **The free trial** (`Operators/Trials.cs`, owner): every organization that signs up tries DELIOS for the number of days
+  set in the console (Plans & payments → Free trial, `TRIAL_DAYS`, 30 unless set, 0 for no end, with why,
+  TRIAL_DAYS_SET); one already trying keeps its own end, changed on its page. Its administrators are reminded 7 days
+  before the end, the day before and on the day, by notification and email, pointing to Contract & plan. The next
+  reminder's moment is written by what sets the end (sign-up, the console: `Subscription.RemindAt`, message
+  `trials.moved`), the worker asleep until it (`TrialReminders`), never looking. Organizations that signed up before
+  have no end until one is set.
+- **Choosing a plan** (owner): on Contract & plan, an administrator picks a plan and how many users, with a note
+  (`POST /api/organization/contract/plan`, PLAN_ASKED; allowed while reading only); DELIOS is emailed
+  (`DELIOS_CONTACT_EMAIL`), the console lists it (Requests → Plans chosen, and on the organization's page, its form
+  filled in with the choice); setting a plan answers it; the first invoice is then issued from the same page.
 - **Legal texts** (`Operators/LegalTexts.cs`): terms, data processing agreement, privacy notice, subprocessors, security,
   service levels, acceptable use, cookies, legal notice. Each starts from a written text describing what the app does,
   with `[[LAWYER: …]]` where only a lawyer may write, drawn in red everywhere. Public at `/legal`, linked under the

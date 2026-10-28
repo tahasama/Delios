@@ -97,6 +97,9 @@ public sealed class FileQueueConsumer(
                 case Actions.NoticesMoved.RoutingKey:
                     await Actions.NoticeDays.OnMovedAsync(scope.ServiceProvider, Read<Actions.NoticesMoved>(delivery), stoppingToken);
                     break;
+                case Operators.TrialsMoved.RoutingKey:
+                    scope.ServiceProvider.GetRequiredService<Operators.TrialBell>().Ring();
+                    break;
                 case Packages.PackagesMoved.RoutingKey:
                     await Packages.PackagesMoved.OnMovedAsync(scope.ServiceProvider, Read<Packages.PackagesMoved>(delivery), stoppingToken);
                     break;

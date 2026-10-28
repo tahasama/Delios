@@ -242,6 +242,21 @@ export async function setSellerAction(_prev: Result | undefined, formData: FormD
   return { ok: "Saved: new invoices carry it." };
 }
 
+/** How many days a new organization tries DELIOS (0: no end). */
+export async function setTrialDaysAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const days = text(formData, "days");
+  const why = text(formData, "why");
+  if (days === "") return { error: "Say how many days (0 for no end).", fields: ["days"] };
+  if (!why) return { error: "Say why it changes.", fields: ["why"] };
+  try {
+    await consoleApi("/api/console/trial-days", { method: "PUT", body: { days: Number(days), why } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/console/payments");
+  return { ok: Number(days) === 0 ? "Saved: organizations signing up from now on try DELIOS with no end." : `Saved: organizations signing up from now on try DELIOS for ${days} days.` };
+}
+
 /** How organizations reach DELIOS support. */
 export async function setSupportContactAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   try {

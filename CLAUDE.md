@@ -850,6 +850,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   priced in the console (a plan's code kept once used). Businesses only. Cancelling is one click (Contract & plan), no
   harder than signing up, ending with the period paid. The seller of record is not connected yet: payments recorded by
   hand (docs/gaps/running.md).
+- **Trying DELIOS, then choosing a plan** (owner: "add the 3"; "can i set how many days"): a new organization tries
+  DELIOS for the days set in the console (Plans & payments → Free trial, `TRIAL_DAYS`, 30 by default, 0 no end;
+  `Operators/Trials.cs`); its administrators are reminded 7 days before, the day before and on the day (notification
+  and email), the moment written by what sets the end, never looked for (`Subscription.RemindAt`, `TrialReminders`);
+  after it, it reads only. On Contract & plan an administrator chooses a plan and how many users ("Choose a plan",
+  PLAN_ASKED); DELIOS is emailed, the console shows it on Requests and on the organization's page (its form filled
+  in), and setting the plan answers it; the first invoice follows. **The console speaks plainly** (owner: "it went
+  technical, forgetting that non-devs will be running the app"): words for the people running the business, never the
+  developers' (no "seller of record", no provider names where a plain phrase says it).
 - **Legal texts are DELIOS's, versioned** (`Operators/LegalTexts.cs`, `/api/legal`, public `/legal/<slug>`, linked under
   every sign-in page): written as the app works, **what only a lawyer may write marked `[[LAWYER: …]]` and drawn in red**
   everywhere (`components/legal-text.tsx`; a public page with such parts says it is a draft binding nobody). A new

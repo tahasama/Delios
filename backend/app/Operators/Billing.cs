@@ -362,7 +362,8 @@ public static class BillingEndpoints
         return Results.NoContent();
     }
 
-    private static async Task TellAsync(IServiceScopeFactory scopes, Guid tenantId, string? billingEmail, string title, string body, CancellationToken cancellationToken) =>
+    internal static async Task TellAsync(IServiceScopeFactory scopes, Guid tenantId, string? billingEmail, string title, string body, CancellationToken cancellationToken,
+        string entity = "Invoice") =>
         await TenantScope.RunAsync(scopes, tenantId, async (services, there) =>
         {
             var admins = await there.Users.AsNoTracking().Where(u => u.TenantId == tenantId && u.IsAdmin && u.Active && !u.IsSupport && u.HomeTenantId == null)
@@ -370,7 +371,7 @@ public static class BillingEndpoints
             var notifier = services.GetRequiredService<Notifications.Notifier>();
             await notifier.NotifyAsync(tenantId, null, admins, "PLATFORM", title, body, "/organization/settings/contract", cancellationToken);
             if (!string.IsNullOrWhiteSpace(billingEmail))
-                notifier.Queue(tenantId, null, Notifications.EmailKinds.Account, billingEmail, billingEmail, title, body, "Invoice", null);
+                notifier.Queue(tenantId, null, Notifications.EmailKinds.Account, billingEmail, billingEmail, title, body, entity, null);
         }, cancellationToken);
 
     private static async Task<IResult> PdfAsync(DeliosDbContext db, Invoice? invoice, CancellationToken cancellationToken)

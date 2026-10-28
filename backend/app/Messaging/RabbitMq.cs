@@ -92,7 +92,7 @@ public static class Topology
         [Host.Notifications.EmailRequested.RoutingKey, Host.Notifications.PushRequested.RoutingKey], Prefetch: 4);
 
     /// <summary>After a change: notice days written again (<see cref="Actions.NoticeDays"/>), packages brought up to date (<see cref="Packages.PackagesMoved"/>); one at a time.</summary>
-    public static readonly WorkQueue Notices = new("delios.notices", "delios.notices.retry", [Host.Actions.NoticesMoved.RoutingKey, Host.Packages.PackagesMoved.RoutingKey], Prefetch: 1);
+    public static readonly WorkQueue Notices = new("delios.notices", "delios.notices.retry", [Host.Actions.NoticesMoved.RoutingKey, Host.Packages.PackagesMoved.RoutingKey, Host.Operators.TrialsMoved.RoutingKey], Prefetch: 1);
 
     /// <summary>Every work queue; the worker runs one <see cref="FileQueueConsumer"/> per entry.</summary>
     public static readonly WorkQueue[] Queues = [Files, Extraction, Checks, Mail, Notices];

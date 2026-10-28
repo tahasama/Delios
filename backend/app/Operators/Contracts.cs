@@ -30,7 +30,8 @@ public static class Subscriptions
             case SubscriptionStates.Trial when s.TrialEndsAt is { } end && end <= now:
                 return new(SubscriptionStates.ReadOnly, "The trial ended: choose a plan to go on working.", true);
             case SubscriptionStates.Trial:
-                return new(SubscriptionStates.Trial, s.TrialEndsAt is null ? "Trying DELIOS, no end set." : "Trying DELIOS.", false);
+                return new(SubscriptionStates.Trial, s.TrialEndsAt is { } ends
+                    ? $"Trying DELIOS for free until {ends.InUtc().Date.ToString("d MMMM yyyy", null)}." : "Trying DELIOS, no end set.", false);
         }
         if (s.PaidUntil is { } paid)
         {
@@ -90,6 +91,7 @@ public static class ContractEndpoints
     public sealed record AcceptRequest(string? Kind);
     public sealed record WhyRequest(string? Why);
     public sealed record GrantRequest(int? Days, string? Why);
+    public sealed record PlanAskRequest(string? Plan, int? Users, string? Note);
 
     /// <summary>The newest version of each kind; version 0 is the text DELIOS starts from, not published yet.</summary>
     public static async Task<Dictionary<string, LegalDocument>> LatestAsync(DeliosDbContext db, CancellationToken cancellationToken)
@@ -162,6 +164,7 @@ public static class ContractEndpoints
         admins.MapPost("/contract/accept", AcceptOneAsync);
         admins.MapPost("/contract/cancel", CancelAsync);
         admins.MapPost("/contract/resume", ResumeAsync);
+        admins.MapPost("/contract/plan", AskPlanAsync);
         admins.MapPost("/support", GrantAsync);
         admins.MapPost("/support/{id:guid}/end", EndGrantAsync);
     }
@@ -197,7 +200,39 @@ public static class ContractEndpoints
             acceptances = accepted.Select(a => new { a.Kind, a.Version, a.UserName, a.UserEmail, a.At }),
             support = grants,
             provider = (string?)null,
+            plans = await db.Set<Plan>().AsNoTracking().Where(p => p.Active).OrderBy(p => p.PricePerUser)
+                .Select(p => new { p.Code, p.Name, p.PricePerUser, p.Currency, p.Notes }).ToListAsync(cancellationToken),
+            asked = row?.PlanAsked is null ? null : new { plan = row.PlanAsked, users = row.PlanAskedUsers, note = row.PlanAskedNote, at = row.PlanAskedAt, by = row.PlanAskedBy },
         });
+    }
+
+    /// <summary>
+    /// An administrator chooses a plan and how many users: it waits for DELIOS, told by email, which sets it up and sends
+    /// the first invoice. Allowed while the organization reads only: it is how it is put right.
+    /// </summary>
+    private static async Task<IResult> AskPlanAsync(PlanAskRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, Notifications.Notifier notifier,
+        Microsoft.Extensions.Options.IOptions<Notifications.EmailOptions> email, IClock clock, CancellationToken cancellationToken)
+    {
+        var code = request.Plan?.Trim().ToUpperInvariant() ?? "";
+        var plan = await db.Set<Plan>().AsNoTracking().SingleOrDefaultAsync(p => p.Code == code && p.Active, cancellationToken);
+        if (plan is null) return Problems.Invalid("PLAN_UNKNOWN", "Choose one of the plans offered.", new { field = "plan" });
+        if (request.Users is not (>= 1 and <= 100000)) return Problems.Invalid("USERS_REQUIRED", "Say how many people will work in it.", new { field = "users" });
+        var note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
+        if (note is { Length: > 2000 }) return Problems.Invalid("TOO_LONG", "Keep it under 2,000 characters.", new { field = "note" });
+        var tenantId = http.User.TenantId();
+        var now = clock.GetCurrentInstant();
+        var me = await db.Users.AsNoTracking().SingleAsync(u => u.Id == http.User.UserId(), cancellationToken);
+        var tenant = await db.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId, cancellationToken);
+        var row = await db.Set<Subscription>().SingleOrDefaultAsync(s => s.TenantId == tenantId, cancellationToken);
+        if (row is null) db.Add(row = new Subscription { TenantId = tenantId, UpdatedAt = now, UpdatedBy = me.Name });
+        (row.PlanAsked, row.PlanAskedUsers, row.PlanAskedNote, row.PlanAskedAt, row.PlanAskedBy) = (plan.Code, request.Users, note, now, me.Name);
+        if (email.Value.DeliosAddress is { Length: > 0 } to && to.Contains('@'))
+            notifier.Queue(tenantId, null, Notifications.EmailKinds.Account, to, "DELIOS", $"{tenant.Name} chose a plan: {plan.Name}",
+                $"{tenant.Name} chose {plan.Name} for {request.Users} users.\n\nAsked by {me.Name} <{me.Email}>.\n\n{note ?? "No message."}\n\nSet it up in the console: Organizations → {tenant.Name}.",
+                "Subscription", null, replyTo: me.Email);
+        await db.SaveChangesAsync(cancellationToken);
+        await audit.WriteAsync(http.User.Actor(), "PLAN_ASKED", "Subscription", tenantId, $"{plan.Name}, {request.Users} users", note, cancellationToken: cancellationToken);
+        return Results.NoContent();
     }
 
     private static async Task<IResult> AcceptOneAsync(AcceptRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock,

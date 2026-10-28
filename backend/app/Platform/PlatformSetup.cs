@@ -199,6 +199,7 @@ public static class PlatformSetup
         services.AddSingleton<Messaging.RabbitMqConnection>();
         services.AddSingleton<Messaging.OutboxWake>();
         services.AddSingleton<Actions.NoticeAlarmBell>();
+        services.AddSingleton<Operators.TrialBell>();
         // Every process sends what its own acts put in the outbox, woken by them.
         services.AddHostedService<Messaging.OutboxRelay>();
         if (role != Roles.Api)
@@ -210,6 +211,7 @@ public static class PlatformSetup
             }
             if (search.UsesOpenSearch) services.AddHostedService<Search.SearchIndexer>();
             if (config.GetValue("Schedule:Notices", true)) services.AddHostedService<Actions.ActionNotices>();
+            if (config.GetValue("Trials:Reminders", true)) services.AddHostedService<Operators.TrialReminders>();
         }
         services.AddScoped<Seeding.TenantSetup>();
         services.AddScoped<Seeding.DemoSeed>();

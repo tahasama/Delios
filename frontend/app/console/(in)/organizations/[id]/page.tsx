@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { ActionForm } from "@/components/form";
-import { Field, inputCls } from "@/components/ui";
+import { Banner, Field, inputCls } from "@/components/ui";
 import { Select } from "@/components/select";
 import { consoleApi } from "@/lib/console/client";
 import { enterAsSupportAction, setOrganizationActiveAction, setSubscriptionAction } from "@/lib/console/forms";
@@ -49,17 +49,24 @@ export default async function Organization({ params }: { params: Promise<{ id: s
         ]}
       />
 
+      {s?.planAsked ? (
+        <Banner tone="warn" title={`${s.planAskedBy} chose a plan on ${fmtDate(s.planAskedAt)}`}>
+          {plans.find((p) => p.code === s.planAsked)?.name ?? s.planAsked}, for {s.planAskedUsers} user{s.planAskedUsers === 1 ? "" : "s"}.
+          {s.planAskedNote ? <> &ldquo;{s.planAskedNote}&rdquo;</> : null} Set it below (it is filled in already), save, then send the first invoice further down.
+        </Banner>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <Sheet title="Plan & contract" said={s ? `changed ${fmtDateTime(s.updatedAt)} by ${s.updatedBy ?? "—"}` : "nothing set yet: it tries DELIOS with no end"}>
           <ActionForm action={setSubscriptionAction} hidden={{ tenantId: o.id }} submitLabel="Save" className="asking space-y-4 px-5 py-4 sm:px-6">
             <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
               <Field label="Where it stands" required>
-                <Select name="state" defaultValue={s?.state ?? "TRIAL"} className="plain w-full">
+                <Select name="state" defaultValue={s?.planAsked ? "ACTIVE" : s?.state ?? "TRIAL"} className="plain w-full">
                   {Object.entries(STATE_WORDS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
                 </Select>
               </Field>
               <Field label="Plan">
-                <Select name="plan" defaultValue={s?.plan ?? ""} className="plain w-full">
+                <Select name="plan" defaultValue={s?.plan ?? s?.planAsked ?? ""} className="plain w-full">
                   <option value="">None yet</option>
                   {plans.map((p) => <option key={p.code} value={p.code}>{p.name}{p.active ? "" : " (no longer sold)"}</option>)}
                 </Select>
@@ -67,16 +74,16 @@ export default async function Organization({ params }: { params: Promise<{ id: s
               <Field label="How it pays">
                 <Select name="billing" defaultValue={s?.billing ?? ""} className="plain w-full">
                   <option value="">Not set</option>
-                  <option value="CARD">By card (seller of record)</option>
+                  <option value="CARD">By card (not connected yet)</option>
                   <option value="INVOICE">On invoice</option>
                 </Select>
               </Field>
               <Field label="Trial ends" hint="its last day"><input type="date" name="trialEndsAt" defaultValue={day(s?.trialEndsAt)} className="plain w-full" /></Field>
               <Field label="Paid until" hint={`reads only ${14} days after`}><input type="date" name="paidUntil" defaultValue={day(s?.paidUntil)} className="plain w-full" /></Field>
-              <Field label="Users in the contract" hint="when it says a number"><input type="number" min={0} name="seats" defaultValue={s?.seats ?? ""} className="plain w-full" /></Field>
+              <Field label="Users in the contract" hint="when it says a number"><input type="number" min={0} name="seats" defaultValue={s?.seats ?? s?.planAskedUsers ?? ""} className="plain w-full" /></Field>
               <Field label="Contract reference"><input name="contractRef" defaultValue={s?.contractRef ?? ""} className="plain w-full" /></Field>
               <Field label="Signed on"><input type="date" name="contractSignedOn" defaultValue={s?.contractSignedOn ?? ""} className="plain w-full" /></Field>
-              <Field label="Seller's reference" hint="Paddle or Stripe, once connected"><input name="providerRef" defaultValue={s?.providerRef ?? ""} className="plain w-full" /></Field>
+              <Field label="Card payment reference" hint="once card payment is connected"><input name="providerRef" defaultValue={s?.providerRef ?? ""} className="plain w-full" /></Field>
               <Field label="Notes" className="sm:col-span-3"><textarea name="notes" rows={2} defaultValue={s?.notes ?? ""} className={inputCls} /></Field>
               <Field label="Why it changes" required className="sm:col-span-3"><input name="why" required className="plain w-full" placeholder="Contract signed, paid by transfer, trial extended…" /></Field>
             </div>

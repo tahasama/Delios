@@ -5,7 +5,7 @@ import { Banner, Field } from "@/components/ui";
 import { Select } from "@/components/select";
 import { api } from "@/lib/client";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
-import { acceptTextAction, cancelPlanAction, endSupportAction, grantSupportAction, resumePlanAction, setBillingDetailsAction } from "@/lib/organization/forms-contract";
+import { acceptTextAction, cancelPlanAction, choosePlanAction, endSupportAction, grantSupportAction, resumePlanAction, setBillingDetailsAction } from "@/lib/organization/forms-contract";
 import { Field as F2, inputCls } from "@/components/ui";
 import { cn, fmtDate, fmtDateTime } from "@/lib/core/utils";
 
@@ -19,6 +19,8 @@ type Contract = {
   texts: { kind: string; slug: string; title: string; version: number; acceptedVersion: number | null; toAccept: boolean }[];
   acceptances: { kind: string; version: number; userName: string; userEmail: string; at: string }[];
   support: { id: string; grantedByName: string; why: string; from: string; until: string; endedAt: string | null; endedByName: string | null; active: boolean }[];
+  plans: { code: string; name: string; pricePerUser: number | null; currency: string; notes: string | null }[];
+  asked: { plan: string; users: number | null; note: string | null; at: string; by: string | null } | null;
 };
 
 type Billing = {
@@ -64,9 +66,9 @@ export default async function ContractPage() {
         <dl className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
           {[
             { term: "Where it stands", value: STATE_WORDS[c.state] ?? c.state, said: c.why, tone: c.readsOnly ? "text-amber-700" : "" },
-            { term: "Plan", value: c.plan?.name ?? "None yet", said: c.plan?.pricePerUser != null ? `${c.plan.pricePerUser} ${c.plan.currency} per user a month` : c.plan ? "price in the contract" : "DELIOS sets it with you" },
+            { term: "Plan", value: c.plan?.name ?? "None yet", said: c.plan?.pricePerUser != null ? `${c.plan.pricePerUser} ${c.plan.currency} per user a month` : c.plan ? "price in the contract" : "choose one below" },
             { term: "Paid users", value: c.users, said: `people of ours who work in it${c.seats ? ` · ${c.seats} in the contract` : ""}; guests are free` },
-            { term: c.state === "TRIAL" ? "Trial ends" : "Paid until", value: fmtDate(c.state === "TRIAL" ? c.trialEndsAt : c.paidUntil), said: c.renewsOn ? `renews then; told 30 days before` : c.cancelledAt ? `cancelled by ${c.cancelledBy}` : "" },
+            { term: c.state === "TRIAL" ? "Trial ends" : "Paid until", value: c.state === "TRIAL" && !c.trialEndsAt ? "No end" : fmtDate(c.state === "TRIAL" ? c.trialEndsAt : c.paidUntil), said: c.renewsOn ? "renews then" : c.cancelledAt ? `cancelled by ${c.cancelledBy}` : "" },
           ].map((f) => (
             <div key={f.term} className="bg-surface px-5 py-3 sm:px-6">
               <dt className="stencil text-slate-500">{f.term}</dt>
@@ -79,8 +81,39 @@ export default async function ContractPage() {
 
       {c.readsOnly ? (
         <Banner tone="warn" title="The organization reads only">
-          {c.why} Everyone keeps reading and exporting; nobody adds or changes until it is put right; nothing is deleted. Write to DELIOS to settle it.
+          {c.why} Everyone keeps reading and exporting; nobody adds or changes until it is put right; nothing is deleted. {c.state === "READ_ONLY" && !c.plan ? "Choose a plan below to work again." : "Pay the invoice below, or write to DELIOS to settle it."}
         </Banner>
+      ) : null}
+
+      {(c.state === "TRIAL" || c.readsOnly || !c.plan) && c.plans.length ? (
+        <section id="choose" className="register register-sheet register-sheet-open">
+          {band("Choose a plan", c.asked ? "sent to DELIOS" : c.state === "TRIAL" ? "to keep working after the trial" : "to work again")}
+          {c.asked ? (
+            <p className="border-b border-line px-5 py-3 text-[13px] text-slate-700 sm:px-6">
+              <strong className="text-slate-900">{c.asked.by} chose {c.plans.find((p) => p.code === c.asked!.plan)?.name ?? c.asked.plan} for {c.asked.users} user{c.asked.users === 1 ? "" : "s"}</strong> on {fmtDate(c.asked.at)}.
+              {" "}DELIOS sets it up and sends your first invoice; you are told, and it appears below under Invoices. You may change your choice until then.
+            </p>
+          ) : (
+            <p className="border-b border-line px-5 py-3 text-[12px] leading-5 text-slate-600 sm:px-6">
+              Pick a plan and how many of your people will use DELIOS. DELIOS then sends you an invoice, which you pay by bank transfer. People of other
+              organizations working with you are free.
+            </p>
+          )}
+          <ActionForm action={choosePlanAction} submitLabel={c.asked ? "Change my choice" : "Send my choice to DELIOS"}
+            className="asking grid grid-cols-1 items-end gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_10rem] sm:px-6" footerClassName="sm:col-span-2">
+            <Field label="Plan" required>
+              <Select name="plan" required defaultValue={c.asked?.plan ?? c.plans[0]?.code} className="plain w-full">
+                {c.plans.map((p) => (
+                  <option key={p.code} value={p.code}>
+                    {p.name} · {p.pricePerUser == null ? "price on request" : `${p.pricePerUser} ${p.currency} per user a month`}{p.notes ? ` · ${p.notes}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Users" required hint={`${c.users} today`}><input name="users" type="number" min={1} required defaultValue={c.asked?.users ?? Math.max(c.users, 1)} className="plain w-full" /></Field>
+            <Field label="Anything to add" hint="optional: yearly payment, a question…" className="sm:col-span-2"><input name="note" defaultValue={c.asked?.note ?? ""} className="plain w-full" /></Field>
+          </ActionForm>
+        </section>
       ) : null}
 
       <section className="register register-sheet register-sheet-open">

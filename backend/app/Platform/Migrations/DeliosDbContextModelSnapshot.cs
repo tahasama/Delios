@@ -4088,10 +4088,37 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("plan");
 
+                    b.Property<string>("PlanAsked")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("plan_asked");
+
+                    b.Property<Instant?>("PlanAskedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("plan_asked_at");
+
+                    b.Property<string>("PlanAskedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("plan_asked_by");
+
+                    b.Property<string>("PlanAskedNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("plan_asked_note");
+
+                    b.Property<int?>("PlanAskedUsers")
+                        .HasColumnType("integer")
+                        .HasColumnName("plan_asked_users");
+
                     b.Property<string>("ProviderRef")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("provider_ref");
+
+                    b.Property<Instant?>("RemindAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("remind_at");
 
                     b.Property<int?>("Seats")
                         .HasColumnType("integer")
@@ -4107,6 +4134,10 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("trial_ends_at");
 
+                    b.Property<Instant?>("TrialToldAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("trial_told_at");
+
                     b.Property<Instant>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -4118,6 +4149,9 @@ namespace Delios.Host.Platform.Migrations
 
                     b.HasKey("TenantId")
                         .HasName("pk_subscriptions");
+
+                    b.HasIndex("RemindAt")
+                        .HasDatabaseName("ix_subscriptions_remind_at");
 
                     b.ToTable("subscriptions", (string)null);
                 });

@@ -9,6 +9,7 @@ export type Subscription = {
   tenantId: string; plan: string | null; state: string; trialEndsAt: string | null; paidUntil: string | null; billing: string | null;
   seats: number | null; contractRef: string | null; contractSignedOn: string | null; providerRef: string | null; notes: string | null;
   cancelledAt: string | null; cancelledBy: string | null; updatedAt: string; updatedBy: string | null;
+  planAsked: string | null; planAskedUsers: number | null; planAskedNote: string | null; planAskedAt: string | null; planAskedBy: string | null;
 };
 
 export type Grant = { id: string; tenantId: string; grantedByName: string; why: string; from: string; until: string; endedAt: string | null; endedByName: string | null };

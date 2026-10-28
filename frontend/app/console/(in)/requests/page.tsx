@@ -2,12 +2,14 @@ import { ActionForm } from "@/components/form";
 import { consoleApi } from "@/lib/console/client";
 import { carryOutMergeAction } from "@/lib/console/forms";
 import type { ProductRequest } from "@/lib/console/types";
+import Link from "next/link";
 import { cn, fmtDate } from "@/lib/core/utils";
 import { Nothing, Plate, Sheet } from "../parts";
 
 export const metadata = { title: "Requests" };
 
 type Requests = {
+  plans: { tenantId: string; organization: string; plan: string; users: number | null; note: string | null; at: string; askedBy: string | null }[];
   products: ProductRequest[];
   merges: { id: string; keep: string; merge: string; requestedByName: string; why: string; requestedAt: string; state: string; refusedByName: string | null; refusedWhy: string | null; doneAt: string | null }[];
   claims: { id: string; entry: string; claimer: string; claimedByName: string; method: string; state: string; createdAt: string; answeredAt: string | null; answeredByName: string | null; refusedWhy: string | null }[];
@@ -26,11 +28,25 @@ export default async function RequestsPage() {
         title="Requests"
         meta="Asked of DELIOS by organizations. A merge is carried out by us once every side agreed; nothing is deleted, the merged name and code stay reserved."
         figures={[
+          { term: "Plans chosen", value: r.plans.length, tone: r.plans.length ? "text-amber-700" : undefined, said: "to set up and invoice" },
           { term: "Merges to carry out", value: agreed.length, tone: agreed.length ? "text-amber-700" : undefined },
           { term: "Claims waiting", value: r.claims.filter((c) => c.state === "WAITING").length },
           { term: "Asked of DELIOS", value: r.products.length, said: "readers and services" },
         ]}
       />
+      <Sheet id="plans" title="Plans chosen, to set up" said={`${r.plans.length}`}>
+        {r.plans.length ? (
+          <ul className="divide-y divide-line">
+            {r.plans.map((p) => (
+              <li key={p.tenantId} className="px-5 py-3 text-[13px] sm:px-6">
+                <Link href={`/console/organizations/${p.tenantId}`} className="font-medium text-slate-900 hover:text-link hover:underline">{p.organization}</Link> chose{" "}
+                <span className="font-medium text-slate-900">{p.plan}</span> for {p.users} user{p.users === 1 ? "" : "s"}
+                <span className="block text-[12px] text-slate-600">{p.askedBy} · {fmtDate(p.at)}{p.note ? ` · ${p.note}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+        ) : <Nothing>No plan waiting to be set up.</Nothing>}
+      </Sheet>
       <Sheet id="merges" title="Merges of organizations listed twice" said={`${r.merges.length}`}>
         {r.merges.length ? (
           <ul className="divide-y divide-line">

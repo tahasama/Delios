@@ -2,7 +2,7 @@ import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { SwitchField } from "@/components/switch";
 import { consoleApi } from "@/lib/console/client";
-import { savePlanAction, setSellerAction } from "@/lib/console/forms";
+import { savePlanAction, setSellerAction, setTrialDaysAction } from "@/lib/console/forms";
 import { INVOICE_TONE, INVOICE_WORDS, money, type InvoiceRow, type OrgRow, type Plan } from "@/lib/console/types";
 import Link from "next/link";
 import { cn, fmtDate } from "@/lib/core/utils";
@@ -16,9 +16,10 @@ export const metadata = { title: "Plans & payments" };
  * never deleted.
  */
 export default async function Payments() {
-  const [plans, orgs, invoices, seller] = await Promise.all([
+  const [plans, orgs, invoices, seller, trial] = await Promise.all([
     consoleApi<Plan[]>("/api/console/plans"), consoleApi<OrgRow[]>("/api/console/organizations"),
     consoleApi<InvoiceRow[]>("/api/console/invoices"), consoleApi<Record<string, string>>("/api/console/seller"),
+    consoleApi<{ days: number }>("/api/console/trial-days"),
   ]);
   const waiting = invoices.filter((i) => i.state === "ISSUED");
   const late = waiting.filter((i) => i.dueOn < new Date().toISOString().slice(0, 10));
@@ -36,6 +37,19 @@ export default async function Payments() {
           { term: "Waiting for payment", value: waiting.length, tone: late.length ? "text-red-700" : undefined, said: late.length ? `${late.length} past their due day` : "none late" },
         ]}
       />
+
+      <Sheet title="Free trial" said={trial.days ? `${trial.days} days for every new organization` : "no end for new organizations"}>
+        <ActionForm action={setTrialDaysAction} submitLabel="Save" className="asking grid grid-cols-1 items-end gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-[10rem_minmax(0,1fr)] sm:px-6"
+          footerClassName="sm:col-span-2">
+          <Field label="Days" required hint="0: no end"><input name="days" type="number" min={0} max={365} required defaultValue={trial.days} className="plain w-full" /></Field>
+          <Field label="Why it changes" required><input name="why" required className="plain w-full" placeholder="Launch offer, back to the usual length…" /></Field>
+          <p className="text-[12px] leading-5 text-slate-600 sm:col-span-2">
+            Every organization that signs up tries DELIOS for free for this many days. Its administrators get a reminder 7 days before the end, the day
+            before, and on the day. After that it reads only until it chooses a plan. Organizations already trying keep their own end date: change it on
+            their page.
+          </p>
+        </ActionForm>
+      </Sheet>
 
       <Sheet title="How it is paid" said="the cheapest and most reliable first (owner)">
         <ul className="divide-y divide-line text-[13px] text-slate-700">

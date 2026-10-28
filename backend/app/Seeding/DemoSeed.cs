@@ -201,6 +201,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             db.Projects.Add(project);
             db.Memberships.Add(new Membership { TenantId = t, ProjectId = project.Id, UserId = admin.Id, FunctionId = control.Id });
         }
+        // Trying DELIOS starts now, for as long as the DELIOS team set (Operators/Trials.cs).
+        await Operators.Trials.StartAsync(db, t, NodaTime.SystemClock.Instance.GetCurrentInstant(), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await Organizations.Registry.EnsureTenantAsync(db, t, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
