@@ -323,7 +323,7 @@ export function PlanRegister({
       ref={card}
       data-dt-frame
       className="register register-sheet flex flex-col rounded-t-none"
-      style={view === "calendar" ? undefined : { height: fit }}
+      style={{ height: fit }}
     >
       {facets.length ? (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2 sm:px-6">
@@ -347,7 +347,8 @@ export function PlanRegister({
       ) : null}
 
       {view === "calendar" ? (
-        <div className={`px-5 py-4 sm:px-6 ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>{calendar}</div>
+        // The same height as the plan and the table (owner): the days grown or shrunk scroll inside the card.
+        <div className={`min-h-0 flex-1 overflow-auto px-5 py-4 sm:px-6 ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>{calendar}</div>
       ) : view === "plan" ? (
         <div className={`flex min-h-0 flex-1 flex-col ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
           {/* What the plan covers, and what its colours mean: the two things a

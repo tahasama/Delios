@@ -968,7 +968,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Calendar card** (Settings → Calendar, read by everyone of ours, changed by the control function): where the site is
   (`PUT /calendar/place`), its country's holidays and its own days off. **The calendar is a tab of the Schedule** (owner:
   "make it a tab as the plan and the table"; `/schedule?view=calendar`, tabs The calendar · The plan · The table, the plan
-  in the middle and shown first; `/calendar` only redirects there, no menu item): read only, drawing the actions the
+  in the middle and shown first; `/calendar` only redirects there, no menu item): its card the same height as the plan's
+  and the table's (owner), the days, however large, scrolling inside it; read only, drawing the actions the
   Schedule's filters leave (another organization's people see only theirs, as on the Schedule), the months centred,
   its key ending with "… in Settings → Calendar" for whoever opens that card. A project's calendar spans **from the month it starts
   to the month it finishes** (owner; This project's dates, `PROJECT_INFO`; no end: twelve months on), widened to the
