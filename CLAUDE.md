@@ -107,7 +107,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - One control size everywhere, set once in `frontend/app/globals.css` on `:root`:
   `--control-h` (2rem), `--control-text` (13px), `--control-radius`. Every
   field, dropdown, button and file field stands that height with that text.
-- The brand's gold is one colour, `gold` / `gold-bright` (words on it `gold-ink`, dark in both themes) (`scripts/gen-theme.mjs` → `app/theme.css`), never typed as
+- The brand's gold is one colour, `gold` / `gold-bright` (words on it `gold-ink`: warm dark brown on light, navy on dark) (`scripts/gen-theme.mjs` → `app/theme.css`), never typed as
   a hex on a page.
 - Use the shared pieces only: `btn()` and `inputCls` (`frontend/components/ui.tsx`),
   `.ask`, `.plain`, `ActionForm`. Never give a field or button its own height,
@@ -883,7 +883,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   in its audit trail under that name (SUPPORT_ENTERED…), and its session ends with the access (`SessionStore` refuses it
   once the access ended or ran out; ending it switches the account off).
 - **Need support** (owner: "just have them write a message with object, we already know which org and which project,
-  and have a drawer with main type of requests"): a "Need support" button (owner: the register's first button, its size and icon, in our gold instead of blue; its words `gold-ink`, dark in both themes) on the right of Help's plate and of the
+  and have a drawer with main type of requests"): a "Need support" button (owner: the register's first button, its size and icon, in our gold instead of blue; its words `gold-ink`: a warm dark brown on light, navy on dark) on the right of Help's plate and of the
   organization's band opens a drawer from the right (`components/support.tsx`, `support-panel.tsx`): what it is about
   (`SupportKinds`, codes provisional: SIGN_IN, OPEN_FILE, UPLOAD, ACCESS, ERROR, SETUP, BILLING, OTHER), a subject, a
   message, then what the person asked before and its answer; who, the organization and the project are known

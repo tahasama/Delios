@@ -16,7 +16,7 @@
   --color-tint-soft: #f2f6fb;
   --color-gold: #d9a441;
   --color-gold-bright: #e4b654;
-  --color-gold-ink: #102a43;
+  --color-gold-ink: #3d2806;
 }
 
 :root {
@@ -281,7 +281,7 @@
   --color-tint-soft: #f2f6fb;
   --color-gold: #d9a441;
   --color-gold-bright: #e4b654;
-  --color-gold-ink: #102a43;
+  --color-gold-ink: #3d2806;
   --color-slate-50: oklch(98.4% 0.003 247.858);
   --color-slate-100: oklch(96.8% 0.007 247.896);
   --color-slate-200: oklch(92.9% 0.013 255.508);
