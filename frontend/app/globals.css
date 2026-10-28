@@ -656,6 +656,20 @@ summary::-webkit-details-marker {
     box-shadow: inset 0 -3px 0 0 var(--color-brand);
   }
   .views::-webkit-scrollbar { display: none; }
+  /* More tabs than one row holds (Reports' eight): the same frame laid as a block of rows (2 across, 4 on a wide
+     screen), a hairline between every side, nothing cut off. */
+  .views-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-line);
+  }
+  @media (min-width: 1024px) { .views-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .views-grid .view + .view { border-left: 0; }
+  .views-grid .view { justify-content: flex-start; }
   .view-hint { font-size: 11px; font-weight: 400; color: var(--color-slate-500); }
   .view-n {
     font-family: var(--font-mono);

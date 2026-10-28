@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, X, FileSpreadsheet } from "lucide-react";
+import { Download, X, FileSpreadsheet, ArrowRight, FileText, ClipboardList, Truck, Hourglass, Send, CalendarCheck, TrendingUp, Scale, CalendarClock, type LucideIcon } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
 import { DataTable, Th, Td, ToneChip, inputCls, btn } from "@/components/ui";
 import { when } from "@/app/(app)/home-parts";
@@ -12,6 +12,13 @@ import {
   type Bar, type Cell, type Chart, type ReportId, type ReportQuery, type Segment,
   reportQuery,
 } from "@/lib/conformance/reports";
+
+
+/** Each report's mark on its tab, as Assurance's tabs carry theirs. */
+const REPORT_ICON: Record<string, LucideIcon> = {
+  register: ClipboardList, deliveries: Truck, reviews: Hourglass, transmittals: Send,
+  readiness: CalendarCheck, progress: TrendingUp, exchange: Scale, asof: CalendarClock,
+};
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Reports" };
@@ -37,12 +44,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const needsDay = current === "asof" && !asked.on;
   const tabs = offered.map((id) => ({ id, title: REPORT_TITLES[id] }));
   const nav = (on: string) => tabs.length > 1 ? (
-    <nav aria-label="Reports" className="views no-print mx-5 mb-4 sm:mx-6">
-      {tabs.map((t) => (
-        <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className="view">
-          {t.title}
-        </Link>
-      ))}
+    <nav aria-label="Reports" className={`${tabs.length > 4 ? "views-grid" : "views"} no-print mx-5 mb-4 sm:mx-6`}>
+      {tabs.map((t) => {
+        const Icon = REPORT_ICON[t.id] ?? FileText;
+        return (
+          <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className="view">
+            <Icon />
+            <span className="truncate">{t.title}</span>
+            <ArrowRight className="view-go ml-auto" />
+          </Link>
+        );
+      })}
     </nav>
   ) : null;
 
