@@ -70,7 +70,7 @@ backend/
 │   ├── Messaging/        the queue between the API and the worker; the outbox relay, woken by the acts that fill it (OutboxWake)
 │   ├── Tenancy/          keeping each organization's data apart; Crossing (the one door across, on the shared tables)
 │   ├── Seeding/          the demo data
-│   ├── Platform/         the database, Migrations/, shared plumbing; ScreenChanges (what a save tells the screens), AccessVersions (access and shared answers kept until the organization's way of working changes); Batch (several writes as one: each line through its own endpoint, in one transaction)
+│   ├── Platform/         the database, Migrations/, shared plumbing; ScreenChanges (what a save tells the screens), AccessVersions (access and shared answers kept until the organization's way of working changes); Batch (several writes as one: each line through its own endpoint, in one transaction); ChangedMeanwhile (two saves of one thing at once: the second refused, 409 CHANGED_MEANWHILE); ScreenErrors (what failed on the screens, into the log and Sentry)
 │   ├── Resources/        files built into the program (fonts for stamped PDFs)
 │   └── appsettings.json  default settings (.env overrides them)
 ├── tests/                the automated tests, one file per area (DocumentTests.cs…)

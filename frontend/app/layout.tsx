@@ -4,6 +4,7 @@ import "./globals.css";
 import { APP_NAME } from "@/lib/core/standard";
 import { cookies } from "next/headers";
 import { PREF, SIDEBAR_LIMITS } from "@/lib/core/preferences";
+import { ErrorWatch } from "@/components/error-watch";
 
 /**
  * The register is a technical document, so it is set in a technical face. Plex
@@ -43,7 +44,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       data-sidebar={sidebar && sidebar < SIDEBAR_LIMITS.railBelow ? "rail" : undefined}
       suppressHydrationWarning
     >
-      <body>{children}</body>
+      <body>
+        <ErrorWatch />
+        {children}
+      </body>
     </html>
   );
 }

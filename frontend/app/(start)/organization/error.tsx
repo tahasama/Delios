@@ -1,10 +1,15 @@
 "use client";
 
+import { useEffect } from "react";
+import { reportError } from "@/components/report-error";
+
 /**
  * A read that failed on the organization's pages, said as it is: never shown as "nothing set" or "none", which an
  * administrator would take for a fact. Nothing was changed; trying again reads everything afresh.
  */
 export default function OrganizationError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  // A fault drawn on the server is reported there already (instrumentation.ts, its digest here): only the browser's own.
+  useEffect(() => { if (!error.digest) reportError(error); }, [error]);
   return (
     <section role="alert" className="register register-sheet register-sheet-open px-5 py-5 sm:px-6">
       <h1 className="plate-title text-red-700">This page could not be read.</h1>

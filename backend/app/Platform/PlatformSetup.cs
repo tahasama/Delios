@@ -260,6 +260,9 @@ public static class PlatformSetup
             {
                 TokenLimit = heavyPerMinute, TokensPerPeriod = heavyPerMinute, ReplenishmentPeriod = TimeSpan.FromMinutes(1), QueueLimit = 0,
             }));
+            // What failed on the screens (ScreenErrors): a few a minute per caller, so one broken page cannot fill the log.
+            o.AddPolicy("screen-errors", http => RateLimitPartition.GetFixedWindowLimiter(Caller(http),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) }));
             // Said in plain words, as every refusal is; the screens show it as it is.
             o.OnRejected = async (context, cancellationToken) =>
             {
@@ -325,6 +328,8 @@ public static class PlatformSetup
         }
 
         services.AddProblemDetails();
+        // Two saves of the same thing at once: the second refused in plain words (409 CHANGED_MEANWHILE), not a 500.
+        services.AddExceptionHandler<ChangedMeanwhile>();
         services.AddValidation();
         services.AddOpenApi();
     }
@@ -426,6 +431,7 @@ public static class PlatformSetup
             Operators.ConsoleEndpoints.MapConsoleEndpoints(app);
             Operators.ContractEndpoints.MapContractEndpoints(app);
             Operators.SupportEndpoints.MapSupportEndpoints(app);
+            app.MapScreenErrorEndpoints();
             Operators.BillingEndpoints.MapBillingEndpoints(app);
             Identity.ForgetPerson.MapForgetEndpoints(app);
             app.MapSsoEndpoints();

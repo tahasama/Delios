@@ -2151,6 +2151,16 @@ a screen only words it. A new rule goes in the backend, never in a page.
   ones are listed in its log. A weak package brought by another is raised under `overrides` in `package.json` when its
   newer version still works for it (today `uuid` ^11.1.1 under `exceljs`, whose own fix would have downgraded it; drop the
   override once `exceljs` asks for a safe `uuid` itself). Today: none found.
+- **Two saves of one thing at once** (owner): the second is refused in plain words, never as a fault of ours
+  (`Platform/ChangedMeanwhile.cs`: a version stamp changed since it was read, or Postgres stopping one of two clashing
+  transactions, 40001 / 40P01 → 409 CHANGED_MEANWHILE, "Someone else changed this at the same moment… send it again").
+  Nothing of it was kept (its transaction rolled back), so sending it again is safe.
+- **Every error reaches us** (owner, "error tracking"): the backend's own, and the screens' (`instrumentation.ts`
+  `onRequestError` on their server; in the browser the error pages, `app/global-error.tsx` and `ErrorWatch` in the root
+  layout, through `/api/client-errors`), written in the API's log by `POST /api/screens/errors` (`Platform/ScreenErrors.cs`,
+  open signed out, 30 a minute per caller) and sent on to Sentry once `SENTRY_DSN` is set in .env. Only the message,
+  where in the code, the page's address without its query and the account's id: never a name, an email or what a page
+  showed. A fault drawn on the server is reported once (the error page sees its digest and leaves it).
 - An outbox routing key is at most 16 characters; `ControlledVersion.VersionLabel` too.
 - Migrations: `dotnet ef migrations add Name -p app -s app -o Platform/Migrations`
   (from `backend/`). Each new table gets `RowLevelSecurity.Enable(migrationBuilder, "<table>")`.

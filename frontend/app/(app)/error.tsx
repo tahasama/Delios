@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { reportError } from "@/components/report-error";
+
 /**
  * What went wrong, said on the page.
  *
@@ -10,6 +13,8 @@
  * back open.
  */
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  // A fault drawn on the server is reported there already (instrumentation.ts, its digest here): only the browser's own.
+  useEffect(() => { if (!error.digest) reportError(error); }, [error]);
   return (
     <div className="rounded-xl border border-red-300 bg-surface p-6">
       <h1 className="text-base font-semibold text-red-700">Something in this page failed.</h1>
