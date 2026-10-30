@@ -74,11 +74,20 @@ public static class PlatformSetup
             preserveStaticLogger: true,
             writeToProviders: true);
 
-        if (!string.IsNullOrWhiteSpace(config["Sentry:Dsn"]))
+        // Errors go to Sentry only with a whole Sentry address: anything else (a note, a cut-off paste) would stop every
+        // process at start, migrations included; it is said in the log and left off instead.
+        var sentryDsn = config["Sentry:Dsn"]?.Trim();
+        if (!string.IsNullOrEmpty(sentryDsn)
+            && !(Uri.TryCreate(sentryDsn, UriKind.Absolute, out var dsn) && dsn.UserInfo.Length > 0 && dsn.AbsolutePath.Trim('/').Length > 0))
+        {
+            Log.Warning("SENTRY_DSN is not a Sentry address (https://<key>@<host>/<project>), so errors are not sent to Sentry, only written in this log");
+            sentryDsn = null;
+        }
+        if (!string.IsNullOrEmpty(sentryDsn))
         {
             builder.WebHost.UseSentry(o =>
             {
-                o.Dsn = config["Sentry:Dsn"];
+                o.Dsn = sentryDsn;
                 o.SendDefaultPii = false;
             });
         }
