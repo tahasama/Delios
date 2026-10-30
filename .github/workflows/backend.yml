@@ -1,10 +1,13 @@
 name: backend
 
+# Paused by the owner (30 Oct 2026): a push runs only the quick checks (layout, build). The 155 tests and the whole
+# stack run by hand: Actions → backend → "Run workflow".
 on:
   push:
     paths: ["backend/**", "deploy/**", ".github/workflows/backend.yml"]
   pull_request:
     paths: ["backend/**", "deploy/**", ".github/workflows/backend.yml"]
+  workflow_dispatch:
 
 concurrency:
   group: backend-${{ github.ref }}
@@ -13,7 +16,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: backend
@@ -26,7 +29,8 @@ jobs:
       - run: dotnet format --verify-no-changes --no-restore
       - run: dotnet build -c Release --no-restore
       # Integration tests start Postgres, Redis and RabbitMQ with Testcontainers.
-      - run: dotnet test -c Release --no-build
+      - if: github.event_name == 'workflow_dispatch'
+        run: dotnet test -c Release --no-build
 
   kubernetes:
     # Switched off in production until needed; checked on every push so it is ready when it is.
@@ -40,6 +44,7 @@ jobs:
           ./kubeconform -strict -summary rendered.yaml
 
   image:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
