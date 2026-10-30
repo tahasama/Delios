@@ -6,6 +6,7 @@ import { Select } from "@/components/select";
 import { consoleApi } from "@/lib/console/client";
 import { enterAsSupportAction, setOrganizationActiveAction, setSubscriptionAction } from "@/lib/console/forms";
 import { Billing } from "./billing";
+import { HOSTED } from "@/lib/core/hosting";
 import { bytes, STATE_TONE, STATE_WORDS, type BillingDetails, type InvoiceRow, type Acceptance, type Grant, type OperatorEvent, type OrgRow, type Plan, type ProductRequest, type Subscription } from "@/lib/console/types";
 import { cn, fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { Nothing, Plate, Sheet } from "../../parts";
@@ -57,7 +58,8 @@ export default async function Organization({ params }: { params: Promise<{ id: s
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <Sheet title="Plan & contract" said={s ? `changed ${fmtDateTime(s.updatedAt)} by ${s.updatedBy ?? "—"}` : "nothing set yet: it tries DELIOS with no end"}>
+        {/* Run by the organization itself (Hosting): no plan, payment or trial to set. */}
+        {HOSTED ? <Sheet title="Plan & contract" said={s ? `changed ${fmtDateTime(s.updatedAt)} by ${s.updatedBy ?? "—"}` : "nothing set yet: it tries DELIOS with no end"}>
           <ActionForm action={setSubscriptionAction} hidden={{ tenantId: o.id }} submitLabel="Save" className="asking space-y-4 px-5 py-4 sm:px-6">
             <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
               <Field label="Where it stands" required>
@@ -92,7 +94,7 @@ export default async function Organization({ params }: { params: Promise<{ id: s
             </div>
             {s?.cancelledAt ? <p className="text-[12px] text-amber-700">Cancelled by {s.cancelledBy} on {fmtDate(s.cancelledAt)}: it ends with the period paid.</p> : null}
           </ActionForm>
-        </Sheet>
+        </Sheet> : null}
 
         <div className="space-y-4">
           <Sheet title="Who answers for it" said="its administrators">
@@ -124,7 +126,7 @@ export default async function Organization({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      <Billing tenantId={o.id} details={billing.details} invoices={billing.invoices} plan={plans.find((p) => p.code === s?.plan) ?? null} users={o.users} />
+      {HOSTED ? <Billing tenantId={o.id} details={billing.details} invoices={billing.invoices} plan={plans.find((p) => p.code === s?.plan) ?? null} users={o.users} /> : null}
 
       <Sheet title="Support access" said={d.supportOpen ? "it lets us in now: what we read below is written in its audit trail" : "we read its projects and people only once one of its administrators lets us in"}
         acts={d.supportOpen ? (

@@ -269,6 +269,7 @@ public static class BillingEndpoints
     private static async Task<IResult> IssueAsync(Guid id, InvoiceRequest request, HttpContext http, DeliosDbContext db, IServiceScopeFactory scopes,
         IClock clock, CancellationToken cancellationToken)
     {
+        if (!Hosting.ByDelios) return Hosting.NotHosted();
         var (invoice, refused) = await PrepareAsync(id, request, http.Current(), db, clock, cancellationToken);
         if (invoice is null) return refused!;
         await db.SaveChangesAsync(cancellationToken);

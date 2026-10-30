@@ -19,6 +19,8 @@ public static class Subscriptions
 
     public static Standing Effective(Subscription? s, Instant now)
     {
+        // Run by the organization itself: no plan, payment or trial; it simply works.
+        if (!Hosting.ByDelios) return new(SubscriptionStates.Active, "Run by the organization itself.", false);
         // No contract recorded yet: it works as it always did, trying DELIOS with no end set.
         if (s is null) return new(SubscriptionStates.Trial, "Trying DELIOS, no end set.", false);
         switch (s.State)
@@ -213,6 +215,7 @@ public static class ContractEndpoints
     private static async Task<IResult> AskPlanAsync(PlanAskRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, Notifications.Notifier notifier,
         Microsoft.Extensions.Options.IOptions<Notifications.EmailOptions> email, IClock clock, CancellationToken cancellationToken)
     {
+        if (!Hosting.ByDelios) return Hosting.NotHosted();
         var code = request.Plan?.Trim().ToUpperInvariant() ?? "";
         var plan = await db.Set<Plan>().AsNoTracking().SingleOrDefaultAsync(p => p.Code == code && p.Active, cancellationToken);
         if (plan is null) return Problems.Invalid("PLAN_UNKNOWN", "Choose one of the plans offered.", new { field = "plan" });
@@ -250,6 +253,7 @@ public static class ContractEndpoints
     private static async Task<IResult> CancelAsync(WhyRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock,
         CancellationToken cancellationToken)
     {
+        if (!Hosting.ByDelios) return Hosting.NotHosted();
         var tenantId = http.User.TenantId();
         var row = await db.Set<Subscription>().SingleOrDefaultAsync(s => s.TenantId == tenantId, cancellationToken);
         if (row is not { State: SubscriptionStates.Active }) return Problems.Conflict("NOTHING_TO_CANCEL", "There is no paid plan to cancel.");
@@ -268,6 +272,7 @@ public static class ContractEndpoints
 
     private static async Task<IResult> ResumeAsync(HttpContext http, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken cancellationToken)
     {
+        if (!Hosting.ByDelios) return Hosting.NotHosted();
         var tenantId = http.User.TenantId();
         var row = await db.Set<Subscription>().SingleOrDefaultAsync(s => s.TenantId == tenantId, cancellationToken);
         if (row?.CancelledAt is null) return Problems.Conflict("NOT_CANCELLED", "It is not cancelled.");

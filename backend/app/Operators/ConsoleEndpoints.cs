@@ -216,6 +216,7 @@ public static class ConsoleEndpoints
     private static async Task<IResult> SetSubscriptionAsync(Guid id, SubscriptionRequest request, HttpContext http, DeliosDbContext db, IClock clock,
         IServiceScopeFactory scopes, CancellationToken cancellationToken)
     {
+        if (!Hosting.ByDelios) return Hosting.NotHosted();
         var why = request.Why?.Trim() ?? "";
         if (why.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why it changes.", new { field = "why" });
         if (!await db.Tenants.AnyAsync(t => t.Id == id, cancellationToken)) return Problems.NotFound("NO_SUCH_ORGANIZATION", "No such organization.");

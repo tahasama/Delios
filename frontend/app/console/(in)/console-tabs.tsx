@@ -17,13 +17,13 @@ const TABS = [
 ];
 
 /** The console's tabs, on the tab strip, scrolling sideways when they do not fit. */
-export function ConsoleTabs() {
+export function ConsoleTabs({ hosted = true }: { hosted?: boolean }) {
   const path = usePathname();
   const on = (href: string) => (href === "/console" ? path === href : path === href || path.startsWith(`${href}/`));
   return (
     <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
       <nav aria-label="The console" className="strip strip-card strip-full">
-        {TABS.map((tab) => (
+        {TABS.filter((tab) => hosted || tab.href !== "/console/payments").map((tab) => (
           <Link key={tab.href} href={tab.href} aria-current={on(tab.href) ? "page" : undefined} className="strip-tab">
             <tab.icon />
             {tab.label}

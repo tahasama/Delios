@@ -16,6 +16,8 @@ conversation, write it into the right one in the same commit as the code.
 | `docs/BEHAVIOUR-CHANGES.md` | What behaves differently since the screens moved onto the backend |
 | `docs/DETAIL-STYLE.md` | The reference style (Schedule & actions, the action page): what "apply the same" means |
 | `docs/RUNNING-DELIOS.md` | Running DELIOS for many organizations: who runs it, our space, payments, legal (advice, not decided yet) |
+| `docs/SANDBOX.md` | The sandbox: DELIOS live for testing on free services, made-up data only |
+| `docs/HANDOVER.md` | Handing DELIOS over for real use: who runs it (`HOSTED`), the services to subscribe to, the steps |
 | `docs/gaps/*.md` | Known gaps per area |
 | `PRODUCT.md` | Product context and users |
 
@@ -2194,6 +2196,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`components/sandbox-band.tsx`, fixed at the window's foot, taking no room, letting clicks through), the full note on
   sign-in and sign-up (`SandboxNotice`, in `AuthShell`), every email "[Sandbox] …" with a first line saying so
   (`Email:Sandbox`). Production mode otherwise (no demo data).
+- **Who runs it** (owner: "build the production version and leave it ready to be used or sold… the owner role" an option,
+  not a must): `HOSTED` in .env (`Platform:Hosted`, `Platform/Hosting.cs`; screens `lib/core/hosting.ts`, the same
+  value). true (the default): DELIOS runs it for many organizations, trials, plans, invoices, renewals, "reads only".
+  false: an organization or a partner runs its own copy: no trial (`Trials.StartAsync`), never reads only
+  (`Subscriptions.Effective`), no reminders, plans, payments or invoices (NOT_HOSTED), the console without Plans &
+  payments nor an organization's plan and billing, the organization's card "Terms & support" (terms and support
+  access only). Guides: `docs/SANDBOX.md` (free test site), `docs/HANDOVER.md` (production, any developer).
 - **Every error reaches us** (owner, "error tracking"): the backend's own, and the screens' (`instrumentation.ts`
   `onRequestError` on their server; in the browser the error pages, `app/global-error.tsx` and `ErrorWatch` in the root
   layout, through `/api/client-errors`), written in the API's log by `POST /api/screens/errors` (`Platform/ScreenErrors.cs`,

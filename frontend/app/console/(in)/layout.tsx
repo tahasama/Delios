@@ -3,6 +3,7 @@ import { btn } from "@/components/ui";
 import { requireOperator } from "@/lib/console/client";
 import { consoleSignOutAction } from "@/lib/console/forms";
 import { ConsoleTabs } from "./console-tabs";
+import { HOSTED } from "@/lib/core/hosting";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: { default: "Console", template: "%s · DELIOS console" } };
@@ -34,7 +35,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
           The authenticator is switched off: the console opens with a password alone. For testing only: set CONSOLE_AUTHENTICATOR=true in .env (or remove the line) before real use.
         </p>
       ) : null}
-      <ConsoleTabs />
+      <ConsoleTabs hosted={HOSTED} />
       <main className="mx-auto max-w-7xl space-y-4 px-4 py-5 sm:px-6">{children}</main>
     </div>
   );

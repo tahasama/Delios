@@ -1,3 +1,4 @@
+import { HOSTED } from "@/lib/core/hosting";
 /**
  * The organization's Settings carry the same cards as a project's (owner): each opens the organization's version, with
  * the switch saying whether projects may change it. `slug` is the card's page here; `area` names its switches
@@ -21,7 +22,10 @@ export type OrgCard = {
 export const ORG_CARDS: OrgCard[] = [
   { project: "identity", title: "Who we are on DELIOS", text: "Our code and name everywhere, our identifier and email domain; claims and merges asked of us.", slug: "identity", group: "Organization" },
   { project: "defaults", title: "Defaults for new projects", text: "What a project of ours starts with: who carries each act out, and how it works. Copied when it opens.", elsewhere: "/organization/defaults", group: "Organization" },
-  { project: "contract", title: "Contract & plan", text: "What we have with DELIOS: the plan, the terms we accepted, cancelling, and letting DELIOS in to help.", slug: "contract", group: "Organization" },
+  // Run by the organization itself (Hosting): no plan or payment, only the terms and letting the team in to help.
+  HOSTED
+    ? { project: "contract", title: "Contract & plan", text: "What we have with DELIOS: the plan, the terms we accepted, cancelling, and letting DELIOS in to help.", slug: "contract", group: "Organization" }
+    : { project: "contract", title: "Terms & support", text: "The terms we accepted, and letting the team that runs DELIOS in to help.", slug: "contract", group: "Organization" },
   { project: "may-change", title: "What projects may change", text: "Every setting in one list: fixed, the same on every project, or free, a project may take its own copy.", slug: "may-change", group: "Organization" },
   { project: "/settings/config", title: "Types & sets", text: "The lists every document is described with, and which of them a project may change.", slug: "types", area: "Types & sets" },
   { project: "/settings/fields", title: "Forms & fields", text: "What each form asks and insists on, for every project.", slug: "fields", area: "Forms & fields" },

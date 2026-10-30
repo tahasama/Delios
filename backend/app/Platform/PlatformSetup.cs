@@ -47,6 +47,8 @@ public static class PlatformSetup
     {
         var services = builder.Services;
         var config = builder.Configuration;
+        // Who runs this DELIOS: read first, as what is registered below depends on it (Hosting).
+        Hosting.Read(config);
         var role = config[$"{DeliosOptions.Section}:Role"] ?? Roles.Api;
 
         // A missing or malformed setting stops the process at start, not at first use.
@@ -212,7 +214,7 @@ public static class PlatformSetup
             }
             if (search.UsesOpenSearch) services.AddHostedService<Search.SearchIndexer>();
             if (config.GetValue("Schedule:Notices", true)) services.AddHostedService<Actions.ActionNotices>();
-            if (config.GetValue("Trials:Reminders", true)) services.AddHostedService<Operators.TrialReminders>();
+            if (config.GetValue("Trials:Reminders", true) && Hosting.ByDelios) services.AddHostedService<Operators.TrialReminders>();
         }
         services.AddScoped<Seeding.TenantSetup>();
         services.AddScoped<Seeding.DemoSeed>();

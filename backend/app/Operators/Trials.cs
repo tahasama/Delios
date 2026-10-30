@@ -31,7 +31,8 @@ public static class Trials
     /// <summary>A new organization's trial, of the length set now.</summary>
     public static async Task StartAsync(DeliosDbContext db, Guid tenantId, Instant now, CancellationToken cancellationToken)
     {
-        if (await db.Set<Subscription>().AnyAsync(s => s.TenantId == tenantId, cancellationToken)) return;
+        // Run by the organization itself: no trial (Hosting).
+        if (!Hosting.ByDelios || await db.Set<Subscription>().AnyAsync(s => s.TenantId == tenantId, cancellationToken)) return;
         var days = await DaysAsync(db, cancellationToken);
         var row = new Subscription
         {

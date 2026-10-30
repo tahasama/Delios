@@ -5,6 +5,7 @@ import { Banner, Field } from "@/components/ui";
 import { Select } from "@/components/select";
 import { api } from "@/lib/client";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
+import { HOSTED } from "@/lib/core/hosting";
 import { acceptTextAction, cancelPlanAction, choosePlanAction, endSupportAction, grantSupportAction, resumePlanAction, setBillingDetailsAction } from "@/lib/organization/forms-contract";
 import { Field as F2, inputCls } from "@/components/ui";
 import { PlanFields } from "./plan-fields";
@@ -52,7 +53,9 @@ const band = (title: string, said?: string) => (
 export default async function ContractPage() {
   await requireOrgAdmin();
   const [c, billing, contact] = await Promise.all([
-    api<Contract>("/api/organization/contract"), api<Billing>("/api/organization/billing"),
+    api<Contract>("/api/organization/contract"),
+    // Run by the organization itself (Hosting): no plan, payment or invoice to read.
+    HOSTED ? api<Billing>("/api/organization/billing") : Promise.resolve<Billing>({ details: null, invoices: [], payTo: { name: null, bank: null } }),
     api<Contact>("/api/legal/support-contact").catch(() => ({ email: null, hours: null, phone: null })),
   ]);
   const toPay = billing.invoices.filter((i) => i.state === "ISSUED");
@@ -61,10 +64,10 @@ export default async function ContractPage() {
     <div className="space-y-4">
       <header className="register register-sheet register-sheet-open">
         <div className="px-5 pt-5 pb-4 sm:px-6">
-          <h1 className="plate-title text-slate-950">Contract &amp; plan</h1>
-          <p className="plate-meta mt-1.5 max-w-2xl font-normal">What the organization has with DELIOS. Your data stays yours: you may export it at any time.</p>
+          <h1 className="plate-title text-slate-950">{HOSTED ? <>Contract &amp; plan</> : "Terms & support"}</h1>
+          <p className="plate-meta mt-1.5 max-w-2xl font-normal">{HOSTED ? "What the organization has with DELIOS. Your data stays yours: you may export it at any time." : "The terms accepted, and letting the team that runs DELIOS in to help. Your data stays yours: you may export it at any time."}</p>
         </div>
-        <dl className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
+        {HOSTED ? <dl className="grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4">
           {[
             { term: "Where it stands", value: STATE_WORDS[c.state] ?? c.state, said: c.why, tone: c.readsOnly ? "text-amber-700" : "" },
             { term: "Plan", value: c.plan?.name ?? "None yet", said: c.plan?.pricePerUser != null ? `${c.plan.pricePerUser} ${c.plan.currency} per user a month` : c.plan ? "price in the contract" : "choose one below" },
@@ -77,7 +80,7 @@ export default async function ContractPage() {
               {f.said ? <dd className="text-[11px] text-slate-500">{f.said}</dd> : null}
             </div>
           ))}
-        </dl>
+        </dl> : null}
       </header>
 
       {c.readsOnly ? (
@@ -86,7 +89,7 @@ export default async function ContractPage() {
         </Banner>
       ) : null}
 
-      {c.state === "TRIAL" || c.readsOnly || !c.plan ? (
+      {HOSTED && (c.state === "TRIAL" || c.readsOnly || !c.plan) ? (
         <section id="choose" className="register register-sheet register-sheet-open">
           {band("Choose a plan", c.asked ? "sent to DELIOS" : c.state === "TRIAL" ? "to keep working after the trial" : "to work again")}
           {c.asked ? (
@@ -114,6 +117,7 @@ export default async function ContractPage() {
         </section>
       ) : null}
 
+      {HOSTED ? <>
       <section className="register register-sheet register-sheet-open">
         {band("Invoices", toPay.length ? `${toPay.length} to pay: ${toPay.map((i) => money(i.total, i.currency)).join(", ")}` : "nothing to pay")}
         {billing.invoices.length ? (
@@ -150,6 +154,8 @@ export default async function ContractPage() {
           <F2 label="Your reference" hint="a purchase order, printed on invoices"><input name="reference" defaultValue={billing.details?.reference ?? ""} className="plain w-full" /></F2>
         </ActionForm>
       </section>
+
+      </> : null}
 
       <section className="register register-sheet register-sheet-open">
         {band("What we accepted", "for the organization, by one of its administrators; a new version is accepted again")}
@@ -216,7 +222,7 @@ export default async function ContractPage() {
         ) : null}
       </section>
 
-      {c.state === "ACTIVE" ? (
+      {HOSTED && c.state === "ACTIVE" ? (
         <section className="register register-sheet register-sheet-open">
           {band(c.cancelledAt ? "Cancelled" : "Cancel", "one click; it ends with the period paid, and nothing is deleted")}
           {c.cancelledAt ? (

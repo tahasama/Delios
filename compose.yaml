@@ -62,6 +62,9 @@ x-backend: &backend
     Email__Notifications: ${EMAIL_NOTIFICATIONS:-true}
     # A sandbox (a test site anyone may sign up to, with made-up data): every email says so. The screens say it too.
     Email__Sandbox: ${SANDBOX:-false}
+    # Who runs this DELIOS: true, DELIOS for many organizations (trials, plans, invoices); false, the organization
+    # itself (none of that; docs/HANDOVER.md).
+    Platform__Hosted: ${HOSTED:-true}
     Email__From: ${EMAIL_FROM:-delios@localhost}
     Email__DeliosAddress: ${DELIOS_CONTACT_EMAIL:-}
     Email__BaseUrl: ${PUBLIC_URL:-http://localhost:3080}
@@ -272,6 +275,8 @@ services:
       SCREENS_CACHE_REDIS: redis://valkey:6379/1
       # A sandbox: a band on every page and a note on sign-in and sign-up (lib/core/sandbox.ts).
       DELIOS_SANDBOX: ${SANDBOX:-false}
+      # Who runs it (lib/core/hosting.ts): false hides plans, invoices and trials.
+      DELIOS_HOSTED: ${HOSTED:-true}
     depends_on: [caddy, valkey]
 
   # The second copy of the files: each copied as it is stored (the app says which on Valkey, Documents/FileBackup.cs),
