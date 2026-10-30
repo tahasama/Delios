@@ -311,7 +311,13 @@ public sealed class RegisterReadTests(Infrastructure infrastructure) : IClassFix
         });
         var path = $"/api/projects/{project}/documents/{doc.GetProperty("id").GetGuid()}";
 
+        // Clearance is the one confidentiality rule (owner): the approver's function is cleared below it.
+        var admin = await app.SignedInAsync("admin@demo.local");
         var approver = await app.SignedInAsync("approver@demo.local");
+        var function = (await approver.GetFromJsonAsync<JsonElement>("/api/me")).GetProperty("projects")[0]
+            .GetProperty("function").GetProperty("id").GetGuid();
+        using (var cleared = await admin.PutAsJsonAsync($"/api/admin/functions/{function}", new { clearance = "PUBLIC" }))
+            Assert.True(cleared.IsSuccessStatusCode, await cleared.Content.ReadAsStringAsync());
         var controller = await app.SignedInAsync("controller@demo.local");
         using var hidden = await approver.GetAsync(new Uri(path, UriKind.Relative));
         var approverPage = await approver.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/documents");
