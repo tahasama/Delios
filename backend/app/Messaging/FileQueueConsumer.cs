@@ -111,6 +111,10 @@ public sealed class FileQueueConsumer(
                     await scope.ServiceProvider.GetRequiredService<Extraction.ExtractionProcessor>().ProcessAsync(
                         Read<Extraction.FileExtract>(delivery), stoppingToken);
                     break;
+                case Documents.FullDownloadRequested.RoutingKey:
+                    await scope.ServiceProvider.GetRequiredService<Documents.FullDownloadBuilder>().ProcessAsync(
+                        Read<Documents.FullDownloadRequested>(delivery), stoppingToken);
+                    break;
                 case Notifications.PushRequested.RoutingKey:
                     await scope.ServiceProvider.GetRequiredService<Notifications.PushSender>().ProcessAsync(
                         Read<Notifications.PushRequested>(delivery), stoppingToken);

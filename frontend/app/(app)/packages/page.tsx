@@ -117,6 +117,8 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
       <div className="border-b border-line px-5 pt-5 pb-2.5 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="plate-title min-w-0 text-slate-950">Packages</h1>
+          {/* The package for everything (owner): every document's files in one zip, filed by the tree or as chosen. */}
+          {user.isInternal && (isController(user) || isAdmin(user)) ? <Link href="/full-download" className="ask">Full download</Link> : null}
         </div>
         <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">{here.says.charAt(0).toUpperCase() + here.says.slice(1) + "."}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">

@@ -1428,6 +1428,128 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("document_snapshots", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Documents.FullDownload", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.PrimitiveCollection<Guid[]>("DocumentIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("document_ids");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("error");
+
+                    b.Property<int?>("FileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("file_count");
+
+                    b.Property<Instant?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("Layout")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("layout");
+
+                    b.PrimitiveCollection<string[]>("LeftOut")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("left_out");
+
+                    b.PrimitiveCollection<string[]>("Levels")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("levels");
+
+                    b.Property<string>("ObjectKey")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("object_key");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.PrimitiveCollection<Guid[]>("ProjectIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("project_ids");
+
+                    b.Property<Instant>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<Guid>("RequestedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_id");
+
+                    b.Property<string>("RequestedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("requested_by_name");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("scope");
+
+                    b.Property<long?>("Size")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size");
+
+                    b.Property<Instant?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.PrimitiveCollection<Guid[]>("TransmittalIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("transmittal_ids");
+
+                    b.Property<bool>("WithAudit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("with_audit");
+
+                    b.Property<bool>("WithRegister")
+                        .HasColumnType("boolean")
+                        .HasColumnName("with_register");
+
+                    b.Property<bool>("WithReviews")
+                        .HasColumnType("boolean")
+                        .HasColumnName("with_reviews");
+
+                    b.Property<bool>("WithTransmittals")
+                        .HasColumnType("boolean")
+                        .HasColumnName("with_transmittals");
+
+                    b.HasKey("Id")
+                        .HasName("pk_full_downloads");
+
+                    b.HasIndex("TenantId", "RequestedById", "RequestedAt")
+                        .HasDatabaseName("ix_full_downloads_tenant_id_requested_by_id_requested_at");
+
+                    b.ToTable("full_downloads", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Documents.HandBackRequest", b =>
                 {
                     b.Property<Guid>("Id")

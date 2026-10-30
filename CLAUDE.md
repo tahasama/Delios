@@ -516,6 +516,22 @@ a screen only words it. A new rule goes in the backend, never in a page.
   you"; the package page read only, "Ask about it" following the delivery), and what they send following it carries no
   document (DELIVERED_READ_ONLY: an information transmittal). Another organization reads only the package's
   transmittals to or from it.
+- **The full download** (owner: "the ultimate package that an org may download, having all their files… the filing
+  organisation might be as you suggest or tree/branches"; `/full-download`, linked from Packages' plate and the
+  organization's Projects plate): one zip of every document at its newest released revision (its PDF as released,
+  stamped where it was, and its source file), with, each a switch on by default, the register as Excel (every document
+  and its folder), each review beside its document as a PDF (verdicts, advice, comments standing), the transmittals as
+  letters, the audit trail as Excel (cut at 500,000 acts, said so), and "Read me.txt" saying what it holds and leaves out.
+  Folders chosen each time: the package tree (each package inside the one it sits in, "In no package" for the rest), the
+  levels in their order (project, deliverable type, discipline, document type, phase, originator; the project first when
+  several), or flat. **Who** (owner): an administrator takes the whole organization or one project, a project's control
+  function that project, ours only; clearance always applies: what the person may read is fixed when they ask, with
+  their own rights on each project (`DocumentQueries.Visible`, the transmittals' `Visible`), a project they are not on
+  named as left out. Made in the background (`Documents/FullDownload.cs`, `FullDownloadBuilder.cs`, queue
+  `delios.exports`, one at a time; `POST`/`GET /api/full-downloads`, FULL_DOWNLOAD_ASKED), the zip sealed in storage and
+  not sent to the second copy (made again on asking), the person told when ready or when it failed; only they open it
+  (`GET /api/full-downloads/{id}/file`, logged DOWNLOAD). One being made at a time per person (DOWNLOAD_BUSY); a newer
+  one takes the older's place (its zip removed, its record kept, REPLACED). It is also the export owed at a contract's end.
 - **Packages' ticks bring up the bottom bar** (owner: "a check box for every package that does absolutely nothing"):
   `package-dock.tsx`, the register's dock: Open and Deliver (one ticked), Export (each ticked, its list), and for whoever
   looks after them Move, only where there is somewhere to go (owner: "what good does move do here?": inside another open

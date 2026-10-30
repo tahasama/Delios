@@ -31,7 +31,7 @@ delios/
 backend/
 ├── app/                  the program (API and worker)
 │   ├── Program.cs        start-up: what runs, in which order
-│   ├── Documents/        documents, revisions, files, the register; FileCipher (every file kept encrypted, opened on each read in FileStorage); FileScanning (what the virus check could not look into, refused in plain words); FileBackup (tells the copier each file stored); their numbers with other organizations (Equivalents.cs); the readers of the Preview, switched on and off (Viewers.cs, the card Viewing files); the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
+│   ├── Documents/        documents, revisions, files, the register; FileCipher (every file kept encrypted, opened on each read in FileStorage); FileScanning (what the virus check could not look into, refused in plain words); FileBackup (tells the copier each file stored); FullDownload / FullDownloadBuilder (every file of a project or the organization in one zip, made by the worker); their numbers with other organizations (Equivalents.cs); the readers of the Preview, switched on and off (Viewers.cs, the card Viewing files); the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
 │   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (the sets of Review outcomes, read by routes)
 │   │                     ProjectLists: the project's lists (own copy on first change, where each value is used, who changes them)
 │   │                     WorkbookView: an Excel source file read for the Preview (components/file-preview.tsx, workbook-view.tsx; a P6 .xer, schedule-file-view.tsx);

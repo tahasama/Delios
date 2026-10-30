@@ -108,6 +108,23 @@ public sealed class FileStorage(IObjectStore store, IClock clock, FileBackup bac
         backup.Post(key);
     }
 
+    /// <summary>
+    /// Stores a large file the system made itself (a full download), sealed through a temporary file, never held whole in
+    /// memory. Not sent to the second copy: it is only a copy of what the register holds, made again on asking.
+    /// </summary>
+    public async Task PutFileAsync(string key, string path, CancellationToken cancellationToken)
+    {
+        var sealedFile = Path.GetTempFileName();
+        try
+        {
+            await using (var from = File.OpenRead(path))
+            await using (var to = File.Create(sealedFile))
+                await cipher.SealAsync(from, to, cancellationToken);
+            await store.PutFileAsync(key, sealedFile, cancellationToken);
+        }
+        finally { File.Delete(sealedFile); }
+    }
+
     /// <summary>Opens a file's own bytes for reading, from the start: opened from its seal, or as it was kept before.</summary>
     public async Task<Stream> OpenReadAsync(string key, CancellationToken cancellationToken)
     {

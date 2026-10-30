@@ -171,6 +171,7 @@ const WORDS: Record<string, string> = {
   DEFECT_ACCEPTED: "Accepted a finding",
   EXCEPTION_RECORDED: "Recorded an exception",
   CONTENT_EXTRACTED: "Read a file's content",
+  FULL_DOWNLOAD_ASKED: "Asked for a full download",
   EXTRACTION_REQUESTED: "Asked for a file's content to be read",
   EXTRACTION_MODE_CHANGED: "Changed how content is read",
   NUMBER_RANGE_ISSUED: "Reserved numbers",

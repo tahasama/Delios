@@ -94,8 +94,11 @@ public static class Topology
     /// <summary>After a change: notice days written again (<see cref="Actions.NoticeDays"/>), packages brought up to date (<see cref="Packages.PackagesMoved"/>); one at a time.</summary>
     public static readonly WorkQueue Notices = new("delios.notices", "delios.notices.retry", [Host.Actions.NoticesMoved.RoutingKey, Host.Packages.PackagesMoved.RoutingKey, Host.Operators.TrialsMoved.RoutingKey], Prefetch: 1);
 
+    /// <summary>A full download (every file of a project or of the organization in one zip): long, one at a time, in nobody's way.</summary>
+    public static readonly WorkQueue Exports = new("delios.exports", "delios.exports.retry", [Host.Documents.FullDownloadRequested.RoutingKey], Prefetch: 1);
+
     /// <summary>Every work queue; the worker runs one <see cref="FileQueueConsumer"/> per entry.</summary>
-    public static readonly WorkQueue[] Queues = [Files, Extraction, Checks, Mail, Notices];
+    public static readonly WorkQueue[] Queues = [Files, Extraction, Checks, Mail, Notices, Exports];
 
     /// <summary>
     /// Creates the exchanges, the work queues with their retry queues and bindings, and the dead queue, if they do not exist yet.

@@ -2,8 +2,9 @@
 
 What the console, payments and legal pieces (docs/RUNNING-DELIOS.md, "Built") do not do yet.
 
-- **The end of a contract**: an organization set to Ended reads only; its data is not yet exported for it as one
-  package, nor deleted after the agreed time. Both are owed by the data processing agreement; the number of days is
+- **The end of a contract**: an organization set to Ended reads only; its data is exported by its administrator as one
+  package (the full download, `/full-download`), but not yet deleted after the agreed time (who deletes, and when, waits
+  on the owner). Both are owed by the data processing agreement; the number of days is
   the lawyer's to write.
 - **CMI and Paddle** are not connected: invoices, their PDFs and payments recorded by hand are built; a card payment
   through either is recorded on its invoice by hand until its merchant contract and keys exist.

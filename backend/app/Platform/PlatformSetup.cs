@@ -177,6 +177,7 @@ public static class PlatformSetup
             c.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<IOptions<Documents.PreviewOptions>>().Value.TimeoutSeconds));
         services.AddScoped<Extraction.ExtractionProcessor>();
         services.AddScoped<Checks.CheckEngine>();
+        services.AddScoped<Documents.FullDownloadBuilder>();
         services.AddScoped<Actions.ScheduleImporter>();
         services.AddScoped<Actions.RequirementsImporter>();
         services.AddScoped<Actions.DepartmentsImporter>();
@@ -432,6 +433,7 @@ public static class PlatformSetup
             Operators.ContractEndpoints.MapContractEndpoints(app);
             Operators.SupportEndpoints.MapSupportEndpoints(app);
             app.MapScreenErrorEndpoints();
+            Documents.FullDownloadEndpoints.MapFullDownloadEndpoints(app);
             Operators.BillingEndpoints.MapBillingEndpoints(app);
             Identity.ForgetPerson.MapForgetEndpoints(app);
             app.MapSsoEndpoints();
