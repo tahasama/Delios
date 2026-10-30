@@ -224,9 +224,12 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         var (twice, twiceBody) = await Flow.PostAsync(controller, register, new { deliverableType = "SUP", discipline = "ME", subproject = "20", contractRef = "PO101" });
         Assert.Equal((HttpStatusCode.Conflict, "ALREADY_REGISTERED"), (twice, Flow.Code(twiceBody)));
 
-        // The package shows the request and what came back; what came unplanned is not something they owed.
+        // The package shows the request and what came back. What came unplanned, once registered, is filed in the
+        // supplier's package like every document of theirs (owner), but nothing was asked of them for it.
         var now2 = await engineer.GetFromJsonAsync<JsonElement>(p);
-        Assert.Equal(2, now2.GetProperty("members").GetArrayLength());
+        Assert.Equal(3, now2.GetProperty("members").GetArrayLength());
+        var filed = now2.GetProperty("members").EnumerateArray().Single(m => m.GetProperty("documentId").GetGuid() == item.GetProperty("documentId").GetGuid());
+        Assert.Equal(JsonValueKind.Null, filed.GetProperty("requestedAt").ValueKind);
         Assert.Equal(new[] { "OUTGOING", "INCOMING" }, now2.GetProperty("transmittals").EnumerateArray().Select(t => t.GetProperty("direction").GetString()));
         var member = now2.GetProperty("members").EnumerateArray().Single(m => m.GetProperty("documentId").GetGuid() == datasheet);
         Assert.Equal(("A", "RECEIVED"), (member.GetProperty("latestRevision").GetString(), member.GetProperty("latestState").GetString()));

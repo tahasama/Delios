@@ -184,14 +184,15 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         });
         Assert.Equal("Site manager", decided.GetProperty("decisions")[0].GetProperty("responsibleName").GetString());
 
-        // How the slab drawing's chain went: sent for review, each step, released, issued.
+        // How the slab drawing's chain went, each checkpoint named for the act: sending for review, each step, then release
+        // and issue as one act (the project does not keep them apart).
         var lateness = await GetAsync(engineer, $"{a("A100")}/lateness");
         var chain = lateness[0].GetProperty("checkpoints").EnumerateArray().Select(c => c.GetProperty("name").GetString()).ToList();
-        Assert.Equal("Sent for review", chain[0]);
-        Assert.Equal(["Released", "Issued"], chain[^2..]);
+        Assert.Equal("Sending for review", chain[0]);
+        Assert.Equal("Release & issue", chain[^1]);
         // Needed two days ago with an eight-day route: it was late going in, and that is the cause.
         var cause = lateness[0].GetProperty("cause");
-        Assert.Equal(("Sent for review", "Eli Engineer"), (cause.GetProperty("name").GetString(), cause.GetProperty("owedBy").GetString()));
+        Assert.Equal(("Sending for review", "Eli Engineer"), (cause.GetProperty("name").GetString(), cause.GetProperty("owedBy").GetString()));
 
         // The next revision of the schedule: what moved, what is new, what went.
         var second = await ScheduleRevisionAsync(engineer, project, schedule,
@@ -249,7 +250,8 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         })).GetProperty("id").GetGuid();
         using (await controller.PutAsJsonAsync($"{p}/schedule", new { documentId = schedule })) { }
         await ReleaseAsync(engineer, approver, controller, project, await ScheduleRevisionAsync(engineer, project, schedule,
-            $"Activity ID,Activity Name,Start\nB100,Excavate pump pit,{Day(-3)}\n"));
+            // Tagged Civil: only an action concerning a discipline takes that discipline's documents (owner).
+            $"Activity ID,Activity Name,Start,Departments\nB100,Excavate pump pit,{Day(-3)},CI\n"));
         var activities = await UntilAsync(engineer, $"{p}/activities", a => a.GetArrayLength() == 1);
         var b100 = $"{p}/activities/{ByCode(activities, "B100").GetProperty("id").GetGuid()}";
         var drawing = (await Api.RegisterAsync(engineer, project, Api.Drawing("Pump pit excavation"))).GetProperty("id").GetGuid();

@@ -90,13 +90,14 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
         // by itself is no longer checked).
         foreach (var id in new[] { "STO-01", "STO-02", "STO-03", "SET-02", "SET-04", "SET-01" })
             Assert.Equal("PASS", Result(run, id));
-        // One of two documents carries a Major defect.
-        Assert.Equal(50.0m, run.GetProperty("integrity").GetDecimal());
+        // Both findings are advisory (a native file is optional; released and never sent is a reminder): no document
+        // carries a Critical or Major defect, so the register's integrity stays whole.
+        Assert.Equal(100.0m, run.GetProperty("integrity").GetDecimal());
         Assert.Equal(0, run.GetProperty("openCritical").GetInt32());
 
         var defects = await DefectsAsync(controller, p.Project);
         var missingNative = defects.Single(d => d.GetProperty("checkId").GetString() == "REV-03");
-        Assert.Equal(("MAJOR", "OPEN", p.Document), (missingNative.GetProperty("severity").GetString(),
+        Assert.Equal(("ADVISORY", "OPEN", p.Document), (missingNative.GetProperty("severity").GetString(),
             missingNative.GetProperty("status").GetString(), missingNative.GetProperty("documentId").GetGuid()));
 
         // The project decides it keeps PDFs only: the check is switched off, with the reason, and its finding closes.
