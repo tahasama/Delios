@@ -4,9 +4,12 @@ What it is: the real app, on the internet, for the team and anyone invited to tr
 (companies, people, files). Every page and every email says it is a sandbox. Nothing here is for real work, and it may
 be wiped at any time.
 
-What it costs: **nothing**. The address is a free one (DuckDNS); everything else below has a free plan. A paid domain
-(about €10 a year) is only for later, when the address should carry your name. Free plans change: check
-each one's page before you sign up.
+How long: meant for **a few weeks, a month at most**: trying the features and how the app behaves, and showing it.
+
+What it costs: **nothing**. The server runs on Google Cloud's free trial ($300 of credit for 90 days; this server uses
+about $100 a month of it, and nothing is ever charged unless you choose to upgrade the account). The address is a free
+one (DuckDNS); everything else below has a free plan. A paid domain (about €10 a year) is only for later, when the
+address should carry your name. Free plans change: check each one's page before you sign up.
 
 Who can do it: anyone who can follow steps and copy text. No code is changed.
 
@@ -16,41 +19,35 @@ Who can do it: anyone who can follow steps and copy text. No code is changed.
 
 | What | Free choice | What it is for |
 |---|---|---|
-| A server | Oracle Cloud "Always Free" (an Ampere virtual machine) | Runs the whole app with Docker |
+| A server | Google Cloud free trial (a virtual machine, 4 cores, 16 GB) | Runs the whole app with Docker |
 | An address | DuckDNS, free (sign in with Google or GitHub) | The address, e.g. `delios-sandbox.duckdns.org` |
 | Bot check | Cloudflare Turnstile, free (no domain needed) | Stops robots signing up |
 | Email | Brevo (about 300 a day) or Resend (about 3,000 a month) | Invitations, password links, notifications |
 | Error tracking | Sentry, free plan | Errors reach you (optional) |
 | Backups off the server | Backblaze B2 (10 GB free) | Only if you want the sandbox kept; it is fake data |
 
-**Oracle's free machines are ARM processors.** DELIOS's own parts are built on the machine itself, so they fit; the
-virus scanner needs its ARM image, one line in `.env` (step 3). If another part still refuses to start ("exec format
-error"), use a small ordinary (x86) server instead, e.g. Hetzner CX22, about €4 a month, and leave that line out.
-
 ---
 
 ## Steps
 
 ### 1. The server
-1. At cloud.oracle.com, create an account (a card is asked to prove who you are; the "Always Free" machines are never
-   charged). Create an instance: image **Ubuntu 24.04**, shape **VM.Standard.A1.Flex** with **4 OCPUs and 24 GB** (the
-   free allowance), and download the SSH key it offers.
-2. Open ports 80 and 443 in the cloud's firewall: the instance's subnet → Security list → Add ingress rules, source
-   `0.0.0.0/0`, TCP, ports `80` and `443`.
-3. Connect to it (`ssh -i <the key> ubuntu@<its public IP>`), then open the same ports in the machine's own firewall
-   (Oracle's Ubuntu closes them a second time):
+1. At cloud.google.com/free, press **Get started for free** and sign in with a Google account. A card is asked to prove
+   who you are; the free trial never charges it unless you press "Upgrade" yourself.
+2. In the console: **Compute Engine → VM instances → Create instance** (switch on the Compute Engine API if asked).
+   - Name: `delios-sandbox`; region: the nearest to the team (e.g. `europe-west1`, Belgium).
+   - Machine: **e2-standard-4** (4 cores, 16 GB).
+   - Boot disk → Change: **Ubuntu 24.04 LTS** (x86/64), **50 GB**, Balanced disk.
+   - Firewall: tick **Allow HTTP traffic** and **Allow HTTPS traffic**.
+   - Create.
+3. Keep its address fixed: **VPC network → IP addresses**, on the instance's external address, **Promote to static**
+   (else it may change when the machine restarts).
+4. Open it: **SSH** beside the instance (a terminal opens in the browser). Install Docker:
 
 ```bash
-sudo iptables -I INPUT 6 -p tcp --dport 80 -j ACCEPT && sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT && sudo netfilter-persistent save
+curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker $USER
 ```
 
-4. Install Docker:
-
-```bash
-curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker ubuntu
-```
-
-   Then disconnect and connect again, so Docker works without `sudo`.
+   Then close that terminal and press **SSH** again, so Docker works without `sudo`.
 5. Copy the code onto it. The repository is private: at GitHub → Settings → Developer settings → Personal access
    tokens, make a token that may read this repository, and use it as the password when asked:
 
@@ -65,7 +62,8 @@ sh deploy/init-env.sh
 This writes `.env` with new random passwords. **Copy `.env` somewhere safe off the server** (a password manager).
 
 ### 2. The address
-1. At duckdns.org, sign in, choose a name (e.g. `delios-sandbox`) and put the server's public IP address beside it.
+1. At duckdns.org, sign in, choose a name (e.g. `delios-sandbox`) and put the server's external IP address beside it
+   (Google Cloud shows it on the instance's line).
 2. In `.env`:
 
 ```bash
@@ -86,10 +84,9 @@ SANDBOX=true
 APP_ENVIRONMENT=Production
 SIGN_UP_ENABLED=true
 COMPOSE_PROFILES=app
-CLAMAV_IMAGE=clamav/clamav-debian:stable
 ```
 
-(The last line only on an ARM machine, Oracle's.) `SANDBOX=true` puts the sandbox band on every page, the note on sign-in and sign-up, and "[Sandbox]" on every email.
+`SANDBOX=true` puts the sandbox band on every page, the note on sign-in and sign-up, and "[Sandbox]" on every email.
 
 ### 4. The bot check on sign-up
 At Cloudflare → Turnstile, add a widget for your address, then in `.env`:
@@ -147,6 +144,11 @@ Open `https://delios-sandbox.duckdns.org/console`, sign in, scan the QR code wit
 ```bash
 cd delios && git pull && docker compose --profile app up -d --build
 ```
+
+### 11. When the month is over
+Google Cloud → **Compute Engine → VM instances**, the instance's ⋮ → **Delete**, then release the static address
+(**VPC network → IP addresses**). Everything on it goes with it: it was made-up data. Nothing is charged after, unless
+the account was upgraded.
 
 ---
 
