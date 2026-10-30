@@ -4,7 +4,8 @@ What it is: the real app, on the internet, for the team and anyone invited to tr
 (companies, people, files). Every page and every email says it is a sandbox. Nothing here is for real work, and it may
 be wiped at any time.
 
-What it costs: **a domain name** (about €10 a year). Everything else below has a free plan. Free plans change: check
+What it costs: **nothing**. The address is a free one (DuckDNS); everything else below has a free plan. A paid domain
+(about €10 a year) is only for later, when the address should carry your name. Free plans change: check
 each one's page before you sign up.
 
 Who can do it: anyone who can follow steps and copy text. No code is changed.
@@ -16,8 +17,8 @@ Who can do it: anyone who can follow steps and copy text. No code is changed.
 | What | Free choice | What it is for |
 |---|---|---|
 | A server | Oracle Cloud "Always Free" (an Ampere virtual machine) | Runs the whole app with Docker |
-| A domain | Bought once (any registrar, ~€10 a year) | The address, e.g. `sandbox.yourname.com` |
-| DNS and protection | Cloudflare, free plan | Points the address to the server; the bot check on sign-up (Turnstile) |
+| An address | DuckDNS, free (sign in with Google or GitHub) | The address, e.g. `delios-sandbox.duckdns.org` |
+| Bot check | Cloudflare Turnstile, free (no domain needed) | Stops robots signing up |
 | Email | Brevo (about 300 a day) or Resend (about 3,000 a month) | Invitations, password links, notifications |
 | Error tracking | Sentry, free plan | Errors reach you (optional) |
 | Backups off the server | Backblaze B2 (10 GB free) | Only if you want the sandbox kept; it is fake data |
@@ -45,12 +46,12 @@ sh deploy/init-env.sh
 This writes `.env` with new random passwords. **Copy `.env` somewhere safe off the server** (a password manager).
 
 ### 2. The address
-1. At Cloudflare, add your domain, then a record `sandbox` → the server's public IP address.
+1. At duckdns.org, sign in, choose a name (e.g. `delios-sandbox`) and put the server's public IP address beside it.
 2. In `.env`:
 
 ```bash
-SITE_ADDRESS=sandbox.yourname.com
-PUBLIC_URL=https://sandbox.yourname.com
+SITE_ADDRESS=delios-sandbox.duckdns.org
+PUBLIC_URL=https://delios-sandbox.duckdns.org
 SECURE_COOKIE=true
 HTTP_PORT=80
 HTTPS_PORT=443
@@ -78,18 +79,20 @@ TURNSTILE_SECRET_KEY=<secret key>
 ```
 
 ### 5. Email
-At Brevo (or Resend), verify your domain (they show the DNS records to add at Cloudflare), then in `.env`:
+A free address has no mailbox of its own, so emails go out from an address you already have: at Brevo, add it as a
+sender (Brevo emails it a link to confirm), then in `.env`:
 
 ```bash
 EMAIL_ENABLED=true
-EMAIL_FROM=sandbox@yourname.com
+EMAIL_FROM=<the address you confirmed at Brevo>
 SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
 SMTP_USER=<the login Brevo gives>
 SMTP_PASSWORD=<the SMTP key Brevo gives>
 ```
 
-(Resend: `SMTP_HOST=smtp.resend.com`, `SMTP_USER=resend`, `SMTP_PASSWORD=` your API key.)
+Some emails may land in spam: fine for testing (a paid domain later fixes it). Or leave email off (`EMAIL_ENABLED=false`):
+the app then shows each invitation's and password link on screen to whoever made it, to pass on by hand.
 
 ### 6. Errors (optional)
 Create a Sentry project (type ".NET"), then `SENTRY_DSN=<its address>` in `.env`.
@@ -103,13 +106,13 @@ docker compose --profile app up -d --build
 ### 8. The console account (the team's own space)
 
 ```bash
-docker compose --profile app run --rm -e DELIOS_OPERATOR_PASSWORD='<a long password, 14 characters or more>' migrate create-operator you@yourname.com "Your Name"
+docker compose --profile app run --rm -e DELIOS_OPERATOR_PASSWORD='<a long password, 14 characters or more>' migrate create-operator you@example.com "Your Name"
 ```
 
-Open `https://sandbox.yourname.com/console`, sign in, scan the QR code with an authenticator app.
+Open `https://delios-sandbox.duckdns.org/console`, sign in, scan the QR code with an authenticator app.
 
 ### 9. Check
-- `https://sandbox.yourname.com` opens, with the sandbox band at the bottom.
+- `https://delios-sandbox.duckdns.org` opens, with the sandbox band at the bottom.
 - Sign up a made-up company; the email with the link arrives, marked "[Sandbox]".
 - Upload a file to a document, then open it.
 
