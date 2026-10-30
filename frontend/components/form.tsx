@@ -4,8 +4,11 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/core/utils";
 import { btn } from "./ui";
 import { collectInvalid, fieldsNamed, markMissing, type MissingField } from "@/app/(public)/form-validation";
+import { SESSION_ENDED } from "@/lib/core/session-words";
 
 type State = { error?: string; ok?: string;
+  /** The session ended: the refusal offers to sign in again, in a new tab, so what was written stays here. */
+  expired?: boolean;
   /** Fields the server found missing or refused, by name: outlined on the form. */
   fields?: string[]; issues?: { line: number; message: string }[]; link?: { href: string; label: string } };
 
@@ -86,6 +89,16 @@ export function ActionForm({
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const [missing, setMissing] = useState<MissingField[]>([]);
+  // Sent with no connection: refused here, before anything leaves, what was written kept as it is.
+  const [offline, setOffline] = useState(false);
+  // A slow answer is said, never left as a frozen button: "Still sending…" after 3 s, and after 10 s that nothing is lost.
+  const [slow, setSlow] = useState(0);
+  useEffect(() => {
+    if (!pending) { setSlow(0); return; }
+    const first = window.setTimeout(() => setSlow(1), 3000);
+    const second = window.setTimeout(() => setSlow(2), 10000);
+    return () => { window.clearTimeout(first); window.clearTimeout(second); };
+  }, [pending]);
   // One key per form, made when it is drawn and sent with it as `formKey` (owner, "idempotency keys"): a second press or
   // a retry of the same form gets the first answer instead of doing the act twice (`once`, lib/core/once.ts; backend
   // IdempotencyFilter). Renewed once the form went through (an answer with no refusal), so the next thing sent from it is
@@ -105,6 +118,13 @@ export function ActionForm({
     const form = formRef.current;
     const data = written.current;
     if (form && data && (state?.error || state?.fields?.length)) requestAnimationFrame(() => restore(form, data));
+    // The first field the server named is where the person goes next, as for what the screen found itself.
+    if (form && state?.fields?.length) requestAnimationFrame(() => {
+      const first = form.querySelector<HTMLElement>("[data-missing]");
+      if (!first) return;
+      first.scrollIntoView({ behavior: "smooth", block: "center" });
+      window.setTimeout(() => first.focus({ preventScroll: true }), 120);
+    });
   }, [state]);
 
   return (
@@ -124,6 +144,8 @@ export function ActionForm({
           return;
         }
         setMissing([]);
+        if (!navigator.onLine) { e.preventDefault(); setOffline(true); return; }
+        setOffline(false);
         if (confirmText && !window.confirm(confirmText)) { e.preventDefault(); return; }
         written.current = new FormData(e.currentTarget);
       }}
@@ -138,9 +160,20 @@ export function ActionForm({
       <Footer className={footerClassName}>
         <MissingSummary missing={missing} />
 
+        {offline ? (
+          <p role="alert" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            You are offline, so nothing was sent. What you wrote stays here: send it again once the connection is back.
+          </p>
+        ) : null}
+
         {state?.error ? (
           <div role="alert" className="rounded-lg bg-red-50 px-3 py-2">
-            <p className="text-xs text-red-700">{state.error}</p>
+            <p className="text-xs text-red-700">
+              {state.error}
+              {state.expired || state.error === SESSION_ENDED ? (
+                <> <a href={`/login?expired=1&next=${encodeURIComponent(window.location.pathname + window.location.search)}`} target="_blank" rel="noopener" className="font-semibold underline">Sign in again in a new tab</a>, then send this again: what you wrote stays here.</>
+              ) : null}
+            </p>
             {state.issues?.length ? (
               <ul className="scroll-thin mt-1.5 max-h-40 space-y-0.5 overflow-y-auto">
                 {state.issues.map((issue, i) => (
@@ -163,9 +196,12 @@ export function ActionForm({
 
         {hideSubmit ? null : (
           <button type="submit" disabled={pending} className={cn(btn(variant, size))}>
-            {pending ? "Working…" : submitLabel}
+            {pending ? (slow ? "Still sending…" : "Working…") : submitLabel}
           </button>
         )}
+        {pending && slow === 2 ? (
+          <p role="status" className="text-[11.5px] text-slate-500">The connection is slow. Your request is still on its way; nothing is lost.</p>
+        ) : null}
       </Footer>
     </form>
   );

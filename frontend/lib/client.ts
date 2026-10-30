@@ -4,6 +4,7 @@ import { revalidateTag, updateTag } from "next/cache";
 import { after } from "next/server";
 import { keepRequestDateFormat } from "@/lib/core/date-format";
 import { dayOf, labelsOf, type Keep } from "@/lib/core/kept";
+import { SESSION_ENDED } from "@/lib/core/session-words";
 
 /**
  * The one door to the backend. Every screen and action reaches the .NET API
@@ -153,7 +154,8 @@ export async function problemOf(response: Response): Promise<ApiProblem> {
   const fault = response.status >= 500 && !body.code;
   const message = fault
     ? "Something went wrong on our side and nothing was saved. Try again; if it happens again, tell your administrator what you were doing."
-    : body.title ?? body.detail ?? (response.status === 401 ? "Please sign in again." : `The server answered ${response.status}.`);
+    : response.status === 401 ? SESSION_ENDED
+    : body.title ?? body.detail ?? `The server answered ${response.status}.`;
   return new ApiProblem(response.status, body.code ?? null, message, body.params ?? null);
 }
 

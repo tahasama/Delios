@@ -138,7 +138,7 @@ export function CommandMenu({ perms }: { perms: Perms }) {
         </div>
         <ul id="command-hits" role="listbox" className="scroll-thin max-h-[min(60vh,26rem)] overflow-y-auto py-1.5">
           {hits.length === 0 ? (
-            <li className="px-4 py-3 text-xs text-slate-500">{pending ? "Looking…" : lower.length < 2 ? "Type a number or a few words." : "Nothing matches that."}</li>
+            <li className="px-4 py-3 text-xs text-slate-500">{pending ? "Looking…" : lower.length < 2 ? "Type a number or a few words." : <>Nothing matches “{words.trim()}”. Fewer words, or part of a number, find more.</>}</li>
           ) : null}
           {hits.map((hit, i) => {
             const head = hit.group !== lastGroup ? hit.group : null;

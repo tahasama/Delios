@@ -147,6 +147,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   in quiet grey (`components/skeleton.tsx`: `RegisterSkeleton` for the registers, `DetailSkeleton` for one thing's page,
   `PageSkeleton` for the rest, `(app)/loading.tsx` for any page without its own), saying "Reading …" to screen readers,
   still for whoever asked for less motion. A filter changed on the same page keeps what is shown until the new answer.
+- **The ten states** (owner: empty, loading, error, no internet, slow network, no search result, permission denied, session
+  expired, form validation, success; `docs/gaps/states.md`, what is built once and what is still checked page by page).
+  Built once: **no internet** is a band at the top while offline ("Back online" after; `components/offline-band.tsx`), a
+  form sent offline refused before anything leaves, its words kept; **slow network** reads "Still sending…" after 3 s on
+  the form's button, and after 10 s that the request is on its way and nothing is lost (`ActionForm`); **session expired**
+  comes back to the same page, filters and all, after signing in (`proxy.ts` keeps the whole address in `next` and passes it
+  as `x-delios-path`; `signInAgain`, `lib/core/sign-in-again.ts`; the sign-in page says the session ended), and a form
+  refused for it (`SESSION_ENDED`, `lib/core/session-words.ts`, every 401) offers to sign in again in a new tab, its words
+  kept; **an address one may not open** reads "Not found, or not yours to open" inside the frame (`app/(app)/not-found.tsx`,
+  the same words whether it exists or not), one leading nowhere "Nothing at this address" (`app/not-found.tsx`); **an
+  error** reads in plain words with a reference to quote, never the server's message or code trace (development only);
+  **validation** focuses the first field the server named, as the screen does for what it found.
 - **The quick find** (owner, "command menu" with its "shortcut hint"): Ctrl K (⌘ K on a Mac) anywhere opens one box
   (`components/command-menu.tsx`, mounted once in the layout): pages by their name at once (only those the person may
   open, as the menu), and documents, transmittals, actions and packages by number or name through the backend, a

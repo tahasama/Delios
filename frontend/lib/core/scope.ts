@@ -1,4 +1,5 @@
 import "server-only";
+import { signInAgain } from "@/lib/core/sign-in-again";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
@@ -138,7 +139,7 @@ export async function requireScope(): Promise<Scope> {
   const scope = await getScope();
   if (!scope) {
     const user = await getCurrentUser();
-    if (!user) redirect("/login");
+    if (!user) await signInAgain();
     redirect("/no-project");
   }
   return scope;

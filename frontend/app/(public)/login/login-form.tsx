@@ -24,6 +24,11 @@ function LoginForm({ contact }: { contact: { email: string | null; hours: string
     <AuthShell>
           <h2 className="text-xl font-semibold text-slate-900">Sign in</h2>
           <p className="mt-1 text-sm text-slate-500">Use the account your administrator created for you.</p>
+          {params.get("expired") ? (
+            <p role="status" className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-[12px] leading-5 text-amber-900 ring-1 ring-amber-300">
+              Your session has ended. Sign in again and you go straight back to the page you were on.
+            </p>
+          ) : null}
           <form
             action={formAction}
             className="mt-6 space-y-4"
