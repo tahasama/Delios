@@ -255,10 +255,10 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         await Flow.PostAsync(engineer, $"{b100}/needs", new { documentId = drawing, purpose = "EXECUTION" });
 
         var run = await CheckTests.RunAsync(controller, project);
-        Assert.Equal(("FAIL", "PASS", "PASS"), (CheckTests.Result(run, "SC-02"), CheckTests.Result(run, "SC-01"), CheckTests.Result(run, "SC-04")));
+        Assert.Equal(("FAIL", "PASS", "PASS"), (CheckTests.Result(run, "SCH-02"), CheckTests.Result(run, "SCH-01"), CheckTests.Result(run, "SET-11")));
         await Flow.PostAsync(controller, $"{b100}/decisions", new { decision = "STOPPED", responsibleName = "Site manager", reason = "No drawing." });
         run = await CheckTests.RunAsync(controller, project);
-        Assert.Equal("PASS", CheckTests.Result(run, "SC-02"));
+        Assert.Equal("PASS", CheckTests.Result(run, "SCH-02"));
 
         // The next revision's export is not readable: the release stands, the check says so.
         var broken = await ScheduleRevisionAsync(engineer, project, schedule, "Task,When\nB100,soon\n");
@@ -266,7 +266,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var imports = await UntilAsync(controller, $"{p}/schedule", s => s.GetProperty("imports").GetArrayLength() == 2);
         Assert.Equal("FAILED", imports.GetProperty("imports")[0].GetProperty("status").GetString());
         run = await CheckTests.RunAsync(controller, project);
-        Assert.Equal("FAIL", CheckTests.Result(run, "SC-01"));
+        Assert.Equal("FAIL", CheckTests.Result(run, "SCH-01"));
     }
 
     [Fact]

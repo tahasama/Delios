@@ -91,7 +91,7 @@ public sealed class TransmittalThreadTests(Infrastructure infrastructure) : ICla
         var eli = addressees.GetProperty("people").EnumerateArray().Single(x => x.GetProperty("name").GetString() == "Eli Engineer").GetProperty("id").GetGuid();
 
         var (noWords, noWordsBody) = await Flow.PostAsync(controller, P(p, "/transmittals"), new { userIds = new[] { eli }, reason = "INFORMATION" });
-        Assert.Equal("ITEMS_REQUIRED", Flow.Code(noWordsBody));
+        Assert.Equal("FIELDS_REQUIRED", Flow.Code(noWordsBody));
         var yesterday = DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd");
         var (_, first) = await Flow.PostAsync(controller, P(p, "/transmittals"), new
         {

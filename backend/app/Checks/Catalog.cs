@@ -296,7 +296,7 @@ public static class CheckCatalog
 
     /// <summary>The checks indexed by their id, for quick lookup by <see cref="Find"/>.</summary>
     private static readonly Dictionary<string, CheckDef> ById = All.ToDictionary(c => c.Id);
-    /// <summary>Finds a check by its id (for example "RV-08"), or null if there is none. Used by the endpoints that switch a check off.</summary>
+    /// <summary>Finds a check by its id (for example "REV-03"), or null if there is none. Used by the endpoints that switch a check off.</summary>
     public static CheckDef? Find(string id) => ById.GetValueOrDefault(id);
 
     /// <summary>True when the named document field is empty. Used by MD-03 to compare a document against the fields its deliverable type requires; an unknown field name counts as filled.</summary>

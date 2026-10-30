@@ -55,7 +55,7 @@ public sealed class ReportTests(Infrastructure infrastructure) : IClassFixture<I
         var lateNumber = late.GetProperty("number").GetString()!;
 
         var list = await GetAsync(engineer, $"{p}/reports");
-        Assert.Equal(["register", "deliveries", "reviews", "transmittals", "readiness"], list.EnumerateArray().Select(r => r.GetProperty("id").GetString()));
+        Assert.Equal(["register", "deliveries", "reviews", "transmittals", "readiness", "progress", "exchange", "asof"], list.EnumerateArray().Select(r => r.GetProperty("id").GetString()));
 
         var register = await GetAsync(engineer, $"{p}/reports/register");
         Assert.Equal(("3", "33%", "1", "1"),

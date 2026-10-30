@@ -174,14 +174,18 @@ public sealed class PackageTests(Infrastructure infrastructure) : IClassFixture<
         Assert.Single(removed.GetProperty("members").EnumerateArray());
         Assert.Single((await GetAsync(engineer, p)).GetProperty("members").EnumerateArray());
 
-        // Nothing is ready, and nobody to deliver to: it closes once the rule is said to stop.
-        await Flow.PostAsync(engineer, $"{p}/assess", new { });
-        await Flow.PostAsync(engineer, $"{p}/shortfall/issue", new { });
+        // Nothing is ready: under a waiver, the control function closes it (handed over outside the system) once the
+        // rule is said to stop. Whoever puts it together does not (owner: they only add and take out documents).
+        var controller = await app.SignedInAsync("controller@demo.local");
+        await Flow.PostAsync(controller, $"{p}/assess", new { });
+        await Flow.PostAsync(controller, $"{p}/shortfall/issue", new { });
         var approver = await app.SignedInAsync("approver@demo.local");
         await Flow.PostAsync(approver, $"{p}/shortfall/accept", new { });
-        var (still, stillBody) = await Flow.PostAsync(engineer, $"{p}/deliver", new { });
+        var (notTheirs, notTheirsBody) = await Flow.PostAsync(engineer, $"{p}/deliver", new { ruleCeased = true });
+        Assert.Equal((HttpStatusCode.Forbidden, "CONTROL_ONLY"), (notTheirs, Flow.Code(notTheirsBody)));
+        var (still, stillBody) = await Flow.PostAsync(controller, $"{p}/deliver", new { });
         Assert.Equal((HttpStatusCode.Conflict, "RULE_STILL_ADMITTING"), (still, Flow.Code(stillBody)));
-        var (_, closed) = await Flow.PostAsync(engineer, $"{p}/deliver", new { ruleCeased = true });
+        var (_, closed) = await Flow.PostAsync(controller, $"{p}/deliver", new { ruleCeased = true });
         Assert.Equal("CLOSED", closed.GetProperty("state").GetString());
     }
 
