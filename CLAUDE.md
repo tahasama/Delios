@@ -1489,7 +1489,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (a portal on the page's body, placed under its field, or above it when the window has no room), so no card or
   scrolling row cuts it (owner: "drawer is blocked by card", the steps of Send for review).
 - A route's step is answered by all its people (any order) or by whoever gets to it first (`StepModes` ALL / ANY): no
-  other kind is offered. A step another organization answers goes to them on a transmittal whose reason is set by itself
+  other kind is offered. On the route form it is one tick on the step, "Wait for everyone's answer" (owner), ticked by
+  default (`RouteStep.Mode` ALL): the next step opens only once every one of its people has answered; unticked, the
+  first answer moves the review on. Said on the routes, Send for review, the review's plate ("1 of 3 answered, it waits
+  for every one") and the plan ("Moves on when"). A step another organization answers goes to them on a transmittal whose reason is set by itself
   (above). "Offer this route first" puts it first among
   routes equally specific. "From which organization" chooses among the organizations taking part (a document's
   originator is an organization's code).

@@ -56,7 +56,8 @@ export const liveDefects = cache(async (projectId: string): Promise<DefectView[]
 
 /** One run, as it stands now. */
 async function runOf(scope: { projectId: string }, runId: string): Promise<RunView> {
-  return api<RunView>(projectPath(scope, `/checks/runs/${runId}`), { keep: { areas: ["checks"] } });
+  // Read fresh: a run waited on is a result to come, never a kept answer (a kept QUEUED answered every look).
+  return api<RunView>(projectPath(scope, `/checks/runs/${runId}`));
 }
 
 /**

@@ -54,6 +54,7 @@ supplier; accepted or for information → us).
 | `mayCondition` | Whether this step's verdicts may carry conditions |
 | `evidence` | `NONE` · `OPTIONAL` · `REQUIRED` — a returned stamped copy |
 | `days` | Working days allowed, for the at-risk and overdue marks |
+| `mode` | `ALL` (default, the tick "Wait for everyone's answer"): the next step opens only once every one of the step's people has answered · `ANY`: the first answer moves the review on |
 
 The route itself names two sets (built): the **advice** its advising steps answer from (`ReviewRoute.Advice`) and the
 **verdicts** its deciding step answers from (`ReviewRoute.Verdicts`), each by its name in Types & sets; none named, the

@@ -288,7 +288,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
                 </span></>
               ) : null}
               {" · "}
-              {cycle.outcome ? `${verdictLabel(cycle.outcome)} — ${cycle.outcomeByName ?? ""}` : `${standing} · ${cycle.assignments.filter((assignment) => assignment.completedAt).length} of ${cycle.assignments.length} answered`}
+              {cycle.outcome ? `${verdictLabel(cycle.outcome)} — ${cycle.outcomeByName ?? ""}` : `${standing} · ${cycle.assignments.filter((assignment) => assignment.completedAt).length} of ${cycle.assignments.length} answered${cycle.assignments.length > 1 && here >= 0 ? (run?.steps[here]?.mode === "ALL" ? ", it waits for every one" : ", the first answer moves it on") : ""}`}
               {/* The status the revision carries. Whether it is in force is the
                   revision's state, not the status. */}
               {rev.statusCode ? <> &middot; <span className="font-mono font-semibold text-slate-700">{rev.statusCode}</span></> : null}

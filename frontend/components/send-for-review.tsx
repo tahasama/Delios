@@ -19,8 +19,8 @@ export type SendStep = {
 export type SendRoute = { id: string; name: string; description: string | null; isDefault: boolean; recommended?: boolean; steps: SendStep[]; verdicts: { title: string; values: { code: string; label: string; effectLabel: string }[]; warning?: string | null } | null };
 
 const MODE: Record<string, string> = {
-  ALL: "all give input, any order",
-  ANY_OF: "any one decides",
+  ALL: "waits for every one, any order",
+  ANY_OF: "the first answer moves it on",
   SERIAL: "one after another",
   ALL_CONSOLIDATOR: "all respond, last decides",
 };

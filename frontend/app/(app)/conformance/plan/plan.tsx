@@ -466,7 +466,7 @@ export async function DocumentManagementPlan() {
               ? `for ${route.patterns.map((p) => [label(deliverables, p.deliverableType), label(docTypes, p.docType), label(disciplines, p.discipline), p.criticality ? `criticality ${p.criticality}` : null, orgName(p.originator)].filter(Boolean).join(" · ") || "any document").join("; ")}`
               : "for any document"}>
             {route.description ? <Say className="text-[12px] text-slate-500">{route.description}</Say> : null}
-            <Grid head={["Step", "Who answers", "Days", "Answered by"]}
+            <Grid head={["Step", "Who answers", "Days", "Moves on when"]}
               rows={route.steps.map((s, i) => [
                 <span key="t">{i + 1}. {s.title}{i === route.steps.length - 1 ? <span className="ml-1.5"><ToneChip tone="moving">decides</ToneChip></span> : null}</span>,
                 s.partyCode
@@ -475,7 +475,7 @@ export async function DocumentManagementPlan() {
                     ? <span>{list([...s.people, ...s.holders.filter((h) => !s.people.includes(h))])}{s.functionCode ? <span className="text-slate-500"> ({functionName(s.functionCode)})</span> : null}</span>
                     : <span className="text-amber-800">nobody yet{s.functionCode ? ` holds ${functionName(s.functionCode)}` : ""}</span>,
                 s.days ? `${s.days} working days` : "no limit",
-                s.mode === "ALL" ? "every one of them" : "the first to answer",
+                s.mode === "ALL" ? "every one has answered" : "the first has answered",
               ])} />
           </Part>
         )) : <Missing>No review route yet: nothing can be reviewed.</Missing>}

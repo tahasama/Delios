@@ -207,7 +207,7 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
                           <p className="mt-1 text-[13px] font-semibold text-slate-900">{s.title || (decides ? "Decision" : `Review ${i + 1}`)}</p>
                           <p className={`mt-1 text-[11px] leading-4 ${who.length ? "text-slate-700" : "text-amber-700"}`}>{who.length ? who.join(", ") : "Nobody named: the sender names them"}</p>
                           {party && s.reason ? <p className="mt-0.5 text-[11px] text-slate-500">on a transmittal, {reasonChoices.find((r) => r.code === s.reason)?.label ?? s.reason}</p> : null}
-                          {who.length > 1 ? <p className="mt-0.5 text-[11px] text-slate-500">{s.mode === "ANY_OF" ? "whoever gets to it first" : "all of them, any order"}</p> : null}
+                          {who.length > 1 ? <p className="mt-0.5 text-[11px] text-slate-500">{s.mode === "ANY_OF" ? "the first answer moves it on" : "waits for every one, any order"}</p> : null}
                           <p className="mt-1.5 border-t border-line pt-1.5 text-[11px] text-slate-500">
                             {s.days ? `${s.days} working day${s.days === 1 ? "" : "s"}` : "no days: no due date"}
                             {last && s.grantsStatuses?.length ? <> · {s.grantsStatuses.length === 1 ? "releases at" : "releases at one of"} {s.grantsStatuses.join(", ")}</> : null}

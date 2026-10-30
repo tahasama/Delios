@@ -37,11 +37,9 @@ type ClassOption = { code: string; label: string };
 type ClassOptions = { documentTypes: ClassOption[]; disciplines: ClassOption[]; criticalities: ClassOption[]; deliverableTypes: ClassOption[]; originators: ClassOption[] };
 type StatusChoice = { code: string; label: string };
 
-// The two ways the backend runs a step (StepModes): everyone answers, or the first answer closes it.
-const HOW: { value: WorkflowBuilderStep["mode"]; label: string; hint: string }[] = [
-  { value: "ALL", label: "All of them, in any order", hint: "each answers; the step closes when everyone has" },
-  { value: "ANY_OF", label: "Whoever gets to it first", hint: "the first answer closes the step" },
-];
+// How the backend runs a step (StepModes), one tick (owner): ticked, the step waits for every one of its people (ALL,
+// the default); unticked, the first answer moves the review to the next step (ANY).
+const WAIT_HINT = { ALL: "the next step opens once every one has answered", ANY_OF: "the first answer moves it to the next step" } as const;
 
 /** A route's working days, by default: five in all (owner), each decider given more than each adviser (2 + 3). */
 const DEFAULT_TOTAL = 5;
@@ -90,7 +88,7 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
   const [draft, setDraft] = useState<WorkflowBuilderStep[]>(
     initialSteps?.length ? initialSteps : defaultDays([
       { act: "REVIEW", mode: "ALL", participantIds: [], title: "Review" },
-      { act: "APPROVAL", mode: "ANY_OF", participantIds: [], title: "Decision", decides: true },
+      { act: "APPROVAL", mode: "ALL", participantIds: [], title: "Decision", decides: true },
     ]),
   );
   // Days typed by hand are kept; until then they follow the defaults as steps come and go.
@@ -267,10 +265,11 @@ export function WorkflowTemplateBuilder({ level = "project", id, name = "", desc
                 ))}
               </span>
             </Field>
-            <Field label="How they answer" hint={HOW.find((h) => h.value === chosen.mode)?.hint}>
-              <Select value={chosen.mode} onChange={(e) => update(open, { mode: e.target.value as WorkflowBuilderStep["mode"] })} className={inputCls}>
-                {HOW.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
-              </Select>
+            <Field label="Parallel answers" hint={WAIT_HINT[chosen.mode]}>
+              <label className="flex h-(--control-h) items-center gap-2 text-(length:--control-text) text-slate-700">
+                <input type="checkbox" checked={chosen.mode === "ALL"} onChange={(e) => update(open, { mode: e.target.checked ? "ALL" : "ANY_OF" })} />
+                Wait for everyone&apos;s answer
+              </label>
             </Field>
             <div className="flex items-end justify-end">
               <button type="button" onClick={() => remove(open)} disabled={steps.length === 1} title="Remove this step" aria-label="Remove this step"
