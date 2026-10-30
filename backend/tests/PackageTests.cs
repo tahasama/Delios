@@ -78,41 +78,46 @@ public sealed class PackageTests(Infrastructure infrastructure) : IClassFixture<
 
         var (_, added) = await Flow.PostAsync(engineer, $"{p}/members", new { documentIds = new[] { ready.Document, late } });
         Assert.Equal(2, added.GetProperty("members").GetArrayLength());
-        var (notAssessed, notAssessedBody) = await Flow.PostAsync(engineer, $"{p}/deliver", new { });
-        Assert.Equal((HttpStatusCode.Conflict, "NOT_ASSESSED"), (notAssessed, Flow.Code(notAssessedBody)));
+        // Not complete: nothing goes until whoever accepts it grants a waiver (owner).
+        using (var notComplete = await controller.GetAsync($"{p}/going"))
+            Assert.Equal(HttpStatusCode.Conflict, notComplete.StatusCode);
 
-        var (_, assessed) = await Flow.PostAsync(engineer, $"{p}/assess", new { });
+        // Readiness is checked by the control function; whoever puts it together only adds and takes out documents.
+        var (notTheirs, notTheirsBody) = await Flow.PostAsync(engineer, $"{p}/assess", new { });
+        Assert.Equal((HttpStatusCode.Forbidden, "CONTROL_ONLY"), (notTheirs, Flow.Code(notTheirsBody)));
+        var (_, assessed) = await Flow.PostAsync(controller, $"{p}/assess", new { });
         var shortfall = assessed.GetProperty("shortfall").EnumerateArray().Single();
         Assert.Equal(late, shortfall.GetProperty("documentId").GetGuid());
-        var (unsent, unsentBody) = await Flow.PostAsync(engineer, $"{p}/deliver", new { });
+        var (unsent, unsentBody) = await Flow.PostAsync(approver, $"{p}/shortfall/accept", new { });
         Assert.Equal((HttpStatusCode.Conflict, "SHORTFALL_NOT_ISSUED"), (unsent, Flow.Code(unsentBody)));
-        await Flow.PostAsync(engineer, $"{p}/shortfall/issue", new { });
-        var (waiting, waitingBody) = await Flow.PostAsync(engineer, $"{p}/deliver", new { });
-        Assert.Equal((HttpStatusCode.Conflict, "SHORTFALL_NOT_ACCEPTED"), (waiting, Flow.Code(waitingBody)));
+        await Flow.PostAsync(controller, $"{p}/shortfall/issue", new { });
 
-        // The owner may not accept the shortfall; the acceptance authority does.
+        // The owner may not grant the waiver; the acceptance authority does.
         var (owner, ownerBody) = await Flow.PostAsync(engineer, $"{p}/shortfall/accept", new { });
         Assert.Equal((HttpStatusCode.Forbidden, "ACCEPTOR_ONLY"), (owner, Flow.Code(ownerBody)));
         var (_, agreed) = await Flow.PostAsync(approver, $"{p}/shortfall/accept", new { note = "Sections follow next week." });
         Assert.Equal("Aisha Approver", agreed.GetProperty("shortfallAcceptedBy").GetString());
 
-        var (deliveredStatus, delivered) = await Flow.PostAsync(engineer, $"{p}/deliver", new { note = "Sections to follow." });
-        Assert.True(deliveredStatus == HttpStatusCode.OK, delivered.ToString());
-        Assert.Equal("DELIVERED", delivered.GetProperty("state").GetString());
-        var number = delivered.GetProperty("transmittals").EnumerateArray().Single().GetProperty("number").GetString();
-        Assert.Equal("P1001-DEMO-NWU-TR-0001", number);
-        // The transmittal log says who it waits on: the client works in its own system, so Document Control sends it.
-        var report = await GetAsync(controller, $"/api/projects/{ready.Project}/reports/transmittals");
-        var line = report.GetProperty("rows").EnumerateArray().Single(r => r[0].GetProperty("text").GetString() == number);
-        Assert.Equal(("Out", "For execution", "Document Control: 1 to send"),
-            (line[1].GetProperty("text").GetString(), line[4].GetProperty("text").GetString(), line[7].GetProperty("text").GetString()));
-
-        // One transmittal, carrying only what was ready; its contents are now fixed.
-        var log = await GetAsync(controller, $"/api/projects/{ready.Project}/transmittals");
-        var transmittal = await GetAsync(controller,
-            $"/api/projects/{ready.Project}/transmittals/{log.EnumerateArray().Single(t => t.GetProperty("number").GetString() == number).GetProperty("id").GetGuid()}");
+        // Delivered on a transmittal carrying exactly what goes: what is ready; the one with nothing yet is named, not sent.
+        var going = await GetAsync(controller, $"{p}/going");
+        var revisions = going.GetProperty("lines").EnumerateArray().Select(l => l.GetProperty("revisionId").GetGuid()).ToArray();
+        Assert.Equal(new[] { ready.Revision }, revisions);
+        var (_, moreBody) = await Flow.PostAsync(controller, $"/api/projects/{ready.Project}/transmittals", new
+        {
+            packageId = package.GetProperty("id").GetGuid(), revisionIds = new[] { ready.Revision, Guid.NewGuid() },
+            partyIds = new[] { clientId }, reason = "EXECUTION", subject = "Inlet works construction set",
+        });
+        Assert.Equal("PACKAGE_CONTENTS", Flow.Code(moreBody));
+        var (sentStatus, sent) = await Flow.PostAsync(controller, $"/api/projects/{ready.Project}/transmittals", new
+        {
+            packageId = package.GetProperty("id").GetGuid(), revisionIds = revisions,
+            partyIds = new[] { clientId }, reason = "EXECUTION", subject = "Inlet works construction set",
+        });
+        Assert.True(sentStatus == HttpStatusCode.OK, sent.ToString());
+        var transmittal = await GetAsync(controller, $"/api/projects/{ready.Project}/transmittals/{sent[0].GetProperty("id").GetGuid()}");
         Assert.Equal(ready.Revision, transmittal.GetProperty("items").EnumerateArray().Single().GetProperty("revisionId").GetGuid());
         Assert.Equal("EXECUTION", transmittal.GetProperty("reason").GetString());
+        Assert.Equal("DELIVERED", (await GetAsync(controller, p)).GetProperty("state").GetString());
         var (fixedStatus, fixedBody) = await Flow.PostAsync(engineer, $"{p}/members/remove", new { documentIds = new[] { ready.Document } });
         Assert.Equal((HttpStatusCode.Conflict, "PACKAGE_CLOSED"), (fixedStatus, Flow.Code(fixedBody)));
 

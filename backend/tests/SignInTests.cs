@@ -130,9 +130,9 @@ public sealed class SignInTests(Infrastructure infrastructure) : IClassFixture<I
         var me = await browser.GetFromJsonAsync<JsonElement>("/api/me");
         Assert.Equal("Eli Engineer", me.GetProperty("user").GetProperty("name").GetString());
 
-        Assert.Equal("/sign-in?sso_error=SSO_NO_ACCOUNT", (await SignInThroughProviderAsync(app, idp, "stranger@demo.local")).Landing);
-        Assert.Equal("/sign-in?sso_error=SSO_DOMAIN_NOT_ALLOWED", (await SignInThroughProviderAsync(app, idp, "supplier@acme.local")).Landing);
-        Assert.Equal("/sign-in?sso_error=SSO_STATE_INVALID",
+        Assert.Equal("/login?sso_error=SSO_NO_ACCOUNT", (await SignInThroughProviderAsync(app, idp, "stranger@demo.local")).Landing);
+        Assert.Equal("/login?sso_error=SSO_DOMAIN_NOT_ALLOWED", (await SignInThroughProviderAsync(app, idp, "supplier@acme.local")).Landing);
+        Assert.Equal("/login?sso_error=SSO_STATE_INVALID",
             (await SignInThroughProviderAsync(app, idp, "engineer@demo.local", otherBrowserFinishes: true)).Landing);
         Assert.Equal("/", (await SignInThroughProviderAsync(app, idp, "engineer@demo.local", "https://evil.example/")).Landing);
 

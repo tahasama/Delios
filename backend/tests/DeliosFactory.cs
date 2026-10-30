@@ -36,9 +36,10 @@ public sealed class DeliosFactory(IDictionary<string, string?> overrides, Action
         // (the sign-in limit, which tests check, is not one of these).
         ["RateLimits:PerMinute"] = "1000000",
         ["RateLimits:HeavyPerMinute"] = "1000000",
-        // The app's own logs stay quiet in tests: thousands of lines a run buried which tests failed and why.
-        ["Serilog:MinimumLevel:Default"] = "Fatal",
-        ["Serilog:MinimumLevel:Override:Microsoft.AspNetCore"] = "Fatal",
+        // The app's own logs stay quiet in tests, but for real faults: thousands of lines a run buried which tests
+        // failed and why. A database error is said once, by whoever met it, never again by the database layer.
+        ["Serilog:MinimumLevel:Default"] = "Error",
+        ["Serilog:MinimumLevel:Override:Microsoft.AspNetCore"] = "Error",
         ["Serilog:MinimumLevel:Override:Microsoft.EntityFrameworkCore"] = "Fatal",
     };
 

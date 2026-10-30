@@ -105,7 +105,7 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
             missingNative.GetProperty("status").GetString(), missingNative.GetProperty("documentId").GetGuid()));
 
         // The project decides it keeps PDFs only: the check is switched off, with the reason, and its finding closes.
-        using (var off = await controller.PutAsJsonAsync($"/api/projects/{p.Project}/checks/FM-01/opt-out",
+        using (var off = await controller.PutAsJsonAsync($"/api/projects/{p.Project}/checks/REV-03/opt-out",
             new { reason = "The client's contract asks for PDF only." }))
             Assert.Equal(HttpStatusCode.NoContent, off.StatusCode);
         // Never sent: accepted as it is, with a reason; it stays counted.

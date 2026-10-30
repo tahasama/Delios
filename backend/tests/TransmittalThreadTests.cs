@@ -90,13 +90,14 @@ public sealed class TransmittalThreadTests(Infrastructure infrastructure) : ICla
         var addressees = await controller.GetFromJsonAsync<JsonElement>(P(p, "/addressees"));
         var eli = addressees.GetProperty("people").EnumerateArray().Single(x => x.GetProperty("name").GetString() == "Eli Engineer").GetProperty("id").GetGuid();
 
-        var (noWords, noWordsBody) = await Flow.PostAsync(controller, P(p, "/transmittals"), new { userIds = new[] { eli }, reason = "INFORMATION" });
+        // A letter is an information transmittal: its subject and message are asked.
+        var (noWords, noWordsBody) = await Flow.PostAsync(controller, P(p, "/transmittals"), new { userIds = new[] { eli }, reason = "CONFIRMATION" });
         Assert.Equal("FIELDS_REQUIRED", Flow.Code(noWordsBody));
         var yesterday = DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd");
         var (_, first) = await Flow.PostAsync(controller, P(p, "/transmittals"), new
         {
             userIds = new[] { eli },
-            reason = "INFORMATION",
+            reason = "CONFIRMATION",
             subject = "Site access",
             message = "Gate 3 is closed this week.",
             issuedOn = yesterday,
@@ -110,7 +111,7 @@ public sealed class TransmittalThreadTests(Infrastructure infrastructure) : ICla
         var (future, futureBody) = await Flow.PostAsync(controller, P(p, "/transmittals"), new
         {
             userIds = new[] { eli },
-            reason = "INFORMATION",
+            reason = "CONFIRMATION",
             subject = "x",
             message = "y",
             issuedOn = tomorrow,
@@ -122,7 +123,7 @@ public sealed class TransmittalThreadTests(Infrastructure infrastructure) : ICla
         var (_, answer) = await Flow.PostAsync(controller, P(p, "/transmittals"), new
         {
             userIds = new[] { carla },
-            reason = "INFORMATION",
+            reason = "ANSWER",
             subject = "Re: Site access",
             message = "Noted.",
             inReplyToId = firstId,
@@ -130,7 +131,7 @@ public sealed class TransmittalThreadTests(Infrastructure infrastructure) : ICla
         var (_, replacing) = await Flow.PostAsync(controller, P(p, "/transmittals"), new
         {
             userIds = new[] { eli },
-            reason = "INFORMATION",
+            reason = "CONFIRMATION",
             subject = "Site access (corrected)",
             message = "Gate 4, not 3.",
             followsId = firstId,
@@ -156,9 +157,11 @@ public sealed class TransmittalThreadTests(Infrastructure infrastructure) : ICla
         var acme = addressees.GetProperty("parties").EnumerateArray().Single(x => x.GetProperty("code").GetString() == "ACME").GetProperty("id").GetGuid();
         var eli = addressees.GetProperty("people").EnumerateArray().Single(x => x.GetProperty("name").GetString() == "Eli Engineer").GetProperty("id").GetGuid();
 
+        // Words alone are an information transmittal (a data transmittal carries a document or the file that came).
         var (status, t) = await Flow.PostAsync(controller, P(p, "/transmittals/incoming"), new
         {
-            reason = "INFORMATION",
+            reason = "CONFIRMATION",
+            subject = "Delivery slot",
             message = "Our delivery slot moves to Friday.",
             fromPartyId = acme,
             note = "Came by email to the site office.",
