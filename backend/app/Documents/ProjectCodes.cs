@@ -15,12 +15,22 @@ public static class ProjectCodes
     public static async Task EnsurePublishedAsync(DeliosDbContext db, Guid tenantId, string code, string name, CancellationToken cancellationToken)
     {
         var owners = await db.Projects.AsNoTracking().Where(p => p.TenantId == tenantId && p.OwnListKeys.Contains(ValueSets.ProjectCodes)).Select(p => (Guid?)p.Id).ToListAsync(cancellationToken);
+        var locked = false;
         foreach (var projectId in owners.Prepend(null))
         {
-            var known = db.ValueEntries.Local.Any(v => v.TenantId == tenantId && v.ProjectId == projectId && v.SetKey == ValueSets.ProjectCodes && v.Code == code)
+            async Task<bool> KnownAsync() =>
+                db.ValueEntries.Local.Any(v => v.TenantId == tenantId && v.ProjectId == projectId && v.SetKey == ValueSets.ProjectCodes && v.Code == code)
                 || await db.ValueEntries.IgnoreQueryFilters().AnyAsync(v => v.TenantId == tenantId && v.ProjectId == projectId
                     && v.SetKey == ValueSets.ProjectCodes && v.Code == code, cancellationToken);
-            if (known) continue;
+            if (await KnownAsync()) continue;
+            // Two documents registered at the same moment, the project's first: the second waits until the first is
+            // saved, then finds the code there (it was refused before, as a fault of ours).
+            if (!locked)
+            {
+                await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({"project-code:" + tenantId + ":" + code}))", cancellationToken);
+                locked = true;
+                if (await KnownAsync()) continue;
+            }
             var sort = await db.ValueEntries.IgnoreQueryFilters().Where(v => v.TenantId == tenantId && v.ProjectId == projectId && v.SetKey == ValueSets.ProjectCodes)
                 .Select(v => (int?)v.Sort).MaxAsync(cancellationToken) ?? 0;
             db.ValueEntries.Add(new ValueEntry { TenantId = tenantId, ProjectId = projectId, SetKey = ValueSets.ProjectCodes, Code = code, Label = name, Sort = sort + 1 });

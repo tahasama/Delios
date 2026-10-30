@@ -117,24 +117,25 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var compaction = (await Api.RegisterAsync(engineer, project, Api.Drawing("Compaction test results"))).GetProperty("id").GetGuid();
         var a = (string code) => $"{p}/activities/{ByCode(activities, code).GetProperty("id").GetGuid()}";
 
-        var (unknown, unknownBody) = await Flow.PostAsync(engineer, $"{a("A100")}/needs", new { documentId = slab, purpose = "WHATEVER" });
+        // The control function adds documents to actions by hand (owner).
+        var (unknown, unknownBody) = await Flow.PostAsync(controller, $"{a("A100")}/needs", new { documentId = slab, purpose = "WHATEVER" });
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "VALUE_NOT_PUBLISHED"), (unknown, Flow.Code(unknownBody)));
-        var (_, slabNeed) = await Flow.PostAsync(engineer, $"{a("A100")}/needs", new { documentId = slab, purpose = "EXECUTION" });
+        var (_, slabNeed) = await Flow.PostAsync(controller, $"{a("A100")}/needs", new { documentId = slab, purpose = "EXECUTION" });
         Assert.Equal("AT_RISK", slabNeed.GetProperty("activity").GetProperty("readiness").GetString());
         Assert.Equal(DateOnly.FromDateTime(Today.AddDays(-2)), slabNeed.GetProperty("needs")[0].GetProperty("neededBy").Deserialize<DateOnly>());
-        var (again, againBody) = await Flow.PostAsync(engineer, $"{a("A100")}/needs", new { documentId = slab, purpose = "EXECUTION" });
+        var (again, againBody) = await Flow.PostAsync(controller, $"{a("A100")}/needs", new { documentId = slab, purpose = "EXECUTION" });
         Assert.Equal((HttpStatusCode.Conflict, "NEED_EXISTS"), (again, Flow.Code(againBody)));
 
-        var (plumbing, plumbingBody) = await Flow.PostAsync(engineer, $"{a("A200")}/needs",
+        var (plumbing, plumbingBody) = await Flow.PostAsync(controller, $"{a("A200")}/needs",
             new { documentId = layout, purpose = "INFORMATION", department = "Plumbing" });
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "VALUE_NOT_PUBLISHED"), (plumbing, Flow.Code(plumbingBody)));
-        var (_, layoutNeed) = await Flow.PostAsync(engineer, $"{a("A200")}/needs",
+        var (_, layoutNeed) = await Flow.PostAsync(controller, $"{a("A200")}/needs",
             new { documentId = layout, purpose = "INFORMATION", department = "Electrical" });
         Assert.Equal("EL", layoutNeed.GetProperty("needs")[0].GetProperty("department").GetString());
         Assert.Equal("PENDING", layoutNeed.GetProperty("activity").GetProperty("readiness").GetString());
 
         // A test result is needed after the work: counted from the finish.
-        var (_, testNeed) = await Flow.PostAsync(engineer, $"{a("A300")}/needs",
+        var (_, testNeed) = await Flow.PostAsync(controller, $"{a("A300")}/needs",
             new { documentId = compaction, purpose = "RECORD", anchor = "FINISH", offsetDays = 7 });
         Assert.Equal(DateOnly.FromDateTime(Today.AddDays(47)), testNeed.GetProperty("needs")[0].GetProperty("neededBy").Deserialize<DateOnly>());
 
@@ -252,7 +253,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var activities = await UntilAsync(engineer, $"{p}/activities", a => a.GetArrayLength() == 1);
         var b100 = $"{p}/activities/{ByCode(activities, "B100").GetProperty("id").GetGuid()}";
         var drawing = (await Api.RegisterAsync(engineer, project, Api.Drawing("Pump pit excavation"))).GetProperty("id").GetGuid();
-        await Flow.PostAsync(engineer, $"{b100}/needs", new { documentId = drawing, purpose = "EXECUTION" });
+        await Flow.PostAsync(controller, $"{b100}/needs", new { documentId = drawing, purpose = "EXECUTION" });
 
         var run = await CheckTests.RunAsync(controller, project);
         Assert.Equal(("FAIL", "PASS", "PASS"), (CheckTests.Result(run, "SCH-02"), CheckTests.Result(run, "SCH-01"), CheckTests.Result(run, "SET-11")));

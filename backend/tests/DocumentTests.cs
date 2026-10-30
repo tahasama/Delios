@@ -468,13 +468,14 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
 
         using var unknown = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions",
             new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-1.pdf", Pdf) }, series = "AS_BUILT", changeDescription = "First issue" });
+        // The demo's scheme has one line, for any phase (owner: a line per phase, plus the default).
         using var execution = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions",
-            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) }, series = "EXECUTION", changeDescription = "First issue" });
+            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) }, series = "DESIGN", changeDescription = "First issue" });
         var revision = await execution.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "REVISION_SERIES_UNKNOWN"), await Api.ProblemAsync(unknown));
         Assert.Equal(HttpStatusCode.Created, execution.StatusCode);
-        Assert.Equal(("0", "EXECUTION"), (revision.GetProperty("value").GetString(), revision.GetProperty("series").GetString()));
+        Assert.Equal(("A", "DESIGN"), (revision.GetProperty("value").GetString(), revision.GetProperty("series").GetString()));
     }
 
     [Fact]

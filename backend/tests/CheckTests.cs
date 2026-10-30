@@ -78,11 +78,6 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
         await ReleaseAsync(engineer, approver, controller, p);
         await Api.RegisterAsync(engineer, p.Project, Api.Drawing("Inlet works sections"));
 
-        // This project does not grade documents by criticality: it says so, and the check is not asked.
-        using (var noCriticality = await controller.PutAsJsonAsync($"/api/projects/{p.Project}/checks/CL-05/opt-out",
-            new { reason = "Criticality is not used on this project." }))
-            Assert.Equal(HttpStatusCode.NoContent, noCriticality.StatusCode);
-
         var (notControl, notControlBody) = await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/checks/run", new { });
         Assert.Equal((HttpStatusCode.Forbidden, "CONTROL_ONLY"), (notControl, Flow.Code(notControlBody)));
 
@@ -139,11 +134,14 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
         {
             await using var scope = app.Factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
-            scope.ServiceProvider.GetRequiredService<TenantContext>().Set(await db.Tenants.Select(t => t.Id).SingleAsync());
+            var tenant = await db.Tenants.Select(t => t.Id).SingleAsync();
+            scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenant);
             await using var tx = await db.Database.BeginTransactionAsync();
             await db.ValueEntries.Where(v => v.SetKey == ValueSets.Disciplines && v.Code == "CI")
                 .ExecuteUpdateAsync(v => v.SetProperty(x => x.Status, status));
             await tx.CommitAsync();
+            // Written around the app: the lists every process keeps until they change are told, as a save would.
+            scope.ServiceProvider.GetRequiredService<AccessVersions>().Raise([tenant]);
         }
 
         // Civil retired from the list while a document still carries it.

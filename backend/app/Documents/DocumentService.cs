@@ -49,6 +49,13 @@ public sealed class DocumentService(
             return Fail(Problems.Invalid("DISCIPLINE_REQUIRED", "Exactly one discipline is required."));
 
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        // The type recommends a criticality (owner: one is always recommended). Where the document form insists on it and
+        // none is given (a list read, what arrived registered, an import line), the recommended level is taken, as the
+        // form fills it in: the rule lives here once, not in each screen.
+        if (Blank(request.Criticality) is null
+            && (await Settings.FormRules.ReadAsync(db, access.Project.Id, "DOCUMENT", cancellationToken)).Rules.GetValueOrDefault("criticality") == Settings.FormRules.Required
+            && catalog.RecommendedCriticality(request.DocType, request.DeliverableType) is { } recommended)
+            request = request with { Criticality = recommended };
         if (Titles.IsGeneric(title, catalog.GenericTitleWords()))
             return Fail(Problems.Invalid("TITLE_GENERIC",
                 "The title only repeats the document type. Say what it shows, and of what.", new { title }));

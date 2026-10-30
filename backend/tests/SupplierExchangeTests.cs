@@ -211,6 +211,7 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
             discipline = "ME",
             subproject = "20",
             contractRef = "PO101",
+            criticality = "C",
         });
         Assert.True(registered == HttpStatusCode.OK, registeredBody.ToString());
         var item = registeredBody.GetProperty("items").EnumerateArray().Single(x => x.GetProperty("kind").GetString() == "UNPLANNED");

@@ -160,6 +160,23 @@ public sealed class Catalog
             && d.ValueKind == JsonValueKind.True)?.Code;
 
     /// <summary>
+    /// The criticality a document type recommends (owner: one is always recommended): its own, else the level marked
+    /// default, else the level the types recommend most; each offered for the deliverable type. Null when there is none.
+    /// </summary>
+    public string? RecommendedCriticality(string? docType, string? deliverableType = null)
+    {
+        bool Offers(string? code) => code is not null && IsOfferedFor(ValueSets.Criticality, code, deliverableType);
+        if (docType is not null && Prop(ValueSets.DocumentTypes, docType, "criticality") is { ValueKind: JsonValueKind.String } own
+            && Offers(own.GetString())) return own.GetString();
+        if (DefaultOf(ValueSets.Criticality, deliverableType) is { } usual) return usual;
+        return _sets.TryGetValue(ValueSets.DocumentTypes, out var types)
+            ? types.Values.Where(v => v.Status == ValueStatus.Active)
+                .Select(v => v.Props?.RootElement.TryGetProperty("criticality", out var c) == true && c.ValueKind == JsonValueKind.String ? c.GetString() : null)
+                .Where(Offers).GroupBy(c => c).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault()
+            : null;
+    }
+
+    /// <summary>
     /// The first active value in the published order, among those offered for the deliverable type when one is given: for
     /// confidentiality, the lowest level (ranks follow that order).
     /// </summary>

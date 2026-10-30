@@ -305,7 +305,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Criticality: the document type recommends a level (Settings, on the type);
   it is filled in on create and marked "(recommended)"; it is optional, and the
   person may choose another. A type naming none recommends the usual level (the list's default, else the level
-  types recommend most): one is always recommended. Required in Forms & fields, it is required on the form too.
+  types recommend most): one is always recommended. Required in Forms & fields, it is required on the form too; a
+  document registered with none where it is required (a requirements list's placeholder, what arrived registered, an
+  import line) takes the recommended level, worked out by the backend (`Catalog.RecommendedCriticality`).
 - A purchase order belongs to a supplier: the one it names (Settings, Purchase orders, "Supplier"), else the one
   whose supply package carries it. A document of another organization names only its own orders (or one tied to
   nobody); the form offers only those, the backend refuses another's (PO_OF_ANOTHER_SUPPLIER). "From another

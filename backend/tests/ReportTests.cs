@@ -70,7 +70,7 @@ public sealed class ReportTests(Infrastructure infrastructure) : IClassFixture<I
 
         var deliveries = await GetAsync(engineer, $"{p}/reports/deliveries");
         var overdue = Rows(deliveries).Single();
-        Assert.Equal((lateNumber, "Overdue", "1 d"), (overdue[0], overdue[6], overdue[5]));
+        Assert.Equal((lateNumber, "Overdue", "1 d"), (overdue[0], overdue[7], overdue[6]));
         Assert.Equal("1", Figure(deliveries, "Overdue now"));
 
         var reviews = await GetAsync(engineer, $"{p}/reports/reviews");
