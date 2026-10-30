@@ -372,7 +372,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         var doc = (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
 
         var fileId = await UploadAsync(client, project, doc, "GA.pdf", Pdf);
-        using var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId } , changeDescription = "Next issue" });
+        using var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId }, changeDescription = "Next issue" });
         var revision = await started.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(HttpStatusCode.Created, started.StatusCode);
         Assert.Equal("A", revision.GetProperty("value").GetString());
@@ -389,7 +389,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         Assert.Equal(Pdf, await client.GetByteArrayAsync($"/api/projects/{project}/files/{fileId}/download"));
 
         using var second = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions",
-            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) } , changeDescription = "Next issue" });
+            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) }, changeDescription = "Next issue" });
         Assert.Equal((HttpStatusCode.Conflict, "REVISION_IN_MOTION"), await Api.ProblemAsync(second));
     }
 
@@ -411,7 +411,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         var ticket = await requested.Content.ReadFromJsonAsync<JsonElement>();
         await Flow.PutAsync(ticket, Pdf);
         var fileId = ticket.GetProperty("fileId").GetGuid();
-        using (var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId } , changeDescription = "Next issue" }))
+        using (var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId }, changeDescription = "Next issue" }))
             Assert.Equal(HttpStatusCode.Created, started.StatusCode);
         Assert.Equal("READY", (await WaitForFilesAsync(client, project, doc)).GetProperty("filesState").GetString());
 
@@ -433,7 +433,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         var doc = (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
 
         var fileId = await UploadAsync(client, project, doc, "notes.txt", Encoding.ASCII.GetBytes("X5O " + FakeScanner.Marker));
-        using var _ = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId } , changeDescription = "Next issue" });
+        using var _ = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId }, changeDescription = "Next issue" });
 
         var revision = await WaitForFilesAsync(client, project, doc);
         Assert.Equal("REJECTED", revision.GetProperty("filesState").GetString());
@@ -452,7 +452,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         var doc = (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
 
         var fileId = await UploadAsync(client, project, doc, "GA.pdf", Pdf, declaredSha256: new string('a', 64));
-        using var _ = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId } , changeDescription = "Next issue" });
+        using var _ = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId }, changeDescription = "Next issue" });
 
         var revision = await WaitForFilesAsync(client, project, doc);
         Assert.Equal("REJECTED", revision.GetProperty("files")[0].GetProperty("status").GetString());
@@ -494,7 +494,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
             sha256 = Convert.ToHexStringLower(SHA256.HashData(Pdf)),
         });
         var fileId = (await ticket.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("fileId").GetGuid();
-        using var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId } , changeDescription = "Next issue" });
+        using var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId }, changeDescription = "Next issue" });
 
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "FILE_NOT_UPLOADED"), await Api.ProblemAsync(started));
     }

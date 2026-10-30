@@ -34,18 +34,16 @@ public sealed record CommentView(Guid Id, int Step, string Author, string Text, 
     bool? OriginalBlocking = null, DateTimeOffset? ReclassifiedAt = null, string? ReclassifiedBy = null, string? ReclassifyNote = null);
 
 /// <summary>The full review as sent to the client: its state, its steps and its comments. Built by <see cref="ReviewEndpoints.View(Review)"/>.</summary>
+/// <param name="VerdictCodes">The verdicts the deciding step may give: those of the review's set, in order.</param>
+/// <param name="AdviceCodes">The advice the advising steps may give: that of the review's set, in order.</param>
+/// <param name="AwaitsIssue">Sent for review, waiting for the control function to send it to its reviewers (REVIEW_ISSUE).</param>
 public sealed record ReviewView(Guid Id, string Number, Guid DocumentId, Guid RevisionId, string Route, string State,
     int? CurrentStep, string? Verdict, string? GrantedStatus, string StartedBy, DateTimeOffset StartedAt,
     DateTimeOffset? DecidedAt, DateTimeOffset? ClosedAt, string? ClosedBy, string? ReturnNote,
     IReadOnlyList<StepView> Steps, IReadOnlyList<CommentView> Comments, DateTimeOffset? ApprovalWithdrawnAt = null,
     string? ApprovalWithdrawnBy = null, string? ApprovalWithdrawnReason = null, string VerdictSet = ReviewSets.Verdicts,
     Guid? StartedById = null, IReadOnlyList<SendBack>? SendBacks = null, string? Verdicts = null,
-    /// <summary>The verdicts the deciding step may give: those of the review's set, in order.</summary>
-    IReadOnlyList<string>? VerdictCodes = null,
-    /// <summary>The advice the advising steps may give: that of the review's set, in order.</summary>
-    IReadOnlyList<string>? AdviceCodes = null,
-    /// <summary>Sent for review, waiting for the control function to send it to its reviewers (REVIEW_ISSUE).</summary>
-    bool AwaitsIssue = false);
+    IReadOnlyList<string>? VerdictCodes = null, IReadOnlyList<string>? AdviceCodes = null, bool AwaitsIssue = false);
 
 /// <summary>
 /// The HTTP endpoints for reviews: listing routes, starting a review, commenting, answering, releasing, returning, rewinding and dispatching steps.
@@ -160,9 +158,9 @@ public static class ReviewEndpoints
         var people = await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Name, cancellationToken);
         var functions = await db.Functions.AsNoTracking().Where(f => codes.Contains(f.Code)).ToDictionaryAsync(f => f.Code, f => f.Name, cancellationToken);
         var holders = codes.Count == 0 ? [] : (await (from m in db.Memberships.AsNoTracking()
-                              join u in db.Users.AsNoTracking() on m.UserId equals u.Id
-                              where projects.Contains(m.ProjectId) && m.Active && m.Function!.Active && u.Active && codes.Contains(m.Function.Code)
-                              select new { m.ProjectId, m.Function!.Code, u.Name }).ToListAsync(cancellationToken))
+                                                      join u in db.Users.AsNoTracking() on m.UserId equals u.Id
+                                                      where projects.Contains(m.ProjectId) && m.Active && m.Function!.Active && u.Active && codes.Contains(m.Function.Code)
+                                                      select new { m.ProjectId, m.Function!.Code, u.Name }).ToListAsync(cancellationToken))
             .GroupBy(h => (h.ProjectId, h.Code)).ToDictionary(g => g.Key, g => g.Select(h => h.Name).Distinct().Order().ToList());
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
         return found.Select(review =>

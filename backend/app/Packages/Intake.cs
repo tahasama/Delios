@@ -106,8 +106,15 @@ public static class Intake
             return;
         }
         if (row is null)
-            db.Add(new Setting { TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Key = key, Value = value,
-                UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = access.UserName });
+            db.Add(new Setting
+            {
+                TenantId = access.Project.TenantId,
+                ProjectId = access.Project.Id,
+                Key = key,
+                Value = value,
+                UpdatedAt = clock.GetCurrentInstant(),
+                UpdatedByName = access.UserName
+            });
         else
         {
             row.Value = value;

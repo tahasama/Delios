@@ -36,8 +36,11 @@ public static class Trials
         var days = await DaysAsync(db, cancellationToken);
         var row = new Subscription
         {
-            TenantId = tenantId, State = SubscriptionStates.Trial, TrialEndsAt = days == 0 ? null : now + Duration.FromDays(days),
-            UpdatedAt = now, UpdatedBy = "DELIOS",
+            TenantId = tenantId,
+            State = SubscriptionStates.Trial,
+            TrialEndsAt = days == 0 ? null : now + Duration.FromDays(days),
+            UpdatedAt = now,
+            UpdatedBy = "DELIOS",
         };
         db.Add(row);
         Moved(db, row);
@@ -73,7 +76,8 @@ public static class Trials
         s.RemindAt = NextReminder(s);
         db.Add(new Messaging.OutboxMessage
         {
-            RoutingKey = TrialsMoved.RoutingKey, Payload = System.Text.Json.JsonSerializer.Serialize(new TrialsMoved(s.TenantId)),
+            RoutingKey = TrialsMoved.RoutingKey,
+            Payload = System.Text.Json.JsonSerializer.Serialize(new TrialsMoved(s.TenantId)),
         });
     }
 

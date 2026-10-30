@@ -255,7 +255,11 @@ public static class Registry
         if (held is not null) return held.HolderId == holderId;
         db.ReservedValues.Add(new ReservedValue
         {
-            Kind = kind, Value = Key(value), Shown = value.Trim(), HolderId = holderId, TenantId = tenantId,
+            Kind = kind,
+            Value = Key(value),
+            Shown = value.Trim(),
+            HolderId = holderId,
+            TenantId = tenantId,
             ReservedAt = SystemClock.Instance.GetCurrentInstant(),
         });
         return true;
@@ -275,7 +279,11 @@ public static class Registry
         {
             var identity = new OrganizationIdentity
             {
-                Code = code, Name = name.Trim(), TenantId = ownTenant, CreatedByTenantId = tenantId, CreatedAt = SystemClock.Instance.GetCurrentInstant(),
+                Code = code,
+                Name = name.Trim(),
+                TenantId = ownTenant,
+                CreatedByTenantId = tenantId,
+                CreatedAt = SystemClock.Instance.GetCurrentInstant(),
             };
             db.OrganizationIdentities.Add(identity);
             await ReserveAsync(db, ReservedKinds.OrganizationCode, code, identity.Id, tenantId, cancellationToken);
@@ -589,7 +597,10 @@ public static class Registry
                 if (clash) party.Code = await FreeOrganizationCodeAsync(db, party.Code, cancellationToken);
                 identity = new OrganizationIdentity
                 {
-                    Code = Key(party.Code), Name = party.Name, TenantId = party.IsInternal ? tenantId : null, CreatedByTenantId = tenantId,
+                    Code = Key(party.Code),
+                    Name = party.Name,
+                    TenantId = party.IsInternal ? tenantId : null,
+                    CreatedByTenantId = tenantId,
                     CreatedAt = SystemClock.Instance.GetCurrentInstant(),
                 };
                 db.OrganizationIdentities.Add(identity);

@@ -91,8 +91,14 @@ public static class ProductRequests
         var by = await db.Users.AsNoTracking().SingleAsync(u => u.Id == http.User.UserId(), cancellationToken);
         var ask = new ProductRequest
         {
-            TenantId = tenantId, OrganizationName = tenant.Name, What = what, Message = message,
-            ByUserId = by.Id, ByName = by.Name, ByEmail = by.Email, At = clock.GetCurrentInstant(),
+            TenantId = tenantId,
+            OrganizationName = tenant.Name,
+            What = what,
+            Message = message,
+            ByUserId = by.Id,
+            ByName = by.Name,
+            ByEmail = by.Email,
+            At = clock.GetCurrentInstant(),
         };
         db.Add(ask);
         if (email.Value.DeliosAddress is { Length: > 0 } to && to.Contains('@'))

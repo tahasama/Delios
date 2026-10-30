@@ -100,7 +100,10 @@ public sealed class ConsoleTests(Infrastructure infrastructure) : IClassFixture<
         // An invoice issued, paid by transfer: the period it pays for is paid.
         var (issued, issuedBody) = await Flow.PostAsync(ops, $"/api/console/organizations/{id}/invoices", new
         {
-            periodFrom = "2027-01-01", periodTo = "2027-12-31", currency = "MAD", taxRate = 20,
+            periodFrom = "2027-01-01",
+            periodTo = "2027-12-31",
+            currency = "MAD",
+            taxRate = 20,
             lines = new[] { new { description = "Team plan, per user, a year", quantity = 5, unitPrice = 1000 } },
         });
         Assert.True(issued == HttpStatusCode.OK, issuedBody.ToString());

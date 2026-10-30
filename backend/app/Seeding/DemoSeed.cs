@@ -217,8 +217,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         Set(ValueSets.Disciplines,
             ("CI", "Civil", null), ("EL", "Electrical", null), ("ME", "Mechanical", null), ("PR", "Process", null),
             ("IN", "Instrumentation", null), ("ST", "Structural", null), ("GE", "General", null), ("PM", "Project Management", null));
+        // Each type recommends a criticality; whoever creates a document may choose another.
         Set(ValueSets.DocumentTypes,
-            // Each type recommends a criticality; whoever creates a document may choose another.
             ("DWG", "Drawing", new { criticality = "B" }), ("CAL", "Calculation", new { criticality = "A" }),
             ("SPC", "Specification", new { criticality = "B" }), ("DAS", "Datasheet", new { criticality = "B" }),
             ("PRO", "Procedure", new { criticality = "B" }), ("REP", "Report", new { criticality = "C" }), ("LST", "List", new { criticality = "C" }));
@@ -330,16 +330,16 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         db.NumberingSchemes.Add(reviewScheme);
         db.SchemeRoutings.Add(new SchemeRouting { TenantId = t, DeliverableType = RecordKinds.Review, SchemeId = reviewScheme.Id });
 
+        // IFU: work does not go ahead on it; it goes back to its author (or supplier) to update for the next revision.
         Set(ReviewSets.Statuses,
             ("IFI", "Issued for information", new { executes = false }),
             ("IFR", "Issued for review", new { executes = false }),
             ("IFA", "Issued for approval", new { executes = false }),
-            // Work does not go ahead on it: it goes back to its author (or supplier) to update for the next revision.
             ("IFU", "Issued for update", new { executes = false, update = true }),
             ("IFC", "Issued for construction", new { executes = true }),
             ("AFC", "Approved for construction", new { executes = true }));
+        // Each verdict says one of the four meanings (accepted, with comments, rejected, for information); the names are ours.
         Set(ReviewSets.Verdicts,
-            // Each says one of the four meanings (accepted, with comments, rejected, for information); the names are ours.
             ("C1", "Accepted", new { proceed = true, resubmit = false, information = false }),
             ("C2", "Accepted with comments", new { proceed = true, resubmit = true, information = false }),
             ("C3", "Rejected: revise and resubmit", new { proceed = false, resubmit = true, information = false }),
@@ -744,7 +744,11 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         foreach (var later in have.Where(v => v.Sort > after)) later.Sort++;
         db.ValueEntries.Add(new ValueEntry
         {
-            TenantId = t, SetKey = ReviewSets.Statuses, Code = "IFU", Label = "Issued for update", Sort = after + 1,
+            TenantId = t,
+            SetKey = ReviewSets.Statuses,
+            Code = "IFU",
+            Label = "Issued for update",
+            Sort = after + 1,
             Props = JsonSerializer.SerializeToDocument(new { executes = false, update = true }),
         });
         foreach (var step in (await db.ReviewRoutes.ToListAsync(cancellationToken)).SelectMany(r => r.Steps).Where(s => s.GrantsStatuses.Contains("IFR")))

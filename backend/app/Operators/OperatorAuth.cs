@@ -197,7 +197,11 @@ public static class OperatorAuth
         await db.SaveChangesAsync(cancellationToken);
         http.Response.Cookies.Append(CookieName, token, new CookieOptions
         {
-            HttpOnly = true, Secure = cookie.SecureCookie, SameSite = SameSiteMode.Strict, Path = "/", Expires = expires.ToDateTimeOffset(),
+            HttpOnly = true,
+            Secure = cookie.SecureCookie,
+            SameSite = SameSiteMode.Strict,
+            Path = "/",
+            Expires = expires.ToDateTimeOffset(),
         });
         return Results.Ok(new SignInAnswer("SIGNED_IN", new Me(who.Id, who.Name, who.Email), RecoveryCodes: recoveryCodes));
     }
@@ -252,8 +256,11 @@ public sealed class CreateOperator(DeliosDbContext db, IPasswordHasher<Operator>
         if (isNew) db.Add(who);
         db.Add(new OperatorEvent
         {
-            OperatorId = who.Id, OperatorName = who.Name, Action = isNew ? "OPERATOR_CREATED" : "OPERATOR_RESET",
-            Detail = "By the backend command create-operator.", At = clock.GetCurrentInstant(),
+            OperatorId = who.Id,
+            OperatorName = who.Name,
+            Action = isNew ? "OPERATOR_CREATED" : "OPERATOR_RESET",
+            Detail = "By the backend command create-operator.",
+            At = clock.GetCurrentInstant(),
         });
         await db.SaveChangesAsync(cancellationToken);
         return $"{(isNew ? "Created" : "Reset")} {who.Name} <{email}>.\n"

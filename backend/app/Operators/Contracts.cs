@@ -114,8 +114,14 @@ public static class ContractEndpoints
         foreach (var kind in kinds)
             db.Add(new LegalAcceptance
             {
-                TenantId = tenantId, UserId = userId, UserName = name, UserEmail = email, Kind = kind,
-                Version = latest.TryGetValue(kind, out var d) ? d.Version : 0, At = now, Address = address,
+                TenantId = tenantId,
+                UserId = userId,
+                UserName = name,
+                UserEmail = email,
+                Kind = kind,
+                Version = latest.TryGetValue(kind, out var d) ? d.Version : 0,
+                At = now,
+                Address = address,
             });
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -140,7 +146,8 @@ public static class ContractEndpoints
             var all = await db.Set<PlatformSetting>().AsNoTracking().ToDictionaryAsync(p => p.Key, p => p.Value, c);
             return Results.Ok(new
             {
-                email = all.GetValueOrDefault(PlatformKeys.SupportEmail), hours = all.GetValueOrDefault(PlatformKeys.SupportHours),
+                email = all.GetValueOrDefault(PlatformKeys.SupportEmail),
+                hours = all.GetValueOrDefault(PlatformKeys.SupportHours),
                 phone = all.GetValueOrDefault(PlatformKeys.SupportPhone),
             });
         });
@@ -192,10 +199,18 @@ public static class ContractEndpoints
         var standing = Subscriptions.Effective(row, now);
         return Results.Ok(new
         {
-            state = standing.State, why = standing.Why, readsOnly = standing.ReadsOnly,
+            state = standing.State,
+            why = standing.Why,
+            readsOnly = standing.ReadsOnly,
             plan = plan is null ? null : new { plan.Code, plan.Name, plan.PricePerUser, plan.Currency },
-            trialEndsAt = row?.TrialEndsAt, paidUntil = row?.PaidUntil, billing = row?.Billing, seats = row?.Seats,
-            contractRef = row?.ContractRef, contractSignedOn = row?.ContractSignedOn, cancelledAt = row?.CancelledAt, cancelledBy = row?.CancelledBy,
+            trialEndsAt = row?.TrialEndsAt,
+            paidUntil = row?.PaidUntil,
+            billing = row?.Billing,
+            seats = row?.Seats,
+            contractRef = row?.ContractRef,
+            contractSignedOn = row?.ContractSignedOn,
+            cancelledAt = row?.CancelledAt,
+            cancelledBy = row?.CancelledBy,
             renewsOn = row is { State: SubscriptionStates.Active, CancelledAt: null } ? row.PaidUntil : null,
             users = await Subscriptions.Paid(db, tenantId).CountAsync(cancellationToken),
             texts,
@@ -299,8 +314,12 @@ public static class ContractEndpoints
             return Problems.Conflict("ALREADY_GRANTED", "DELIOS is already let in: end that first.");
         var grant = new SupportGrant
         {
-            TenantId = tenantId, GrantedById = http.User.UserId(), GrantedByName = http.User.Identity?.Name ?? "", Why = why[..Math.Min(why.Length, 2000)],
-            From = now, Until = now + Duration.FromDays(request.Days.Value),
+            TenantId = tenantId,
+            GrantedById = http.User.UserId(),
+            GrantedByName = http.User.Identity?.Name ?? "",
+            Why = why[..Math.Min(why.Length, 2000)],
+            From = now,
+            Until = now + Duration.FromDays(request.Days.Value),
         };
         db.Add(grant);
         await db.SaveChangesAsync(cancellationToken);

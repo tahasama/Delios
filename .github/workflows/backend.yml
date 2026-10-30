@@ -47,8 +47,9 @@ jobs:
       - run: docker build -t delios-backend backend
       - run: docker build -t delios-postgres deploy/postgres
       - run: sh deploy/init-env.sh
-      # Start the whole stack from the image just built and require every service to be healthy.
-      - run: docker compose --profile app up -d --no-build
+      # Start the server's stack from the images just built and require the API and worker to be healthy. The screens,
+      # the drawing reader and the file copier are built from their own folders and are not what this job checks.
+      - run: docker compose up -d --no-build postgres valkey rabbitmq seaweedfs storage-init clamav migrate api worker caddy
       - name: Wait for api and worker to be healthy
         run: |
           for i in $(seq 1 120); do

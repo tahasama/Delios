@@ -112,8 +112,12 @@ public static class ConsoleEndpoints
         var who = http.Current();
         db.Add(new OperatorEvent
         {
-            OperatorId = who.Id, OperatorName = who.Name, Action = action, TenantId = tenantId,
-            Detail = detail is { Length: > 4000 } ? detail[..4000] : detail, At = clock.GetCurrentInstant(),
+            OperatorId = who.Id,
+            OperatorName = who.Name,
+            Action = action,
+            TenantId = tenantId,
+            Detail = detail is { Length: > 4000 } ? detail[..4000] : detail,
+            At = clock.GetCurrentInstant(),
         });
     }
 
@@ -207,8 +211,15 @@ public static class ConsoleEndpoints
         }, cancellationToken);
         return Results.Ok(new
         {
-            organization = row, subscription = sub, inside.admins, inside.projects, inside.people, support = grants,
-            supportOpen = open is not null, acceptances, requests,
+            organization = row,
+            subscription = sub,
+            inside.admins,
+            inside.projects,
+            inside.people,
+            support = grants,
+            supportOpen = open is not null,
+            acceptances,
+            requests,
             log = await db.Set<OperatorEvent>().AsNoTracking().Where(e => e.TenantId == id).OrderByDescending(e => e.At).Take(50).ToListAsync(cancellationToken),
         });
     }
@@ -302,13 +313,44 @@ public static class ConsoleEndpoints
                            join t in db.Tenants.AsNoTracking() on s.TenantId equals t.Id
                            where s.PlanAsked != null
                            orderby s.PlanAskedAt descending
-                           select new { tenantId = t.Id, organization = t.Name, plan = s.PlanAsked, users = s.PlanAskedUsers, note = s.PlanAskedNote,
-                               at = s.PlanAskedAt, askedBy = s.PlanAskedBy }).ToListAsync(cancellationToken),
+                           select new
+                           {
+                               tenantId = t.Id,
+                               organization = t.Name,
+                               plan = s.PlanAsked,
+                               users = s.PlanAskedUsers,
+                               note = s.PlanAskedNote,
+                               at = s.PlanAskedAt,
+                               askedBy = s.PlanAskedBy
+                           }).ToListAsync(cancellationToken),
             products = await db.Set<ProductRequest>().AsNoTracking().OrderByDescending(r => r.At).Take(200).ToListAsync(cancellationToken),
-            merges = merges.Select(m => new { m.Id, keep = Name(m.KeepId), merge = Name(m.MergeId), m.RequestedByName, m.Why, m.RequestedAt, m.State,
-                m.RefusedByName, m.RefusedWhy, m.AnsweredAt, m.DoneAt }),
-            claims = claims.Select(c => new { c.Id, entry = Name(c.EntryId), claimer = Name(c.ClaimerIdentityId), c.ClaimedByName, c.Method, c.State,
-                c.CreatedAt, c.AnsweredAt, c.AnsweredByName, c.RefusedWhy }),
+            merges = merges.Select(m => new
+            {
+                m.Id,
+                keep = Name(m.KeepId),
+                merge = Name(m.MergeId),
+                m.RequestedByName,
+                m.Why,
+                m.RequestedAt,
+                m.State,
+                m.RefusedByName,
+                m.RefusedWhy,
+                m.AnsweredAt,
+                m.DoneAt
+            }),
+            claims = claims.Select(c => new
+            {
+                c.Id,
+                entry = Name(c.EntryId),
+                claimer = Name(c.ClaimerIdentityId),
+                c.ClaimedByName,
+                c.Method,
+                c.State,
+                c.CreatedAt,
+                c.AnsweredAt,
+                c.AnsweredByName,
+                c.RefusedWhy
+            }),
         });
     }
 
@@ -383,7 +425,14 @@ public static class ConsoleEndpoints
                 var text = ContractEndpoints.TextOf(k, latest.GetValueOrDefault(k.Code));
                 return new
                 {
-                    text.Kind, text.Slug, text.Title, text.Lead, text.Version, text.PublishedAt, text.Placeholder, k.Accepted,
+                    text.Kind,
+                    text.Slug,
+                    text.Title,
+                    text.Lead,
+                    text.Version,
+                    text.PublishedAt,
+                    text.Placeholder,
+                    k.Accepted,
                     lawyerParts = text.Body.Split("[[LAWYER").Length - 1,
                     acceptedBy = accepted.Where(a => a.Kind == k.Code && a.Version == text.Version).Sum(a => a.Organizations),
                 };
@@ -396,10 +445,20 @@ public static class ConsoleEndpoints
                 var text = m.Text is { } kind ? ContractEndpoints.TextOf(LegalKinds.Of(kind)!, latest.GetValueOrDefault(kind)) : null;
                 return new
                 {
-                    m.Key, m.Group, m.Must, m.Title, m.What, text = m.Text, textSlug = m.Text is null ? null : LegalKinds.Of(m.Text)!.Slug,
-                    textVersion = text?.Version, textPlaceholder = text?.Placeholder,
+                    m.Key,
+                    m.Group,
+                    m.Must,
+                    m.Title,
+                    m.What,
+                    text = m.Text,
+                    textSlug = m.Text is null ? null : LegalKinds.Of(m.Text)!.Slug,
+                    textVersion = text?.Version,
+                    textPlaceholder = text?.Placeholder,
                     status = s?.Status ?? (text is { Version: 0 } || text?.Placeholder == true ? MatterStates.Placeholder : MatterStates.ToDo),
-                    set = s is not null, note = s?.Note, s?.UpdatedAt, s?.UpdatedBy,
+                    set = s is not null,
+                    note = s?.Note,
+                    s?.UpdatedAt,
+                    s?.UpdatedBy,
                 };
             }),
         });
@@ -412,8 +471,15 @@ public static class ConsoleEndpoints
         return Results.Ok(new
         {
             current = ContractEndpoints.TextOf(k, versions.FirstOrDefault()),
-            versions = versions.Select(v => new { v.Version, v.Title, v.Note, v.PublishedAt, v.PublishedBy,
-                acceptedBy = db.Set<LegalAcceptance>().Where(a => a.Kind == k.Code && a.Version == v.Version).Select(a => a.TenantId).Distinct().Count() }),
+            versions = versions.Select(v => new
+            {
+                v.Version,
+                v.Title,
+                v.Note,
+                v.PublishedAt,
+                v.PublishedBy,
+                acceptedBy = db.Set<LegalAcceptance>().Where(a => a.Kind == k.Code && a.Version == v.Version).Select(a => a.TenantId).Distinct().Count()
+            }),
             k.Accepted,
         });
     }
@@ -472,7 +538,15 @@ public static class ConsoleEndpoints
         var names = await db.Tenants.AsNoTracking().Where(t => ids.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.Name, cancellationToken);
         return Results.Ok(grants.Select(g => new
         {
-            g.Id, g.TenantId, organization = names.GetValueOrDefault(g.TenantId), g.GrantedByName, g.Why, g.From, g.Until, g.EndedAt, g.EndedByName,
+            g.Id,
+            g.TenantId,
+            organization = names.GetValueOrDefault(g.TenantId),
+            g.GrantedByName,
+            g.Why,
+            g.From,
+            g.Until,
+            g.EndedAt,
+            g.EndedByName,
             open = g.EndedAt == null && g.Until > now,
         }));
     }
@@ -511,7 +585,9 @@ public static class ConsoleEndpoints
             return Problems.Invalid("EMAIL_INVALID", "An email address.", new { field = "supportEmail" });
         var values = new Dictionary<string, string?>
         {
-            [PlatformKeys.SupportEmail] = email, [PlatformKeys.SupportHours] = request.SupportHours?.Trim(), [PlatformKeys.SupportPhone] = request.SupportPhone?.Trim(),
+            [PlatformKeys.SupportEmail] = email,
+            [PlatformKeys.SupportHours] = request.SupportHours?.Trim(),
+            [PlatformKeys.SupportPhone] = request.SupportPhone?.Trim(),
         };
         var now = clock.GetCurrentInstant();
         foreach (var (key, value) in values)

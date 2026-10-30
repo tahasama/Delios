@@ -170,8 +170,14 @@ public static class FormRules
 
     private static string Noun(string form) => form switch
     {
-        "DOCUMENT" => "document", "REVISION" => "revision", "TRANSMITTAL" => "transmittal", "PACKAGE" => "package",
-        "ASSET" => "tag", "PROJECT" => "project", "PARTY" => "organization", _ => "form",
+        "DOCUMENT" => "document",
+        "REVISION" => "revision",
+        "TRANSMITTAL" => "transmittal",
+        "PACKAGE" => "package",
+        "ASSET" => "tag",
+        "PROJECT" => "project",
+        "PARTY" => "organization",
+        _ => "form",
     };
 
     /// <summary>

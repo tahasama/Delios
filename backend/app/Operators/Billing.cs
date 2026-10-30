@@ -204,8 +204,16 @@ public static class BillingEndpoints
 
     private static object Row(Invoice i, string? organization) => new
     {
-        i.Id, i.TenantId, organization, i.Number, i.IssuedOn, i.DueOn, i.PeriodFrom, i.PeriodTo, i.Currency, i.Subtotal, i.TaxRate, i.Tax, i.Total,
-        i.State, i.PaidOn, i.PaidBy, i.PaymentReference, i.VoidReason, i.Note, i.IssuedBy, i.CreatedAt,
+        i.Id, i.TenantId, organization, i.Number, i.IssuedOn, i.DueOn, i.PeriodFrom, i.PeriodTo, i.Currency, i.Subtotal, i.TaxRate, i.Tax,
+        i.Total,
+        i.State,
+        i.PaidOn,
+        i.PaidBy,
+        i.PaymentReference,
+        i.VoidReason,
+        i.Note,
+        i.IssuedBy,
+        i.CreatedAt,
         lines = i.Lines.OrderBy(l => l.Position).Select(l => new { l.Description, l.Quantity, l.UnitPrice, l.Amount }),
     };
 
@@ -218,9 +226,13 @@ public static class BillingEndpoints
         if (request.DueDays is < 0 or > 365) return Problems.Invalid("DUE_DAYS", "From 0 to 365 days.", new { field = "dueDays" });
         var values = new Dictionary<string, string?>
         {
-            [SellerKeys.Name] = request.Name, [SellerKeys.Address] = request.Address, [SellerKeys.TaxNumbers] = request.TaxNumbers,
-            [SellerKeys.Bank] = request.Bank, [SellerKeys.TaxRate] = request.TaxRate?.ToString(CultureInfo.InvariantCulture),
-            [SellerKeys.DueDays] = request.DueDays?.ToString(CultureInfo.InvariantCulture), [SellerKeys.Mentions] = request.Mentions,
+            [SellerKeys.Name] = request.Name,
+            [SellerKeys.Address] = request.Address,
+            [SellerKeys.TaxNumbers] = request.TaxNumbers,
+            [SellerKeys.Bank] = request.Bank,
+            [SellerKeys.TaxRate] = request.TaxRate?.ToString(CultureInfo.InvariantCulture),
+            [SellerKeys.DueDays] = request.DueDays?.ToString(CultureInfo.InvariantCulture),
+            [SellerKeys.Mentions] = request.Mentions,
         };
         var now = clock.GetCurrentInstant();
         var who = http.Current();
@@ -312,9 +324,17 @@ public static class BillingEndpoints
         var next = last.Select(n => int.TryParse(n[prefix.Length..], out var x) ? x : 0).DefaultIfEmpty(0).Max() + 1;
         var invoice = new Invoice
         {
-            TenantId = id, Number = $"{prefix}{next:D4}", IssuedOn = issued, DueOn = issued.PlusDays(dueDays),
-            PeriodFrom = request.PeriodFrom is { } pf ? LocalDate.FromDateOnly(pf) : null, PeriodTo = request.PeriodTo is { } pt ? LocalDate.FromDateOnly(pt) : null,
-            Currency = currency, TaxRate = rate, Note = Clip(request.Note, 2000), IssuedBy = by.Name, CreatedAt = clock.GetCurrentInstant(),
+            TenantId = id,
+            Number = $"{prefix}{next:D4}",
+            IssuedOn = issued,
+            DueOn = issued.PlusDays(dueDays),
+            PeriodFrom = request.PeriodFrom is { } pf ? LocalDate.FromDateOnly(pf) : null,
+            PeriodTo = request.PeriodTo is { } pt ? LocalDate.FromDateOnly(pt) : null,
+            Currency = currency,
+            TaxRate = rate,
+            Note = Clip(request.Note, 2000),
+            IssuedBy = by.Name,
+            CreatedAt = clock.GetCurrentInstant(),
             Buyer = details is null ? tenant.Name : string.Join('\n', new[] { details.LegalName, details.Address, details.Country,
                 details.TaxNumber is null ? null : $"Tax number: {details.TaxNumber}", details.Reference is null ? null : $"Their reference: {details.Reference}" }
                 .Where(x => !string.IsNullOrWhiteSpace(x))),
@@ -325,15 +345,28 @@ public static class BillingEndpoints
         foreach (var l in lines)
         {
             var amount = Math.Round(l.Quantity!.Value * l.UnitPrice!.Value, 2, MidpointRounding.AwayFromZero);
-            invoice.Lines.Add(new InvoiceLine { Position = position++, Description = l.Description!.Trim()[..Math.Min(l.Description.Trim().Length, 500)],
-                Quantity = l.Quantity.Value, UnitPrice = l.UnitPrice.Value, Amount = amount });
+            invoice.Lines.Add(new InvoiceLine
+            {
+                Position = position++,
+                Description = l.Description!.Trim()[..Math.Min(l.Description.Trim().Length, 500)],
+                Quantity = l.Quantity.Value,
+                UnitPrice = l.UnitPrice.Value,
+                Amount = amount
+            });
         }
         invoice.Subtotal = invoice.Lines.Sum(l => l.Amount);
         invoice.Tax = Math.Round(invoice.Subtotal * rate / 100, 2, MidpointRounding.AwayFromZero);
         invoice.Total = invoice.Subtotal + invoice.Tax;
         db.Add(invoice);
-        db.Add(new OperatorEvent { OperatorId = by.Id, OperatorName = by.Name, Action = "INVOICE_ISSUED", TenantId = id,
-            Detail = $"{invoice.Number}: {invoice.Total:0.00} {currency}", At = clock.GetCurrentInstant() });
+        db.Add(new OperatorEvent
+        {
+            OperatorId = by.Id,
+            OperatorName = by.Name,
+            Action = "INVOICE_ISSUED",
+            TenantId = id,
+            Detail = $"{invoice.Number}: {invoice.Total:0.00} {currency}",
+            At = clock.GetCurrentInstant()
+        });
         return (invoice, null);
     }
 
@@ -363,8 +396,15 @@ public static class BillingEndpoints
             sub.UpdatedAt = now;
             sub.UpdatedBy = http.Current().Name;
         }
-        db.Add(new OperatorEvent { OperatorId = http.Current().Id, OperatorName = http.Current().Name, Action = "INVOICE_PAID", TenantId = invoice.TenantId,
-            Detail = $"{invoice.Number} by {way}{(invoice.PaymentReference is null ? "" : $", {invoice.PaymentReference}")}", At = now });
+        db.Add(new OperatorEvent
+        {
+            OperatorId = http.Current().Id,
+            OperatorName = http.Current().Name,
+            Action = "INVOICE_PAID",
+            TenantId = invoice.TenantId,
+            Detail = $"{invoice.Number} by {way}{(invoice.PaymentReference is null ? "" : $", {invoice.PaymentReference}")}",
+            At = now
+        });
         await db.SaveChangesAsync(cancellationToken);
         return Results.NoContent();
     }
@@ -378,8 +418,15 @@ public static class BillingEndpoints
         if (invoice.State == InvoiceStates.Void) return Results.NoContent();
         invoice.State = InvoiceStates.Void;
         invoice.VoidReason = Clip(why, 1000);
-        db.Add(new OperatorEvent { OperatorId = http.Current().Id, OperatorName = http.Current().Name, Action = "INVOICE_VOIDED", TenantId = invoice.TenantId,
-            Detail = $"{invoice.Number}: {why}", At = clock.GetCurrentInstant() });
+        db.Add(new OperatorEvent
+        {
+            OperatorId = http.Current().Id,
+            OperatorName = http.Current().Name,
+            Action = "INVOICE_VOIDED",
+            TenantId = invoice.TenantId,
+            Detail = $"{invoice.Number}: {why}",
+            At = clock.GetCurrentInstant()
+        });
         await db.SaveChangesAsync(cancellationToken);
         return Results.NoContent();
     }

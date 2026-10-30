@@ -83,8 +83,14 @@ public static class KeptCopies
         string by, string reason) =>
         db.Add(new KeptCopy
         {
-            TenantId = tenantId, ProjectId = projectId, Kind = kind, Title = title, Payload = JsonSerializer.Serialize(payload, Json),
-            KeptAt = clock.GetCurrentInstant(), KeptByName = by, Reason = reason,
+            TenantId = tenantId,
+            ProjectId = projectId,
+            Kind = kind,
+            Title = title,
+            Payload = JsonSerializer.Serialize(payload, Json),
+            KeptAt = clock.GetCurrentInstant(),
+            KeptByName = by,
+            Reason = reason,
         });
 
     /// <summary>The settings rows of a project matching a test, as a copy keeps them.</summary>

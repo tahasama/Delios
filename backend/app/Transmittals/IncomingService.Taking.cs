@@ -77,8 +77,12 @@ public sealed partial class IncomingService
             latest.Submission += 1;
             latest.Submissions.Add(new SubmissionRecord
             {
-                Number = latest.Submission, SubmittedAt = transmittal.IssuedAt, SubmittedByName = transmittal.IssuedByName,
-                Check = Arrivals.Accepted, CheckedByName = access.UserName, CheckedAt = clock.GetCurrentInstant(),
+                Number = latest.Submission,
+                SubmittedAt = transmittal.IssuedAt,
+                SubmittedByName = transmittal.IssuedByName,
+                Check = Arrivals.Accepted,
+                CheckedByName = access.UserName,
+                CheckedAt = clock.GetCurrentInstant(),
             });
             latest.State = RevisionStates.InPreparation;
             latest.FilesState = FilesStates.Ready;
@@ -275,8 +279,12 @@ public sealed partial class IncomingService
 
         var check = new SubmissionRecord
         {
-            Number = 1, SubmittedAt = transmittal.IssuedAt, SubmittedByName = transmittal.IssuedByName,
-            Check = Arrivals.Accepted, CheckedByName = access.UserName, CheckedAt = now,
+            Number = 1,
+            SubmittedAt = transmittal.IssuedAt,
+            SubmittedByName = transmittal.IssuedByName,
+            Check = Arrivals.Accepted,
+            CheckedByName = access.UserName,
+            CheckedAt = now,
         };
         var status = item.TheirStatus is { } said && catalog.IsActive(ReviewSets.Statuses, said) ? said : null;
         var revision = await db.Revisions.SingleOrDefaultAsync(r => r.DocumentId == document.Id && r.Value == item.RevisionValue, cancellationToken);

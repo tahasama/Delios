@@ -44,7 +44,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var pdf = await Flow.UploadAsync(client, project, document, "Programme.pdf", Flow.Pdf(), "application/pdf");
         var export = await Flow.UploadAsync(client, project, document, "Programme.csv", Encoding.UTF8.GetBytes(csv), "text/csv");
         var (status, revision) = await Flow.PostAsync(client, $"/api/projects/{project}/documents/{document}/revisions",
-            new { fileIds = new[] { pdf, export } , changeDescription = "Next issue" });
+            new { fileIds = new[] { pdf, export }, changeDescription = "Next issue" });
         Assert.True(status == HttpStatusCode.Created, revision.ToString());
         var id = revision.GetProperty("id").GetGuid();
         await Flow.UntilAsync(client, project, document, d => Flow.Revision(d, id).GetProperty("filesState").GetString() != "PROCESSING");
@@ -249,8 +249,8 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
             subproject = "00",
         })).GetProperty("id").GetGuid();
         using (await controller.PutAsJsonAsync($"{p}/schedule", new { documentId = schedule })) { }
+        // Tagged Civil: only an action concerning a discipline takes that discipline's documents (owner).
         await ReleaseAsync(engineer, approver, controller, project, await ScheduleRevisionAsync(engineer, project, schedule,
-            // Tagged Civil: only an action concerning a discipline takes that discipline's documents (owner).
             $"Activity ID,Activity Name,Start,Departments\nB100,Excavate pump pit,{Day(-3)},CI\n"));
         var activities = await UntilAsync(engineer, $"{p}/activities", a => a.GetArrayLength() == 1);
         var b100 = $"{p}/activities/{ByCode(activities, "B100").GetProperty("id").GetGuid()}";

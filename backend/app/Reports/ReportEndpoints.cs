@@ -32,10 +32,10 @@ public static class ReportEndpoints
     /// </summary>
     public static void MapReportEndpoints(this IEndpointRouteBuilder app)
     {
+        // Our own people read every report; another organization reads its own deliveries against plan.
         var project = app.MapGroup("/api/projects/{projectId:guid}/reports").WithTags("Reports")
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter<ProjectAccessFilter>()
-            // Our own people read every report; another organization reads its own deliveries against plan.
             .AddEndpointFilter(async (context, next) =>
             {
                 var access = ProjectAccessFilter.Of(context.HttpContext);
@@ -155,8 +155,16 @@ public static class ReportEndpoints
             report = report with { CountedBy = access.UserName };
             if (kept is null)
             {
-                kept = new ReportCount { TenantId = project.TenantId, ProjectId = project.Id, ReportId = reportId, Asked = asked, Audience = audience,
-                    Body = "", CountedByName = access.UserName };
+                kept = new ReportCount
+                {
+                    TenantId = project.TenantId,
+                    ProjectId = project.Id,
+                    ReportId = reportId,
+                    Asked = asked,
+                    Audience = audience,
+                    Body = "",
+                    CountedByName = access.UserName
+                };
                 db.Add(kept);
             }
             kept.Body = System.Text.Json.JsonSerializer.Serialize(report, Json);

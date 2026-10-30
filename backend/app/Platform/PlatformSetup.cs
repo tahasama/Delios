@@ -92,8 +92,8 @@ public static class PlatformSetup
         // Every save names what the screens keep that it changed (ScreenChanges): on a screen's answer, or posted to them.
         services.AddHttpContextAccessor();
         services.AddOptions<ScreensOptions>().BindConfiguration(ScreensOptions.Section);
+        // A redirect (to the sign-in page) is a refusal, never the screens' answer.
         services.AddHttpClient(nameof(ScreensNotifier), c => c.Timeout = TimeSpan.FromSeconds(5))
-            // A redirect (to the sign-in page) is a refusal, never the screens' answer.
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddSingleton<ScreensNotifier>();
         services.AddHostedService(sp => sp.GetRequiredService<ScreensNotifier>());
@@ -254,14 +254,20 @@ public static class PlatformSetup
                     ? RateLimitPartition.GetNoLimiter("probe")
                     : RateLimitPartition.GetTokenBucketLimiter(Caller(http), _ => new TokenBucketRateLimiterOptions
                     {
-                        TokenLimit = perMinute, TokensPerPeriod = perMinute, ReplenishmentPeriod = TimeSpan.FromMinutes(1), QueueLimit = 0,
+                        TokenLimit = perMinute,
+                        TokensPerPeriod = perMinute,
+                        ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
                     }));
             // The heavy calls, per person: a file's bytes or its preview, an export, an upload asked, a search. A person
             // reading files one by one never reaches it; a whole project pulled out in a loop does (DownloadWatch still
             // tells the administrators past 200 files in an hour).
             o.AddPolicy("heavy", http => RateLimitPartition.GetTokenBucketLimiter(Caller(http), _ => new TokenBucketRateLimiterOptions
             {
-                TokenLimit = heavyPerMinute, TokensPerPeriod = heavyPerMinute, ReplenishmentPeriod = TimeSpan.FromMinutes(1), QueueLimit = 0,
+                TokenLimit = heavyPerMinute,
+                TokensPerPeriod = heavyPerMinute,
+                ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
             }));
             // What failed on the screens (ScreenErrors): a few a minute per caller, so one broken page cannot fill the log.
             o.AddPolicy("screen-errors", http => RateLimitPartition.GetFixedWindowLimiter(Caller(http),
@@ -388,10 +394,10 @@ public static class PlatformSetup
                         // In a transaction of its own: the tenant is set on a transaction, and row-level security shows
                         // nothing outside one (the lists would silently be read as the organization's).
                         await using var look = await db.Database.BeginTransactionAsync(http.RequestAborted);
+                        // None said: the project the screens open first, as /api/me lists them.
                         var project = named is { } one
                             ? await db.Projects.AsNoTracking().Where(p => p.Id == one)
                                 .Select(p => new ListsOf(p.Id, p.OwnListKeys, p.OwnFunctions)).SingleOrDefaultAsync(http.RequestAborted)
-                            // None said: the project the screens open first, as /api/me lists them.
                             : await db.Memberships.AsNoTracking()
                                 .Where(m => m.UserId == userId && m.Active && m.Project!.Status == "ACTIVE" && m.Function!.Active)
                                 .OrderBy(m => m.Project!.Code).Select(m => new ListsOf(m.Project!.Id, m.Project.OwnListKeys, m.Project.OwnFunctions))
@@ -444,7 +450,7 @@ public static class PlatformSetup
             app.MapAdminEndpoints();
             app.MapDirectoryEndpoints();
             Identity.JoinRequests.MapJoinRequestEndpoints(app);
-        Identity.ProjectDirectory.MapProjectDirectoryEndpoints(app);
+            Identity.ProjectDirectory.MapProjectDirectoryEndpoints(app);
             Organizations.OrganizationEndpoints.MapOrganizationEndpoints(app);
             Organizations.RegistryEndpoints.MapRegistryEndpoints(app);
             Seeding.SignUpEndpoints.MapSignUpEndpoints(app);

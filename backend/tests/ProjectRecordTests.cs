@@ -77,7 +77,7 @@ public sealed class ProjectRecordTests(Infrastructure infrastructure) : IClassFi
             "Activity ID,Activity Name,Start,Finish,Responsible,Departments\n"
             + $"A100,Pour inlet base slab,{Day(20)},{Day(25)},Site team,CI\n"
             + $"A200,Install switchgear,{Day(40)},{Day(45)},Electrical,\n"), "text/csv");
-        var (_, revision) = await Flow.PostAsync(engineer, $"{p}/documents/{schedule}/revisions", new { fileIds = new[] { pdf, csv } , changeDescription = "Next issue" });
+        var (_, revision) = await Flow.PostAsync(engineer, $"{p}/documents/{schedule}/revisions", new { fileIds = new[] { pdf, csv }, changeDescription = "Next issue" });
         var revisionId = revision.GetProperty("id").GetGuid();
         await Flow.UntilAsync(engineer, project, schedule, d => Flow.Revision(d, revisionId).GetProperty("filesState").GetString() != "PROCESSING");
         var (_, review) = await Flow.PostAsync(engineer, $"{p}/revisions/{revisionId}/reviews", new { });

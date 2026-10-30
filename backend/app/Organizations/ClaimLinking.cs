@@ -68,8 +68,14 @@ public static class ClaimLinking
             {
                 link = new OrganizationLink
                 {
-                    HostTenantId = host, HostPartyId = party.Id, HostPartyCode = party.Code, HostPartyName = party.Name, GuestTenantId = claimer,
-                    InvitedEmail = "(claimed)", InvitedAt = now, InvitedByName = "DELIOS",
+                    HostTenantId = host,
+                    HostPartyId = party.Id,
+                    HostPartyCode = party.Code,
+                    HostPartyName = party.Name,
+                    GuestTenantId = claimer,
+                    InvitedEmail = "(claimed)",
+                    InvitedAt = now,
+                    InvitedByName = "DELIOS",
                 };
                 hostDb.OrganizationLinks.Add(link);
             }
@@ -107,9 +113,15 @@ public static class ClaimLinking
                     if (await homeDb.SignInNames.AnyAsync(n => n.NormalizedEmail == guest.NormalizedEmail, cancellationToken)) return (Guid?)null;
                     home = new User
                     {
-                        TenantId = claimer, Email = guest.Email, NormalizedEmail = guest.NormalizedEmail, Name = guest.Name,
-                        PasswordHash = guest.PasswordHash, Active = guest.Active, MfaSecretProtected = guest.MfaSecretProtected,
-                        MfaEnabledAt = guest.MfaEnabledAt, RecoveryCodeHashes = guest.RecoveryCodeHashes,
+                        TenantId = claimer,
+                        Email = guest.Email,
+                        NormalizedEmail = guest.NormalizedEmail,
+                        Name = guest.Name,
+                        PasswordHash = guest.PasswordHash,
+                        Active = guest.Active,
+                        MfaSecretProtected = guest.MfaSecretProtected,
+                        MfaEnabledAt = guest.MfaEnabledAt,
+                        RecoveryCodeHashes = guest.RecoveryCodeHashes,
                         PartyId = await homeDb.Parties.Where(p => p.TenantId == claimer && p.IsInternal).Select(p => (Guid?)p.Id).FirstOrDefaultAsync(cancellationToken),
                     };
                     homeDb.Users.Add(home);
@@ -118,7 +130,12 @@ public static class ClaimLinking
                 {
                     homeDb.AccountLinks.Add(new AccountLink
                     {
-                        LinkId = link.Id, HomeTenantId = claimer, HomeUserId = home.Id, HostTenantId = host, HostUserId = guest.Id, CreatedAt = now,
+                        LinkId = link.Id,
+                        HomeTenantId = claimer,
+                        HomeUserId = home.Id,
+                        HostTenantId = host,
+                        HostUserId = guest.Id,
+                        CreatedAt = now,
                     });
                 }
                 await services.GetRequiredService<AuditLog>().WriteAsync(new Actor(null, by), "GUEST_BROUGHT_OVER", "User", home.Id, home.Email,

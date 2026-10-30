@@ -27,7 +27,7 @@ public sealed class RequirementsListTests(Infrastructure infrastructure) : IClas
     {
         var pdf = await Flow.UploadAsync(client, project, document, "Printed.pdf", Flow.Pdf(), "application/pdf");
         var export = await Flow.UploadAsync(client, project, document, csvName, Encoding.UTF8.GetBytes(csv), "text/csv");
-        var (status, revision) = await Flow.PostAsync(client, $"/api/projects/{project}/documents/{document}/revisions", new { fileIds = new[] { pdf, export } , changeDescription = "Next issue" });
+        var (status, revision) = await Flow.PostAsync(client, $"/api/projects/{project}/documents/{document}/revisions", new { fileIds = new[] { pdf, export }, changeDescription = "Next issue" });
         Assert.True(status == HttpStatusCode.Created, revision.ToString());
         var id = revision.GetProperty("id").GetGuid();
         await Flow.UntilAsync(client, project, document, d => Flow.Revision(d, id).GetProperty("filesState").GetString() != "PROCESSING");
@@ -195,7 +195,7 @@ public sealed class RequirementsListTests(Infrastructure infrastructure) : IClas
         async Task<Guid> ReleasedPdfOnlyAsync(Guid document)
         {
             var pdf = await Flow.UploadAsync(engineer, project, document, "Printed.pdf", Flow.Pdf(), "application/pdf");
-            var (_, revision) = await Flow.PostAsync(engineer, $"{p}/documents/{document}/revisions", new { fileIds = new[] { pdf } , changeDescription = "Next issue" });
+            var (_, revision) = await Flow.PostAsync(engineer, $"{p}/documents/{document}/revisions", new { fileIds = new[] { pdf }, changeDescription = "Next issue" });
             var id = revision.GetProperty("id").GetGuid();
             await Flow.UntilAsync(engineer, project, document, d => Flow.Revision(d, id).GetProperty("filesState").GetString() != "PROCESSING");
             await ReleaseAsync(engineer, approver, controller, project, id);

@@ -257,8 +257,13 @@ public static class Calendar
             if (words.Length > 120) words = words[..120];
             var row = new DayOff
             {
-                TenantId = http.User.TenantId(), ProjectId = null, Day = day, Name = words, Country = country,
-                CreatedAt = clock.GetCurrentInstant(), CreatedByName = by,
+                TenantId = http.User.TenantId(),
+                ProjectId = null,
+                Day = day,
+                Name = words,
+                Country = country,
+                CreatedAt = clock.GetCurrentInstant(),
+                CreatedByName = by,
             };
             db.Add(row);
             added.Add(row);
@@ -295,8 +300,13 @@ public static class Calendar
         var by = (await db.Users.AsNoTracking().SingleAsync(u => u.Id == http.User.UserId(), cancellationToken)).Name;
         var row = new DayOff
         {
-            TenantId = http.User.TenantId(), ProjectId = projectId, Day = day, Name = words, Country = country,
-            CreatedAt = clock.GetCurrentInstant(), CreatedByName = by,
+            TenantId = http.User.TenantId(),
+            ProjectId = projectId,
+            Day = day,
+            Name = words,
+            Country = country,
+            CreatedAt = clock.GetCurrentInstant(),
+            CreatedByName = by,
         };
         db.Add(row);
         await db.SaveChangesAsync(cancellationToken);

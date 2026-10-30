@@ -162,9 +162,17 @@ public static class SignUpEndpoints
                 var now = NodaTime.SystemClock.Instance.GetCurrentInstant();
                 db.OrganizationClaims.Add(new Organizations.OrganizationClaim
                 {
-                    EntryId = recorded.Id, ClaimerTenantId = tenant.Id, ClaimerIdentityId = keep.Id, ClaimedByName = name, MakerTenantId = host,
-                    Method = Organizations.ClaimMethods.GuestEmail, SentTo = email, State = Organizations.ClaimStates.Confirmed,
-                    CreatedAt = now, AnsweredAt = now, AnsweredByName = email,
+                    EntryId = recorded.Id,
+                    ClaimerTenantId = tenant.Id,
+                    ClaimerIdentityId = keep.Id,
+                    ClaimedByName = name,
+                    MakerTenantId = host,
+                    Method = Organizations.ClaimMethods.GuestEmail,
+                    SentTo = email,
+                    State = Organizations.ClaimStates.Confirmed,
+                    CreatedAt = now,
+                    AnsweredAt = now,
+                    AnsweredByName = email,
                 });
                 await Organizations.Registry.MergeAsync(db, scopes, keep, recorded, cancellationToken);
                 await db.SaveChangesAsync(cancellationToken);

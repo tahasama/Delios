@@ -104,14 +104,20 @@ public sealed class PackageTests(Infrastructure infrastructure) : IClassFixture<
         Assert.Equal(new[] { ready.Revision }, revisions);
         var (_, moreBody) = await Flow.PostAsync(controller, $"/api/projects/{ready.Project}/transmittals", new
         {
-            packageId = package.GetProperty("id").GetGuid(), revisionIds = new[] { ready.Revision, Guid.NewGuid() },
-            partyIds = new[] { clientId }, reason = "EXECUTION", subject = "Inlet works construction set",
+            packageId = package.GetProperty("id").GetGuid(),
+            revisionIds = new[] { ready.Revision, Guid.NewGuid() },
+            partyIds = new[] { clientId },
+            reason = "EXECUTION",
+            subject = "Inlet works construction set",
         });
         Assert.Equal("PACKAGE_CONTENTS", Flow.Code(moreBody));
         var (sentStatus, sent) = await Flow.PostAsync(controller, $"/api/projects/{ready.Project}/transmittals", new
         {
-            packageId = package.GetProperty("id").GetGuid(), revisionIds = revisions,
-            partyIds = new[] { clientId }, reason = "EXECUTION", subject = "Inlet works construction set",
+            packageId = package.GetProperty("id").GetGuid(),
+            revisionIds = revisions,
+            partyIds = new[] { clientId },
+            reason = "EXECUTION",
+            subject = "Inlet works construction set",
         });
         Assert.True(sentStatus == HttpStatusCode.OK, sent.ToString());
         var transmittal = await GetAsync(controller, $"/api/projects/{ready.Project}/transmittals/{sent[0].GetProperty("id").GetGuid()}");

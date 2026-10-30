@@ -90,7 +90,10 @@ public sealed class RouteAndArrivalTests(Infrastructure infrastructure) : IClass
         {
             using var put = await admin.PutAsJsonAsync("/api/admin/lists/REVIEW_OUTCOMES/values", new
             {
-                code, label = code, setId, props = new { proceed, resubmit = !proceed, information = false },
+                code,
+                label = code,
+                setId,
+                props = new { proceed, resubmit = !proceed, information = false },
             });
             Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
         }

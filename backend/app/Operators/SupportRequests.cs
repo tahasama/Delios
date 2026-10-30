@@ -127,8 +127,22 @@ public static class SupportEndpoints
             var waiting = thread.Count == 0 || !thread[^1].FromDelios;
             return (object)new
             {
-                a.Id, a.TenantId, a.OrganizationName, a.ProjectId, a.ProjectName, a.Kind, a.Subject, a.Message, a.ByUserId, a.ByName, a.ByEmail, a.At,
-                a.Answer, a.AnsweredBy, a.AnsweredAt, Waiting = waiting,
+                a.Id,
+                a.TenantId,
+                a.OrganizationName,
+                a.ProjectId,
+                a.ProjectName,
+                a.Kind,
+                a.Subject,
+                a.Message,
+                a.ByUserId,
+                a.ByName,
+                a.ByEmail,
+                a.At,
+                a.Answer,
+                a.AnsweredBy,
+                a.AnsweredAt,
+                Waiting = waiting,
                 Messages = thread.Select(m => new { m.Id, m.FromDelios, m.ByName, m.Text, m.At }),
             };
         }).ToList();
@@ -184,8 +198,17 @@ public static class SupportEndpoints
             .SingleOrDefaultAsync(cancellationToken) : null;
         var ask = new SupportRequest
         {
-            TenantId = tenantId, OrganizationName = tenant.Name, ProjectId = project?.Id, ProjectName = project is null ? null : $"{project.Code} {project.Name}",
-            Kind = kind.Code, Subject = subject, Message = message, ByUserId = by.Id, ByName = by.Name, ByEmail = by.Email, At = clock.GetCurrentInstant(),
+            TenantId = tenantId,
+            OrganizationName = tenant.Name,
+            ProjectId = project?.Id,
+            ProjectName = project is null ? null : $"{project.Code} {project.Name}",
+            Kind = kind.Code,
+            Subject = subject,
+            Message = message,
+            ByUserId = by.Id,
+            ByName = by.Name,
+            ByEmail = by.Email,
+            At = clock.GetCurrentInstant(),
         };
         db.Add(ask);
         var support = await db.Set<PlatformSetting>().AsNoTracking().Where(p => p.Key == PlatformKeys.SupportEmail).Select(p => p.Value).SingleOrDefaultAsync(cancellationToken);
