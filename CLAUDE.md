@@ -845,8 +845,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Where an organization stands is read when looked at** (`Subscriptions.Effective`, never a clock): Trying · Active ·
   Reads only (trial over, 14 days past the period paid, cancelled and past it, or set by us) · Ended. Reading only, the
   backend refuses every change (READ_ONLY) but signing in, notifications and the contract; every page says so
-  (`/api/standing`); **nothing is deleted**. Set in the console with why (SUBSCRIPTION_SET). Codes provisional (TRIAL,
-  ACTIVE, READ_ONLY, ENDED; CARD, INVOICE): the owner confirms them.
+  (`/api/standing`); **nothing is deleted**. Set in the console with why (SUBSCRIPTION_SET). Codes confirmed by the owner, 30 Oct 2026 (TRIAL,
+  ACTIVE, READ_ONLY, ENDED; CARD, INVOICE; invoices ISSUED, PAID, VOID).
 - **Paid per organization, per user working in it** (its own people; guests and linked accounts free), plans named and
   priced in the console (a plan's code kept once used). Businesses only. Cancelling is one click (Contract & plan), no
   harder than signing up, ending with the period paid. The seller of record is not connected yet: payments recorded by
@@ -886,7 +886,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Need support** (owner: "just have them write a message with object, we already know which org and which project,
   and have a drawer with main type of requests"): a "Need support" button (owner: the register's first button, its size and icon, in our gold instead of blue; its words `gold-ink`: a warm dark brown on light, navy on dark) on the right of Help's plate and of the
   organization's band opens a drawer from the right (`components/support.tsx`, `support-panel.tsx`): what it is about
-  (`SupportKinds`, codes provisional: SIGN_IN, OPEN_FILE, UPLOAD, ACCESS, ERROR, SETUP, BILLING, OTHER), a subject, a
+  (`SupportKinds`, codes confirmed: SIGN_IN, OPEN_FILE, UPLOAD, ACCESS, ERROR, SETUP, BILLING, OTHER), a subject, a
   message, then what the person asked before and its answer; who, the organization and the project are known
   (`Operators/SupportRequests.cs`, `POST /api/support/requests`, `support_requests`, kept above every organization,
   allowed while reading only; emailed to the support email). Answered in the console's **Support** tab, the person told
@@ -899,7 +899,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   invoices issued from the console (`Operators/Billing.cs`), numbered DLS-<year>-<n>, never deleted (voided with why),
   buyer and seller written on them as they were, a PDF (PDFsharp) with how to pay by bank transfer; an organization's
   administrators keep who they are made out to and download them on Contract & plan, and are told of each; a payment is
-  recorded when it arrives (bank transfer, CMI, Paddle, other: provisional codes TRANSFER, CMI, PADDLE, OTHER; states
+  recorded when it arrives (bank transfer, CMI, Paddle, other: codes confirmed: TRANSFER, CMI, PADDLE, OTHER; states
   ISSUED, PAID, VOID), the period it pays for then paid by itself. DELIOS's own details on every invoice (company, tax
   and registration numbers, bank, tax rate, days to pay, mentions) set in the console's Plans & payments, what a Moroccan
   invoice must carry marked for an accountant. CMI and Paddle are not connected (docs/gaps/running.md).
@@ -2155,6 +2155,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (`Platform/ChangedMeanwhile.cs`: a version stamp changed since it was read, or Postgres stopping one of two clashing
   transactions, 40001 / 40P01 → 409 CHANGED_MEANWHILE, "Someone else changed this at the same moment… send it again").
   Nothing of it was kept (its transaction rolled back), so sending it again is safe.
+- **A sandbox** (owner: "a test production… fake companies, fake files… explaining to people this is a sandbox"):
+  `SANDBOX=true` in .env makes the site a testing area anyone may sign up to with made-up data: a band on every page
+  (`components/sandbox-band.tsx`, fixed at the window's foot, taking no room, letting clicks through), the full note on
+  sign-in and sign-up (`SandboxNotice`, in `AuthShell`), every email "[Sandbox] …" with a first line saying so
+  (`Email:Sandbox`). Production mode otherwise (no demo data).
 - **Every error reaches us** (owner, "error tracking"): the backend's own, and the screens' (`instrumentation.ts`
   `onRequestError` on their server; in the browser the error pages, `app/global-error.tsx` and `ErrorWatch` in the root
   layout, through `/api/client-errors`), written in the API's log by `POST /api/screens/errors` (`Platform/ScreenErrors.cs`,

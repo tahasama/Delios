@@ -117,6 +117,8 @@ public sealed class EmailOptions
     public long MaxAttachmentBytes { get; set; } = 15 * 1024 * 1024;
     /// <summary>DELIOS's own address: what an organization asks of DELIOS (a certified DWG reader) is emailed there. Empty: kept only.</summary>
     public string DeliosAddress { get; set; } = "";
+    /// <summary>A sandbox (SANDBOX=true): every email says it comes from a testing area, in its subject and first line.</summary>
+    public bool Sandbox { get; set; }
 
     /// <summary>Whether an email of this kind is sent now.</summary>
     public bool Sends(string kind) => Enabled && kind switch
@@ -298,8 +300,10 @@ public sealed class EmailSender(
                 new System.Net.Mail.MailAddress(settings.From, settings.FromName),
                 new System.Net.Mail.MailAddress(email.ToAddress, email.ToName ?? email.ToAddress))
             {
-                Subject = email.Subject,
-                Body = email.Body,
+                Subject = settings.Sandbox ? $"[Sandbox] {email.Subject}" : email.Subject,
+                Body = settings.Sandbox
+                    ? "This comes from the DELIOS sandbox, a testing area: everything in it is made up.\n\n" + email.Body
+                    : email.Body,
             };
             if (email.ReplyTo is { } replyTo) mail.ReplyToList.Add(new System.Net.Mail.MailAddress(replyTo));
             // Attached as stored: only files scanned clean.

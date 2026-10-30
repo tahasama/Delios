@@ -1,5 +1,6 @@
 import { APP_NAME } from "@/lib/core/standard";
 import { LegalLinks } from "@/app/(public)/legal/frame";
+import { SandboxNotice } from "@/components/sandbox-band";
 
 /** The sign-in pages' frame: the brand panel, and the form beside it. */
 export function AuthShell({ children }: { children: React.ReactNode }) {
@@ -37,6 +38,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
               DELIOS · EDMS
             </div>
           </div>
+          <SandboxNotice />
           {children}
           <LegalLinks />
         </div>

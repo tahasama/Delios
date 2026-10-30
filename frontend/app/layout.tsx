@@ -5,6 +5,7 @@ import { APP_NAME } from "@/lib/core/standard";
 import { cookies } from "next/headers";
 import { PREF, SIDEBAR_LIMITS } from "@/lib/core/preferences";
 import { ErrorWatch } from "@/components/error-watch";
+import { SandboxBand } from "@/components/sandbox-band";
 
 /**
  * The register is a technical document, so it is set in a technical face. Plex
@@ -47,6 +48,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <ErrorWatch />
         {children}
+        <SandboxBand />
       </body>
     </html>
   );

@@ -60,6 +60,8 @@ x-backend: &backend
     Email__Transmittals: ${EMAIL_TRANSMITTALS:-true}
     Email__Reviews: ${EMAIL_REVIEWS:-true}
     Email__Notifications: ${EMAIL_NOTIFICATIONS:-true}
+    # A sandbox (a test site anyone may sign up to, with made-up data): every email says so. The screens say it too.
+    Email__Sandbox: ${SANDBOX:-false}
     Email__From: ${EMAIL_FROM:-delios@localhost}
     Email__DeliosAddress: ${DELIOS_CONTACT_EMAIL:-}
     Email__BaseUrl: ${PUBLIC_URL:-http://localhost:3080}
@@ -268,6 +270,8 @@ services:
       DELIOS_SCREENS_SECRET: ${SCREENS_SECRET:-}
       # What the screens keep of the backend's answers, kept in Valkey (frontend/cache-handler.mjs).
       SCREENS_CACHE_REDIS: redis://valkey:6379/1
+      # A sandbox: a band on every page and a note on sign-in and sign-up (lib/core/sandbox.ts).
+      DELIOS_SANDBOX: ${SANDBOX:-false}
     depends_on: [caddy, valkey]
 
   # The second copy of the files: each copied as it is stored (the app says which on Valkey, Documents/FileBackup.cs),

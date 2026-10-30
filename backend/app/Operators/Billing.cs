@@ -79,7 +79,7 @@ public static class InvoiceStates
     public const string Issued = "ISSUED", Paid = "PAID", Void = "VOID";
 }
 
-/// <summary>How an invoice was paid (provisional codes, the owner to confirm).</summary>
+/// <summary>How an invoice was paid (codes confirmed by the owner).</summary>
 public static class PaymentWays
 {
     public const string Transfer = "TRANSFER", Cmi = "CMI", Paddle = "PADDLE", Other = "OTHER";

@@ -1,3 +1,5 @@
+using Delios.Host.Identity;
+
 namespace Delios.Host.Platform;
 
 /// <summary>
@@ -18,7 +20,7 @@ public static class ScreenErrors
             var signedIn = http.User.Identity?.IsAuthenticated == true;
             logger.LogError("Screens failed ({Where}) on {Page}: {Message} [digest {Digest}, user {UserId}, organization {TenantId}]\n{Stack}",
                 Cut(report.Where, 20) ?? "browser", Cut(report.Page, 300) ?? "?", Cut(report.Message, 1000) ?? "(no message)",
-                Cut(report.Digest, 100) ?? "-", signedIn ? http.User.UserId() : null, signedIn ? http.User.TenantId() : null,
+                Cut(report.Digest, 100) ?? "-", signedIn ? (object)http.User.UserId() : null, signedIn ? (object)http.User.TenantId() : null,
                 Cut(report.Stack, 8000) ?? "");
             return Results.NoContent();
         }).AllowAnonymous().RequireRateLimiting("screen-errors").WithTags("Screens");

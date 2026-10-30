@@ -364,8 +364,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             Description = "The discipline engineer checks; the approver decides.",
             Steps =
             [
-                new() { Title = "Discipline check", FunctionCode = "ENG", Days = 5 },
-                new() { Title = "Approval", FunctionCode = "APP", Days = 3, GrantsStatuses = ["IFI", "IFR", "IFA", "IFU", "IFC", "AFC"] },
+                new() { Title = "Discipline check", FunctionCode = "ENG", Days = 5, Mode = StepModes.Any },
+                new() { Title = "Approval", FunctionCode = "APP", Days = 3, Mode = StepModes.Any, GrantsStatuses = ["IFI", "IFR", "IFA", "IFU", "IFC", "AFC"] },
             ],
         });
         return true;
@@ -438,8 +438,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             Patterns = [new() { Criticality = "A" }],
             Steps =
             [
-                new() { Title = "Discipline check", FunctionCode = "ENG", Days = 5 },
-                new() { Title = "Client approval", PartyCode = "NWU", Reason = "APPROVAL", Days = 10, GrantsStatuses = ["AFC"] },
+                new() { Title = "Discipline check", FunctionCode = "ENG", Days = 5, Mode = StepModes.Any },
+                new() { Title = "Client approval", PartyCode = "NWU", Mode = StepModes.Any, Reason = "APPROVAL", Days = 10, GrantsStatuses = ["AFC"] },
             ],
         });
     }

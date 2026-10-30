@@ -16,5 +16,5 @@ What the console, payments and legal pieces (docs/RUNNING-DELIOS.md, "Built") do
   price worked out for the organization on the page (users × price) before it sends.
 - **Organizations that signed up before the free trial existed** have no end date until one is set on their page in
   the console.
-- **Codes provisional** (the owner confirms them): the kinds of support request (SIGN_IN, OPEN_FILE, UPLOAD, ACCESS,
-  ERROR, SETUP, BILLING, OTHER), with the subscription, billing and legal codes already listed in RUNNING-DELIOS.md.
+- **Codes**: confirmed by the owner on 30 Oct 2026 (subscription, payment, invoice and support kinds); the legal matters'
+  states (TO_DO, PLACEHOLDER, WITH_LAWYER, IN_FORCE, NOT_NEEDED) are still to confirm.

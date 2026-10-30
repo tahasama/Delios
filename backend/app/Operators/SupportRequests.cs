@@ -54,7 +54,7 @@ internal sealed class SupportRequestConfiguration : IEntityTypeConfiguration<Sup
     }
 }
 
-/// <summary>The main kinds of request, so support sees at once what it is about (codes provisional: the owner confirms them).</summary>
+/// <summary>The main kinds of request, so support sees at once what it is about (codes confirmed by the owner).</summary>
 public static class SupportKinds
 {
     public sealed record Kind(string Code, string Label);

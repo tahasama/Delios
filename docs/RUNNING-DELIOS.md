@@ -98,7 +98,7 @@ date and version, the subprocessor list, the export and the deletion at the end)
 - **Where an organization stands** (`Subscriptions.Effective`, read when looked at): Trying (no end, or until its trial's
   last day) · Active · Reads only (trial over, 14 days past the period paid, cancelled and past it, or set by us) · Ended.
   Reading only: every change refused (READ_ONLY) but signing in, notifications, the contract; a banner on every page
-  (`/api/standing`). Nothing is deleted. Codes provisional: TRIAL, ACTIVE, READ_ONLY, ENDED; CARD, INVOICE; the matter
+  (`/api/standing`). Nothing is deleted. Codes confirmed by the owner (30 Oct 2026): TRIAL, ACTIVE, READ_ONLY, ENDED; CARD, INVOICE; still provisional: the matter
   states TO_DO, PLACEHOLDER, WITH_LAWYER, IN_FORCE, NOT_NEEDED (owner to confirm).
 - **Payments**: per organization per paid user (its own people; guests and linked accounts free), plans named and priced
   in the console. The seller of record (Paddle or Stripe) is **not connected yet**: a payment is recorded by hand (Paid
