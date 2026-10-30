@@ -19,6 +19,32 @@ public static class Supply
     /// <summary>The revision the first item of an incoming transmittal made or updated.</summary>
     public static Guid RevisionOf(JsonElement transmittal) => transmittal.GetProperty("items")[0].GetProperty("revisionId").GetGuid();
 
+    /// <summary>The supplier's package under an order, made by itself with its first document (owner).</summary>
+    public static async Task<JsonElement> PackageAsync(HttpClient controller, Guid project, string order = "PO101")
+    {
+        var packages = await controller.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/packages");
+        var row = packages.EnumerateArray().Single(x => x.GetProperty("kind").GetString() == "SUPPLY"
+            && x.GetProperty("purchaseOrder").GetString() == order);
+        return await controller.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/packages/{row.GetProperty("id").GetGuid()}");
+    }
+
+    /// <summary>
+    /// Asks the supplier for these documents of its package: shared with it first (once), then asked on a transmittal.
+    /// Until then the supplier sees none of them.
+    /// </summary>
+    public static async Task AskAsync(HttpClient controller, Guid project, params Guid[] documents)
+    {
+        var package = await PackageAsync(controller, project);
+        var p = $"/api/projects/{project}/packages/{package.GetProperty("id").GetGuid()}";
+        if (!package.TryGetProperty("sharedAt", out var at) || at.ValueKind == JsonValueKind.Null)
+        {
+            var (shared, sharedBody) = await Flow.PostAsync(controller, $"{p}/share", new { });
+            Assert.True(shared == HttpStatusCode.OK, sharedBody.ToString());
+        }
+        var (asked, askedBody) = await Flow.PostAsync(controller, $"{p}/request", new { documentIds = documents });
+        Assert.True(asked == HttpStatusCode.OK, askedBody.ToString());
+    }
+
     /// <summary>Uploads a file that belongs to no document yet (an unplanned item's, or a covering letter).</summary>
     public static async Task<Guid> LooseAsync(HttpClient client, Guid project, string name, byte[] bytes, bool proof = false)
     {
@@ -61,25 +87,6 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         return (Person("Eli Engineer"), Person("Aisha Approver"), acme.GetProperty("id").GetGuid());
     }
 
-    private static async Task<JsonElement> SupplyPackageAsync(HttpClient engineer, Guid project)
-    {
-        var (engineerId, approverId, acme) = await PeopleAsync(engineer, project);
-        var (created, package) = await Flow.PostAsync(engineer, $"/api/projects/{project}/packages", new
-        {
-            kind = "SUPPLY",
-            supplierPartyId = acme,
-            purchaseOrder = "PO101",
-            title = "Duty pumps vendor data",
-            reason = "APPROVAL",
-            requiredStatuses = new[] { "IFC", "AFC" },
-            ownerIds = new[] { engineerId },
-            acceptorIds = new[] { approverId },
-            completionDate = "2026-11-30",
-        });
-        Assert.True(created == HttpStatusCode.Created, package.ToString());
-        return package;
-    }
-
     [Fact]
     public async Task A_supplier_is_asked_on_a_transmittal_and_what_it_sends_back_comes_on_its_own_with_a_receipt()
     {
@@ -103,27 +110,31 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         })).GetProperty("id").GetGuid();
         var ours = (await Api.RegisterAsync(engineer, project, Api.Drawing())).GetProperty("id").GetGuid();
 
-        // The package fills itself with the supplier's placeholders under its order, and nothing else.
-        var package = await SupplyPackageAsync(engineer, project);
+        // The supplier's package for its order is made by itself with its first document, and takes its documents under
+        // that order, and nothing else (owner).
+        var package = await Supply.PackageAsync(controller, project);
         var p = $"/api/projects/{project}/packages/{package.GetProperty("id").GetGuid()}";
         Assert.Equal(("SUPPLY", "Acme Pumps"), (package.GetProperty("kind").GetString(), package.GetProperty("supplier").GetString()));
         Assert.Equal(new[] { curve, datasheet }.Order(), package.GetProperty("members").EnumerateArray().Select(m => m.GetProperty("documentId").GetGuid()).Order());
-        var (foreign, foreignBody) = await Flow.PostAsync(engineer, $"{p}/members", new { documentIds = new[] { ours } });
+        var (foreign, foreignBody) = await Flow.PostAsync(controller, $"{p}/members", new { documentIds = new[] { ours } });
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "NOT_THE_SUPPLIERS"), (foreign, Flow.Code(foreignBody)));
         Assert.DoesNotContain(package.GetProperty("members").EnumerateArray(), m => m.GetProperty("documentId").GetGuid() == otherOrder);
 
-        // The supplier sees its own package, and may not change it.
+        // Not shared yet, it cannot be asked; shared, the supplier sees its own package, and may not change it.
+        var (notShared, notSharedBody) = await Flow.PostAsync(controller, $"{p}/request", new { });
+        Assert.Equal((HttpStatusCode.Conflict, "NOT_SHARED"), (notShared, Flow.Code(notSharedBody)));
+        await Flow.PostAsync(controller, $"{p}/share", new { });
         var theirs = await supplier.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/packages");
         Assert.Equal(package.GetProperty("id").GetGuid(), theirs.EnumerateArray().Single().GetProperty("id").GetGuid());
         var (meddle, meddleBody) = await Flow.PostAsync(supplier, $"{p}/request", new { });
-        Assert.Equal((HttpStatusCode.Forbidden, "OWNER_ONLY"), (meddle, Flow.Code(meddleBody)));
+        Assert.Equal((HttpStatusCode.Forbidden, "CONTROL_ONLY"), (meddle, Flow.Code(meddleBody)));
 
         // Asking: one transmittal to the supplier, each placeholder with its date.
-        var (asked, askedBody) = await Flow.PostAsync(engineer, $"{p}/request", new { message = "Please send by the dates shown." });
+        var (asked, askedBody) = await Flow.PostAsync(controller, $"{p}/request", new { message = "Please send by the dates shown." });
         Assert.True(asked == HttpStatusCode.OK, askedBody.ToString());
         var request = askedBody.GetProperty("transmittals").EnumerateArray().Single();
         Assert.Equal(("OUTGOING", 2), (request.GetProperty("direction").GetString(), request.GetProperty("items").GetInt32()));
-        var (again, againBody) = await Flow.PostAsync(engineer, $"{p}/request", new { });
+        var (again, againBody) = await Flow.PostAsync(controller, $"{p}/request", new { });
         Assert.Equal((HttpStatusCode.Conflict, "NOTHING_TO_REQUEST"), (again, Flow.Code(againBody)));
         var requestView = await supplier.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/transmittals/{request.GetProperty("id").GetGuid()}");
         Assert.All(requestView.GetProperty("items").EnumerateArray(), i =>
@@ -252,7 +263,7 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
     }
 
     [Fact]
-    public async Task A_package_is_renamed_at_any_time_and_deleted_only_while_empty_and_never_sent()
+    public async Task A_package_is_changed_by_the_control_function_and_removed_until_it_goes_out()
     {
         await using var app = await TestApp.StartAsync(infrastructure);
         var engineer = await app.SignedInAsync("engineer@demo.local");
@@ -260,7 +271,7 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         var project = await Api.ProjectIdAsync(engineer);
         var (engineerId, approverId, _) = await PeopleAsync(engineer, project);
         var drawing = (await Api.RegisterAsync(engineer, project, Api.Drawing())).GetProperty("id").GetGuid();
-        var (_, package) = await Flow.PostAsync(engineer, $"/api/projects/{project}/packages", new
+        var (_, package) = await Flow.PostAsync(controller, $"/api/projects/{project}/packages", new
         {
             title = "Handover",
             reason = "EXECUTION",
@@ -270,36 +281,27 @@ public sealed class SupplierExchangeTests(Infrastructure infrastructure) : IClas
         });
         var p = $"/api/projects/{project}/packages/{package.GetProperty("id").GetGuid()}";
 
-        using (var renamed = await engineer.PutAsJsonAsync(p, new { title = "Operations handover — inlet works", description = "For the operator." }))
+        // Those putting it together only add and take out its documents; the control function changes the rest.
+        var rename = new { title = "Operations handover — inlet works", description = "For the operator." };
+        using (var notTheirs = await engineer.PutAsJsonAsync(p, rename))
+            Assert.Equal((HttpStatusCode.Forbidden, "CONTROL_ONLY"), await Api.ProblemAsync(notTheirs));
+        using (var renamed = await controller.PutAsJsonAsync(p, rename))
         {
             var view = await renamed.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal(("Operations handover — inlet works", "For the operator."), (view.GetProperty("title").GetString(), view.GetProperty("description").GetString()));
         }
         await Flow.PostAsync(engineer, $"{p}/members", new { documentIds = new[] { drawing } });
-        using (var full = await engineer.DeleteAsync(p))
-            Assert.Equal((HttpStatusCode.Conflict, "PACKAGE_NOT_EMPTY"), await Api.ProblemAsync(full));
 
-        // The database refuses it too, whatever asks.
-        await using (var connection = new Npgsql.NpgsqlConnection(app.Settings["ConnectionStrings:Postgres"]))
-        {
-            await connection.OpenAsync();
-            await using var delete = new Npgsql.NpgsqlCommand(
-                $"SELECT set_config('app.tenant_id', (SELECT id::text FROM tenants LIMIT 1), false); DELETE FROM packages WHERE id = '{package.GetProperty("id").GetGuid()}'",
-                connection);
-            Assert.Equal("23001", (await Assert.ThrowsAsync<Npgsql.PostgresException>(() => delete.ExecuteNonQueryAsync())).SqlState);
-        }
-
-        await Flow.PostAsync(engineer, $"{p}/members/remove", new { documentIds = new[] { drawing } });
-        using (var gone = await engineer.DeleteAsync(p)) Assert.Equal(HttpStatusCode.NoContent, gone.StatusCode);
+        // Never delivered to anyone, it is removed even filled (owner); its documents stay in the register.
+        using (var gone = await controller.DeleteAsync(p)) Assert.Equal(HttpStatusCode.NoContent, gone.StatusCode);
         using (var missing = await engineer.GetAsync(p)) Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        using (var kept = await engineer.GetAsync($"/api/projects/{project}/documents/{drawing}")) Assert.Equal(HttpStatusCode.OK, kept.StatusCode);
 
-        // A supply package that asked its supplier stays, even emptied.
+        // A supplier's package that asked its supplier stays.
         var placeholder = (await Api.RegisterAsync(controller, project, Placeholder("Duty pump datasheet"))).GetProperty("id").GetGuid();
-        var supply = await SupplyPackageAsync(engineer, project);
-        var s = $"/api/projects/{project}/packages/{supply.GetProperty("id").GetGuid()}";
-        await Flow.PostAsync(engineer, $"{s}/request", new { });
-        await Flow.PostAsync(engineer, $"{s}/members/remove", new { documentIds = new[] { placeholder } });
-        using (var sentOut = await engineer.DeleteAsync(s))
-            Assert.Equal((HttpStatusCode.Conflict, "PACKAGE_HAS_GONE_OUT"), await Api.ProblemAsync(sentOut));
+        await Supply.AskAsync(controller, project, placeholder);
+        var supply = await Supply.PackageAsync(controller, project);
+        using (var sentOut = await controller.DeleteAsync($"/api/projects/{project}/packages/{supply.GetProperty("id").GetGuid()}"))
+            Assert.Equal((HttpStatusCode.Conflict, "SENT_TO_SUPPLIER"), await Api.ProblemAsync(sentOut));
     }
 }

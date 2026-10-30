@@ -48,6 +48,8 @@ public sealed class ControlTests(Infrastructure infrastructure) : IClassFixture<
             receivedDate = "2026-10-01",
         })).GetProperty("id").GetGuid();
 
+        // The supplier sees it once it is asked of them (owner).
+        await Supply.AskAsync(controller, project, document);
         // Starting a revision outside a transmittal is refused: what a supplier sends comes with a receipt.
         var direct = await Flow.UploadAsync(supplier, project, document, "datasheet.pdf", Flow.Pdf(), "application/pdf");
         var (outside, outsideBody) = await Flow.PostAsync(supplier, $"/api/projects/{project}/documents/{document}/revisions",

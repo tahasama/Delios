@@ -36,6 +36,8 @@ public sealed class RouteAndArrivalTests(Infrastructure infrastructure) : IClass
             contractRef = "PO101",
             receivedDate = "2026-10-01",
         })).GetProperty("id").GetGuid();
+        // The supplier sees it once it is asked of them (owner).
+        await Supply.AskAsync(controller, project, document);
         var file = await Flow.UploadAsync(supplier, project, document, "datasheet.pdf", Flow.Pdf(), "application/pdf");
         var (_, sent) = await Supply.SendAsync(supplier, project, document, file, "IFR");
         var revision = Supply.RevisionOf(sent);

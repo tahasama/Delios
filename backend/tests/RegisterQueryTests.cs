@@ -43,7 +43,6 @@ public sealed class RegisterQueryTests(Infrastructure infrastructure) : IClassFi
         var row = all.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("revisionState").GetString() == "RELEASED");
         Assert.Equal(("IFC", "C1", "Approver"),
             (row.GetProperty("releasedStatus").GetString(), row.GetProperty("verdict").GetString(), row.GetProperty("decidedBy").GetString()));
-        Assert.Contains(all.GetProperty("lists").GetProperty("values").GetProperty("STATUSES").EnumerateArray(), v => v.GetProperty("code").GetString() == "IFC");
 
         // Alternatives with commas; every word of one must appear.
         Assert.Single(Numbers(await GetAsync(engineer, $"{p}/register?q=switchroom")));

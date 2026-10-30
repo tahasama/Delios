@@ -331,7 +331,7 @@ public sealed class RegisterReadTests(Infrastructure infrastructure) : IClassFix
     }
 
     [Fact]
-    public async Task Another_party_reads_only_what_it_produces()
+    public async Task Another_party_reads_only_what_passed_between_us()
     {
         await using var app = await TestApp.StartAsync(infrastructure);
         var controller = await app.SignedInAsync("controller@demo.local");
@@ -352,8 +352,9 @@ public sealed class RegisterReadTests(Infrastructure infrastructure) : IClassFix
         var supplier = await app.SignedInAsync("supplier@acme.local");
         var page = await supplier.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/documents");
 
-        var numbers = page.GetProperty("items").EnumerateArray().Select(d => d.GetProperty("number").GetString());
-        Assert.Equal(["P1001-20-ACME-PO101-ME-DAS-00001"], numbers);
+        // Neither ours, nor one of theirs we registered and have not asked of them yet: of what it produces, another
+        // organization reads only what passed between us on a transmittal.
+        Assert.Empty(page.GetProperty("items").EnumerateArray());
     }
 }
 
@@ -466,9 +467,9 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         var doc = (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
 
         using var unknown = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions",
-            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-1.pdf", Pdf) }, series = "AS_BUILT" });
+            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-1.pdf", Pdf) }, series = "AS_BUILT", changeDescription = "First issue" });
         using var execution = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions",
-            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) }, series = "EXECUTION" });
+            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) }, series = "EXECUTION", changeDescription = "First issue" });
         var revision = await execution.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "REVISION_SERIES_UNKNOWN"), await Api.ProblemAsync(unknown));

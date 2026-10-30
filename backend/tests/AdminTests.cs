@@ -221,6 +221,7 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
         var registered = await Api.RegisterAsync(rita, project, new { title = "Intake screen general arrangement", deliverableType = "ENG", docType = "DWG", discipline = "CI", subproject = "00" });
         Assert.StartsWith("RW1-", registered.GetProperty("number").GetString());
         var parties = await rita.GetFromJsonAsync<JsonElement>("/api/admin/parties");
-        Assert.Equal(["OUR-ORG"], parties.EnumerateArray().Select(p => p.GetProperty("code").GetString()));
+        // Only itself, under its own name (one code and one name everywhere, owner), never a placeholder of ours.
+        Assert.Equal("Riverside Water", Assert.Single(parties.EnumerateArray()).GetProperty("name").GetString());
     }
 }
