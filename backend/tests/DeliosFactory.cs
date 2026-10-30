@@ -36,6 +36,10 @@ public sealed class DeliosFactory(IDictionary<string, string?> overrides, Action
         // (the sign-in limit, which tests check, is not one of these).
         ["RateLimits:PerMinute"] = "1000000",
         ["RateLimits:HeavyPerMinute"] = "1000000",
+        // The app's own logs stay quiet in tests: thousands of lines a run buried which tests failed and why.
+        ["Serilog:MinimumLevel:Default"] = "Fatal",
+        ["Serilog:MinimumLevel:Override:Microsoft.AspNetCore"] = "Fatal",
+        ["Serilog:MinimumLevel:Override:Microsoft.EntityFrameworkCore"] = "Fatal",
     };
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
