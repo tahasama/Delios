@@ -159,6 +159,19 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the same words whether it exists or not), one leading nowhere "Nothing at this address" (`app/not-found.tsx`); **an
   error** reads in plain words with a reference to quote, never the server's message or code trace (development only);
   **validation** focuses the first field the server named, as the screen does for what it found.
+- **Motion** (owner: "smooth animations, not overdoing it… kill the static states… numbers incrementing / decrementing,
+  building up the progress, bigger to regular for success… keeping the professional elegance"; `globals.css`, the Motion
+  block): only transform, opacity and colour move, never what pushes the page; fast start, soft stop; about 150 ms for a
+  press (`btn()`: a press sinks to 0.98), 220 ms for what appears, 600 to 700 ms for what builds. **Figures count** from the
+  value last seen under the same id to the new one, up or down, from zero only the first time in a session
+  (`components/count-up.tsx`, `CountUp`, sessionStorage; the true figure drawn first and read by screen readers): Assurance's
+  rate and statement, report figures, a supplier package's counts; Home keeps its own (`tally.tsx`). **Bars build** from the
+  left and move to a new width (`.bar-build`: packages' readiness, an action's readiness, report bars). **A success
+  settles**, a breath larger then its size with a soft emerald ring fading (`.settle`, `ActionForm`'s line). **Rows rise**
+  into place, the first eight one after another (`.rows-rise`, `DataTable`). **The chosen tab's line draws itself out**
+  (`.strip-tab[aria-current]::after`). **Drawers slide** in over a fading veil (`.drawer-in`, `.veil-in`), the quick find grows
+  into place (`.pop-in`); a chip's colour crossfades (`Chip`). Everything is off for whoever asked for less motion: it is
+  simply there, already done. No animation library, no script written in the page.
 - **The quick find** (owner, "command menu" with its "shortcut hint"): Ctrl K (⌘ K on a Mac) anywhere opens one box
   (`components/command-menu.tsx`, mounted once in the layout): pages by their name at once (only those the person may
   open, as the menu), and documents, transmittals, actions and packages by number or name through the backend, a

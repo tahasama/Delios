@@ -153,8 +153,8 @@ export default async function ProjectOrganizationsPage({ searchParams }: { searc
         const theirPeople = users.filter((u) => u.active && u.partyId === one.partyId).map((u) => ({ id: u.id, name: u.name, detail: u.email }));
         return (
           <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={one.name}>
-            <Link href={href({})} scroll={false} aria-label="Close" className="absolute inset-0 bg-slate-900/40" />
-            <aside className="register absolute inset-y-0 right-0 flex w-[min(40rem,100vw)] flex-col overflow-y-auto bg-surface shadow-2xl">
+            <Link href={href({})} scroll={false} aria-label="Close" className="veil-in absolute inset-0 bg-slate-900/40" />
+            <aside className="drawer-in register absolute inset-y-0 right-0 flex w-[min(40rem,100vw)] flex-col overflow-y-auto bg-surface shadow-2xl">
               <div className="flex items-start justify-between gap-3 border-b border-line px-5 pt-6 pb-4 sm:px-6">
                 <div className="min-w-0">
                   <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{one.code}</p>

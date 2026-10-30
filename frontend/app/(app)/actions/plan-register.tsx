@@ -709,7 +709,7 @@ const COLUMNS: Column[] = [
           <span className="text-xs font-semibold tabular-nums text-slate-800">{row.ready}<span className="font-normal text-slate-500"> / {row.total}</span></span>
           <span className="h-1 w-14 overflow-hidden rounded-full bg-slate-100">
             <span
-              className={`block h-full rounded-full ${row.ready === row.total ? "bg-emerald-500" : "bg-amber-500"}`}
+              className={`bar-build block h-full rounded-full ${row.ready === row.total ? "bg-emerald-500" : "bg-amber-500"}`}
               style={{ width: row.ready ? `${Math.max(Math.round((row.ready / row.total) * 100), 4)}%` : "0%" }}
             />
           </span>

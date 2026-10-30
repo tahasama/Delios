@@ -188,7 +188,7 @@ export function ActionForm({
         ) : null}
 
         {state?.ok ? (
-          <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          <p role="status" className="settle rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
             {state.ok}
             {state.link ? <> <a href={state.link.href} className="font-semibold underline">{state.link.label}</a></> : null}
           </p>

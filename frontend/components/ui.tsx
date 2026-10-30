@@ -176,7 +176,7 @@ export function ToneChip({ tone, children, title, inRegister }: { tone: keyof ty
 
 export function Chip({ children, className, title }: { children: React.ReactNode; className?: string; title?: string }) {
   return (
-    <span title={title} className={cn("inline-flex items-center whitespace-nowrap rounded-[0.3rem] px-1.5 py-0.5 text-[11px] font-semibold leading-[1.35] ring-1 ring-inset", className ?? "bg-canvas-deep text-slate-700 ring-line")}>
+    <span title={title} className={cn("inline-flex items-center whitespace-nowrap rounded-[0.3rem] px-1.5 py-0.5 text-[11px] font-semibold leading-[1.35] ring-1 ring-inset transition-colors duration-300", className ?? "bg-canvas-deep text-slate-700 ring-line")}>
       {children}
     </span>
   );
@@ -197,7 +197,7 @@ export function SeverityChip({ severity }: { severity: string }) {
 }
 
 export function btn(variant: "primary" | "secondary" | "danger" | "ghost" = "primary", size: "sm" | "md" = "md") {
-  const base = "inline-flex items-center justify-center gap-1.5 rounded-(--control-radius) font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-link/20 disabled:cursor-not-allowed disabled:opacity-50";
+  const base = "inline-flex items-center justify-center gap-1.5 rounded-(--control-radius) font-semibold transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.98] motion-reduce:active:scale-100 outline-none focus-visible:ring-3 focus-visible:ring-link/20 disabled:cursor-not-allowed disabled:opacity-50";
   // The app's one control size (--control-h): every button stands the same
   // height as every field and every .ask. "sm" keeps a narrower side padding only.
   const sizes = size === "sm" ? "h-(--control-h) px-3 text-(length:--control-text)" : "h-(--control-h) px-3.5 text-(length:--control-text)";

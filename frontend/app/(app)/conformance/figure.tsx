@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CountUp } from "@/components/count-up";
 import { requireScope } from "@/lib/core/scope";
 import { fmtDateTime } from "@/lib/core/utils";
 import { untoldRecipients } from "@/lib/documents/supersession";
@@ -44,7 +45,7 @@ export async function AssuranceFigure() {
   return (
     <div className="grid gap-x-8 gap-y-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
       <div className="flex items-baseline gap-3">
-        <p className={`text-4xl font-semibold leading-none tabular-nums ${below ? "text-amber-700" : "text-emerald-700"}`}>{rate.toFixed(0)}%</p>
+        <p className={`text-4xl font-semibold leading-none tabular-nums ${below ? "text-amber-700" : "text-emerald-700"}`}><CountUp id={`assurance:${ctx.projectId}:rate`} value={`${rate.toFixed(0)}%`} /></p>
         <p className="text-[13px] leading-4 text-slate-700">
           of documents are clear
           <span className="block text-[11px] leading-4 text-slate-400">

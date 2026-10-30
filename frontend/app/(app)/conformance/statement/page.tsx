@@ -1,4 +1,5 @@
 import { requireScope } from "@/lib/core/scope";
+import { CountUp } from "@/components/count-up";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { AssuranceHead } from "@/app/(app)/conformance/head";
 import { CATALOG, CHECK_BY_ID, PHASE_LABEL, type Phase } from "@/lib/conformance/checks/catalog";
@@ -213,7 +214,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function Figure({ value, label, note }: { value: string; label: string; note: string }) {
   return (
     <div className="figure rounded-xl border border-line bg-tint-soft px-4 py-3">
-      <p className="text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
+      <p className="text-2xl font-semibold tabular-nums text-slate-900"><CountUp id={`statement:${label}`} value={value} /></p>
       <p className="mt-0.5 text-[12px] leading-4 text-slate-700">{label}</p>
       <p className="mt-1 text-[11px] leading-4 text-slate-400">{note}</p>
     </div>

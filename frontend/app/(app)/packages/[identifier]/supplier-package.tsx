@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CountUp } from "@/components/count-up";
 import { requireScope } from "@/lib/core/scope";
 import { isController, isAdmin, hasVerb, standsInForControl } from "@/lib/core/auth";
 import { DataTable, Th, Td, Field, inputCls, ToneChip, Chip, btn } from "@/components/ui";
@@ -237,10 +238,10 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
         </div>
         <div className="grid grid-cols-2 border-t border-line sm:grid-cols-4">
           {/* Every document is in exactly one of these: they add up to the package. */}
-          <Figure label="Not sent yet" value={`${counts.notSent} of ${counts.total}`} hint={counts.lateNotSent ? `${counts.lateNotSent} overdue, ours to send` : "ours to send to the supplier"} />
-          <Figure label="With the supplier" value={`${counts.withThem} of ${counts.total}`} hint={counts.lateWithThem ? `${counts.lateWithThem} overdue` : "to send, correct or revise"} />
-          <Figure label="With us" value={`${counts.withUs} of ${counts.total}`} hint={counts.toCheck ? `${counts.toCheck} to check, the rest in review` : "to send for review, or in review"} />
-          <Figure label="Released" value={`${counts.released} of ${counts.total}`} hint={`${f.firstTime}% released first time`} />
+          <Figure at={pkg.number} label="Not sent yet" value={`${counts.notSent} of ${counts.total}`} hint={counts.lateNotSent ? `${counts.lateNotSent} overdue, ours to send` : "ours to send to the supplier"} />
+          <Figure at={pkg.number} label="With the supplier" value={`${counts.withThem} of ${counts.total}`} hint={counts.lateWithThem ? `${counts.lateWithThem} overdue` : "to send, correct or revise"} />
+          <Figure at={pkg.number} label="With us" value={`${counts.withUs} of ${counts.total}`} hint={counts.toCheck ? `${counts.toCheck} to check, the rest in review` : "to send for review, or in review"} />
+          <Figure at={pkg.number} label="Released" value={`${counts.released} of ${counts.total}`} hint={`${f.firstTime}% released first time`} />
         </div>
       </section>
 
@@ -346,11 +347,11 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
   );
 }
 
-function Figure({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Figure({ at, label, value, hint }: { at: string; label: string; value: string; hint: string }) {
   return (
     <div className="border-line px-5 py-3 not-last:border-r sm:px-6">
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-slate-900">{value}</p>
+      <p className="mt-1 text-lg font-semibold text-slate-900"><CountUp id={`package:${at}:${label}`} value={value} /></p>
       <p className="text-[11px] text-slate-500">{hint}</p>
     </div>
   );

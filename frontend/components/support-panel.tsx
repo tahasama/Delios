@@ -20,8 +20,8 @@ export function SupportPanel({ children, startOpen = false }: { children: React.
       </button>
       {open ? (
         <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Need support">
-          <button type="button" aria-label="Close" onClick={() => setOpen(false)} className="absolute inset-0 cursor-default bg-slate-900/40" />
-          <aside className="register absolute inset-y-0 right-0 flex w-[min(36rem,100vw)] flex-col overflow-y-auto bg-surface shadow-2xl">
+          <button type="button" aria-label="Close" onClick={() => setOpen(false)} className="veil-in absolute inset-0 cursor-default bg-slate-900/40" />
+          <aside className="drawer-in register absolute inset-y-0 right-0 flex w-[min(36rem,100vw)] flex-col overflow-y-auto bg-surface shadow-2xl">
             <button type="button" title="Close" onClick={() => setOpen(false)} className={`${btn("ghost", "sm")} absolute top-5 right-4`}>
               <X aria-label="Close" className="h-4 w-4" />
             </button>

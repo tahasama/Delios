@@ -452,7 +452,7 @@ export function DataTable({
       >
         <table ref={tableRef} className="min-w-full">
           <thead>{head}</thead>
-          <tbody>{children}</tbody>
+          <tbody className="rows-rise">{children}</tbody>
         </table>
       </div>
     </div>

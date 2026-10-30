@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CountUp } from "@/components/count-up";
 import { TabLink } from "@/components/tab-link";
 import { Download, X, FileSpreadsheet } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
@@ -122,7 +123,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             {report.figures.map((f) => (
               <div key={f.label} className="rounded-md px-3 py-2.5 ring-1 ring-line">
                 <p className="text-xs text-slate-600">{f.label}</p>
-                <p className={`mt-0.5 text-xl font-semibold tabular-nums ${TEXT[f.tone ?? ""] ?? "text-slate-900"}`}>{f.value}</p>
+                <p className={`mt-0.5 text-xl font-semibold tabular-nums ${TEXT[f.tone ?? ""] ?? "text-slate-900"}`}><CountUp id={`report:${ctx.projectId}:${current}:${f.label}`} value={f.value} /></p>
                 {f.change ? <p className={`mt-0.5 text-[11px] ${f.changeTone ? TEXT[f.changeTone] : "text-slate-500"}`}>{f.change}</p> : null}
               </div>
             ))}
@@ -312,7 +313,7 @@ function BarChart({ chart, chosen, hrefOf }: ChartProps) {
                 {b.label}
               </Link>
               <span className="flex h-4 overflow-hidden rounded-sm bg-tint-soft" role="img" aria-label={`${b.label}: ${counts}`}>
-                <span className="flex h-full" style={{ width: `${(total / max) * 100}%` }}><Stack segments={segments} bar={b} /></span>
+                <span className="bar-build flex h-full" style={{ width: `${(total / max) * 100}%` }}><Stack segments={segments} bar={b} /></span>
               </span>
               <span className="w-10 text-right font-semibold tabular-nums text-slate-700">{chart.unit === "days" ? `${total} d` : total}</span>
             </li>
