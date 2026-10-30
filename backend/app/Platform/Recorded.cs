@@ -142,6 +142,32 @@ internal sealed class ValueUsedConfiguration : IEntityTypeConfiguration<ValueUse
     }
 }
 
+/// <summary>
+/// A document's planned day as it moved (owner: past weeks judged against the plan as it stood then): written by the
+/// database the moment <c>documents.planned_date</c> changes (trigger <c>record_planned_date</c>), never by the app.
+/// Read by Progress by week; before the first change kept, a document's day is read as it stands.
+/// </summary>
+public sealed class PlannedDateChange
+{
+    public long Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid ProjectId { get; set; }
+    public Guid DocumentId { get; set; }
+    public LocalDate? Was { get; set; }
+    public LocalDate? Became { get; set; }
+    public Instant At { get; set; }
+}
+
+internal sealed class PlannedDateChangeConfiguration : IEntityTypeConfiguration<PlannedDateChange>
+{
+    public void Configure(EntityTypeBuilder<PlannedDateChange> b)
+    {
+        b.ToTable("planned_date_changes");
+        b.Property(x => x.Id).UseIdentityAlwaysColumn();
+        b.HasIndex(x => new { x.ProjectId, x.DocumentId, x.At });
+    }
+}
+
 internal sealed class RevisionFactConfiguration : IEntityTypeConfiguration<RevisionFact>
 {
     public void Configure(EntityTypeBuilder<RevisionFact> b)

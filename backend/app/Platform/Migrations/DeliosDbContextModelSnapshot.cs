@@ -4330,6 +4330,49 @@ namespace Delios.Host.Platform.Migrations
                     b.ToTable("support_grants", (string)null);
                 });
 
+            modelBuilder.Entity("Delios.Host.Operators.SupportMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<string>("ByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("by_name");
+
+                    b.Property<bool>("FromDelios")
+                        .HasColumnType("boolean")
+                        .HasColumnName("from_delios");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id")
+                        .HasName("pk_support_messages");
+
+                    b.HasIndex("RequestId", "At")
+                        .HasDatabaseName("ix_support_messages_request_id_at");
+
+                    b.ToTable("support_messages", (string)null);
+                });
+
             modelBuilder.Entity("Delios.Host.Operators.SupportRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5399,6 +5442,48 @@ namespace Delios.Host.Platform.Migrations
                         .HasDatabaseName("ix_idempotency_records_tenant_id_user_id_key");
 
                     b.ToTable("idempotency_records", (string)null);
+                });
+
+            modelBuilder.Entity("Delios.Host.Platform.PlannedDateChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<Instant>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<LocalDate?>("Became")
+                        .HasColumnType("date")
+                        .HasColumnName("became");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<LocalDate?>("Was")
+                        .HasColumnType("date")
+                        .HasColumnName("was");
+
+                    b.HasKey("Id")
+                        .HasName("pk_planned_date_changes");
+
+                    b.HasIndex("ProjectId", "DocumentId", "At")
+                        .HasDatabaseName("ix_planned_date_changes_project_id_document_id_at");
+
+                    b.ToTable("planned_date_changes", (string)null);
                 });
 
             modelBuilder.Entity("Delios.Host.Platform.RevisionFact", b =>

@@ -42,9 +42,21 @@ public static class Trials
         Moved(db, row);
     }
 
-    /// <summary>The next reminder of a trial: 7 days before its end, the day before, the day it ends; each once.</summary>
+    /// <summary>A paid plan renews: its administrators are told this long before the period paid ends (as the terms say).</summary>
+    public static readonly Duration RenewalNotice = Duration.FromDays(30);
+
+    /// <summary>
+    /// The next reminder: of a trial, 7 days before its end, the day before, the day it ends; of a paid plan not cancelled,
+    /// once, 30 days before the period paid ends (a later period paid reminds again). Each once
+    /// (<see cref="Subscription.TrialToldAt"/> is when they were last told, trial or renewal alike).
+    /// </summary>
     public static Instant? NextReminder(Subscription s)
     {
+        if (s.State == SubscriptionStates.Active && s.CancelledAt is null && s.PaidUntil is { } paid)
+        {
+            var at = paid - RenewalNotice;
+            return s.TrialToldAt is { } toldRenewal && toldRenewal >= at ? null : at;
+        }
         if (s.State != SubscriptionStates.Trial || s.TrialEndsAt is not { } end) return null;
         foreach (var before in Before)
         {
@@ -74,6 +86,20 @@ public static class Trials
         var left = (int)Math.Ceiling((end - now).TotalDays);
         return (left <= 1 ? "Your DELIOS trial ends tomorrow" : $"Your DELIOS trial ends in {left} days",
             $"On {day} your organization will read only. {after} {choose}");
+    }
+}
+
+/// <summary>What the renewal reminder says (owner: told by itself 30 days before, never by hand).</summary>
+public static class Renewals
+{
+    public static (string Title, string Body) Words(Instant paidUntil, Instant now, string? plan)
+    {
+        var day = paidUntil.InUtc().Date.ToString("d MMMM yyyy", null);
+        var left = Math.Max(0, (int)Math.Ceiling((paidUntil - now).TotalDays));
+        return ($"Your DELIOS plan renews in {left} days",
+            $"The period paid{(plan is null ? "" : $" on your plan {plan}")} ends on {day}. It renews for the same period unless an administrator " +
+            "cancels it in the organization's Settings → Contract & plan; the invoice for the next period follows. Cancelled, everyone keeps " +
+            "reading and exporting once it ends, and nothing is deleted.");
     }
 }
 
@@ -110,7 +136,9 @@ public sealed class TrialReminders(IServiceScopeFactory scopes, TrialBell bell, 
                     var due = await db.Set<Subscription>().Where(s => s.RemindAt != null && s.RemindAt <= now).ToListAsync(stoppingToken);
                     foreach (var row in due)
                     {
-                        var told = row.State == SubscriptionStates.Trial && row.TrialEndsAt is { } end ? Trials.Words(end, now) : default;
+                        var told = row.State == SubscriptionStates.Trial && row.TrialEndsAt is { } end ? Trials.Words(end, now)
+                            : row.State == SubscriptionStates.Active && row.CancelledAt is null && row.PaidUntil is { } paid ? Renewals.Words(paid, now, row.Plan)
+                            : default;
                         row.TrialToldAt = now;
                         row.RemindAt = Trials.NextReminder(row);
                         await db.SaveChangesAsync(stoppingToken);

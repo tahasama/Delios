@@ -4,13 +4,16 @@ import { ActionForm } from "@/components/form";
 import { Field, inputCls } from "@/components/ui";
 import { Select } from "@/components/select";
 import { api } from "@/lib/client";
-import { askSupportAction } from "@/lib/support/forms";
+import { askSupportAction, replySupportAction } from "@/lib/support/forms";
 import { fmtDateTime } from "@/lib/core/utils";
 
 export type SupportContact = { email: string | null; hours: string | null; phone: string | null };
 type Mine = {
   kinds: { code: string; label: string }[];
-  mine: { id: string; kind: string; subject: string; message: string; projectName: string | null; at: string; answer: string | null; answeredBy: string | null; answeredAt: string | null }[];
+  mine: {
+    id: string; kind: string; subject: string; message: string; projectName: string | null; at: string; waiting: boolean;
+    messages: { id: string; fromDelios: boolean; byName: string; text: string; at: string }[];
+  }[];
 };
 
 export const supportContact = () =>
@@ -67,12 +70,20 @@ export async function Support({ projectId, contact, startOpen }: { projectId?: s
                   <p className="font-semibold text-slate-900">{r.subject}</p>
                   <p className="text-[11px] text-slate-500">{kindOf.get(r.kind) ?? r.kind} · {fmtDateTime(r.at)}{r.projectName ? ` · ${r.projectName}` : ""}</p>
                   <p className="mt-1 whitespace-pre-line text-slate-700">{r.message}</p>
-                  {r.answer ? (
-                    <div className="mt-2 border-l-[3px] border-l-emerald-500 pl-3">
-                      <p className="text-[11px] font-semibold text-emerald-700">Answered by {r.answeredBy} · {fmtDateTime(r.answeredAt)}</p>
-                      <p className="whitespace-pre-line text-slate-800">{r.answer}</p>
+                  {/* The conversation (owner: back and forth), oldest first: DELIOS support's answers marked green. */}
+                  {r.messages.map((m) => (
+                    <div key={m.id} className={`mt-2 border-l-[3px] pl-3 ${m.fromDelios ? "border-l-emerald-500" : "border-l-line-strong"}`}>
+                      <p className={`text-[11px] font-semibold ${m.fromDelios ? "text-emerald-700" : "text-slate-500"}`}>{m.fromDelios ? `DELIOS support · ${m.byName}` : "You"} · {fmtDateTime(m.at)}</p>
+                      <p className="whitespace-pre-line text-slate-800">{m.text}</p>
                     </div>
-                  ) : <p className="mt-2 text-[12px] font-semibold text-amber-700">Waiting for an answer</p>}
+                  ))}
+                  {r.waiting ? <p className="mt-2 text-[12px] font-semibold text-amber-700">Waiting for support</p> : null}
+                  <details className="mt-2">
+                    <summary className="ask cursor-pointer list-none">Write back</summary>
+                    <ActionForm action={replySupportAction} hidden={{ requestId: r.id }} submitLabel="Send" size="sm" resetOnSuccess className="asking mt-2 space-y-2">
+                      <Field label="Your message" required><textarea name="text" required rows={3} maxLength={4000} className={inputCls} /></Field>
+                    </ActionForm>
+                  </details>
                 </li>
               ))}
             </ul>

@@ -35,6 +35,33 @@ public sealed class SupportRequest
     public Instant? AnsweredAt { get; set; }
 }
 
+/// <summary>
+/// A message of a request's conversation after its first (owner: support back and forth): the person writing back, or
+/// DELIOS support answering. Kept with the request, above every organization as it is.
+/// </summary>
+public sealed class SupportMessage
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid RequestId { get; set; }
+    public Guid TenantId { get; set; }
+    /// <summary>Written by DELIOS support (else by the person who asked).</summary>
+    public bool FromDelios { get; set; }
+    public required string ByName { get; set; }
+    public required string Text { get; set; }
+    public Instant At { get; set; }
+}
+
+internal sealed class SupportMessageConfiguration : IEntityTypeConfiguration<SupportMessage>
+{
+    public void Configure(EntityTypeBuilder<SupportMessage> b)
+    {
+        b.ToTable("support_messages");
+        b.Property(x => x.ByName).HasMaxLength(200);
+        b.Property(x => x.Text).HasMaxLength(4000);
+        b.HasIndex(x => new { x.RequestId, x.At });
+    }
+}
+
 internal sealed class SupportRequestConfiguration : IEntityTypeConfiguration<SupportRequest>
 {
     public void Configure(EntityTypeBuilder<SupportRequest> b)
@@ -75,23 +102,69 @@ public static class SupportEndpoints
 {
     public sealed record AskRequest(string? Kind, string? Subject, string? Message, Guid? ProjectId);
     public sealed record AnswerRequest(string? Answer);
+    public sealed record ReplyRequest(string? Text);
 
     public static void MapSupportEndpoints(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/support").WithTags("Support").AddEndpointFilter<TransactionFilter>();
         g.MapGet("/requests", MineAsync);
         g.MapPost("/requests", AskAsync);
+        g.MapPost("/requests/{id:guid}/messages", ReplyAsync);
+    }
+
+    /// <summary>A request with its conversation: every message after the first, oldest first, and whether DELIOS owes the next word.</summary>
+    private static async Task<List<object>> WithMessagesAsync(DeliosDbContext db, List<SupportRequest> asks, CancellationToken cancellationToken)
+    {
+        var ids = asks.Select(a => a.Id).ToList();
+        var messages = (await db.Set<SupportMessage>().AsNoTracking().Where(m => ids.Contains(m.RequestId)).OrderBy(m => m.At).ToListAsync(cancellationToken))
+            .GroupBy(m => m.RequestId).ToDictionary(g => g.Key, g => g.ToList());
+        return asks.Select(a =>
+        {
+            var thread = messages.GetValueOrDefault(a.Id) ?? [];
+            // An answer kept before the conversation existed reads as DELIOS's first message.
+            if (thread.Count == 0 && a.Answer is not null)
+                thread = [new SupportMessage { RequestId = a.Id, TenantId = a.TenantId, FromDelios = true, ByName = a.AnsweredBy ?? "DELIOS support", Text = a.Answer, At = a.AnsweredAt ?? a.At }];
+            var waiting = thread.Count == 0 || !thread[^1].FromDelios;
+            return (object)new
+            {
+                a.Id, a.TenantId, a.OrganizationName, a.ProjectId, a.ProjectName, a.Kind, a.Subject, a.Message, a.ByUserId, a.ByName, a.ByEmail, a.At,
+                a.Answer, a.AnsweredBy, a.AnsweredAt, Waiting = waiting,
+                Messages = thread.Select(m => new { m.Id, m.FromDelios, m.ByName, m.Text, m.At }),
+            };
+        }).ToList();
+    }
+
+    /// <summary>The person who asked writes back (owner: a conversation, not one answer): support is emailed, as for a new request.</summary>
+    private static async Task<IResult> ReplyAsync(Guid id, ReplyRequest request, HttpContext http, DeliosDbContext db, Notifier notifier,
+        IOptions<EmailOptions> email, IClock clock, CancellationToken cancellationToken)
+    {
+        var text = request.Text?.Trim() ?? "";
+        if (text.Length == 0) return Problems.Invalid("MESSAGE_REQUIRED", "Write your message.", new { field = "text" });
+        if (text.Length > 4000) return Problems.Invalid("TOO_LONG", "Keep it under 4,000 characters.", new { field = "text" });
+        var tenantId = http.User.TenantId();
+        var me = http.User.UserId();
+        var ask = await db.Set<SupportRequest>().AsNoTracking().SingleOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId && r.ByUserId == me, cancellationToken);
+        if (ask is null) return Problems.NotFound("NO_SUCH_REQUEST", "No such request of yours.");
+        var by = await db.Users.AsNoTracking().Where(u => u.Id == me).Select(u => u.Name).SingleAsync(cancellationToken);
+        var message = new SupportMessage { RequestId = ask.Id, TenantId = tenantId, FromDelios = false, ByName = by, Text = text, At = clock.GetCurrentInstant() };
+        db.Add(message);
+        var support = await db.Set<PlatformSetting>().AsNoTracking().Where(p => p.Key == PlatformKeys.SupportEmail).Select(p => p.Value).SingleOrDefaultAsync(cancellationToken);
+        var to = !string.IsNullOrWhiteSpace(support) ? support : email.Value.DeliosAddress;
+        if (to is { Length: > 0 } && to.Contains('@'))
+            notifier.Queue(tenantId, null, EmailKinds.Account, to, "DELIOS support", $"[Reply] {ask.Subject}",
+                $"{ask.ByName} <{ask.ByEmail}>, {ask.OrganizationName}, wrote back.\n\n{text}\n\nAnswer it in the console: Support.",
+                "SupportRequest", ask.Id, replyTo: ask.ByEmail);
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.Ok(new { message.Id });
     }
 
     private static async Task<IResult> MineAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
     {
         var tenantId = http.User.TenantId();
         var me = http.User.UserId();
-        var mine = await db.Set<SupportRequest>().AsNoTracking().Where(r => r.TenantId == tenantId && r.ByUserId == me)
-            .OrderByDescending(r => r.At).Take(50)
-            .Select(r => new { r.Id, r.Kind, r.Subject, r.Message, r.ProjectName, r.At, r.Answer, r.AnsweredBy, r.AnsweredAt })
-            .ToListAsync(cancellationToken);
-        return Results.Ok(new { kinds = SupportKinds.All, mine });
+        var asks = await db.Set<SupportRequest>().AsNoTracking().Where(r => r.TenantId == tenantId && r.ByUserId == me)
+            .OrderByDescending(r => r.At).Take(50).ToListAsync(cancellationToken);
+        return Results.Ok(new { kinds = SupportKinds.All, mine = await WithMessagesAsync(db, asks, cancellationToken) });
     }
 
     private static async Task<IResult> AskAsync(AskRequest request, HttpContext http, DeliosDbContext db, Notifier notifier,
@@ -127,7 +200,7 @@ public static class SupportEndpoints
 
     /// <summary>In the console: every request, newest first, and the answer, which tells the person.</summary>
     public static async Task<object> AllAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
-        await db.Set<SupportRequest>().AsNoTracking().OrderByDescending(r => r.At).Take(300).ToListAsync(cancellationToken);
+        await WithMessagesAsync(db, await db.Set<SupportRequest>().AsNoTracking().OrderByDescending(r => r.At).Take(300).ToListAsync(cancellationToken), cancellationToken);
 
     public static async Task<IResult> AnswerAsync(Guid id, AnswerRequest request, string operatorName, DeliosDbContext db, IServiceScopeFactory scopes,
         IClock clock, CancellationToken cancellationToken)
@@ -137,9 +210,15 @@ public static class SupportEndpoints
         if (answer.Length > 4000) return Problems.Invalid("TOO_LONG", "Keep it under 4,000 characters.", new { field = "answer" });
         var ask = await db.Set<SupportRequest>().SingleOrDefaultAsync(r => r.Id == id, cancellationToken);
         if (ask is null) return Problems.NotFound("NO_SUCH_REQUEST", "No such request.");
+        var now = clock.GetCurrentInstant();
+        // An answer kept before the conversation existed is written into it first, so nothing said is lost.
+        if (ask.Answer is not null && !await db.Set<SupportMessage>().AnyAsync(m => m.RequestId == ask.Id, cancellationToken))
+            db.Add(new SupportMessage { RequestId = ask.Id, TenantId = ask.TenantId, FromDelios = true, ByName = ask.AnsweredBy ?? "DELIOS support", Text = ask.Answer, At = ask.AnsweredAt ?? ask.At });
+        db.Add(new SupportMessage { RequestId = ask.Id, TenantId = ask.TenantId, FromDelios = true, ByName = operatorName, Text = answer, At = now });
+        // The latest answer, as read before the conversation existed.
         ask.Answer = answer;
         ask.AnsweredBy = operatorName;
-        ask.AnsweredAt = clock.GetCurrentInstant();
+        ask.AnsweredAt = now;
         await db.SaveChangesAsync(cancellationToken);
         await TenantScope.RunAsync(scopes, ask.TenantId, async (services, _) =>
         {

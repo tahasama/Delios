@@ -7,6 +7,7 @@ import { api } from "@/lib/client";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { acceptTextAction, cancelPlanAction, choosePlanAction, endSupportAction, grantSupportAction, resumePlanAction, setBillingDetailsAction } from "@/lib/organization/forms-contract";
 import { Field as F2, inputCls } from "@/components/ui";
+import { PlanFields } from "./plan-fields";
 import { cn, fmtDate, fmtDateTime } from "@/lib/core/utils";
 
 export const dynamic = "force-dynamic";
@@ -102,16 +103,7 @@ export default async function ContractPage() {
           {c.plans.length ? (
           <ActionForm action={choosePlanAction} submitLabel={c.asked ? "Change my choice" : "Send my choice to DELIOS"}
             className="asking grid grid-cols-1 items-end gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_10rem] sm:px-6" footerClassName="sm:col-span-2">
-            <Field label="Plan" required>
-              <Select name="plan" required defaultValue={c.asked?.plan ?? c.plans[0]?.code} className="plain w-full">
-                {c.plans.map((p) => (
-                  <option key={p.code} value={p.code}>
-                    {p.name} · {p.pricePerUser == null ? "price on request" : `${p.pricePerUser} ${p.currency} per user a month`}{p.notes ? ` · ${p.notes}` : ""}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Users" required hint={`${c.users} today`}><input name="users" type="number" min={1} required defaultValue={c.asked?.users ?? Math.max(c.users, 1)} className="plain w-full" /></Field>
+            <PlanFields plans={c.plans} plan={c.asked?.plan ?? c.plans[0]?.code ?? ""} users={c.asked?.users ?? Math.max(c.users, 1)} today={c.users} />
             <Field label="Anything to add" hint="optional: yearly payment, a question…" className="sm:col-span-2"><input name="note" defaultValue={c.asked?.note ?? ""} className="plain w-full" /></Field>
           </ActionForm>
           ) : (

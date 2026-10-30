@@ -21,3 +21,17 @@ export async function askSupportAction(_prev: Result | undefined, formData: Form
   revalidatePath("/organization", "layout");
   return { ok: "Sent to DELIOS support. You are told here and on Notifications when they answer." };
 }
+
+/** Writing back on a request (owner: support is a conversation): support is told, as for a new request. */
+export async function replySupportAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const message = text(formData, "text");
+  if (!message) return { error: "Write your message.", fields: ["text"] };
+  try {
+    await api(`/api/support/requests/${text(formData, "requestId")}/messages`, { body: { text: message } });
+  } catch (e) {
+    return refusalForForm(e);
+  }
+  revalidatePath("/guide");
+  revalidatePath("/organization", "layout");
+  return { ok: "Sent: support reads it with the rest of the conversation." };
+}

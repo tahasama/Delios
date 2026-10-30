@@ -269,17 +269,40 @@ public static class BillingEndpoints
     private static async Task<IResult> IssueAsync(Guid id, InvoiceRequest request, HttpContext http, DeliosDbContext db, IServiceScopeFactory scopes,
         IClock clock, CancellationToken cancellationToken)
     {
+        var (invoice, refused) = await PrepareAsync(id, request, http.Current(), db, clock, cancellationToken);
+        if (invoice is null) return refused!;
+        await db.SaveChangesAsync(cancellationToken);
+        await TellIssuedAsync(scopes, db, invoice, cancellationToken);
+        return Results.Ok(new { invoice.Id, invoice.Number });
+    }
+
+    /// <summary>The organization's administrators told of an invoice issued, and its billing email sent the news.</summary>
+    public static async Task TellIssuedAsync(IServiceScopeFactory scopes, DeliosDbContext db, Invoice invoice, CancellationToken cancellationToken)
+    {
+        var email = await db.Set<BillingDetails>().AsNoTracking().Where(d => d.TenantId == invoice.TenantId).Select(d => d.Email).SingleOrDefaultAsync(cancellationToken);
+        await TellAsync(scopes, invoice.TenantId, email, $"Invoice {invoice.Number} from DELIOS",
+            $"DELIOS issued invoice {invoice.Number}: {invoice.Total.ToString("0.00", CultureInfo.InvariantCulture)} {invoice.Currency}, due {invoice.DueOn:yyyy-MM-dd}. "
+            + "Download it, and read how to pay, in the organization's Settings → Contract & plan.", cancellationToken);
+    }
+
+    /// <summary>
+    /// An invoice made ready to save (numbered, its lines and totals worked out, logged), or the refusal: by hand from
+    /// the organization's page, or by itself when a plan is set with its first invoice (<c>ConsoleEndpoints</c>).
+    /// </summary>
+    public static async Task<(Invoice? Invoice, IResult? Refused)> PrepareAsync(Guid id, InvoiceRequest request, Operator by, DeliosDbContext db, IClock clock,
+        CancellationToken cancellationToken)
+    {
         var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(t => t.Id == id, cancellationToken);
-        if (tenant is null) return Problems.NotFound("NO_SUCH_ORGANIZATION", "No such organization.");
+        if (tenant is null) return (null, Problems.NotFound("NO_SUCH_ORGANIZATION", "No such organization."));
         var lines = (request.Lines ?? []).Where(l => !string.IsNullOrWhiteSpace(l.Description)).ToList();
-        if (lines.Count == 0) return Problems.Invalid("LINES_REQUIRED", "At least one line: what is invoiced.", new { field = "lines" });
+        if (lines.Count == 0) return (null, Problems.Invalid("LINES_REQUIRED", "At least one line: what is invoiced.", new { field = "lines" }));
         if (lines.Any(l => l.Quantity is null or <= 0 || l.UnitPrice is null or < 0))
-            return Problems.Invalid("LINE_INVALID", "Each line has a quantity above zero and a price not below zero.", new { field = "lines" });
+            return (null, Problems.Invalid("LINE_INVALID", "Each line has a quantity above zero and a price not below zero.", new { field = "lines" }));
         var currency = (request.Currency ?? "EUR").Trim().ToUpperInvariant();
-        if (currency.Length != 3) return Problems.Invalid("CURRENCY", "A currency's three letters (MAD, EUR, USD).", new { field = "currency" });
+        if (currency.Length != 3) return (null, Problems.Invalid("CURRENCY", "A currency's three letters (MAD, EUR, USD).", new { field = "currency" }));
         var seller = await SellerAsync(db, cancellationToken);
         var rate = request.TaxRate ?? (decimal.TryParse(seller.GetValueOrDefault(SellerKeys.TaxRate), NumberStyles.Number, CultureInfo.InvariantCulture, out var r) ? r : 0);
-        if (rate is < 0 or > 100) return Problems.Invalid("TAX_RATE", "A rate from 0 to 100.", new { field = "taxRate" });
+        if (rate is < 0 or > 100) return (null, Problems.Invalid("TAX_RATE", "A rate from 0 to 100.", new { field = "taxRate" }));
         var details = await db.Set<BillingDetails>().AsNoTracking().SingleOrDefaultAsync(d => d.TenantId == id, cancellationToken);
         var issued = request.IssuedOn is { } on ? LocalDate.FromDateOnly(on) : clock.GetCurrentInstant().InUtc().Date;
         var dueDays = int.TryParse(seller.GetValueOrDefault(SellerKeys.DueDays), out var d) ? d : 30;
@@ -290,7 +313,7 @@ public static class BillingEndpoints
         {
             TenantId = id, Number = $"{prefix}{next:D4}", IssuedOn = issued, DueOn = issued.PlusDays(dueDays),
             PeriodFrom = request.PeriodFrom is { } pf ? LocalDate.FromDateOnly(pf) : null, PeriodTo = request.PeriodTo is { } pt ? LocalDate.FromDateOnly(pt) : null,
-            Currency = currency, TaxRate = rate, Note = Clip(request.Note, 2000), IssuedBy = http.Current().Name, CreatedAt = clock.GetCurrentInstant(),
+            Currency = currency, TaxRate = rate, Note = Clip(request.Note, 2000), IssuedBy = by.Name, CreatedAt = clock.GetCurrentInstant(),
             Buyer = details is null ? tenant.Name : string.Join('\n', new[] { details.LegalName, details.Address, details.Country,
                 details.TaxNumber is null ? null : $"Tax number: {details.TaxNumber}", details.Reference is null ? null : $"Their reference: {details.Reference}" }
                 .Where(x => !string.IsNullOrWhiteSpace(x))),
@@ -308,13 +331,9 @@ public static class BillingEndpoints
         invoice.Tax = Math.Round(invoice.Subtotal * rate / 100, 2, MidpointRounding.AwayFromZero);
         invoice.Total = invoice.Subtotal + invoice.Tax;
         db.Add(invoice);
-        db.Add(new OperatorEvent { OperatorId = http.Current().Id, OperatorName = http.Current().Name, Action = "INVOICE_ISSUED", TenantId = id,
+        db.Add(new OperatorEvent { OperatorId = by.Id, OperatorName = by.Name, Action = "INVOICE_ISSUED", TenantId = id,
             Detail = $"{invoice.Number}: {invoice.Total:0.00} {currency}", At = clock.GetCurrentInstant() });
-        await db.SaveChangesAsync(cancellationToken);
-        await TellAsync(scopes, id, details?.Email, $"Invoice {invoice.Number} from DELIOS",
-            $"DELIOS issued invoice {invoice.Number}: {invoice.Total.ToString("0.00", CultureInfo.InvariantCulture)} {currency}, due {invoice.DueOn:yyyy-MM-dd}. "
-            + "Download it, and read how to pay, in the organization's Settings → Contract & plan.", cancellationToken);
-        return Results.Ok(new { invoice.Id, invoice.Number });
+        return (invoice, null);
     }
 
     /// <summary>A payment arrived (a transfer seen on the bank account, CMI, Paddle…): recorded, and the period paid moves on.</summary>
@@ -338,6 +357,8 @@ public static class BillingEndpoints
             if (sub is null) db.Add(sub = new Subscription { TenantId = invoice.TenantId });
             if (sub.PaidUntil is null || sub.PaidUntil < until) sub.PaidUntil = until;
             if (sub.State is SubscriptionStates.Trial or SubscriptionStates.ReadOnly) sub.State = SubscriptionStates.Active;
+            // A later period paid: its renewal reminder is written.
+            Trials.Moved(db, sub);
             sub.UpdatedAt = now;
             sub.UpdatedBy = http.Current().Name;
         }

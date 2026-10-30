@@ -18,7 +18,7 @@ namespace Delios.Host.Operators;
 public static class ConsoleEndpoints
 {
     public sealed record SubscriptionRequest(string? Plan, string? State, DateOnly? TrialEndsAt, DateOnly? PaidUntil, string? Billing, int? Seats,
-        string? ContractRef, DateOnly? ContractSignedOn, string? ProviderRef, string? Notes, string? Why);
+        string? ContractRef, DateOnly? ContractSignedOn, string? ProviderRef, string? Notes, string? Why, int? FirstInvoiceMonths = null);
     public sealed record ActiveRequest(bool Active, string? Why);
     public sealed record PlanRequest(string? Code, string? Name, decimal? PricePerUser, string? Currency, string? Notes, bool? Active);
     public sealed record PublishRequest(string? Title, string? Body, string? Note);
@@ -68,6 +68,7 @@ public static class ConsoleEndpoints
         g.MapPost("/notices", NoticeAsync);
         g.MapGet("/team", async (DeliosDbContext db, CancellationToken c) => Results.Ok(await db.Set<Operator>().AsNoTracking().OrderBy(o => o.Name)
             .Select(o => new { o.Id, o.Name, o.Email, o.Active, o.CreatedAt, o.LastSignInAt, locked = o.LockedUntil }).ToListAsync(c)));
+        g.MapPut("/team/{id:guid}/active", SetOperatorActiveAsync);
         g.MapGet("/log", async (Guid? tenantId, string? before, DeliosDbContext db, CancellationToken c) =>
         {
             var q = db.Set<OperatorEvent>().AsNoTracking().AsQueryable();
@@ -79,6 +80,31 @@ public static class ConsoleEndpoints
             }
             return Results.Ok(await q.OrderByDescending(e => e.At).Take(100).ToListAsync(c));
         });
+    }
+
+    /// <summary>
+    /// A console account switched off (someone who left the team) or back on, always with why, logged. Never one's own,
+    /// never the last one on (nobody could sign in to the console then). Off, its sessions end at once; nothing it did goes.
+    /// </summary>
+    private static async Task<IResult> SetOperatorActiveAsync(Guid id, ActiveRequest request, HttpContext http, DeliosDbContext db, IClock clock,
+        CancellationToken cancellationToken)
+    {
+        var why = request.Why?.Trim();
+        if (string.IsNullOrEmpty(why)) return Problems.Invalid("REASON_REQUIRED", "Say why.", new { field = "why" });
+        var who = await db.Set<Operator>().SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
+        if (who is null) return Problems.NotFound("NO_SUCH_OPERATOR", "No such console account.");
+        if (who.Id == http.Current().Id) return Problems.Conflict("OWN_ACCOUNT", "Not your own account: another of the team switches it off.");
+        if (who.Active == request.Active) return Results.NoContent();
+        if (!request.Active && !await db.Set<Operator>().AnyAsync(o => o.Active && o.Id != id, cancellationToken))
+            return Problems.Conflict("LAST_OPERATOR", "It is the last console account switched on: nobody could sign in to the console.");
+        var now = clock.GetCurrentInstant();
+        who.Active = request.Active;
+        if (!request.Active)
+            await db.Set<OperatorSession>().Where(s => s.OperatorId == id && s.RevokedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), cancellationToken);
+        Log(db, http, request.Active ? "OPERATOR_SWITCHED_ON" : "OPERATOR_SWITCHED_OFF", null, $"{who.Name} ({who.Email}). Why: {why}", clock);
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
     }
 
     private static void Log(DeliosDbContext db, HttpContext http, string action, Guid? tenantId, string? detail, IClock clock)
@@ -188,7 +214,7 @@ public static class ConsoleEndpoints
     }
 
     private static async Task<IResult> SetSubscriptionAsync(Guid id, SubscriptionRequest request, HttpContext http, DeliosDbContext db, IClock clock,
-        CancellationToken cancellationToken)
+        IServiceScopeFactory scopes, CancellationToken cancellationToken)
     {
         var why = request.Why?.Trim() ?? "";
         if (why.Length == 0) return Problems.Invalid("REASON_REQUIRED", "Say why it changes.", new { field = "why" });
@@ -201,8 +227,11 @@ public static class ConsoleEndpoints
         if (plan is not null && !await db.Set<Plan>().AnyAsync(p => p.Code == plan, cancellationToken))
             return Problems.Invalid("PLAN_UNKNOWN", "No such plan.", new { field = "plan" });
         if (request.Seats is < 0) return Problems.Invalid("SEATS_NEGATIVE", "Users cannot be fewer than none.", new { field = "seats" });
+        if (request.FirstInvoiceMonths is < 0 or > 36) return Problems.Invalid("MONTHS_RANGE", "The first invoice covers 1 to 36 months.", new { field = "firstInvoiceMonths" });
         var row = await db.Set<Subscription>().SingleOrDefaultAsync(s => s.TenantId == id, cancellationToken);
         var before = row is null ? "none" : $"{row.State} {row.Plan} paid until {row.PaidUntil}";
+        // Setting the plan makes its first invoice by itself where asked (owner): its users × its price × the months.
+        var askedUsers = row?.PlanAskedUsers;
         if (row is null) db.Add(row = new Subscription { TenantId = id });
         var trialEnd = EndOf(request.TrialEndsAt);
         var trialMoved = row.State != state || row.TrialEndsAt != trialEnd;
@@ -211,12 +240,10 @@ public static class ConsoleEndpoints
         row.TrialEndsAt = trialEnd;
         // A plan set answers the one its administrator asked for.
         if (plan is not null) (row.PlanAsked, row.PlanAskedUsers, row.PlanAskedNote, row.PlanAskedAt, row.PlanAskedBy) = (null, null, null, null, null);
-        if (trialMoved)
-        {
-            row.TrialToldAt = null;
-            Trials.Moved(db, row);
-        }
+        if (trialMoved) row.TrialToldAt = null;
         row.PaidUntil = EndOf(request.PaidUntil);
+        // The next reminder, trial or renewal, written again with what was set.
+        Trials.Moved(db, row);
         row.Billing = billing;
         row.Seats = request.Seats;
         row.ContractRef = Clip(request.ContractRef, 100);
@@ -226,8 +253,25 @@ public static class ConsoleEndpoints
         row.UpdatedAt = clock.GetCurrentInstant();
         row.UpdatedBy = http.Current().Name;
         Log(db, http, "SUBSCRIPTION_SET", id, $"{before} → {state} {plan} paid until {request.PaidUntil}. Why: {why}", clock);
+        Invoice? first = null;
+        if (request.FirstInvoiceMonths is { } months && months > 0)
+        {
+            var offer = plan is null ? null : await db.Set<Plan>().AsNoTracking().SingleAsync(p => p.Code == plan, cancellationToken);
+            if (offer is null) return Problems.Invalid("PLAN_REQUIRED", "Choose the plan the first invoice is for.", new { field = "plan" });
+            if (offer.PricePerUser is not { } price) return Problems.Invalid("PLAN_NOT_PRICED", $"{offer.Name} has no price per user: issue its invoice by hand.", new { field = "firstInvoiceMonths" });
+            var users = request.Seats is > 0 ? request.Seats.Value : askedUsers is > 0 ? askedUsers.Value : 0;
+            if (users == 0) return Problems.Invalid("USERS_REQUIRED", "Say how many users, in Users: the first invoice counts them.", new { field = "seats" });
+            var from = clock.GetCurrentInstant().InUtc().Date;
+            var to = from.PlusMonths(months).PlusDays(-1);
+            var (invoice, refused) = await BillingEndpoints.PrepareAsync(id, new BillingEndpoints.InvoiceRequest(null, from.ToDateOnly(), to.ToDateOnly(), offer.Currency, null,
+                [new BillingEndpoints.LineRequest($"{offer.Name}: {users} user{(users == 1 ? "" : "s")}, {months} month{(months == 1 ? "" : "s")} ({from:yyyy-MM-dd} to {to:yyyy-MM-dd})",
+                    users * months, price)], null), http.Current(), db, clock, cancellationToken);
+            if (invoice is null) return refused!;
+            first = invoice;
+        }
         await db.SaveChangesAsync(cancellationToken);
-        return Results.NoContent();
+        if (first is not null) await BillingEndpoints.TellIssuedAsync(scopes, db, first, cancellationToken);
+        return first is null ? Results.NoContent() : Results.Ok(new { invoice = first.Number });
     }
 
     private static async Task<IResult> SetActiveAsync(Guid id, ActiveRequest request, HttpContext http, DeliosDbContext db, IClock clock,

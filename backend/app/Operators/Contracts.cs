@@ -257,6 +257,8 @@ public static class ContractEndpoints
         var now = clock.GetCurrentInstant();
         row.CancelledAt = now;
         row.CancelledBy = http.User.Identity?.Name;
+        // Cancelled: nothing renews, so no renewal reminder.
+        Trials.Moved(db, row);
         row.UpdatedAt = now;
         row.UpdatedBy = http.User.Identity?.Name;
         await db.SaveChangesAsync(cancellationToken);
@@ -271,6 +273,7 @@ public static class ContractEndpoints
         if (row?.CancelledAt is null) return Problems.Conflict("NOT_CANCELLED", "It is not cancelled.");
         row.CancelledAt = null;
         row.CancelledBy = null;
+        Trials.Moved(db, row);
         row.UpdatedAt = clock.GetCurrentInstant();
         row.UpdatedBy = http.User.Identity?.Name;
         await db.SaveChangesAsync(cancellationToken);

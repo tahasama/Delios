@@ -43,8 +43,8 @@ Each found wrong in the Settings review of 2026-10-16 (`.impeccable/critique/`),
 - Demo data: schemes seeded with documents are not marked as having given numbers (real use marks them).
 - ~~The organization's "Reset to the app's defaults" keeps no copy yet~~ (done: replacing the defaults, from a project
   or back to the app's own, asks why and keeps a copy, put back from the defaults' page).
-- A review rejected a day before the action it serves leaves no time to put it right (owner: "still not resolved, it is
-  problematic"). Nothing yet warns at sending, or plans the days back from the action; to be decided.
+- ~~A review rejected a day before the action it serves leaves no time to put it right~~ (decided by the owner, 30 Oct
+  2026: "their own ways, not our problem"; the organizations plan their reviews themselves, nothing is built for it).
 
 ## The organization's Control room (left to do)
 

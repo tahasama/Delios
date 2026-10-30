@@ -97,7 +97,7 @@ public sealed class ScreenChangeWatcher(ScreenChanges changes, ScreensNotifier n
         "AuditEvent", "OutboxMessage", "Session", "Notification", "EmailMessage", "PushSubscription", "SearchWatermark",
         "DocumentSnapshot", "IdempotencyRecord", "PersonSeen", "RevisionFact", "TransmittalFact", "DocumentFact", "ValueUsed", "FileText", "DataProtectionKey", "Notice", "NoticeAlarm",
         // A full download is read fresh by its own page, never kept: making one clears nothing.
-        "FullDownload",
+        "FullDownload", "PlannedDateChange",
     ];
 
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result,

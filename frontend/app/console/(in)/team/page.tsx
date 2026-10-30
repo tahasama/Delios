@@ -1,5 +1,8 @@
 import { consoleApi } from "@/lib/console/client";
 import { cn, fmtDate, fmtDateTime } from "@/lib/core/utils";
+import { ActionForm } from "@/components/form";
+import { Field } from "@/components/ui";
+import { setOperatorActiveAction } from "@/lib/console/forms";
 import { Plate, Sheet } from "../parts";
 
 export const metadata = { title: "Team" };
@@ -17,7 +20,16 @@ export default async function Team() {
           {team.map((m) => (
             <li key={m.id} className={cn("px-5 py-3 text-[13px] sm:px-6", !m.active && "opacity-60")}>
               <span className="font-medium text-slate-900">{m.name}</span> <span className="text-slate-500">{m.email}</span>
-              <span className="block text-[11px] text-slate-500">since {fmtDate(m.createdAt)} · last signed in {fmtDateTime(m.lastSignInAt)}{m.locked && new Date(m.locked) > new Date() ? " · locked for a few minutes" : ""}</span>
+              <span className="block text-[11px] text-slate-500">since {fmtDate(m.createdAt)} · last signed in {fmtDateTime(m.lastSignInAt)}{m.locked && new Date(m.locked) > new Date() ? " · locked for a few minutes" : ""}{m.active ? "" : " · switched off"}</span>
+              {/* Someone who left the team (owner): switched off here, with why; never one's own, never the last. */}
+              <details className="mt-1.5">
+                <summary className="ask cursor-pointer list-none">{m.active ? "Switch off" : "Switch on"}</summary>
+                <ActionForm action={setOperatorActiveAction} hidden={{ operatorId: m.id, active: m.active ? "false" : "true" }}
+                  submitLabel={m.active ? "Switch off" : "Switch on"} variant={m.active ? "danger" : "primary"}
+                  confirmText={m.active ? `${m.name} will no longer sign in to the console; their sessions end now.` : undefined} className="asking mt-2 max-w-md space-y-3">
+                  <Field label="Why" required><input name="why" required className="plain w-full" /></Field>
+                </ActionForm>
+              </details>
             </li>
           ))}
         </ul>

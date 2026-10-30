@@ -67,21 +67,25 @@ export async function setSubscriptionAction(_prev: Result | undefined, formData:
   const why = text(formData, "why");
   if (!why) return { error: "Say why it changes.", fields: ["why"] };
   const seats = text(formData, "seats");
+  const months = text(formData, "firstInvoiceMonths");
+  let invoice: string | null = null;
   try {
-    await consoleApi(`/api/console/organizations/${id}/subscription`, {
+    const answer = await consoleApi<{ invoice?: string } | undefined>(`/api/console/organizations/${id}/subscription`, {
       method: "PUT",
       body: {
         plan: text(formData, "plan") || null, state: text(formData, "state"), trialEndsAt: day(text(formData, "trialEndsAt")),
         paidUntil: day(text(formData, "paidUntil")), billing: text(formData, "billing") || null, seats: seats ? Number(seats) : null,
         contractRef: text(formData, "contractRef") || null, contractSignedOn: text(formData, "contractSignedOn") || null,
         providerRef: text(formData, "providerRef") || null, notes: text(formData, "notes") || null, why,
+        firstInvoiceMonths: months ? Number(months) : null,
       },
     });
+    invoice = answer?.invoice ?? null;
   } catch (e) {
     return failed(e);
   }
   revalidatePath("/console", "layout");
-  return { ok: "Saved. It applies at once; the organization reads it on its Contract & plan." };
+  return { ok: `Saved. It applies at once; the organization reads it on its Contract & plan.${invoice ? ` Invoice ${invoice} issued; they are told.` : ""}` };
 }
 
 export async function setOrganizationActiveAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
@@ -95,6 +99,20 @@ export async function setOrganizationActiveAction(_prev: Result | undefined, for
   }
   revalidatePath("/console", "layout");
   return { ok: active ? "Switched on: its people sign in again." : "Switched off: nobody of it signs in; nothing is deleted." };
+}
+
+/** A console account switched off (someone left the team) or back on, with why: never one's own, never the last. */
+export async function setOperatorActiveAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const why = text(formData, "why");
+  if (!why) return { error: "Say why.", fields: ["why"] };
+  const active = text(formData, "active") === "true";
+  try {
+    await consoleApi(`/api/console/team/${text(formData, "operatorId")}/active`, { method: "PUT", body: { active, why } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/console/team");
+  return { ok: active ? "Switched on: they sign in to the console again." : "Switched off: their sessions ended; what they did stays in the log." };
 }
 
 export async function carryOutMergeAction(_prev: Result | undefined, formData: FormData): Promise<Result> {

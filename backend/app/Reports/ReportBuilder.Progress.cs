@@ -11,9 +11,10 @@ public sealed partial class ReportBuilder
     /// <summary>
     /// Week by week (Monday to Sunday, this week so far): documents registered and released, what was delivered on time or
     /// late, what was overdue at the end of each week, the reviews open then, what went out and came in. Each is worked
-    /// out from the dates the register keeps, so the weeks before today are there from the first day; overdue is read
-    /// against the plan as it stands now (a planned day moved since is not known). The figures say how each moved since
-    /// last week.
+    /// out from the dates the register keeps, so the weeks before today are there from the first day; overdue and on time
+    /// are read against the plan as it stood at each week's end (owner): each move of a planned day is kept as it happens
+    /// (<see cref="Platform.PlannedDateChange"/>); a document whose day never moved since then is read as it stands. The
+    /// figures say how each moved since last week.
     /// </summary>
     private async Task<Report> ProgressAsync(ReportOptions options, CancellationToken cancellationToken)
     {
@@ -39,12 +40,23 @@ public sealed partial class ReportBuilder
             .Select(r => r.Submissions).ToListAsync(cancellationToken)).SelectMany(s => s.Select(x => x.SubmittedAt)).ToList();
         var needed = await NeededByAsync(cancellationToken);
         var firstSent = await FirstSentAsync(cancellationToken);
-        // Each document's due day as the plan stands now; cancelled and withdrawn documents are owed by nobody.
+        // Each move of a planned day, as it happened: a week is judged against the day as it stood at its end.
+        var moves = (await db.Set<Platform.PlannedDateChange>().AsNoTracking().Where(c => c.ProjectId == _project.Id)
+                .OrderBy(c => c.At).ThenBy(c => c.Id).ToListAsync(cancellationToken))
+            .GroupBy(c => c.DocumentId).ToDictionary(g => g.Key, g => g.ToList());
+        // Cancelled and withdrawn documents are owed by nobody.
         var due = docs.Where(d => d.State is not (DocumentStates.Cancelled or DocumentStates.Withdrawn))
-            .Select(d => (d.Id, d.CreatedAt, Due: Earliest(d.PlannedDate, needed.GetValueOrDefault(d.Id))))
-            .Where(x => x.Due is not null)
-            .Select(x => (x.Id, x.CreatedAt, Due: x.Due!.Value, Sent: firstSent.TryGetValue(x.Id, out var at) ? DayOf(at) : (LocalDate?)null))
+            .Select(d => (d.Id, d.CreatedAt, d.PlannedDate, Needed: needed.GetValueOrDefault(d.Id),
+                Sent: firstSent.TryGetValue(d.Id, out var at) ? DayOf(at) : (LocalDate?)null))
             .ToList();
+        // A document's due day as the plan stood at that moment: the day its last move before then gave it, or the day
+        // its first move after then replaced; never moved, the day as it stands (the earliest an action needs it).
+        LocalDate? DueAt(Guid id, LocalDate? planned, LocalDate? neededNow, Instant end)
+        {
+            if (!moves.TryGetValue(id, out var moved)) return Earliest(planned, neededNow);
+            var before = moved.LastOrDefault(c => c.At < end);
+            return before is not null ? before.Became : moved[0].Was;
+        }
 
         // One week, as the register stood at its end.
         Week Count(LocalDate start)
@@ -60,7 +72,8 @@ public sealed partial class ReportBuilder
                     .Select(s => LateKey(s.DueDate, last)).OrderByDescending(k => Array.IndexOf(rank, k)).FirstOrDefault() ?? "none")
                 .ToList();
             var inWeek = releases.Where(r => r.ReleasedAt >= from && r.ReleasedAt < end).ToList();
-            var delivered = due.Where(x => x.Sent is { } s && s >= start && s <= last).ToList();
+            var delivered = due.Where(x => x.Sent is { } s && s >= start && s <= last)
+                .Select(x => (x.Sent, Due: DueAt(x.Id, x.PlannedDate, x.Needed, end))).Where(x => x.Due is not null).ToList();
             return new Week(
                 start, last,
                 Registered: docs.Count(d => d.CreatedAt < end),
@@ -70,7 +83,7 @@ public sealed partial class ReportBuilder
                 OnTime: delivered.Count(x => x.Sent <= x.Due),
                 Late: delivered.Count(x => x.Sent > x.Due),
                 // Overdue then: registered by then, its day passed, not delivered by then.
-                Overdue: due.Count(x => x.CreatedAt < end && x.Due < last && (x.Sent is null || x.Sent > last)),
+                Overdue: due.Count(x => x.CreatedAt < end && (x.Sent is null || x.Sent > last) && DueAt(x.Id, x.PlannedDate, x.Needed, end) is { } d && d < last),
                 ReviewsInTime: open.Count(k => k == "intime"),
                 ReviewsAtRisk: open.Count(k => k == "risk"),
                 ReviewsLate: open.Count(k => k == "late"),
@@ -92,7 +105,7 @@ public sealed partial class ReportBuilder
             ("delivered", "Delivered each week, on time or late",
                 [new("onTime", "On time", "good"), new("late", "Late", "warn")],
                 w => new() { ["onTime"] = w.OnTime, ["late"] = w.Late }),
-            ("overdue", "Overdue at the end of each week (against today's plan)",
+            ("overdue", "Overdue at the end of each week (against the plan as it stood then)",
                 [new("overdue", "Overdue", "bad")], w => new() { ["overdue"] = w.Overdue }),
             ("reviews", "Reviews open at the end of each week, against their steps' due days",
                 LateSegments,

@@ -11,7 +11,8 @@ export const metadata = { title: "Support" };
 type Grant = { id: string; tenantId: string; organization: string | null; grantedByName: string; why: string; from: string; until: string; endedAt: string | null; endedByName: string | null; open: boolean };
 type Ask = {
   id: string; tenantId: string; organizationName: string; projectName: string | null; kind: string; subject: string; message: string;
-  byName: string; byEmail: string; at: string; answer: string | null; answeredBy: string | null; answeredAt: string | null;
+  byName: string; byEmail: string; at: string; waiting: boolean;
+  messages: { id: string; fromDelios: boolean; byName: string; text: string; at: string }[];
 };
 
 const KIND_WORDS: Record<string, string> = {
@@ -29,7 +30,8 @@ export default async function Support() {
     consoleApi<Ask[]>("/api/console/support/requests"), consoleApi<Grant[]>("/api/console/support"),
     consoleApi<Record<string, string>>("/api/console/platform"),
   ]);
-  const waiting = asks.filter((a) => !a.answer);
+  // Waiting: nothing answered yet, or the person wrote back since (owner: a conversation).
+  const waiting = asks.filter((a) => a.waiting);
   const open = grants.filter((r) => r.open);
   return (
     <>
@@ -47,8 +49,8 @@ export default async function Support() {
       <Sheet title="Requests" said={waiting.length ? `${waiting.length} waiting` : "none waiting"}>
         {asks.length ? (
           <ul className="divide-y divide-line">
-            {[...waiting, ...asks.filter((a) => a.answer)].map((a) => (
-              <li key={a.id} className={cn("space-y-2 border-l-[3px] px-5 py-3 text-[13px] sm:px-6", a.answer ? "border-l-emerald-500" : "border-l-amber-500")}>
+            {[...waiting, ...asks.filter((a) => !a.waiting)].map((a) => (
+              <li key={a.id} className={cn("space-y-2 border-l-[3px] px-5 py-3 text-[13px] sm:px-6", a.waiting ? "border-l-amber-500" : "border-l-emerald-500")}>
                 <div>
                   <p className="font-semibold text-slate-900">{a.subject}</p>
                   <p className="text-[11px] text-slate-500">
@@ -57,13 +59,14 @@ export default async function Support() {
                   </p>
                   <p className="mt-1 whitespace-pre-line text-slate-700">{a.message}</p>
                 </div>
-                {a.answer ? (
-                  <p className="whitespace-pre-line text-slate-800"><span className="text-[11px] font-semibold text-emerald-700">Answered by {a.answeredBy} · {fmtDateTime(a.answeredAt)}</span><br />{a.answer}</p>
-                ) : (
-                  <ActionForm action={answerSupportAction} hidden={{ requestId: a.id }} submitLabel="Send the answer" size="sm" className="asking space-y-2">
-                    <Field label="Your answer" required hint="they read it in their drawer and on Notifications"><textarea name="answer" required rows={3} className={inputCls} /></Field>
-                  </ActionForm>
-                )}
+                {a.messages.map((m) => (
+                  <p key={m.id} className={cn("whitespace-pre-line border-l-[3px] pl-3", m.fromDelios ? "border-l-emerald-500 text-slate-800" : "border-l-line-strong text-slate-700")}>
+                    <span className={cn("text-[11px] font-semibold", m.fromDelios ? "text-emerald-700" : "text-slate-500")}>{m.fromDelios ? `Answered by ${m.byName}` : `${a.byName} wrote back`} · {fmtDateTime(m.at)}</span><br />{m.text}
+                  </p>
+                ))}
+                <ActionForm action={answerSupportAction} hidden={{ requestId: a.id }} submitLabel="Send the answer" size="sm" resetOnSuccess className="asking space-y-2">
+                  <Field label={a.messages.length ? "Answer again" : "Your answer"} required={a.waiting} hint="they read it in their drawer and on Notifications"><textarea name="answer" required rows={a.waiting ? 3 : 2} className={inputCls} /></Field>
+                </ActionForm>
               </li>
             ))}
           </ul>

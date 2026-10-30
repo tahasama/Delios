@@ -84,6 +84,9 @@ export default async function Organization({ params }: { params: Promise<{ id: s
               <Field label="Contract reference"><input name="contractRef" defaultValue={s?.contractRef ?? ""} className="plain w-full" /></Field>
               <Field label="Signed on"><input type="date" name="contractSignedOn" defaultValue={s?.contractSignedOn ?? ""} className="plain w-full" /></Field>
               <Field label="Card payment reference" hint="once card payment is connected"><input name="providerRef" defaultValue={s?.providerRef ?? ""} className="plain w-full" /></Field>
+              <Field label="First invoice" hint="months it covers; empty: none now (users × the plan's price, issued at once)">
+                <input type="number" min={1} max={36} name="firstInvoiceMonths" placeholder="none" className="plain w-full" />
+              </Field>
               <Field label="Notes" className="sm:col-span-3"><textarea name="notes" rows={2} defaultValue={s?.notes ?? ""} className={inputCls} /></Field>
               <Field label="Why it changes" required className="sm:col-span-3"><input name="why" required className="plain w-full" placeholder="Contract signed, paid by transfer, trial extended…" /></Field>
             </div>

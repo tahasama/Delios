@@ -899,11 +899,27 @@ a screen only words it. A new rule goes in the backend, never in a page.
   in that organization, never paid for, no sign-in name or password): its administrators are told at once, every act is
   in its audit trail under that name (SUPPORT_ENTERED…), and its session ends with the access (`SessionStore` refuses it
   once the access ended or ran out; ending it switches the account off).
+- **Renewals told by themselves** (owner): a paid plan not cancelled tells its administrators 30 days before the period
+  paid ends (notification and email), once per period, the moment written by what sets it (`Trials.NextReminder`,
+  `Renewals.Words`; a period paid, a plan set, a cancel or a resume writes it again), as the trial's reminders.
+- **Console accounts switched off from the console** (owner): Team, each account's "Switch off" with why
+  (`PUT /api/console/team/{id}/active`, OPERATOR_SWITCHED_OFF / ON), its sessions ended at once; never one's own
+  (OWN_ACCOUNT), never the last one on (LAST_OPERATOR). Added still by `create-operator` on the server.
+- **The price before the choice, the invoice with the plan** (owner): Contract & plan works out what a plan comes to as it
+  is chosen (users × price a month, a year, before tax; `plan-fields.tsx`); setting the plan in the console may make its
+  first invoice at once ("First invoice", months it covers: users × price × months, `BillingEndpoints.PrepareAsync`,
+  the organization told), else invoices stay by hand.
+- **Decided, nothing to build** (owner, 30 Oct 2026): an ended organization's data is deleted by the app owner or
+  whoever of our team they delegate, managed internally (never by the app on its own); a review rejected just before its
+  action is the organizations' to plan ("their own ways, not our problem"); Word and PowerPoint previews stay off, on
+  request only; reports are sent by hand, never emailed by themselves.
 - **Need support** (owner: "just have them write a message with object, we already know which org and which project,
   and have a drawer with main type of requests"): a "Need support" button (owner: the register's first button, its size and icon, in our gold instead of blue; its words `gold-ink`: a warm dark brown on light, navy on dark) on the right of Help's plate and of the
   organization's band opens a drawer from the right (`components/support.tsx`, `support-panel.tsx`): what it is about
   (`SupportKinds`, codes confirmed: SIGN_IN, OPEN_FILE, UPLOAD, ACCESS, ERROR, SETUP, BILLING, OTHER), a subject, a
-  message, then what the person asked before and its answer; who, the organization and the project are known
+  message, then what the person asked before, each a conversation (owner: back and forth; `support_messages`: the person
+  writes back, `POST /api/support/requests/{id}/messages`, support emailed; the console answers as often as needed, a
+  request waiting again once the person wrote last); who, the organization and the project are known
   (`Operators/SupportRequests.cs`, `POST /api/support/requests`, `support_requests`, kept above every organization,
   allowed while reading only; emailed to the support email). Answered in the console's **Support** tab, the person told
   (notification and email, `/guide?support=1` opening the drawer). **How organizations reach support** (email, hours,
@@ -1682,7 +1698,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   legend then counts waits, never adds days), or "By reviewer".
 - **Progress by week** (`ProgressAsync`): each week (Monday to Sunday, this one so far) as the register stood at its end:
   registered, released (first time / a new revision), delivered on time or late, overdue (against the plan as it
-  stands now, only documents registered by then), reviews open by age, sent and received. Worked out from the dates
+  stood at each week's end: every move of a planned day kept by the database as it happens, `planned_date_changes`,
+  trigger `record_planned_date`; never moved since, read as it stands; only documents registered by then; on time and
+  late the same way), reviews open by age, sent and received. Worked out from the dates
   kept, so past weeks are there from day one; no snapshot is stored. The figures say how each moved since last week
   (`Figure.Change`, green or red by whether the move is good). The chart shows one of these at a time, chosen in its head.
 - **Who owes what** (`ExchangeAsync`): per other organization, what it owes us (asked and not sent, to correct, to
