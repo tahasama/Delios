@@ -48,8 +48,15 @@ public static partial class ScheduleEndpoints
         Confirmations = [],
         Decisions = action.Decisions.Select(d => d with
         {
-            ResponsibleName = "", Reason = "", DelayOwedBy = null, DelayReason = null, RecordedBy = "",
-            ConfirmedBy = null, ConfirmNote = null, ReversedBy = null, ReversedReason = null,
+            ResponsibleName = "",
+            Reason = "",
+            DelayOwedBy = null,
+            DelayReason = null,
+            RecordedBy = "",
+            ConfirmedBy = null,
+            ConfirmNote = null,
+            ReversedBy = null,
+            ReversedReason = null,
         }).ToList(),
     };
 

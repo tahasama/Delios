@@ -53,7 +53,10 @@ public static class NumberingLevels
             var view = await ReadAsync(db, scope, c);
             return Results.Ok(new
             {
-                view.Schemes, view.Routing, Own = scope is not null, Free = free,
+                view.Schemes,
+                view.Routing,
+                Own = scope is not null,
+                Free = free,
                 Exception = await Liberty.ExceptionHereAsync(db, Liberty.Numbering, access.Project.Id, c),
                 MayChange = free && await ProjectLists.MayChangeAsync(db, access, c),
                 MayChangeOrganization = await Keepers.ConfiguresAsync(h),
@@ -88,7 +91,8 @@ public static class NumberingLevels
         var revisionRouting = await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.ProjectId == null).ToListAsync(cancellationToken);
         return Results.Ok(new
         {
-            view.Schemes, view.Routing,
+            view.Schemes,
+            view.Routing,
             RevisionSchemes = revisions.Select(s => new { s.Id, s.Name, s.IsDefault, s.ForwardOnly, s.Series }),
             RevisionRouting = revisionRouting.Select(r => new { r.DeliverableType, r.SchemeId }),
         });
@@ -128,8 +132,12 @@ public static class NumberingLevels
         {
             var copy = new NumberingScheme
             {
-                TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Name = scheme.Name, Delimiter = scheme.Delimiter,
-                Active = scheme.Active, Notes = scheme.Notes,
+                TenantId = access.Project.TenantId,
+                ProjectId = access.Project.Id,
+                Name = scheme.Name,
+                Delimiter = scheme.Delimiter,
+                Active = scheme.Active,
+                Notes = scheme.Notes,
                 Fields = scheme.Fields.Select(f => new SchemeField { Label = f.Label, Source = f.Source, Value = f.Value, Digits = f.Digits }).ToList(),
             };
             db.NumberingSchemes.Add(copy);
@@ -139,12 +147,20 @@ public static class NumberingLevels
             if (map.TryGetValue(route.SchemeId, out var schemeId))
                 db.SchemeRoutings.Add(new SchemeRouting
                 {
-                    TenantId = access.Project.TenantId, ProjectId = access.Project.Id, DeliverableType = route.DeliverableType, SchemeId = schemeId, Active = route.Active,
+                    TenantId = access.Project.TenantId,
+                    ProjectId = access.Project.Id,
+                    DeliverableType = route.DeliverableType,
+                    SchemeId = schemeId,
+                    Active = route.Active,
                 });
         db.Add(new Setting
         {
-            TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Key = OwnKey, Value = "ON",
-            UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = access.UserName,
+            TenantId = access.Project.TenantId,
+            ProjectId = access.Project.Id,
+            Key = OwnKey,
+            Value = "ON",
+            UpdatedAt = clock.GetCurrentInstant(),
+            UpdatedByName = access.UserName,
         });
         await db.SaveChangesAsync(cancellationToken);
         return map;
@@ -256,8 +272,13 @@ public static class NumberingLevels
         if (await CheckFieldsAsync(db, scope, fields, cancellationToken) is { } problem) return problem;
         var scheme = new NumberingScheme
         {
-            TenantId = http.User.TenantId(), ProjectId = scope, Name = name, Delimiter = request.Delimiter ?? "-", Active = request.Active ?? true,
-            Notes = Blank(request.Notes), Fields = fields.ToList(),
+            TenantId = http.User.TenantId(),
+            ProjectId = scope,
+            Name = name,
+            Delimiter = request.Delimiter ?? "-",
+            Active = request.Active ?? true,
+            Notes = Blank(request.Notes),
+            Fields = fields.ToList(),
         };
         db.NumberingSchemes.Add(scheme);
         await db.SaveChangesAsync(cancellationToken);

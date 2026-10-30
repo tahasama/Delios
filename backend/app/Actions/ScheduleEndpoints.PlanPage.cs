@@ -186,8 +186,19 @@ public static partial class ScheduleEndpoints
         var kept = await db.Activities.AsNoTracking().Where(a => a.ProjectId == projectId && a.State == ActivityStates.Active)
             .Select(a => new
             {
-                a.Id, a.Code, a.Name, a.ExternalId, a.Start, a.Finish, a.Departments, HasWbs = a.Wbs.Length > 0, a.WbsOrder,
-                a.NeedCount, a.MetCount, a.LastMetAt, a.RiskFrom,
+                a.Id,
+                a.Code,
+                a.Name,
+                a.ExternalId,
+                a.Start,
+                a.Finish,
+                a.Departments,
+                HasWbs = a.Wbs.Length > 0,
+                a.WbsOrder,
+                a.NeedCount,
+                a.MetCount,
+                a.LastMetAt,
+                a.RiskFrom,
             }).ToListAsync(cancellationToken);
         return kept.Select(a => new PlanRow(a.Id, a.Code, a.Name, a.ExternalId, a.Start, a.Finish, a.Departments, a.HasWbs, a.WbsOrder,
             a.NeedCount, RecordedFacts(a.NeedCount, a.MetCount, a.LastMetAt, a.RiskFrom, a.Start, today), null, null)).ToList();
@@ -231,8 +242,18 @@ public static partial class ScheduleEndpoints
         var listed = activities.Where(a => a.Start is { } s && s >= first && s <= last && a.Needs > 0).ToList();
         var complete = listed.Count(a => a.Facts.State is ActionStates.Ready or ActionStates.Done or ActionStates.LateReceipt);
         var at = activities.Count == 0 ? 0 : untagged > 0 ? 1 : answered < pairs.Count || listed.Count == 0 ? 2 : complete == listed.Count ? 4 : 3;
-        return Results.Ok(new { at, actions = activities.Count, untagged, answered, asked = pairs.Count, complete, listed = listed.Count,
-            from = first.ToDateOnly(), to = last.ToDateOnly() });
+        return Results.Ok(new
+        {
+            at,
+            actions = activities.Count,
+            untagged,
+            answered,
+            asked = pairs.Count,
+            complete,
+            listed = listed.Count,
+            from = first.ToDateOnly(),
+            to = last.ToDateOnly()
+        });
     }
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

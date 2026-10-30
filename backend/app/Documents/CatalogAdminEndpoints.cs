@@ -24,13 +24,11 @@ public sealed record SchemeRequest(string? Name, string? Delimiter = null, bool?
 public sealed record SchemeRoutingRequest(string? DeliverableType, Guid? SchemeId);
 
 /// <summary>Body of creating or changing a review route. A null field is left as it is; lists, when given, replace.</summary>
+/// <param name="Verdicts">The set of the review outcomes it decides from, by name; empty: the set serving the document's deliverable type.</param>
+/// <param name="Advice">The set of the review advice its advising steps answer from, by name; empty: the set serving the document's deliverable type.</param>
 public sealed record RouteRequest(
     string? Name = null, string? Description = null, bool? IsDefault = null, bool? Active = null, RoutePattern[]? Patterns = null,
-    RouteStep[]? Steps = null, string? VerdictSet = null,
-    /// <summary>The set of the review outcomes it decides from, by name; empty: the set serving the document's deliverable type.</summary>
-    string? Verdicts = null,
-    /// <summary>The set of the review advice its advising steps answer from, by name; empty: the set serving the document's deliverable type.</summary>
-    string? Advice = null);
+    RouteStep[]? Steps = null, string? VerdictSet = null, string? Verdicts = null, string? Advice = null);
 
 /// <summary>
 /// What an administrator publishes for the organization: the value lists, how numbers are built and which scheme
@@ -70,7 +68,8 @@ public static class CatalogAdminEndpoints
             return Results.Ok(new
             {
                 Routes = await RouteViewsAsync(db, await RouteScopeAsync(db, access.Project.Id, c), c),
-                Own = await RouteScopeAsync(db, access.Project.Id, c) is not null, Free = free,
+                Own = await RouteScopeAsync(db, access.Project.Id, c) is not null,
+                Free = free,
                 Exception = await Liberty.ExceptionHereAsync(db, Liberty.Routes, access.Project.Id, c),
                 MayChange = free && await ProjectLists.MayChangeAsync(db, access, c),
                 MayChangeOrganization = await Keepers.ConfiguresAsync(h),
@@ -173,8 +172,14 @@ public static class CatalogAdminEndpoints
             {
                 var copy = new ReviewRoute
                 {
-                    TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Name = route.Name, Description = route.Description,
-                    IsDefault = route.IsDefault, Active = route.Active, Verdicts = route.Verdicts, Advice = route.Advice,
+                    TenantId = access.Project.TenantId,
+                    ProjectId = access.Project.Id,
+                    Name = route.Name,
+                    Description = route.Description,
+                    IsDefault = route.IsDefault,
+                    Active = route.Active,
+                    Verdicts = route.Verdicts,
+                    Advice = route.Advice,
                     Patterns = route.Patterns.Select(x => new RoutePattern { DeliverableType = x.DeliverableType, DocType = x.DocType, Discipline = x.Discipline, Criticality = x.Criticality, Originator = x.Originator }).ToList(),
                     Steps = System.Text.Json.JsonSerializer.Deserialize<List<RouteStep>>(System.Text.Json.JsonSerializer.Serialize(route.Steps)) ?? [],
                 };
@@ -183,8 +188,12 @@ public static class CatalogAdminEndpoints
             }
             db.Add(new Settings.Setting
             {
-                TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Key = RoutesOwnKey, Value = "ON",
-                UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = access.UserName,
+                TenantId = access.Project.TenantId,
+                ProjectId = access.Project.Id,
+                Key = RoutesOwnKey,
+                Value = "ON",
+                UpdatedAt = clock.GetCurrentInstant(),
+                UpdatedByName = access.UserName,
             });
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -259,7 +268,15 @@ public static class CatalogAdminEndpoints
         // a warning, never a refusal).
         return routes.Select(r => (object)new
         {
-            r.Id, r.Name, r.Description, r.IsDefault, r.Active, r.Patterns, r.Steps, VerdictSet = ReviewSets.Verdicts, r.Verdicts,
+            r.Id,
+            r.Name,
+            r.Description,
+            r.IsDefault,
+            r.Active,
+            r.Patterns,
+            r.Steps,
+            VerdictSet = ReviewSets.Verdicts,
+            r.Verdicts,
             VerdictsMismatch = r.Verdicts is null ? [] : r.Patterns.Select(p => p.DeliverableType).OfType<string>().Distinct()
                 .Where(t => catalog.ServingSetName(ReviewSets.Verdicts, t) != r.Verdicts).ToArray(),
             r.Advice,

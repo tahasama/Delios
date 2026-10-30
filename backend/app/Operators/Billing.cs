@@ -204,7 +204,18 @@ public static class BillingEndpoints
 
     private static object Row(Invoice i, string? organization) => new
     {
-        i.Id, i.TenantId, organization, i.Number, i.IssuedOn, i.DueOn, i.PeriodFrom, i.PeriodTo, i.Currency, i.Subtotal, i.TaxRate, i.Tax,
+        i.Id,
+        i.TenantId,
+        organization,
+        i.Number,
+        i.IssuedOn,
+        i.DueOn,
+        i.PeriodFrom,
+        i.PeriodTo,
+        i.Currency,
+        i.Subtotal,
+        i.TaxRate,
+        i.Tax,
         i.Total,
         i.State,
         i.PaidOn,

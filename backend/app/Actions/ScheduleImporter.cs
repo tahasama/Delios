@@ -404,8 +404,14 @@ public sealed class ScheduleImporter(
     /// <summary>The same columns, reading another sheet or P6 project.</summary>
     private static ScheduleColumns Copy(ScheduleColumns c, string sheet) => new()
     {
-        Sheet = sheet, Code = c.Code, Name = c.Name, Start = c.Start, Finish = c.Finish, Responsible = c.Responsible,
-        Departments = c.Departments, DateOrder = c.DateOrder,
+        Sheet = sheet,
+        Code = c.Code,
+        Name = c.Name,
+        Start = c.Start,
+        Finish = c.Finish,
+        Responsible = c.Responsible,
+        Departments = c.Departments,
+        DateOrder = c.DateOrder,
     };
 
     /// <summary>The months the schedule runs, said with its read (owner: "deduce first month and last month"): ", Mar 2022 → Jun 2023".</summary>

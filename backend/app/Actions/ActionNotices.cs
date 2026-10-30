@@ -186,8 +186,10 @@ public sealed class ActionNotices(IServiceScopeFactory scopes, NoticeAlarmBell b
             var today = WorkingCalendar.Today(clock, project.TimeZone);
             // What fell today is written again, from tomorrow on.
             var activities = await db.Activities.Where(a => a.ProjectId == projectId && a.NoticeOn != null && a.NoticeOn <= today).Select(a => a.Id).ToListAsync(cancellationToken);
-            var steps = await (from s in db.ReviewSteps join r in db.Reviews on s.ReviewId equals r.Id
-                               where r.ProjectId == projectId && s.WarnOn != null && s.WarnOn <= today select s.Id).ToListAsync(cancellationToken);
+            var steps = await (from s in db.ReviewSteps
+                               join r in db.Reviews on s.ReviewId equals r.Id
+                               where r.ProjectId == projectId && s.WarnOn != null && s.WarnOn <= today
+                               select s.Id).ToListAsync(cancellationToken);
             await NoticeDays.WriteAsync(db, clock, project, activities, steps, cancellationToken);
             await tx.CommitAsync(cancellationToken);
         }

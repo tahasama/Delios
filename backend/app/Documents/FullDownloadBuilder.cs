@@ -196,49 +196,49 @@ public sealed class FullDownloadBuilder(
                 break;
 
             case FullDownloadLayouts.Levels:
-            {
-                var labels = await LabelsAsync(job, cancellationToken);
-                string[] levels = several && !job.Levels.Contains(FullDownloadLevels.Project)
-                    ? [FullDownloadLevels.Project, .. job.Levels] : job.Levels;
-                string Named(string set, string? code) => code is null or "" ? "None"
-                    : labels.TryGetValue((set, code), out var label) && label != code ? Safe($"{code} {label}") : Safe(code);
-                foreach (var d in documents)
-                    folders[d.Id] = string.Join('/', levels.Select(level => level switch
-                    {
-                        FullDownloadLevels.Project => ProjectFolder(d),
-                        FullDownloadLevels.DeliverableType => Named(ValueSets.DeliverableTypes, d.DeliverableType),
-                        FullDownloadLevels.Discipline => Named(ValueSets.Disciplines, d.Discipline),
-                        FullDownloadLevels.DocType => Named(ValueSets.DocumentTypes, d.DocType),
-                        FullDownloadLevels.Phase => Named(ValueSets.Phases, d.Phase),
-                        _ => Named("ORIGINATOR", d.Originator),
-                    }));
-                break;
-            }
+                {
+                    var labels = await LabelsAsync(job, cancellationToken);
+                    string[] levels = several && !job.Levels.Contains(FullDownloadLevels.Project)
+                        ? [FullDownloadLevels.Project, .. job.Levels] : job.Levels;
+                    string Named(string set, string? code) => code is null or "" ? "None"
+                        : labels.TryGetValue((set, code), out var label) && label != code ? Safe($"{code} {label}") : Safe(code);
+                    foreach (var d in documents)
+                        folders[d.Id] = string.Join('/', levels.Select(level => level switch
+                        {
+                            FullDownloadLevels.Project => ProjectFolder(d),
+                            FullDownloadLevels.DeliverableType => Named(ValueSets.DeliverableTypes, d.DeliverableType),
+                            FullDownloadLevels.Discipline => Named(ValueSets.Disciplines, d.Discipline),
+                            FullDownloadLevels.DocType => Named(ValueSets.DocumentTypes, d.DocType),
+                            FullDownloadLevels.Phase => Named(ValueSets.Phases, d.Phase),
+                            _ => Named("ORIGINATOR", d.Originator),
+                        }));
+                    break;
+                }
 
             default:
-            {
-                // The package tree: each package under the one it sits in, by its number and title. A document in two
-                // trees (two separate delivery trees may share one) is filed in the first, by package number.
-                var ids = documents.Select(d => d.Id).ToList();
-                var packages = await db.Packages.AsNoTracking().Where(p => job.ProjectIds.Contains(p.ProjectId)).ToDictionaryAsync(p => p.Id, cancellationToken);
-                var members = await db.PackageMembers.AsNoTracking().Where(m => ids.Contains(m.DocumentId)).ToListAsync(cancellationToken);
-                string PathOf(Package package)
                 {
-                    var parts = new List<string>();
-                    var seen = new HashSet<Guid>();
-                    for (Package? at = package; at is not null && seen.Add(at.Id); at = at.ParentId is { } up ? packages.GetValueOrDefault(up) : null)
-                        parts.Insert(0, Safe($"{at.Number} {at.Title}"));
-                    return string.Join('/', parts);
+                    // The package tree: each package under the one it sits in, by its number and title. A document in two
+                    // trees (two separate delivery trees may share one) is filed in the first, by package number.
+                    var ids = documents.Select(d => d.Id).ToList();
+                    var packages = await db.Packages.AsNoTracking().Where(p => job.ProjectIds.Contains(p.ProjectId)).ToDictionaryAsync(p => p.Id, cancellationToken);
+                    var members = await db.PackageMembers.AsNoTracking().Where(m => ids.Contains(m.DocumentId)).ToListAsync(cancellationToken);
+                    string PathOf(Package package)
+                    {
+                        var parts = new List<string>();
+                        var seen = new HashSet<Guid>();
+                        for (Package? at = package; at is not null && seen.Add(at.Id); at = at.ParentId is { } up ? packages.GetValueOrDefault(up) : null)
+                            parts.Insert(0, Safe($"{at.Number} {at.Title}"));
+                        return string.Join('/', parts);
+                    }
+                    var home = members.Where(m => packages.ContainsKey(m.PackageId)).GroupBy(m => m.DocumentId)
+                        .ToDictionary(g => g.Key, g => g.Select(m => packages[m.PackageId]).OrderBy(p => p.Number).First());
+                    foreach (var d in documents)
+                    {
+                        var within = home.TryGetValue(d.Id, out var package) ? PathOf(package) : "In no package";
+                        folders[d.Id] = several ? $"{ProjectFolder(d)}/{within}" : within;
+                    }
+                    break;
                 }
-                var home = members.Where(m => packages.ContainsKey(m.PackageId)).GroupBy(m => m.DocumentId)
-                    .ToDictionary(g => g.Key, g => g.Select(m => packages[m.PackageId]).OrderBy(p => p.Number).First());
-                foreach (var d in documents)
-                {
-                    var within = home.TryGetValue(d.Id, out var package) ? PathOf(package) : "In no package";
-                    folders[d.Id] = several ? $"{ProjectFolder(d)}/{within}" : within;
-                }
-                break;
-            }
         }
         return folders;
     }

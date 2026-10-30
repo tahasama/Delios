@@ -209,16 +209,29 @@ public static class ProjectLists
         var newId = sets.ToDictionary(s => s.Id, _ => Guid.CreateVersion7());
         db.ListSets.AddRange(sets.Select(s => new ValueSet
         {
-            Id = newId[s.Id], TenantId = s.TenantId, ProjectId = project.Id, ListKey = s.ListKey, Name = s.Name,
-            DeliverableTypes = [.. s.DeliverableTypes], IsDefault = s.IsDefault, Active = s.Active, Sort = s.Sort,
+            Id = newId[s.Id],
+            TenantId = s.TenantId,
+            ProjectId = project.Id,
+            ListKey = s.ListKey,
+            Name = s.Name,
+            DeliverableTypes = [.. s.DeliverableTypes],
+            IsDefault = s.IsDefault,
+            Active = s.Active,
+            Sort = s.Sort,
         }));
         var originals = await db.ValueEntries.IgnoreQueryFilters().AsNoTracking()
             .Where(v => v.ProjectId == null && v.TenantId == project.TenantId && v.SetKey == listKey).ToListAsync(cancellationToken);
         db.ValueEntries.AddRange(originals.Select(v => new ValueEntry
         {
-            TenantId = v.TenantId, ProjectId = project.Id, SetKey = v.SetKey, Code = v.Code, Label = v.Label, Status = v.Status,
+            TenantId = v.TenantId,
+            ProjectId = project.Id,
+            SetKey = v.SetKey,
+            Code = v.Code,
+            Label = v.Label,
+            Status = v.Status,
             SetId = v.SetId is { } setId && newId.TryGetValue(setId, out var copied) ? copied : null,
-            Sort = v.Sort, Props = v.Props is null ? null : JsonDocument.Parse(v.Props.RootElement.GetRawText()),
+            Sort = v.Sort,
+            Props = v.Props is null ? null : JsonDocument.Parse(v.Props.RootElement.GetRawText()),
         }));
         project.OwnListKeys = [.. project.OwnListKeys, listKey];
         await db.SaveChangesAsync(cancellationToken);
@@ -424,8 +437,11 @@ public static class ProjectLists
         {
             db.ListSets.AddRange(missing.Select(key => new ValueSet
             {
-                TenantId = level.TenantId, ProjectId = owned.Contains(key) ? level.ProjectId : null,
-                ListKey = key, Name = "Default", IsDefault = true,
+                TenantId = level.TenantId,
+                ProjectId = owned.Contains(key) ? level.ProjectId : null,
+                ListKey = key,
+                Name = "Default",
+                IsDefault = true,
             }));
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -610,7 +626,13 @@ public static class ProjectLists
             var offered = await OfferedAsync(db, level.ProjectId, target, cancellationToken);
             value = new ValueEntry
             {
-                TenantId = level.TenantId, ProjectId = level.ProjectId, SetKey = set, SetId = target.Id, Code = code, Label = label, Sort = sort,
+                TenantId = level.TenantId,
+                ProjectId = level.ProjectId,
+                SetKey = set,
+                SetId = target.Id,
+                Code = code,
+                Label = label,
+                Sort = sort,
                 Status = status == ValueStatus.Retired ? ValueStatus.Retired : offered ? ValueStatus.Active : ValueStatus.Off,
                 Props = request.Props is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } p ? JsonDocument.Parse(p.GetRawText()) : null,
             };
@@ -845,7 +867,11 @@ public static class ProjectLists
             return Problems.Conflict("SET_EXISTS", $"This list already has a set called {name}.");
         var added = new ValueSet
         {
-            TenantId = level.TenantId, ProjectId = level.ProjectId, ListKey = set, Name = name, Active = request.Active ?? true,
+            TenantId = level.TenantId,
+            ProjectId = level.ProjectId,
+            ListKey = set,
+            Name = name,
+            Active = request.Active ?? true,
             Sort = (await db.ListSets.Where(s => s.ListKey == set).MaxAsync(s => (int?)s.Sort, cancellationToken) ?? 0) + 10,
         };
         var (types, problem) = await TypesForAsync(db, added, request.DeliverableTypes ?? [], added.Active, cancellationToken);

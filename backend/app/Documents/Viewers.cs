@@ -106,7 +106,12 @@ public static class Viewers
         var askedAt = asked.Select(a => new { a.What, a.ByName, At = a.At.ToDateTimeOffset(), a.Message }).ToList();
         return Results.Ok(All.Select(r => new
         {
-            r.Key, r.Title, r.Shows, r.Cost, r.Said, r.Asks,
+            r.Key,
+            r.Title,
+            r.Shows,
+            r.Cost,
+            r.Said,
+            r.Asks,
             Installed = Installed(r, options.Value),
             On = OrganizationOn(r, options.Value, rows),
             Asked = r.Asks is null ? null : askedAt.Where(a => a.What == r.Asks).Select(a => new { a.ByName, a.At, a.Message }).FirstOrDefault(),

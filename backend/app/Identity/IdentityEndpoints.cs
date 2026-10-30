@@ -405,7 +405,15 @@ public static class IdentityEndpoints
         var shown = projects.Select(p => new
         {
             NoControl = noControl.Contains(p.Id),
-            p.Id, p.Code, p.Name, p.TimeZone, p.ContractRole, p.Kind, p.Status, p.Department, p.Function,
+            p.Id,
+            p.Code,
+            p.Name,
+            p.TimeZone,
+            p.ContractRole,
+            p.Kind,
+            p.Status,
+            p.Department,
+            p.Function,
             Verbs = p.ActsAsControl && !p.Verbs.Contains(Verbs.Control) ? [.. p.Verbs, Verbs.Control] : p.Verbs,
             Rules = p.ActsAsControl
                 ? [.. p.Rules.Select(r => new { r.DeliverableType, r.DocType, r.Discipline, r.Criticality, r.Confidentiality, r.ProjectRole, r.Family, r.Verbs }),

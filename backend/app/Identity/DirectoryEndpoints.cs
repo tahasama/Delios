@@ -179,7 +179,15 @@ public static class DirectoryEndpoints
             kinds,
             rows = rows.Select(e => new
             {
-                e.Id, At = e.At.ToDateTimeOffset(), e.Action, Kind = AuditKinds.Of(e.Action), e.EntityType, e.EntityId, e.EntityLabel, Detail = AuditKinds.Readable(e.Detail, names), e.ProjectId,
+                e.Id,
+                At = e.At.ToDateTimeOffset(),
+                e.Action,
+                Kind = AuditKinds.Of(e.Action),
+                e.EntityType,
+                e.EntityId,
+                e.EntityLabel,
+                Detail = AuditKinds.Readable(e.Detail, names),
+                e.ProjectId,
                 Project = e.ProjectId is { } pid ? projects.GetValueOrDefault(pid) : null,
                 DocumentId = e.EntityId is { } eid && documents.TryGetValue(eid, out var did) ? did : (Guid?)null,
             }),
@@ -473,10 +481,11 @@ public static class DirectoryEndpoints
         if (await KindRefusedAsync(db, request.Kind, cancellationToken) is { } refusedKind) return refusedKind;
         // What the organization's form for opening a project insists on (Settings, Forms & fields).
         if (await Settings.FormRules.CheckAsync(db, null, "PROJECT", new Dictionary<string, bool>
-            {
-                ["startDate"] = request.StartDate is not null, ["endDate"] = request.EndDate is not null,
-                ["scopeStatement"] = !string.IsNullOrWhiteSpace(request.ScopeStatement),
-            }, null, cancellationToken) is { } formProblem) return formProblem;
+        {
+            ["startDate"] = request.StartDate is not null,
+            ["endDate"] = request.EndDate is not null,
+            ["scopeStatement"] = !string.IsNullOrWhiteSpace(request.ScopeStatement),
+        }, null, cancellationToken) is { } formProblem) return formProblem;
         var project = new Project
         {
             TenantId = http.User.TenantId(),
@@ -988,7 +997,13 @@ public static class DirectoryEndpoints
             LinkedAt = linkedAt.TryGetValue(p.Id, out var at) ? at : (DateTimeOffset?)null,
             Projects = taking.Where(r => r.PartyId == p.Id).OrderBy(r => r.AddedAt).Select(r => new
             {
-                Id = r.ProjectId, r.Code, r.Name, r.Status, r.Role, r.Active, r.ContractNumber,
+                Id = r.ProjectId,
+                r.Code,
+                r.Name,
+                r.Status,
+                r.Role,
+                r.Active,
+                r.ContractNumber,
                 JoinedAt = Joined(p.Id, r.ProjectId, r.AddedAt),
                 StartDate = Day(infos.GetValueOrDefault(r.ProjectId), "startDate"),
                 EndDate = Day(infos.GetValueOrDefault(r.ProjectId), "endDate"),
@@ -1009,10 +1024,11 @@ public static class DirectoryEndpoints
         var actor = await ActorAsync(http, db, cancellationToken);
         // What the organization's form for adding an organization insists on (Settings, Forms & fields), for one created here.
         if (request.IdentityId is null && await Settings.FormRules.CheckAsync(db, null, "PARTY", new Dictionary<string, bool>
-            {
-                ["contactId"] = request.ContactId is not null, ["backupId"] = request.BackupId is not null,
-                ["liaisonFunction"] = !string.IsNullOrWhiteSpace(request.CarriedBy),
-            }, null, cancellationToken) is { } formProblem) return formProblem;
+        {
+            ["contactId"] = request.ContactId is not null,
+            ["backupId"] = request.BackupId is not null,
+            ["liaisonFunction"] = !string.IsNullOrWhiteSpace(request.CarriedBy),
+        }, null, cancellationToken) is { } formProblem) return formProblem;
         Party party;
         Organizations.OrganizationIdentity identity;
         if (request.IdentityId is { } known)

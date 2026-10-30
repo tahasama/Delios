@@ -127,8 +127,23 @@ public static class FullDownloadEndpoints
             .OrderByDescending(d => d.RequestedAt).Take(10)
             .Select(d => new
             {
-                d.Id, d.ProjectId, d.Scope, d.RequestedAt, d.Layout, d.Levels, d.WithRegister, d.WithReviews, d.WithTransmittals, d.WithAudit,
-                Documents = d.DocumentIds.Length, d.LeftOut, d.Status, d.FinishedAt, d.Size, d.FileCount, d.Error,
+                d.Id,
+                d.ProjectId,
+                d.Scope,
+                d.RequestedAt,
+                d.Layout,
+                d.Levels,
+                d.WithRegister,
+                d.WithReviews,
+                d.WithTransmittals,
+                d.WithAudit,
+                Documents = d.DocumentIds.Length,
+                d.LeftOut,
+                d.Status,
+                d.FinishedAt,
+                d.Size,
+                d.FileCount,
+                d.Error,
             })
             .ToListAsync(cancellationToken);
         return Results.Ok(mine);

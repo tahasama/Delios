@@ -138,8 +138,10 @@ public sealed class DocumentService(
         // own: checked here, for every way a document is registered, an import included.
         var formGiven = new Dictionary<string, bool>
         {
-            ["subProject"] = Blank(request.Subproject) is not null, ["phase"] = Blank(request.Phase) is not null,
-            ["contractRef"] = Blank(request.ContractRef) is not null, ["criticality"] = Blank(request.Criticality) is not null,
+            ["subProject"] = Blank(request.Subproject) is not null,
+            ["phase"] = Blank(request.Phase) is not null,
+            ["contractRef"] = Blank(request.ContractRef) is not null,
+            ["criticality"] = Blank(request.Criticality) is not null,
             ["confidentiality"] = confidentiality is not null,
             ["retentionClass"] = (Blank(request.RetentionClass) ?? catalog.RetentionFor(Blank(request.Criticality), request.DeliverableType)) is not null,
             ["plannedDate"] = request.PlannedDate is not null,
@@ -335,14 +337,26 @@ public sealed class DocumentService(
         if (changes.Count == 0) return (document, null);
         // A change never empties what the project's document form insists on, and an answer to a list of one's own is
         // one of its values offered for the document's deliverable type.
-        var formKey = new Dictionary<string, string> { ["subproject"] = "subProject", ["phase"] = "phase", ["contractRef"] = "contractRef",
-            ["criticality"] = "criticality", ["confidentiality"] = "confidentiality", ["retentionClass"] = "retentionClass", ["plannedDate"] = "plannedDate" };
+        var formKey = new Dictionary<string, string>
+        {
+            ["subproject"] = "subProject",
+            ["phase"] = "phase",
+            ["contractRef"] = "contractRef",
+            ["criticality"] = "criticality",
+            ["confidentiality"] = "confidentiality",
+            ["retentionClass"] = "retentionClass",
+            ["plannedDate"] = "plannedDate"
+        };
         var touched = (request.Changes ?? []).Keys.Where(formKey.ContainsKey).Select(k => formKey[k]).ToList();
         var nowGiven = new Dictionary<string, bool>
         {
-            ["subProject"] = document.Subproject is not null, ["phase"] = document.Phase is not null, ["contractRef"] = document.ContractRef is not null,
-            ["criticality"] = document.Criticality is not null, ["confidentiality"] = document.Confidentiality is not null,
-            ["retentionClass"] = document.RetentionClass is not null, ["plannedDate"] = document.PlannedDate is not null,
+            ["subProject"] = document.Subproject is not null,
+            ["phase"] = document.Phase is not null,
+            ["contractRef"] = document.ContractRef is not null,
+            ["criticality"] = document.Criticality is not null,
+            ["confidentiality"] = document.Confidentiality is not null,
+            ["retentionClass"] = document.RetentionClass is not null,
+            ["plannedDate"] = document.PlannedDate is not null,
         };
         if (touched.Count > 0 && await Settings.FormRules.CheckAsync(db, document.ProjectId, "DOCUMENT", nowGiven, null, cancellationToken, touched) is { } formProblem)
             return Fail(formProblem);
@@ -665,9 +679,9 @@ public sealed class DocumentService(
         revision.FilesState = FilesStates.Processing;
         document!.UpdatedAt = clock.GetCurrentInstant();
         await db.SaveChangesAsync(cancellationToken);
+        // Files added to a revision rather than a new one: the uploader's reason is kept with them.
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "FILE_UPLOADED", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}",
-            // Files added to a revision rather than a new one: the uploader's reason is kept with them.
             string.Join(", ", files!.Select(f => f.Name)) + (string.IsNullOrWhiteSpace(request.ChangeDescription) ? "" : $". Why: {request.ChangeDescription.Trim()}"),
             document.ProjectId, cancellationToken);
         return (revision, null);

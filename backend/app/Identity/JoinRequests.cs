@@ -139,7 +139,8 @@ public static class JoinRequests
                 if (refused is not null) return refused;
                 return Results.Ok(new
                 {
-                    Held = false, Brought = organization,
+                    Held = false,
+                    Brought = organization,
                     Said = linked
                         ? $"{organization} works with us already: it now takes part in {project.Code}; their administrator puts {name} on"
                         : $"{organization} is on DELIOS: it now takes part in {project.Code} and is invited to work with us; once their administrator accepts, they put {name} on",
@@ -200,8 +201,15 @@ public static class JoinRequests
         if (!held) await TellJoinedAsync(db, notifier, project, membership, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         // Asked on a transmittal: its page is where the answer is read (the New transmittal form opens it).
-        return Results.Ok(new { user.Id, Held = held, Said = said, Invited = !held && newAccount && link is null, Link = link,
-            TransmittalId = held ? membership.ConfirmTransmittalId : null });
+        return Results.Ok(new
+        {
+            user.Id,
+            Held = held,
+            Said = said,
+            Invited = !held && newAccount && link is null,
+            Link = link,
+            TransmittalId = held ? membership.ConfirmTransmittalId : null
+        });
     }
 
     /// <summary>

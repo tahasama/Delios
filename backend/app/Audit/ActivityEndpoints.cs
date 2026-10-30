@@ -127,8 +127,17 @@ public static class ActivityEndpoints
             actions = actions.OrderByDescending(x => x.Count).Select(x => new { x.Action, x.Count, Kind = AuditKinds.Of(x.Action) }),
             rows = rows.Select(e => new
             {
-                e.Id, At = e.At.ToDateTimeOffset(), e.ActorId, e.ActorName, e.Action, Kind = AuditKinds.Of(e.Action), e.EntityType, e.EntityId,
-                e.EntityLabel, Detail = AuditKinds.Readable(e.Detail, names), Project = (string?)access.Project.Code,
+                e.Id,
+                At = e.At.ToDateTimeOffset(),
+                e.ActorId,
+                e.ActorName,
+                e.Action,
+                Kind = AuditKinds.Of(e.Action),
+                e.EntityType,
+                e.EntityId,
+                e.EntityLabel,
+                Detail = AuditKinds.Readable(e.Detail, names),
+                Project = (string?)access.Project.Code,
                 DocumentId = e.EntityId is { } eid && documents.TryGetValue(eid, out var did) ? did : (Guid?)null,
             }),
         });
