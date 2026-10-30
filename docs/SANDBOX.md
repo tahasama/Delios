@@ -23,20 +23,39 @@ Who can do it: anyone who can follow steps and copy text. No code is changed.
 | Error tracking | Sentry, free plan | Errors reach you (optional) |
 | Backups off the server | Backblaze B2 (10 GB free) | Only if you want the sandbox kept; it is fake data |
 
-**One thing to check first:** Oracle's free machines are ARM processors. Most of DELIOS's parts run on ARM; if one
-refuses to start ("exec format error"), use a small ordinary (x86) server instead, e.g. Hetzner CX22, about €4 a month.
+**Oracle's free machines are ARM processors.** DELIOS's own parts are built on the machine itself, so they fit; the
+virus scanner needs its ARM image, one line in `.env` (step 3). If another part still refuses to start ("exec format
+error"), use a small ordinary (x86) server instead, e.g. Hetzner CX22, about €4 a month, and leave that line out.
 
 ---
 
 ## Steps
 
 ### 1. The server
-1. Create the machine (Ubuntu 24.04), give it at least 8 GB of memory (the virus scanner alone takes 2–3 GB).
-2. Open ports 80 and 443 in the cloud's firewall (Oracle: "Security list" of the network).
-3. Install Docker, then copy the repository onto it:
+1. At cloud.oracle.com, create an account (a card is asked to prove who you are; the "Always Free" machines are never
+   charged). Create an instance: image **Ubuntu 24.04**, shape **VM.Standard.A1.Flex** with **4 OCPUs and 24 GB** (the
+   free allowance), and download the SSH key it offers.
+2. Open ports 80 and 443 in the cloud's firewall: the instance's subnet → Security list → Add ingress rules, source
+   `0.0.0.0/0`, TCP, ports `80` and `443`.
+3. Connect to it (`ssh -i <the key> ubuntu@<its public IP>`), then open the same ports in the machine's own firewall
+   (Oracle's Ubuntu closes them a second time):
 
 ```bash
-git clone <the repository's address> delios && cd delios
+sudo iptables -I INPUT 6 -p tcp --dport 80 -j ACCEPT && sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT && sudo netfilter-persistent save
+```
+
+4. Install Docker:
+
+```bash
+curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker ubuntu
+```
+
+   Then disconnect and connect again, so Docker works without `sudo`.
+5. Copy the code onto it. The repository is private: at GitHub → Settings → Developer settings → Personal access
+   tokens, make a token that may read this repository, and use it as the password when asked:
+
+```bash
+git clone https://github.com/tahasama/Delios.git delios && cd delios
 ```
 
 ```bash
@@ -66,9 +85,11 @@ In `.env`:
 SANDBOX=true
 APP_ENVIRONMENT=Production
 SIGN_UP_ENABLED=true
+COMPOSE_PROFILES=app
+CLAMAV_IMAGE=clamav/clamav-debian:stable
 ```
 
-`SANDBOX=true` puts the sandbox band on every page, the note on sign-in and sign-up, and "[Sandbox]" on every email.
+(The last line only on an ARM machine, Oracle's.) `SANDBOX=true` puts the sandbox band on every page, the note on sign-in and sign-up, and "[Sandbox]" on every email.
 
 ### 4. The bot check on sign-up
 At Cloudflare → Turnstile, add a widget for your address, then in `.env`:
@@ -103,6 +124,9 @@ Create a Sentry project (type ".NET"), then `SENTRY_DSN=<its address>` in `.env`
 docker compose --profile app up -d --build
 ```
 
+The first time takes 15 to 30 minutes (everything is built on the machine, and the virus scanner downloads its
+signatures). `docker compose ps` shows each part; all should read "running" or "healthy".
+
 ### 8. The console account (the team's own space)
 
 ```bash
@@ -115,6 +139,14 @@ Open `https://delios-sandbox.duckdns.org/console`, sign in, scan the QR code wit
 - `https://delios-sandbox.duckdns.org` opens, with the sandbox band at the bottom.
 - Sign up a made-up company; the email with the link arrives, marked "[Sandbox]".
 - Upload a file to a document, then open it.
+
+---
+
+### 10. Updating it later
+
+```bash
+cd delios && git pull && docker compose --profile app up -d --build
+```
 
 ---
 

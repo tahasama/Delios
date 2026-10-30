@@ -16,5 +16,5 @@ What the console, payments and legal pieces (docs/RUNNING-DELIOS.md, "Built") do
   invoice at once (done); later invoices are issued by hand, each period.
 - **Organizations that signed up before the free trial existed** have no end date until one is set on their page in
   the console.
-- **Codes**: confirmed by the owner on 30 Oct 2026 (subscription, payment, invoice and support kinds); the legal matters'
-  states (TO_DO, PLACEHOLDER, WITH_LAWYER, IN_FORCE, NOT_NEEDED) are still to confirm.
+- **Codes**: confirmed by the owner on 30 Oct 2026 (subscription, payment, invoice and support kinds, and the legal matters' states TO_DO, PLACEHOLDER,
+  WITH_LAWYER, IN_FORCE, NOT_NEEDED).

@@ -156,6 +156,7 @@ public sealed class LegalMatterState
     public string? UpdatedBy { get; set; }
 }
 
+/// <summary>Where a legal matter stands (codes confirmed by the owner, 30 Oct 2026). A must is never NOT_NEEDED.</summary>
 public static class MatterStates
 {
     public const string ToDo = "TO_DO", Placeholder = "PLACEHOLDER", WithLawyer = "WITH_LAWYER", InForce = "IN_FORCE", NotNeeded = "NOT_NEEDED";

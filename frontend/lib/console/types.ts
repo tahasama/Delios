@@ -28,7 +28,7 @@ export type Matter = {
   textPlaceholder: boolean | null; status: string; set: boolean; note: string | null; updatedAt: string | null; updatedBy: string | null;
 };
 
-/** The states of an organization with us (provisional codes, the owner to confirm). */
+/** The states of an organization with us (codes confirmed by the owner, 30 Oct 2026). */
 export const STATE_WORDS: Record<string, string> = { TRIAL: "Trying DELIOS", ACTIVE: "Active", READ_ONLY: "Reads only", ENDED: "Ended" };
 export const STATE_TONE: Record<string, string> = {
   TRIAL: "text-sky-700", ACTIVE: "text-emerald-700", READ_ONLY: "text-amber-700", ENDED: "text-slate-500",
@@ -57,7 +57,7 @@ export type InvoiceRow = {
 };
 export type BillingDetails = { legalName: string; address: string | null; country: string | null; taxNumber: string | null; email: string | null; reference: string | null; updatedAt: string; updatedBy: string | null };
 
-/** How an invoice was paid (provisional codes, the owner to confirm). */
+/** How an invoice was paid (codes confirmed by the owner, 30 Oct 2026). */
 export const PAID_BY: Record<string, string> = { TRANSFER: "Bank transfer", CMI: "Card (CMI)", PADDLE: "Card (Paddle)", OTHER: "Other" };
 export const INVOICE_WORDS: Record<string, string> = { ISSUED: "Waiting for payment", PAID: "Paid", VOID: "Voided" };
 export const INVOICE_TONE: Record<string, string> = { ISSUED: "text-amber-700", PAID: "text-emerald-700", VOID: "text-slate-500" };

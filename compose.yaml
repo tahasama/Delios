@@ -197,7 +197,9 @@ services:
         echo 's3.bucket.create -name delios' | weed shell -master=seaweedfs:9333 | grep -q 'created bucket')
 
   clamav:
-    image: clamav/clamav:stable
+    # clamav/clamav runs on ordinary (x86) processors only; on an ARM server (Oracle's free machines) set
+    # CLAMAV_IMAGE=clamav/clamav-debian:stable in .env, the same scanner built for both.
+    image: ${CLAMAV_IMAGE:-clamav/clamav:stable}
     restart: unless-stopped
     # clamd refuses streams over 25 MB by default; drawings and scans are larger. What it cannot look into (a file locked
     # by a password, one holding more than it opens) it reports, and the app refuses it in plain words (FileScanning).

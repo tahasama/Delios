@@ -887,7 +887,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (backend TERMS_NOT_ACCEPTED) and again at each new version by an administrator (LEGAL_ACCEPTED), every acceptance kept.
 - **Every legal matter, must or may** (`LegalMatters.All`, console → Legal): by when (before the first paying customer,
   while running, as it grows), each with where it stands (to do, placeholder text, with the lawyer, in force, not needed;
-  a must is never "not needed") and our notes. A new legal matter goes in that list.
+  codes TO_DO, PLACEHOLDER, WITH_LAWYER, IN_FORCE, NOT_NEEDED confirmed by the owner, 30 Oct 2026; a must is never
+  "not needed") and our notes. A new legal matter goes in that list.
 - **Forget a person** (organization's People, an administrator of ours, with why; `ForgetPerson`, PERSON_FORGOTTEN): name
   and email replaced ("Former user …"), account closed, sign-in, devices and pop-ups gone; what they did stays under the
   name it was done by (GDPR 17(3)). A linked account is forgotten at home.
