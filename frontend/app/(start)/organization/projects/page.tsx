@@ -221,9 +221,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                     ) : <span className="text-slate-800">{title}</span>}
                     {!here && !training ? <span className="ml-1.5 text-[11px] text-slate-500">(you are not on it)</span> : null}
                     {p.codeChangedAt ? <span className="block text-[11px] text-slate-500">was {p.previousCode}</span> : null}
-                    {training
-                      ? <span className="mt-0.5 block text-[11px] text-slate-500">For practice: nothing in it is real, no email leaves it.</span>
-                      : p.info.description ? <span className="mt-0.5 block max-w-md truncate text-[11px] text-slate-500" title={p.info.description}>{p.info.description}</span> : null}
+                    {p.info.description
+                      ? <span className="mt-0.5 block max-w-md truncate text-[11px] text-slate-500" title={p.info.description}>{p.info.description}</span>
+                      : training ? <span className="mt-0.5 block text-[11px] text-slate-500">For practice: nothing in it is real, no email leaves it.</span> : null}
                     {p.statusReason ? (
                       <span className="block text-[11px] whitespace-pre-line text-slate-500">
                         {stands.said}{p.statusChangedAt ? ` ${fmtDate(p.statusChangedAt)}` : ""}{p.statusChangedByName ? ` by ${p.statusChangedByName}` : ""}: {p.statusReason}
@@ -253,7 +253,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                     </div>
                   </Td>
                   <Td className="w-px whitespace-nowrap text-right">
-                    {training ? null : isOpen ? (
+                    {isOpen ? (
                       <Link href={lineHref()} scroll={false} className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Close">
                         <X aria-label={`Close ${p.code}`} className="h-4 w-4" />
                       </Link>

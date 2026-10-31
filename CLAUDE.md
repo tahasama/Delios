@@ -1019,7 +1019,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   does not appear to people": off is suspended, nobody on it sees it) and **Start again** (asked first: the old one
   archived with all it holds, nothing deleted, out of every list, a fresh one opening in its place, its people not carried
   over; `POST /api/admin/training/again`; owner: "restart should be creating a new one with the last one archived"). An
-  administrator opens it from its code even before being on it (joining on the switch). No pencil: it is not edited.
+  administrator opens it from its code even before being on it (joining on the switch); its pencil opens its line as any
+  project's (owner: "I should be able to edit my training space").
   **One made-up organization per role** (`Party.TrainingProjectId`): seen only inside it (query filter on `Party`; the
   organization's list and other projects never show them), holding no code or name on DELIOS. **Left out of what spans
   projects**: the organization's whole audit trail, the whole full download, the plan's paid users (someone only on it),
@@ -1027,6 +1028,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (a violet line, `(app)/layout.tsx`).
 - The organization's pages are stacked sheets with their space between them (`organization/template.tsx`,
   `space-y-4`: the fade's wrapper had swallowed the layout's spacing).
+- **A switch pressed slides at once, and comes back** (owner: "the switches hang up, can't come and go"): a press waits
+  for the page; the page moving on without choosing it (a choice that first asks why, then Cancel), four seconds with no
+  answer, or a press on what really stands puts the thumb back on it (`seg-slider.tsx`, `letGo`).
 - The register's **Controlled · Uncontrolled** switch sits beside its title, never beside "Create document" (owner: "the
   switch here is competing with the button").
 

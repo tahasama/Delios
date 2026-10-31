@@ -17,6 +17,14 @@ export function SegSlider() {
     const sizes = new ResizeObserver((entries) => entries.forEach((e) => place(e.target as HTMLElement)));
     let frame = 0;
     let stale: number | undefined;
+    // A press waiting for the page to answer: which switch, and the address it was pressed at.
+    let pending: { seg: HTMLElement; href: string } | null = null;
+    const letGo = (seg: HTMLElement) => {
+      seg.querySelectorAll("[data-pick]").forEach((p) => p.removeAttribute("data-pick"));
+      if (pending?.seg === seg) pending = null;
+      window.clearTimeout(stale);
+      place(seg);
+    };
 
     function place(seg: HTMLElement, to?: HTMLElement | null) {
       const one = to ?? seg.querySelector<HTMLElement>(".segment[data-pick]") ?? seg.querySelector<HTMLElement>(`.segment${CHOSEN}`);
@@ -46,6 +54,8 @@ export function SegSlider() {
         // The page answered: what it now marks chosen stands, and a press waiting for it is done.
         if (m.type === "attributes") m.target instanceof Element && m.target.closest(".seg")?.querySelectorAll("[data-pick]").forEach((p) => p.removeAttribute("data-pick"));
       }
+      // The page moved on without choosing it (a choice that first asks why, then Cancel; a refusal): back to what stands.
+      if (pending && location.href !== pending.href) letGo(pending.seg);
       soon();
     });
     changes.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["aria-current", "aria-pressed", "aria-selected"] });
@@ -54,13 +64,17 @@ export function SegSlider() {
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const one = (e.target as Element | null)?.closest<HTMLElement>(".seg .segment");
       const seg = one?.closest<HTMLElement>(".seg");
-      if (!one || !seg || one.matches(CHOSEN) || one.getAttribute("aria-disabled") === "true" || !one.matches("a, button")) return;
+      if (!one || !seg || one.getAttribute("aria-disabled") === "true") return;
+      // Pressing what really stands (a plain mark, not a link) takes back a press still waiting: the switch comes back.
+      if (one.matches(CHOSEN)) { if (seg.querySelector("[data-pick]")) letGo(seg); return; }
+      if (!one.matches("a, button")) return;
       seg.querySelectorAll("[data-pick]").forEach((p) => p.removeAttribute("data-pick"));
       one.setAttribute("data-pick", "");
+      pending = { seg, href: location.href };
       place(seg, one);
       // The page never answered (an address elsewhere, a refusal): it goes back to what is chosen.
       window.clearTimeout(stale);
-      stale = window.setTimeout(() => { one.removeAttribute("data-pick"); place(seg); }, 5000);
+      stale = window.setTimeout(() => letGo(seg), 4000);
     };
     document.addEventListener("click", press, true);
     window.addEventListener("resize", soon);
