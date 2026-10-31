@@ -21,33 +21,29 @@ export function RegisterPlate({ project, canCreate, showing = "controlled", ours
       {/* The project is named in the header of every page and in the switcher
           beside it. Repeating it here is a line of chrome that says nothing the
           reader did not already know. */}
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <h1 className="plate-title text-slate-950">{showing === "uncontrolled" ? "Uncontrolled documents" : "Document register"}</h1>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            {showing === "uncontrolled"
-              ? "Every file kept outside the register: how it came, on what, from whom and when."
-              : "Every controlled document on this project, one row each, showing the revision in hand now."}
-          </p>
-        </div>
-        {/* The first act, and under it which register, a small switch (owner: "move it back under create doc button
-            with a tiny addition to height"; beside the title or on the line it competed with them). */}
-        {canCreate || ours ? (
-          <div className="flex flex-col items-end gap-1.5">
-            {canCreate ? (
-              <ButtonLink href="/documents/new">
-                <Plus className="h-4 w-4" /> Create document
-              </ButtonLink>
-            ) : null}
-            {ours ? (
-              <nav aria-label="Which register" className="seg seg-sm">
-                <Link href="/documents" aria-current={showing === "controlled" ? "page" : undefined} className="segment">Controlled</Link>
-                <Link href="/documents/uncontrolled" aria-current={showing === "uncontrolled" ? "page" : undefined} className="segment">Uncontrolled</Link>
-              </nav>
-            ) : null}
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h1 className="plate-title min-w-0 text-slate-950">{showing === "uncontrolled" ? "Uncontrolled documents" : "Document register"}</h1>
+        {canCreate ? (
+          <ButtonLink href="/documents/new">
+            <Plus className="h-4 w-4" /> Create document
+          </ButtonLink>
         ) : null}
       </div>
+      <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+        {showing === "uncontrolled"
+          ? "Every file kept outside the register: how it came, on what, from whom and when."
+          : "Every controlled document on this project, one row each, showing the revision in hand now."}
+      </p>
+      {/* Which register, under the line saying what it holds, as Packages' two kinds (owner: "we will do register like
+          packages and put the switch under subtitle"). */}
+      {ours ? (
+        <div className="mt-3">
+          <nav aria-label="Which register" className="seg w-fit max-w-full">
+            <Link href="/documents" aria-current={showing === "controlled" ? "page" : undefined} className="segment">Controlled</Link>
+            <Link href="/documents/uncontrolled" aria-current={showing === "uncontrolled" ? "page" : undefined} className="segment">Uncontrolled</Link>
+          </nav>
+        </div>
+      ) : null}
     </div>
   );
 }

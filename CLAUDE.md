@@ -1038,13 +1038,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   doesn't belong to the app"), `(app)/error.tsx` inside the frame;
   **Try again reads the page afresh** (owner: "does absolutely nothing unless manually clicking on refresh"):
   `useTryAgain` (`components/try-again.ts`), a refresh with the boundary let go; the last resort reloads the window.
-- The register's **Controlled · Uncontrolled** switch is a small one (`.seg-sm`) under "Create document", on the plate's
-  right (owner, after beside the title and on the description line: "move it back under create doc button with a tiny
-  addition to height").
-  after the words saying what the register holds (owner: beside the button "competing", beside the title "still not
-  feeling it", then "a smaller one next to" the line).
-
-### Settings
+- The register's **Controlled · Uncontrolled** switch stands under the line saying what the register holds, as Packages'
+  two kinds (owner: "we will do register like packages and put the switch under subtitle"), at the switch's own size.
 - **Settings are read by everyone of ours** (owner: "access without the editing liberty"): the Control room, Types &
   sets, Numbering, Revisions, Review routes, Forms & fields and Functions & permissions open read only for whoever may
   not change them (`SETUP_PAGES` `read: true`), each saying who changes it; editing stays with whoever the backend
