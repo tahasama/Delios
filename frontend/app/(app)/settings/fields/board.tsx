@@ -154,7 +154,7 @@ export async function FieldsBoard({ level, sp }: { level: "project" | "organizat
                 const list = titleOf(row.setKey);
                 return editing && row.of === "own" ? (
                   <tr key={`${row.of}:${row.key}`} className="bg-tint-soft/60">
-                    <td colSpan={4} className="p-0">
+                    <td colSpan={4} className="open-in p-0">
                       <OwnFieldForm id="edit-field" level={level} kind={kind} sets={sets} field={row} />
                       <div className="flex items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
                         <Link scroll={false} href={here({})} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Cancel</Link>
@@ -164,7 +164,7 @@ export async function FieldsBoard({ level, sp }: { level: "project" | "organizat
                   </tr>
                 ) : editing ? (
                   <tr key={`${row.of}:${row.key}`} className="bg-tint-soft/60">
-                    <td colSpan={4} className="p-0">
+                    <td colSpan={4} className="open-in p-0">
                       <ActionForm id="rename-field" action={renameFieldAction} hideSubmit hidden={{ level, kind, key: row.key, of: row.of }} className="asking grid grid-cols-1 gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-2 sm:px-6">
                         <Field label={`What ${row.of === "app" ? fieldsOf(kind).find((f) => f.key === row.key)?.label ?? row.label : "it"} is called here`}>
                           <input name="label" defaultValue={row.label} maxLength={60} className={inputCls} />

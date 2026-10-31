@@ -241,7 +241,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 {changing ? (
                   // Another state chosen on the line: only why is asked, under it, then it is done.
                   <tr>
-                    <td colSpan={8} className="border-b border-line bg-tint-soft p-0">
+                    <td colSpan={8} className="open-in border-b border-line bg-tint-soft p-0">
                       <ActionForm action={setProjectStatusAction} hideSubmit hidden={{ projectId: p.id, status: changing.code }}
                         className="asking flex flex-wrap items-end gap-x-6 gap-y-3 px-5 py-4 sm:px-6">
                         <div className="min-w-0 max-w-sm">
@@ -262,7 +262,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 {isOpen ? (
                   // The project's line opened under it: the row itself goes on, the new-document form's way.
                   <tr>
-                    <td colSpan={8} className="border-b border-line p-0">
+                    <td colSpan={8} className="open-in border-b border-line p-0">
                       <ActionForm id={`project-form-${p.id}`} action={saveProjectAction} hideSubmit hidden={{ projectId: p.id }}
                         className="asking space-y-5 px-5 py-5 sm:px-6">
                         <ProjectFields p={{ ...p, scopeStatement: p.info.scopeStatement, description: p.info.description ?? undefined }} roles={roleOptions} kinds={kinds.offered} />

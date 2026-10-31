@@ -430,7 +430,7 @@ export async function ListsBoard({ level, sp }: { level: "project" | "organizati
                       {open ? (
                         // The value's line opened under it: the row itself goes on (grey fields, then the strip), never a box inside the table.
                         <tr>
-                          <td colSpan={cols} className="border-b border-line p-0">
+                          <td colSpan={cols} className="open-in border-b border-line p-0">
                             <ActionForm id={`value-${index}`} action={updateValueAction} hideSubmit hidden={{ level, valueId: v.id, used: isUsed ? "1" : "0" }} className="asking px-5 py-5 sm:px-6">
                               <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                                 <Field label="Code" hint={isUsed ? "used: it stays. Add a new value for another code" : "never used: it may still change"}>

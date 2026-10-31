@@ -125,6 +125,12 @@ export function DataTable({
 }) {
   const scope = `dt${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const tableRef = useRef<HTMLTableElement>(null);
+  // The first rows rise only when the table first appears; a filter, a sort or a page later swaps them in at once.
+  const [rise, setRise] = useState(true);
+  useEffect(() => {
+    const done = window.setTimeout(() => setRise(false), 600);
+    return () => window.clearTimeout(done);
+  }, []);
   const [labels, setLabels] = useState<string[]>([]);
   const [rows, setRows] = useState(0);
   const [prefs, setPrefs] = useState<Prefs>(() => ({ ...EMPTY, hidden: defaultHidden ?? [] }));
@@ -452,7 +458,7 @@ export function DataTable({
       >
         <table ref={tableRef} className="min-w-full">
           <thead>{head}</thead>
-          <tbody className="rows-rise">{children}</tbody>
+          <tbody className={rise ? "rows-rise" : undefined}>{children}</tbody>
         </table>
       </div>
     </div>

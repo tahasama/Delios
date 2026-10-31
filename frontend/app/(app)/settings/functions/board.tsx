@@ -237,7 +237,7 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
                   </tr>,
                   isOpen ? (
                     <tr key={`${fn.id}-open`} className="bg-tint-soft">
-                      <td colSpan={columns} className="px-5 pt-1 pb-5 sm:px-6">
+                      <td colSpan={columns} className="open-in px-5 pt-1 pb-5 sm:px-6">
                         <div className="space-y-4 rounded-md bg-surface p-4 ring-1 ring-line">
                           <FunctionRules fn={fn} rules={fn.rules} level={level} rights={rights && fn.active} fixedHere={fixedHere} scopeOf={scopeOf} selectors={selectors} />
                           {admin ? (

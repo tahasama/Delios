@@ -289,7 +289,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                   // The person's line opened under it: the row itself goes on, the new-document form's way (grey
                   // fields side by side, then the strip with Cancel and Save), never a box inside the table.
                   <tr>
-                    <td colSpan={columns} className="border-b border-line p-0">
+                    <td colSpan={columns} className="open-in border-b border-line p-0">
                       <ActionForm id={`person-form-${u.id}`} action={savePersonAction} hideSubmit hidden={{ userId: u.id, partyId: u.partyId ?? "" }}
                         className="asking space-y-5 px-5 py-5 sm:px-6">
                         {u.linked ? (

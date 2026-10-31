@@ -127,7 +127,7 @@ export default async function OrganizationPeoplePage({ searchParams }: { searchP
                 </tr>
                 {open ? (
                   <tr>
-                    <td colSpan={6} className="border-b border-line bg-tint-soft p-0">
+                    <td colSpan={6} className="open-in border-b border-line bg-tint-soft p-0">
                       <PersonPanel user={u} me={me} functions={functions} projects={projects} disciplines={disciplines} close={href({ who }, `person-${u.id}`)} />
                     </td>
                   </tr>

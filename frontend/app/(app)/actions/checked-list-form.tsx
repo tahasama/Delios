@@ -263,7 +263,7 @@ export function CheckedListForm({ hidden, children, ask, className }: { hidden: 
                   </tr>,
                   editing === row.line ? (
                     <tr key={`${row.line}-form`}>
-                      <td colSpan={6} className="p-0">
+                      <td colSpan={6} className="open-in p-0">
                         <RowForm headings={sheet.headings} cells={cells[row.line - 1] ?? []} onCancel={() => setEditing(null)} onSave={(v) => correct([row.line], v)} />
                       </td>
                     </tr>

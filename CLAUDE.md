@@ -170,7 +170,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   settles**, a breath larger then its size with a soft emerald ring fading (`.settle`, `ActionForm`'s line). **Rows rise**
   into place, the first eight one after another (`.rows-rise`, `DataTable`). **The chosen tab's line draws itself out**
   (`.strip-tab[aria-current]::after`). **Drawers slide** in over a fading veil (`.drawer-in`, `.veil-in`), the quick find grows
-  into place (`.pop-in`); a chip's colour crossfades (`Chip`). Everything is off for whoever asked for less motion: it is
+  into place (`.pop-in`); a chip's colour crossfades (`Chip`). **Closing the gaps** (owner, after a review: "yes
+  please"): one curve, `--ease-out` (`cubic-bezier(0.23, 1, 0.32, 1)`); a list opened from a field grows out of it
+  (`Floating`, `.float-in`, 150 ms), the top bar's menus out of their button; what opens under a line (`.open-in` on its
+  cell) or a fold (`details`) comes down 4 px into place, 200 ms; a page arriving fades in, opacity only (`template.tsx`,
+  `.page-in`, 150 ms; a tab or filter on the same page does not); rows rise only when a table first appears, never on a
+  filter, sort or page; the quick find, opened from the keyboard, has no motion. **The switches slide** (owner: "it should
+  feel like a slide"): one raised thumb per `.seg`, placed and moved by `components/seg-slider.tsx` (mounted once in the
+  root layout), sliding at once to the segment pressed, before the page answers. No hover lifts, no bounce, no page
+  transitions. Everything is off for whoever asked for less motion: it is
   simply there, already done. No animation library, no script written in the page.
 - **The quick find** (owner, "command menu" with its "shortcut hint"): Ctrl K (⌘ K on a Mac) anywhere opens one box
   (`components/command-menu.tsx`, mounted once in the layout): pages by their name at once (only those the person may

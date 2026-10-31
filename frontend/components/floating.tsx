@@ -24,6 +24,7 @@ export function Floating({ anchor, panel, children, className, width = "anchor",
   label?: string;
 }) {
   const [at, setAt] = useState<React.CSSProperties | null>(null);
+  const [up, setUp] = useState(false);
   useLayoutEffect(() => {
     const place = () => {
       const field = anchor.current;
@@ -32,6 +33,7 @@ export function Floating({ anchor, panel, children, className, width = "anchor",
       const across = document.documentElement.clientWidth, high = window.innerHeight;
       const below = high - r.bottom - 8, above = r.top - 8;
       const up = below < room && above > below;
+      setUp(up);
       const widest = Math.min(width === "anchor" ? r.width : typeof width === "number" ? width : 448, across - 16);
       const drawn = Math.min(panel.current?.offsetWidth || r.width, widest);
       const sizing: React.CSSProperties =
@@ -56,7 +58,8 @@ export function Floating({ anchor, panel, children, className, width = "anchor",
   return createPortal(
     <div ref={panel} id={id} role={role} aria-label={label}
       style={at ?? { position: "fixed", top: 0, left: 0, visibility: "hidden" }}
-      className={cn("z-[60] flex flex-col overflow-hidden rounded-md bg-surface shadow-lg ring-1 ring-line", className)}>
+      // Grows out of its field once placed (above it, from its foot), so it never seems to come from nowhere.
+      className={cn(at && (up ? "float-in origin-bottom" : "float-in origin-top"), "z-[60] flex flex-col overflow-hidden rounded-md bg-surface shadow-lg ring-1 ring-line", className)}>
       {children}
     </div>,
     document.body,

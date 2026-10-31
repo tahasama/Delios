@@ -285,7 +285,7 @@ export function DeliverableImport({ fromDocument }: { fromDocument?: { label: st
                 </tr>,
                 editing === line.at ? (
                   <tr key={`${line.at}-form`}>
-                    <td colSpan={6} className="p-0">
+                    <td colSpan={6} className="open-in p-0">
                       <LineForm form={form} values={line.values} update={!!(one?.number ?? line.number)} faulty={one?.fields ?? []}
                         onCancel={() => setEditing(null)} onSave={(values) => correct([line.at], values)} />
                     </td>

@@ -113,8 +113,8 @@ export function CommandMenu({ perms }: { perms: Perms }) {
   let lastGroup = "";
   return (
     <div className="no-print fixed inset-0 z-[70] flex items-start justify-center px-4 pt-[12vh]" role="dialog" aria-modal="true" aria-label="Find">
-      <button type="button" aria-label="Close" tabIndex={-1} onClick={() => setOpen(false)} className="veil-in absolute inset-0 bg-slate-900/40" />
-      <div className="pop-in relative w-full max-w-xl overflow-hidden rounded-xl bg-surface shadow-[0_24px_48px_-12px_rgb(16_42_67/0.35)] ring-1 ring-line">
+      <button type="button" aria-label="Close" tabIndex={-1} onClick={() => setOpen(false)} className="absolute inset-0 bg-slate-900/40" />
+      <div className="relative w-full max-w-xl overflow-hidden rounded-xl bg-surface shadow-[0_24px_48px_-12px_rgb(16_42_67/0.35)] ring-1 ring-line">
         <div className="relative border-b border-line px-1.5 py-2">
           <Search aria-hidden className="pointer-events-none absolute top-1/2 left-5 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
