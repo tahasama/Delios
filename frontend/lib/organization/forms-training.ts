@@ -19,7 +19,7 @@ export async function trainingAgainAction(_prev: Result | undefined, formData: F
   try {
     const opened = await api<Opened>("/api/admin/training/again", { body: { reason: reason || null } });
     refresh();
-    return { ok: `Started again: ${opened.code} is open and empty. The old one is put away, nothing deleted. Put trainees on it from People.` };
+    return { ok: `Started again: ${opened.code} is open and empty; the old one is archived.` };
   } catch (e) {
     return { error: refusal(e).message };
   }

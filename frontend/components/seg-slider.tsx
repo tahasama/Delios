@@ -17,8 +17,10 @@ export function SegSlider() {
     const sizes = new ResizeObserver((entries) => entries.forEach((e) => place(e.target as HTMLElement)));
     let frame = 0;
     let stale: number | undefined;
-    // A press waiting for the page to answer: which switch, and the address it was pressed at.
-    let pending: { seg: HTMLElement; href: string } | null = null;
+    // A press waiting for the page to answer: which switch, the address it was pressed at, and where it leads.
+    let pending: { seg: HTMLElement; href: string; to: string | null } | null = null;
+    // An address without its fragment: a segment's link and the address it leads to read the same.
+    const bare = (href: string) => { const u = new URL(href, location.href); u.hash = ""; return u.href; };
     const letGo = (seg: HTMLElement) => {
       seg.querySelectorAll("[data-pick]").forEach((p) => p.removeAttribute("data-pick"));
       if (pending?.seg === seg) pending = null;
@@ -54,8 +56,15 @@ export function SegSlider() {
         // The page answered: what it now marks chosen stands, and a press waiting for it is done.
         if (m.type === "attributes") m.target instanceof Element && m.target.closest(".seg")?.querySelectorAll("[data-pick]").forEach((p) => p.removeAttribute("data-pick"));
       }
-      // The page moved on without choosing it (a choice that first asks why, then Cancel; a refusal): back to what stands.
-      if (pending && location.href !== pending.href) letGo(pending.seg);
+      // The address moved. Where the segment leads: the thumb stays on it while the page answers (a choice that first
+      // asks why keeps it there while it asks), and the next move of the address settles it, on what the page then
+      // marks chosen (Cancel: back to what stands). Anywhere else (a refusal): back to what stands at once.
+      if (pending && bare(location.href) !== pending.href) {
+        if (pending.to && bare(location.href) === pending.to) {
+          window.clearTimeout(stale);
+          pending = { seg: pending.seg, href: bare(location.href), to: null };
+        } else letGo(pending.seg);
+      }
       soon();
     });
     changes.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["aria-current", "aria-pressed", "aria-selected"] });
@@ -70,11 +79,12 @@ export function SegSlider() {
       if (!one.matches("a, button")) return;
       seg.querySelectorAll("[data-pick]").forEach((p) => p.removeAttribute("data-pick"));
       one.setAttribute("data-pick", "");
-      pending = { seg, href: location.href };
+      const link = one.getAttribute("href");
+      pending = { seg, href: bare(location.href), to: link ? bare(link) : null };
       place(seg, one);
       // The page never answered (an address elsewhere, a refusal): it goes back to what is chosen.
       window.clearTimeout(stale);
-      stale = window.setTimeout(() => letGo(seg), 4000);
+      stale = window.setTimeout(() => letGo(seg), 8000);
     };
     document.addEventListener("click", press, true);
     window.addEventListener("resize", soon);

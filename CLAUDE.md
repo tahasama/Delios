@@ -1028,10 +1028,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (a violet line, `(app)/layout.tsx`).
 - The organization's pages are stacked sheets with their space between them (`organization/template.tsx`,
   `space-y-4`: the fade's wrapper had swallowed the layout's spacing).
-- **A switch pressed slides at once, and comes back** (owner: "the switches hang up, can't come and go"): a press waits
-  for the page; the page moving on without choosing it (a choice that first asks why, then Cancel), four seconds with no
-  answer, or a press on what really stands puts the thumb back on it (`seg-slider.tsx`, `letGo`).
-- The register's **Controlled · Uncontrolled** switch is a small one (`.seg-sm`) on the line under its title, right
+- **A switch pressed slides at once, and comes back** (owner: "the switches hang up, can't come and go", then "still
+  glitching"): the thumb stays on the segment pressed while the page answers, and on it while the page reached asks why
+  (never back and forth); the next move of the address settles it on what the page then marks (Cancel: back), an address
+  elsewhere, eight seconds with no answer, or a press on what really stands puts it back (`seg-slider.tsx`, `letGo`).
+- **A page that fails reads in the app's look** (owner: the bare page "even 2001 php looks better"): `components/error-page.tsx`
+  for a whole frame (`app/error.tsx`, `app/global-error.tsx` with the brand's fonts), `(app)/error.tsx` inside the frame;
+  **Try again reads the page afresh** (owner: "does absolutely nothing unless manually clicking on refresh"):
+  `useTryAgain` (`components/try-again.ts`), a refresh with the boundary let go; the last resort reloads the window.
+- The register's **Controlled · Uncontrolled** switch is a small one (`.seg-sm`) under "Create document", on the plate's
+  right (owner, after beside the title and on the description line: "move it back under create doc button with a tiny
+  addition to height").
   after the words saying what the register holds (owner: beside the button "competing", beside the title "still not
   feeling it", then "a smaller one next to" the line).
 

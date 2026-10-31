@@ -222,7 +222,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                     {!here && !training ? <span className="ml-1.5 text-[11px] text-slate-500">(you are not on it)</span> : null}
                     {p.codeChangedAt ? <span className="block text-[11px] text-slate-500">was {p.previousCode}</span> : null}
                     {p.info.description
-                      ? <span className="mt-0.5 block max-w-md truncate text-[11px] text-slate-500" title={p.info.description}>{p.info.description}</span>
+                      ? <span className="mt-0.5 line-clamp-2 block max-w-xs text-[11px] text-slate-500" title={p.info.description}>{p.info.description}</span>
                       : training ? <span className="mt-0.5 block text-[11px] text-slate-500">For practice: nothing in it is real, no email leaves it.</span> : null}
                     {p.statusReason ? (
                       <span className="block text-[11px] whitespace-pre-line text-slate-500">
@@ -239,7 +239,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                   </Td>
                   <Td className="w-px whitespace-nowrap">
                     {/* Where it stands, changed right here: choosing another asks only why, under the line. */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-start gap-2">
                       <nav aria-label={`Where ${p.code} stands`} className="seg w-fit">
                         {choices.map((one) => one.code === p.status
                           ? <span key={one.code} aria-current="page" className="segment">{one.label}</span>
@@ -247,8 +247,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                       </nav>
                       {/* The training space starts again (owner: "restart should be creating a new one with the last one archived"). */}
                       {training ? (
-                        <ActionForm action={trainingAgainAction} submitLabel="Start again" variant="secondary" size="sm"
-                          confirmText={`Start the training space again? ${p.code} is archived with all it holds (nothing deleted) and a fresh, empty one opens in its place. Its people are not carried over.`} />
+                        // Its answer wraps under the button, never widening the table (the cell does not wrap).
+                        <div className="w-44 whitespace-normal">
+                          <ActionForm action={trainingAgainAction} submitLabel="Start again" variant="secondary" size="sm"
+                            confirmText={`Start the training space again? ${p.code} is archived with all it holds (nothing deleted) and a fresh, empty one opens in its place. Its people are not carried over.`} />
+                        </div>
                       ) : null}
                     </div>
                   </Td>

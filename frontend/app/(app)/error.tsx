@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { reportError } from "@/components/report-error";
 import { btn } from "@/components/ui";
+import { useTryAgain } from "@/components/try-again";
 
 /**
  * What went wrong, said on the page, inside the app's frame: the menu and the top bar stay, so the way on is open.
@@ -13,6 +14,7 @@ import { btn } from "@/components/ui";
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   // A fault drawn on the server is reported there already (instrumentation.ts, its digest here): only the browser's own.
   useEffect(() => { if (!error.digest) reportError(error); }, [error]);
+  const again = useTryAgain(reset);
   return (
     <div role="alert" className="rounded-md border border-red-200 bg-surface p-6">
       <h1 className="text-base font-semibold text-red-700">This page could not be shown.</h1>
@@ -21,7 +23,7 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
         you were doing{error.digest ? <> and quote this reference: <span className="font-mono text-slate-800">{error.digest}</span></> : null}.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={reset} className={btn("primary")}>Try again</button>
+        <button type="button" onClick={again} className={btn("primary")}>Try again</button>
         <Link href="/" className={btn("secondary")}>Back to Home</Link>
         <Link href="/guide?support=1" className="ml-1 text-[13px] font-semibold text-link hover:underline">Ask support</Link>
       </div>
