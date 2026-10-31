@@ -89,7 +89,9 @@ export async function setProjectStatusAction(_prev: ProjectState | undefined, fo
   const projects = await adminProjects();
   const project = projects.find((one) => one.id === projectId);
   if (!project) return { error: "That project is not in your organization." };
-  if (status !== "ACTIVE" && !projects.some((one) => one.status === "ACTIVE" && one.id !== projectId)) {
+  // The training space never counts as somewhere to work, and switching it off leaves every real project as it is.
+  const training = project.space === "TRAINING";
+  if (!training && status !== "ACTIVE" && !projects.some((one) => one.status === "ACTIVE" && one.space !== "TRAINING" && one.id !== projectId)) {
     return { error: "This is your only active project: suspending or archiving it would leave nobody anywhere to work." };
   }
   try {
@@ -98,7 +100,11 @@ export async function setProjectStatusAction(_prev: ProjectState | undefined, fo
     return { error: refusal(e).message };
   }
   revalidateProjects();
-  return { ok: `${project.code} is now ${status === "ON_HOLD" ? "suspended" : status.toLowerCase()}.` };
+  return {
+    ok: training
+      ? status === "ACTIVE" ? `${project.code} is on: its people see it again.` : `${project.code} is off: nobody on it sees it until it is switched on.`
+      : `${project.code} is now ${status === "ON_HOLD" ? "suspended" : status.toLowerCase()}.`,
+  };
 }
 
 /**

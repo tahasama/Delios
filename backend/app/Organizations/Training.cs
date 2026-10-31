@@ -3,6 +3,7 @@ using Delios.Host.Documents;
 using Delios.Host.Identity;
 using Delios.Host.Platform;
 using Delios.Host.Tenancy;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 
@@ -72,7 +73,7 @@ public static class Training
         if (await CurrentAsync(db, cancellationToken) is { } open)
             return Problems.Conflict("TRAINING_OPEN", $"The training space is open already ({open.Code}): start it again to begin afresh.");
         var actor = await ActorAsync(http, db, cancellationToken);
-        var project = await NewAsync(http, db, audit, actor, cancellationToken);
+        var project = await NewAsync(db, audit, http.User.TenantId(), actor, cancellationToken);
         if (project is null) return Problems.Conflict("TRAINING_CODE_TAKEN", "No training code was free for this organization. Write to support.");
         return Results.Ok(await ViewAsync(db, project, cancellationToken));
     }
@@ -96,7 +97,7 @@ public static class Training
             await audit.WriteAsync(actor, "PROJECT_UPDATED", "Project", old.Id, old.Code,
                 $"put away, the training space started again: {why}", old.Id, cancellationToken);
         }
-        var project = await NewAsync(http, db, audit, actor, cancellationToken);
+        var project = await NewAsync(db, audit, http.User.TenantId(), actor, cancellationToken);
         if (project is null) return Problems.Conflict("TRAINING_CODE_TAKEN", "No training code was free for this organization. Write to support.");
         return Results.Ok(await ViewAsync(db, project, cancellationToken));
     }
@@ -106,14 +107,15 @@ public static class Training
     /// administrator on it with the control function, and one made-up organization for each role of the organization's
     /// list, taking part in it with that role. Its settings are the organization's, read live.
     /// </summary>
-    private static async Task<Project?> NewAsync(HttpContext http, DeliosDbContext db, AuditLog audit, Actor actor, CancellationToken cancellationToken)
+    private static async Task<Project?> NewAsync(DeliosDbContext db, AuditLog audit, Guid tenantId, Actor actor, CancellationToken cancellationToken)
     {
-        var tenantId = http.User.TenantId();
         var ours = await db.Parties.IgnoreQueryFilters().Where(p => p.IsInternal).OrderBy(p => p.Code)
             .Select(p => new { p.Code, p.Name }).FirstOrDefaultAsync(cancellationToken);
-        var stem = $"SB-{(ours?.Code ?? "ORG").ToUpperInvariant()}";
+        // Our code, else (an organization not set up yet) its short name and name as DELIOS knows it.
+        var tenant = await db.Tenants.AsNoTracking().Where(t => t.Id == tenantId).Select(t => new { t.Slug, t.Name }).FirstOrDefaultAsync(cancellationToken);
+        var stem = $"SB-{(ours?.Code ?? tenant?.Slug ?? "ORG").ToUpperInvariant()}";
         stem = stem.Length > 26 ? stem[..26] : stem;
-        var named = $"{ours?.Name ?? "Our organization"} training";
+        var named = $"{ours?.Name ?? tenant?.Name ?? "Our organization"} training";
         named = named.Length > 190 ? named[..190] : named;
         var place = await Settings.ProjectPlace.OrganizationAsync(db, cancellationToken);
 
@@ -172,6 +174,26 @@ public static class Training
                     AddedByName = actor.Name,
                 });
             }
+            // As any new project: what it is, and the organization's answers for new projects (the Control room's); its lists,
+            // numbering, forms, routes and functions are the organization's, read live.
+            var now = SystemClock.Instance.GetCurrentInstant();
+            db.Settings.Add(new Settings.Setting
+            {
+                TenantId = tenantId,
+                ProjectId = project.Id,
+                Key = "PROJECT_INFO",
+                Value = JsonSerializer.Serialize(new
+                {
+                    kind = "GENERIC",
+                    startDate = now.InUtc().Date.ToString("yyyy-MM-dd", null),
+                    description = "The organization's training space: nothing in it is real, and no email leaves it.",
+                    scopeStatement = "Practice only: documents, reviews and transmittals made here are not controlled information.",
+                }),
+                UpdatedAt = now,
+                UpdatedByName = actor.Name,
+            });
+            foreach (var (key, value) in await DefaultsAsync(db, cancellationToken))
+                db.Settings.Add(new Settings.Setting { TenantId = tenantId, ProjectId = project.Id, Key = key, Value = value, UpdatedAt = now, UpdatedByName = actor.Name });
             await db.SaveChangesAsync(cancellationToken);
             await audit.WriteAsync(actor, "PROJECT_CREATED", "Project", project.Id, project.Code,
                 $"{project.Name}: the organization's training space, with {roles.Count} made-up organization(s), one for each role", project.Id,
@@ -179,6 +201,38 @@ public static class Training
             return project;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Every organization has its training space (owner: "a training space should be by default"): opened by itself when
+    /// the organization starts, and for an organization from before, when DELIOS is next updated (the migrate step). One
+    /// already there, open or put away, is left as it is.
+    /// </summary>
+    public static async Task EnsureAsync(DeliosDbContext db, AuditLog audit, Guid tenantId, Actor actor, CancellationToken cancellationToken)
+    {
+        if (await db.Projects.AnyAsync(p => p.Space == Spaces.Training, cancellationToken)) return;
+        await NewAsync(db, audit, tenantId, actor, cancellationToken);
+    }
+
+    /// <summary>The organization's answers for new projects, as the defaults page shows them (never the stamp, nor how documents come in).</summary>
+    private static async Task<List<(string Key, string Value)>> DefaultsAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var kept = await db.Settings.AsNoTracking().Where(x => x.ProjectId == null && x.Key == Settings.OrganizationDefaults.Key)
+            .Select(x => x.Value).FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(kept)) return [];
+        try
+        {
+            using var json = JsonDocument.Parse(kept);
+            if (!json.RootElement.TryGetProperty("values", out var values) || values.ValueKind != JsonValueKind.Object) return [];
+            return values.EnumerateObject()
+                .Where(v => v.Value.ValueKind == JsonValueKind.String && Settings.Liberty.RoomItemOf(v.Name) is { } item
+                    && item is not ("POLICY_PDF_STAMP" or "SUPPLIER_INTAKE"))
+                .Select(v => (v.Name, v.Value.GetString()!)).ToList();
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     private static async Task<TrainingView> ViewAsync(DeliosDbContext db, Project project, CancellationToken cancellationToken)

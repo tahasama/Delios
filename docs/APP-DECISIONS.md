@@ -222,9 +222,13 @@ mostly work the same way for all projects, and customization of the later would 
 - **It follows the organization's settings live** (owner): its lists, numbering, revisions, forms, routes and functions
   are the organization's, read at once, as a project that changed nothing reads them. Like every new project, it takes
   the organization's answers for new projects (the Control room's) when it opens; starting it again takes them anew.
-- **It can be started again clean, by the organization's administrators** (owner): the old one is put away (archived,
-  out of every list, its made-up organizations switched off) and a fresh one opens; nothing is deleted (owner: "Put away,
-  open fresh"), so the database's guards on every real project's files and trail stay whole.
+- **There by default, listed with the projects** (owner: "a training space should be by default and listed with project"):
+  every organization has one from the start (one from before gets it when DELIOS is next updated), its line among the
+  projects with **On · Off** (owner: "the off state, where the training does not appear to people") and **Start again**.
+- **Started again clean, by the organization's administrators** (owner: "restart should be creating a new one with the
+  last one archived"): the old one is archived with all it holds (out of every list, its made-up organizations switched
+  off) and a fresh one opens; nothing is deleted (owner: "Put away, open fresh"), so the database's guards on every real
+  project's files and trail stay whole.
 - **Its people never count towards the plan's users** (owner: "agreed").
 - **Marked TRAINING** (owner: "code TRAINING works"): the mark, never the project's code, decides what leaves it out (a
   real project's code may start with anything). Its code reads `SB-<the organization's code>`, so it is seen at once.

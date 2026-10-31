@@ -4,5 +4,6 @@
  * A filter or a tab changed on the same page keeps the page as it is (no new template), so it does not fade.
  */
 export default function Template({ children }: { children: React.ReactNode }) {
-  return <div className="page-in">{children}</div>;
+  // The organization's pages are stacked sheets: their space between them is kept here, as the layout's was.
+  return <div className="page-in space-y-4">{children}</div>;
 }

@@ -12,7 +12,7 @@ namespace Delios.Host.Seeding;
 /// Every password is <c>demo1234</c>. Development only.
 /// </summary>
 public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.TenantContext tenantContext, ILogger<DemoSeed> logger,
-    Microsoft.AspNetCore.Identity.IPasswordHasher<Operators.Operator> operatorHasher)
+    Microsoft.AspNetCore.Identity.IPasswordHasher<Operators.Operator> operatorHasher, Audit.AuditLog audit)
 {
     /// <summary>The demo's account in the DELIOS console (console@demo.local, the demo password), to try it out.</summary>
     public const string ConsoleEmail = "console@demo.local";
@@ -70,6 +70,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             issuing |= await EnsurePropNamesAsync(cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await Organizations.Registry.EnsureTenantAsync(db, existing.Id, cancellationToken);
+            await Organizations.Training.EnsureAsync(db, audit, existing.Id, Audit.Actor.System, cancellationToken);
             await upgrade.CommitAsync(cancellationToken);
             logger.LogInformation(reviews || issuing ? "The demo tenant exists; what it lacked was added" : "The demo tenant already exists; nothing to do");
             return;
@@ -126,6 +127,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         await EnsureCorrespondenceSetupAsync(t, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await Organizations.Registry.EnsureTenantAsync(db, t, cancellationToken);
+        await Organizations.Training.EnsureAsync(db, audit, t, Audit.Actor.System, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         logger.LogInformation("Demo tenant '{Slug}' created; every password is {Password}", Slug, Password);
     }
@@ -205,6 +207,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         await Operators.Trials.StartAsync(db, t, NodaTime.SystemClock.Instance.GetCurrentInstant(), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await Organizations.Registry.EnsureTenantAsync(db, t, cancellationToken);
+        // Its training space, from the start (docs/APP-DECISIONS.md §84), the administrator on it.
+        await Organizations.Training.EnsureAsync(db, audit, t, new Audit.Actor(admin.Id, admin.Name), cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (tenant, admin.Id);
     }

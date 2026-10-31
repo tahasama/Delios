@@ -18,8 +18,7 @@ import { projectSettings } from "@/lib/settings/api";
 import { ProjectFields } from "@/app/(app)/settings/projects/project-fields";
 import { joinedProjects } from "@/lib/organization/api";
 import { JoinedProjects } from "../joined";
-import { api } from "@/lib/client";
-import { openTrainingAction, trainingAgainAction } from "@/lib/organization/forms-training";
+import { trainingAgainAction } from "@/lib/organization/forms-training";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
@@ -29,6 +28,15 @@ const STANDS = [
   { code: "ACTIVE", label: "Active", act: "Activate", tone: "done", said: "Activated", means: "Its people work on it as usual." },
   { code: "ON_HOLD", label: "Suspended", act: "Suspend", tone: "waiting", said: "Suspended", means: "Nobody opens it until it is activated again; its documents stay as they are." },
   { code: "ARCHIVED", label: "Archived", act: "Archive", tone: "idle", said: "Archived", means: "Put away with its documents; it leaves the picker. Nothing is deleted." },
+] as const;
+
+/**
+ * The training space's line (owner: "the org can have the off state, where the training does not appear to people"):
+ * on, or off (nobody on it sees it until it is on again). Archived only by starting it again.
+ */
+const TRAINING_STANDS = [
+  { code: "ACTIVE", label: "On", act: "Switch on", tone: "done", said: "Switched on", means: "Its people see it in their project list and practise in it." },
+  { code: "ON_HOLD", label: "Off", act: "Switch off", tone: "waiting", said: "Switched off", means: "Nobody on it sees it until it is switched on again; what it holds stays." },
 ] as const;
 
 /** A field as on the new-document form: grey, no box, inside the sheet's `asking` body. */
@@ -54,10 +62,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   /** I am on this project: its code and name open it. */
   const onIt = (id: string) => users.some((one) => one.id === scope.user.id && one.memberships.some((m) => m.active && m.projectId === id));
 
-  // The training space is listed apart (docs/APP-DECISIONS.md §84): never counted among the organization's projects.
-  const training = await api<{ training: { id: string; code: string; name: string; openedAt: string; people: number; documents: number; organizations: { id: string; code: string; name: string; role: string }[] } | null }>(
-    "/api/admin/training", { keep: { areas: [] } }).then((r) => r.training).catch(() => null);
-  const projects = await Promise.all(all.filter((one) => one.space !== "TRAINING")
+  const listed = await Promise.all(all
     // By code only: changing where a project stands never moves its line.
     .sort((a, b) => a.code.localeCompare(b.code))
     .map(async (one) => {
@@ -66,6 +71,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       try { info = JSON.parse((await projectSettings(one.id).catch(() => new Map<string, string>())).get("PROJECT_INFO") ?? "{}"); } catch { info = {}; }
       return { ...one, info, kind: one.kind ?? info.kind ?? "GENERIC", startDate: info.startDate ?? one.createdAt.slice(0, 10), endDate: info.endDate ?? null };
     }));
+  // The training space is a line of the table (owner: "listed with the projects"), never counted among them.
+  const isTraining = (p: { space?: string | null }) => p.space === "TRAINING";
+  const projects = listed.filter((p) => !isTraining(p));
   const open = projects.filter((p) => p.status === "ACTIVE").length;
   const suspended = projects.filter((p) => p.status === "ON_HOLD").length;
   const archived = projects.filter((p) => p.status === "ARCHIVED").length;
@@ -128,48 +136,6 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         </dl>
       </header>
 
-      {/* The training space: one per organization, nothing in it real, started again whenever wanted (owner). */}
-      <section className="register register-sheet register-sheet-open" aria-labelledby="training-head">
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
-          <span id="training-head" className="stencil mr-1 text-slate-500">Training space</span>
-          <span className="text-[11px] text-slate-500">
-            One for the organization, set up its way: try documents, reviews and transmittals with made-up organizations. Nothing in it is real, no email leaves it, its people are not counted on the plan.
-          </span>
-        </div>
-        {training ? (
-          <div className="grid gap-4 px-5 py-4 sm:px-6 lg:grid-cols-[1fr_auto]">
-            <div className="min-w-0">
-              <p className="text-[13px] text-slate-800">
-                {onIt(training.id) ? (
-                  <form action={switchProjectAction} className="inline">
-                    <input type="hidden" name="projectId" value={training.id} />
-                    <button type="submit" className="font-mono font-semibold text-link hover:underline" title={`Open ${training.code}`}>{training.code}</button>
-                  </form>
-                ) : <span className="font-mono font-semibold">{training.code}</span>}
-                <span className="ml-2">{training.name}</span>
-                <span className="ml-2 text-[11.5px] text-slate-500">open since {fmtDate(new Date(training.openedAt))} · {training.people} {training.people === 1 ? "person" : "people"} · {training.documents} {training.documents === 1 ? "document" : "documents"}</span>
-              </p>
-              <p className="mt-1.5 text-[11.5px] text-slate-500">
-                Made-up organizations, one for each role: {training.organizations.map((o) => o.name).join(", ") || "none (the organization's list of roles is empty)"}.
-                {" "}Put trainees on it from People, as on any project.
-              </p>
-            </div>
-            <ActionForm action={trainingAgainAction} submitLabel="Start it again" variant="secondary" size="sm"
-              confirmText={`Start the training space again? ${training.code} is put away (archived, out of every list, nothing deleted) and a fresh, empty one opens. Its people are not carried over.`}
-              className="flex flex-wrap items-end gap-2">
-              <Field label="Why (optional)" hint="kept on the old one's line">
-                <input name="reason" maxLength={500} className={field} placeholder="e.g. a new group of trainees" />
-              </Field>
-            </ActionForm>
-          </div>
-        ) : (
-          <div className="px-5 py-4 sm:px-6">
-            <ActionForm action={openTrainingAction} submitLabel="Open the training space" size="sm">
-              <p className="text-[12.5px] text-slate-600">None yet. It opens empty, with a made-up organization for each role, and you on it as the control function.</p>
-            </ActionForm>
-          </div>
-        )}
-      </section>
 
       {/* A new project: one sheet, opened from the plate; it becomes the form. */}
       {opening ? (
@@ -229,38 +195,43 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
 
       {/* Every project: its code and name open it; the pencil opens its line. */}
       <section className="register register-sheet register-sheet-open" aria-labelledby="list-head">
-        {band("Every project", `${projects.length} · type, dates and scope are each project's own`)}
+        {band("Every project", `${projects.length} · type, dates and scope are each project's own${listed.some(isTraining) ? "; the training space is last" : ""}`)}
         <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
           head={<tr><Th>Project</Th><Th>Type</Th><Th>Our role</Th><Th>People</Th><Th>Documents</Th><Th>Start → planned end</Th><Th>Where it stands</Th><Th></Th></tr>}>
-          {projects.map((p) => {
+          {[...projects, ...listed.filter(isTraining)].map((p) => {
+            const training = isTraining(p);
             const here = onIt(p.id);
             const active = p.status === "ACTIVE";
-            const stands = STANDS.find((one) => one.code === p.status) ?? STANDS[0];
+            const choices = training ? TRAINING_STANDS : STANDS;
+            const stands = choices.find((one) => one.code === p.status) ?? choices[0];
             const isOpen = editing === p.id;
-            const changing = sp.p === p.id ? STANDS.find((one) => one.code === sp.to && one.code !== p.status) ?? null : null;
+            const changing = sp.p === p.id ? choices.find((one) => one.code === sp.to && one.code !== p.status) ?? null : null;
             const lineHref = (edit?: string) => `/organization/projects${edit ? `?edit=${edit}` : ""}#project-${p.id}`;
             const title = <><code className="code-chip mr-1.5">{p.code}</code><span className="font-medium">{p.name}</span></>;
             return (
               <Fragment key={p.id}>
                 <tr id={`project-${p.id}`} className={cn("scroll-mt-20 align-top target:bg-tint-soft", !active && "opacity-60", isOpen && "[&>td]:border-b-0")}>
                   <Td>
-                    {here && active ? (
+                    {/* An administrator opens the training space even before being on it (opened by itself, nobody is). */}
+                    {(here || training) && active ? (
                       <form action={switchProjectAction} className="inline">
                         <input type="hidden" name="projectId" value={p.id} />
                         <button type="submit" className="text-left text-slate-800 hover:text-link hover:underline" title={`Open ${p.code}`}>{title}</button>
                       </form>
                     ) : <span className="text-slate-800">{title}</span>}
-                    {!here ? <span className="ml-1.5 text-[11px] text-slate-500">(you are not on it)</span> : null}
+                    {!here && !training ? <span className="ml-1.5 text-[11px] text-slate-500">(you are not on it)</span> : null}
                     {p.codeChangedAt ? <span className="block text-[11px] text-slate-500">was {p.previousCode}</span> : null}
-                    {p.info.description ? <span className="mt-0.5 block max-w-md truncate text-[11px] text-slate-500" title={p.info.description}>{p.info.description}</span> : null}
+                    {training
+                      ? <span className="mt-0.5 block text-[11px] text-slate-500">For practice: nothing in it is real, no email leaves it.</span>
+                      : p.info.description ? <span className="mt-0.5 block max-w-md truncate text-[11px] text-slate-500" title={p.info.description}>{p.info.description}</span> : null}
                     {p.statusReason ? (
                       <span className="block text-[11px] whitespace-pre-line text-slate-500">
                         {stands.said}{p.statusChangedAt ? ` ${fmtDate(p.statusChangedAt)}` : ""}{p.statusChangedByName ? ` by ${p.statusChangedByName}` : ""}: {p.statusReason}
                       </span>
                     ) : null}
                   </Td>
-                  <Td className="text-xs">{kindLabel(p.kind)}</Td>
-                  <Td className="text-xs">{p.contractRole === "GENERIC" ? <span className="text-slate-500">not stated</span> : roleLabel(p.contractRole)}</Td>
+                  <Td className="text-xs">{training ? <span className="font-medium text-violet-700 dark:text-violet-300">Training space</span> : kindLabel(p.kind)}</Td>
+                  <Td className="text-xs">{training ? <span className="text-slate-500">a made-up organization for each role</span> : p.contractRole === "GENERIC" ? <span className="text-slate-500">not stated</span> : roleLabel(p.contractRole)}</Td>
                   <Td className="text-xs tabular-nums">{p.members}</Td>
                   <Td className="text-xs tabular-nums">{p.documents}</Td>
                   <Td className="text-xs whitespace-nowrap">
@@ -268,14 +239,21 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                   </Td>
                   <Td className="w-px whitespace-nowrap">
                     {/* Where it stands, changed right here: choosing another asks only why, under the line. */}
-                    <nav aria-label={`Where ${p.code} stands`} className="seg w-fit">
-                      {STANDS.map((one) => one.code === p.status
-                        ? <span key={one.code} aria-current="page" className="segment">{one.label}</span>
-                        : <Link key={one.code} href={`/organization/projects?p=${p.id}&to=${one.code}#project-${p.id}`} scroll={false} className="segment">{one.label}</Link>)}
-                    </nav>
+                    <div className="flex items-center gap-2">
+                      <nav aria-label={`Where ${p.code} stands`} className="seg w-fit">
+                        {choices.map((one) => one.code === p.status
+                          ? <span key={one.code} aria-current="page" className="segment">{one.label}</span>
+                          : <Link key={one.code} href={`/organization/projects?p=${p.id}&to=${one.code}#project-${p.id}`} scroll={false} className="segment">{one.label}</Link>)}
+                      </nav>
+                      {/* The training space starts again (owner: "restart should be creating a new one with the last one archived"). */}
+                      {training ? (
+                        <ActionForm action={trainingAgainAction} submitLabel="Start again" variant="secondary" size="sm"
+                          confirmText={`Start the training space again? ${p.code} is archived with all it holds (nothing deleted) and a fresh, empty one opens in its place. Its people are not carried over.`} />
+                      ) : null}
+                    </div>
                   </Td>
                   <Td className="w-px whitespace-nowrap text-right">
-                    {isOpen ? (
+                    {training ? null : isOpen ? (
                       <Link href={lineHref()} scroll={false} className="inline-flex rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Close">
                         <X aria-label={`Close ${p.code}`} className="h-4 w-4" />
                       </Link>

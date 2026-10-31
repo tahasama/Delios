@@ -421,8 +421,11 @@ public static class DirectoryEndpoints
     /// <summary><c>GET /api/admin/projects</c>: every project, with how many people are on it.</summary>
     private static async Task<IResult> ProjectsAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {
-        // A training space put away (started again) is out of every list; the one open is listed, marked by its Space.
-        var projects = await db.Projects.AsNoTracking().Where(p => !(p.Space == Spaces.Training && p.Status == "ARCHIVED"))
+        // The training space is listed with the projects, marked by its Space: the newest one only, whatever where it stands
+        // (archived by hand, it stays on its line to be started again); those put away before are out of every list.
+        var training = await db.Projects.AsNoTracking().Where(p => p.Space == Spaces.Training).OrderByDescending(p => p.CreatedAt)
+            .Select(p => (Guid?)p.Id).FirstOrDefaultAsync(cancellationToken);
+        var projects = await db.Projects.AsNoTracking().Where(p => p.Space != Spaces.Training || p.Space == null || p.Id == training)
             .OrderBy(p => p.Code).ToListAsync(cancellationToken);
         var counts = await db.Memberships.AsNoTracking().Where(m => m.Active).GroupBy(m => m.ProjectId)
             .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(cancellationToken);

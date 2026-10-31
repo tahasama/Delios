@@ -1008,16 +1008,27 @@ a screen only words it. A new rule goes in the backend, never in a page.
   is registered from its transmittal and leaves the list.
 
 ### The training space (docs/APP-DECISIONS.md §84)
-- **One per organization** (owner: "they mostly work the same way for all projects"): a project marked
-  `Space = TRAINING` (`Identity/Spaces`, owner: "code TRAINING works"), its code `SB-<our code>` (then -2, -3: codes are
-  never given twice), opened and started again by administrators on the organization's Projects (`Organizations/Training.cs`,
-  `GET`/`POST /api/admin/training`, `POST /api/admin/training/again`; screens `lib/organization/forms-training.ts`), its
-  line apart from the projects (never counted). **Started again**: the old one archived, out of every list, nothing
-  deleted (owner: "Put away, open fresh"); a fresh one opens with the administrator on it as the control function.
+- **Every organization has one, by default** (owner: "a training space should be by default"): a project marked
+  `Space = TRAINING` (`Identity/Spaces`, owner: "code TRAINING works"), its code `SB-<our code>` (else its short name; then
+  -2, -3: codes are never given twice), opened by itself when the organization starts (`DemoSeed.StartAsync`, the demo)
+  and, for one from before, by the update itself (the `migrate` command, `Commands.TrainingSpacesAsync`; a failure is
+  logged, never stops the update): `Organizations/Training.cs` `EnsureAsync`, with what it is (`PROJECT_INFO`) and the
+  organization's answers for new projects copied as any new project. **Listed with the projects** (owner), its line
+  last in the organization's Projects table, never counted in its figures: "Training space" for its type, a made-up
+  organization for each role, and in place of Where it stands **On · Off** (owner: "the off state, where the training
+  does not appear to people": off is suspended, nobody on it sees it) and **Start again** (asked first: the old one
+  archived with all it holds, nothing deleted, out of every list, a fresh one opening in its place, its people not carried
+  over; `POST /api/admin/training/again`; owner: "restart should be creating a new one with the last one archived"). An
+  administrator opens it from its code even before being on it (joining on the switch). No pencil: it is not edited.
   **One made-up organization per role** (`Party.TrainingProjectId`): seen only inside it (query filter on `Party`; the
   organization's list and other projects never show them), holding no code or name on DELIOS. **Left out of what spans
   projects**: the organization's whole audit trail, the whole full download, the plan's paid users (someone only on it),
-  and email (an email of it is kept, marked off, `EmailSender`). Every page in it says so (a violet line, `(app)/layout.tsx`).
+  the "only active project" guard, and email (an email of it is kept, marked off, `EmailSender`). Every page in it says so
+  (a violet line, `(app)/layout.tsx`).
+- The organization's pages are stacked sheets with their space between them (`organization/template.tsx`,
+  `space-y-4`: the fade's wrapper had swallowed the layout's spacing).
+- The register's **Controlled · Uncontrolled** switch sits beside its title, never beside "Create document" (owner: "the
+  switch here is competing with the button").
 
 ### Settings
 - **Settings are read by everyone of ours** (owner: "access without the editing liberty"): the Control room, Types &

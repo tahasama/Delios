@@ -29,6 +29,7 @@ public static class Commands
         {
             case DatabaseMigrator.Command:
                 await DatabaseMigrator.ApplyAsync(app.Services);
+                await TrainingSpacesAsync(services);
                 return 0;
 
             case "create-tenant" when args.Length == 5:
@@ -110,6 +111,32 @@ public static class Commands
                 await Console.Error.WriteLineAsync(
                     "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex | grant-all <email> | unshare-package <email> <package-number> | merge-organizations [<merge-id>] | requests | rebuild-recorded | create-operator <email> <name>");
                 return 2;
+        }
+    }
+
+    /// <summary>
+    /// Every organization has its training space (docs/APP-DECISIONS.md §84): one from before it existed gets it here, once.
+    /// A failure is said in the log and never stops the update: the app starts all the same.
+    /// </summary>
+    private static async Task TrainingSpacesAsync(IServiceProvider services)
+    {
+        var scopes = services.GetRequiredService<IServiceScopeFactory>();
+        var log = services.GetRequiredService<ILoggerFactory>().CreateLogger("Delios.Training");
+        List<Guid> tenants;
+        await using (var scope = scopes.CreateAsyncScope())
+            tenants = await scope.ServiceProvider.GetRequiredService<DeliosDbContext>().Tenants.AsNoTracking().Select(t => t.Id).ToListAsync();
+        foreach (var tenantId in tenants)
+        {
+            try
+            {
+                await Tenancy.TenantScope.RunAsync(scopes, tenantId, (sp, db) =>
+                    Organizations.Training.EnsureAsync(db, sp.GetRequiredService<Audit.AuditLog>(), tenantId, Audit.Actor.System, CancellationToken.None),
+                    CancellationToken.None);
+            }
+            catch (Exception e)
+            {
+                log.LogWarning(e, "The training space of organization {Tenant} could not be opened; it opens on the next update", tenantId);
+            }
         }
     }
 }
