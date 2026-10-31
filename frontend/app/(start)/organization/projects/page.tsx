@@ -241,8 +241,12 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                     {/* Where it stands, changed right here: choosing another asks only why, under the line. */}
                     <div className="flex items-start gap-2">
                       <nav aria-label={`Where ${p.code} stands`} className="seg w-fit">
+                        {/* What stands is a plain mark, but while another state asks why it leads back, closing the
+                            question (owner: "the cursor should be hand… if clicked the why form should disappear"). */}
                         {choices.map((one) => one.code === p.status
-                          ? <span key={one.code} aria-current="page" className="segment">{one.label}</span>
+                          ? changing
+                            ? <Link key={one.code} href={lineHref()} scroll={false} aria-current="page" className="segment" title={`Keep it ${one.label.toLowerCase()}`}>{one.label}</Link>
+                            : <span key={one.code} aria-current="page" className="segment">{one.label}</span>
                           : <Link key={one.code} href={`/organization/projects?p=${p.id}&to=${one.code}#project-${p.id}`} scroll={false} className="segment">{one.label}</Link>)}
                       </nav>
                       {/* The training space starts again (owner: "restart should be creating a new one with the last one archived"). */}
