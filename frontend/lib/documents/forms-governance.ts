@@ -10,7 +10,7 @@ import { backendRevision } from "@/lib/documents/api";
  * Each keeps what was there and says what changed; the backend decides who may.
  */
 
-type Result = { error?: string };
+type Result = { error?: string; ok?: string };
 const failed = (e: unknown): Result => ({ error: refusal(e).message });
 
 // ── §2.2–2.4 Records: confirmed, fixed, never revised; corrections are new records ──
@@ -24,7 +24,7 @@ export async function confirmRecordAction(_prev: Result | undefined, formData: F
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "Confirmed. The record is fixed from now on; a mistake is put right by a correction." };
 }
 
 /** §2.3 — a correction is a NEW record referencing the record corrected; both retained. */
@@ -39,7 +39,7 @@ export async function correctRecordAction(_prev: Result | undefined, formData: F
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "The correction is registered as a record of its own, pointing to the one it corrects. Both are kept." };
 }
 
 // ── §8.7 Withdrawal of approval ─────────────────────────────────────────────
@@ -57,5 +57,5 @@ export async function withdrawApprovalAction(_prev: Result | undefined, formData
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "Withdrawn, with your reason, kept in the document's History." };
 }

@@ -20,7 +20,7 @@ export async function takeBackNumberAction(_prev: State | undefined, formData: F
   } finally {
     revalidatePath(`/documents/${documentId}`);
   }
-  return {};
+  return { ok: "Taken back, with your reason. Their number no longer points to this document." };
 }
 
 /** Our documents a few words find (number, title, or a number of theirs matched before): for choosing one of ours, never typing it. */

@@ -27,7 +27,14 @@ state must show.
 - **Empty:** the four registers (documents, reviews, transmittals, the Schedule's table) are done: narrowed to nothing,
   they say so and offer to clear the filters; empty with no filter, they say what fills them. Still to check: the other
   lists and tabs (`EmptyState` or a line saying why and the act that fills it, never a bare "None").
-- **Success:** every act's action returns its `ok` line (what happened, what comes next); acts that open a new page
-  (sending for review opens the review) say it there.
-- **Error in place:** a failing part of a page (a panel, a tab) shows its own error and leaves the rest of the page.
-- **Loading inside a page:** a tab or panel that loads on its own shows its own outline.
+- **Success:** done for the acts that ended silently (about forty: the checks, records, legal hold, numbers taken back,
+  tags, organization links, asks to send, the check on arrival, notifying again, packages, every act on a revision and a
+  review): each returns its line, what happened and what comes next. Left silent on purpose: switches (they show their
+  new state at once), acts that open another page (it is the answer), the two-step sign-in's setup (its own steps), and
+  Count again (the report itself says when it was counted).
+- **A part of a page on its own** (`components/part.tsx`, `Part`; `PartSkeleton` in `components/skeleton.tsx`): an async
+  server component wrapped in it reads on its own: its grey outline while it reads, the rest of the page drawn already;
+  if it fails, "<what> could not be shown. The rest of the page is fine, and nothing was lost." with Try again, the
+  failure reported to us. Used on Home's journal ("what happened lately", `app/(app)/home-journal.tsx`). Next candidates,
+  one at a time as each page is touched: the document page's side reads (other numbers, who it may go to), the review
+  page's people and its run, the action page's lateness, the Schedule's list sources.

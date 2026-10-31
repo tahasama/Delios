@@ -149,7 +149,7 @@ export async function issueTransmittalAction(_prev: { error?: string } | undefin
  * submission it carried is checked, and a return says why, for the sender to
  * read. Something unplanned is registered on its own, from its file.
  */
-export async function acceptTransmittalAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function acceptTransmittalAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const id = String(formData.get("transmittalId") ?? "");
   const reject = formData.get("decision") === "reject";
@@ -178,7 +178,7 @@ export async function acceptTransmittalAction(_prev: { error?: string } | undefi
   } finally {
     revalidatePath(`/transmittals/${id}`);
   }
-  return {};
+  return { ok: "Checked. Whoever sent it is told the answer." };
 }
 
 /**
@@ -205,7 +205,7 @@ export async function matchItemAction(_prev: { error?: string; ok?: string } | u
  * What came into a package taking documents as they come: accepted, each is in the register as it came (their number,
  * revision, status, review outcome); returned, nothing is registered and they are told why.
  */
-export async function checkAsReceivedAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function checkAsReceivedAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const id = String(formData.get("transmittalId") ?? "");
   const reject = formData.get("decision") === "reject";
@@ -218,7 +218,7 @@ export async function checkAsReceivedAction(_prev: { error?: string } | undefine
   } finally {
     revalidatePath(`/transmittals/${id}`);
   }
-  return {};
+  return { ok: "Checked. Whoever sent it is told the answer." };
 }
 
 /** Adding to what came with a received transmittal, after it was recorded. */
@@ -242,7 +242,7 @@ export async function attachTransmittalFilesAction(_prev: { error?: string; ok?:
 /**
  * Notifying again the people who have not opened it.
  */
-export async function chaseTransmittalAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function chaseTransmittalAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const id = String(formData.get("transmittalId") ?? "");
   const recipientIds = formData.getAll("recipientIds").map(String).filter(Boolean);
@@ -252,7 +252,7 @@ export async function chaseTransmittalAction(_prev: { error?: string } | undefin
     return { error: refusal(e).message };
   }
   revalidatePath(`/transmittals/${id}`);
-  return {};
+  return { ok: "Notified again. The notices sent on it are counted on this page." };
 }
 
 /**

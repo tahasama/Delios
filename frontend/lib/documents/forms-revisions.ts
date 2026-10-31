@@ -18,7 +18,7 @@ import { once } from "@/lib/core/once";
  * review's id.
  */
 
-type Result = { error?: string };
+type Result = { error?: string; ok?: string };
 const failed = (e: unknown): Result => ({ error: refusal(e).message });
 const text = (formData: FormData, name: string) => String(formData.get(name) ?? "").trim();
 
@@ -38,7 +38,7 @@ export async function prepareRevisionAction(_prev: Result | undefined, formData:
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "The new revision is started. Add or replace its files in Edit rev, then send it for review." };
 }
 
 /**
@@ -92,7 +92,7 @@ export async function withdrawRevisionAction(_prev: Result | undefined, formData
   }
   revalidatePath(`/documents/${documentId}`);
   revalidatePath("/reviews", "layout");
-  return {};
+  return { ok: "Withdrawn from review, with your reason. Everyone on the route is told; the revision can be changed and sent again." };
 }
 
 /** The control function sends a review waiting for it to its reviewers (where the project has it do so). */
@@ -106,7 +106,7 @@ export async function issueToReviewAction(_prev: Result | undefined, formData: F
   }
   revalidatePath(`/reviews/${cycleId}`);
   revalidatePath("/");
-  return {};
+  return { ok: "Sent to its reviewers. They are told, and whoever sent it for review too." };
 }
 
 /** Taking a comment back before the step is answered: until then it is a draft. */
@@ -121,7 +121,7 @@ export async function removeCommentAction(_prev: Result | undefined, formData: F
     return failed(e);
   }
   revalidatePath(`/reviews/${cycleId}`);
-  return {};
+  return { ok: "Comment taken back." };
 }
 
 /**
@@ -145,7 +145,7 @@ export async function editCommentAction(_prev: Result | undefined, formData: For
     return failed(e);
   }
   revalidatePath(`/reviews/${cycleId}`);
-  return {};
+  return { ok: "Comment changed. Until your step is answered it stays a draft; only its last version is shown." };
 }
 
 /** Answer the open step: a verdict and status on the deciding step, advice before it. */
@@ -177,7 +177,7 @@ export async function recordOutcomeAction(_prev: Result | undefined, formData: F
   }
   revalidatePath(`/reviews/${cycleId}`);
   revalidatePath("/");
-  return {};
+  return { ok: "Your answer is recorded. The review's progress shows where it stands now." };
 }
 
 /** the control function sends the decided revision back to its author. */
@@ -190,7 +190,7 @@ export async function returnToOriginatorAction(_prev: Result | undefined, formDa
     return failed(e);
   }
   revalidatePath(`/reviews/${cycleId}`);
-  return {};
+  return { ok: "Sent back to its author, who is told. Their next revision takes the comments in." };
 }
 
 // G.1 steps 11–13 — release at a status (§7.6), superseding the current revision (§7.5)
@@ -258,7 +258,7 @@ export async function returnAtGateAction(_prev: Result | undefined, formData: Fo
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "Not released, with your reason. It goes back as you chose, and they are told." };
 }
 
 /** §7.2 — void: the newest revision, released in error or never reviewed. */
@@ -277,7 +277,7 @@ export async function voidRevisionAction(_prev: Result | undefined, formData: Fo
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "Voided, with your reason. It stays on its row, marked void." };
 }
 
 /** Take a void back, with a reason: the revision counts again. The control function's. */
@@ -294,7 +294,7 @@ export async function unvoidRevisionAction(_prev: Result | undefined, formData: 
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "The void is taken back, with your reason. The revision counts again." };
 }
 
 /** §12.6 — the reassessment of work performed under a voided revision. */
@@ -309,7 +309,7 @@ export async function recordVoidReassessmentAction(_prev: Result | undefined, fo
     return failed(e);
   }
   revalidatePath("/exposures");
-  return {};
+  return { ok: "The reassessment is recorded beside the void it answers." };
 }
 
 /** An approval asked for after release came back yes: the hold is lifted and what waited is sent. */
@@ -324,7 +324,7 @@ export async function liftHoldAction(_prev: Result | undefined, formData: FormDa
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "The hold is lifted, and what waited for the approval is sent." };
 }
 
 /** An approval asked for after release came back no: it stays on hold for good, and goes back with a reason. */
@@ -341,5 +341,5 @@ export async function returnHeldAction(_prev: Result | undefined, formData: Form
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "It stays on hold for good, and goes back with your reason." };
 }

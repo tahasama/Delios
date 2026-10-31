@@ -91,7 +91,7 @@ async function onPackage(packageId: string, path: string, body: unknown, method:
   }
 }
 
-export async function addPackageMemberAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function addPackageMemberAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const packageId = String(formData.get("packageId") ?? "");
   const documentIds = formData.getAll("documentId").map(String).filter(Boolean);
   const requiredStatuses = formData.getAll("requiredStatus").map(String).filter(Boolean);
@@ -101,7 +101,7 @@ export async function addPackageMemberAction(_prev: { error?: string } | undefin
   if (error) return { error };
   // From the register's "Add to package": land on the package, where the result is.
   if (formData.get("redirect")) redirect(`/packages/${number}?added=${documentIds.length}`);
-  return {};
+  return { ok: "Added to the package." };
 }
 
 /**
@@ -172,7 +172,7 @@ export async function setPackageRuleAction(_prev: { error?: string } | undefined
  * Change a package while it is open: name and description; for a delivery package also its date, the statuses it
  * needs, who it goes to, who puts it together and who accepts it. The control function (and above); the backend checks.
  */
-export async function updatePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function updatePackageAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
   // Renumbered only before it was shared or sent; the backend refuses otherwise.
@@ -195,7 +195,7 @@ export async function updatePackageAction(_prev: { error?: string } | undefined,
   const { error, number: now } = await onPackage(String(formData.get("packageId") ?? ""), "", body, "PUT");
   if (error) return { error };
   if (now && was && now !== was) redirect(`/packages/${now}`);
-  return {};
+  return { ok: "Saved." };
 }
 
 /** the control function shares a supplier's package with that supplier: once, and for good. */

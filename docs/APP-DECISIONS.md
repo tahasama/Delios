@@ -208,6 +208,21 @@ The Standard asks that controlled information be kept safe; it says nothing of t
 - **What opens drawings and office files is shut in**: on a network of its own, it reaches neither the register, the
   store nor the internet.
 
+## 84 · A training space per organization (decided, not built)
+
+The owner (31 Oct 2026): "we should have a sand box for trainees too"; then "the training is per organisation as they
+mostly work the same way for all projects, and customization of the later would never be 100% different from it".
+
+- **One training space per organization**, never one per trainee and never one per project: an organization works the
+  same way on all its projects, and a project's own changes never stray far from the organization's settings, so one
+  space set up the organization's way teaches what every project does.
+- **Everything can be tried there**: register documents, send them for review and decide, release, send transmittals,
+  and **make made-up organizations for the different roles** (a client, a supplier, a contractor…) to try working with
+  others, all without touching a real project.
+- Still to discuss before it is built: whether it reads the organization's settings live or a copy made when it is
+  opened, whether it can be wiped and started again, whether its people count towards the plan's users (they should
+  not), and how it is kept apart from the real register (search, reports, the full download, the audit trail).
+
 ## Passages taken out of sections that stay in the Standard-changes file
 
 **From §27:**

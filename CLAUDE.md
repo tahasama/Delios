@@ -158,7 +158,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   kept; **an address one may not open** reads "Not found, or not yours to open" inside the frame (`app/(app)/not-found.tsx`,
   the same words whether it exists or not), one leading nowhere "Nothing at this address" (`app/not-found.tsx`); **an
   error** reads in plain words with a reference to quote, never the server's message or code trace (development only);
-  **validation** focuses the first field the server named, as the screen does for what it found.
+  **validation** focuses the first field the server named, as the screen does for what it found. **A part of a page reading
+  on its own** (`Part`, `components/part.tsx`) shows its own grey outline while it reads and, failing, its own line with
+  Try again, the rest of the page standing (Home's journal first). **An address refused by the server** (403, 404, 400 on
+  the page's own thing, `notYours`, `lib/client.ts`) reads "Not found, or not yours to open"; any other failure is the
+  error page. **Every act says what happened and what comes next** (its `ok` line), but switches and acts that open
+  another page.
 - **Motion** (owner: "smooth animations, not overdoing it… kill the static states… numbers incrementing / decrementing,
   building up the progress, bigger to regular for success… keeping the professional elegance"; `globals.css`, the Motion
   block): only transform, opacity and colour move, never what pushes the page; fast start, soft stop; about 150 ms for a

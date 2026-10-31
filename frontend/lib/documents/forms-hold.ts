@@ -10,7 +10,7 @@ import { api, projectPath, refusal } from "@/lib/client";
  * control function's; disposal is refused (nothing is removed but by the app owner).
  */
 
-type Result = { error?: string };
+type Result = { error?: string; ok?: string };
 // ── §13.5 Disposal & legal hold ──────────────────────────────────────────────
 
 export async function setLegalHoldAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
@@ -23,5 +23,5 @@ export async function setLegalHoldAction(_prev: Result | undefined, formData: Fo
     return { error: refusal(e).message };
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "Saved. The banner on the document says where the hold stands, since when and why." };
 }

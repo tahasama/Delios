@@ -48,7 +48,7 @@ export async function refuseLinkAction(_prev: Result | undefined, formData: Form
   }
   revalidatePath("/organization", "layout");
   revalidatePath("/");
-  return {};
+  return { ok: "Refused, with your reason. They are told." };
 }
 
 /** Either side ends a link (or takes back an invitation not answered yet), saying why. */
@@ -79,7 +79,7 @@ export async function joinPersonAction(_prev: Result | undefined, formData: Form
     return failed(e);
   }
   revalidatePath("/organization", "layout");
-  return {};
+  return { ok: "Saved." };
 }
 
 /** the control function says an organization takes part in this project (or no longer does), its role, and its people's starting function. */

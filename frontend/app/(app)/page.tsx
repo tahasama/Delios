@@ -4,8 +4,10 @@ import Link from "next/link";
 import { btn } from "@/components/ui";
 import { api, projectPath } from "@/lib/client";
 import { actionWork } from "@/lib/actions/api";
-import type { ActivityRow, ActivitySummary, Work } from "@/lib/types";
+import type { ActivitySummary, Work } from "@/lib/types";
 import { requireScope } from "@/lib/core/scope";
+import { Part } from "@/components/part";
+import { HomeJournal } from "./home-journal";
 import { isAdmin } from "@/lib/core/auth";
 import { organizationLinks } from "@/lib/organization/api";
 import { emailReplies } from "@/lib/transmittals/api";
@@ -25,7 +27,7 @@ export const dynamic = "force-dynamic";
  * clean the register is. The page used to be a column of cards that listed the
  * reader's chores and never told them the news.
  */
-import { type Row, type Aspect, ACTIVITY, NEWS, ALIAS, read, daysOf, lastWorkingDay, weekday, when, greeting, Fig, Card, Queue } from "./home-parts";
+import { type Row, type Aspect, daysOf, greeting, Fig, Card, Queue } from "./home-parts";
 
 /** Home's log: the project's whole trail, a page at a time, with every act's count (backend `GET /log`). */
 type ProjectLog = { total: number; page: number; pages: number; actions: { action: string; count: number; kind: string }[]; rows: LogAct[] };
@@ -46,9 +48,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const mayLog = user.isInternal && ctx.can("READ");
   const view = sp.view === "log" && !mayLog ? undefined : sp.view;
   const at = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
-  const acts = (rows: ActivityRow[]) => rows.map((e) => ({ id: e.id, ts: new Date(e.at), action: ALIAS[e.action] ?? e.action, actorName: e.actorName, entityType: e.entityType, entityLabel: e.entityLabel, detail: e.detail }));
-  // The backend's names for the acts each kind of the journal covers.
-  const backendNames = (kinds: string[]) => Object.keys(ALIAS).filter((name) => kinds.includes(ALIAS[name])).concat(kinds).join(",");
 
   const [work, checks, criticalDefects, activities, neverSent, scheduleWork] = await Promise.all([
     api<Work>(projectPath(session, "/work"), { keep: { areas: ["reviews", "transmittals", "docs", "packages", "plan"] } }),
@@ -75,20 +74,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // What moved while the reader was away: the last working day's worth of the
   // events that are news to somebody, not bookkeeping.
   //
-  // Project-wide, for everybody. A release, a rejection or a transmittal is a
-  // fact about the project, not about the person reading it; scoping the
-  // record by department is how people stop trusting it, because each of them
-  // ends up looking at a different project. What a reader may not see is
-  // already settled by the backend, not by this page.
-  const since = lastWorkingDay();
-  const news = acts(await api<ActivityRow[]>(projectPath(session, "/activity"), { keep: { areas: ["docs", "reviews", "transmittals", "packages", "plan", "checks"] }, query: { actions: backendNames(NEWS), since: since.toISOString(), take: 4 } }));
-  // A quiet day should not leave the panel empty or showing one lonely line:
-  // when the last working day produced almost nothing, the journal reaches
-  // further back and says so instead.
-  const older = news.length < 4
-    ? acts(await api<ActivityRow[]>(projectPath(session, "/activity"), { keep: { areas: ["docs", "reviews", "transmittals", "packages", "plan", "checks"] }, query: { actions: backendNames(NEWS), before: since.toISOString(), take: 4 - news.length } }))
-    : [];
-  const journal = [...news, ...older];
   // The whole log, when the reader asks for it. It carries the same kinds of
   // act as the journal beside the board — what the project did — and none of
   // what only an administrator should see: who signed in, who downloaded what,
@@ -107,12 +92,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       .filter((e): e is [string, string] => !!e[1]));
     return `/?${next}`;
   };
-  // An audit label reads "P1001-60-CI-SPC-00001 rev B — route name", and a
-  // supplier's number runs half as long again. The panel measures its own
-  // entries: the widest number sets the column the revisions line up in, and
-  // when that number is long the kind is dropped rather than squeezed.
-  const widest = Math.max(20, ...journal.map((e) => read(e.entityLabel)?.number.length ?? 0));
-  const room = widest <= 26;
 
   // One list per kind of ask: advice on a route's earlier step, or the
   // binding verdict — the one decision, which is also the release approval.
@@ -447,38 +426,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </main>
 
         <aside className={`grid min-w-0 gap-3 xl:sticky xl:top-22 ${view === "log" ? "hidden" : ""}`}>
-          {journal.length && view !== "log" ? (
-            <section className="home-rise register register-sheet register-sheet-open px-4 py-3" style={rise()}>
-              <h2 className="mb-2.5 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">{older.length ? "Lately" : `Since ${weekday(since)}`}</h2>
-              <ul>
-                {journal.map((e, i) => {
-                  const kind = ACTIVITY[e.action];
-                  const shape = read(e.entityLabel);
-                  if (!kind || !shape) return null;
-                  return (
-                    <li key={e.id} className="relative min-w-0 pb-2.5 pl-4.5 last:pb-0">
-                      <span className={`absolute top-1.25 left-0 h-1.75 w-1.75 rounded-full border-2 bg-surface ${kind.mark}`} />
-                      {i < journal.length - 1 ? <span className="absolute top-3.5 -bottom-px left-0.75 w-px bg-line" /> : null}
-                      {/* The lines are held to the width of the longest number in
-                          the panel, so every revision lands in the same column
-                          instead of drifting out to the panel's edge. */}
-                      <span className="block min-w-0" style={{ maxWidth: `${widest}ch` }}>
-                        <span className="flex items-baseline gap-2">
-                          <span className="min-w-0 truncate font-mono text-[12.5px] font-semibold text-link">{shape.number}</span>
-                          {room ? <span className="ml-auto shrink-0 text-[11px] text-slate-400">{kind.kind}</span> : null}
-                        </span>
-                        <span className="flex items-baseline gap-2 text-[12.5px] text-slate-600">
-                          <span className="min-w-0 truncate">{kind.said}</span>
-                          {shape.rev ? <span className="ml-auto shrink-0 font-mono text-[11.5px] text-slate-400">rev {shape.rev}</span> : null}
-                        </span>
-                        <span className="block truncate text-[11px] text-slate-400">{e.actorName} · {when(e.ts)}</span>
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-                            {controller ? <Link href="/?view=log" scroll={false} className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">Everything that happened →</Link> : null}
-            </section>
+          {view !== "log" ? (
+            <Part name="what happened lately">
+              <HomeJournal scope={session} controller={controller} style={rise()} />
+            </Part>
           ) : null}
 
           {view !== "log" && user.isInternal && atRisk.length ? (

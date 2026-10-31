@@ -161,7 +161,7 @@ export async function updateDocumentAction(_prev: { error?: string; ok?: string 
 }
 
 /** Associate the document with the asset it describes (§5.8). */
-export async function linkAssetAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function linkAssetAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const documentId = String(formData.get("documentId") ?? "");
   const assetCode = String(formData.get("assetCode") ?? "").trim();
@@ -172,7 +172,7 @@ export async function linkAssetAction(_prev: { error?: string } | undefined, for
     return { error: refusal(e).message };
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "Linked. The tag's page lists this document among those that describe it." };
 }
 
 export async function unlinkRelationshipAction(formData: FormData) {

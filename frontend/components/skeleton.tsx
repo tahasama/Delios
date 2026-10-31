@@ -97,3 +97,19 @@ export function PageSkeleton({ what = "the page" }: { what?: string }) {
     </Reading>
   );
 }
+
+/** One part of a page reading on its own (`Part`): a few quiet lines in the place it will take, the rest of the page already there. */
+export function PartSkeleton({ what = "this part", lines = 4, className }: { what?: string; lines?: number; className?: string }) {
+  return (
+    <div aria-busy="true" className={cn("register register-sheet register-sheet-open px-4 py-3", className)}>
+      <span className="sr-only" role="status">Reading {what}…</span>
+      <Bone className="h-3 w-24" />
+      {Array.from({ length: lines }, (_, i) => (
+        <div key={i} className="mt-3">
+          <Bone className="h-3.5 w-3/4" />
+          <Bone className="mt-1.5 h-3 w-1/2" />
+        </div>
+      ))}
+    </div>
+  );
+}
