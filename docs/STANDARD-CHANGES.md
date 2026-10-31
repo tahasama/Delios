@@ -1134,3 +1134,19 @@ names; each is settled so the record stays whole and its custody clear.
   proves nothing was altered. Who opened or downloaded a document is kept for as long as the organization chooses
   (3 months to the life of the register), then removed; it never enters the chain. Downloads are always kept for that
   period and watched (one person past 200 files in an hour: the administrators are told).
+
+## 86 · Uncontrolled documents: kept as they came, listed apart, clearly marked
+
+The Standard speaks of controlled information only. A project also keeps files nobody controls (owner: "we forgot that
+this app also manages uncontrolled"), and they must never be mistaken for the project's documents.
+
+- **Nothing uncontrolled is made here** (owner: "we will just keep them if we receive in a transmittal… that is as far
+  as we can do"): no library, no folders, no working copies. What is kept uncontrolled is only what came in, and the
+  proof attached to an act.
+- **Listed apart, clearly marked "uncontrolled"** (owner): beside the register, its own list, each file with how it came,
+  on what (a link to that transmittal, review or list), from which organization, by whom and when. Its kinds (owner:
+  "make those types of docs for uncontrolled docs"): received on a transmittal and never registered nor matched to one
+  of ours; kept with what arrived; the covering letter of what came from outside the system; the proof that something
+  of ours went out; the proof of an answer recorded for another organization; a reply by email set aside; a list file
+  uploaded on the Schedule.
+- **One that matters is registered**, from its transmittal, and becomes controlled: it then leaves the list.

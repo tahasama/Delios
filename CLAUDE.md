@@ -996,6 +996,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
   organizations' identities and holders are read by all, written only for itself; across, only through
   `Tenancy/Crossing.OpenAsync`, said where it is used.
 
+### Uncontrolled documents (docs/STANDARD-CHANGES.md §86)
+- **Kept as they came, never made here** (owner: "we will just keep them if we receive in a transmittal… that is as far
+  as we can do"): the register's switch **Controlled · Uncontrolled** (`register-plate.tsx`, our people only) opens
+  `/documents/uncontrolled`, every file the project keeps outside the register, marked "uncontrolled", each with its type,
+  what it came on (a link to it), from whom, by whom and when (backend `Documents/Uncontrolled.cs`,
+  `GET /projects/{id}/uncontrolled`, read from where each file sits, nothing stored; the transmittals' as the reader may
+  open them). Its types (owner: "make those types of docs for uncontrolled docs"; worked out on reading, never kept):
+  RECEIVED (on a transmittal, never registered nor matched), KEPT_WITH, COVERING_LETTER, SENT_PROOF, ANSWER_PROOF,
+  EMAIL_REPLY (set aside), LIST_FILE (uploaded on the Schedule); words in `lib/documents/uncontrolled.ts`. One that matters
+  is registered from its transmittal and leaves the list.
+
 ### The training space (docs/APP-DECISIONS.md §84)
 - **One per organization** (owner: "they mostly work the same way for all projects"): a project marked
   `Space = TRAINING` (`Identity/Spaces`, owner: "code TRAINING works"), its code `SB-<our code>` (then -2, -3: codes are

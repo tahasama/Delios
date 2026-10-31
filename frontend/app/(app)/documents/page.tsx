@@ -335,7 +335,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     {sp.sendError ? <Banner tone="warn" title="Not sent">{sp.sendError}</Banner> : null}
     <DocumentRegister
       supplier={supplierView && (hasVerb(user, "CREATE") || hasVerb(user, "REVISE")) ? { to: hostName ?? "them" } : supplierView ? { to: hostName ?? "them", readOnly: true } : null}
-      plate={<RegisterPlate project={{ code: project.code, name: project.name }} canCreate={!isReadOnly(user)} />}
+      plate={<RegisterPlate project={{ code: project.code, name: project.name }} canCreate={!isReadOnly(user)} ours={user.isInternal} />}
       rows={rows}
       total={matchCount}
       views={views}
