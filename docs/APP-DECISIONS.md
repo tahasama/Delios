@@ -219,9 +219,17 @@ mostly work the same way for all projects, and customization of the later would 
 - **Everything can be tried there**: register documents, send them for review and decide, release, send transmittals,
   and **make made-up organizations for the different roles** (a client, a supplier, a contractor…) to try working with
   others, all without touching a real project.
-- Still to discuss before it is built: whether it reads the organization's settings live or a copy made when it is
-  opened, whether it can be wiped and started again, whether its people count towards the plan's users (they should
-  not), and how it is kept apart from the real register (search, reports, the full download, the audit trail).
+- **It follows the organization's settings live** (owner): what the organization changes, the training space reads at
+  once, as a project that changed nothing does.
+- **It can be wiped and started again**, by whoever has the authority (owner): the one exception to "nothing is deleted
+  but by the app owner", because nothing in it is real.
+- **Its people never count towards the plan's users** (owner: "agreed").
+- **Kept apart from the real work** (owner: "search and audit trail are by project"): it is a project of its own, so the
+  register, search, reports and a project's trail are already apart. What spans projects must leave it out: the
+  organization's whole audit trail and whole full download, the projects' figures, the organization's list of
+  organizations and the names and codes reserved across DELIOS (made-up organizations must not take a real company's
+  code or name), and email (nothing in it is sent outside the app).
+- Still to settle: who wipes it, and the code that marks a project as the training space.
 
 ## Passages taken out of sections that stay in the Standard-changes file
 
