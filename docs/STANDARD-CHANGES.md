@@ -1,18 +1,13 @@
 # Changes the Standard needs
 
-Decisions taken while building the application that the **Document Management
-Standard v2** does not yet say, or says differently. None of these are screen
-design; each is a rule about how information is controlled, so the published
-document has to change before the application can claim conformance to it.
+Decisions taken while building that the **Document Management Standard v2** does not yet say, or says differently.
+Each is a rule about how information is controlled, so the published document has to change before the application
+can claim conformance to it. Nothing here is about how the application is built or drawn: screens, settings pages,
+sign-in, storage, payments and code names are in `docs/APP-DECISIONS.md`, which also keeps the sections moved out of
+this file under their old numbers (so references to "§N" still lead somewhere) and, for each section here, what in the
+application depends on it.
 
-The check catalogue is
-not generated from the document: `frontend/lib/conformance/checks/catalog.ts` is the
-application's own list of what it can answer (see §21 below), so a change here
-is a change to the published document, and only then — if it names something
-the register can settle — a change to the catalogue.
-
-Each entry says what the Standard holds today, what it must hold, and what in
-the application already depends on the change.
+Each entry says what the Standard holds today and what it must hold.
 
 ---
 
@@ -34,19 +29,14 @@ so. Latency with no owner.
 
 **Default, and preference.** Released and issued in one act is the default —
 what the application recommends and does out of the box. It is not a rule:
-an organization that wants them separate keeps them separate — `POLICY_RELEASE`
-(TOGETHER | SEPARATE), set by its administrator. The Standard should state the
+an organization that wants them separate keeps them separate, set by its administrator. The Standard should state the
 default and permit the other, not forbid it (§1.3 *Local configuration*).
 
 Where they are separate they are two states in order: **Released**, then
 **Issued** once it is sent; saying who receives it is optional on the review
 route, and a released revision not yet sent is a state of its own, not a
 breach. Where they are one act, such a revision breaks the rule and is stamped
-NOT ISSUED; `scripts/issue-released.ts` issues the ones seeded that way on demo
-data.
-
-**Depends on it:** `releaseRevision` in `frontend/lib/lifecycle.ts`, the issue-request
-gate, 19 checks in `scripts/verify-release.ts`.
+NOT ISSUED.
 
 ---
 
@@ -62,10 +52,6 @@ of the review route. It has the route's own due date, it holds the release
 until it answers, and its answer either releases and issues the revision or
 returns it to review. The days it takes are inside the review time, not added
 to it.
-
-**Depends on it:** `openApprovalStep` / `settleApproval` in
-`frontend/lib/transmittals/issue-requests.ts`; the *External approval* checkpoint in
-`frontend/lib/actions/action-lateness.ts`.
 
 ---
 
@@ -84,9 +70,6 @@ must be able to. A function may carry a clearance (§46).
 **Why:** clearance made confidentiality a property of rank. On a project the
 people who may read a closed document are chosen deliberately, one by one.
 
-**Depends on it:** `closedDocumentFilter` and `CLOSED_MODELS` in
-`frontend/lib/core/tenant.ts`; the access list on the document page.
-
 **Amended by §46:** a function may carry a clearance, confirmed by the owner.
 
 ---
@@ -100,9 +83,6 @@ route names for that act. Holding the verb as Document Control or as an
 administrator is an emergency power, not a qualification to answer in
 somebody's place; those holders are refused as ordinary targets, and the refusal
 says so.
-
-**Depends on it:** `frontend/lib/reviews/delegation.ts` — `delegateCandidates`,
-`delegationRefusal`, `byPrivilege`.
 
 ---
 
@@ -119,9 +99,6 @@ produced outside, where release is not ours to give, the required status alone
 counts — and which of the two readings applies is the project's published
 answer, not the reader's assumption (`POLICY_READY`: ISSUED | STATUS).
 
-**Depends on it:** `frontend/lib/schedule/readiness.ts`, the denormalised counters on
-`Action` (`needCount`, `metIssuedCount`, `metStatusCount`).
-
 ---
 
 ## 6 · Late receipt is a state of its own
@@ -133,8 +110,6 @@ arrived **after** the day of the work, is not complete in the sense §14.8
 means. It is recorded as **late receipt** — the work went ahead without
 everything it needed, and what was missing turned up afterwards. It is never
 reported as done.
-
-**Depends on it:** `Action.lastMetAt`; the `LATE_RECEIPT` state on the schedule.
 
 ---
 
@@ -155,9 +130,6 @@ after it inherit the delay rather than own it.
 
 **Why:** so nobody argues about it afterwards, and so a step never carries a
 delay that began before it.
-
-**Depends on it:** `frontend/lib/actions/action-lateness.ts`; the delay columns on the action
-page; the baseline export.
 
 ---
 
@@ -191,9 +163,6 @@ DEF-DB-13 therefore fails an action that passed short of its documents **and
 carries no such note**. An action that carries one has answered the clause,
 whatever the note says.
 
-**Depends on it:** the `ActionNote` record; `DB-13` in
-`frontend/lib/checks/runners.ts`; audit acts `ACTION_CARRIED` / `ACTION_STOPPED`.
-
 ---
 
 ## 10 · Recipients: asked, or only told
@@ -209,9 +178,6 @@ read from the addressed recipients only**: a transmittal is not received
 because somebody copied in happened to look at it. A copy's opening is still
 recorded, against that person.
 
-**Depends on it:** `TransmittalRecipient.kind`; the seen count everywhere it
-appears.
-
 ---
 
 ## 11 · An answer is correspondence, not a field
@@ -226,10 +192,6 @@ on the answer unless changed.
 
 Whether the response period of §11.12 has been met is then read from the
 existence of a linked answer, not from a note somebody typed.
-
-**Depends on it:** `Transmittal.inReplyToId`; the exchange on the transmittal
-page; `/transmittals/new?follows=` (see §45: answering and completing are one
-"Follow up").
 
 ---
 
@@ -264,11 +226,6 @@ receipt §11.5 asks for. It is the same record a review step carried for such an
 organization already keeps, and a review step sent that way fills in the
 transmittal's row for them too.
 
-**Depends on it:** `chaseTransmittalAction`, `markRecipientSentAction`; the
-recipient's `dispatchedAt`, `dispatchChannel`, `dispatchRef`,
-`dispatchedByName` and proof; audit acts `TRANSMITTAL_CHASED`,
-`TRANSMITTAL_SENT_ON`.
-
 ---
 
 ## 13 · Acceptance is the control function's decision, not a checklist
@@ -291,11 +248,6 @@ makes it one; the transmittal then lists that document.
 
 Checks recorded condition by condition before this change are kept, and shown
 as they were.
-
-**Depends on it:** `acceptTransmittalAction`, `attachTransmittalFilesAction`;
-files of kind `ATTACHMENT` on the transmittal; "Make it a document" on the
-transmittal page; audit acts `TRANSMITTAL_FILES_ATTACHED`,
-`TRANSMITTAL_FILE_REGISTERED`.
 
 ---
 
@@ -322,9 +274,6 @@ an answer, a covering letter — is complete and is issued like any other. Only 
 transmittal empty of both documents and words is incomplete, and IS-03 counts
 only that one.
 
-**Depends on it:** gate `ISS-ITEMS`; check `IS-03`; the acceptance conditions
-of entry 13, which a letter answers as not applicable.
-
 ---
 
 ## 16 · An outside approval is answered through Document Control, and a late one puts the revision on hold
@@ -347,11 +296,6 @@ while on hold. An approval lets the control function lift the hold, and what
 was asked for it is then sent. A refusal leaves it on hold for good; it goes
 back with a reason, and the next revision replaces it.
 
-**Depends on it:** `settleApproval`, `returnAtGate`, `holdRevision`,
-`liftHold`, `returnHeld`, `returnRecipients`; `Revision.heldAt`,
-`heldReason`, `heldByName`; audit acts `OUTSIDE_APPROVED`, `OUTSIDE_REFUSED`,
-`REVISION_HELD`, `REVISION_HOLD_LIFTED`.
-
 ---
 
 ## 17 · The verdict stamped on the document
@@ -370,9 +314,6 @@ review, superseded, void, on hold), and whether the comments of a verdict that
 carries them (accepted with comments, rejected) go with the stamp, listed on a
 last page of the copy. A rejected revision is stamped RETURNED. The copy opened
 from the document is the stamped one.
-
-**Depends on it:** policy `POLICY_PDF_STAMP`, `STAMP:<kind>`, `STAMP_COMMENTS`;
-`Stamping` (`StampChoices`), `lib/documents/copies.ts` (`openCopy`).
 
 ---
 
@@ -401,9 +342,6 @@ people doing the work by default, whether or not the project has a control
 function. An administrator may give it to Document Control instead; it cannot
 be switched off, because the reason is the record.
 
-**Depends on it:** `revisionGround`; act `AUTHORIZE_REVISION` (default: the
-people doing the work).
-
 ---
 
 ## 19 · A document type says whether it is reviewed
@@ -426,9 +364,6 @@ down a route after all needs its approval like any other.
 type is reviewed is the organization's answer, given when the type is
 published.
 
-**Depends on it:** property `review` on `DOCUMENT_TYPES`; `typeSkipsReview`,
-`releasedWithoutReview`, `readyForRelease`, `submitForReleaseAction`.
-
 ---
 
 ## 20 · A transmittal is never changed after it went
@@ -444,8 +379,6 @@ missing or wrong. The first lists what was sent after it.
 
 A replacement follows only a rejected transmittal; anything else is added to on
 a supplement. A draft has not gone, so it is simply changed.
-
-**Depends on it:** `Transmittal.followsId`, `followKind` (SUPPLEMENT | REPLACES).
 
 ---
 
@@ -473,8 +406,6 @@ ignore the page. Coverage rose from 51% to 100% by removing questions nobody
 could answer, and the measured figure now means *of what can go wrong here, how
 much is watched*.
 
-**Depends on it:** `frontend/lib/conformance/checks/catalog.ts`, the Assurance section.
-
 ---
 
 ## 22 · A condition the application refuses is not a check, and is not counted
@@ -490,8 +421,6 @@ hold cannot be destroyed. Twenty such rules are published beside the checks.
 **Why:** folding them into the percentage could only raise it and could never
 lower it, which makes the figure unfalsifiable — the one thing a conformance
 number must not be.
-
-**Depends on it:** `frontend/lib/conformance/checks/prevented.ts`, *Assurance → Default rules*.
 
 ---
 
@@ -514,8 +443,6 @@ with who approved it. A photograph of a rulebook that cannot move is a
 photograph of nothing — which is also why the traceability spine and its
 synchronized baseline were removed.
 
-**Depends on it:** the retire/reactivate actions, `ConfigValue.status`.
-
 ---
 
 ## 24 · What a form asks is the organization's; what makes a record controlled is not
@@ -533,9 +460,6 @@ Two things override the organization's answer, and only ever to make a field
 stricter: a numbering scheme that draws on a field, and the type-to-field
 matrix.
 
-**Depends on it:** `frontend/lib/settings/field-policy.ts`, `FieldPolicy`, `CustomField`,
-*Settings → Forms & fields*; ten forms wired to it.
-
 ---
 
 ## 25 · Records other than documents are numbered by a published scheme
@@ -548,8 +472,6 @@ rule buried in the code that raises them. A scheme for a record reads the record
 itself (project, sub-project, sender, receiver, reason, counter). Until one is
 routed, the short form (`TR-0001`) stands, and numbers already raised keep it.
 
-**Depends on it:** `frontend/lib/numbering-records.ts`, *Settings → Numbering*.
-
 ---
 
 ## 26 · A review's time belongs to the route, step by step
@@ -561,9 +483,6 @@ The step's own date is what that reviewer must answer by; the review's date is
 every step's days added up, counted from the day it went out. Both are stated
 wherever reviews are listed, and never confused: a step answered on time inside
 a route that is overdue is a different fact from either on its own.
-
-**Depends on it:** the `days` on a route step, `ReviewCycle.dueAt`, the **Step
-due** and **Review due** columns.
 
 ---
 
@@ -579,17 +498,12 @@ drift. What the application does not hold (cover page, client clauses, local
 conventions) stays in a document the organization registers and names as its
 plan.
 
-The plan is a document, not a setting: it changes nothing, so it is read under
-Assurance, beside the statement of conformance, never among the settings. A
-project states its scope once (This project), and how it is measured once
-(Assurance: the share of clear documents it aims at; the checks run by
-themselves every day). There is no separate
+The plan is a document, not a setting: it changes nothing. A project states its
+scope once, and how it is measured once (the share of clear documents it aims at).
+There is no separate
 register of exceptions to the rules: an exception that changes nothing is not a
 control. The departure that applies is a check switched off, with why, by whom
 and when.
-
-**Depends on it:** `frontend/app/(app)/conformance/plan/plan.tsx`,
-`ScopeConfig` (`MEASURE`, `dmpDocumentId`).
 
 ## 28 · Advice is chosen from a published list, with its comments
 
@@ -602,8 +516,6 @@ answer has comments; otherwise they are not asked. Advice never says less than
 the comments it carries. The decider reads it and is not bound by it, except
 that a blocking comment stops release until settled. The same holds for a
 verdict that carries comments (accepted with comments, rejected).
-
-**Depends on it:** `REVIEW_ADVICE`, `ReviewService.AnswerAsync`, `verdict-status.tsx`.
 
 ---
 
@@ -618,8 +530,6 @@ withdraws it, with a reason. The review is kept, in the review register, as
 The revision then goes through a new review. A revision is never in two
 reviews at once.
 
-**Depends on it:** `ReviewStates.Withdrawn`, `WithdrawForUpdateAsync`.
-
 ---
 
 ## 30 · What a revision is issued for is stated at start and confirmed at each step
@@ -630,8 +540,6 @@ reviews at once.
 Each step of its review confirms it or changes it, on purpose; the decider's
 grant is what the revision is released at. Document Control releases what was
 granted and does not choose it.
-
-**Depends on it:** `Revision.StatusCode`, `AnswerRequest.Status`.
 
 ---
 
@@ -644,8 +552,6 @@ people for that review, and the record says so. Every step names who answers it
 before the review starts, and the review shows those names on every step,
 including those not yet reached. "Leave it to" someone (who receives it once
 released) goes to whoever started the review.
-
-**Depends on it:** `StartReviewRequest.People`, `StepView.GoesTo`.
 
 ---
 
@@ -662,8 +568,6 @@ revision: a reason is obligatory (approver away, approved on paper and the
 stamped scan follows). Every upload is logged with who and why. Actions keep
 the application's own number and the planner's ID beside it.
 
-**Depends on it:** `ListUploadEndpoints`, `Verbs.Plan`, `Activity.ExternalId`.
-
 ## 33 · A document's details change only with a revision
 
 **Clause:** §4.9 *Metadata change*.
@@ -674,8 +578,6 @@ and are part of what that revision's review sees. Once the revision has left
 preparation, no detail changes on its own: correcting one takes a new
 revision. Before the first revision, the reserved number's details may be set.
 
-**Depends on it:** `DocumentService.UpdateAsync` (`DETAILS_NEED_A_REVISION`).
-
 ## 34 · Legal hold freezes the end of a document, not its work
 
 **Clause:** §10 *Retention and disposal*.
@@ -685,8 +587,6 @@ with a recorded reason. While held, the document cannot be retired and none of
 its revisions voided. The work goes on: new revisions and reviews are allowed.
 Nothing is ever disposed of by the application; only the owner of the system
 removes anything.
-
-**Depends on it:** `KeepingService.LegalHoldAsync`, `ON_LEGAL_HOLD`.
 
 ## 35 · How a document ends: cancelled, withdrawn, archived
 
@@ -705,9 +605,6 @@ document is reinstated (not while its project is archived), and a void is
 taken back while the revision is still the newest and the document not held.
 The people told of the end are told of its reversal.
 
-**Depends on it:** `DocumentService.EndAsync`, `ReinstateAsync`, `KeepingService.UnvoidAsync` (`WAS_RELEASED`, `NEVER_RELEASED`,
-`ARCHIVED_WITH_PROJECT`), `Supersession.TellWithdrawnAsync`, project status update.
-
 ## 36 · A project's code is always a published value
 
 **Clause:** Annex C *Configuration* (published value sets), §5 *Numbering*.
@@ -716,8 +613,6 @@ The people told of the end are told of its reversal.
 from the moment the project is created or its code changed. A document takes
 its project's code from the project it is created in; it is never typed and
 never refused for it. A code the administrator retired stays retired.
-
-**Depends on it:** `ProjectCodes.EnsurePublishedAsync`, called on project create and code change and before a document is numbered.
 
 ## 37 · Criticality is recommended by the document type
 
@@ -729,8 +624,6 @@ person creating it may choose another level when they see it differently, and
 the recommended one stays marked. Each level says in plain words what it means,
 with examples, and what it decides (who approves, how long it is kept), shown
 where it is chosen.
-
-**Depends on it:** `DOCUMENT_TYPES` property `criticality`, `CRITICALITY` property `meaning`, the create form.
 
 ## 38 · Before an action: automatic confirmation, notices, postponement
 
@@ -747,9 +640,6 @@ whoever plans the project with what changes, so a new schedule revision can
 follow. Document Control may take back a confirmation or a decision, with a
 reason, kept on the record. Every notice is kept: who was told, by whom, when.
 
-**Depends on it:** `ActionNotices`, `NoticeLog`, `Activity.RiskFrom`, `Requirement.RiskDays`, `ReadinessConfirmation.Automatic/Revoked*`,
-`ActivityDecision.Confirmed*/Reversed*`, `/notices`, `NotifyPanel`.
-
 ## 39 · Disciplines and documents of an action set by hand
 
 **Clause:** §14 *Planning and readiness of activities*.
@@ -761,9 +651,6 @@ discipline it concerns) or take one off. Anyone concerned may ask, by a
 transmittal to Document Control that names the action; Document Control
 answers every such request, by adding the document or saying why not, and the
 person who asked is told. Each change is kept in the activity log.
-
-**Depends on it:** `Transmittal.ActivityId/ActivityAnswered*`, `/transmittals/{id}/activity-answer`, `NeedRequest.TransmittalId`,
-`ADD_TO_ACTION` Home work, `LinksCard`, `needDefaults`.
 
 ## 40 · What people write is kept, and shown where it matters
 
@@ -777,9 +664,6 @@ sending a route back to an earlier step, or submitting corrected files keeps
 what was written before, beside what answers it. A text that is too long is
 refused, never cut.
 
-**Depends on it:** `Written` (`Revision.Unvoided*`, `Document.Ended*/Reinstated*/LegalHoldLifted*`), `Review.SendBacks`,
-`ReviewComment.ReclassifyNote`, `Package.AcceptNote`, the revision row, the review page's "Sent back".
-
 ## 41 · Management confirms requests and new people, where the project wants it
 
 **Clause:** §1.4 *Roles* and §14 *Planning and readiness of activities*.
@@ -792,9 +676,6 @@ Control checks the request, management (a function holding Manage) confirms
 or refuses with a reason, and the change is then applied. A person added is
 not on the project until confirmed. A request keeps the rule it was raised
 under.
-
-**Depends on it:** `ACTION_LINKS`, `PROJECT_PEOPLE`, `CONFIRM:{act}`, `Verbs.Manage`, `Transmittal.ActivityConfirm/ActivityProposal`,
-`Membership.PendingSince/Refused*`, `/activity-check|confirm|refuse`, `/people/pending|confirm|refuse`.
 
 ## 42 · A supplier's document is held by one side at a time
 
@@ -824,10 +705,6 @@ and issued, returned (rejected by the review). A notice about a supplier's
 missing document proposes that supplier's people, who are sent to the document
 itself.
 
-**Depends on it:** `Document.WithSupplier`, `HandBackRequest` (RETURN_FOR_UPDATE), `/documents/{id}/asks`,
-`/asks/{id}/answer`, `/documents/{id}/send-to-supplier`, `ASKED_OF_SUPPLIER`, `HELD_BY_US`, `ANSWER_HAND_BACK`,
-`SupplierHold.HandsToSupplier`, `Register.SupplierStage`, `supplierStage`, `NoticeRequest.OutsideLink`.
-
 ## 43 · A verdict list says four meanings, whatever its names
 
 **Clause:** §9.3 *Review outcomes*.
@@ -837,8 +714,6 @@ four things: accepted; accepted with comments, to take into the next revision;
 rejected, back to the author for a new revision; for information, its content
 not reviewed. What follows a verdict (release, a next revision, who holds a
 supplier's document) is read from that meaning, never from a code.
-
-**Depends on it:** `VERDICT_EFFECT` (`proceed`, `resubmit`, `information`), `verdictEffect`, `SupplierHold`.
 
 ## 44 · A supplier sees where its documents are needed, and nothing else of the plan
 
@@ -850,8 +725,6 @@ whether it is on time, at risk or overdue. It is never shown other parties'
 documents, our disciplines, confirmations, notices, or why an activity moved; a
 postponed activity reads "date to be confirmed". Every planned date reads the
 same way for everyone: ready, submitted, overdue, at risk, or days left.
-
-**Depends on it:** `/supplier-schedule`, `/needed`, `plannedState`.
 
 ## 45 · One "Follow up"; two families of transmittal; a receipt is ticked
 
@@ -874,9 +747,6 @@ The sender is the person signed in and the date is today: neither is asked.
 Recording one received outside the system is a tick, "Received from outside the
 system" (Document Control only), and only then are who sent it and when asked.
 
-**Depends on it:** `followsId` / `inReplyToId`, `REASONS_FOR_ISSUE.family`; the
-transmittal form and page.
-
 ---
 
 ## 46 · A function may be limited to a confidentiality level
@@ -894,27 +764,6 @@ published confidentiality list (its `level` where given, else its order).
 **Replaces** §3's "no clearance": clearance belongs to a function, never to a
 person. Confirmed by the owner.
 
-**Depends on it:** `Function.Clearance`, `Identity/Clearance.cs`,
-`DocumentQueries.Visible`; the clearance choice on Functions & permissions.
-
----
-
-## 47 · Correspondence is a deliverable type, released without review
-
-**Clause:** §3.1 *Document types*. Extends §19.
-
-**Must say:** the organization publishes a deliverable type **Correspondence
-(COR)**, numbered like engineering documents. Its document types are not
-reviewed before release: minutes (MOM), letters (LET), site and progress
-reports (SRP), photos and survey records (PHO), test certificates and
-inspection records (TCR), delivery notes (DLN), permits (PMT), vendor
-catalogues and manuals (VCM), requests for information (RFI). The organization
-may rename, retire or add types; whether each is reviewed stays the type's own
-answer (§19).
-
-**Depends on it:** `DemoSeed.EnsureCorrespondenceSetupAsync`;
-`releaseRevisionAction` (sends a not-reviewed type on).
-
 ---
 
 ## 48 · A released requirements list is read on release, all or nothing
@@ -928,22 +777,6 @@ requirements automatically. One wrong line applies nothing, and the control
 function is told why. The upload by Document Control or Plan (§32) remains the
 manual way.
 
-**Depends on it:** `Actions/RequirementsImporter.cs`, type property
-`readsRequirements`.
-
----
-
-## 49 · A needed document is shown whatever its state
-
-**Clause:** §14.3 *Baseline entries*. Extends §5.
-
-**Must say:** a document an action needs is listed from the register whatever
-its state — placeholder, in review, released, released and issued — with that
-state shown in the organization's own words. It counts as ready only as §5
-says; showing it tells people it exists, not that it may be used.
-
-**Depends on it:** `frontend/lib/actions/api.ts` (`latest`), the action page.
-
 ---
 
 ## 50 · Numbers from a range issued to a party; none without registering
@@ -954,8 +787,6 @@ says; showing it tells people it exists, not that it may be used.
 range has been issued to a party for the same start of number, it is drawn
 first, lowest range first, until exhausted; then the project counter resumes.
 A number already used is skipped, so the two never give the same number.
-
-**Depends on it:** `Numbering.FromRangeAsync`, `number_ranges`.
 
 ---
 
@@ -969,9 +800,6 @@ A reviewer who has not answered is warned once, the working day before the
 step falls due (the project's working days and time zone). A void revision's
 viewable copy is marked VOID on every page, like ON HOLD (§17).
 
-**Depends on it:** `Transmittals/Supersession.cs` (`/exposures/untold`),
-`Reviews/ReviewWarnings.cs`, `Stamping.MarkAsync`.
-
 ---
 
 ## 52 · An administrator who opens a project joins it, on the record
@@ -982,11 +810,9 @@ viewable copy is marked VOID on every page, like ON HOLD (§17).
 with the administrator function, and the audit trail says so. No one reads a
 project without being on it.
 
-**Depends on it:** `POST /api/admin/projects/{id}/join`.
-
 ---
 
-## 53 · A discipline that does not answer is escalated
+## 53 · A discipline that does not answer is notified again
 
 **Clause:** §14.8 *Verification*.
 
@@ -996,9 +822,6 @@ ahead without them, the discipline's people, management and the control
 function are all told, once, a number of working days after the day. The
 number is the project's (three unless it says otherwise). Nothing is marked on
 the action; the notice is the record.
-
-**Depends on it:** `ActionNotices.EscalateAsync`, project setting
-`ESCALATE_AFTER_DAYS`.
 
 ---
 
@@ -1024,66 +847,20 @@ answer replying to what it answers, so the thread is the record:
 Answering a transmittal one was asked on acknowledges it. Escalation and the
 automatic notices about an action stay notices (§53).
 
-**Depends on it:** `Actions/ActionLetters.cs`; `ActivityDecision.TransmittalId`,
-`Membership.ConfirmTransmittalId`.
-
 ---
 
-## 55 · Organizations working together, each with its own DELIOS
-
-> Added: an organization not on DELIOS may receive our transmittals by email at one address of theirs; only a reply
-> to such an email, from that address, comes back, and only as a reply waiting for Document Control to record it
-> as received (or set aside with why). Correspondence is never opened to a free project mailbox.
-
-
-**Before:** another organization took part as a party of ours: its people held accounts we made inside our
-organization, or nobody of theirs signed in and one of ours recorded for them.
-
-**Now:** three ways, and a company can move from one to the next without losing anything
-(docs/ORGANIZATIONS.md):
-
-- **Collaborator.** It has its own DELIOS organization. We invite it through someone we know there; its
-  administrator accepts or refuses, saying why. Its people then work on our projects with their own sign-in:
-  each gets an account here standing for them, holding the function we chose for their organization on that
-  project, linked to their own. Their administrator chooses who works on our project; we may change the
-  function or take them off. Switching someone off at home, or ending the link (either side, with why), stops
-  their accounts here at once. What they did stays, under the party we know them by.
-- **Guest.** It has no DELIOS. We make accounts for its people inside ours, and close them when the work is done.
-- **Not on DELIOS.** Nobody of theirs signs in. It has a code (in document numbers), and one of ours records
-  for them, with proof. If it registers later, our party is linked to it, and its people see everything recorded
-  for them, under the same code and numbers.
-
-A project belongs to the organization that opened it, and its data stays there. Each project says which
-organizations take part, the role each plays, and the function a collaborator's people start with. An
-organization that asks for two-step sign-in is entered from elsewhere only by someone who has it turned on at
-home. Each organization's administrators see, on its own page, the projects it opened and those it joined, its
-people on each, the organizations it works with, and the invitations between them; every invitation, answer and
-end is on both organizations' audit trails.
-
-**Depends on it:** `Organizations/` (`OrganizationLink`, `AccountLink`, `ProjectParty`), `User.HomeTenantId`,
-`POST /api/auth/switch`.
-
----
-
-## 56 · A list is checked before it is imported, and accounts are made by invitation
+## 56 · A list is checked before it is imported
 
 **Clause:** bulk loading (deliverable lists, teams, the distribution matrix, the published lists).
 
 **Must say:** a file brought in is always checked first, and the check writes nothing: it says, row by row and at
-the row the person sees (sheet and row), what writing it would do, with the same rules as registering one by one
-(the backend's own check, `POST /documents/check`). Writing names its count ("Register 41 documents"); rows with
-problems are left out only once that is said and agreed, and they can be downloaded to fix and import again. A person
-added from a list, or by anyone, never has a password chosen for them: they are emailed a link to choose their own
-(good for 7 days, once); where email is off, the link is handed to whoever added them. Joining still waits for
-management where the project asks for it (People to confirm).
+the row the person sees (sheet and row), what writing it would do, with the same rules as registering one by one. Writing names its count ("Register 41 documents"); rows with
+problems are left out only once that is said and agreed, and they can be downloaded to fix and import again.
 
 Every spreadsheet brought in is first checked as a file, before anything reads it: it is what its name says, a
 workbook unpacks within bounds and carries no macros, and the virus check finds nothing; when the check cannot be
 made the file is refused, never read unchecked. Every list taken out keeps a cell that would run as a formula as
 text. Each list can be taken out as it stands, and as an empty template.
-
-**Depends on it:** `SheetGuard` (no list is uploaded in Settings), `DocumentService.CheckRegisterAsync`, `Numbering.RefusalAsync`, `CreateUserRequest.Invite`,
-`PasswordReset.InvitationLink`, `lib/documents/forms-import.ts`.
 
 ---
 
@@ -1097,9 +874,6 @@ current now, and when and how each moved on since (replaced, released for the fi
 worked out from the record, never kept as a copy, and never answered when it cannot be. Another organization taking
 part reads its own deliveries against plan and what it owes and is owed (documents and answers), and nothing else of
 the reports.
-
-**Depends on it:** `ReportBuilder.AsOfAsync`, `ReportBuilder.ExchangeAsync`, `ReportIds.AsOf`, `ReportIds.Outside`,
-`ReportOptions.Party`.
 
 ---
 
@@ -1154,93 +928,41 @@ team and the matrix arrive as spreadsheets, often hundreds of lines, edited outs
 brought in is held to the same rules as a single entry, checked before anything is written, and what cannot be
 written is said and returned to be fixed (§56).
 
-**Depends on it:** `ReportBuilder` (`ProgressAsync`, `ExchangeAsync`, `AsOfAsync`), `Chart.Kind`, `Figure.Change`,
-reports print (`.report-print`). Not yet built: 58.1's planned-date history (`docs/gaps/conformance-reports.md`).
-
 ---
 
 ## 59 · The control function is a role on the project, never a job title
 
-- The Standard speaks of "Document Control" as a department. DELIOS names no function or job title in its rules: the
+- The Standard speaks of "Document Control" as a department. The rules name no function or job title in its rules: the
   **control function** is whoever holds CONTROL on the project, by their function or because the project's
   configuration names them to act as it (whatever their function). Confirmations are given by **whoever holds
   Manage**. The names people read are the organization's own functions.
 - Who joins a project is a project's choice: only the control function adds people (the default), or everyone on the
   project; and each addition is confirmed by whoever holds Manage (the default) or not. Asking for someone new is an
   information transmittal (Request), answered on the same thread.
-- Everyone on a project reads its directory: the organizations taking part and their people.
 
-## 60 · One code and one name for everything, across every organization
+## 60 · One code and one name for everything, never reused
 
-- The Standard makes codes unique within one register. DELIOS keeps them unique across every organization on it, and
-  never reuses one: a project's code and name, an organization's code and name, a contract number belong to one thing
+- The Standard makes codes unique within one register. They must be unique across every organization exchanging
+  records, and never reused: a project's code and name, an organization's code and name, a contract number belong to one thing
   for good, even after it changes, so every record carrying the old one keeps meaning it.
 - An organization has one code and one name everywhere: the history of what it sent and received reads under one name
   in every organization working with it.
 - A code is changed once, for a mistake (a project's, an organization's), and so are an organization's name, how it
   works with us and a contract's number; what was numbered with the old code keeps it. A project is renamed as often as
-  needed. Settings are kept at two levels: the organization's (its projects, opened, archived and reopened there) and
-  each project's.
+  needed.
 - A contract is between two organizations: the one signing it is known on the project by the project's code, the other
   by its contract number.
-- Beside its name, an organization carries an identifier with its country: its company registration, else its tax
-  number, else its number on a professional register, else a public body's own; or why it has none. A name can be
-  spelled ten ways; an identifier cannot. Before one is created, those that look like it are named, and the person
-  says whether it is one of them. An organization joining DELIOS proves its email domain and claims what others made for
-  it; duplicates are merged with every side's agreement, never deleted.
 
-## 61 · Lists are the project's; what was never used may still change
+## 61 · What was never used may still change
 
-- The Standard publishes one set of lists for the organization. In DELIOS the organization's lists are the default
-  every project starts from; a project may change its own, and that change stays the project's (it never becomes the
-  default for projects opened later).
 - Refines §23: a value or a list none of the project's records ever carried may be changed entirely or deleted; once
   used, it is renamed or retired only, and anything else is a new value or a new list. The log keeps every change.
-- Only whoever acts as the control function on the project changes its lists; a project with none leaves it to
-  whoever opened it, and nobody else.
-- A list holds sets. Each set names the deliverable types it serves; the default set serves every other type, so a
-  document always finds exactly one set of each list, and two sets switched on never serve the same type. This is how
-  supplier documents get their own document types, criticality levels or review outcomes without a second list.
 - A value, a set and a list of one's own are switched off rather than deleted once used: what carries them keeps them.
 
-## 62 · Verdicts are one list, its sets serving deliverable types
+## 63 · What a form insists on is held by the system
 
-- **One list of verdicts** (Review outcomes), kept where every list is kept; what were separate verdict lists are its
-  sets. A set names the deliverable types it serves, as any set does; a code is never repeated in the list.
-- **Each verdict states its meaning** (accepted, accepted with comments, rejected, for information) when it is
-  written, and every set in use keeps one that lets a revision be released.
-- **A review decides with the set serving its document's deliverable type**, unless its route names another; a route
-  naming a set that does not serve its documents is warned of, never refused. The review keeps the set it was offered.
-
-## 63 · What a form asks is the project's, and the system holds it
-
-- **Each project decides what its forms ask** (made required, asked, or left out; fields of its own), starting from
-  the organization's; its own version never changes when the organization's does.
 - **What a form insists on is refused by the system itself**, whichever way the record arrives (a person, an import,
   another tool), never only by the screen.
-- **A list the project creates is a field of the document** by that alone, offered for each deliverable type from the
-  set serving it, and read, filtered and shown like the app's own fields.
-
-## 64 · Two levels of settings: what a project may change is the organization's choice
-
-- **The organization's settings are the default of every project**: what the app gives, adapted by the organization.
-- **For each setting the organization decides, once, whether projects may change it**: fixed (every project uses the
-  organization's) or free (a project keeps its own version, which later changes of the organization never touch).
-- **What stays the same across projects by default is what other things depend on**: numbering, revision naming,
-  what verdicts, statuses and reasons mean, classification and keeping, functions and their rights; what is the
-  project's own work (its sub-projects, orders, routes, forms, who does what) is free.
-- **Making a setting fixed later undoes nothing** a project already changed: what a project changed is never
-  overridden by the organization.
-- **What each function may do may be the project's own** where the organization leaves it free (the functions
-  themselves stay the organization's, and so does the right to configure).
-- **Only a reset, from the organization's settings, puts a project back on the organization's**, for a mess, with why,
-  its control function told; **what the project held is kept**, and may be put back on it, with why.
-- **Lists are decided one by one**: each list has its own switch, and a project copies only the list it changes,
-  where the organization leaves it free; a list the organization keeps fixed is the same on every project. Lists that
-  describe projects themselves (their type, our role) are always the organization's.
-- **Forms are decided the same way, form by form**: one switch for all of them; a project copies only the form it
-  changes, where free. Opening a project and adding an organization are the organization's acts: their forms are
-  always the organization's.
 
 ## 65 · A numbering scheme that gave numbers keeps its shape
 
@@ -1251,52 +973,28 @@ reports print (`.report-print`). Not yet built: 58.1's planned-date history (`do
   numbers nothing. Numbers already given keep their shape for good.
 - **Until its first number, a scheme is entirely free**: a new organization changes every default it was given, parts,
   order and delimiter, and deletes what it does not want.
-- **Turning a scheme off for a deliverable type stops registering that type** until a scheme is chosen again; records
-  (transmittals, reviews, packages, actions, tags) fall back to a short form instead.
-
-## 66 · Organizations link by themselves once proven, never on their word
-
-- **The Standard assumes every party is on the same system.** In practice another organization works with us in one
-  of three ways: from its own DELIOS, through accounts we make for it, or not on DELIOS at all (one of ours records for
-  it). Nobody is forced to register.
-- **When an organization we recorded joins DELIOS and proves it is the one recorded** (its guest's email link, the
-  word of whoever recorded it, an agreed merge, or a guest making their own DELIOS with the account made for them),
-  every organization that recorded it is linked with it at once, and the accounts made for its people move to it:
-  same sign-in, now from home, everything they did kept. Nobody is invited or asked; the host's administrators are told.
-
-## 67 · How the project works, on two levels
-
-- **The Control room's answers** (who carries each act out, how releasing, stamping, readiness and the matrix work, the
-  risk window, escalation) follow the same two levels: where the organization keeps an answer fixed, a project reads it
-  and cannot change it; where free, the project chooses. A project keeps the answers it already held when an answer is
-  made fixed later.
-- **Functions are the organization's; what each may do is each project's by default** (owner): a project's control
-  function changes it there, for every function, its first change taking its own copy. The organization may make it
-  Fixed. Configure, the administrators' permission, is never given or taken on a project.
 
 ## 68 · One document, two numbers; and documents taken as they come
 
 **What the Standard assumes:** every document in the register carries our number, from our numbering, and what an
 outside organization sends is either a placeholder of ours filled or registered anew under our numbering.
 
-**What we built (owner):**
+**Must say:**
 - **Equivalence.** What arrives unplanned is matched by hand to one of our documents: if it is one of ours, what came
   becomes its content (a new submission of the revision being prepared, else its next revision); if it is none of ours,
-  it is made a document under our numbering. Either way their number is kept beside ours, one to one
-  (`number_equivalents`, `Documents/Equivalents.cs`), the register finds it under both, and the next arrival under the
+  it is made a document under our numbering. Either way their number is kept beside ours, one to one, the register finds it under both, and the next arrival under the
   same number of theirs proposes the same document. Taken back only with why, and kept.
 - **What lands in a register is what its organization accepted.** Placeholders filled become the document once the
   check accepts them; unplanned items once matched or registered; nothing is copied anywhere by itself.
 - **Numbering is never manual.** Matching chooses one of ours from the register; nobody types an equivalence. Nothing
   is asked of what is sent (a loose attachment has no number); whoever checks refuses what lacks what it needs.
 - **Documents taken as they come** (no placeholders): a project's exception, never the default; one way or the other, never both
-  (Control room; once either way is in use, the other is refused). Chosen by an administrator or the control function,
-  with what they are filed under (deliverable type, document type, discipline) and a warning read and ticked. Each
+  (once either way is in use, the other is refused). Chosen by an administrator or the control function,
+  with what they are filed under (deliverable type, document type, discipline). Each
   document is filed in its organization's package. The other organization sends each document under its own number and revision, with its status and review outcome; once the
-  check accepts it, it is in the register exactly so (`Document.AsReceived`, `Revision.TheirStatus` / `TheirOutcome`,
-  series `AS_RECEIVED`); returned, nothing is registered. Their next revision replaces the one before that we never
-  took further; we never start one of our own on it (AS_RECEIVED). A red warning says, wherever it shows (package,
-  transmittal, document, register stamp "as received", Control room): numbering, revisions, states and review
+  check accepts it, it is in the register exactly so; returned, nothing is registered. Their next revision replaces
+  the one before that we never took further; we never start one of our own on it. Wherever such a document shows, it
+  is said that numbering, revisions, states and review
   outcomes, search and reports, archiving and keeping no longer follow one rule.
 - **No step of a process is "optional".** The Standard's flows mark some steps optional; a step either always happens
   or happens under a stated condition: set by the project's configuration (shown on or off as it stands), or brought on
@@ -1306,43 +1004,23 @@ outside organization sends is either a placeholder of ours filled or registered 
 
 - **Every transmittal and every notification also goes by email**, showing what
   the app shows, so there is a double proof: inside the app, and outside by
-  email. Built: every notification queues its email (kept in the email log
-  with its state, by kind: transmittal, review, notification), and a
-  transmittal's email carries the whole transmittal as its page shows it
-  (number, project, subject, from, to, copied in, issued for, answer by,
-  message, every document with revision and status, the link). Switched off
-  until the installation names a mail server. Still to come: an organization
-  with nobody on the system receiving it by email directly (today one of ours
-  sends it, and the dispatch is recorded).
+  email. A transmittal's email carries the whole transmittal: number,
+  project, subject, from, to, copied in, issued for, answer by, message, every
+  document with revision and status.
 
 - **A data transmittal carries a document**, sent or received (the file that came,
   when received from outside); words alone are an information transmittal
   (request, RFI, answer, confirmation). Whether an answer is asked is the
   sender's choice each time, never assumed from the reason.
-- **Asset tags are numbered**, as packages are: from their scheme, by default
-  project code, TAG and a sequence (P1001-TAG-0001); a tag never changes.
-- **Revision naming is the organization's**: schemes of series (letters or
-  numbers, with a prefix and a start), a default, and per deliverable type
-  another (for example supplier documents P1, P2). A document keeps counting
-  the way it began; a series in use is never recounted.
-- **A verdict list may be the organization's own** (for example for supplier
-  documents): a list says it is verdicts, each value says what it means, and a
-  route serving supplier documents decides from it.
+- **Asset tags are numbered** by a published scheme, as packages are; a tag never changes.
+- **A document keeps counting its revisions the way it began**; a series in use is never recounted.
 - **Phase is document metadata**, and revisions are named per phase: one line
   per phase (letters, numbers, prefix, start) and one default line for a
   phase without its own; each revision keeps the phase it was made in.
-- **Verdict lists are made as lists of verdicts**: each verdict states its
-  meaning when it is written; a list with no accepting verdict cannot be
-  published.
-- **Checks are numbered by the system** by what they look at (settings,
-  document details, revisions, reviews, storage, schedule, packages), not by
-  the standard's clauses.
-- **A supplier package can be delivered** like any delivery package.
+- **A list of verdicts with no accepting verdict cannot be published** (§43).
 - **Planned dates keep their history** (58.1): each change of a document's planned date kept with the day it was
   set, so lateness can be read against the baseline or the plan of any day. Today a past week is read against the
   plan as it stands now, and says so.
-- **DCIOM** (a governance framework of measures, thresholds and advice) is on hold by the owner's choice: nothing
-  of it is built. Notes in `docs/gaps/dciom.md`.
 
 ## 69 · Advice from a set the route names
 
@@ -1359,69 +1037,116 @@ answered by an organization, a function, named people, or whoever the distributi
 discipline, alone or together, each narrowing the others. A route's days are a default (five in all, deciders given
 more), never a limit.
 
-## 71 · What each function may do, said in one place
-
-A function's permissions are read and changed in one place: the grid (a permission on every document) and, opened
-from the function's name, every rule it holds for certain documents only, each named by its field ("Discipline Civil").
-What each permission allows is always written under the grid, never left to a hover. A function's name may be
-corrected; its code never changes. A function has no department of its own (the field shown before was never kept).
-
-A project changes what each function may do by default; the organization may fix it for all. Configure, the
-administrators' permission, is given and taken only in the organization's Settings.
-
 ## 72 · Clearance, the one confidentiality rule
 
 Who reads a confidential document is said once: by each function's clearance (the highest level its people read). A
 document above it is read by them only if named on it, if they registered it, or if it was sent to them. Levels
-"restricted to named readers" are dropped: they said the same thing a second way. A function's opened card shows only
-its rules for certain documents; on every document is said by the grid's ticks alone.
-
-## 73 · A person's email is proven before it counts
-
-An email given to someone by an administrator counts only once its owner opens a link sent to that address; until
-then the account keeps the email it had, which is told of the change. Sign-in by the organization's own account
-matches people by email, so an unproven address would let in, or shut out, the wrong person.
+"restricted to named readers" are dropped: they said the same thing a second way.
 
 ## 74 · One transmittal for every ask, its decision taken where it belongs
 
 Whatever one person asks of another on a project (a document or a discipline added to an action, someone to join,
-documents asked back from a supplier) is a transmittal, written on the one New transmittal form. What the ask fixes is
-filled in and shown, never chosen, so it cannot be got wrong: its kind and type (information, request), who it goes to
+documents asked back from a supplier) is a transmittal. What the ask fixes is filled in, never chosen, so it cannot be got wrong: its kind and type (information, request), who it goes to
 where the ask names who answers it (copies stay free), its subject, and the first line of its message; the person only
-writes why. The request then names its decision for whoever is asked ("Confirm", "Refuse", "Add it", "Nothing to add",
-"Confirm the postponement", "Deliver it as it stands"), each leading to the place where it is taken (the action, People
-to confirm, the package), already chosen, because the decision needs what is known there. Anyone else reads who it waits
+writes why. The request names the decision it asks of whoever is asked, taken where what it needs is known (the action, the
+people to confirm, the package). Anyone else reads who it waits
 for, and once answered, by whom, when, what, and the transmittal that answered it. Decisions are never taken on the
 request itself.
 
-## 75 · The stamp, a review's engagement, set on a card of its own; families only organise
+## 75 · The stamp is a review's engagement, the same for every document
 
-A stamp on a PDF holds legally: it says what a review decided. It is set in one place, the same for every document: the
-organization's card is every project's default, and a project changes its own where the organization leaves it free.
-The card says whether PDFs are stamped at all; when a review stamps (the revision it released, on; the one it returned,
+A stamp on a PDF holds legally: it says what a review decided. It is set once, the same for every document: whether PDFs are stamped at all; when a review stamps (the revision it released, on; the one it returned,
 on; released without a review, nothing to stamp); what the stamp shows (always the organization, the project and the
 outcome alone, in the colour the register gives the revision's state; who gave it and when unless every grade given is
 shown; then, as chosen, every grade given with who and when, what it is released for, the document's number and
-revision, the review's number, the time with each date, and why, the comments on a last page); the words at its foot;
-the corner it sits in (top right by default); and how large it is drawn. The marks across the page (superseded, void, on hold) are kept as they were.
+revision, the review's number, the time with each date, and why, the comments on a last page); and the words at its foot. It is
+never laid over the drawing, and it says nothing it was not given. The marks across the page (superseded, void, on hold) are kept as they were.
 
-Document families group document types and help with recommendations; they decide nothing, so they carry no stamp
-rule and have no Settings page: they are a set in Types & sets, read on Help.
+## 80 · Working days are the site's
 
-**Depends on it:** `POLICY_PDF_STAMP`, `STAMP:RELEASED|RETURNED|SUPERSEDED|VOID|HELD`, `STAMP_SHOW:<what>`,
-`STAMP_COMMENTS`, `STAMP_PLACE`, `STAMP_SIZE`, `STAMP_NOTE` (Settings → The stamp, both levels); `Stamping.StampChoices`, `FaceAsync` (worker);
-`DOC_FAMILIES` (Types & sets).
+The Standard counts review and answer periods in working days without saying whose. They are counted at the site:
 
-## 76 · What a project starts with, and what it may change, said in one place each
+- **Each project says where its site is:** its country, its time zone and its days off each week. Today and every due
+  day are counted in the site's time zone; due days skip its days off.
+- **Public holidays are on the organization's calendar**, each kept for a country or for every country; a project skips those of its country, and may mark its own days off (a site shutdown, a local
+  holiday) where the organization leaves it free.
 
-The Standard has each project write down how it works. In DELIOS the organization says it once for every project:
-its Control room is the same console as a project's, every step with its answers, and is what a new project starts
-with (Defaults for new projects, a page of its own with the whole form). A second page, What projects may change,
-lists every setting with one switch each: Fixed, every project uses the organization's as it is; Free, a project may
-take its own copy, which the organization's later changes never touch. Making a setting fixed later never undoes
-what a project already changed. A project already open keeps its own answers when the defaults change, and goes
-back to them only by its own "Back to the defaults". What only a project knows (who acts as its control function, its
-schedule's days, how its suppliers send) stays the project's.
+## 81 · Packages in packages: the arborescence clients ask for
 
-**Depends on it:** `PROJECT_DEFAULTS`, `LIBERTY:<key>` (`Settings/Liberty.cs`); `/organization/settings/flow`,
-`/organization/defaults`, `/organization/settings/may-change`.
+The Standard knows packages as flat sets of documents. Clients often hand down an arborescence (a package broken into
+parts, each into smaller parts). The register keeps it as it is asked:
+
+- **A package may hold packages of its own kind**, as deep as wanted, beside its own documents: a delivery package only
+  delivery packages, a supplier's package only packages of the same supplier (its people see the tree).
+- **Each package keeps its own number, delivery, check and acceptance.** Above, a package counts what is under it (its
+  documents and its branches'), and reads complete once every branch is delivered and accepted; delivering one never
+  delivers another.
+- **Where it sits is shown, never written into its number:** the packages above it lead to its name; it may be moved
+  inside another, or to the top, while it is open (a supplier's until it is shared), never inside one of its own
+  branches; every move is recorded with where it was. A package holding packages is not deleted.
+- **A document sits in one package of a tree** (and in one package of a supplier), never counted twice: moved into a
+  branch, it leaves the package it was in; once delivered, or sent to the supplier, it stays where it went. Two
+  separate delivery trees may still share a document.
+
+## 82 · What another organization reads of a document it was sent
+
+The Standard lets a recipient read what was transmitted to it; it does not say what else of the document comes with it.
+
+- **Of a document of ours, another organization reads only the revisions a transmittal carried to its people**: never a
+  revision in preparation, never one sent to someone else, and only those revisions' files as they stand (the newest
+  submission: never a draft replaced before it went). Our reviews of it, our
+  exchanges about it with others and the packages it sits in are ours; it reads the transmittals it may open and the
+  supplier packages shared with it.
+- **Of its own documents** (it is their originator) it reads everything it read before.
+- **A review is read by another organization** once it decided, of its own document (owner: "they see only decided
+  reviews"; never one still running, its advice and drafts ours), or when it answers one of the review's steps; a
+  hand-over of a step (delegation) is ours alone.
+- **Guests and other organizations see only what was shared with them** (owner): in the register too, one of our
+  documents reads at the newest revision sent to them, with no verdict, decider or package of ours.
+- **Who else we work with is ours**: another organization's people read, of the organizations we deal with, only their own.
+
+## 84 · A package is delivered at the end, to whom we choose, and read only by whoever receives it
+
+The Standard has a package name its recipients when it is made and go to them on its delivery. Real projects decide
+whom a package goes to at the end, and may hand the same package to more than one party.
+
+- Two kinds: a **supplier package** is an exchange with that supplier (placeholders, uploads, checks, reviews); **our
+  package** files our own documents, managed in our space. Either may be delivered once complete.
+- Delivering is a **data transmittal**, its recipients chosen when it is written; nobody is named when the package is
+  made. It carries the package **and every package under it**, each document at the revision that goes, and nothing
+  else: none can be added or taken out on the transmittal. It may be delivered again, as it stands, to someone else.
+- A package delivered is the **receiver's to read, never to change or return**: they see it as its sender does (its
+  tree and lines) and ask what they need by an information transmittal.
+
+## 85 · Who outside reads the register, a person forgotten, and how long reading is kept
+
+The Standard assumes the register is run by the organization itself. Three things touch the record that it never
+names; each is settled so the record stays whole and its custody clear.
+
+- **The service provider reads nothing by default.** Whoever runs the register for the organization sees counts only and
+  who answers for the organization. To help, it is let in by one of the organization's administrators, for a set time
+  (1 to 30 days), with why, ended whenever they choose; it then acts as a named administrator, the administrators are told when it enters, and every act and every reading is in the organization's own
+  audit trail under that name. Access ends by itself when the time is over.
+- **A person forgotten leaves the record whole.** At their request (data protection law), their name and email are
+  replaced ("Former user …") and their account closed; what they did stays in the record under the name it was done
+  by, because the register must prove who did what (the law's own exception for keeping records).
+- **Reading and changing are kept differently.** Every act that changes the record is kept for good, in a chain that
+  proves nothing was altered. Who opened or downloaded a document is kept for as long as the organization chooses
+  (3 months to the life of the register), then removed; it never enters the chain. Downloads are always kept for that
+  period and watched (one person past 200 files in an hour: the administrators are told).
+
+## 86 · Uncontrolled documents: kept as they came, listed apart, clearly marked
+
+The Standard speaks of controlled information only. A project also keeps files nobody controls (owner: "we forgot that
+this app also manages uncontrolled"), and they must never be mistaken for the project's documents.
+
+- **Nothing uncontrolled is made here** (owner: "we will just keep them if we receive in a transmittal… that is as far
+  as we can do"): no library, no folders, no working copies. What is kept uncontrolled is only what came in, and the
+  proof attached to an act.
+- **Listed apart, clearly marked "uncontrolled"** (owner): beside the register, its own list, each file with how it came,
+  on what (a link to that transmittal, review or list), from which organization, by whom and when. Its kinds (owner:
+  "make those types of docs for uncontrolled docs"): received on a transmittal and never registered nor matched to one
+  of ours; kept with what arrived; the covering letter of what came from outside the system; the proof that something
+  of ours went out; the proof of an answer recorded for another organization; a reply by email set aside; a list file
+  uploaded on the Schedule.
+- **One that matters is registered**, from its transmittal, and becomes controlled: it then leaves the list.

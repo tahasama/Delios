@@ -17,6 +17,8 @@ export function SettingsCrumb({ pages }: { pages: { href: string; title: string 
     .sort((a, b) => b.href.length - a.href.length)[0];
   if (!page) return null;
   const deeper = path !== page.href;
+  // The side menu lights the page; the way back is said only deeper than it.
+  if (!deeper) return null;
   return (
     <nav aria-label="Where you are" className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
       <Link href="/settings" className="inline-flex items-center gap-1 font-semibold text-link hover:underline">

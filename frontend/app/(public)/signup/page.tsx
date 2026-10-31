@@ -138,6 +138,16 @@ export default function SignupPage() {
                 it with you: give that account&rsquo;s password. You keep every project you are on at {guest.host}, as a collaborator from now on.
               </p>
             ) : null}
+            {/* The terms and the data processing agreement are accepted for the organization; kept with their version and the day. */}
+            <label className="flex items-start gap-2 text-xs leading-5 text-slate-600">
+              <input type="checkbox" name="acceptTerms" required className="mt-0.5" />
+              <span>
+                For my organization, I accept the{" "}
+                <Link href="/legal/terms" target="_blank" className="font-semibold text-link hover:underline">terms of service</Link> and the{" "}
+                <Link href="/legal/dpa" target="_blank" className="font-semibold text-link hover:underline">data processing agreement</Link>, and I have read the{" "}
+                <Link href="/legal/privacy" target="_blank" className="font-semibold text-link hover:underline">privacy notice</Link>. DELIOS is for businesses, not consumers.
+              </span>
+            </label>
             <MissingSummary missing={missing} />
             <BotCheck renew={state} />
             {state?.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}

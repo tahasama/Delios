@@ -1,4 +1,4 @@
-import { documentPage, documentContext } from "@/lib/documents/api";
+import { packageLines } from "@/lib/packages/api";
 import type { PackageView } from "@/lib/types";
 import { supplierStage, supplierStamp, type SupplierStage } from "@/lib/core/state-names";
 import { stateLook } from "@/lib/core/state-look";
@@ -63,6 +63,8 @@ function stateOf(revisionState: string | null): SupplierState {
  */
 export async function supplierRows(t: { projectId: string }, pkg: PackageView, detail = false): Promise<SupplierRow[]> {
   const now = Date.now();
+  // In full: every line read at once from the backend, never document by document.
+  const lines = detail ? new Map((await packageLines(t, pkg.id).catch(() => [])).map((one) => [one.documentId, one])) : null;
   return Promise.all(pkg.members.map(async (m): Promise<SupplierRow> => {
     const due = m.dueDate ? new Date(m.dueDate) : pkg.completionDate ? new Date(pkg.completionDate) : null;
     const light: SupplierRow = {
@@ -73,34 +75,28 @@ export async function supplierRows(t: { projectId: string }, pkg: PackageView, d
     };
     light.late = light.state === "NOT_SENT" && !!due && due.getTime() < now;
     if (!detail || !m.latestRevision) return light;
-    const [doc, context] = await Promise.all([
-      documentPage(t, m.documentId).catch(() => null),
-      documentContext(t, m.documentId).catch(() => null),
-    ]);
-    const rev = doc?.revisions[0];
-    if (!doc || !rev) return light;
-    const cycle = rev.cycles[rev.cycles.length - 1] ?? null;
+    const line = lines?.get(m.documentId);
+    if (!line?.revisionId) return light;
     // Sent back to the supplier after the control function took it back: with them, not returned.
-    const resent = rev.backend.state === "CORRECTING" && supplierStage(true, { state: rev.backend.state, resentAt: rev.backend.resent?.at, returnedAt: rev.backend.returnedAt }) === "SENT";
-    const state = resent ? "NOT_SENT" : stateOf(rev.backend.state);
-    const incoming = (context?.transmittals ?? [])
-      .filter((one) => one.direction === "INCOMING" && one.revisionId === rev.id)
-      .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))[0] ?? null;
-    const arrivedOnTime = rev.submittedAt && due ? rev.submittedAt.getTime() <= due.getTime() : rev.submittedAt ? true : null;
+    const resent = line.revisionState === "CORRECTING" && supplierStage(true, { state: line.revisionState, resentAt: line.resentAt ?? undefined, returnedAt: line.returnedAt }) === "SENT";
+    const state = resent ? "NOT_SENT" : stateOf(line.revisionState);
+    const submittedAt = line.submittedAt ? new Date(line.submittedAt) : null;
+    const arrivedOnTime = submittedAt && due ? submittedAt.getTime() <= due.getTime() : submittedAt ? true : null;
+    const issued = line.issuedAt ?? line.releasedAt;
     return {
-      doc: { id: doc.id, docNumber: doc.docNumber, title: doc.title, isPlaceholder: doc.isPlaceholder },
-      revision: { id: rev.id, value: rev.value, submittedAt: rev.submittedAt, statusCode: rev.statusCode },
+      doc: { id: line.documentId, docNumber: line.number, title: line.title, isPlaceholder: line.isPlaceholder },
+      revision: { id: line.revisionId, value: line.revision!, submittedAt, statusCode: line.statusCode },
       state, due,
       late: state === "NOT_SENT" ? !!due && due.getTime() < now : arrivedOnTime === false,
       arrivedOnTime,
-      reason: state === "REJECTED" || state === "RETURNED" ? rev.backend.returnedReason ?? cycle?.outcomeNote ?? null : null,
-      outcome: cycle?.outcome ?? null,
-      transmittal: incoming ? { id: incoming.id, number: incoming.number } : null,
-      submissions: doc.revisions.filter((r) => r.submittedAt).length,
-      issued: state === "APPROVED" ? rev.issuedAt ?? rev.releasedAt : null,
+      reason: state === "REJECTED" || state === "RETURNED" ? line.returnedReason ?? line.outcomeNote ?? null : null,
+      outcome: line.outcome,
+      transmittal: line.incomingId && line.incomingNumber ? { id: line.incomingId, number: line.incomingNumber } : null,
+      submissions: line.submissions,
+      issued: state === "APPROVED" && issued ? new Date(issued) : null,
       // The comments of the latest revision's reviews — the ones its verdict
       // rests on. A revision not yet reviewed has none, and shows none.
-      comments: rev.cycles.flatMap((cy) => cy.comments.map((one) => ({ by: one.authorName, text: one.text, blocking: one.progressionPreventing, settled: one.status === "CLOSED", review: cy.number, rev: rev.value }))),
+      comments: line.comments,
     };
   }));
 }

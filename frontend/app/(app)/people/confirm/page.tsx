@@ -22,7 +22,7 @@ export default async function PeopleToConfirmPage({ searchParams }: { searchPara
   const ctx = await requireScope();
   // Opened from the request transmittal (`Asks`): the person it names, its choice made.
   const { decide, as: chosen } = await searchParams;
-  const rows = await api<Pending[]>(projectPath(ctx, "/people/pending")).catch(() => [] as Pending[]);
+  const rows = await api<Pending[]>(projectPath(ctx, "/people/pending"), { keep: { areas: [] } }).catch(() => [] as Pending[]);
 
   return (
     <div className="space-y-4">

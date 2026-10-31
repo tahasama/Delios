@@ -40,7 +40,7 @@ public sealed class RequirementsImporter(
     /// <summary>How the list is filed among the uploaded lists, so its history reads in one place.</summary>
     public const string Kind = "DOCUMENT_REQUIREMENTS";
 
-    private static readonly Dictionary<string, string[]> Columns = new()
+    internal static readonly Dictionary<string, string[]> Columns = new()
     {
         ["department"] = ["department", "departments"],
         ["action"] = ["action code", "activity code", "activity id"],
@@ -58,14 +58,18 @@ public sealed class RequirementsImporter(
         ["riskDays"] = ["risk window (days)", "risk window", "risk days", "at risk days before"],
     };
 
-    private static readonly string[] Ours = ["", "OURS", "US", "INTERNAL", "INTERNAL ENGINEERING", "OUR ENGINEERING", "ENG"];
+    internal static readonly string[] Ours = ["", "OURS", "US", "INTERNAL", "INTERNAL ENGINEERING", "OUR ENGINEERING", "ENG"];
 
     private sealed record Row(
         int Line, string ActionCode, string Department, string? DocNumber, string? Title, string? Discipline, string? DocType,
         string? Supplier, string Status, LocalDate? NeededBy, string? Subproject, string? Po, string? Asset, int? RiskDays = null);
 
     /// <summary>Whether a released revision is a requirements list, by its document's type.</summary>
-    public static async Task<bool> IsListAsync(DeliosDbContext db, Guid documentId, CancellationToken cancellationToken)
+    public static async Task<bool> IsListAsync(DeliosDbContext db, Guid documentId, CancellationToken cancellationToken) =>
+        // The document the control function chose, once one is chosen; before that, a document whose type is marked so.
+        await ListSources.IsChosenAsync(db, documentId, Kind, () => ByTypeAsync(db, documentId, cancellationToken), cancellationToken);
+
+    private static async Task<bool> ByTypeAsync(DeliosDbContext db, Guid documentId, CancellationToken cancellationToken)
     {
         var docType = await db.Documents.AsNoTracking().Where(d => d.Id == documentId).Select(d => d.DocType).SingleOrDefaultAsync(cancellationToken);
         if (docType is null) return false;
@@ -164,6 +168,7 @@ public sealed class RequirementsImporter(
             SourceName = label,
             SourceSize = file?.Size,
             SourceHash = file?.Sha256,
+            FileId = file?.Id,
             Notes = failed ? null : summary,
             CreatedById = revision.AuthoredById,
             CreatedByName = "Released revision",
@@ -300,10 +305,20 @@ public sealed class RequirementsImporter(
         var supplied = deliverables.FirstOrDefault(AsksOriginator)?.Code ?? "SUP";
         var ours = deliverables.Any(v => v.Code == "ENG") ? "ENG" : deliverables.FirstOrDefault(v => !AsksOriginator(v))?.Code ?? "ENG";
         var source = await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == project.Id, cancellationToken);
-        var lead = source?.DefaultLeadDays ?? 7;
+        var lead = (await ScheduleDays.ForProjectAsync(db, project.Id, cancellationToken)).Lead;
         var activities = await db.Activities.Where(a => a.ProjectId == project.Id).ToDictionaryAsync(a => a.Code, cancellationToken);
         var register = await db.Documents.AsNoTracking().Where(d => d.ProjectId == project.Id).ToDictionaryAsync(d => d.Number, d => d.Id, cancellationToken);
         var access = await RegistrarAsync(project, cancellationToken);
+        // Read once, not once a line (a list runs to thousands): the project's needs, its tags and which documents they
+        // describe. Kept up to date as lines are read, so two lines naming the same new tag make it once, and a need one
+        // line adds or keeps is never taken off by the next line on the same action and document.
+        var needs = (await db.Requirements.Where(n => n.ProjectId == project.Id).ToListAsync(cancellationToken))
+            .GroupBy(n => (n.ActivityId, n.DocumentId)).ToDictionary(g => g.Key, g => g.ToList());
+        var assets = (await db.Set<Asset>().Where(a => a.ProjectId == project.Id).ToListAsync(cancellationToken))
+            .GroupBy(a => a.Code, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var described = (await db.Set<DocumentAsset>().AsNoTracking().Where(l => l.ProjectId == project.Id)
+            .Select(l => new { l.DocumentId, l.AssetId }).ToListAsync(cancellationToken)).Select(l => (l.DocumentId, l.AssetId)).ToHashSet();
+        var listedHere = new HashSet<Requirement>();
         int created = 0, kept = 0, changed = 0, dropped = 0;
         var keep = new Dictionary<(Guid Activity, string Department), HashSet<Guid>>();
 
@@ -326,24 +341,26 @@ public sealed class RequirementsImporter(
 
             if (row.Asset is { } code)
             {
-                var asset = await db.Set<Asset>().SingleOrDefaultAsync(a => a.ProjectId == project.Id && a.Code == code, cancellationToken);
-                if (asset is null)
+                if (!assets.TryGetValue(code, out var asset))
                 {
                     asset = new Asset { TenantId = project.TenantId, ProjectId = project.Id, Code = code, Name = code };
                     db.Add(asset);
+                    assets[code] = asset;
                 }
-                if (!await db.Set<DocumentAsset>().AnyAsync(l => l.DocumentId == documentId && l.AssetId == asset.Id, cancellationToken))
+                if (described.Add((documentId, asset.Id)))
                     db.Add(new DocumentAsset { TenantId = project.TenantId, ProjectId = project.Id, DocumentId = documentId, AssetId = asset.Id, CreatedByName = label, CreatedAt = now });
             }
 
-            var existing = await db.Requirements.Where(n => n.ActivityId == activity.Id && n.DocumentId == documentId).ToListAsync(cancellationToken);
+            if (!needs.TryGetValue((activity.Id, documentId), out var existing)) needs[(activity.Id, documentId)] = existing = [];
             var same = existing.FirstOrDefault(n => string.Equals(n.Department, row.Department, StringComparison.OrdinalIgnoreCase)
                 && n.RequiredStatuses.SequenceEqual([row.Status]) && n.FixedDate == row.NeededBy);
-            if (same is not null) { kept++; same.RiskDays = row.RiskDays; }
+            if (same is not null) { kept++; same.RiskDays = row.RiskDays; listedHere.Add(same); }
             else
             {
-                if (existing.Count > 0) { db.Requirements.RemoveRange(existing); changed++; }
-                db.Requirements.Add(new Requirement
+                // What the action held for this document before the list, not what an earlier line of it listed.
+                var before = existing.Where(n => !listedHere.Contains(n)).ToList();
+                if (before.Count > 0) { db.Requirements.RemoveRange(before); existing.RemoveAll(before.Contains); changed++; }
+                var need = new Requirement
                 {
                     TenantId = project.TenantId,
                     ProjectId = project.Id,
@@ -358,7 +375,10 @@ public sealed class RequirementsImporter(
                     Department = row.Department,
                     CreatedByName = label,
                     CreatedAt = now,
-                });
+                };
+                db.Requirements.Add(need);
+                existing.Add(need);
+                listedHere.Add(need);
             }
             var key = (activity.Id, row.Department.ToUpperInvariant());
             if (!keep.TryGetValue(key, out var listed)) keep[key] = listed = [];
@@ -368,10 +388,11 @@ public sealed class RequirementsImporter(
         await db.SaveChangesAsync(cancellationToken);
 
         // What an (activity, department) the list covers no longer lists is no longer needed.
+        var byDepartment = needs.Values.SelectMany(n => n).Where(n => n.Department != null)
+            .ToLookup(n => (n.ActivityId, n.Department!.ToUpperInvariant()));
         foreach (var ((activityId, department), listed) in keep)
         {
-            var stale = await db.Requirements.Where(n => n.ActivityId == activityId && n.Department != null && n.Department.ToUpper() == department
-                && !listed.Contains(n.DocumentId)).ToListAsync(cancellationToken);
+            var stale = byDepartment[(activityId, department)].Where(n => !listed.Contains(n.DocumentId)).ToList();
             dropped += stale.Count;
             db.Requirements.RemoveRange(stale);
         }

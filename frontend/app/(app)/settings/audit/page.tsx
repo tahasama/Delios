@@ -39,7 +39,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       lede={<p>
         Every controlled act, in the order it happened: who did it, what it was done to, and when. The evidence for one
         document is on the document; this is the whole memory. What is kept about reading and sign-ins is the
-        organization&rsquo;s choice (<Link href="/organization/settings/tracking" className="font-semibold text-link hover:underline">organization&rsquo;s page</Link>).
+        organization&rsquo;s choice (<Link href="/organization/settings/security#tracking" className="font-semibold text-link hover:underline">organization&rsquo;s page</Link>).
       </p>}
       reading={log ? readingLine({ from: sp.from, to: sp.to, kindLabel: AUDIT_KINDS.find((k) => k.key === sp.kind)?.label, q: sp.q })
         : "The audit trail could not be read just now. Try again in a moment."}

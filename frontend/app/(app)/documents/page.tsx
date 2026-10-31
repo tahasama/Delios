@@ -1,13 +1,14 @@
 import { plannedState, plannedProgress } from "@/lib/actions/planned-state";
+import { listSources } from "@/lib/actions/list-sources";
 import { projectAsset } from "@/lib/records/api";
 import { packageByNumber } from "@/lib/packages/api";
 import type { SupplierStage } from "@/lib/core/state-names";
 import { requireScope } from "@/lib/core/scope";
 import { api, projectPath } from "@/lib/client";
 import { getMe } from "@/lib/account/api";
-import type { ActivitySummary, RegisterPage } from "@/lib/types";
+import type { ActivitySummary, RegisterPage, RegisterUsed } from "@/lib/types";
 import { RegisterPlate } from "./register-plate";
-import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_STATE_LABEL, DOC_MEANING, REV_STATES, REV_MEANING, type DocState } from "@/lib/core/standard";
+import { OUTCOME_CONSEQUENCES, DOC_STATES, DOC_MEANING, REV_STATES, REV_MEANING } from "@/lib/core/standard";
 import { getSet } from "@/lib/settings/config";
 import { DocumentRegister } from "./document-register";
 import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
@@ -81,7 +82,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const { policy } = await import("@/lib/settings/control-activities");
   const together = (await policy(scope, "POLICY_RELEASE")) === "TOGETHER";
   // What this organization calls each state; the states themselves are fixed.
-  const { stateNames, stateName, supplierStageName, supplierStamp, SUPPLIER_STAGES } = await import("@/lib/core/state-names");
+  const { stateNames, stateName, supplierStageName, docStateName, supplierStamp, SUPPLIER_STAGES } = await import("@/lib/core/state-names");
   const names = await stateNames(scope);
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
@@ -121,24 +122,29 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const page = Math.max(1, Number(sp.page) || 1);
 
   // The register itself, filtered, sorted and cut into pages by the backend.
-  const [register, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, phases, activities, views] =
+  const [register, used, disciplines, types, statuses, verdictSet, supplierCodes, poCodes, criticalities, confidentialities, retentions, deliverableTypes, phases, activities, views] =
     await Promise.all([
       api<RegisterPage>(projectPath(scope, "/register"), {
+        keep: { areas: ["docs", "reviews", "transmittals", "packages", "plan"] },
         query: {
           q, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, criticality, confidentiality,
           deliverable, phase: sp.phase ?? "", action: sp.action ?? "", own: ownFilter, on: dateOn, from: sp.from ?? "", to: sp.to ?? "", view, sort, dir, page, per: perPage,
         },
       }),
+      // What the filters offer, kept until a document changes: never worked out again with every page or filter.
+      api<RegisterUsed>(projectPath(scope, "/register/used"), { keep: { areas: ["docs"] } }),
       getSet("DISCIPLINES"), getSet("DOCUMENT_TYPES"), getSet("STATUSES"), getSet("REVIEW_OUTCOMES"), getSet("SUPPLIER_CODES"), getSet("PURCHASE_ORDERS"),
       getSet("CRITICALITY"), getSet("CONFIDENTIALITY"), getSet("RETENTION_CLASSES"), getSet("DELIVERABLE_TYPES"), getSet("PHASES"),
       // Only the activities that actually owe something: an action nobody has
       // listed a document against would filter to an empty register.
       api<ActivitySummary[]>(projectPath(scope, "/activities")).catch(() => [] as ActivitySummary[]),
       // The questions this reader keeps, oldest first so the list stays put.
-      api<{ id: string; name: string; query: string; createdAt: string }[]>(projectPath(scope, "/register/views")).catch(() => []),
+      api<{ id: string; name: string; query: string; createdAt: string }[]>(projectPath(scope, "/register/views"), { keep: { areas: [] } }).catch(() => []),
     ]);
   // A filter on a list of several sets offers every set's values under the set's name and whom it serves (owner).
   const inSets = await setGrouping(scope);
+  // The types that describe equipment (Types & sets, on the type), offered together: an asset's documents (owner).
+  const equipmentTypes = types.filter((t) => t.status !== "RETIRED" && t.props.describesAsset === true).map((t) => t.code);
   // The filters this person keeps shown (the Filters menu), else the usual ones.
   // The project's own fields: a column when asked for in the register, a filter when it has choices.
   const ownAsks = (await ownFields(scope, "DOCUMENT")).filter((f) => f.inRegister || f.control === "CHOICE");
@@ -153,8 +159,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const current = Math.min(register.page, pages);
 
   // Filters offer what the register holds, not every value the organisation publishes.
-  const usedDisciplines = new Set(register.lists.usedDisciplines);
-  const usedTypes = new Set(register.lists.usedDocTypes);
+  const usedDisciplines = new Set(used.usedDisciplines);
+  const usedTypes = new Set(used.usedDocTypes);
   const disciplineLabel = new Map(disciplines.map((d) => [d.code, d.label]));
   const typeLabel = new Map(types.map((t) => [t.code, t.label]));
   const retentionLabel = new Map(retentions.map((item) => [item.code, item.label]));
@@ -173,7 +179,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const supplierView = !user.isInternal && !!user.partyCode;
   const hostName = supplierView ? (await getMe())?.tenant.name ?? "Our client" : null;
   // The project's risk window: from it, a planned date not met yet reads "at risk".
-  const riskDays = user.isInternal ? (await scheduleSource(scope)).source?.riskWindowDays ?? DEFAULT_RISK_DAYS : DEFAULT_RISK_DAYS;
+  const riskDays = user.isInternal ? (await scheduleSource(scope)).days.risk : DEFAULT_RISK_DAYS;
   const all = register.rows.map((doc) => {
     // A revision whose review is decided and not yet released reads as not released.
     const latestState = doc.revisionState === "IN_REVIEW" && doc.verdict ? "NOT_RELEASED" : doc.revisionState;
@@ -196,7 +202,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       asReceived: !!doc.asReceived,
       supplierStamp: doc.supplier && (SUPPLIER_STAGES as readonly string[]).includes(doc.supplier)
         ? supplierStamp(doc.supplier as SupplierStage, user.isInternal ? "ours" : "theirs", doc.withSupplier) : null,
-      docState: doc.state, docStateLabel: DOC_STATE_LABEL[doc.state as DocState] ?? doc.state,
+      docState: doc.state, docStateLabel: docStateName(names, doc.state),
       revision: doc.revision,
       revState: latestState,
       // The stage a supplier's document reads in (its own colour and line on Help), else none.
@@ -206,7 +212,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         ? supplierStageName(names, doc.supplier as SupplierStage, { together, held: false })
         : latestState
         ? stateName(names, latestState, { together, held: false })
-        : "No revision yet",
+        : names.NONE,
       onHold: null as string | null,
       // A code is printed only when the organization publishes it. Records made
       // before the list existed carry the Standard's own consequence names,
@@ -259,7 +265,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   }
   // A list's code opens its page in Types & sets for our people (who read Settings); another organization's read no Settings.
   if (user.isInternal) codes["@lists"] = "1";
-  for (const code of DOC_STATES) codes[`DOC_STATE|${code}`] = `${DOC_STATE_LABEL[code]} — ${DOC_MEANING[code].means}`;
+  for (const code of DOC_STATES) codes[`DOC_STATE|${code}`] = `${docStateName(names, code)} — ${DOC_MEANING[code].means}`;
   for (const code of REV_STATES) codes[`REV_STATE|${code}`] = `${stateName(names, code)} — ${REV_MEANING[code].means}`;
   // A supplier's stages, read in the same column (in review and released mean what ours do).
   const { SUPPLIER_STAGE_MEANING } = await import("@/lib/core/state-names");
@@ -300,7 +306,14 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         locked: pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId),
       } : null).catch(() => null)
     : null;
-  const picking = formPick ?? assetPick ?? packagePick ?? (sp.pick && !formPick && !sp.pick.startsWith("pkg:") && !sp.pick.startsWith("asset:") && (scope.can("CONTROL") || own)
+  // Opened to choose the register document a list is read from ("src:<list>"), by the control function: one tick.
+  const sourcePick = sp.pick?.startsWith("src:") && scope.can("CONTROL")
+    ? await listSources(scope).then((all) => all.find((one) => one.kind === sp.pick!.slice(4))).then((found) => found ? {
+        kind: "source" as const, actionId: "", packageId: "", code: found.kind, name: found.title, back: undefined, returnTo: found.where === "IMPORT" ? "/import" : "/schedule",
+        linked: found.document && !found.document.chosenByApp ? [found.document.id] : [], disciplines: [] as { code: string; label: string }[], locked: [] as string[],
+      } : null)
+    : null;
+  const picking = formPick ?? assetPick ?? packagePick ?? sourcePick ?? (sp.pick && !formPick && !sp.pick.startsWith("pkg:") && !sp.pick.startsWith("asset:") && !sp.pick.startsWith("src:") && (scope.can("CONTROL") || own)
     ? await (async () => {
         const one = activities.find((a) => a.code === sp.pick);
         const detail = one ? await activityDetail(scope, one.id) : null;
@@ -313,7 +326,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         };
       })()
     : null);
-  const pickKey = !picking ? "" : picking.kind === "asset" ? `asset:${picking.packageId}` : picking.kind === "package" ? `pkg:${picking.code}` : picking.kind === "transmittal" || picking.kind === "review" ? sp.pick! : picking.code;
+  const pickKey = !picking ? "" : picking.kind === "asset" ? `asset:${picking.packageId}` : picking.kind === "package" ? `pkg:${picking.code}` : picking.kind === "source" ? `src:${picking.code}` : picking.kind === "transmittal" || picking.kind === "review" ? sp.pick! : picking.code;
   if (picking) query.set("pick", pickKey);
 
 
@@ -322,7 +335,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     {sp.sendError ? <Banner tone="warn" title="Not sent">{sp.sendError}</Banner> : null}
     <DocumentRegister
       supplier={supplierView && (hasVerb(user, "CREATE") || hasVerb(user, "REVISE")) ? { to: hostName ?? "them" } : supplierView ? { to: hostName ?? "them", readOnly: true } : null}
-      plate={<RegisterPlate project={{ code: project.code, name: project.name }} canCreate={!isReadOnly(user)} />}
+      plate={<RegisterPlate project={{ code: project.code, name: project.name }} canCreate={!isReadOnly(user)} ours={user.isInternal} />}
       rows={rows}
       total={matchCount}
       views={views}
@@ -333,8 +346,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       mayAddToAction={scope.can("CONTROL")}
       shownFilters={shownFilters}
       own={ownColumns}
-      userCanAct={!isReadOnly(user)} filters={{ pick: pickKey, q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: DOC_STATE_LABEL[code] ?? code })), revStates: [
-      { code: "NONE", label: "No revision yet" },
+      userCanAct={!isReadOnly(user)} filters={{ pick: pickKey, q, terms, state, rev: revState, status: statusCode, verdict: verdictCode, supplier, po, discipline, docType, view, criticality, confidentiality, deliverable, phase: sp.phase ?? "", action: sp.action ?? "", on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }} filterOptions={{ states: DOC_STATES.map((code) => ({ code, label: docStateName(names, code) })), revStates: [
+      { code: "NONE", label: names.NONE },
       { code: "IN_PREPARATION", label: names.IN_PREPARATION },
       { code: "IN_REVIEW", label: names.IN_REVIEW },
       { code: "NOT_RELEASED", label: names.NOT_RELEASED },
@@ -342,7 +355,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       { code: "RELEASED", label: together ? names.RELEASED_ISSUED : names.RELEASED },
       { code: "SUPERSEDED", label: names.SUPERSEDED },
       { code: "VOID", label: names.VOID },
-    ], statuses: inSets("STATUSES", statuses, (item) => `${item.code} — ${item.label}`), verdicts: inSets("REVIEW_OUTCOMES", verdictSet, (item) => `${item.code} — ${item.label}`), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: inSets("PURCHASE_ORDERS", poCodes, (item) => item.label), disciplines: inSets("DISCIPLINES", disciplines.filter((item) => usedDisciplines.has(item.code)), (item) => item.status === "RETIRED" ? `${item.label} (retired)` : item.label), types: inSets("DOCUMENT_TYPES", types.filter((item) => usedTypes.has(item.code)), (item) => item.status === "RETIRED" ? `${item.label} (retired)` : item.label), criticalities: inSets("CRITICALITY", criticalities, (item) => item.label), deliverables: deliverableTypes.map((item) => ({ code: item.code, label: item.label })), confidentialities: inSets("CONFIDENTIALITY", confidentialities, (item) => item.label.split(" — ")[0]), phases: inSets("PHASES", phases, (item) => item.label), actions: actionCodes.map((item) => ({ code: item.code, label: `${item.code} — ${item.name}` })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
+    ], statuses: inSets("STATUSES", statuses, (item) => `${item.code} — ${item.label}`), verdicts: inSets("REVIEW_OUTCOMES", verdictSet, (item) => `${item.code} — ${item.label}`), suppliers: supplierCodes.map((item) => ({ code: item.code, label: item.label })), pos: inSets("PURCHASE_ORDERS", poCodes, (item) => item.label), disciplines: inSets("DISCIPLINES", disciplines.filter((item) => usedDisciplines.has(item.code)), (item) => item.status === "RETIRED" ? `${item.label} (retired)` : item.label), types: [...(equipmentTypes.length > 1 ? [{ code: equipmentTypes.join(","), label: "Types that describe equipment" }] : []), ...inSets("DOCUMENT_TYPES", types.filter((item) => usedTypes.has(item.code)), (item) => item.status === "RETIRED" ? `${item.label} (retired)` : item.label)], criticalities: inSets("CRITICALITY", criticalities, (item) => item.label), deliverables: deliverableTypes.map((item) => ({ code: item.code, label: item.label })), confidentialities: inSets("CONFIDENTIALITY", confidentialities, (item) => item.label.split(" — ")[0]), phases: inSets("PHASES", phases, (item) => item.label), actions: actionCodes.map((item) => ({ code: item.code, label: `${item.code} — ${item.name}` })), dateFields: DATE_FIELDS.map((field) => ({ code: field.key, label: field.label })) }} exportHref={`/api/register/export${query.size ? `?${query.toString()}` : ""}`} />
   </div>;
 }
 

@@ -15,7 +15,7 @@ import { MEASURE_KEY } from "@/lib/settings/api-admin";
  * who may; these send what the form says and show its refusal word for word.
  */
 
-type Result = { error?: string };
+type Result = { error?: string; ok?: string };
 const failed = (e: unknown): Result => ({ error: refusal(e).message });
 
 export async function runChecksAction(): Promise<void> {
@@ -47,7 +47,7 @@ export async function acceptDefectAction(_prev: Result | undefined, formData: Fo
   }
   revalidatePath("/conformance");
   revalidatePath("/conformance/checks");
-  return {};
+  return { ok: "Accepted, with your reason, kept on the record." };
 }
 
 /**
@@ -67,7 +67,7 @@ export async function closeDefectAction(_prev: Result | undefined, formData: For
   }
   revalidatePath("/conformance");
   revalidatePath("/conformance/checks");
-  return {};
+  return { ok: "Closed: the checks ran again and no longer find it." };
 }
 
 /**
@@ -93,7 +93,7 @@ export async function retireCheckAction(_prev: Result | undefined, formData: For
   }
   revalidatePath("/conformance/checks");
   revalidatePath("/conformance");
-  return {};
+  return { ok: "Switched off on this project, with your reason. Its findings are closed; switch it back on whenever it applies again." };
 }
 
 /** Ask it again. */
@@ -108,11 +108,11 @@ export async function restoreCheckAction(_prev: Result | undefined, formData: Fo
   }
   revalidatePath("/conformance/checks");
   revalidatePath("/conformance");
-  return {};
+  return { ok: "Switched back on. It counts from the next time the checks run." };
 }
 
 /**
- * How this project is measured: the share of clear documents it aims at (the checks run by themselves every day).
+ * How this project is measured: the share of clear documents it aims at (the checks run when someone runs them).
  * The project's answer (MEASURE); the backend lets an administrator or the control function change it.
  */
 export async function setMeasureAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
@@ -127,5 +127,16 @@ export async function setMeasureAction(_prev: Result | undefined, formData: Form
     return failed(e);
   }
   revalidatePath("/conformance", "layout");
-  return {};
+  return { ok: "Saved. The rate is measured against the new target from now on." };
+}
+
+/** "Count again": the report counted now, as asked, kept for everyone who reads it. */
+export async function countReportAgainAction(id: string, query: Record<string, string>): Promise<Result> {
+  const ctx = await requireScope();
+  try {
+    await api(projectPath(ctx, `/reports/${encodeURIComponent(id)}/count`), { method: "POST", query });
+    return {};
+  } catch (e) {
+    return failed(e);
+  }
 }

@@ -102,7 +102,8 @@ elease" works. Behind the scenes it creates a review with **no steps**, already
   the day itself. It is a notification, and an email when review email is on.
 - The reviews list shows "warned <date>". Sending a step back and opening it again clears it, so it is
   warned again.
-- It runs in the worker every 30 minutes. A step with no due date is never warned.
+- It goes with the project's day's notices, once a day at the project's notify hour (09:00 unless the Control room says
+  otherwise, "The day's notices go out at"). A step with no due date is never warned.
 
 ---
 
@@ -666,3 +667,192 @@ in the code; it lives only in your local database.
   the permission on every document, and two columns the backend never kept are gone. Sign-in & security sets single
   sign-on and password sign-in, and the sign-in page offers the organization's own account.
 
+
+
+---
+
+**The day's notices, once a day at a set hour** (owner: "09:00, and add it to settings as a choice").
+- Before: a worker job looked at every action of every project every 30 minutes.
+- Now: once a day per project, at its notify hour on its own clock (`NOTIFY_AT`, 09:00 by default, the Control room's
+  "At risk" step, the organization's Control room and Defaults for new projects; a switch as every Control room answer),
+  only the actions whose risk window is open or whose day passed lately, and the review steps falling due, are read.
+- Sent then, once each: at risk; notified again when a discipline stays silent (no longer waiting for a "day passed"
+  notice first); a review step due today or the next working day. Each is a notification, an email and a pop-up.
+- Taken out (owner: they are states, read when someone looks): the "all your documents are ready" notice for an action
+  still ahead, and the "its day passed with documents missing" notice. Both still read on the action and on Home.
+- The automatic confirmation of a discipline whose documents were all there by the day is still written, in the first
+  day's notices after the day.
+- A schedule read by an older version of the app's reading is read again once, when the worker starts after an update,
+  never on a clock.
+
+---
+
+**Nothing runs on a clock to find out what happened** (owner: "the changes are the ones who tell us").
+- The checks (Assurance) no longer run by themselves every day: they run when someone of the control function presses
+  "Run the checks". Their figures say when they last ran. Taken out because the daily run re-read stored files and the
+  whole history of every project every day, a cost growing every year, whoever looked.
+- The notices no longer look every day whether anything is due: what changes an action, a review step or how a project
+  counts its days writes the day its notices fall on, and the worker sleeps until the earliest one. A day with nothing
+  written runs nothing. What is sent, and when, is unchanged.
+- The sender of emails, notifications and the worker's jobs no longer asks every second whether there is something to
+  send: the act that put it there wakes it once its save is committed.
+- A schedule read by an older version of the reading is no longer read again when the worker starts: it is read again
+  the first time someone opens that project's schedule. Schedules nobody opens are left as they are.
+- The screens are told what changed only once the change is committed (before, a screen could read just before the
+  commit and keep the old answer).
+
+---
+
+**Home's log is read by everyone of ours on the project** (owner). Before: the control function and administrators only.
+Now anyone of ours reads it, narrowed to the acts on what they may open (a document above their clearance, its
+revisions, files, reviews, and a transmittal they may not open are left out). The journal beside Home is narrowed the
+same way (before, it named documents above the reader's clearance). Another organization's people still never read it.
+
+---
+
+**Every page keeps what it read until something it shows changes** (owner). Reports, the register's other reads,
+transmittals, packages, assets, reviews, Assurance and its plan, the Schedule's extras, the calendar, Home, and every
+Settings and organization page now keep their answers, per person, until a change names them (at most an hour). Read
+fresh every time, as before: notifications, the account, sign-in and security, what waits for a result, the audit trail
+and a person's activity, the notice log, and Excel downloads. A wrong password typed no longer throws away every kept
+answer; a discipline's confirmation now also refreshes the Schedule.
+
+---
+
+**Reports are counted by hand, for everyone** (owner, as the checks). Before: counted again on every opening, every
+tab, every page of lines and every download. Now: counted once, kept for everyone, and counted again only when someone
+presses "Count again"; the plate says when and by whom. Each of our readers now sees only the lines on documents and
+transmittals they may open (before, a report listed documents above the reader's clearance); the figures and the chart
+still count the whole project.
+
+---
+
+**The pages' kept answers are capped** (owner). They live in the screens' memory only, at most 100 MB; when full, the
+ones used longest ago drop by themselves. Nothing is written to disk any more, and a restart of the screens starts with
+none kept (the first opening of each page reads it again).
+
+---
+
+**Health checks ask often only while starting** (owner: "what purpose of it all?"). Docker asks each part whether it is
+alive: the database, Redis, the queue, the backend and the drawing converter. Before: every 5 to 30 seconds, for ever
+(the queue's and the backend's each start a program to answer). Now: every few seconds while starting, so what waits
+on them starts at once, then every 5 minutes.
+
+---
+
+**Opening and downloading no longer wait in the audit queue** (owner). Before: every recorded act, opening a document
+included, locked the organization's audit trail until its save, so readers queued behind one another. Now: opened,
+downloaded and a person's activity read are written beside the chain, unlocked, each sealed by its own fingerprint; acts
+that change something stay in the chain as before. Nothing disappears from the Audit trail or a person's activity.
+
+---
+
+**A document's history keeps only what changed** (owner). Before: every change saved the whole document again, with all
+its revisions and files. Now: each point keeps only what changed since the one before (a whole one every 20), and the
+History page reads exactly as before. Nothing kept earlier is touched.
+
+---
+
+**Each file is copied to the second place as it is stored** (owner). Before: every 6 hours the copier listed every file
+on both sides to find what was new. Now: the app copies each file the moment it is stored (an upload once checked, a
+stamped copy…), and the full comparison runs once a week as a safety net; its alert waits 8 days instead of 12 hours.
+
+---
+
+**Who you are and what you may do is read once, not on every click** (owner). Before: every backend call read your
+membership, function and rights from the database (about four reads), and every page read your profile and all your
+projects. Now: kept in memory until something about people, functions, rights, projects, organizations or settings
+changes in your organization, then read again once; at most 15 minutes in any case, as a safety net. The backend still
+checks every act; signing out and sessions ended work as before.
+
+---
+
+**The pages' kept answers never expire, and live in Valkey** (owner). Before: read again after an hour even when nothing
+changed, and kept in the screens' memory (lost on a restart). Now: kept until a change names them, in Valkey (shared by
+every screens server, surviving restarts); the answers worked out against today (the Schedule, reviews, transmittals) are
+kept per day of the project. The backend also writes each change into Valkey itself, so nothing is missed while the
+screens are down. The values of lists, read on every page, are read once for everyone of the organization.
+
+---
+
+**Packages are brought up to date when something changes, never when a list opens** (owner). Before: opening Packages (or
+a package) took in what each rule now admitted, handed documents down each tree, and filed every unfiled supplier
+document, package by package, sometimes saving while only reading. Now: a document registered or changed in what a rule
+reads, a tag linked, or a package made, moved or given a rule sends one word with its save, and the worker brings that
+project's packages up to date once (`Packages/PackagesMoved.cs`). A list reads its trees once for all its packages.
+Filing supplier documents left in none of their packages is now a button on a supplier's package, **Fill the package**
+(`POST /packages/{id}/fill`, PACKAGE_FILLED): nothing is filed by itself any more, but a new document is still filed as it
+is registered, and a deleted package's documents still go back as before.
+
+---
+
+**When people last signed in, acted and joined is kept with the act** (owner). Before: the organization's People and
+Organizations pages went through the whole audit trail on every opening. Now: the audit functions write it as they write
+the act (`people_seen`), filled once from the trail as it stood.
+
+---
+
+**Counts of acts are made once and topped up** (owner). The Audit trail, a person's activity and Home's log count each kind
+of act once, then only what was written since; words or days asked are counted as asked.
+
+---
+
+**Lists and the per-request lookups are kept until how the organization works changes** (owner). The lists every rule reads
+(`Catalog`) and, before each call, which lists a project reads and how dates read: read once, not on every call. Access is
+still checked on every act.
+
+---
+
+**Files are never read** (owner: "never ever read the files, ever ever, forbidden forever, unless I get back on that with a
+client's request"). Search finds a document by its number and title only. Reading text inside files (and OCR) can no longer
+be switched on (CONTENT_NOT_READ); every project's switch went to OFF and, as OFF always meant, the text read before was
+deleted (migration FilesNeverRead).
+
+---
+
+**Downloads are prepared in the background** (owner). Every export, list as it stands and report's Excel is asked for while
+you keep working: a tray in the corner says it is being prepared, then saves it (`components/downloads.tsx`). The register
+and transmittal log exports match their lines in one pass. The register's filters ask what the project holds once
+(`GET /register/used`), not with every page.
+
+---
+
+**Smaller**: the bell asks only how many are unread; Assets & tags counts every tag's documents in one read; the audit chain
+is verified once for all the projects checked in the hour; a package opened by its number is looked up by it (it was found
+in the newest 500 only).
+
+---
+
+**Recorded as it happens** (owner). "Not sent yet" and whether a transmittal was answered are now written by the
+database at the moment a transmittal or its line is added, and read back, instead of being looked for among every
+revision and transmittal each time. Opening or downloading a document no longer takes a point of its history (it changed
+nothing). `rebuild-recorded` (backend command) writes the recorded facts again from what exists, should one look wrong.
+
+---
+
+**The Schedule reads where each action stands from the action itself** (owner). Before: every reading loaded every action
+with all its documents and worked out each one's state. Now: each action keeps where it stands (written when one of its
+documents or needs changes), and only the actions on screen are read with their documents. One small difference: a
+document marked as waived no longer makes an action "at risk" on the plan, as the rule always said ("a document still
+missing"); the notices already read it so.
+
+---
+
+**The register filters and sorts on what is recorded** (owner). Released or not, released at what, the newest revision's
+verdict, waiting to be released, the last file added and when it first went out are written by the database as a
+revision, review, file or transmittal line changes, for that document only, and the register reads them; it no longer
+works them out over every document on each filter or sort. Which disciplines and document types the documents carry is
+counted as they are registered and changed. Sorting by "Issued" now follows the Issued column (the first time it went out
+to someone), as the column always read.
+
+---
+
+**The files are protected** (owner, security review). Every file is now kept encrypted, with the files' key (FILES_KEY in
+.env) kept apart; files kept before stay readable as they were. Downloads no longer go straight from the store: the app
+opens each file and the screens pass it on. The backup copy is made by its own copier as each file is stored, and the app
+no longer holds any key to it. A file the virus check cannot look into (locked by a password, too much inside) is
+refused with why, where before it passed as clean. Every download is recorded, even where the organization switched
+reading off, and administrators are told when one person downloads more than 200 files in an hour. Another organization
+sent a revision opens only its files as they stand, no longer the drafts replaced before it went. The converters (DWG,
+office files) sit on a network of their own. The review page no longer records a download each time it opens (it asked
+the download for a file's name).

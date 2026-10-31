@@ -53,7 +53,7 @@ export function Logbook({
       </header>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[248px_minmax(0,1fr)] lg:items-start">
-        <aside className="lg:sticky lg:top-22">
+        <aside className="scroll-thin lg:sticky lg:top-22 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
           <LogbookSide counts={counts} chosen={chosen} href={href} find={find} />
         </aside>
         <main className="min-w-0 space-y-5">
@@ -94,8 +94,8 @@ export function LogbookSide({ counts, chosen, href, find, categoriesOnly = false
       {narrowed ? <Link href={find.clear} className="block text-[12px] font-semibold text-link hover:underline">Clear</Link> : null}
     </form>
 
-    {/* The menu scrolls on its own, without a bar, so the log beside it keeps its place. */}
-    <nav aria-label="Kinds of act" className="scroll-quiet mt-3 max-h-[calc(100vh-14rem)] overflow-y-auto">
+    {/* Every kind shown, its acts folded under it (owner: kinds hidden below a menu scrolling without a bar went unseen). */}
+    <nav aria-label="Kinds of act" className="mt-3">
       <Link
         href={href({})}
         aria-current={!chosen.kind && !chosen.action ? "page" : undefined}
@@ -151,7 +151,7 @@ export function LogbookSide({ counts, chosen, href, find, categoriesOnly = false
 }
 
 /** The log itself: the day as a rule, each act a slip in its kind's side colour, and the pager further back. */
-export function LogbookDays({ acts, chosen, href, paging, showWho = true }: { acts: LogAct[]; chosen: Chosen; href: Href; paging: Paging; showWho?: boolean }) {
+export function LogbookDays({ acts, chosen, href, paging, showWho = true, whoLinks = true }: { acts: LogAct[]; chosen: Chosen; href: Href; paging: Paging; showWho?: boolean; /** Each name opens what that person did: only for whoever reads it (an administrator, the control function). */ whoLinks?: boolean }) {
   // Filed by the day it happened: correspondence is remembered by its day, and a day with nothing in it is not a heading.
   const days: { day: string; when: Date; acts: LogAct[] }[] = [];
   for (const e of acts) {
@@ -194,7 +194,7 @@ export function LogbookDays({ acts, chosen, href, paging, showWho = true }: { ac
                   <span className="route">
                     {showWho ? (
                       <span className="route-party">
-                        {e.actorId ? <Link href={`/settings/users/${e.actorId}`} className="hover:underline">{e.actorName}</Link> : e.actorName}
+                        {e.actorId && whoLinks ? <Link href={`/settings/users/${e.actorId}`} className="hover:underline">{e.actorName}</Link> : e.actorName}
                       </span>
                     ) : null}
                     {showWho ? <span className="route-line" aria-hidden="true" /> : null}

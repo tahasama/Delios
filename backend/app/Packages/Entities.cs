@@ -17,6 +17,11 @@ public sealed class Package
     public required string Number { get; set; }
     /// <summary>One of <c>PackageKinds</c>: documents we deliver, or documents a supplier owes us.</summary>
     public string Kind { get; set; } = PackageKinds.Delivery;
+    /// <summary>
+    /// The package it sits in, when it is a branch of another (owner: the arborescence clients ask for): of the same kind,
+    /// and for a supplier's package of the same supplier. Null: a package at the top. It may be moved while it is open.
+    /// </summary>
+    public Guid? ParentId { get; set; }
     /// <summary>For a supply package: the supplier whose placeholders it holds. Its people see the package.</summary>
     public Guid? SupplierPartyId { get; set; }
     /// <summary>For a supply package: the purchase order it is under, as written on it. Optional.</summary>
@@ -49,6 +54,11 @@ public sealed class Package
     public Guid[] Excluded { get; set; } = [];
     /// <summary>The organizations it is delivered to; one transmittal each. Empty: handed over without one.</summary>
     public Guid[] RecipientPartyIds { get; set; } = [];
+    /// <summary>
+    /// The organizations it was delivered to, on a transmittal naming it or a package above it (owner: whoever delivers
+    /// chooses to whom, at the end): their people read it as we do, its tree and lines, and change nothing.
+    /// </summary>
+    public Guid[] DeliveredTo { get; set; } = [];
     /// <summary>The people (user ids) who put the package together and deliver it.</summary>
     public Guid[] OwnerIds { get; set; } = [];
     /// <summary>Any one of them accepts. Never one of the owners.</summary>

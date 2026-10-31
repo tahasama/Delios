@@ -15,6 +15,12 @@ namespace Delios.Host.Extraction;
 /// <summary>The values a project's extraction switch (<c>Project.ContentExtraction</c>) can take.</summary>
 public static class ExtractionModes
 {
+    /// <summary>
+    /// Files are never read (owner: "never ever read the files, ever ever, forbidden forever, unless I get back on that
+    /// with a client's request"): no switch turns it on, nothing is queued, search reads a document's details only.
+    /// </summary>
+    public static readonly bool Forbidden = true;
+
     /// <summary>Files are never read; any text already read is deleted when the switch is turned off.</summary>
     public const string Off = "OFF";
     /// <summary>Files are read only when someone asks, for a revision or the whole project.</summary>
@@ -95,7 +101,7 @@ public sealed record FileExtract(Guid TenantId, Guid FileId)
 /// </summary>
 public sealed class ExtractionProcessor(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, IHttpClientFactory http, IOptions<ExtractionOptions> options,
-    AuditLog audit, IClock clock, ILogger<ExtractionProcessor> logger)
+    AuditLog audit, IClock clock, ILogger<ExtractionProcessor> logger, Search.SearchSignal search)
 {
     /// <summary>Name of the HttpClient registered at startup for the extraction service, with its timeout.</summary>
     public const string HttpClientName = "extraction";
@@ -120,6 +126,12 @@ public sealed class ExtractionProcessor(
     /// </summary>
     public async Task ProcessAsync(FileExtract message, CancellationToken cancellationToken)
     {
+        // Forbidden: a message left from before is dropped unread.
+        if (ExtractionModes.Forbidden)
+        {
+            Extracted.WithLabels("skipped").Inc();
+            return;
+        }
         tenant.Set(message.TenantId);
         StoredFile? file;
         string mode;
@@ -185,6 +197,7 @@ public sealed class ExtractionProcessor(
         // The document changed for search: the index takes the text on its next pass.
         await db.Documents.Where(d => d.Id == file.DocumentId)
             .ExecuteUpdateAsync(d => d.SetProperty(x => x.UpdatedAt, clock.GetCurrentInstant()), cancellationToken);
+        search.Publish([file.TenantId]);
         await db.SaveChangesAsync(cancellationToken);
         await audit.WriteAsync(Actor.System, "CONTENT_EXTRACTED", "StoredFile", file.Id, file.Name,
             text.Length == 0 ? "No readable text." : $"{text.Length} characters{(truncated ? " (cut at the limit)" : "")}.",

@@ -145,10 +145,14 @@ internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
         b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Revisions).WithOne().HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.ProjectId, x.Number }).IsUnique();
+        // What changed since the search index last looked, organization by organization: never a scan of the register.
+        b.HasIndex(x => new { x.TenantId, x.UpdatedAt, x.Id });
         b.HasIndex(x => new { x.ProjectId, x.Discipline });
         b.HasIndex(x => new { x.ProjectId, x.DocType });
         b.HasIndex(x => new { x.ProjectId, x.State });
         b.HasIndex(x => new { x.ProjectId, x.Originator });
+        // "Is this the document's newest revision?": asked from a revision, by the register's "to release" and transmittals.
+        b.HasIndex(x => x.LatestRevisionId);
         b.Property(x => x.Number).HasMaxLength(200);
         b.Property(x => x.Title).HasMaxLength(500);
         b.Property(x => x.DeliverableType).HasMaxLength(64);
@@ -193,6 +197,10 @@ internal sealed class RevisionConfiguration : IEntityTypeConfiguration<Revision>
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Files).WithOne().HasForeignKey(x => x.RevisionId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.DocumentId, x.Value }).IsUnique();
+        // A project's revisions in a state (Home's to-do, the checks): never every revision of the organization.
+        b.HasIndex(x => new { x.ProjectId, x.State });
+        // Home: what of mine waits in a state (being prepared, returned, released with comments to take in).
+        b.HasIndex(x => new { x.AuthoredById, x.State });
         b.Property(x => x.Value).HasMaxLength(16);
         b.Property(x => x.Series).HasMaxLength(16);
         b.Property(x => x.Phase).HasMaxLength(64);

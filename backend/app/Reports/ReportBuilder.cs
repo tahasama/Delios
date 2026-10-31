@@ -112,9 +112,9 @@ public sealed partial class ReportBuilder(IClock clock)
     /// </summary>
     private async Task<Report> DeliveriesAsync(ReportOptions options, CancellationToken cancellationToken)
     {
+        // Another organization reading: its own documents only.
         var docs = await db.Documents.AsNoTracking()
             .Where(d => d.ProjectId == _project.Id && d.State != DocumentStates.Cancelled && d.State != DocumentStates.Withdrawn)
-            // Another organization reading: its own documents only.
             .Where(d => options.Party == null || d.Originator == options.Party)
             .Select(d => new { d.Id, d.Number, d.Title, d.Originator, d.Discipline, d.PlannedDate }).ToListAsync(cancellationToken);
         var needed = await NeededByAsync(cancellationToken);
@@ -347,7 +347,7 @@ public sealed partial class ReportBuilder(IClock clock)
             .Where(a => a.ProjectId == _project.Id && a.State == ActivityStates.Active && a.Start != null && a.Start <= horizon
                 && (a.Finish ?? a.Start) >= _today)
             .OrderBy(a => a.Start).ThenBy(a => a.Code).ToListAsync(cancellationToken);
-        var window = await db.ScheduleSources.Where(s => s.ProjectId == _project.Id).Select(s => (int?)s.RiskWindowDays).SingleOrDefaultAsync(cancellationToken) ?? 14;
+        var window = (await ScheduleDays.ForProjectAsync(db, _project.Id, cancellationToken)).Risk;
         var documentIds = activities.SelectMany(a => a.Requirements).Select(n => n.DocumentId).Distinct().ToList();
         var documents = await db.Documents.AsNoTracking().Where(d => documentIds.Contains(d.Id))
             .ToDictionaryAsync(d => d.Id, d => d.Number, cancellationToken);
@@ -418,7 +418,13 @@ public sealed partial class ReportBuilder(IClock clock)
         var docs = await db.Documents.AsNoTracking().Where(d => d.ProjectId == _project.Id && d.CreatedAt < end).OrderBy(d => d.Number)
             .Select(d => new
             {
-                d.Id, d.Number, d.Title, d.Discipline, d.CreatedAt, d.EndedAt, d.ReinstatedAt,
+                d.Id,
+                d.Number,
+                d.Title,
+                d.Discipline,
+                d.CreatedAt,
+                d.EndedAt,
+                d.ReinstatedAt,
                 Revisions = d.Revisions.Where(r => r.ReleasedAt != null)
                     .Select(r => new { r.Value, r.StatusCode, r.ReleasedAt, r.VoidedAt, r.UnvoidedAt, r.State }).ToList(),
             })
@@ -520,6 +526,7 @@ public sealed partial class ReportBuilder(IClock clock)
         }
         var label = day.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
         var changed = tally["replaced"] + tally["first"] + tally["out"];
+        // The chart: the periods before that day, then from it on (From: the day). Nothing moved at all: no chart.
         return Make(ReportIds.AsOf, "Register on a date", $"Which revision was current on {label}?",
             "Audits, claims and \"what did we build from?\": the register as it stood at the end of that day, and what moved since.",
             [
@@ -528,7 +535,6 @@ public sealed partial class ReportBuilder(IClock clock)
                 new("Changed since", changed.ToString(), changed > 0 ? "warn" : "good"),
                 new("As it was", tally["same"].ToString()),
             ],
-            // The periods before that day, then from it on (From: the day). Nothing moved at all: no chart.
             new Chart($"How the register moved around {label}, {(weekly ? "week" : "month")} by {(weekly ? "week" : "month")}", segments,
                 changed == 0 && registeredSince.Count == 0 && earlier.Count == 0 ? [] : [.. earlier, .. periods], ChartKinds.Columns, From: Iso(day)),
             ["Document", "Title", "Discipline", $"Current on {day:yyyy-MM-dd}", "Status then", "Released", "Current now", "Since then", "Changed on"],

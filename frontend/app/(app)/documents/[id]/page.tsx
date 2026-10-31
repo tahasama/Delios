@@ -15,13 +15,16 @@ import { isController, isAdmin, mayContributeToDocument, standsInForControl } fr
 import { ToneChip, StateChip, Banner, Field, inputCls } from "@/components/ui";
 import { ActionForm } from "@/components/form";
 import { Asked, Added } from "@/components/policy-fields";
-import { DOC_STATE_LABEL, DOC_STATE_COLOR, revStateColor, type DocState } from "@/lib/core/standard";
-import { stateNames, stateName, supplierStage, supplierStageName, supplierStamp } from "@/lib/core/state-names";
+import { DOC_STATE_COLOR, revStateColor, type DocState } from "@/lib/core/standard";
+import { stateNames, stateName, supplierStage, supplierStageName, docStateName, supplierStamp } from "@/lib/core/state-names";
 import { revisionGround } from "@/lib/documents/revision-ground";
 import { ownFields, readExtras, formPolicy } from "@/lib/settings/field-policy";
 import { fmtDate, timeAgo, plain } from "@/lib/core/utils";
 import { readableDetail } from "@/lib/settings/activity-words";
 import { forType } from "@/lib/settings/serving";
+import { readersOn } from "@/lib/settings/viewers";
+import { cookies } from "next/headers";
+import { PREF } from "@/lib/core/preferences";
 import { servingOf } from "@/lib/settings/serving-api";
 import { getActiveSet, getSet, getValue } from "@/lib/settings/config";
 import { updateDocumentAction, reinstateDocumentAction, linkAssetAction, unlinkRelationshipAction, endDocumentStateAction } from "@/lib/documents/forms";
@@ -44,6 +47,9 @@ import { SupplierDelivery } from "./supplier-delivery";
 import { Timeline } from "@/components/timeline";
 import { openCopy } from "@/lib/documents/copies";
 import { StampPending } from "@/components/stamp-pending";
+import { FilesChecking } from "@/components/files-checking";
+import { checking, refused } from "@/lib/documents/checking";
+import { FilePreview } from "@/components/file-preview";
 import { DocTabs } from "./doc-tabs";
 import { ArrowLeft, Download, ExternalLink, FileText, Send, X, FileDown } from "lucide-react";
 import { activityList, scheduleSource } from "@/lib/actions/api";
@@ -52,7 +58,7 @@ import { sendToSupplierAction, askBackAction, answerAskAction } from "@/lib/pack
 import { addressees } from "@/lib/transmittals/api";
 import { AlsoKnownAs, type Equivalent } from "./numbers";
 import { AsReceivedWarning } from "@/components/as-received-warning";
-import { api, projectPath } from "@/lib/client";
+import { api, apiAfter, projectPath } from "@/lib/client";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +83,8 @@ export default async function DocumentDetailPage({
   const sp = await searchParams;
 
   const doc = await documentPage(ctx, id);
+  // Opened: recorded once the page is drawn, its answers being kept (backend POST /documents/{id}/viewed).
+  if (doc) await apiAfter(projectPath(ctx, `/documents/${id}/viewed`));
   if (!doc) notFound();
 
   const context = await documentContext(ctx, id);
@@ -121,7 +129,7 @@ export default async function DocumentDetailPage({
   const controller = isController(user) || isAdmin(user);
   // Equivalence: its numbers with other organizations, ours only; kept by the control function (or, with none, whoever exchanges).
   const numbers = user.isInternal
-    ? await api<Equivalent[]>(projectPath(ctx, `/documents/${doc.id}/numbers`)).catch(() => [] as Equivalent[]) : [];
+    ? await api<Equivalent[]>(projectPath(ctx, `/documents/${doc.id}/numbers`), { keep: { areas: ["docs"], doc: doc.id } }).catch(() => [] as Equivalent[]) : [];
   const mayKeepNumbers = user.isInternal && (controller || standsInForControl(user));
   // The control function adds it to a schedule action from here too: the actions with a discipline tagged that do not need it yet.
   const mayAddToAction = ctx.can("CONTROL") && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
@@ -181,6 +189,9 @@ export default async function DocumentDetailPage({
       return a.POLICY_PDF_STAMP !== "OFF" && a["STAMP:RELEASED"] !== "OFF";
     })();
   const native = previewed?.files.find((f) => f.kind === "NATIVE") ?? null;
+  // The source file shown beside the PDF: the newest submission's, once through the virus check.
+  const newestSubmission = previewed ? Math.max(0, ...previewed.files.map((f) => f.submission ?? 0)) : 0;
+  const shownSource = previewed?.files.find((f) => f.kind === "NATIVE" && (f.submission ?? 0) === newestSubmission && f.status === "CLEAN") ?? null;
   // Requests on the revision in hand: who asked for it to be sent, to whom, and
   // whether it has gone.
   const carrying = working ?? current ?? null;
@@ -250,6 +261,11 @@ export default async function DocumentDetailPage({
   // step, and the organization says what counts as one.
   const returnReasons = await getActiveSet("RETURN_REASONS");
   const workingHasPdf = !!working?.files.some((f) => f.kind === "RENDITION");
+  // What each box of Edit rev holds now (owner: "under upload input it should indicate if i have an already uploaded
+  // file"): the newest submission's PDF and source file.
+  const workingNewest = working ? Math.max(0, ...working.files.map((f) => f.submission ?? 0)) : 0;
+  const workingPdf = working?.files.find((f) => f.kind === "RENDITION" && (f.submission ?? 0) === workingNewest) ?? null;
+  const workingSource = working?.files.find((f) => f.kind === "NATIVE" && (f.submission ?? 0) === workingNewest) ?? null;
   const run = working ? await getRunForRevision(ctx, working.id) : null;
   // The steps of its route, for choosing where a revision goes back to.
   const routeSteps = (run?.steps ?? []).map((step, index) => ({ number: index + 1, title: step.title ?? `Step ${index + 1}` }));
@@ -294,7 +310,7 @@ export default async function DocumentDetailPage({
     // The planned date, with what it says today: ready, submitted, overdue, at risk, or days left.
     ["Planned submission", doc.plannedDate ? [fmtDate(doc.plannedDate), plannedState(doc.plannedDate,
       plannedProgress(doc.revisions.some((r) => r.state === "RELEASED"), doc.revisions[0]?.backend.state ?? null),
-      user.isInternal ? (await scheduleSource(ctx)).source?.riskWindowDays ?? DEFAULT_RISK_DAYS : DEFAULT_RISK_DAYS)?.word].filter(Boolean).join(" · ") : null],
+      user.isInternal ? (await scheduleSource(ctx)).days.risk : DEFAULT_RISK_DAYS)?.word].filter(Boolean).join(" · ") : null],
     ["Created", fmtDate(doc.createdDate)],
     ["Previous number", doc.previousId],
     // Whatever this organization asks for itself, read back under its own name.
@@ -349,11 +365,15 @@ export default async function DocumentDetailPage({
             {askedOf ? (
               <p className="text-xs text-slate-500">It is with {askedOf}: its files are theirs to change, until they send it or hand it back.</p>
             ) : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="PDF" hint={workingHasPdf ? "replaces the one there" : "what people will read — needed before it is sent"}>
+              <Field label="PDF" hint={workingPdf ? "a new one replaces it" : "what people will read — needed before it is sent"}>
                 <input type="file" name="renditionFile" accept=".pdf" className="w-full" />
+                <NowHeld file={workingPdf} />
               </Field>
-              <Field label="Source file" hint="the editable original; for a schedule or a list, its .xlsx or .csv — read on release">
+              <Field label="Source file" hint={listKind
+                ? `the editable original: the ${listKind === "SCHEDULE" ? "schedule's .xlsx, .csv or P6 .xer" : "list's .xlsx or .csv"}, read on release`
+                : workingSource ? "a new one replaces it" : "optional — the editable original (.docx, .dwg, .xlsx…)"}>
                 <input type="file" name="nativeFile" className="w-full" />
+                <NowHeld file={workingSource} withType />
                 {listTemplate}
               </Field>
             </div>}
@@ -650,7 +670,7 @@ export default async function DocumentDetailPage({
     ? supplierStageName(names, stage, { together, held: onHold })
     : shown
     ? stateName(names, shown.state, { together, held: onHold })
-    : DOC_STATE_LABEL[doc.state as DocState] ?? doc.state;
+    : docStateName(names, doc.state);
   const stateColor = onHold ? "bg-red-50/40 text-red-800 ring-red-300" : shown ? revStateColor(shown.state) : DOC_STATE_COLOR[doc.state as DocState] ?? "";
 
   return (
@@ -665,6 +685,11 @@ export default async function DocumentDetailPage({
       {(doc.state === "CANCELLED" || doc.state === "WITHDRAWN") && doc.ended ? (
         <Banner tone="danger" title={`${doc.state === "CANCELLED" ? "Cancelled" : "Withdrawn"} ${fmtDate(doc.ended.at)} — ${doc.ended.by}`}>
           <span className="whitespace-pre-line">{doc.ended.reason}</span>
+        </Banner>
+      ) : null}
+      {sp.filesRefused ? (
+        <Banner tone="warn" title="Registered, without its files">
+          {sp.filesRefused} Attach them with its first revision below.
         </Banner>
       ) : null}
       {sp.released ? (
@@ -739,18 +764,24 @@ export default async function DocumentDetailPage({
           {
             id: "viewer",
             label: previewed ? `Preview · rev ${previewed.value}` : "Preview",
-            content: pdf ? (<>
-              {stampWaited ? <StampPending /> : null}
-              <iframe src={`/api/files/${pdf.id}`} title={`${doc.docNumber} rev ${previewed?.value ?? ""}`} className="h-[70vh] min-h-120 w-full bg-slate-100" />
-            </>) : (
-              <div className="grid h-48 place-items-center p-6 text-center">
-                <div>
-                  <FileText className="mx-auto h-8 w-8 text-slate-400" />
-                  <p className="mt-2 text-sm font-semibold text-slate-700">{previewed ? `No PDF for rev ${previewed.value} yet` : "No PDF to show yet"}</p>
-                  <p className="mt-1 text-xs text-slate-500">{working ? `Attach one to rev ${working.value} in the step above.` : "Start a revision to add content."}</p>
-                </div>
-              </div>
-            ),
+            // The PDF as it stands, and the source file where the page can show it (a picture, a workbook).
+            content: (<>
+              {pdf && stampWaited ? <StampPending /> : null}
+              {previewed && checking(previewed.files).length ? <FilesChecking names={checking(previewed.files)} /> : null}
+              {previewed ? refused(previewed.files).map((f) => (
+                <p key={f.name} className="px-5 py-2 text-[11px] text-rose-700 sm:px-6 dark:text-rose-300">{f.name} was refused: {f.why} Replace it in Edit rev {previewed.value}.</p>
+              )) : null}
+              <FilePreview pdf={pdf} source={shownSource} title={`${doc.docNumber} rev ${previewed?.value ?? ""}`} admin={isAdmin(user)} readers={await readersOn(ctx)} viewingNote={(await cookies()).get(PREF.viewingNote)?.value !== "0"} pdfDark={(await cookies()).get(PREF.pdfDark)?.value === "1"}
+                empty={(
+                  <div className="grid h-48 place-items-center p-6 text-center">
+                    <div>
+                      <FileText className="mx-auto h-8 w-8 text-slate-400" />
+                      <p className="mt-2 text-sm font-semibold text-slate-700">{previewed ? `No PDF for rev ${previewed.value} yet` : "No PDF to show yet"}</p>
+                      <p className="mt-1 text-xs text-slate-500">{working ? `Attach one to rev ${working.value} in the step above.` : "Start a revision to add content."}</p>
+                    </div>
+                  </div>
+                )} />
+            </>),
           },
           {
             id: "metadata",
@@ -1073,5 +1104,21 @@ export default async function DocumentDetailPage({
         ]}
       />
     </div>
+  );
+}
+
+/** What a file box of a revision holds now, under it: its name (and, for the source file, what kind of file it is), or that it holds none. */
+function NowHeld({ file, withType = false }: { file: { name: string } | null; withType?: boolean }) {
+  if (!file) return <p className="mt-1 text-[11px] text-slate-500">None yet</p>;
+  const ext = file.name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? "";
+  const KINDS: Record<string, string> = {
+    xlsx: "Excel workbook", xlsm: "Excel workbook", xls: "Excel workbook (old format)", csv: "CSV table", xer: "P6 schedule",
+    docx: "Word document", doc: "Word document (old format)", dwg: "AutoCAD drawing", dxf: "drawing exchange file", pptx: "PowerPoint",
+    jpg: "picture", jpeg: "picture", png: "picture", gif: "picture", webp: "picture", zip: "zip archive", ifc: "IFC model",
+  };
+  return (
+    <p className="mt-1 truncate text-[11px] text-slate-600" title={file.name}>
+      Now: <span className="font-semibold">{file.name}</span>{withType ? <span className="text-slate-500"> · {KINDS[ext] ?? (ext ? `.${ext} file` : "file")}</span> : null}
+    </p>
   );
 }

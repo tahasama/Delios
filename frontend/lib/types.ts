@@ -63,14 +63,10 @@ export type RegisterPage = {
   per: number;
   sizes: number[];
   rows: RegisterRow[];
-  lists: {
-    values: Record<string, ListValue[]>;
-    usedDisciplines: string[];
-    usedDocTypes: string[];
-    parties: { code: string; name: string }[];
-    activities: { code: string; name: string }[];
-  };
 };
+
+/** The disciplines and document types the project's documents carry (`GET /register/used`). */
+export type RegisterUsed = { usedDisciplines: string[]; usedDocTypes: string[] };
 
 export type RegisterRow = {
   /** The answers kept with it to the project's own fields and lists of its own. */
@@ -167,6 +163,9 @@ export type ReviewListRow = {
   warnedAt?: string | null;
   /** Why it was withdrawn or sent back, in the words recorded. */
   note?: string | null;
+  /** The revision it reviews, and who its open step still waits on (read with the row). */
+  revisionId?: string;
+  waitingOn?: string[] | null;
 };
 
 /** GET /reviews/{id} (ReviewEndpoints ReviewView). */
@@ -355,6 +354,8 @@ export type PackageView = {
   sharedAt?: string | null; sharedBy?: string | null; autoCreated?: boolean;
   /** The supplier's people on this project: who sees it once shared. Ours only. */
   supplierPeople?: string[] | null;
+  /** Read by another organization it was delivered to: the whole package, as we read it, and nothing to change. */
+  deliveredToUs?: boolean;
   /**
    * Its people and dates in words: who it goes to (its supplier, or its recipients), who puts it together and who
    * accepts it, the supplier's code, when it was opened, when it was delivered.
@@ -362,6 +363,22 @@ export type PackageView = {
   names: { to: string; owners: string; acceptors: string; supplierCode: string | null; createdAt: string; deliveredAt: string | null };
   /** On a project taking other organizations' documents as they come (Control room): what they are filed under. */
   asReceived?: { deliverableType: string; docType: string; discipline: string } | null;
+  /** Where it sits in the arborescence: the packages above it (top first), its branches, and the whole under it. */
+  place?: PackagePlace | null;
+};
+
+/**
+ * A package and everything under it (PackageEndpoints.cs PackageTally): packages below and how many are still open, its
+ * documents once each, how many are released at the status their package needs, how many are released at all.
+ */
+export type PackageTally = { packages: number; open: number; documents: number; ready: number; released: number };
+
+/** Where a package sits (PackageEndpoints.cs PackagePlace): the packages above it, top first; its branches; the whole. */
+export type PackagePlace = {
+  parentId: string | null;
+  path: { id: string; number: string; title: string }[];
+  branches: { id: string; number: string; title: string; state: string; branches: number; tally: PackageTally }[];
+  whole: PackageTally;
 };
 
 /** GET /activity (ActivityEndpoints.cs): one act of the project, for Home's journal and log. */

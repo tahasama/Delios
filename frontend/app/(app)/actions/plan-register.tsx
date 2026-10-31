@@ -2,14 +2,16 @@
 import { Select } from "@/components/select";
 
 import Link from "next/link";
+import { TabLink } from "@/components/tab-link";
 import { TONE } from "./plan-timeline";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CalendarRange, ChevronDown, Download, Pin, PinOff, Rows3, Search, X } from "lucide-react";
+import { TablePaging } from "@/components/table-paging";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { DateWindow } from "@/components/date-window";
 import { FilterMenu } from "@/components/filter-menu";
-import { FilterOptions } from "@/components/filter-options";
+import { Narrow } from "@/components/narrow";
 
 /**
  * The schedule, asked about once and answered two ways.
@@ -31,6 +33,9 @@ export type PlanTableRow = {
   date: string | null;
   /** The day the work ends, when the schedule gives one; how long it lasts is said in `when`. */
   finish: string | null;
+  /** The planner says its start, its finish, happened ("A", achieved): their word on the work, never our "done". */
+  startAchieved: boolean;
+  finishAchieved: boolean;
   when: string;
   late: boolean;
   readiness: "DONE" | "LATE_RECEIPT" | "READY" | "AT_RISK" | "NOT_READY" | "UPCOMING" | "UNKNOWN";
@@ -42,7 +47,7 @@ export type PlanTableRow = {
   confirmed: string;
   confirmedTone: "good" | "bad" | "plain";
   /** What became of the work itself, and what its documents were on the day. */
-  happened: "POSTPONED" | "CARRIED" | "DONE" | "AHEAD";
+  happened: "POSTPONED" | "CARRIED" | "DONE" | "NONE" | "AHEAD";
   happenedNote: string;
 };
 
@@ -60,15 +65,17 @@ const FILTERS = [
 ];
 
 export function PlanRegister({
-  plate, uploads, view, plan, cardHeight, more, rows, total, filters, filterOptions, facets, paging, sort, exportHref, shownFilters,
+  plate, uploads, view, plan, calendar, cardHeight, more, rows, total, filters, filterOptions, facets, paging, sort, exportHref, shownFilters,
 }: {
   /** The filters this person keeps shown (Filters menu); one holding a value always shows. None kept: all. */
   shownFilters?: string[];
   plate: React.ReactNode;
   /** Where the dates come from, the pages behind the schedule, and uploading by hand for whoever plans. */
   uploads: React.ReactNode;
-  /** Which of the two views is showing. */
-  view: "plan" | "table";
+  /** Which of the three views is showing: the calendar, the plan (the first shown) or the table. */
+  view: "calendar" | "plan" | "table";
+  /** The calendar, drawn by the server component when it is the view shown. */
+  calendar?: React.ReactNode;
   /** The plan, drawn by the server component, shown under the question. */
   plan: React.ReactNode;
   /**
@@ -86,8 +93,12 @@ export function PlanRegister({
     href: string | null;
     /** The days the plan is drawn across, and the address that widens or narrows it. */
     window: { label: string; href: string; wide: boolean; elsewhere: number } | null;
+    /** The schedule's own first and last months ("Mar 2022 → Jun 2023"). */
+    span?: string | null;
     /** Of those drawn, how many have no date from the schedule and so no bar. */
     undated: number;
+    /** No WBS bands: none read yet (the schedule came from Excel, or before the WBS was kept), or sorted another way. */
+    wbs?: { none: boolean; href?: string } | null;
     noNote?: { count: number; href: string };
     undatedHref?: string;
   };
@@ -121,7 +132,7 @@ export function PlanRegister({
   useEffect(() => {
     const measure = () => {
       const bar = document.querySelector<HTMLElement>("[data-app-header]")?.offsetHeight ?? 0;
-      const above = tabs.current ? tabs.current.offsetHeight + 16 : 0;
+      const above = tabs.current ? tabs.current.offsetHeight : 0;
       setFit(Math.max(360, Math.floor(window.innerHeight - bar - above - 24)));
     };
     measure();
@@ -209,9 +220,9 @@ export function PlanRegister({
     params.delete("page");
     return here(params);
   };
-  const viewHref = (next: "plan" | "table") => {
+  const viewHref = (next: "calendar" | "plan" | "table") => {
     const params = new URLSearchParams(paging.query);
-    if (next === "table") params.set("view", "table");
+    if (next !== "plan") params.set("view", next);
     else params.delete("view");
     params.delete("page");
     return here(params);
@@ -255,7 +266,7 @@ export function PlanRegister({
           setDirty(false);
           const data = new FormData(event.currentTarget);
           const params = new URLSearchParams();
-          if (view === "table") params.set("view", "table");
+          if (view !== "plan") params.set("view", view);
           for (const [key, value] of data.entries()) if (value) params.set(key, String(value));
           go(here(params));
         }}
@@ -293,44 +304,25 @@ export function PlanRegister({
       </form>
     </section>
 
-    {/* The two views stand on their own between the question and the answer.
-        One frame, split down the middle: the chosen side is the lit one, and
-        the other is drawn as the control it is rather than left as plain text. */}
-    <nav ref={tabs} className="mb-4 grid grid-cols-2 space overflow-hidden rounded-xl border border-line bg-surface" aria-label="How to look at the schedule">
+    {/* The views between the question and the answer: the tab strip (globals.css `.strip`), full width, joined to the
+        answer under it as its head (owner: "stick it to the table under it"). */}
+    <nav ref={tabs} className="strip strip-card strip-full rounded-b-none border-b-0 shadow-none" aria-label="How to look at the schedule">
       {([
+        { id: "calendar", label: "The calendar", hint: "month by month", icon: CalendarDays },
         { id: "plan", label: "The plan", hint: "drawn on a timeline", icon: CalendarRange },
         { id: "table", label: "The table", hint: "one line per action", icon: Rows3 },
-      ] as const).map((tab, at) => {
-        const on = view === tab.id;
-        return (
-          <Link
-            key={tab.id}
-            href={viewHref(tab.id)}
-            scroll={false}
-            aria-current={on ? "page" : undefined}
-            className={`group flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition ${
-              at === 0 ? "border-r border-line" : ""
-            } ${
-              on
-                ? "bg-surface text-brand-ink shadow-[inset_0_-3px_0_0_var(--color-brand)]"
-                : "bg-slate-100 text-slate-600 hover:bg-surface hover:text-brand-ink shadow-[inset_0_-3px_0_0_var(--color-brand)]/20"
-            }`}
-          >
-            <tab.icon className="h-4 w-4" />
-            {tab.label}
-            <span className={`hidden text-[11px] font-normal sm:inline ${on ? "text-slate-500" : "text-slate-500"}`}>· {tab.hint}</span>
-            {/* The side you are not on is the one you can go to, so it is the
-                one that carries the arrow. */}
-            {on ? null : <ArrowRight className="h-3.5 w-3.5 text-slate-400 transition group-hover:translate-x-0.5" />}
-          </Link>
-        );
-      })}
+      ] as const).map((tab) => (
+        <TabLink key={tab.id} href={viewHref(tab.id)} active={view === tab.id} className="strip-tab">
+          <tab.icon />
+          {tab.label}
+        </TabLink>
+      ))}
     </nav>
 
     <section
       ref={card}
       data-dt-frame
-      className="register register-sheet flex flex-col"
+      className="register register-sheet flex flex-col rounded-t-none"
       style={{ height: fit }}
     >
       {facets.length ? (
@@ -345,7 +337,7 @@ export function PlanRegister({
           ))}
           <button
             type="button"
-            onClick={() => go(view === "table" ? "/schedule?view=table" : "/schedule")}
+            onClick={() => go(view === "plan" ? "/schedule" : `/schedule?view=${view}`)}
             className="ml-1 inline-flex items-center gap-1 rounded-sm bg-brand px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-brand-hover"
           >
             <X className="h-3 w-3" /> Clear all {facets.length}
@@ -354,13 +346,22 @@ export function PlanRegister({
         </div>
       ) : null}
 
-      {view === "plan" ? (
+      {view === "calendar" ? (
+        // The same height as the plan and the table (owner): the days grown or shrunk scroll inside the card.
+        <div className={`min-h-0 flex-1 overflow-auto px-5 py-4 sm:px-6 ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>{calendar}</div>
+      ) : view === "plan" ? (
         <div className={`flex min-h-0 flex-1 flex-col ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
           {/* What the plan covers, and what its colours mean: the two things a
               reader needs before the bars, at the two corners above them. */}
-          <div className="flex items-start justify-between gap-4 px-5 pt-4 sm:px-6">
-            <span className="font-mono text-xs font-semibold tracking-tight text-slate-700 tabular-nums">
+          <div className="flex items-center justify-between gap-4 px-5 pt-3 sm:px-6">
+            {/* The days drawn, once (owner: "date is repeated 3 times"): where the schedule runs is said on hover. */}
+            <span className="font-mono text-xs font-semibold tracking-tight text-slate-700 tabular-nums" title={more?.span ? `The schedule runs ${more.span}` : undefined}>
               {more?.window && !more.window.wide ? more.window.label : filters.from || filters.to ? `${filters.from || "…"} → ${filters.to || "…"}` : "Every date in the schedule"}
+              {more?.wbs?.none ? (
+                <span className="ml-2 font-sans text-[11px] font-normal text-slate-500" title="The WBS comes only from a P6 export (.xer).">· no WBS</span>
+              ) : more?.wbs?.href ? (
+                <Link href={more.wbs.href} className="ml-2 font-sans text-[11px] font-semibold text-link hover:underline">Group by WBS</Link>
+              ) : null}
             </span>
             <span
               className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px] text-slate-500"
@@ -421,15 +422,19 @@ export function PlanRegister({
           ) : plan}
 
           {more && more.total ? (
-            <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
+            <div data-dt-foot className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-2 sm:px-6">
               {/* How much of the schedule is in front of you, and the way out of
                   the window — one line, on the left where counts are read. */}
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
                 <span className="font-mono tabular-nums">
-                  {more.shown.toLocaleString("en-GB")}<span className="ml-1 font-sans text-slate-500">of {more.total.toLocaleString("en-GB")}</span>
+                  {/* How many are drawn, in garnet, of how many there are (owner: "50 on 159, the 50 is the colored one"). */}
+                  <span className="font-semibold text-rose-800">{more.shown.toLocaleString("en-GB")}</span>
+                  <span className="mx-1 font-sans text-slate-500">of</span>
+                  {more.total.toLocaleString("en-GB")}
+                  <span className="ml-1 font-sans text-slate-500">{more.total === 1 ? "action" : "actions"}{more.window ? " in these days" : ""}</span>
                 </span>
                 {more.window && more.window.elsewhere ? (
-                  <span className="text-amber-800">· {more.window.elsewhere.toLocaleString("en-GB")} outside these days</span>
+                  <span className="text-amber-800">· {more.window.elsewhere.toLocaleString("en-GB")} more on other days</span>
                 ) : null}
                 {more.undated ? (
                   <button type="button" onClick={() => go(more.undatedHref ?? viewHref("table"))} className="text-amber-800 hover:underline" title="An action with no date has no bar; the table lists them">
@@ -462,7 +467,7 @@ export function PlanRegister({
                   {pending ? "Loading…" : `Load ${Math.min(more.step, more.total - more.shown)} more`}
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
-              ) : <span className="text-[11px] text-slate-500">all of them drawn</span>}
+              ) : null}
 
               {/* How many more each press draws. */}
               <label className="flex items-center justify-end gap-1.5 leading-none">
@@ -505,6 +510,7 @@ export function PlanRegister({
               <DataTable
                 id="actions"
                 className="rounded-none border-0 shadow-none"
+                paging={total > 0 ? <TablePaging from={paging.from} to={paging.to} total={total} page={paging.page} pages={paging.pages} onPage={(page) => go(step(page))} perPage={paging.perPage} sizes={paging.sizes} onSize={(per) => go(sized(per))} /> : undefined}
                 defaultHidden={["Confirmed"]}
                 fill
                 stretch
@@ -590,88 +596,18 @@ export function PlanRegister({
             ) : (
               <div className="px-6 py-20 text-center">
                 <p className="font-mono text-xs tracking-[0.2em] text-slate-500 uppercase">no actions</p>
-                <p className="mt-2 text-sm text-slate-700">Nothing in the schedule matches these filters.</p>
+                <p className="mt-2 text-sm text-slate-700">{facets.length ? "Nothing in the schedule matches these filters." : "The schedule has no actions yet. They come from the schedule's file: its register document released, or uploaded here."}</p>
                 {facets.length ? <button type="button" onClick={() => go("/schedule?view=table")} className="mt-3 text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
               </div>
             )}
           </div>
 
-          {total > 0 ? (
-            <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
-              <p className="font-mono text-[11px] tabular-nums text-slate-500">
-                {paging.from.toLocaleString("en-GB")}–{paging.to.toLocaleString("en-GB")}
-                <span className="ml-1.5 font-sans text-slate-500">of {total.toLocaleString("en-GB")}</span>
-              </p>
-              {paging.pages > 1 ? (
-                <span className="flex items-center gap-2">
-                  <PageStep onClick={() => go(step(paging.page - 1))} disabled={paging.page === 1} label="Previous page"><ChevronLeft className="h-4 w-4" /></PageStep>
-                  <span className="font-mono text-[11px] tabular-nums text-slate-500">{paging.page} of {paging.pages}</span>
-                  <PageStep onClick={() => go(step(paging.page + 1))} disabled={paging.page === paging.pages} label="Next page"><ChevronRight className="h-4 w-4" /></PageStep>
-                </span>
-              ) : <span />}
-              <label className="flex items-center justify-end gap-1.5">
-                <span className="stencil text-slate-500">Rows</span>
-                <Select className="plain" value={paging.perPage} onChange={(event) => go(sized(Number(event.target.value)))}>
-                  {paging.sizes.map((size) => <option key={size} value={size}>{size}</option>)}
-                </Select>
-              </label>
-            </div>
-          ) : null}
         </div>
       )}
     </section>
   </>;
 }
 
-/** One narrowing choice, drawn as the register draws them. */
-function Narrow({ name, value, empty, options }: { name: string; value: string; empty: string; options: Opt[] }) {
-  // A choice made with the pointer applies at once, like the colour key. One
-  // made with the keyboard applies on leaving the box, so stepping through the
-  // options with the arrow keys does not reload the page at every step.
-  const pointer = useRef(false);
-  const waiting = useRef(false);
-  return (
-    <label className="min-w-0 flex-1">
-      <span className="sr-only">{empty}</span>
-      <Select
-        name={name}
-        defaultValue={value}
-        data-on={value ? "true" : "false"}
-        data-instant="true"
-        className="plain w-full"
-        onPointerDown={() => { pointer.current = true; }}
-        onKeyDown={() => { pointer.current = false; }}
-        onChange={(event) => {
-          if (pointer.current) event.currentTarget.form?.requestSubmit();
-          else waiting.current = true;
-        }}
-        onBlur={(event) => {
-          if (!waiting.current) return;
-          waiting.current = false;
-          event.currentTarget.form?.requestSubmit();
-        }}
-      >
-        <option value="">{empty}</option>
-        <FilterOptions options={options} />
-      </Select>
-    </label>
-  );
-}
-
-/** One step through the register. A step that leads nowhere is shown, and dead. */
-function PageStep({ onClick, disabled, label, children }: { onClick: () => void; disabled: boolean; label: string; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className="rounded-sm p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-ink disabled:cursor-default disabled:text-slate-300 disabled:hover:bg-transparent"
-    >
-      {children}
-    </button>
-  );
-}
 
 /** Where this browser keeps the order its reader dragged the columns into. */
 const ORDER_KEY = "actions:columns";
@@ -719,6 +655,7 @@ const HAPPENED: Record<PlanTableRow["happened"], { label: string; chip: string }
   POSTPONED: { label: "Postponed", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
   CARRIED: { label: "Missing documents", chip: "bg-amber-100 text-amber-900 ring-amber-300" },
   DONE: { label: "With documents", chip: "bg-emerald-600/10 text-emerald-900 ring-emerald-300" },
+  NONE: { label: "Went ahead", chip: "bg-slate-100 text-slate-700 ring-slate-300" },
   AHEAD: { label: "Not yet", chip: "bg-sky-50 text-sky-800 ring-sky-200" },
 };
 
@@ -739,7 +676,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "happened", label: "Went ahead?",
-    note: "Once the day has passed: With documents — it had everything it needed, in time. Missing documents — it went ahead without all of them; each discipline that confirmed going ahead said why. Postponed — the control function wrote down that it did not happen. Before the day: not yet.",
+    note: "Once the day has passed: With documents — it had everything it needed, in time. Missing documents — it went ahead without all of them; each discipline that confirmed going ahead said why. Postponed — the control function wrote down that it did not happen. Went ahead — its day passed with no document listed, so nothing says what it had. Before the day: not yet.",
     cellClass: "whitespace-nowrap",
     // Before the day there is nothing to say: the column stays quiet.
     cell: (row) => row.happened === "AHEAD" ? <span className="text-xs text-slate-400">—</span> : (
@@ -754,7 +691,9 @@ const COLUMNS: Column[] = [
     headClass: "text-right", cellClass: "whitespace-nowrap text-right text-xs tabular-nums",
     cell: (row) => row.date
       ? <>
-          <span className="text-xs font-medium text-slate-800">{row.date}{row.finish ? ` → ${row.finish}` : ""}</span>
+          <span className="text-xs font-medium text-slate-800" title={row.startAchieved || row.finishAchieved ? "A: achieved, as the planner says (their word on the work, not on its documents)" : undefined}>
+            {row.date}{row.startAchieved ? " A" : ""}{row.finish ? ` → ${row.finish}${row.finishAchieved ? " A" : ""}` : ""}
+          </span>
           <span className={`block font-sans text-[11px] ${row.late ? "text-red-600" : "text-slate-500"}`}>
             {row.when}
           </span>
@@ -770,7 +709,7 @@ const COLUMNS: Column[] = [
           <span className="text-xs font-semibold tabular-nums text-slate-800">{row.ready}<span className="font-normal text-slate-500"> / {row.total}</span></span>
           <span className="h-1 w-14 overflow-hidden rounded-full bg-slate-100">
             <span
-              className={`block h-full rounded-full ${row.ready === row.total ? "bg-emerald-500" : "bg-amber-500"}`}
+              className={`bar-build block h-full rounded-full ${row.ready === row.total ? "bg-emerald-500" : "bg-amber-500"}`}
               style={{ width: row.ready ? `${Math.max(Math.round((row.ready / row.total) * 100), 4)}%` : "0%" }}
             />
           </span>

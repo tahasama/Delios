@@ -7,7 +7,7 @@ import { randomUUID } from "crypto";
 import { STATE_NAMES, STATE_NAME_MAX } from "@/lib/core/state-names";
 import { orgSettings, projectSettings, setOrgSetting, setProjectSetting } from "@/lib/settings/api";
 import { api, projectPath, refusal } from "@/lib/client";
-import { ESCALATE_AFTER_KEY } from "@/lib/actions/escalation";
+import { ESCALATE_AFTER_KEY, NOTIFY_AT_KEY } from "@/lib/actions/escalation";
 import {
   CONTROL_ACTIVITIES,
   controlSettings,
@@ -15,7 +15,6 @@ import {
   SKIPPABLE,
   SKIP_KEY,
   CONFIRMABLE,
-  CONFIRM_KEY,
   actIsOff,
   effectiveAnswer,
   MODE_LABEL,
@@ -56,8 +55,8 @@ async function save(formData: FormData, wanted: [key: string, value: string | nu
   if (String(formData.get("target") ?? "") !== "defaults") {
     const ctx = await requireAdminScope();
     // An answer the organization keeps fixed is not the project's to change: it is left as it stands.
-    const { liberty } = await import("@/lib/organization/liberty");
-    const fixed = new Set((await liberty()).filter((one) => !one.free).map((one) => one.key));
+    const { projectLiberty } = await import("@/lib/organization/liberty");
+    const fixed = new Set((await projectLiberty(ctx.projectId)).filter((one) => !one.free).map((one) => one.key));
     let changed = 0;
     for (const [key, value] of wanted) {
       const item = roomItemOf(key);
@@ -89,82 +88,11 @@ async function save(formData: FormData, wanted: [key: string, value: string | nu
 
 function revalidateHowItWorks() {
   revalidatePath("/settings/flow");
-  revalidatePath("/settings/flow");
+  revalidatePath("/schedule");
   revalidatePath("/organization");
   revalidatePath("/organization/settings");
   revalidatePath("/organization/settings/flow");
   revalidatePath("/organization/defaults");
-}
-
-/**
- * The screen, saved in one go: the project's answer, and — when that answer is
- * "it depends" — each act's own. For the defaults, "as each project is set up"
- * (FOLLOW) forgets the answer.
- */
-export async function setControlActivitiesAction(_prev: State | undefined, formData: FormData): Promise<State> {
-  const asked = String(formData.get("projectMode") ?? "") as ProjectMode | "FOLLOW";
-  const defaults = String(formData.get("target") ?? "") === "defaults";
-  if (!PROJECT_MODES.includes(asked as ProjectMode) && !(defaults && asked === "FOLLOW")) return { error: "Choose who carries these acts out." };
-
-  const wanted: [string, string | null][] = [[PROJECT_KEY, asked === "FOLLOW" ? null : asked]];
-  if (asked === "CUSTOM") {
-    for (const activity of CONTROL_ACTIVITIES) {
-      const value = String(formData.get(`mode:${activity.key}`) ?? "") as ControlMode;
-      if (ACT_MODES.includes(value)) wanted.push([activity.key, value]);
-    }
-  }
-
-  // An act that may be left out says so with its own answer, kept whichever way the acts are carried out: who would
-  // carry it out stays as it was, for the day it is used again.
-  for (const key of Object.keys(SKIPPABLE)) if (formData.has(`skipping:${key}`)) wanted.push([SKIP_KEY(key), formData.get(`use:${key}`) === "on" ? "ON" : "OFF"]);
-  // The confirmation by whoever holds Manage is its own answer, kept whichever way the acts are carried out.
-  for (const key of Object.keys(CONFIRMABLE)) wanted.push([CONFIRM_KEY(key), formData.get(`confirm:${key}`) === "on" ? "ON" : "OFF"]);
-  let changed: number;
-  try {
-    changed = await save(formData, wanted);
-  } catch (e) {
-    return { error: refusal(e).message };
-  }
-  revalidateHowItWorks();
-  if (!changed) return { ok: "Nothing changed." };
-  if (asked === "FOLLOW") return { ok: "Saved — each new project follows whether it has a control function." };
-  return {
-    ok: asked === "CUSTOM"
-      ? `Saved — act by act. ${CONTROL_ACTIVITIES.length} acts, each with its own answer.`
-      : `Saved — ${PROJECT_MODE_LABEL[asked].toLowerCase()}.`,
-  };
-}
-
-/**
- * How this organization works, as against who does what: what releasing a
- * revision means, and what makes an action's document count as delivered.
- * Both are genuine choices, and the app holds an opinion rather than a rule.
- */
-export async function setPolicyAction(_prev: State | undefined, formData: FormData): Promise<State> {
-  const wanted: [string, string | null][] = [];
-  const said: string[] = [];
-  for (const one of POLICIES) {
-    const asked = String(formData.get(one.key) ?? "");
-    if (!one.options.some((option) => option.value === asked)) continue;
-    wanted.push([one.key, asked]);
-    said.push(one.options.find((option) => option.value === asked)!.label.toLowerCase());
-  }
-  const escalate = String(formData.get(ESCALATE_AFTER_KEY) ?? "").trim();
-  if (escalate) {
-    const days = Number(escalate);
-    if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Notify again after 1 to 60 working days." };
-    wanted.push([ESCALATE_AFTER_KEY, String(days)]);
-    said.push(`notified again after ${days} working days`);
-  }
-  let changed: number;
-  try {
-    changed = await save(formData, wanted);
-  } catch (e) {
-    return { error: refusal(e).message };
-  }
-  revalidateHowItWorks();
-  if (!changed) return { ok: "Nothing changed." };
-  return { ok: `Saved: ${said.join("; ")}.` };
 }
 
 /**
@@ -190,6 +118,8 @@ export async function resetProjectToDefaultsAction(_prev: State | undefined, _fo
       await setProjectSetting(ctx.projectId, key, value);
       changed++;
     }
+    // The days around an action follow the organization's again too.
+    await api(projectPath(ctx, "/schedule/days"), { method: "PUT", body: { followOrganization: true } });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -214,10 +144,13 @@ export async function setStateNamesAction(_prev: State | undefined, formData: Fo
   });
   for (const { one, label } of wanted) {
     if (label.length > STATE_NAME_MAX) return { error: `Keep “${label}” under ${STATE_NAME_MAX} characters.` };
-    // Two states read the same would make the register lie about one of them.
-    const clash = taken.get(label.toLowerCase());
+    // Two states of the same column read the same would make the register lie about one of them (the app's own words
+    // may share one: a supplier's document is "Returned" by the check and by the review alike).
+    if (label === one.default) continue;
+    const word = `${one.group}:${label.toLowerCase()}`;
+    const clash = taken.get(word) ?? wanted.find((w) => w.one.group === one.group && w.one.code !== one.code && w.label.toLowerCase() === label.toLowerCase())?.one.default;
     if (clash) return { error: `“${label}” is used twice — ${clash} and ${one.default} must read differently.` };
-    taken.set(label.toLowerCase(), one.default);
+    taken.set(word, one.default);
   }
   try {
     for (const { one, label } of wanted) {
@@ -242,6 +175,17 @@ export async function setStateNamesAction(_prev: State | undefined, formData: Fo
  */
 export async function setScheduleDaysAction(_prev: State | undefined, formData: FormData): Promise<State> {
   const ctx = await requireScope();
+  // Back on the organization's days: the project's own are forgotten.
+  if (formData.get("follow") === "1") {
+    try {
+      await api(projectPath(ctx, "/schedule/days"), { method: "PUT", body: { followOrganization: true } });
+    } catch (e) {
+      return { error: refusal(e).message };
+    }
+    revalidatePath("/settings/flow");
+    revalidatePath("/schedule");
+    return { ok: "The project follows the organization's days around an action again." };
+  }
   const lead = Number(formData.get("leadDays"));
   const risk = Number(formData.get("riskDays"));
   if (!Number.isInteger(lead) || !Number.isInteger(risk) || lead < 0 || risk < 0 || lead > 365 || risk > 365)
@@ -258,6 +202,31 @@ export async function setScheduleDaysAction(_prev: State | undefined, formData: 
 
 
 /**
+ * The organization's days around an action (its Control room and the defaults for new projects): the default of every
+ * project, read live; a project that changed its own keeps them. The backend reads every project's actions again.
+ */
+export async function setOrgScheduleDaysAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const { requireOrgAdmin } = await import("@/lib/core/org-scope");
+  await requireOrgAdmin();
+  const lead = formData.get("leadDays");
+  const risk = formData.get("riskDays");
+  const body: Record<string, number> = {};
+  for (const [name, value] of [["defaultLeadDays", lead], ["riskWindowDays", risk]] as const) {
+    if (value === null || String(value).trim() === "") continue;
+    const days = Number(value);
+    if (!Number.isInteger(days) || days < 0 || days > 365) return { error: "Write whole days, from 0 to 365." };
+    body[name] = days;
+  }
+  try {
+    await api("/api/admin/schedule-days", { method: "PUT", body });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidateHowItWorks();
+  return { ok: "Saved: every project following the organization's days reads them from now on." };
+}
+
+/**
  * One answer of the Control room, changed where it is shown (a step's panel): who carries out an act (CONTROL /
  * SELF, or OFF for an act that may be left out), a question of how the project works, a confirmation by whoever
  * holds Manage (ON / OFF), a stamp on the PDF (ON / OFF), or the working days before a silent discipline is escalated. Only this answer changes;
@@ -269,7 +238,21 @@ export async function setRoomAnswerAction(_prev: State | undefined, formData: Fo
   const activity = CONTROL_ACTIVITIES.find((one) => one.key === key);
   let said: string;
   try {
-    if (activity && String(formData.get("target") ?? "") === "defaults") {
+    if (key === PROJECT_KEY) {
+      // Who carries out every act at once; "as each project is set up" (the defaults only) forgets the answer. Moving to
+      // "it depends on the act" writes each act down as it stands, so that nothing moves by itself.
+      const defaults = String(formData.get("target") ?? "") === "defaults";
+      if (!PROJECT_MODES.includes(value as ProjectMode) && !(defaults && value === "FOLLOW")) return { error: "Choose who carries these acts out." };
+      const wanted: [string, string | null][] = [[PROJECT_KEY, value === "FOLLOW" ? null : value]];
+      if (value === "CUSTOM") {
+        const now = defaults
+          ? controlFrom(new Map(Object.entries((await (await import("@/lib/organization/defaults")).projectDefaults())?.values ?? {})), true)
+          : await controlSettings(await requireAdminScope());
+        for (const row of now.rows) wanted.push([row.activity.key, row.controlDoes ? "CONTROL" : "SELF"]);
+      }
+      await save(formData, wanted);
+      said = value === "FOLLOW" ? "Each new project reads whether somebody holds the control function." : `${PROJECT_MODE_LABEL[value as ProjectMode]}.`;
+    } else if (activity && String(formData.get("target") ?? "") === "defaults") {
       // The organization's defaults: the act answers for itself, the others written down as they stand, so that
       // moving this one never moves another.
       if (value === "OFF") {
@@ -317,6 +300,11 @@ export async function setRoomAnswerAction(_prev: State | undefined, formData: Fo
       if (!Number.isInteger(days) || days < 1 || days > 60) return { error: "Notify again after 1 to 60 working days." };
       await save(formData, [[key, String(days)]]);
       said = `A silent discipline is notified again after ${days} working days.`;
+    } else if (key === NOTIFY_AT_KEY) {
+      const hour = Number(value);
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23) return { error: "Choose an hour from 0 to 23." };
+      await save(formData, [[key, String(hour)]]);
+      said = `The day's notices go out at ${String(hour).padStart(2, "0")}:00, the project's time.`;
     } else {
       const policy = POLICIES.find((one) => one.key === key);
       const option = policy?.options.find((one) => one.value === value);

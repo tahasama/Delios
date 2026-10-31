@@ -8,7 +8,8 @@ using NodaTime;
 namespace Delios.Host.Actions;
 
 /// <summary>The schedule as its screens show it: the actions in force, each with everything its rows and page need.</summary>
-public sealed record PlanView(string? VersionInForce, IReadOnlyList<PlanAction> Actions);
+/// <param name="Total">Every action in force, when more than are sent (<see cref="ScheduleEndpoints.MaxActions"/>); null when all are.</param>
+public sealed record PlanView(string? VersionInForce, IReadOnlyList<PlanAction> Actions, int? Total = null);
 
 /// <summary>
 /// An action with its needs (each with its document and where it stands), the decisions about it (newest first), and each
@@ -20,7 +21,9 @@ public sealed record PlanView(string? VersionInForce, IReadOnlyList<PlanAction> 
 public sealed record PlanAction(Guid Id, string Code, string? ExternalId, string Name, string? Responsible, IReadOnlyList<string> Departments,
     DateOnly? Start, DateOnly? Finish, int NeedCount, ActivityMove? Moved, DateTimeOffset? LastMetAt,
     IReadOnlyList<PlanNeed> Needs, IReadOnlyList<DecisionView> Decisions, IReadOnlyList<PlanConfirmation> Confirmations,
-    bool Passed, string State, DateOnly? RiskFrom, IReadOnlyDictionary<string, DateOnly?> DisciplineRiskFrom);
+    bool Passed, string State, DateOnly? RiskFrom, IReadOnlyDictionary<string, DateOnly?> DisciplineRiskFrom,
+    bool StartAchieved = false, bool FinishAchieved = false, IReadOnlyList<string>? Wbs = null, int? WbsOrder = null,
+    DateOnly? NeededFrom = null);
 
 /// <summary>
 /// One need: what it asks for (the statuses it names, or its purpose), by when (<c>ManualDate</c>: a date set by hand;
@@ -56,14 +59,20 @@ public static partial class ScheduleEndpoints
 {
     // ── The plan, as its screens show it ──────────────────────────────────────
 
+    /// <summary>The most actions one answer carries (a large P6 schedule runs to thousands); past it, the plan says how many in all.</summary>
+    public const int MaxActions = 20_000;
+
     /// <summary>GET /plan: every action in force, in one answer (the schedule list, its exports and its upkeep).</summary>
     private static async Task<IResult> PlanAsync(HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        var activities = await db.Activities.AsNoTracking().Include(a => a.Requirements)
-            .Where(a => a.ProjectId == access.Project.Id && a.State == ActivityStates.Active)
-            .OrderBy(a => a.Start).ThenBy(a => a.Code).Take(2000).ToListAsync(cancellationToken);
-        return Results.Ok(await ViewAsync(db, clock, access, activities, cancellationToken));
+        await ScheduleImporter.AskCatchUpAsync(db, access.Project, cancellationToken);
+        var inForce = db.Activities.AsNoTracking().Where(a => a.ProjectId == access.Project.Id && a.State == ActivityStates.Active);
+        var activities = await inForce.Include(a => a.Requirements).AsSplitQuery()
+            .OrderBy(a => a.Start).ThenBy(a => a.Code).Take(MaxActions).ToListAsync(cancellationToken);
+        var view = await ViewAsync(db, clock, access, activities, cancellationToken);
+        // Never cut without saying so: past the limit, how many there are in all.
+        return Results.Ok(activities.Count < MaxActions || !access.IsInternal ? view : view with { Total = await inForce.CountAsync(cancellationToken) });
     }
 
     /// <summary>GET /plan/{code}: one action by its code, also one the schedule has since dropped.</summary>
@@ -97,12 +106,56 @@ public static partial class ScheduleEndpoints
         return value is null ? null : $"rev {value}";
     }
 
+    /// <summary>Where an action stands, from itself and its needs alone (no document read): the plan, its page and its filters.</summary>
+    internal readonly record struct ActionFacts(bool Covered, DateTimeOffset? LastMet, bool Passed, LocalDate? RiskFrom, string State);
+
+    internal static ActionFacts FactsOf(Activity a, LocalDate today, int window)
+    {
+        var covered = a.Requirements.Count > 0 && a.Requirements.All(n => n.State == RequirementStates.Met);
+        var lastMet = covered ? a.Requirements.Max(n => n.MetAt)?.ToDateTimeOffset() : null;
+        var passed = a.Start is { } day && day < today;
+        var riskFrom = RiskOf(a, _ => true, window);
+        var state = a.Requirements.Count == 0 ? ActionStates.Unknown
+            : covered ? (!passed ? ActionStates.Ready
+                : lastMet is { } met && a.Start is { } s && met > s.AtStartOfDayInZone(DateTimeZone.Utc).ToDateTimeOffset() ? ActionStates.LateReceipt
+                : ActionStates.Done)
+            : passed ? ActionStates.Overdue
+            : riskFrom is { } from && from <= today ? ActionStates.AtRisk : ActionStates.Upcoming;
+        return new ActionFacts(covered, lastMet, passed, riskFrom, state);
+    }
+
+    /// <summary>
+    /// Where an action stands, from what it keeps (written by Readiness.RestateAsync when one of its documents or needs
+    /// changes): the same answer as <see cref="FactsOf"/>, without reading its needs.
+    /// </summary>
+    internal static ActionFacts RecordedFacts(int needs, int met, Instant? lastMetAt, LocalDate? riskFrom, LocalDate? start, LocalDate today)
+    {
+        var covered = needs > 0 && met == needs;
+        var lastMet = covered ? lastMetAt?.ToDateTimeOffset() : null;
+        var passed = start is { } day && day < today;
+        var state = needs == 0 ? ActionStates.Unknown
+            : covered ? (!passed ? ActionStates.Ready
+                : lastMet is { } at && start is { } s && at > s.AtStartOfDayInZone(DateTimeZone.Utc).ToDateTimeOffset() ? ActionStates.LateReceipt
+                : ActionStates.Done)
+            : passed ? ActionStates.Overdue
+            : riskFrom is { } from && from <= today ? ActionStates.AtRisk : ActionStates.Upcoming;
+        return new ActionFacts(covered, lastMet, passed, riskFrom, state);
+    }
+
+    /// <summary>The day an action is at risk from, for the needs given: its day less the longest window of one still missing.</summary>
+    private static LocalDate? RiskOf(Activity a, Func<Requirement, bool> only, int window)
+    {
+        var missing = a.Requirements.Where(n => only(n) && n.State != RequirementStates.Met).ToList();
+        return a.Start is { } start && missing.Count > 0 ? missing.Min(n => start.PlusDays(-(n.RiskDays ?? window))) : null;
+    }
+
     private static async Task<List<PlanAction>> PlanActionsAsync(DeliosDbContext db, IClock clock, Project project, List<Activity> activities,
         CancellationToken cancellationToken)
     {
         var projectId = project.Id;
         var today = WorkingCalendar.Today(clock, project.TimeZone);
-        var window = await db.ScheduleSources.Where(s => s.ProjectId == projectId).Select(s => (int?)s.RiskWindowDays).SingleOrDefaultAsync(cancellationToken) ?? 7;
+        var days = await ScheduleDays.ForProjectAsync(db, projectId, cancellationToken);
+        var window = days.Risk;
         var ids = activities.Select(a => a.Id).ToList();
         var documentIds = activities.SelectMany(a => a.Requirements).Select(r => r.DocumentId).Distinct().ToList();
         var documents = await db.Documents.AsNoTracking().Where(d => documentIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, cancellationToken);
@@ -133,21 +186,8 @@ public static partial class ScheduleEndpoints
                             inForce is null ? null : new PlanReleased(inForce.Value, inForce.StatusCode, n.State == RequirementStates.Met),
                             newest is null ? null : new PlanLatest(newest.Value, newest.State, newest.StatusCode, newest.HeldAt is not null)));
                 }).ToList();
-            var covered = a.Requirements.Count > 0 && a.Requirements.All(n => n.State == RequirementStates.Met);
-            var lastMet = covered ? a.Requirements.Max(n => n.MetAt)?.ToDateTimeOffset() : null;
-            var passed = a.Start is { } day && day < today;
-            LocalDate? RiskFromOf(Func<Requirement, bool> only)
-            {
-                var missing = a.Requirements.Where(n => only(n) && n.State != RequirementStates.Met).ToList();
-                return a.Start is { } start && missing.Count > 0 ? missing.Min(n => start.PlusDays(-(n.RiskDays ?? window))) : null;
-            }
-            var riskFrom = RiskFromOf(_ => true);
-            var state = a.Requirements.Count == 0 ? ActionStates.Unknown
-                : covered ? (!passed ? ActionStates.Ready
-                    : lastMet is { } met && a.Start is { } s && met > s.AtStartOfDayInZone(DateTimeZone.Utc).ToDateTimeOffset() ? ActionStates.LateReceipt
-                    : ActionStates.Done)
-                : passed ? ActionStates.Overdue
-                : riskFrom is { } from && from <= today ? ActionStates.AtRisk : ActionStates.Upcoming;
+            var (_, lastMet, passed, riskFrom, state) = FactsOf(a, today, window);
+            LocalDate? RiskFromOf(Func<Requirement, bool> only) => RiskOf(a, only, window);
             var disciplineRisk = a.Departments.ToDictionary(d => d,
                 d => RiskFromOf(n => n.Department is null || string.Equals(n.Department, d, StringComparison.Ordinal))?.ToDateOnly());
             return new PlanAction(a.Id, a.Code, a.ExternalId, a.Name, a.Responsible, a.Departments, a.Start?.ToDateOnly(), a.Finish?.ToDateOnly(),
@@ -159,7 +199,10 @@ public static partial class ScheduleEndpoints
                     d.ConfirmedByName, d.ConfirmedAt?.ToDateTimeOffset(), d.ConfirmNote, d.ReversedByName, d.ReversedAt?.ToDateTimeOffset(), d.ReversedReason)).ToList(),
                 confirmations[a.Id].Select(c => new PlanConfirmation(c.Department, c.Available, c.Note, c.ConfirmedByName, c.ConfirmedAt.ToDateTimeOffset(),
                     c.Automatic, c.RevokedAt?.ToDateTimeOffset(), c.RevokedByName, c.RevokedReason)).ToList(),
-                passed, state, riskFrom?.ToDateOnly(), disciplineRisk);
+                passed, state, riskFrom?.ToDateOnly(), disciplineRisk, a.StartAchieved, a.FinishAchieved, a.Wbs, a.WbsOrder,
+                // From when its documents are needed (owner: the plan's lead-in): the earliest a listed document is due,
+                // else the project's lead before its day, as a document added by hand would be due.
+                (a.Requirements.Select(n => Readiness.NeededBy(a, n)).Where(d => d is not null).Min() ?? a.Start?.PlusDays(-days.Lead))?.ToDateOnly());
         }).ToList();
     }
 }

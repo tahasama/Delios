@@ -1,7 +1,7 @@
 #!/bin/sh
 # Creates .env (the project folder) with a random password for every service, once. The file
 # is never committed; Compose reads it on every command. Run it again and it
-# leaves an existing file alone.
+# leaves what is there alone, adding only what a newer version needs (the files' key, the copier's key).
 #
 #   sh deploy/init-env.sh
 #
@@ -12,9 +12,11 @@ here=$(cd "$(dirname "$0")" && pwd)
 env_file="$here/../.env"
 
 random() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32; }
+# The files' key: 32 random bytes in base64.
+files_key() { head -c 32 /dev/urandom | base64 | tr -d '\n'; }
 
 if [ -f "$env_file" ]; then
-  echo "$env_file exists; nothing changed."
+  echo "$env_file exists; kept as it is."
 else
   umask 077
   cat > "$env_file" <<ENV
@@ -24,11 +26,34 @@ DB_APP_PASSWORD=$(random)
 DB_MONITOR_PASSWORD=$(random)
 DB_REPLICATION_PASSWORD=$(random)
 RABBITMQ_PASSWORD=$(random)
+SCREENS_SECRET=$(random)
 STORAGE_ACCESS_KEY=delios
 STORAGE_SECRET_KEY=$(random)
 GRAFANA_ADMIN_PASSWORD=$(random)
 ENV
   echo "Created $env_file"
+fi
+
+# A file not ending in a new line had the next key glued onto its last line: put each back on its own.
+for name in SCREENS_SECRET STORAGE_COPIER_KEY STORAGE_COPIER_SECRET FILES_KEY; do
+  if grep -q "^[^#].*$name=" "$env_file"; then
+    awk -v k="$name=" '{ i = index($0, k); if (i > 1 && substr($0, 1, 1) != "#") { print substr($0, 1, i - 1); print substr($0, i) } else print }' \
+      "$env_file" > "$env_file.tmp" && cat "$env_file.tmp" > "$env_file" && rm -f "$env_file.tmp"
+    echo "Put $name back on its own line in $env_file"
+  fi
+done
+# End the file with a new line, so a key added below starts on its own.
+if [ -s "$env_file" ] && [ -n "$(tail -c 1 "$env_file")" ]; then printf '\n' >> "$env_file"; fi
+
+# What a newer version needs, added to an existing file without touching the rest.
+add() { grep -q "^$1=" "$env_file" || { printf '%s=%s\n' "$1" "$2" >> "$env_file"; echo "Added $1 to $env_file"; }; }
+add SCREENS_SECRET "$(random)"
+add STORAGE_COPIER_KEY copier
+add STORAGE_COPIER_SECRET "$(random)"
+if ! grep -q '^FILES_KEY=' "$env_file"; then
+  add FILES_KEY "$(files_key)"
+  echo "FILES_KEY encrypts every file kept. Save a copy of that line somewhere safe, apart from this machine and its"
+  echo "backups (a password manager, a safe): without it, the files cannot be read again."
 fi
 
 if command -v dotnet >/dev/null 2>&1; then
@@ -41,5 +66,6 @@ if command -v dotnet >/dev/null 2>&1; then
     "amqp://delios:$RABBITMQ_PASSWORD@localhost:5672/" --project "$project" >/dev/null
   dotnet user-secrets set "Storage:AccessKey" "$STORAGE_ACCESS_KEY" --project "$project" >/dev/null
   dotnet user-secrets set "Storage:SecretKey" "$STORAGE_SECRET_KEY" --project "$project" >/dev/null
+  dotnet user-secrets set "Storage:EncryptionKey" "$FILES_KEY" --project "$project" >/dev/null
   echo "Stored the same credentials as user-secrets for dotnet run."
 fi

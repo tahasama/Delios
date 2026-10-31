@@ -3,6 +3,7 @@
 import { Children, Fragment, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { Floating } from "@/components/floating";
 
 type Option = { value: string; label: string; disabled: boolean; group: string | null };
 
@@ -49,6 +50,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
   const native = useRef<HTMLSelectElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const narrowRef = useRef<HTMLInputElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const list = useId();
   const [value, setValue] = useState<string>(String(rest.value ?? rest.defaultValue ?? options[0]?.value ?? ""));
   const [open, setOpen] = useState(false);
@@ -76,7 +78,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
 
   useEffect(() => {
     if (!open) return;
-    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
+    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", away);
     if (long) narrowRef.current?.focus();
     return () => document.removeEventListener("mousedown", away);
@@ -136,7 +138,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
         onKeyDown={key}
         onBlur={(event) => {
           // Leaving the box is when a choice made with the keys applies (as on the register's filters).
-          if (!box.current?.contains(event.relatedTarget as Node)) native.current?.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+          if (!box.current?.contains(event.relatedTarget as Node) && !panel.current?.contains(event.relatedTarget as Node)) native.current?.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
         }}
         className={cn(className, "flex items-center justify-between gap-2 text-left", plain ? "" : "pr-0.5")}
       >
@@ -144,7 +146,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
         {plain ? null : <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform duration-150", open && "rotate-180")} aria-hidden="true" />}
       </button>
       {open ? (
-        <div className="absolute left-0 z-40 mt-1 min-w-full max-w-[28rem] rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
+        <Floating anchor={box} panel={panel} width="at-least" room={Math.min(320, options.length * 32 + (long ? 44 : 12))} className="py-1">
           {long ? (
             <div className="relative border-b border-line px-2 pb-1">
               <Search className="pointer-events-none absolute top-1/2 left-3.5 h-3.5 w-3.5 -translate-y-[60%] text-slate-400" aria-hidden />
@@ -153,7 +155,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
                 className="h-7 w-full bg-transparent pl-7 text-[13px] text-slate-800 outline-none placeholder:text-slate-400" />
             </div>
           ) : null}
-          <ul id={list} role="listbox" className="scroll-thin max-h-80 overflow-y-auto">
+          <ul id={list} role="listbox" className="scroll-thin min-h-0 flex-1 overflow-y-auto">
             {shown.length === 0 ? <li className="px-3 py-2 text-xs text-slate-400">Nothing matches that.</li> : null}
             {shown.map((one, index) => {
               const on = one.value === value;
@@ -173,7 +175,7 @@ export function Select({ children, className, style, disabled, title, id, ...res
               );
             })}
           </ul>
-        </div>
+        </Floating>
       ) : null}
     </div>
   );

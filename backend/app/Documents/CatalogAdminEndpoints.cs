@@ -24,13 +24,11 @@ public sealed record SchemeRequest(string? Name, string? Delimiter = null, bool?
 public sealed record SchemeRoutingRequest(string? DeliverableType, Guid? SchemeId);
 
 /// <summary>Body of creating or changing a review route. A null field is left as it is; lists, when given, replace.</summary>
+/// <param name="Verdicts">The set of the review outcomes it decides from, by name; empty: the set serving the document's deliverable type.</param>
+/// <param name="Advice">The set of the review advice its advising steps answer from, by name; empty: the set serving the document's deliverable type.</param>
 public sealed record RouteRequest(
     string? Name = null, string? Description = null, bool? IsDefault = null, bool? Active = null, RoutePattern[]? Patterns = null,
-    RouteStep[]? Steps = null, string? VerdictSet = null,
-    /// <summary>The set of the review outcomes it decides from, by name; empty: the set serving the document's deliverable type.</summary>
-    string? Verdicts = null,
-    /// <summary>The set of the review advice its advising steps answer from, by name; empty: the set serving the document's deliverable type.</summary>
-    string? Advice = null);
+    RouteStep[]? Steps = null, string? VerdictSet = null, string? Verdicts = null, string? Advice = null);
 
 /// <summary>
 /// What an administrator publishes for the organization: the value lists, how numbers are built and which scheme
@@ -66,11 +64,13 @@ public static class CatalogAdminEndpoints
         project.MapGet("", async (HttpContext h, DeliosDbContext db, CancellationToken c) =>
         {
             var access = ProjectAccessFilter.Of(h);
-            var free = await Liberty.IsFreeAsync(db, Liberty.Routes, c);
+            var free = await Liberty.IsFreeAsync(db, Liberty.Routes, access.Project.Id, c);
             return Results.Ok(new
             {
                 Routes = await RouteViewsAsync(db, await RouteScopeAsync(db, access.Project.Id, c), c),
-                Own = await RouteScopeAsync(db, access.Project.Id, c) is not null, Free = free,
+                Own = await RouteScopeAsync(db, access.Project.Id, c) is not null,
+                Free = free,
+                Exception = await Liberty.ExceptionHereAsync(db, Liberty.Routes, access.Project.Id, c),
                 MayChange = free && await ProjectLists.MayChangeAsync(db, access, c),
                 MayChangeOrganization = await Keepers.ConfiguresAsync(h),
             });
@@ -161,7 +161,7 @@ public static class CatalogAdminEndpoints
         Func<Guid?, Task<IResult>> act, Guid? routeId = null)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!await Liberty.IsFreeAsync(db, Liberty.Routes, cancellationToken))
+        if (!await Liberty.IsFreeAsync(db, Liberty.Routes, access.Project.Id, cancellationToken))
             return Problems.Forbidden("ROUTES_FIXED", "The review routes are the organization's, the same on every project: an administrator changes them in the organization's Settings.");
         if (!await ProjectLists.MayChangeAsync(db, access, cancellationToken))
             return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes its review routes (on a project with none, whoever opened it).");
@@ -172,8 +172,14 @@ public static class CatalogAdminEndpoints
             {
                 var copy = new ReviewRoute
                 {
-                    TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Name = route.Name, Description = route.Description,
-                    IsDefault = route.IsDefault, Active = route.Active, Verdicts = route.Verdicts, Advice = route.Advice,
+                    TenantId = access.Project.TenantId,
+                    ProjectId = access.Project.Id,
+                    Name = route.Name,
+                    Description = route.Description,
+                    IsDefault = route.IsDefault,
+                    Active = route.Active,
+                    Verdicts = route.Verdicts,
+                    Advice = route.Advice,
                     Patterns = route.Patterns.Select(x => new RoutePattern { DeliverableType = x.DeliverableType, DocType = x.DocType, Discipline = x.Discipline, Criticality = x.Criticality, Originator = x.Originator }).ToList(),
                     Steps = System.Text.Json.JsonSerializer.Deserialize<List<RouteStep>>(System.Text.Json.JsonSerializer.Serialize(route.Steps)) ?? [],
                 };
@@ -182,8 +188,12 @@ public static class CatalogAdminEndpoints
             }
             db.Add(new Settings.Setting
             {
-                TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Key = RoutesOwnKey, Value = "ON",
-                UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = access.UserName,
+                TenantId = access.Project.TenantId,
+                ProjectId = access.Project.Id,
+                Key = RoutesOwnKey,
+                Value = "ON",
+                UpdatedAt = clock.GetCurrentInstant(),
+                UpdatedByName = access.UserName,
             });
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -258,7 +268,15 @@ public static class CatalogAdminEndpoints
         // a warning, never a refusal).
         return routes.Select(r => (object)new
         {
-            r.Id, r.Name, r.Description, r.IsDefault, r.Active, r.Patterns, r.Steps, VerdictSet = ReviewSets.Verdicts, r.Verdicts,
+            r.Id,
+            r.Name,
+            r.Description,
+            r.IsDefault,
+            r.Active,
+            r.Patterns,
+            r.Steps,
+            VerdictSet = ReviewSets.Verdicts,
+            r.Verdicts,
             VerdictsMismatch = r.Verdicts is null ? [] : r.Patterns.Select(p => p.DeliverableType).OfType<string>().Distinct()
                 .Where(t => catalog.ServingSetName(ReviewSets.Verdicts, t) != r.Verdicts).ToArray(),
             r.Advice,
@@ -443,7 +461,7 @@ public static class CatalogAdminEndpoints
     /// a project, a person, and a date range (UTC days). Each row says its kind; the kinds come with their counts.
     /// </summary>
     private static async Task<IResult> AuditAsync(
-        DeliosDbContext db, CancellationToken cancellationToken, string? q = null, string? kind = null, string? action = null, string? entityType = null,
+        DeliosDbContext db, Audit.AuditCounts counts, TenantContext tenant, CancellationToken cancellationToken, string? q = null, string? kind = null, string? action = null, string? entityType = null,
         Guid? projectId = null, Guid? actorId = null, DateOnly? from = null, DateOnly? to = null, int page = 1, int per = 50)
     {
         per = Math.Clamp(per, 10, 200);
@@ -451,6 +469,8 @@ public static class CatalogAdminEndpoints
         var query = db.AuditEvents.AsNoTracking();
         if (Blank(entityType) is { } t) query = query.Where(e => e.EntityType == t);
         if (projectId is { } p) query = query.Where(e => e.ProjectId == p);
+        // The whole trail is the organization's work: the training space's acts are read only on that space, asked for by name.
+        else query = query.Where(e => e.ProjectId == null || !db.Projects.Any(t => t.Id == e.ProjectId && t.Space == Identity.Spaces.Training));
         if (actorId is { } who) query = query.Where(e => e.ActorId == who);
         if (from is { } f) { var start = LocalDate.FromDateOnly(f).AtStartOfDayInZone(DateTimeZone.Utc).ToInstant(); query = query.Where(e => e.At >= start); }
         if (to is { } u) { var end = LocalDate.FromDateOnly(u).PlusDays(1).AtStartOfDayInZone(DateTimeZone.Utc).ToInstant(); query = query.Where(e => e.At < end); }
@@ -461,7 +481,11 @@ public static class CatalogAdminEndpoints
                 || (e.EntityLabel != null && EF.Functions.ILike(e.EntityLabel, pattern)) || (e.Detail != null && EF.Functions.ILike(e.Detail, pattern)));
         }
         // The kinds, counted over everything narrowed so far but the kind itself, so each count says what choosing it gives.
-        var actions = await query.GroupBy(e => e.Action).Select(g => new { Action = g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
+        // No words, days or type asked: counted once, then only what was written since (AuditCounts).
+        var counted = Blank(q) is null && from is null && to is null && Blank(entityType) is null
+            ? await counts.ByActionAsync(tenant.Required, $"trail:{projectId}:{actorId}", query, cancellationToken)
+            : await query.GroupBy(e => e.Action).Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N, cancellationToken);
+        var actions = counted.Select(x => new { Action = x.Key, Count = x.Value }).ToList();
         var kinds = AuditKinds.All.Select(k => new { k.Key, k.Label, Count = actions.Where(a => AuditKinds.Of(a.Action) == k.Key).Sum(a => a.Count) })
             .ToList();
         if (Blank(kind) is { } chosen)

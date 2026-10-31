@@ -1,7 +1,7 @@
 import { Select } from "@/components/select";
 import { Fragment } from "react";
 import Link from "next/link";
-import { Pencil, Plus, SlidersHorizontal, X } from "lucide-react";
+import { Download, Pencil, Plus, SlidersHorizontal, X } from "lucide-react";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { DataTable, Th, Td, Field, ToneChip } from "@/components/ui";
 import { ActionForm } from "@/components/form";
@@ -12,11 +12,14 @@ import { switchProjectAction } from "@/lib/settings/forms-project-switch";
 import { cn, fmtDate } from "@/lib/core/utils";
 import { projectKinds } from "@/lib/settings/project-kinds";
 import { contractRoleOptions } from "@/lib/settings/contract-roles";
-import { adminProjects, adminUsers } from "@/lib/settings/api-admin";
+import { adminProjects, adminUsers, projectPlace } from "@/lib/settings/api-admin";
+import { PlaceFields } from "@/app/(app)/settings/projects/place-fields";
 import { projectSettings } from "@/lib/settings/api";
 import { ProjectFields } from "@/app/(app)/settings/projects/project-fields";
 import { joinedProjects } from "@/lib/organization/api";
 import { JoinedProjects } from "../joined";
+import { api } from "@/lib/client";
+import { openTrainingAction, trainingAgainAction } from "@/lib/organization/forms-training";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
@@ -44,13 +47,17 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const scope = await requireOrgAdmin();
   const sp = await searchParams;
   const joined = await joinedProjects();
-  const [policy, roleOptions, all, users] = await Promise.all([
+  const [policy, roleOptions, all, users, place] = await Promise.all([
     formPolicy({ orgId: scope.orgId, projectId: "" }, "PROJECT"), contractRoleOptions(), adminProjects().catch(() => []), adminUsers().catch(() => []),
+    projectPlace().catch(() => ({ timeZone: "UTC", weekendDays: [6, 7], country: null })),
   ]);
   /** I am on this project: its code and name open it. */
   const onIt = (id: string) => users.some((one) => one.id === scope.user.id && one.memberships.some((m) => m.active && m.projectId === id));
 
-  const projects = await Promise.all(all
+  // The training space is listed apart (docs/APP-DECISIONS.md §84): never counted among the organization's projects.
+  const training = await api<{ training: { id: string; code: string; name: string; openedAt: string; people: number; documents: number; organizations: { id: string; code: string; name: string; role: string }[] } | null }>(
+    "/api/admin/training", { keep: { areas: [] } }).then((r) => r.training).catch(() => null);
+  const projects = await Promise.all(all.filter((one) => one.space !== "TRAINING")
     // By code only: changing where a project stands never moves its line.
     .sort((a, b) => a.code.localeCompare(b.code))
     .map(async (one) => {
@@ -99,6 +106,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {/* Every project's files in one zip (owner): taken on the full download's page, "the whole organization". */}
+            <Link href="/full-download" className="ask"><Download className="h-3.5 w-3.5" aria-hidden="true" /> Full download</Link>
             <Link href="/organization/defaults" className="ask"><SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" /> Defaults for new projects</Link>
             {opening ? null : <Link href="/organization/projects?new=1#new" scroll={false} data-on="true" className="ask"><Plus className="h-3.5 w-3.5" aria-hidden="true" /> New project</Link>}
           </div>
@@ -119,6 +128,49 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         </dl>
       </header>
 
+      {/* The training space: one per organization, nothing in it real, started again whenever wanted (owner). */}
+      <section className="register register-sheet register-sheet-open" aria-labelledby="training-head">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span id="training-head" className="stencil mr-1 text-slate-500">Training space</span>
+          <span className="text-[11px] text-slate-500">
+            One for the organization, set up its way: try documents, reviews and transmittals with made-up organizations. Nothing in it is real, no email leaves it, its people are not counted on the plan.
+          </span>
+        </div>
+        {training ? (
+          <div className="grid gap-4 px-5 py-4 sm:px-6 lg:grid-cols-[1fr_auto]">
+            <div className="min-w-0">
+              <p className="text-[13px] text-slate-800">
+                {onIt(training.id) ? (
+                  <form action={switchProjectAction} className="inline">
+                    <input type="hidden" name="projectId" value={training.id} />
+                    <button type="submit" className="font-mono font-semibold text-link hover:underline" title={`Open ${training.code}`}>{training.code}</button>
+                  </form>
+                ) : <span className="font-mono font-semibold">{training.code}</span>}
+                <span className="ml-2">{training.name}</span>
+                <span className="ml-2 text-[11.5px] text-slate-500">open since {fmtDate(new Date(training.openedAt))} · {training.people} {training.people === 1 ? "person" : "people"} · {training.documents} {training.documents === 1 ? "document" : "documents"}</span>
+              </p>
+              <p className="mt-1.5 text-[11.5px] text-slate-500">
+                Made-up organizations, one for each role: {training.organizations.map((o) => o.name).join(", ") || "none (the organization's list of roles is empty)"}.
+                {" "}Put trainees on it from People, as on any project.
+              </p>
+            </div>
+            <ActionForm action={trainingAgainAction} submitLabel="Start it again" variant="secondary" size="sm"
+              confirmText={`Start the training space again? ${training.code} is put away (archived, out of every list, nothing deleted) and a fresh, empty one opens. Its people are not carried over.`}
+              className="flex flex-wrap items-end gap-2">
+              <Field label="Why (optional)" hint="kept on the old one's line">
+                <input name="reason" maxLength={500} className={field} placeholder="e.g. a new group of trainees" />
+              </Field>
+            </ActionForm>
+          </div>
+        ) : (
+          <div className="px-5 py-4 sm:px-6">
+            <ActionForm action={openTrainingAction} submitLabel="Open the training space" size="sm">
+              <p className="text-[12.5px] text-slate-600">None yet. It opens empty, with a made-up organization for each role, and you on it as the control function.</p>
+            </ActionForm>
+          </div>
+        )}
+      </section>
+
       {/* A new project: one sheet, opened from the plate; it becomes the form. */}
       {opening ? (
       <section id="new" className="register register-sheet register-sheet-open scroll-mt-24" aria-label="New project">
@@ -133,6 +185,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 <Asked policy={policy} field="role" hint="decides where approval sits, and the matrix it starts from">{({ required }) => roleSelect("GENERIC", required)}</Asked>
                 <Asked policy={policy} field="startDate">{({ required }) => <input type="date" name="startDate" required={required} className={field} />}</Asked>
                 <Asked policy={policy} field="endDate" hint="planned completion">{({ required }) => <input type="date" name="endDate" required={required} className={field} />}</Asked>
+                {/* Where the site is starts as the organization's defaults for new projects. */}
+                <PlaceFields place={place} />
                 <Asked policy={policy} field="scopeStatement" hint="what it controls" className="sm:col-span-2">
                   {({ required }) => <input name="scopeStatement" required={required} className={field} placeholder="Leave blank for the standard wording" />}
                 </Asked>
@@ -235,7 +289,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 {changing ? (
                   // Another state chosen on the line: only why is asked, under it, then it is done.
                   <tr>
-                    <td colSpan={8} className="border-b border-line bg-tint-soft p-0">
+                    <td colSpan={8} className="open-in border-b border-line bg-tint-soft p-0">
                       <ActionForm action={setProjectStatusAction} hideSubmit hidden={{ projectId: p.id, status: changing.code }}
                         className="asking flex flex-wrap items-end gap-x-6 gap-y-3 px-5 py-4 sm:px-6">
                         <div className="min-w-0 max-w-sm">
@@ -256,7 +310,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 {isOpen ? (
                   // The project's line opened under it: the row itself goes on, the new-document form's way.
                   <tr>
-                    <td colSpan={8} className="border-b border-line p-0">
+                    <td colSpan={8} className="open-in border-b border-line p-0">
                       <ActionForm id={`project-form-${p.id}`} action={saveProjectAction} hideSubmit hidden={{ projectId: p.id }}
                         className="asking space-y-5 px-5 py-5 sm:px-6">
                         <ProjectFields p={{ ...p, scopeStatement: p.info.scopeStatement, description: p.info.description ?? undefined }} roles={roleOptions} kinds={kinds.offered} />

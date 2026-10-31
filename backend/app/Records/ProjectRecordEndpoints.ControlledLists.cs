@@ -58,6 +58,8 @@ public static partial class ProjectRecordEndpoints
     private static async Task<bool> MayControlAsync(HttpContext h, DeliosDbContext db, Guid? projectId)
     {
         if (await Keepers.ConfiguresAsync(h)) return true;
+        // The organization's own lists are an administrator's: the control function of one project does not answer for all.
+        if (projectId is null) return false;
         var me = h.User.UserId();
         return await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && (projectId == null || m.ProjectId == projectId)
             && m.Function!.Active && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control))), h.RequestAborted);

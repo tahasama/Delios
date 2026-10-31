@@ -10,8 +10,20 @@ namespace Delios.Host.Identity;
 /// </summary>
 public static class StandIns
 {
-    /// <summary>Whether the project has nobody acting as the control function.</summary>
-    public static async Task<bool> NoControlAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken) =>
+    /// <summary>
+    /// Whether the project has nobody acting as the control function. Kept until people, functions or rights change
+    /// (<see cref="AccessVersions"/>: owner, "recorded… and updated"), never while this request is changing them.
+    /// </summary>
+    public static async Task<bool> NoControlAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken)
+    {
+        var changing = db.ChangeTracker.Entries<Membership>().Any() || db.ChangeTracker.Entries<PermissionRule>().Any()
+            || db.ChangeTracker.Entries<User>().Any() || db.ChangeTracker.Entries<Function>().Any();
+        if (changing || db.CurrentTenant is not { } tenant || db.AppService<AccessVersions>() is not { } versions)
+            return await ReadNoControlAsync(db, projectId, cancellationToken);
+        return await versions.SharedAsync(tenant, $"no-control:{projectId}", () => ReadNoControlAsync(db, projectId, cancellationToken));
+    }
+
+    private static async Task<bool> ReadNoControlAsync(DeliosDbContext db, Guid projectId, CancellationToken cancellationToken) =>
         !await db.Memberships.AnyAsync(m => m.ProjectId == projectId && m.Active && m.Function!.Active
             && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control)))
             && db.Users.Any(u => u.Id == m.UserId && u.Active), cancellationToken);

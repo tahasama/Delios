@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
+import { Download } from "lucide-react";
 import { mayUploadLists } from "@/lib/core/permissions";
 import { requireScope } from "@/lib/core/scope";
 import { planLists } from "@/lib/actions/plan-lists";
@@ -39,14 +40,23 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
     if (released.length > 1) return `${released.length} documents released`;
     return <Link href={`/documents/${released[0].id}`} className="font-semibold text-link hover:underline">Rev {released[0].released!.value}</Link>;
   };
+  // The file the list in force was read from, as it came (owner: "that same file should be downloadable as is").
+  const file = (kind: string) => {
+    const list = lists.find((one) => one.kind === kind);
+    const read = !!list?.direct || !!list?.documents.some((one) => one.released && one.read);
+    return ctx.user.isInternal && read ? (
+      <a href={`/api/schedule/lists/${kind}`} title="Download the file it was read from, as it came" aria-label="Download the file it was read from"
+        className="ml-1 inline-flex align-middle text-slate-500 hover:text-link"><Download className="h-3.5 w-3.5" /></a>
+    ) : null;
+  };
   const under: React.ReactNode[] = [
-    inForce("SCHEDULE"),
+    <>{inForce("SCHEDULE")}{file("SCHEDULE")}</>,
     <>
-      {inForce("DEPARTMENTS")}
+      {inForce("DEPARTMENTS")}{file("DEPARTMENTS")}
       {/* Only a problem is counted here: actions no discipline is tagged on. */}
-      {progress.untagged.length ? <>{" · "}<Link href="/schedule?view=table&untagged=1" className="font-semibold text-amber-800 hover:underline">{progress.untagged.length} untagged</Link></> : null}
+      {progress.untagged ? <>{" · "}<Link href="/schedule?view=table&untagged=1" className="font-semibold text-amber-800 hover:underline">{progress.untagged} untagged</Link></> : null}
     </>,
-    inForce("REQUIREMENTS"),
+    <>{inForce("REQUIREMENTS")}{file("REQUIREMENTS")}</>,
     // Counted only in the window: a month either side of today, or the dates chosen.
     progress.actions ? (
       <span title={progress.window.chosen ? "Actions within the dates chosen" : "Actions within a month either side of today"}>
@@ -61,8 +71,10 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
   const keyed = under.map((node, i) => <Fragment key={i}>{node}</Fragment>);
   // Whoever plans the project opens each list's upload from its own stage.
   const STAGE: Record<string, number> = { SCHEDULE: 0, DEPARTMENTS: 1, REQUIREMENTS: 2 };
-  const panels = plans
-    ? lists.map((list) => ({ stage: STAGE[list.kind], kind: list.kind, panel: <PlanListPanel list={list} control /> }))
+  // Whoever holds Manage opens them too: to read a list again from its other source, never to upload one.
+  const switcher = ctx.user.isInternal && (ctx.can("CONTROL") || ctx.can("MANAGE"));
+  const panels = plans || switcher
+    ? lists.map((list) => ({ stage: STAGE[list.kind], kind: list.kind, panel: <PlanListPanel list={list} control={plans} switcher={switcher} projectCode={ctx.project.code} /> }))
     : [];
   return <UploadSwitch stages={PLAN_STAGES} at={progress.at} under={keyed} panels={panels} />;
 }

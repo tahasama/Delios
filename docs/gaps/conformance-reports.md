@@ -47,14 +47,13 @@ Kept in the project's settings store, because the backend has no table for them:
 
 14. **Distribution matrix import: rows cut by document family.** A filled-in matrix may carry a family column; backend rules (`RuleRequest`) have no family. Such lines are refused ("a row cut by document family is not supported yet"). Want: `RuleRequest.Family: string?`. Rules are also written back as the function's whole list (`PUT /api/admin/functions/{id} { rules }`), so the rule note ("Read from a filled-in distribution matrix") is not kept: want `RuleRequest.Note`.
 
-- **Progress by week reads overdue against today's plan.** A planned day moved since is not kept, so a past week's
-  "overdue" uses each document's planned day as it stands now (said on the chart). Want, if it matters: the planned
-  day kept with each change (a history of `Document.PlannedDate`), then each week read against the plan of its day.
+- ~~**Progress by week reads overdue against today's plan.**~~ Done (30 Oct 2026): each move of a planned day is kept by
+  the database as it happens (`planned_date_changes`, trigger `record_planned_date`), and each week is read against the
+  plan as it stood at its end. Moves before this were not kept: those documents read as they stand.
 
 ## Reports: what is left open (end of the reports round)
 
-- **Planned-date history** (above, and Standard §58.1): without it, Progress by week reads past weeks against
-  today's plan, and says so.
+- ~~**Planned-date history**~~ (above, and Standard §58.1): done.
 - **Register on a date, its chart** (when the register moved on from that day) has not been seen with real changes:
   the demo's documents were all registered and released on the same day or the day before, so there is nothing to
   draw yet. The counting was checked by reading it; the drawing is the same column chart the other reports use.
@@ -64,5 +63,5 @@ Kept in the project's settings store, because the backend has no table for them:
   `FromPartyId`) or by the party of whoever issued it. A transmittal sent only to named people of another
   organization, with no organization on it, is not counted as owed by them.
 - **Print** was checked as the browser's print preview; not on a printer.
-- **Reports by email** (a report sent each week to who it is for) was not asked and is not built.
+- **Reports by email**: decided by the owner (30 Oct 2026), not built: a report is sent by hand (its Excel).
 

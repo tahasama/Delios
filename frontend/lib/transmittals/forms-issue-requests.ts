@@ -16,7 +16,7 @@ import { cancelRequest, carryOutRequest, noRecipients, raiseRequest, requestFrom
  */
 
 /** Raise a request against a revision, at any time. */
-export async function requestIssueAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function requestIssueAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const revisionId = String(formData.get("revisionId") ?? "");
   const asked = requestFromForm(formData);
@@ -30,14 +30,14 @@ export async function requestIssueAction(_prev: { error?: string } | undefined, 
     const rev = await backendRevision(ctx, revisionId);
     await raiseRequest(ctx, revisionId, asked);
     revalidatePath(`/documents/${rev.documentId}`);
-    return {};
+    return { ok: "Asked. Whoever sends it out is told, and it waits on their Home." };
   } catch (e) {
     return { error: refusal(e).message };
   }
 }
 
 /** Carry one request out: raise its transmittals. */
-export async function carryOutRequestAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function carryOutRequestAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const requestId = String(formData.get("requestId") ?? "");
   // The control function sends what was asked for; where a project has no control
@@ -46,21 +46,21 @@ export async function carryOutRequestAction(_prev: { error?: string } | undefine
     const { request } = await carryOutRequest(ctx, requestId);
     const rev = await backendRevision(ctx, request.revisionId);
     revalidatePath(`/documents/${rev.documentId}`);
-    return {};
+    return { ok: "Sent. Its transmittals are in the log." };
   } catch (e) {
     return { error: refusal(e).message };
   }
 }
 
 /** Withdraw a request that is no longer wanted. */
-export async function cancelRequestAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function cancelRequestAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const requestId = String(formData.get("requestId") ?? "");
   try {
     const request = await cancelRequest(ctx, requestId);
     const rev = await backendRevision(ctx, request.revisionId);
     revalidatePath(`/documents/${rev.documentId}`);
-    return {};
+    return { ok: "The request is withdrawn. Nothing was sent." };
   } catch (e) {
     return { error: refusal(e).message };
   }

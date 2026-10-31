@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { api, ApiProblem, projectPath, type Query } from "@/lib/client";
+import { api, notYours, projectPath, type Query } from "@/lib/client";
 import { getMe } from "@/lib/account/api";
 import { holders } from "@/lib/settings/api";
 import type { Addressees, TransmittalLog, TransmittalPage, TransmittalView, Work } from "@/lib/types";
@@ -11,25 +11,25 @@ type Scope = { projectId: string };
 
 /** One page of the transmittal log, filtered and sorted by the backend. */
 export async function transmittalLog(scope: Scope, query: Query): Promise<TransmittalLog> {
-  return api<TransmittalLog>(projectPath(scope, "/transmittals/log"), { query });
+  return api<TransmittalLog>(projectPath(scope, "/transmittals/log"), { query, keep: { areas: ["transmittals", "docs"] } });
 }
 
 /** One transmittal, or null when it does not exist or is not the reader's to see. Reading it records a recipient's first opening. */
 export const backendTransmittal = cache(async (scope: Scope, id: string): Promise<TransmittalView | null> => {
   try {
-    return await api<TransmittalView>(projectPath(scope, `/transmittals/${id}`));
+    return await api<TransmittalView>(projectPath(scope, `/transmittals/${id}`), { keep: { areas: ["transmittals", "docs"] } });
   } catch (e) {
-    if (e instanceof ApiProblem && (e.status === 404 || e.status === 400)) return null;
+    if (notYours(e)) return null;
     throw e;
   }
 });
 
 /** Who a transmittal can go to; empty for someone outside our organization, who may not ask. */
 export const addressees = cache(async (scope: Scope): Promise<Addressees> =>
-  api<Addressees>(projectPath(scope, "/addressees")).catch(() => ({ people: [], parties: [] })));
+  api<Addressees>(projectPath(scope, "/addressees"), { keep: { areas: [] } }).catch(() => ({ people: [], parties: [] })));
 
 /** What waits on the signed-in person in this project. */
-const work = cache(async (scope: Scope): Promise<Work> => api<Work>(projectPath(scope, "/work")));
+const work = cache(async (scope: Scope): Promise<Work> => api<Work>(projectPath(scope, "/work"), { keep: { areas: ["reviews", "transmittals", "docs", "packages", "plan"] } }));
 
 /**
  * Our organization's name as the record carries it: what was sent to us reads
@@ -43,9 +43,9 @@ export async function ourOrganizationName(): Promise<string> {
 /** One transmittal as its page shows it, or null when it does not exist or is not the reader's to see. Reading it records a recipient's opening. */
 export const transmittalPage = cache(async (scope: Scope, id: string): Promise<TransmittalPage | null> => {
   try {
-    return await api<TransmittalPage>(projectPath(scope, `/transmittals/${id}/page`));
+    return await api<TransmittalPage>(projectPath(scope, `/transmittals/${id}/page`), { keep: { areas: ["transmittals", "docs", "reviews", "packages"] } });
   } catch (e) {
-    if (e instanceof ApiProblem && (e.status === 404 || e.status === 400)) return null;
+    if (notYours(e)) return null;
     throw e;
   }
 });
@@ -81,7 +81,7 @@ export async function dispatchOf(scope: Scope, recipientId: string): Promise<str
 /** The drafts the reader may see, newest first: written, not sent, no number yet. */
 export async function transmittalDrafts(scope: Scope) {
   return api<{ id: string; subject: string; createdAt: string; createdBy: string; reason: string | null; documents: number; people: number; parties: number; copies: number }[]>(
-    projectPath(scope, "/transmittals/drafts")).catch(() => []);
+    projectPath(scope, "/transmittals/drafts"), { keep: { areas: ["transmittals"] } }).catch(() => []);
 }
 
 /** A reply by email to one of our transmittals, waiting for the control function (or answered). */
@@ -94,4 +94,4 @@ export type EmailReply = {
 
 /** The replies by email on one transmittal, or (none named) those waiting on the project. The control function's only. */
 export const emailReplies = cache(async (scope: Scope, transmittalId?: string): Promise<EmailReply[]> =>
-  api<EmailReply[]>(projectPath(scope, "/email-replies"), { query: { transmittalId } }).catch(() => [] as EmailReply[]));
+  api<EmailReply[]>(projectPath(scope, "/email-replies"), { keep: { areas: ["transmittals"] }, query: { transmittalId } }).catch(() => [] as EmailReply[]));

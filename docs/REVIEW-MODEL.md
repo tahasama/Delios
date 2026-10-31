@@ -54,6 +54,7 @@ supplier; accepted or for information → us).
 | `mayCondition` | Whether this step's verdicts may carry conditions |
 | `evidence` | `NONE` · `OPTIONAL` · `REQUIRED` — a returned stamped copy |
 | `days` | Working days allowed, for the at-risk and overdue marks |
+| `mode` | `ALL` (default, the tick "Wait for everyone's answer"): the next step opens only once every one of the step's people has answered · `ANY`: the first answer moves the review on |
 
 The route itself names two sets (built): the **advice** its advising steps answer from (`ReviewRoute.Advice`) and the
 **verdicts** its deciding step answers from (`ReviewRoute.Verdicts`), each by its name in Types & sets; none named, the
@@ -603,3 +604,16 @@ queue with its age, and the reports that measure each step's duration.
 7. **No electronic signature by default.** A route step may be configured to
    require one, and the system's own stamp on the rendition at publication stays
    on regardless.
+
+## Delegate and add in copy, in flow
+
+- **Delegate** is the one button on the verdict card. Whoever sits on the open step hands their own seat over; the
+  control function and whoever holds Manage (of ours) open the same button and choose whose seat on the open step, not
+  answered yet, they hand over, to anyone of ours on the project (the control function included; the matrix's people
+  first, anyone else flagged), until a date. The control function's hand-over is in force at once; Manage's waits for
+  the control function where it carries out hand-overs. Both people are told. Why is optional.
+- **Add in copy** ("Add in copy?" in the review's title): the control function and whoever holds Manage add people in
+  copy, told now and of what comes of it, never asked to review. Why is optional.
+
+Who answers a step changes only by a hand-over: adding someone to a step was tried and taken out, as it is the same as
+delegating.

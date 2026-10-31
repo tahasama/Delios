@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using System.ComponentModel.DataAnnotations;
 using Delios.Host.Audit;
 using Delios.Host.Platform;
@@ -332,7 +333,23 @@ public static class IdentityEndpoints
     /// <summary>
     /// <c>GET /api/me</c>: who the signed-in user is, their organization, and the active projects they are on with their function and verbs there.
     /// </summary>
-    private static async Task<IResult> MeAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
+    private static async Task<IResult> MeAsync(HttpContext http, DeliosDbContext db, Platform.AccessVersions versions, CancellationToken cancellationToken)
+    {
+        // Kept until how the organization works changes (owner: "static once done"), as each project's access is.
+        var version = await versions.CurrentAsync(http.User.TenantId());
+        var key = version is null ? null : $"me:{http.User.TenantId():N}:{version}:{http.User.UserId():N}";
+        if (key is not null && versions.Kept.TryGetValue(key, out object? kept) && kept is not null) return Results.Ok(kept);
+        var answer = await ReadMeAsync(http, db, cancellationToken);
+        if (key is not null)
+            versions.Kept.Set(key, answer, new Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = ProjectAccessLoader.KeptAtMost,
+                Size = 1,
+            });
+        return Results.Ok(answer);
+    }
+
+    private static async Task<object> ReadMeAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken)
     {
         var userId = http.User.UserId();
         var me = await db.Users.AsNoTracking().Where(u => u.Id == userId)
@@ -360,6 +377,7 @@ public static class IdentityEndpoints
                 m.Project.ContractRole,
                 m.Project.Kind,
                 m.Project.Status,
+                m.Project.Space,
                 m.Department,
                 Function = new { m.Function!.Id, m.Function.Code, m.Function.Name, m.Function.Clearance },
                 // Each project's own copy of what the function may do where it keeps one, else the organization's.
@@ -388,7 +406,15 @@ public static class IdentityEndpoints
         var shown = projects.Select(p => new
         {
             NoControl = noControl.Contains(p.Id),
-            p.Id, p.Code, p.Name, p.TimeZone, p.ContractRole, p.Kind, p.Status, p.Department, p.Function,
+            p.Id,
+            p.Code,
+            p.Name,
+            p.TimeZone,
+            p.ContractRole,
+            p.Kind,
+            p.Status,
+            p.Department,
+            p.Function,
             Verbs = p.ActsAsControl && !p.Verbs.Contains(Verbs.Control) ? [.. p.Verbs, Verbs.Control] : p.Verbs,
             Rules = p.ActsAsControl
                 ? [.. p.Rules.Select(r => new { r.DeliverableType, r.DocType, r.Discipline, r.Criticality, r.Confidentiality, r.ProjectRole, r.Family, r.Verbs }),
@@ -396,7 +422,7 @@ public static class IdentityEndpoints
                         Confidentiality = (string?)null, ProjectRole = (string?)null, Family = (string?)null, Verbs = new[] { Verbs.Control } }]
                 : p.Rules,
             p.ActsAsControl,
-        });
-        return Results.Ok(new { user = me, tenant = organization, projects = shown });
+        }).ToList();
+        return new { user = me, tenant = organization, projects = shown };
     }
 }

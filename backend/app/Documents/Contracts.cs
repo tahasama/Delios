@@ -22,7 +22,8 @@ public sealed record UpdateDocumentRequest(Dictionary<string, string?>? Changes)
 public sealed record EndDocumentRequest(string? State, string? Reason);
 
 /// <summary>The JSON body a client sends to ask for an upload link: the file's name, size in bytes, content type and SHA-256.</summary>
-public sealed record UploadRequest(string? FileName, long Size, string? ContentType, string? Sha256);
+/// <summary>A file about to be uploaded; <c>Slot</c> names the box it was put in on a revision (PDF or SOURCE), which decides its kind.</summary>
+public sealed record UploadRequest(string? FileName, long Size, string? ContentType, string? Sha256, string? Slot = null);
 
 /// <summary>
 /// The JSON body for starting a new revision, or for resubmitting a returned one: the uploaded files to attach
@@ -111,5 +112,3 @@ public sealed record DocumentPage(IReadOnlyList<DocumentSummary> Items, string? 
 /// </summary>
 public sealed record UploadTicket(Guid FileId, string Method, string Url, IReadOnlyDictionary<string, string> Headers, DateTimeOffset ExpiresAt);
 
-/// <summary>A short-lived signed URL the browser uses to download a file directly from object storage.</summary>
-public sealed record DownloadTicket(string Url, DateTimeOffset ExpiresAt);

@@ -52,7 +52,7 @@ public sealed class ProjectExtrasTests(Infrastructure infrastructure) : IClassFi
         var id = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"{p}/reviews/{id}/answer", new { });
         await Flow.PostAsync(approver, $"{p}/reviews/{id}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"{p}/reviews/{id}/release", new { });
+        await Flow.PostAsync(controller, $"{p}/reviews/{id}/release", await Flow.ReleaseBodyAsync(controller));
 
         var (voided, body) = await Flow.PostAsync(controller, $"{p}/documents/{x.Document}/revisions/{x.Revision}/void", new { reason = "Issued against the wrong grid." });
         Assert.True(voided == HttpStatusCode.OK, body.ToString());
@@ -67,7 +67,7 @@ public sealed class ProjectExtrasTests(Infrastructure infrastructure) : IClassFi
         await using var app = await TestApp.StartAsync(infrastructure);
         var admin = await app.SignedInAsync("admin@demo.local");
         var engineer = await app.SignedInAsync("engineer@demo.local");
-        var (created, project) = await Flow.PostAsync(admin, "/api/admin/projects", new { code = "NP9", name = "North pier", kind = "infrastructure" });
+        var (created, project) = await Flow.PostAsync(admin, "/api/admin/projects", new { code = "NP9", name = "North pier", kind = "energy" });
         Assert.True(created == HttpStatusCode.Created, project.ToString());
         var id = project.GetProperty("id").GetGuid();
         await using (var scope = app.Factory.Services.CreateAsyncScope())
@@ -85,7 +85,7 @@ public sealed class ProjectExtrasTests(Infrastructure infrastructure) : IClassFi
         var (joined, joinedBody) = await Flow.PostAsync(admin, $"/api/admin/projects/{id}/join", new { });
         Assert.True(joined == HttpStatusCode.NoContent, joinedBody.ToString());
         var mine = (await admin.GetFromJsonAsync<JsonElement>("/api/me")).GetProperty("projects").EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == id);
-        Assert.Equal("INFRASTRUCTURE", mine.GetProperty("kind").GetString());
+        Assert.Equal("ENERGY", mine.GetProperty("kind").GetString());
         Assert.Contains("CONFIGURE", mine.GetProperty("verbs").EnumerateArray().Select(v => v.GetString()));
     }
 
@@ -172,7 +172,7 @@ public sealed class CorrespondenceTests(Infrastructure infrastructure) : IClassF
 
         var (sent, review) = await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/revisions/{p.Revision}/send-on", new { status = "IFI" });
         Assert.True(sent == HttpStatusCode.Created, review.ToString());
-        var (released, body) = await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{review.GetProperty("id")}/release", new { });
+        var (released, body) = await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{review.GetProperty("id")}/release", await Flow.ReleaseBodyAsync(controller));
         Assert.True(released == HttpStatusCode.OK, body.ToString());
 
         // A drawing is reviewed: it cannot skip its review the same way.

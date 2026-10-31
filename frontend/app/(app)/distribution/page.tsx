@@ -1,11 +1,10 @@
-import { Select } from "@/components/select";
+import { MatrixFilters } from "./matrix-filters";
 import { Fragment } from "react";
 import { shownFilters as keptFilters } from "@/lib/core/filter-choice";
-import { FilterMenu } from "@/components/filter-menu";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
-import { PageHeader, Card, DataTable, Th, Td, btn, inputCls } from "@/components/ui";
+import { PageHeader, DataTable, Th, Td } from "@/components/ui";
 import { getActiveSet } from "@/lib/settings/config";
 import { MATRIX_CODES as CODE, buildSheet } from "@/lib/settings/matrix-sheet";
 import { roleFor } from "@/lib/settings/profiles/roles";
@@ -66,6 +65,11 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
   // rules and showed nowhere, because the page never asked who produced it.
   const sheet = await buildSheet(ctx, { allDisciplines: !inUseOnly || Boolean(one), deliverableType: producer, docType });
   const visible = sheet.rows.filter((row) => !one || row.discipline === one);
+  const tally = new Map<string, number>();
+  for (const row of visible) for (const letter of row.cells) {
+    const key = CODE.some((c) => c.letter === letter) ? letter : "";
+    tally.set(key, (tally.get(key) ?? 0) + 1);
+  }
   const toneOf = (letter: string) => CODE.find((c) => c.letter === letter) ?? null;
   // "Civil — quality, inspection and certification" is built from two names;
   // nested, each half is printed where it belongs.
@@ -100,56 +104,48 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
         </p>
       )}
 
-      <Card
-        title="Who gets what"
-        description={`${visible.length} discipline${visible.length === 1 ? "" : "s"} × ${sheet.columns.length} functions · ${producer ? producers.find((p) => p.code === producer)!.label.toLowerCase() : "any producer"} · ${docType ? `document type ${docType}` : "any document type"} · internal classification`}
-      >
-        <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 px-3 py-3">
-          {shown.includes("discipline") || one ? <label className="text-xs">
-            <span className="mb-1 block font-medium text-slate-700">Discipline</span>
-            <Select name="discipline" defaultValue={one ?? ""} className={`${inputCls} py-1.5 text-xs`}>
-              <option value="">Every discipline</option>
-              {disciplines.map((d) => <option key={d.code} value={d.code}>{d.code} — {d.label}</option>)}
-            </Select>
-          </label> : null}
-          {shown.includes("producer") || producer ? <label className="text-xs">
-            <span className="mb-1 block font-medium text-slate-700">Who produced it</span>
-            <Select name="producer" defaultValue={producer ?? ""} className={`${inputCls} py-1.5 text-xs`}>
-              <option value="">Any producer</option>
-              {producers.map((p) => <option key={p.code} value={p.code}>{p.code} — {p.label}</option>)}
-            </Select>
-          </label> : null}
-          {shown.includes("type") || docType ? <label className="text-xs">
-            <span className="mb-1 block font-medium text-slate-700">Document type <span className="font-normal text-slate-400">— optional</span></span>
-            <Select name="type" defaultValue={docType ?? ""} className={`${inputCls} py-1.5 text-xs`}>
-              <option value="">Any type</option>
-              {docTypes.map((t) => <option key={t.code} value={t.code}>{t.code} — {t.label}</option>)}
-            </Select>
-          </label> : null}
-          {shown.includes("inuse") || inUseOnly ? <label className="flex items-center gap-2 pb-2 text-xs text-slate-600">
-            <input type="checkbox" name="inuse" value="1" defaultChecked={inUseOnly} />
-            Only the disciplines this project already works in
-          </label> : null}
-          <div className="pb-2"><FilterMenu page="distribution" shown={shown} filters={[
-            { key: "discipline", label: "Discipline", held: !!one }, { key: "producer", label: "Who produced it", held: !!producer },
-            { key: "type", label: "Document type", held: !!docType }, { key: "inuse", label: "Only disciplines in use", held: inUseOnly },
-          ]} /></div>
-          <button type="submit" className={btn("secondary", "sm")}>Apply</button>
-        </form>
-
-        <div className="mb-3 flex flex-wrap gap-2">
-          {CODE.map((c) => (
-            <span key={c.letter} className="inline-flex items-center gap-1.5 text-[11px] text-slate-600">
-              <span className={`grid h-5 w-5 place-items-center rounded font-bold ${c.tone}`}>{c.letter}</span>
-              {c.label}
-            </span>
-          ))}
-          <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
-            <span className="grid h-5 w-5 place-items-center rounded bg-surface ring-1 ring-slate-200">—</span>
-            Not distributed
+      <section className="register register-sheet register-sheet-open">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span className="stencil mr-1 text-slate-500">Who gets what</span>
+          <span className="text-[11px] text-slate-500">
+            {visible.length} discipline{visible.length === 1 ? "" : "s"} × {sheet.columns.length} function{sheet.columns.length === 1 ? "" : "s"}
+            {" · "}{producer ? producers.find((p) => p.code === producer)!.label.toLowerCase() : "every deliverable type"}
+            {" · "}{docType ? docTypes.find((t) => t.code === docType)?.label.toLowerCase() ?? docType : "every document type"}
           </span>
         </div>
 
+        <MatrixFilters
+          shown={shown}
+          values={{ discipline: one ?? "", producer: producer ?? "", type: docType ?? "", inuse: inUseOnly }}
+          options={{
+            disciplines: disciplines.map((d) => ({ code: d.code, label: `${d.code} — ${d.label}` })),
+            producers: producers.map((p) => ({ code: p.code, label: p.label })),
+            types: docTypes.map((t) => ({ code: t.code, label: `${t.code} — ${t.label}` })),
+          }}
+        />
+
+        {/* The key, strongest first: a cell shows the strongest thing its function does. Each letter counts its
+            cells in this view, so a column of nothing but dots reads at once. */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line px-5 py-3 sm:px-6">
+          <span className="text-[11px] text-slate-500">Each cell shows the strongest, from</span>
+          <ol className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {CODE.map((c) => (
+              <li key={c.letter} className="inline-flex items-center gap-1.5 text-xs text-slate-700">
+                <span aria-hidden className={`inline-grid h-5 w-5 place-items-center rounded-md text-[11px] font-bold ${c.tone}`}>{c.letter}</span>
+                {c.label}
+                <span className="font-mono text-[11px] tabular-nums text-slate-400">{tally.get(c.letter) ?? 0}</span>
+              </li>
+            ))}
+            <li className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+              <span aria-hidden className="inline-grid h-5 w-5 place-items-center rounded-md text-slate-300 ring-1 ring-line">–</span>
+              Nothing
+              <span className="font-mono text-[11px] tabular-nums text-slate-400">{tally.get("") ?? 0}</span>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section className="register register-sheet">
         <DataTable
           id="distribution-matrix"
           head={
@@ -201,11 +197,11 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
           ))}
         </DataTable>
         {visible.length === 0 ? (
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Nothing to show. Untick “Only the disciplines this project already works in” to see every published discipline.
+          <p className="m-5 rounded-md bg-amber-50 px-3 py-2 ring-1 ring-amber-200 text-xs text-amber-800">
+            Nothing to show. Switch off “Only the disciplines in use here” to see every published discipline.
           </p>
         ) : null}
-      </Card>
+      </section>
 
     </div>
   );

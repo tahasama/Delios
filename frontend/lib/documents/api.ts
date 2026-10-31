@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { api, ApiProblem, projectPath } from "@/lib/client";
+import { api, notYours, projectPath } from "@/lib/client";
 import type { DocumentView, ReviewView, RevisionView, Written, HandBack } from "@/lib/types";
 
 /**
@@ -104,24 +104,38 @@ const date = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
 /** The backend's document, or null when it does not exist or is not the reader's to see. */
 export const backendDocument = cache(async (scope: Scope, id: string): Promise<DocumentView | null> => {
   try {
-    return await api<DocumentView>(projectPath(scope, `/documents/${id}`));
+    return await api<DocumentView>(projectPath(scope, `/documents/${id}`), { keep: { areas: [], doc: id, fallback: ["reviews", "transmittals"] } });
   } catch (e) {
-    if (e instanceof ApiProblem && (e.status === 404 || e.status === 400)) return null;
+    if (notYours(e)) return null;
     throw e;
   }
 });
 
+/** Several reviews in full at once (a document's page): one read, never one a review. */
+export async function backendReviews(scope: Scope, ids: string[]): Promise<ReviewView[]> {
+  const wanted = [...new Set(ids.filter(Boolean))];
+  if (!wanted.length) return [];
+  return api<ReviewView[]>(projectPath(scope, `/reviews/many?ids=${wanted.map(encodeURIComponent).join(",")}`), { keep: { areas: ["reviews", "docs"] } });
+}
+
+/** Several documents at once, those the reader may see (a form enclosing them): one read, never one a document. */
+export async function backendDocuments(scope: Scope, ids: string[]): Promise<DocumentView[]> {
+  const wanted = [...new Set(ids.filter(Boolean))];
+  if (!wanted.length) return [];
+  return api<DocumentView[]>(projectPath(scope, `/documents/many?ids=${wanted.map(encodeURIComponent).join(",")}`), { keep: { areas: ["docs", "reviews", "transmittals"] } });
+}
+
 /** Reviews, transmittals, packages, activities and history around one document. */
 export const documentContext = cache(async (scope: Scope, id: string): Promise<BackendContext> =>
-  api<BackendContext>(projectPath(scope, `/documents/${id}/context`)));
+  api<BackendContext>(projectPath(scope, `/documents/${id}/context`), { keep: { areas: [], doc: id, fallback: ["reviews", "transmittals", "plan", "packages"] } }));
 
 /** Every ask to hand a supplier's document back, newest first, with its answer. */
 export const handBacks = cache(async (scope: Scope, id: string): Promise<HandBack[]> =>
-  api<HandBack[]>(projectPath(scope, `/documents/${id}/asks`)).catch(() => []));
+  api<HandBack[]>(projectPath(scope, `/documents/${id}/asks`), { keep: { areas: ["docs"], doc: id } }).catch(() => []));
 
 /** One review in full: its steps, who sits on them and the comments. */
 export const backendReview = cache(async (scope: Scope, id: string): Promise<ReviewView> =>
-  api<ReviewView>(projectPath(scope, `/reviews/${id}`)));
+  api<ReviewView>(projectPath(scope, `/reviews/${id}`), { keep: { areas: ["reviews"] } }));
 
 /** A review as a review cycle on the document page: one per review, binding when it has a deciding step. */
 function cycleOf(review: ReviewView, sequence: number): PageCycle {
@@ -197,7 +211,8 @@ export const documentPage = cache(async (scope: Scope, id: string): Promise<Page
   const doc = await backendDocument(scope, id);
   if (!doc) return null;
   const context = await documentContext(scope, id);
-  const reviews = await Promise.all(context.reviews.map((one) => backendReview(scope, one.id)));
+  const read = new Map((await backendReviews(scope, context.reviews.map((one) => one.id))).map((one) => [one.id, one]));
+  const reviews = context.reviews.map((one) => read.get(one.id)).filter((one): one is ReviewView => !!one);
   return {
     id: doc.id, extras: doc.extras ? JSON.stringify(doc.extras) : null, projectId: scope.projectId, docNumber: doc.number, title: doc.title, deliverableType: doc.deliverableType,
     docType: doc.docType, discipline: doc.discipline, originator: doc.originator, subProject: doc.subproject, phase: doc.phase ?? null, contractRef: doc.contractRef,
@@ -227,11 +242,11 @@ export const documentPage = cache(async (scope: Scope, id: string): Promise<Page
 /** A revision on its own, with the document it belongs to. */
 export const backendRevision = cache(async (scope: Scope, revisionId: string) =>
   api<{ id: string; documentId: string; value: string; state: string; statusCode: string | null; authoredById: string; authoredByName: string }>(
-    projectPath(scope, `/revisions/${revisionId}`)));
+    projectPath(scope, `/revisions/${revisionId}`), { keep: { areas: ["docs", "reviews"] } }));
 
 /** What the caller may do about sending a revision out, and who wrote it. */
 export const revisionStanding = cache(async (scope: Scope, revisionId: string) =>
-  api<{ mayRequest: boolean; letsItOut: boolean; author: string | null; authorId: string | null }>(projectPath(scope, `/revisions/${revisionId}/standing`)));
+  api<{ mayRequest: boolean; letsItOut: boolean; author: string | null; authorId: string | null }>(projectPath(scope, `/revisions/${revisionId}/standing`), { keep: { areas: ["docs", "reviews", "transmittals"] } }));
 
 /** The review a revision is in, or was last in: the newest one. Null when it never went to review. */
 export async function reviewOfRevision(scope: Scope, revisionId: string): Promise<{ id: string; documentId: string; state: string } | null> {

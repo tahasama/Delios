@@ -1,22 +1,26 @@
 import Link from "next/link";
+import { CountUp } from "@/components/count-up";
 import { requireScope } from "@/lib/core/scope";
 import { isController, isAdmin, hasVerb, standsInForControl } from "@/lib/core/auth";
 import { DataTable, Th, Td, Field, inputCls, ToneChip, Chip, btn } from "@/components/ui";
 import { FileTally } from "./file-tally";
-import { setPackageRuleAction, sharePackageAction, deletePackageAction } from "@/lib/packages/forms";
+import { setPackageRuleAction, sharePackageAction, deletePackageAction, fillPackageAction } from "@/lib/packages/forms";
 import { PackageLines, type PackageLine } from "./package-lines";
 import { ruleFilter, ruleWords } from "@/lib/packages/package-rule";
 import { RuleFields } from "../rule-fields";
 import { manageItems } from "../manage-items";
 import { ActionForm } from "@/components/form";
+import { IconAct } from "@/components/icon-act";
 import { submitSupplierPackageAction, sendAsReceivedAction } from "@/lib/packages/forms-supplier";
 import { AsReceivedWarning } from "@/components/as-received-warning";
 import { supplierRows, supplierFigures, packageStage, packageCounts, lineStage, WITH_SUPPLIER, type SupplierRow } from "@/lib/packages/supplier";
 import { fmtDate } from "@/lib/core/utils";
 import { plannedState } from "@/lib/actions/planned-state";
-import { ArrowLeft, Download, Filter, PackageCheck, Pencil, Send, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Filter, FolderInput, PackageCheck, Pencil, Send, Share2 } from "lucide-react";
 import { getMe } from "@/lib/account/api";
 import type { PackageView } from "@/lib/types";
+import { Branches, MovePackage, PackagePath, moveTargets } from "../arborescence";
+import { packagesOf } from "@/lib/packages/api";
 
 /** What the planned date says today, as on every planned date: ready, submitted, overdue, at risk, days left. */
 function SubmitBy({ row }: { row: SupplierRow }) {
@@ -71,7 +75,8 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
   const asked = new Set(pkg.members.filter((m) => m.requestedAt).map((m) => m.documentId));
   const listHref = `/api/packages/${encodeURIComponent(pkg.number)}/list`;
   const listLink = <a href={listHref} className="ask inline-flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> Delivery list</a>;
-  const plateCode = <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">{pkg.number}</p>;
+  // The packages it sits in, then its own number (the arborescence).
+  const plateCode = <PackagePath pkg={pkg} />;
 
   // ── The supplier's page ──────────────────────────────────────────────────────
   if (isSupplier) {
@@ -127,6 +132,8 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
             </div>
           </div>
         </section>
+        {/* The packages shared with it that sit in this one, drilled into from here. */}
+        <Branches pkg={pkg} newHref={null} />
         <section data-dt-frame className="register register-sheet">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
             <span className="stencil mr-1 text-slate-500">Your documents</span>
@@ -231,12 +238,16 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
         </div>
         <div className="grid grid-cols-2 border-t border-line sm:grid-cols-4">
           {/* Every document is in exactly one of these: they add up to the package. */}
-          <Figure label="Not sent yet" value={`${counts.notSent} of ${counts.total}`} hint={counts.lateNotSent ? `${counts.lateNotSent} overdue, ours to send` : "ours to send to the supplier"} />
-          <Figure label="With the supplier" value={`${counts.withThem} of ${counts.total}`} hint={counts.lateWithThem ? `${counts.lateWithThem} overdue` : "to send, correct or revise"} />
-          <Figure label="With us" value={`${counts.withUs} of ${counts.total}`} hint={counts.toCheck ? `${counts.toCheck} to check, the rest in review` : "to send for review, or in review"} />
-          <Figure label="Released" value={`${counts.released} of ${counts.total}`} hint={`${f.firstTime}% released first time`} />
+          <Figure at={pkg.number} label="Not sent yet" value={`${counts.notSent} of ${counts.total}`} hint={counts.lateNotSent ? `${counts.lateNotSent} overdue, ours to send` : "ours to send to the supplier"} />
+          <Figure at={pkg.number} label="With the supplier" value={`${counts.withThem} of ${counts.total}`} hint={counts.lateWithThem ? `${counts.lateWithThem} overdue` : "to send, correct or revise"} />
+          <Figure at={pkg.number} label="With us" value={`${counts.withUs} of ${counts.total}`} hint={counts.toCheck ? `${counts.toCheck} to check, the rest in review` : "to send for review, or in review"} />
+          <Figure at={pkg.number} label="Released" value={`${counts.released} of ${counts.total}`} hint={`${f.firstTime}% released first time`} />
         </div>
       </section>
+
+      {/* The arborescence: its packages, a new one in it, and where it sits (moved until it is shared). */}
+      <Branches pkg={pkg} newHref={staff ? `/packages?category=SUPPLIER&parent=${encodeURIComponent(pkg.number)}#new` : null} manage={staff && !pkg.sharedAt} />
+      {staff && !pkg.sharedAt ? <MovePackage pkg={pkg} targets={moveTargets(pkg, await packagesOf(ctx, "SUPPLY"))} /> : null}
 
       {staff ? (
         <section id="package" className="register register-sheet register-sheet-open">
@@ -282,6 +293,13 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
                   </ActionForm>
                 </Act>
               ) : null}
+              {pkg.state === "OPEN" ? (
+                <Act icon={FolderInput} label="Fill the package">
+                  <ActionForm action={fillPackageAction} submitLabel="Fill the package" size="sm" hidden={{ packageId: pkg.id }}>
+                    <p className="text-xs leading-5 text-slate-600">Files every document of {supplierName} that is in none of its packages yet, each where a new one would go: the package for its order first. Nothing is filed by itself until you do.</p>
+                  </ActionForm>
+                </Act>
+              ) : null}
               {!shared ? (
                 <Act icon={Filter} label={narrowed ? "Change the rule" : "Narrow by a rule"}>
                   <ActionForm action={setPackageRuleAction} submitLabel="Save the rule" size="sm" hidden={{ packageId: pkg.id }}>
@@ -292,21 +310,24 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
               ) : null}
               {edit ? <Act icon={Pencil} label={typeof edit.label === "string" ? edit.label : "Edit"}>{edit.body}</Act> : null}
               {!shared && !sentAny ? (
-                <Act icon={Trash2} label="Delete the package">
-                  <ActionForm action={deletePackageAction} submitLabel="Delete the package" size="sm" variant="danger" hidden={{ packageId: pkg.id }} confirmText="The package is deleted. Its documents stay in the register. Continue?">
-                    <p className="text-xs leading-5 text-slate-600">
-                      Its documents stay in the register{rows.length ? ` (${rows.length})` : ""} and are filed again: into another package of {supplierName} when there is one, else into one made by itself. Its number is not given out again.
-                    </p>
-                    <Field label="Why" required hint="goes on the record"><input name="reason" required className={inputCls} /></Field>
-                  </ActionForm>
-                </Act>
+                <IconAct action={deletePackageAction} icon="remove" danger label="Delete the package" hidden={{ packageId: pkg.id }}
+                  confirm={`${pkg.number} is deleted. Its documents stay in the register${rows.length ? ` (${rows.length})` : ""} and are filed again with ${supplierName}. Continue?`} />
               ) : null}
               {listLink}
-              {/* Handed over to whoever gets them (the client, operations): a delivery package holding its documents. */}
-              {rows.length ? (
-                <Link href={`/packages?${new URLSearchParams({ category: "DELIVERY", from: pkg.number, docs: rows.map((r) => r.doc.id).join(",") })}#new`}
-                  className="ask inline-flex items-center gap-1.5"><PackageCheck className="h-3.5 w-3.5" /> Deliver</Link>
-              ) : null}
+              {/* Delivered once complete, to whom we choose then (owner): a data transmittal carrying the package and every
+                  package in it, each document at its released revision, nothing added or taken out. Not complete, it says so. */}
+              {rows.length ? (() => {
+                const whole = pkg.place?.whole ?? { documents: pkg.members.length, released: pkg.members.filter((m) => m.revision).length };
+                return whole.documents > 0 && whole.released === whole.documents ? (
+                  <Link href={`/transmittals/new?${new URLSearchParams({ package: pkg.number })}`}
+                    className="ask inline-flex items-center gap-1.5"><PackageCheck className="h-3.5 w-3.5" /> Deliver</Link>
+                ) : (
+                  // A supplier's package goes complete: nobody accepts it, so nobody grants a waiver.
+                  <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500" title="A supplier's package is delivered once every document in it is released">
+                    <PackageCheck className="h-3.5 w-3.5" /> Deliver once complete · {whole.released} of {whole.documents} released
+                  </span>
+                );
+              })() : null}
             </div>
             {shared ? <p className="text-[11px] text-slate-500">Shared: it can no longer be renamed, have its rule changed or be deleted.</p> : null}
           </div>
@@ -326,11 +347,11 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
   );
 }
 
-function Figure({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Figure({ at, label, value, hint }: { at: string; label: string; value: string; hint: string }) {
   return (
     <div className="border-line px-5 py-3 not-last:border-r sm:px-6">
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-slate-900">{value}</p>
+      <p className="mt-1 text-lg font-semibold text-slate-900"><CountUp id={`package:${at}:${label}`} value={value} /></p>
       <p className="text-[11px] text-slate-500">{hint}</p>
     </div>
   );

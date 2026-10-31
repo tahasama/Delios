@@ -142,7 +142,7 @@ export async function requestChoices(
   doc: { id?: string; deliverableType: string; docType: string; discipline: string; criticality: string | null; confidentiality: string | null; originator?: string | null },
 ) {
   // Who the matrix proposes, everyone else on the project, and the organizations on it: the backend's distribution.
-  const found = await api<Distribution>(projectPath(t, `/documents/${doc.id}/distribution`)).catch((e) => {
+  const found = await api<Distribution>(projectPath(t, `/documents/${doc.id}/distribution`), { keep: { areas: ["docs"] } }).catch((e) => {
     if (e instanceof ApiProblem && e.status === 403) return { proposed: [], others: [], parties: [] } as unknown as Distribution;
     throw e;
   });
@@ -188,7 +188,7 @@ export async function returnRecipients(t: Tenant, revisionId: string): Promise<{
 /** The requests on a revision, as the screens read them: who asked, for what, to whom, and the transmittal it went in. */
 export async function requestsOn(t: Tenant, revisionId: string) {
   // Who it is sent to is ours to read: another organization's people see none of it.
-  const rows = await api<IssueRequestView[]>(projectPath(t, `/revisions/${revisionId}/issue-requests`)).catch((e) => {
+  const rows = await api<IssueRequestView[]>(projectPath(t, `/revisions/${revisionId}/issue-requests`), { keep: { areas: ["docs", "transmittals"] } }).catch((e) => {
     if (e instanceof ApiProblem && e.status === 403) return [] as IssueRequestView[];
     throw e;
   });

@@ -1,3 +1,4 @@
+import { ExceptionNote } from "@/lib/settings/exception";
 import { Select } from "@/components/select";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
@@ -45,14 +46,14 @@ function parseVerbs(json: string): Verb[] {
  * documents only, "Add a rule" (which asks which documents) and, in the organization's Settings, the function itself. The key under the grid says what each permission allows.
  */
 export async function FunctionsBoard({ level, open, adding }: { level: "project" | "organization"; open?: string; adding?: boolean }) {
-  let scope: { projectId: string } | null = null;
+  let scope: { projectId: string; projectCode: string } | null = null;
   if (level === "organization") await requireOrgAdmin();
   else {
     const ctx = await requireScope();
     if (!maySetup(ctx.user, SETUP_PAGES.find((p) => p.href === "/settings/functions")!)) {
       return <NoAccess title="Functions & permissions" who="control" />;
     }
-    scope = ctx;
+    scope = { projectId: ctx.projectId, projectCode: ctx.project.code };
   }
   const here = level === "organization" ? "/organization/settings/functions" : "/settings/functions";
 
@@ -108,7 +109,9 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
   const plateLine = admin
     ? "The jobs people hold, and what each may do. Every project reads them, unless it changed what each may do for itself where that is left free."
     : project?.own
-      ? "The organization's functions; what each may do here is this project's own copy, which the organization's later changes never touch. Configure, the administrators' permission, stays the organization's."
+      ? <>The organization&rsquo;s functions; what each may do here is this project&rsquo;s own copy, which the organization&rsquo;s later changes never touch. Configure, the administrators&rsquo; permission, stays the organization&rsquo;s.{project.exception && scope ? <> <ExceptionNote project={scope.projectCode} what="what each function may do" exception={project.exception} /></> : null}</>
+      : project?.free && project.exception && scope
+        ? <>The organization&rsquo;s functions, and what each may do as the organization has it. <ExceptionNote project={scope.projectCode} what="what each function may do" exception={project.exception} />{rights ? " Change one here and the project takes its own copy; Configure, the administrators' permission, stays the organization's." : " The control function changes it for this project."}</>
       : project?.free
         ? `The organization's functions, and what each may do as the organization has it.${rights ? " Change one here and the project takes its own copy, which the organization's later changes never touch; Configure, the administrators' permission, stays the organization's." : " The control function changes it for this project."}`
         : "The organization's functions and what each may do, the same on every project: an administrator changes them in the organization's Settings.";
@@ -234,7 +237,7 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
                   </tr>,
                   isOpen ? (
                     <tr key={`${fn.id}-open`} className="bg-tint-soft">
-                      <td colSpan={columns} className="px-5 pt-1 pb-5 sm:px-6">
+                      <td colSpan={columns} className="open-in px-5 pt-1 pb-5 sm:px-6">
                         <div className="space-y-4 rounded-md bg-surface p-4 ring-1 ring-line">
                           <FunctionRules fn={fn} rules={fn.rules} level={level} rights={rights && fn.active} fixedHere={fixedHere} scopeOf={scopeOf} selectors={selectors} />
                           {admin ? (

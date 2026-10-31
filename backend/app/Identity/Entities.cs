@@ -98,10 +98,22 @@ public sealed class Party
     public Guid? CarriedByUserId { get; set; }
     /// <summary>The organization it is, as all of DELIOS knows it (one code and one name everywhere): <c>Organizations.Registry</c>.</summary>
     public Guid? OrganizationId { get; set; }
+    /// <summary>
+    /// The training space it was made for, one per role (docs/APP-DECISIONS.md §84): seen only there, never in the
+    /// organization's list of organizations, and never holding a code or name across DELIOS. Empty: a real organization.
+    /// </summary>
+    public Guid? TrainingProjectId { get; set; }
     /// <summary>How it worked with us before its one change of it, by whom and when; once changed it is fixed.</summary>
     public string? PreviousParticipation { get; set; }
     public Instant? ParticipationChangedAt { get; set; }
     public string? ParticipationChangedByName { get; set; }
+}
+
+/// <summary>The kinds of space a project may be (<c>Project.Space</c>); a real project carries none.</summary>
+public static class Spaces
+{
+    /// <summary>The organization's training space: one at a time, nothing in it real (owner: "code TRAINING works").</summary>
+    public const string Training = "TRAINING";
 }
 
 /// <summary>The allowed values of <c>Party.Participation</c>.</summary>
@@ -146,6 +158,12 @@ public sealed class User
     public bool Active { get; set; } = true;
     /// <summary>Configures the tenant: people, projects, functions, the matrix.</summary>
     public bool IsAdmin { get; set; }
+    /// <summary>
+    /// An account of the DELIOS team, standing in this organization as one of its administrators only while it lets DELIOS in
+    /// (<c>Operators.SupportGrant</c>): named "DELIOS support: …", it signs in only from the console, and every act it does
+    /// is in the audit trail under that name. Never paid for, never signing in by password.
+    /// </summary>
+    public bool IsSupport { get; set; }
     /// <summary>The groups of notifications this person does not want popping up in their browsers (see <c>PushGroups</c>).</summary>
     public string[] PushOff { get; set; } = [];
     /// <summary>
@@ -191,6 +209,8 @@ public sealed class Project
     public string TimeZone { get; set; } = "UTC";
     /// <summary>The days the site does not work, ISO numbers (1 Monday … 7 Sunday). Due dates skip them.</summary>
     public int[] WeekendDays { get; set; } = [6, 7];
+    /// <summary>The country the site is in (ISO 3166, two letters): which public holidays its working days skip. None: only those for every country.</summary>
+    public string? Country { get; set; }
     /// <summary>
     /// Whether the system may read inside this project's files to search them:
     /// OFF (the default; nothing is read), ON_DEMAND (only what somebody asks for),
@@ -210,6 +230,11 @@ public sealed class Project
     public string? CodeChangedByName { get; set; }
     /// <summary>Who opened the project. Where nobody acts as its control function, they alone change its lists.</summary>
     public Guid? OpenedById { get; set; }
+    /// <summary>
+    /// What kind of space it is: empty for a real project, <see cref="Spaces.Training"/> for the organization's training
+    /// space (docs/APP-DECISIONS.md §84), left out of what spans projects. The mark decides, never the code.
+    /// </summary>
+    public string? Space { get; set; }
     /// <summary>
     /// The lists the project keeps its own copy of (each copied on its first change, where the organization leaves the list
     /// free): it reads its copy of those, never the organization's again, and the organization's of every other list.

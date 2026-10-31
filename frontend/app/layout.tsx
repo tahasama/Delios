@@ -4,6 +4,10 @@ import "./globals.css";
 import { APP_NAME } from "@/lib/core/standard";
 import { cookies } from "next/headers";
 import { PREF, SIDEBAR_LIMITS } from "@/lib/core/preferences";
+import { ErrorWatch } from "@/components/error-watch";
+import { SandboxBand } from "@/components/sandbox-band";
+import { OfflineBand } from "@/components/offline-band";
+import { SegSlider } from "@/components/seg-slider";
 
 /**
  * The register is a technical document, so it is set in a technical face. Plex
@@ -32,7 +36,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = jar.get(PREF.theme)?.value;
   const dark = theme === "dark" || (theme !== "light" && jar.get(PREF.deviceDark)?.value === "1");
   const width = Number.parseInt(jar.get(PREF.sidebar)?.value ?? "", 10);
-  const sidebar = width >= SIDEBAR_LIMITS.min && width <= SIDEBAR_LIMITS.max ? width : null;
+  // 268 was the width the menu opened at before (owner: "10px less"); kept by an expand, it reads as the new 258.
+  const kept = width === 268 ? 258 : width;
+  const sidebar = kept >= SIDEBAR_LIMITS.min && kept <= SIDEBAR_LIMITS.max ? kept : null;
   return (
     <html
       lang="en"
@@ -41,7 +47,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       data-sidebar={sidebar && sidebar < SIDEBAR_LIMITS.railBelow ? "rail" : undefined}
       suppressHydrationWarning
     >
-      <body>{children}</body>
+      <body>
+        <ErrorWatch />
+        {children}
+        <SandboxBand />
+        <OfflineBand />
+        <SegSlider />
+      </body>
     </html>
   );
 }

@@ -1,5 +1,5 @@
 using Delios.Host.Tenancy;
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using NodaTime;
 

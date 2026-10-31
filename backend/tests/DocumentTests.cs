@@ -23,11 +23,20 @@ public static class Api
         docType = "DWG",
         discipline,
         subproject = "10",
+        criticality = "C",
     };
+
+    /// <summary>A request with a criticality, which the document form requires (Forms & fields), unless it names one.</summary>
+    public static System.Text.Json.Nodes.JsonObject WithCriticality(object request)
+    {
+        var node = System.Text.Json.JsonSerializer.SerializeToNode(request)!.AsObject();
+        if (!node.ContainsKey("criticality")) node["criticality"] = "C";
+        return node;
+    }
 
     public static async Task<JsonElement> RegisterAsync(HttpClient client, Guid project, object request)
     {
-        using var response = await client.PostAsJsonAsync($"/api/projects/{project}/documents", request);
+        using var response = await client.PostAsJsonAsync($"/api/projects/{project}/documents", WithCriticality(request));
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(response.StatusCode == HttpStatusCode.Created, body.ToString());
         return body;
@@ -98,7 +107,7 @@ public sealed class RegisterTests(Infrastructure infrastructure) : IClassFixture
         var project = await Api.ProjectIdAsync(client);
 
         using var response = await client.PostAsJsonAsync($"/api/projects/{project}/documents",
-            new { title, deliverableType, docType, discipline, subproject });
+            new { title, deliverableType, docType, discipline, subproject, criticality = "C" });
 
         Assert.Equal((HttpStatusCode.UnprocessableEntity, code), await Api.ProblemAsync(response));
     }
@@ -302,7 +311,13 @@ public sealed class RegisterReadTests(Infrastructure infrastructure) : IClassFix
         });
         var path = $"/api/projects/{project}/documents/{doc.GetProperty("id").GetGuid()}";
 
+        // Clearance is the one confidentiality rule (owner): the approver's function is cleared below it.
+        var admin = await app.SignedInAsync("admin@demo.local");
         var approver = await app.SignedInAsync("approver@demo.local");
+        var function = (await approver.GetFromJsonAsync<JsonElement>("/api/me")).GetProperty("projects")[0]
+            .GetProperty("function").GetProperty("id").GetGuid();
+        using (var cleared = await admin.PutAsJsonAsync($"/api/admin/functions/{function}", new { clearance = "PUBLIC" }))
+            Assert.True(cleared.IsSuccessStatusCode, await cleared.Content.ReadAsStringAsync());
         var controller = await app.SignedInAsync("controller@demo.local");
         using var hidden = await approver.GetAsync(new Uri(path, UriKind.Relative));
         var approverPage = await approver.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/documents");
@@ -316,7 +331,7 @@ public sealed class RegisterReadTests(Infrastructure infrastructure) : IClassFix
     }
 
     [Fact]
-    public async Task Another_party_reads_only_what_it_produces()
+    public async Task Another_party_reads_only_what_passed_between_us()
     {
         await using var app = await TestApp.StartAsync(infrastructure);
         var controller = await app.SignedInAsync("controller@demo.local");
@@ -337,8 +352,9 @@ public sealed class RegisterReadTests(Infrastructure infrastructure) : IClassFix
         var supplier = await app.SignedInAsync("supplier@acme.local");
         var page = await supplier.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/documents");
 
-        var numbers = page.GetProperty("items").EnumerateArray().Select(d => d.GetProperty("number").GetString());
-        Assert.Equal(["P1001-20-ACME-PO101-ME-DAS-00001"], numbers);
+        // Neither ours, nor one of theirs we registered and have not asked of them yet: of what it produces, another
+        // organization reads only what passed between us on a transmittal.
+        Assert.Empty(page.GetProperty("items").EnumerateArray());
     }
 }
 
@@ -356,7 +372,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         var doc = (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
 
         var fileId = await UploadAsync(client, project, doc, "GA.pdf", Pdf);
-        using var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId } });
+        using var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId }, changeDescription = "Next issue" });
         var revision = await started.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(HttpStatusCode.Created, started.StatusCode);
         Assert.Equal("A", revision.GetProperty("value").GetString());
@@ -369,12 +385,11 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         Assert.Equal("application/pdf", file.GetProperty("detectedType").GetString());
         Assert.Equal("RENDITION", file.GetProperty("kind").GetString());
 
-        var ticket = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/files/{fileId}/download");
-        using var raw = new HttpClient();
-        Assert.Equal(Pdf, await raw.GetByteArrayAsync(new Uri(ticket.GetProperty("url").GetString()!)));
+        // The bytes come through the app, opened from their seal: byte for byte what was uploaded.
+        Assert.Equal(Pdf, await client.GetByteArrayAsync($"/api/projects/{project}/files/{fileId}/download"));
 
         using var second = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions",
-            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) } });
+            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) }, changeDescription = "Next issue" });
         Assert.Equal((HttpStatusCode.Conflict, "REVISION_IN_MOTION"), await Api.ProblemAsync(second));
     }
 
@@ -396,7 +411,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         var ticket = await requested.Content.ReadFromJsonAsync<JsonElement>();
         await Flow.PutAsync(ticket, Pdf);
         var fileId = ticket.GetProperty("fileId").GetGuid();
-        using (var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId } }))
+        using (var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId }, changeDescription = "Next issue" }))
             Assert.Equal(HttpStatusCode.Created, started.StatusCode);
         Assert.Equal("READY", (await WaitForFilesAsync(client, project, doc)).GetProperty("filesState").GetString());
 
@@ -405,9 +420,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         Assert.Equal(Pdf.Length, swapped.Length);
         await Flow.PutAsync(ticket, swapped);
 
-        var download = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/files/{fileId}/download");
-        using var raw = new HttpClient();
-        Assert.Equal(Pdf, await raw.GetByteArrayAsync(new Uri(download.GetProperty("url").GetString()!)));
+        Assert.Equal(Pdf, await client.GetByteArrayAsync($"/api/projects/{project}/files/{fileId}/download"));
     }
 
     [Fact]
@@ -420,7 +433,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         var doc = (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
 
         var fileId = await UploadAsync(client, project, doc, "notes.txt", Encoding.ASCII.GetBytes("X5O " + FakeScanner.Marker));
-        using var _ = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId } });
+        using var _ = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId }, changeDescription = "Next issue" });
 
         var revision = await WaitForFilesAsync(client, project, doc);
         Assert.Equal("REJECTED", revision.GetProperty("filesState").GetString());
@@ -439,7 +452,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         var doc = (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
 
         var fileId = await UploadAsync(client, project, doc, "GA.pdf", Pdf, declaredSha256: new string('a', 64));
-        using var _ = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId } });
+        using var _ = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId }, changeDescription = "Next issue" });
 
         var revision = await WaitForFilesAsync(client, project, doc);
         Assert.Equal("REJECTED", revision.GetProperty("files")[0].GetProperty("status").GetString());
@@ -454,14 +467,15 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
         var doc = (await Api.RegisterAsync(client, project, Api.Drawing())).GetProperty("id").GetGuid();
 
         using var unknown = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions",
-            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-1.pdf", Pdf) }, series = "AS_BUILT" });
+            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-1.pdf", Pdf) }, series = "AS_BUILT", changeDescription = "First issue" });
+        // The demo's scheme has one line, for any phase (owner: a line per phase, plus the default).
         using var execution = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions",
-            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) }, series = "EXECUTION" });
+            new { fileIds = new[] { await UploadAsync(client, project, doc, "GA-2.pdf", Pdf) }, series = "DESIGN", changeDescription = "First issue" });
         var revision = await execution.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "REVISION_SERIES_UNKNOWN"), await Api.ProblemAsync(unknown));
         Assert.Equal(HttpStatusCode.Created, execution.StatusCode);
-        Assert.Equal(("0", "EXECUTION"), (revision.GetProperty("value").GetString(), revision.GetProperty("series").GetString()));
+        Assert.Equal(("A", "DESIGN"), (revision.GetProperty("value").GetString(), revision.GetProperty("series").GetString()));
     }
 
     [Fact]
@@ -480,7 +494,7 @@ public sealed class RevisionTests(Infrastructure infrastructure) : IClassFixture
             sha256 = Convert.ToHexStringLower(SHA256.HashData(Pdf)),
         });
         var fileId = (await ticket.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("fileId").GetGuid();
-        using var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId } });
+        using var started = await client.PostAsJsonAsync($"/api/projects/{project}/documents/{doc}/revisions", new { fileIds = new[] { fileId }, changeDescription = "Next issue" });
 
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "FILE_NOT_UPLOADED"), await Api.ProblemAsync(started));
     }

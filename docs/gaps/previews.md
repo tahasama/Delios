@@ -1,0 +1,54 @@
+# Previews: what the page shows, and what comes next
+
+Decided with the owner (keep this answer).
+
+## Shown today
+PDF (the browser's viewer), pictures (JPG, PNG, GIF, WebP, AVIF, BMP; SVG stays a download, it can carry code), Excel
+(.xlsx, .xlsm), CSV (one sheet), Primavera P6 (.xer). Every one with the zoom and the download in the bar above.
+
+## Built (owner: "build all including the dwg workaround")
+1. **.xls** (old Excel): a free reader for the old format, drawn in the same table as .xlsx.
+2. **Plain text** (.txt, .log, .json, .xml): shown as text, never run.
+3. **Word (.docx)**: a free converter to a readable page in the app; close, not exact, on complex layouts.
+4. **PowerPoint (.pptx), and Word exactly**: turned into a PDF on our side (LibreOffice in a container, free), then shown
+   as any PDF. Faithful; one more service to run.
+5. **3D, BIM first** (owner: "mostly BIM"): **IFC**, and **glTF / OBJ / STL**, viewed in the page (turn, zoom, hide
+   parts), free libraries. STEP left out.
+
+## DWG: the free route built; a certified reader to decide
+No good free reader. Paid, certified: the Open Design Alliance's SDK (yearly membership; web use needs the Sustaining
+tier or above), or Autodesk Platform Services (the Viewer free, each conversion paid in Flex tokens past a free monthly
+allowance). Free route: convert to DXF or PDF on our side, mixed quality. DXF itself can be drawn free in the page.
+
+Built: LibreDWG behind a small service (`deploy/dwg`, openSUSE's ready-made libredwg-tools: building it from source failed), the DXF drawn in the page (dxf-viewer). If its reading falls short
+on the project's drawings, the certified routes above stay open.
+
+## Decided after trying them (owner)
+- **Office → PDF on standby**: out of the default services (compose profile `office`, `PREVIEW_OFFICE_URL` empty).
+  About 1.5 GB to download and up to 1 GB of memory, for what the revision's own PDF already shows; nobody edits Word
+  in the app. Word and PowerPoint files are offered to download, saying why. To switch it on: `COMPOSE_PROFILES=app,office`
+  and `PREVIEW_OFFICE_URL=http://gotenberg:3000` in `.env`.
+- **DWG, the free route kept**: light, and good on Autodesk's samples once its multi-line texts were mended (v2).
+- **A certified DWG reader stays an option, not built**: added the day a client asks for one (Autodesk Platform Services
+  for pay per use, ODA for volume or files that must not leave our servers).
+- **How it is suggested** (owner): above every drawing, one short line, "For viewing only · the revision's PDF is the
+  reference", closed by its × for good. **Every reader on one card, switched on and off** (owner): Settings → Viewing
+  files (`Documents/Viewers.cs`). The organization's card lists them all, the heavy (Office) and the paid (a certified
+  DWG reader) among them: switching on one not installed opens the ask to DELIOS under its line (kept above every
+  organization, `product_requests`, backend command `requests`, emailed to `DELIOS_CONTACT_EMAIL`). A project sees only
+  the readers the organization has on, and switches them off or back on where the switch `VIEWERS` leaves it free.
+  Under a DWG that does not open, an administrator alone reads "A certified reader opens these: see Settings → Viewing
+  files".
+- **A drawing with nothing the reader draws** (owner's "Visualization - Sun and Sky Demo": 15 3D solids, ACIS bodies,
+  nothing else) is said in words ("Nothing in … can be drawn here: it holds only 3D solids…"), never a blank page. No
+  free reader draws 3D solids; a certified reader does.
+- **3D parts of a drawing** (owner: "a 3d dwg returned a 2d visual"): the drawing reader draws flat, seen from above;
+  3D solids, surfaces, meshes and regions are left out, counted in the DXF and said above it ("N 3D parts are not
+  shown", with what it cannot read and the 3D files the page turns: IFC, glTF/GLB, OBJ, STL). A drawing coloured by its own lines rather than its layers (the owner's multi-family demo: 381 lines set to
+  one brown, 420 = 8867329) is drawn as the file says, as AutoCAD does; the Layers list shows the layers' own colours.
+- **Light and dark** (owner: "follow the app's theme"): every viewer follows the app's theme. The sheets, schedules,
+  text and the frame around pictures take the theme's palette; a drawing is drawn on the theme's surface (lines too
+  close to it corrected by the reader), a 3D model on its slate backdrop, both changing at once when the theme does
+  (`components/use-dark.ts`). The PDF stays as the browser's reader draws it: its page and stamp are never recoloured.
+- **Full page** (owner): an icon in the Preview's bar opens the same Preview, with its bar, over the whole window in a
+  new tab (`/preview`), on the document's and the review's pages.

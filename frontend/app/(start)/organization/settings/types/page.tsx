@@ -3,12 +3,14 @@ import { keptCopies } from "@/lib/settings/api-admin";
 import { KeptCopies } from "../copies";
 import { ActionForm } from "@/components/form";
 import { inputCls } from "@/components/ui";
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { listCopies } from "@/lib/settings/api-admin";
 import { organizationSets } from "@/lib/settings/config";
 import { resetListAction } from "@/lib/organization/forms";
 import { ListsBoard, type Params } from "@/app/(app)/settings/config/board";
 import { ProjectSwitches } from "../switches";
+import { Download } from "lucide-react";
+import { LinesImport } from "@/app/(app)/import/lines-import";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Types & sets" };
@@ -20,12 +22,25 @@ export const metadata = { title: "Types & sets" };
  */
 export default async function OrganizationTypesPage({ searchParams }: { searchParams: Promise<Params> }) {
   const sp = await searchParams;
-  const [switches, copies, sets] = await Promise.all([liberty(), listCopies(), organizationSets()]);
+  const [switches, copies, sets] = await Promise.all([libertyOrFail(), listCopies(), organizationSets()]);
   const titleOf = (key: string) => sets.find((one) => one.key === key)?.title ?? key;
 
   return (
     <>
       <ListsBoard level="organization" sp={sp} />
+      {/* The organization's lists from a workbook (owner: "the org's Types & sets card"; the one upload in Settings): checked
+          line by line first, then written whole or not at all; every project reading a list gets the change. */}
+      <section className="register register-sheet register-sheet-open" aria-labelledby="org-lists-import">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span id="org-lists-import" className="stencil mr-1 text-slate-500">Bring the lists in from a workbook</span>
+          <span className="text-[11px] text-slate-500">the organization&rsquo;s lists, the default of every project; a project&rsquo;s own copy is never touched</span>
+          <span className="ml-auto flex flex-wrap gap-x-4 text-xs">
+            <a href="/api/export/template-sets?level=organization" className="inline-flex items-center gap-1.5 font-semibold text-link hover:underline"><Download className="h-3.5 w-3.5" aria-hidden="true" /> The lists as they stand (.xlsx)</a>
+            <a href="/api/export/template-sets?level=organization&blank=1" className="inline-flex items-center gap-1.5 font-semibold text-link hover:underline"><Download className="h-3.5 w-3.5" aria-hidden="true" /> An empty template (.xlsx)</a>
+          </span>
+        </div>
+        <LinesImport kind="org-sets" />
+      </section>
       <ProjectSwitches items={switches.filter((one) => one.area === "Types & sets")} title="Which lists projects may change" />
       <section className="register register-sheet register-sheet-open">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">

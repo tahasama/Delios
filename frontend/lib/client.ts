@@ -1,5 +1,10 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
+import { revalidateTag, updateTag } from "next/cache";
+import { after } from "next/server";
+import { keepRequestDateFormat } from "@/lib/core/date-format";
+import { dayOf, labelsOf, type Keep } from "@/lib/core/kept";
+import { SESSION_ENDED } from "@/lib/core/session-words";
 
 /**
  * The one door to the backend. Every screen and action reaches the .NET API
@@ -38,6 +43,11 @@ type ApiOptions = {
   idempotencyKey?: string;
   /** This browser's id (the sign-in calls): a sign-in from a browser never seen before is emailed to the person. */
   device?: string;
+  /**
+   * Keep the answer (a read only) until a change names one of its labels (`lib/core/kept.ts`): what it depends on.
+   * Without it, the answer is read fresh every time.
+   */
+  keep?: Keep;
 };
 
 function url(path: string, query?: Query): string {
@@ -56,7 +66,8 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   const incoming = await headers();
   const session = jar.get(SESSION_COOKIE)?.value;
   const forwarded = incoming.get("x-forwarded-for") ?? incoming.get("x-real-ip");
-  const sendHeaders: Record<string, string> = { Accept: "application/json" };
+  // The screens read what changed on the answer to their own acts (backend ScreenChanges).
+  const sendHeaders: Record<string, string> = { Accept: "application/json", "X-Delios-Screens": "1" };
   if (session) sendHeaders.Cookie = `${BACKEND_COOKIE}=${session}`;
   // The project the person is in: the backend reads the lists as that project sees them (its own, else the organization's).
   const project = jar.get("edms_project")?.value;
@@ -70,14 +81,61 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   if (options.idempotencyKey) sendHeaders["Idempotency-Key"] = options.idempotencyKey;
   if (options.body !== undefined) sendHeaders["Content-Type"] = "application/json";
   const started = TRACE ? performance.now() : 0;
+  const method = options.method ?? (options.body === undefined ? "GET" : "POST");
+  // A read that says what it depends on is kept, per session, until a change names one of its labels; one worked out
+  // against today is kept per day (the day is part of the question: the backend reads none of it).
+  const kept = method === "GET" && options.keep;
+  const day = kept ? dayOf(path, options.keep!) : null;
+  if (day) sendHeaders["X-Delios-Day"] = day;
   const response = await fetch(url(path, options.query), {
-    method: options.method ?? (options.body === undefined ? "GET" : "POST"),
+    method,
     headers: sendHeaders,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    cache: "no-store",
+    ...(kept ? { cache: "force-cache" as const, next: { revalidate: false as const, tags: labelsOf(path, options.keep!) } } : { cache: "no-store" as const }),
   });
+  // An act: what it changed is cleared now, so the page drawn after it reads it fresh (read-your-own-writes).
+  if (method !== "GET") clearChanged(response.headers.get("x-delios-changed"));
   if (TRACE) console.log(`[api] ${response.status} ${Math.round(performance.now() - started)}ms ${options.method ?? "GET"} ${path}`);
+  // How dates read: the organization's, on every answer; kept for the page being drawn.
+  keepRequestDateFormat(response.headers.get("x-delios-date-format"));
   return response;
+}
+
+/**
+ * An act sent once the page is drawn (Next.js `after`), never making it wait: an opening recorded while the page's
+ * answers are kept. The session is read now; the call goes after.
+ */
+export async function apiAfter(path: string, options: Pick<ApiOptions, "method" | "body"> = {}) {
+  const jar = await cookies();
+  const session = jar.get(SESSION_COOKIE)?.value;
+  const project = jar.get("edms_project")?.value;
+  const sendHeaders: Record<string, string> = { Accept: "application/json", "X-Delios-Screens": "1" };
+  if (session) sendHeaders.Cookie = `${BACKEND_COOKIE}=${session}`;
+  if (project) sendHeaders["X-Delios-Project"] = project;
+  if (options.body !== undefined) sendHeaders["Content-Type"] = "application/json";
+  after(async () => {
+    try {
+      await fetch(url(path), { method: options.method ?? "POST", headers: sendHeaders, body: options.body === undefined ? undefined : JSON.stringify(options.body), cache: "no-store" });
+    } catch {
+      // Recorded on the next opening.
+    }
+  });
+}
+
+/** Clears the labels a backend answer says its act changed: at once in a Server Action, else for the next view. */
+function clearChanged(header: string | null) {
+  if (!header) return;
+  for (const tag of header.split(",").map((one) => one.trim()).filter(Boolean)) {
+    try {
+      updateTag(tag);
+    } catch {
+      try {
+        revalidateTag(tag, { expire: 0 });
+      } catch {
+        // Neither an action nor a route (a page being drawn): the backend's own word, posted, clears it.
+      }
+    }
+  }
 }
 
 /** DELIOS_API_TRACE=1 logs every backend call with its time, to see what a page waits on. */
@@ -91,7 +149,13 @@ export async function problemOf(response: Response): Promise<ApiProblem> {
   } catch {
     // Not JSON (a proxy error page, an empty 401): the status says enough.
   }
-  const message = body.title ?? body.detail ?? (response.status === 401 ? "Please sign in again." : `The server answered ${response.status}.`);
+  // A fault of ours (no refusal code, a 5xx) is never shown in the server's own words ("An error occurred while
+  // processing your request."): it says plainly what happened and what to do.
+  const fault = response.status >= 500 && !body.code;
+  const message = fault
+    ? "Something went wrong on our side and nothing was saved. Try again; if it happens again, tell your administrator what you were doing."
+    : response.status === 401 ? SESSION_ENDED
+    : body.title ?? body.detail ?? `The server answered ${response.status}.`;
   return new ApiProblem(response.status, body.code ?? null, message, body.params ?? null);
 }
 
@@ -133,6 +197,15 @@ export async function apiShortLived<T>(path: string, ttlMs: number, options: Pic
 export async function forgetShortLived(): Promise<void> {
   const session = (await cookies()).get(SESSION_COOKIE)?.value ?? "";
   for (const key of shortLived.keys()) if (key.startsWith(`${session}\n`)) shortLived.delete(key);
+}
+
+/**
+ * A page's own thing refused as not there, or not the reader's (404, 403, or an id that is no id: 400): the page then
+ * reads "Not found, or not yours to open" (`notFound()`), the same words whether it exists or not. Anything else is a
+ * fault, and goes on to the error page.
+ */
+export function notYours(error: unknown): boolean {
+  return error instanceof ApiProblem && (error.status === 404 || error.status === 403 || error.status === 400);
 }
 
 /** For actions: the problem's message to show, or rethrows anything that is not a refusal. */

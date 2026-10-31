@@ -36,6 +36,8 @@ public sealed class RouteAndArrivalTests(Infrastructure infrastructure) : IClass
             contractRef = "PO101",
             receivedDate = "2026-10-01",
         })).GetProperty("id").GetGuid();
+        // The supplier sees it once it is asked of them (owner).
+        await Supply.AskAsync(controller, project, document);
         var file = await Flow.UploadAsync(supplier, project, document, "datasheet.pdf", Flow.Pdf(), "application/pdf");
         var (_, sent) = await Supply.SendAsync(supplier, project, document, file, "IFR");
         var revision = Supply.RevisionOf(sent);
@@ -65,39 +67,47 @@ public sealed class RouteAndArrivalTests(Infrastructure infrastructure) : IClass
         var admin = await app.SignedInAsync("admin@demo.local");
         var engineer = await app.SignedInAsync("engineer@demo.local");
         var approver = await app.SignedInAsync("approver@demo.local");
-        foreach (var (code, proceed) in new[] { ("A", true), ("R", false) })
-        {
-            using var put = await admin.PutAsJsonAsync("/api/admin/values", new { setKey = "SHOP_CODES", code, label = code, props = new { proceed } });
-            Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
-        }
+        // Verdicts are one list, Review outcomes; a route names one of its sets (owner).
+        var (setMade, set) = await Flow.PostAsync(admin, "/api/admin/lists/REVIEW_OUTCOMES/sets", new { name = "Shop codes" });
+        Assert.True(setMade == HttpStatusCode.OK, set.ToString());
+        var setId = set.GetProperty("id").GetGuid();
         var p = await Flow.RevisionAsync(engineer);
         var path = $"/api/projects/{p.Project}";
         var people = await engineer.GetFromJsonAsync<JsonElement>($"{path}/addressees");
         var aisha = people.GetProperty("people").EnumerateArray().Single(x => x.GetProperty("name").GetString() == "Aisha Approver").GetProperty("id").GetGuid();
+        object Route(string verdicts) => new
+        {
+            name = "Shop drawings",
+            verdicts,
+            steps = new[] { new { title = "Decide", mode = "ANY", userIds = new[] { aisha } } },
+        };
 
-        var (unknown, unknownBody) = await Flow.PostAsync(admin, "/api/admin/routes", new
+        var (unknown, unknownBody) = await Flow.PostAsync(admin, "/api/admin/routes", Route("No such set"));
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "VERDICT_SET_UNKNOWN"), (unknown, Flow.Code(unknownBody)));
+        var (empty, emptyBody) = await Flow.PostAsync(admin, "/api/admin/routes", Route("Shop codes"));
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "VERDICT_SET_EMPTY"), (empty, Flow.Code(emptyBody)));
+        foreach (var (code, proceed) in new[] { ("SA", true), ("SR", false) })
         {
-            name = "Shop drawings",
-            verdictSet = "NO_SUCH_LIST",
-            steps = new[] { new { title = "Decide", mode = "ANY", userIds = new[] { aisha } } },
-        });
-        Assert.Equal((HttpStatusCode.UnprocessableEntity, "VERDICT_SET_EMPTY"), (unknown, Flow.Code(unknownBody)));
-        var (created, route) = await Flow.PostAsync(admin, "/api/admin/routes", new
-        {
-            name = "Shop drawings",
-            verdictSet = "SHOP_CODES",
-            steps = new[] { new { title = "Decide", mode = "ANY", userIds = new[] { aisha } } },
-        });
+            using var put = await admin.PutAsJsonAsync("/api/admin/lists/REVIEW_OUTCOMES/values", new
+            {
+                code,
+                label = code,
+                setId,
+                props = new { proceed, resubmit = !proceed, information = false },
+            });
+            Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
+        }
+        var (created, route) = await Flow.PostAsync(admin, "/api/admin/routes", Route("Shop codes"));
         Assert.True(created == HttpStatusCode.Created, route.ToString());
 
         var (_, review) = await Flow.PostAsync(engineer, $"{path}/revisions/{p.Revision}/reviews", new { routeId = route.GetProperty("id").GetGuid() });
         var id = review.GetProperty("id").GetGuid();
-        Assert.Equal("SHOP_CODES", review.GetProperty("verdictSet").GetString());
+        Assert.Equal("Shop codes", review.GetProperty("verdicts").GetString());
         Assert.Equal("Aisha Approver", Assert.Single(review.GetProperty("steps")[0].GetProperty("participants").EnumerateArray()).GetProperty("name").GetString());
 
         var (wrongList, wrongBody) = await Flow.PostAsync(approver, $"{path}/reviews/{id}/answer", new { verdict = "C1", status = "IFC" });
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "VALUE_NOT_PUBLISHED"), (wrongList, Flow.Code(wrongBody)));
-        var (_, decided) = await Flow.PostAsync(approver, $"{path}/reviews/{id}/answer", new { verdict = "A", status = "IFC" });
+        var (_, decided) = await Flow.PostAsync(approver, $"{path}/reviews/{id}/answer", new { verdict = "SA", status = "IFC" });
         Assert.Equal(("DECIDED", "IFC"), (decided.GetProperty("state").GetString(), decided.GetProperty("grantedStatus").GetString()));
     }
 
@@ -152,7 +162,7 @@ public sealed class RouteAndArrivalTests(Infrastructure infrastructure) : IClass
             var id = review.GetProperty("id").GetGuid();
             await Flow.PostAsync(engineer, $"{p}/reviews/{id}/answer", new { });
             await Flow.PostAsync(approver, $"{p}/reviews/{id}/answer", new { verdict = "C1", status = "IFC" });
-            var (released, body) = await Flow.PostAsync(controller, $"{p}/reviews/{id}/release", new { });
+            var (released, body) = await Flow.PostAsync(controller, $"{p}/reviews/{id}/release", await Flow.ReleaseBodyAsync(controller));
             Assert.True(released == HttpStatusCode.OK, body.ToString());
         }
 
@@ -161,7 +171,7 @@ public sealed class RouteAndArrivalTests(Infrastructure infrastructure) : IClass
         var victor = addressees.GetProperty("people").EnumerateArray().Single(x => x.GetProperty("name").GetString() == "Victor Viewer").GetProperty("id").GetGuid();
         var client = addressees.GetProperty("parties").EnumerateArray().Single(x => x.GetProperty("code").GetString() == "NWU").GetProperty("id").GetGuid();
         var (sent, sentBody) = await Flow.PostAsync(controller, $"{p}/transmittals",
-            new { revisionIds = new[] { first.Revision }, userIds = new[] { victor }, partyIds = new[] { client }, reason = "INFORMATION" });
+            new { revisionIds = new[] { first.Revision }, userIds = new[] { victor }, partyIds = new[] { client }, reason = "INFORMATION", subject = "For your files" });
         Assert.True(sent == HttpStatusCode.OK, sentBody.ToString());
 
         var second = await Flow.RevisionAsync(engineer, first.Document);
@@ -176,7 +186,7 @@ public sealed class RouteAndArrivalTests(Infrastructure infrastructure) : IClass
         var his = await viewer.GetFromJsonAsync<JsonElement>("/api/me/notifications");
         Assert.Contains(his.GetProperty("rows").EnumerateArray(), n => n.GetProperty("title").GetString()!.Contains("replaced by rev"));
 
-        await Flow.PostAsync(controller, $"{p}/transmittals", new { revisionIds = new[] { second.Revision }, partyIds = new[] { client }, reason = "INFORMATION" });
+        await Flow.PostAsync(controller, $"{p}/transmittals", new { revisionIds = new[] { second.Revision }, partyIds = new[] { client }, reason = "INFORMATION", subject = "For your files" });
         Assert.Empty((await controller.GetFromJsonAsync<JsonElement>($"{p}/exposures/untold")).EnumerateArray());
     }
 }

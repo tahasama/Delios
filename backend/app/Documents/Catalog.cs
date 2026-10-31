@@ -21,8 +21,21 @@ public sealed class Catalog
         _listSets = sets.GroupBy(s => s.ListKey).ToDictionary(g => g.Key, g => g.ToList());
     }
 
-    /// <summary>Reads every value of the current tenant from the database. Called by <see cref="DocumentService"/> when it needs the lists.</summary>
-    public static async Task<Catalog> LoadAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
+    /// <summary>
+    /// Every value of the current tenant, as the project in hand reads them. Kept until how the organization works
+    /// changes (owner: lists read once, not on every call; <see cref="AccessVersions.SharedAsync"/>), never while this
+    /// request is changing a list itself (it reads its own change).
+    /// </summary>
+    public static async Task<Catalog> LoadAsync(DeliosDbContext db, CancellationToken cancellationToken)
+    {
+        var changing = db.ChangeTracker.Entries<ValueEntry>().Any() || db.ChangeTracker.Entries<ValueSet>().Any();
+        if (changing || db.CurrentTenant is not { } tenant || db.AppService<AccessVersions>() is not { } versions)
+            return await ReadAsync(db, cancellationToken);
+        return await versions.SharedAsync(tenant, $"catalog:{db.ListsProject}:{string.Join(",", db.ListsOwnKeys.Order())}",
+            () => ReadAsync(db, cancellationToken));
+    }
+
+    private static async Task<Catalog> ReadAsync(DeliosDbContext db, CancellationToken cancellationToken) =>
         new(await db.ValueEntries.AsNoTracking().ToListAsync(cancellationToken), await db.ListSets.AsNoTracking().ToListAsync(cancellationToken));
 
     /// <summary>
@@ -145,6 +158,23 @@ public sealed class Catalog
     public string? DefaultOf(string setKey, string? deliverableType = null) =>
         Offered(setKey, deliverableType).FirstOrDefault(v => v.Props?.RootElement.TryGetProperty("default", out var d) == true
             && d.ValueKind == JsonValueKind.True)?.Code;
+
+    /// <summary>
+    /// The criticality a document type recommends (owner: one is always recommended): its own, else the level marked
+    /// default, else the level the types recommend most; each offered for the deliverable type. Null when there is none.
+    /// </summary>
+    public string? RecommendedCriticality(string? docType, string? deliverableType = null)
+    {
+        bool Offers(string? code) => code is not null && IsOfferedFor(ValueSets.Criticality, code, deliverableType);
+        if (docType is not null && Prop(ValueSets.DocumentTypes, docType, "criticality") is { ValueKind: JsonValueKind.String } own
+            && Offers(own.GetString())) return own.GetString();
+        if (DefaultOf(ValueSets.Criticality, deliverableType) is { } usual) return usual;
+        return _sets.TryGetValue(ValueSets.DocumentTypes, out var types)
+            ? types.Values.Where(v => v.Status == ValueStatus.Active)
+                .Select(v => v.Props?.RootElement.TryGetProperty("criticality", out var c) == true && c.ValueKind == JsonValueKind.String ? c.GetString() : null)
+                .Where(Offers).GroupBy(c => c).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault()
+            : null;
+    }
 
     /// <summary>
     /// The first active value in the published order, among those offered for the deliverable type when one is given: for

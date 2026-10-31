@@ -163,7 +163,7 @@ public sealed class DelegationTests(Infrastructure infrastructure) : IClassFixtu
         // Not a review to list; Document Control's to release.
         var listed = await controller.GetFromJsonAsync<JsonElement>($"/api/projects/{p.Project}/reviews?per=200");
         Assert.DoesNotContain(listed.GetProperty("rows").EnumerateArray(), r => r.GetProperty("id").GetGuid() == review.GetProperty("id").GetGuid());
-        var (released, body) = await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{review.GetProperty("id")}/release", new { });
+        var (released, body) = await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{review.GetProperty("id")}/release", await Flow.ReleaseBodyAsync(controller));
         Assert.True(released == HttpStatusCode.OK, body.ToString());
         Assert.Equal("RELEASED", body.GetProperty("state").GetString());
     }

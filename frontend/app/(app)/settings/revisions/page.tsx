@@ -1,3 +1,4 @@
+import { ExceptionNote } from "@/lib/settings/exception";
 import Link from "next/link";
 import { SETUP_PAGES, maySetup } from "../setup-pages";
 import { requireScope } from "@/lib/core/scope";
@@ -21,10 +22,15 @@ export default async function RevisionsPage() {
   }
   const [naming, deliverables, phaseValues] = await Promise.all([projectRevisions(), getActiveSet("DELIVERABLE_TYPES"), getActiveSet("PHASES")]);
   const project = ctx.project.code;
+  const exception = naming.exception;
   const lead = naming.own
     ? naming.free
-      ? `${project}'s own revision naming, changed here${naming.mayChange ? "" : " by whoever acts as the control function"}. The organization's later changes do not touch it.`
+      ? exception
+        ? <>{project}&rsquo;s own revision naming, changed here. <ExceptionNote project={project} what="revision naming" exception={exception} /></>
+        : `${project}'s own revision naming, changed here${naming.mayChange ? "" : " by whoever acts as the control function"}. The organization's later changes do not touch it.`
       : `${project}'s own revision naming, changed here before the organization fixed it for every project: it stays as it is, and nothing more is changed here.`
+    : naming.free && exception
+      ? <>The organization&rsquo;s revision naming. <ExceptionNote project={project} what="revision naming" exception={exception} /> A change here gives {project} its own copy, which the organization&rsquo;s later changes never touch.{naming.mayChange ? null : " Whoever acts as the control function changes it."}</>
     : naming.free
       ? <>The organization&rsquo;s revision naming. Projects may change it: a change here gives {project} its own copy, which the organization&rsquo;s later changes never touch.{naming.mayChange ? null : " Whoever acts as the control function changes it."}</>
       : <>The organization&rsquo;s revision naming, the same on every project.{" "}

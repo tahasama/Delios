@@ -4,7 +4,8 @@ import type { NextRequest } from "next/server";
 // Registering an organization, and getting a new password, must be reachable
 // without a session. Everything else needs one.
 // The pop-up notifications script is fetched by the browser on its own, sometimes without the page.
-const PUBLIC = ["/login", "/signup", "/forgot-password", "/reset-password", "/confirm-email", "/confirm-domain", "/confirm-claim", "/_next", "/favicon", "/icon", "/robots.txt", "/sw.js"];
+// The backend's word that something changed carries no session: its route checks the shared secret itself.
+const PUBLIC = ["/login", "/signup", "/forgot-password", "/reset-password", "/confirm-email", "/confirm-domain", "/confirm-claim", "/console", "/api/console", "/legal", "/_next", "/favicon", "/icon", "/robots.txt", "/sw.js", "/api/screens/changed", "/api/client-errors"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -23,13 +24,19 @@ export async function proxy(req: NextRequest) {
     again.cookies.delete("delios_session");
     return again;
   }
+  // Where the person was, filters and all: signing in again leads straight back there.
+  const here = pathname + req.nextUrl.search;
   if (!token) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("next", pathname);
+    url.search = "";
+    url.searchParams.set("next", here);
     return NextResponse.redirect(url);
   }
-  return NextResponse.next();
+  // A page that finds the session ended while it is drawn (`signInAgain`) reads where it was from here.
+  const forward = new Headers(req.headers);
+  forward.set("x-delios-path", here);
+  return NextResponse.next({ request: { headers: forward } });
 }
 
 export const config = {

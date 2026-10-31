@@ -65,6 +65,7 @@ internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
         b.Property(x => x.PreviousParticipation).HasMaxLength(16);
         b.Property(x => x.ParticipationChangedByName).HasMaxLength(200);
         b.HasIndex(x => x.OrganizationId);
+        b.HasIndex(x => x.TrainingProjectId);
     }
 }
 
@@ -101,10 +102,12 @@ internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         b.Property(x => x.Kind).HasMaxLength(32).HasDefaultValue("GENERIC");
         b.Property(x => x.Status).HasMaxLength(16);
         b.Property(x => x.TimeZone).HasMaxLength(64);
+        b.Property(x => x.Country).HasMaxLength(2);
         b.Property(x => x.ContentExtraction).HasMaxLength(16);
         b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
         b.Property(x => x.PreviousCode).HasMaxLength(32);
         b.Property(x => x.CodeChangedByName).HasMaxLength(200);
+        b.Property(x => x.Space).HasMaxLength(16);
     }
 }
 
@@ -182,8 +185,18 @@ internal sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEv
         b.HasIndex(x => new { x.TenantId, x.Id });
         b.HasIndex(x => new { x.EntityType, x.EntityId });
         b.HasIndex(x => x.ProjectId);
+        // A document's History (its own events and its revisions'), newest first: never a walk through the whole trail.
+        b.HasIndex(x => new { x.EntityId, x.Id });
+        // A project's log, newest first.
+        b.HasIndex(x => new { x.ProjectId, x.Id });
         // A person's own record (Settings, People & access), newest first.
         b.HasIndex(x => new { x.ActorId, x.Id });
+        // Whether someone opened this document in the last half hour, asked on every opening: never a scan of all they did.
+        b.HasIndex(x => new { x.ActorId, x.EntityId, x.At });
+        // Downloads by one person in the last hour (Audit/DownloadWatch), read with each download.
+        b.HasIndex(x => new { x.ActorId, x.Action, x.At });
+        // The audit trail and the log narrowed to one kind of act, newest first.
+        b.HasIndex(x => new { x.Action, x.Id });
         b.Property(x => x.Action).HasMaxLength(64);
         b.Property(x => x.EntityType).HasMaxLength(64);
     }

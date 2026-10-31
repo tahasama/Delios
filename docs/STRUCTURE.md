@@ -31,16 +31,18 @@ delios/
 backend/
 ├── app/                  the program (API and worker)
 │   ├── Program.cs        start-up: what runs, in which order
-│   ├── Documents/        documents, revisions, files, the register; their numbers with other organizations (Equivalents.cs); the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
+│   ├── Documents/        documents, revisions, files, the register; FileCipher (every file kept encrypted, opened on each read in FileStorage); FileScanning (what the virus check could not look into, refused in plain words); FileBackup (tells the copier each file stored); FullDownload / FullDownloadBuilder (every file of a project or the organization in one zip, made by the worker); their numbers with other organizations (Equivalents.cs); the readers of the Preview, switched on and off (Viewers.cs, the card Viewing files); the lists, numbering (NumberingEndpoints: the organization's and a project's copy) and revision
 │   │                     schemes (CatalogAdminEndpoints, RevisionSchemeEndpoints); Reviews/ also VerdictListEndpoints (the sets of Review outcomes, read by routes)
 │   │                     ProjectLists: the project's lists (own copy on first change, where each value is used, who changes them)
+│   │                     WorkbookView: an Excel source file read for the Preview (components/file-preview.tsx, workbook-view.tsx; a P6 .xer, schedule-file-view.tsx);
+│   │                     Previews: office files to PDF, DWG to DXF, text (components text-, office-, drawing-, model-view.tsx; deploy/dwg)
 │   │                     ListRules: groups, the app's lists, which set of a list serves a deliverable type; Catalog.IsOfferedFor checks it
 │   │                     SheetGuard: every spreadsheet checked before it is read (type, size unpacked, macros, viruses)
-│   ├── Reviews/          routes, steps, advice, verdicts, release
+│   ├── Reviews/          routes, steps, advice, verdicts, release; the stamp (Stamping, where it goes: StampPlacement, StampPlaceEndpoints)
 │   ├── Transmittals/     sending, receiving, the check on arrival, replies by email (EmailReplies.cs); what a request asks and where it is decided (Asks.cs); matching what arrived
 │   │                     to one of ours and packages taking documents as they come (IncomingService.Taking.cs)
 │   ├── Packages/         delivery packages and supplier packages; how other organizations' documents come in (Intake.cs: by placeholder or as they come)
-│   ├── Actions/          the schedule, its actions, what each needs, notices
+│   ├── Actions/          the schedule, its actions, what each needs, notices; ScheduleDays (the days around an action, on two levels); XerReader (the schedule read from a P6 .xer); NoticeDays (the days notices fall on, written by what changes them); ListSources (each list's register document, chosen in the register, and what it was read from last)
 │   ├── Records/          assets, number ranges, readiness answers
 │   ├── Checks/           conformance checks
 │   ├── Reports/          reports
@@ -49,15 +51,26 @@ backend/
 │   ├── Organizations/    organizations working together: links, linked accounts, switching; Registry (what is
 │   │                     unique across DELIOS: codes, names, identifiers, contract numbers; changed once;
 │   │                     look-alikes, claims, merges), RegistryEndpoints (on DELIOS, our identity and domain,
-│   │                     claims, merges; command merge-organizations)
-│   ├── Settings/         the organization's and the project's settings and lists; KeptCopies (a project's own copy kept when reset, put back from the organization's card); FormRules (Forms & fields: what each form asks, checked on save); Liberty (what projects may change: Fixed or Free per setting)
+│   │                     claims, merges; command merge-organizations), ProductRequests (what an organization
+│   │                     asks of DELIOS, a certified DWG reader: kept above every organization, emailed, command
+│   │                     requests; asked from the card organization/settings/viewers)
+│   ├── Operators/        the DELIOS team's console, above every organization (no row-level security, its own
+│   │                     sign-in): Entities (operators, sessions, subscriptions, plans, legal texts and acceptances,
+│   │                     legal matters, support access, the team's log); OperatorAuth (sign-in with password and code,
+│   │                     command create-operator); ConsoleEndpoints (/api/console); Trials (the free trial, its
+│   │                     reminders, TrialReminders in the worker); SupportRequests (Need support: /api/support,
+│   │                     answered in the console); Contracts (what an organization has
+│   │                     with us read as it applies today, Subscriptions.Effective; read only when not paid; /api/legal,
+│   │                     /api/organization/contract, /api/organization/support, /api/standing); LegalTexts (the kinds
+│   │                     of legal text, their starting text, every legal matter must or may)
+│   ├── Settings/         the organization's and the project's settings and lists; KeptCopies (a project's own copy kept when reset, put back from the organization's card); FormRules (Forms & fields: what each form asks, checked on save); Liberty (what projects may change: Fixed or Free per setting, and the projects a fixed one leaves free); ProjectDifferences (what one project changed, for the organization's Settings); OrganizationDefaults (the defaults for new projects replaced as a whole, a copy kept); ProjectPlace (where a new project's site starts: time zone, days off, country); Calendar (public holidays and a project's own days off, the calendars' endpoints); DateFormat (how dates read, carried to the screens on every answer)
 │   ├── Notifications/    notifications, email, pop-ups
-│   ├── Audit/            the audit trail
+│   ├── Audit/            the audit trail; DownloadWatch (every download recorded, administrators told past 200 an hour)
 │   ├── Extraction/       reading text out of files
-│   ├── Messaging/        the queue between the API and the worker
-│   ├── Tenancy/          keeping each organization's data apart
+│   ├── Messaging/        the queue between the API and the worker; the outbox relay, woken by the acts that fill it (OutboxWake)
+│   ├── Tenancy/          keeping each organization's data apart; Crossing (the one door across, on the shared tables)
 │   ├── Seeding/          the demo data
-│   ├── Platform/         the database, Migrations/, shared plumbing
+│   ├── Platform/         the database, Migrations/, shared plumbing; ScreenChanges (what a save tells the screens), AccessVersions (access and shared answers kept until the organization's way of working changes); Batch (several writes as one: each line through its own endpoint, in one transaction); Hosting (who runs this DELIOS: HOSTED); ChangedMeanwhile (two saves of one thing at once: the second refused, 409 CHANGED_MEANWHILE); ScreenErrors (what failed on the screens, into the log and Sentry)
 │   ├── Resources/        files built into the program (fonts for stamped PDFs)
 │   └── appsettings.json  default settings (.env overrides them)
 ├── tests/                the automated tests, one file per area (DocumentTests.cs…)
@@ -83,25 +96,29 @@ The program's internal name is still `Delios.Host` (in the code and the built fi
 
 ```
 frontend/
+├── cache-handler.mjs     where Next.js keeps the backend's answers: Valkey, until a change names them
 ├── app/                  the pages: a folder's name is its web address
 │   ├── layout.tsx        the outer frame of every page
 │   ├── (public)/         pages for someone not signed in
 │   │   ├── login/  signup/  confirm-email/  forgot-password/  reset-password/
+│   │   ├── legal/        the legal texts, open to anyone (components/legal-text.tsx draws a lawyer's parts in red)
 │   │   └── bot-check.tsx, form-validation.ts   pieces only these pages use
 │   ├── (start)/          signed in, outside any project
 │   │   ├── setup/        after registering an organization: add people, open the first project
 │   │   ├── no-project/   on no project yet (lists other organizations' projects they work on)
 │   │   └── organization/ the organization's space (layout.tsx: its band, the waiting banner; org-tabs.tsx: Projects · People · Organizations · Settings) and admin page: projects (ours and joined), people,
 │   │                     organizations we work with, invitations; + defaults/ (defaults for new projects), settings/ (the organization's Settings: the same cards as a project's, each with its switch and the projects with their own copy; numbering/ built, [slug] for cards not moved yet)
+│   ├── console/          the DELIOS team's console (sign-in/, then (in)/: overview, organizations, requests,
+│   │                     payments, legal, support, notices, team, log), its own session (lib/console/client.ts)
 │   ├── (app)/            inside a project
 │   │   ├── layout.tsx    the frame: menu, project switcher, theme
 │   │   ├── page.tsx      Home (with home-parts.tsx, tally.tsx)
-│   │   ├── documents/    + import/
+│   │   ├── documents/    + import/ (deliverable-import.tsx, lines-import.tsx: every import on two pages)
 │   │   ├── reviews/
 │   │   ├── transmittals/ + exposures/
-│   │   ├── packages/
+│   │   ├── packages/     arborescence.tsx: packages in packages (the path, "Packages in it", where it sits, the tree)
 │   │   ├── schedule/     the schedule list (/schedule), the same page for everyone
-│   │   ├── actions/      each action's page (/actions/<code>); /actions and needed/ are old addresses, redirect
+│   │   ├── actions/      each action's page (/actions/<code>); the schedule's list panels (plan-list-panel.tsx, checked-list-form.tsx: checked before applied); /actions and needed/ are old addresses, redirect
 │   │   ├── assets/
 │   │   ├── conformance/  + reports/
 │   │   ├── notifications/
@@ -125,13 +142,15 @@ frontend/
 │   ├── records/          assets & tags (api.ts reads; forms.ts links a tag's documents)
 │   ├── conformance/      (checks/prevented.ts: what the app refuses, listed by area under Default rules)
 │   ├── account/
-│   ├── organization/      organizations working together, the admin page, defaults for new projects
+│   ├── organization/      organizations working together, the admin page, defaults for new projects; forms-contract.ts (Contract & plan)
+│   ├── console/          the console's own door to the backend (client.ts, its own session), its forms and types
+│   ├── legal/            the legal texts, read by anyone
 │   └── settings/         (forms-revisions.ts: Settings → Revisions; verdicts are the list Review outcomes, kept in Types & sets)
 │
 ├── components/           only the pieces several areas use
 │                         (ui.tsx: buttons and fields; form, data-table, timeline, search-pick, select (every dropdown),
-│                          send-for-review, notify-panel, preflight, how-it-works: the form How this
-                         project works and the organization's defaults share)
+│                          send-for-review, notify-panel, preflight, how-it-works: the way to the
+                         organization's defaults, answered on their own page with the Control room's Choice)
 ├── public/               files served as they are (sw.js, for pop-up notifications)
 ├── scripts/              demo-schedule.mjs (fills a demo), gen-theme.mjs
 └── Dockerfile            builds the screens into an image
@@ -178,7 +197,7 @@ deploy/
 ├── postgres/             the database image, backups, restore drill
 ├── caddy/                the front door
 ├── monitoring/           Prometheus, Grafana, alerts
-├── file-backup/          copies of stored files
+├── file-backup/          the copier: its image (rclone and Valkey's client), each file copied as it is stored, a full comparison weekly
 ├── kubernetes/           the same services, for a cluster later
 └── init-env.sh / .ps1    makes .env with fresh passwords
 ```
@@ -219,4 +238,19 @@ A new feature ....................... its area's folder in each part; a new area
 - **A new area gets one name**, the same in `backend/app/`, `frontend/app/(app)/` and `frontend/lib/`, and is
   added to this file.
 - **Only `lib/client.ts` calls the backend.** Pages read through their area's `api.ts`; forms send through
-  its `forms*.ts`.
+  its `forms*.ts`. The one exception is the console, which carries its own session: `lib/console/client.ts`.
+
+
+
+- Packages brought up to date after a change, in the worker: `backend/app/Packages/PackagesMoved.cs` (sent by
+  `ScreenChangeWatcher.MovesPackages`), `PackageService.RestateAsync`.
+- When people were last seen (sign-in, acts, joined): table `people_seen`, written by the database function `audit_seen`
+  (called by `audit_append` / `audit_note`), read by `DirectoryEndpoints.SeenAsync`.
+- Counts of acts made once and topped up: `backend/app/Audit/AuditCounts.cs`.
+- Downloads prepared in the background: `frontend/components/downloads.tsx` (in the app's layout; `startDownload` from code).
+
+## Kept answers and what clears them
+- `frontend/lib/core/kept.ts` — the labels of a kept read; `frontend/lib/client.ts` `api(…, { keep })`, `apiAfter`.
+- `frontend/app/api/screens/changed/route.ts` — the backend says what changed; clears those labels.
+- `backend/app/Platform/ScreenChanges.cs` — the save interceptor naming the labels each save touched, and the poster.
+- `backend/app/Search/SearchSignal.cs` — "this organization's register changed", for the search index.

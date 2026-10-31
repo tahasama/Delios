@@ -41,7 +41,7 @@ export function Part({ title, children, aside }: { title: string; children: Reac
   return (
     <div className="plan-part space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-[13px] font-semibold text-slate-900">{title}</h3>
+        <h3 className="flex items-center gap-2 text-[13px] font-semibold text-brand-ink"><span aria-hidden className="h-3.5 w-[3px] rounded-full bg-brand-ink/40" />{title}</h3>
         {aside ? <span className="text-[11px] text-slate-500">{aside}</span> : null}
       </div>
       {children}
@@ -97,7 +97,7 @@ export function Facts({ rows }: { rows: [string, React.ReactNode][] }) {
     <dl className="divide-y divide-line rounded-md ring-1 ring-line">
       {rows.map(([label, value]) => (
         <div key={label} className="grid grid-cols-1 gap-1 px-3.5 py-2 text-[13px] sm:grid-cols-[13rem_minmax(0,1fr)] sm:gap-4">
-          <dt className="text-xs font-semibold text-slate-500">{label}</dt>
+          <dt className="text-xs font-semibold text-brand-ink/80">{label}</dt>
           <dd className="min-w-0 text-slate-800">{value}</dd>
         </div>
       ))}
@@ -112,14 +112,14 @@ export function Grid({ head, rows, empty }: { head: string[]; rows: React.ReactN
     <div className="overflow-x-auto rounded-md ring-1 ring-line">
       <table className="w-full text-left text-[12.5px]">
         <thead>
-          <tr className="border-b border-line bg-tint-soft">
-            {head.map((h) => <th key={h} className="px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">{h}</th>)}
+          <tr className="border-b border-line bg-tint">
+            {head.map((h) => <th key={h} className="px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-brand-ink/80">{h}</th>)}
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
           {rows.map((row, i) => (
-            <tr key={i} className="align-top">
-              {row.map((cell, j) => <td key={j} className={cn("px-3 py-1.5 text-slate-800", j === 0 && "font-medium")}>{cell}</td>)}
+            <tr key={i} className="align-top even:bg-tint-soft/60">
+              {row.map((cell, j) => <td key={j} className={cn("px-3 py-2 text-slate-800", j === 0 && "font-medium text-brand-ink")}>{cell}</td>)}
             </tr>
           ))}
         </tbody>

@@ -107,6 +107,22 @@ export const SETUP_PAGES: SetupPage[] = [
     read: true,
   },
   {
+    href: "/settings/viewers",
+    title: "Viewing files",
+    text: "Which readers a document's Preview uses on this project, among those the organization has on.",
+    group: "How work flows",
+    control: true,
+    read: true,
+  },
+  {
+    href: "/settings/calendar",
+    title: "Calendar",
+    text: "Where the site is, its country's public holidays and its own days off: the days due days skip.",
+    group: "How work flows",
+    control: true,
+    read: true,
+  },
+  {
     href: "/settings/workflow-templates",
     title: "Review routes",
     text: "Who reviews, and in which order: side by side, one after another, or gathered by a lead.",

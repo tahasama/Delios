@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 namespace Delios.Host.Reports;
 
 /// <summary>
@@ -47,8 +48,9 @@ public sealed record Cell(string Text, string? Tone = null, string? Kind = null,
 
 /// <summary>
 /// A report answers one question with a few headline figures, one chart and the
-/// list behind them, which is what the export carries. Counted from the register
-/// each time it is opened: never stored, never stale.
+/// list behind them, which is what the export carries. Counted once and kept for
+/// everyone (<see cref="ReportCount"/>), as the checks are: it stays as it was counted
+/// until someone counts it again (owner: "the refresh is 100% manual").
 /// </summary>
 /// <remarks>
 /// <see cref="RowBars"/> says, for each row, which bar of the chart it is counted in (the bar's label): a bar chosen
@@ -57,7 +59,40 @@ public sealed record Cell(string Text, string? Tone = null, string? Kind = null,
 public sealed record Report(
     string Id, string Title, string Question, string Audience, IReadOnlyList<Figure> Figures, Chart Chart,
     IReadOnlyList<string> Columns, IReadOnlyList<IReadOnlyList<Cell>> Rows, string Empty, DateTimeOffset CountedAt,
-    IReadOnlyList<string?>? RowBars = null);
+    IReadOnlyList<string?>? RowBars = null, string? CountedBy = null);
+
+/// <summary>
+/// A report as it was last counted, kept for everyone who reads it: one per report, per way it is asked (its window, how
+/// its chart is cut, its day) and per audience (ours, or one other organization's own narrowed count). Counted again only
+/// when someone asks (owner: as the checks, "the control function… once a week per project").
+/// </summary>
+public sealed class ReportCount
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid TenantId { get; set; }
+    public Guid ProjectId { get; set; }
+    public required string ReportId { get; set; }
+    /// <summary>How it was asked, written as one key (<see cref="ReportEndpoints"/>).</summary>
+    public required string Asked { get; set; }
+    /// <summary>Empty: ours; else the code of the organization it was counted for.</summary>
+    public required string Audience { get; set; }
+    public required string Body { get; set; }
+    public NodaTime.Instant CountedAt { get; set; }
+    public required string CountedByName { get; set; }
+}
+
+internal sealed class ReportCountConfiguration : Microsoft.EntityFrameworkCore.IEntityTypeConfiguration<ReportCount>
+{
+    public void Configure(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<ReportCount> b)
+    {
+        b.ToTable("report_counts");
+        b.HasIndex(x => new { x.ProjectId, x.ReportId, x.Asked, x.Audience }).IsUnique();
+        b.Property(x => x.ReportId).HasMaxLength(32);
+        b.Property(x => x.Asked).HasMaxLength(200);
+        b.Property(x => x.Audience).HasMaxLength(64);
+        b.Property(x => x.CountedByName).HasMaxLength(200);
+    }
+}
 
 /// <summary>The windows and limits a reader may change; the defaults are only a starting point.</summary>
 /// <param name="HorizonDays">Readiness: how far ahead to look.</param>

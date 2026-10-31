@@ -14,6 +14,11 @@ namespace Delios.Host.Documents;
 /// <param name="Code">The value's code; with <paramref name="NewCode"/>, the one it had.</param>
 /// <param name="NewCode">A new code: only for a value never used.</param>
 /// <param name="SetId">The set it goes in (none: the list's default set); moved to another only while never used.</param>
+/// <summary>A line of the Settings lists' workbook: where it is, its list, and the value as the person changes it by hand.</summary>
+public sealed record ProjectValueLine(string At, string Set, ProjectValueRequest Value);
+/// <summary>The Settings lists' workbook, checked (<paramref name="Dry"/>: everything undone) or written whole.</summary>
+public sealed record ProjectValuesRequest(ProjectValueLine[]? Values, bool Dry = false);
+
 public sealed record ProjectValueRequest(string? Code, string? NewCode = null, string? Label = null, string? Status = null, int? Sort = null,
     JsonElement? Props = null, Guid? SetId = null);
 
@@ -49,6 +54,7 @@ public static class ProjectLists
         lists.MapPut("/{set}", UpdateListAsync);
         lists.MapDelete("/{set}", DeleteListAsync);
         lists.MapPut("/{set}/values", ValueAsync);
+        lists.MapPost("/values/many", ValuesAsync);
         lists.MapDelete("/{set}/values/{code}", DeleteValueAsync);
         lists.MapPost("/{set}/sets", CreateSetAsync);
         lists.MapPut("/{set}/sets/{setId:guid}", UpdateSetAsync);
@@ -75,6 +81,7 @@ public static class ProjectLists
         organization.MapPut("/{set}", UpdateListAsync);
         organization.MapDelete("/{set}", DeleteListAsync);
         organization.MapPut("/{set}/values", ValueAsync);
+        organization.MapPost("/values/many", ValuesAsync);
         organization.MapDelete("/{set}/values/{code}", DeleteValueAsync);
         organization.MapPost("/{set}/sets", CreateSetAsync);
         organization.MapPut("/{set}/sets/{setId:guid}", UpdateSetAsync);
@@ -202,16 +209,29 @@ public static class ProjectLists
         var newId = sets.ToDictionary(s => s.Id, _ => Guid.CreateVersion7());
         db.ListSets.AddRange(sets.Select(s => new ValueSet
         {
-            Id = newId[s.Id], TenantId = s.TenantId, ProjectId = project.Id, ListKey = s.ListKey, Name = s.Name,
-            DeliverableTypes = [.. s.DeliverableTypes], IsDefault = s.IsDefault, Active = s.Active, Sort = s.Sort,
+            Id = newId[s.Id],
+            TenantId = s.TenantId,
+            ProjectId = project.Id,
+            ListKey = s.ListKey,
+            Name = s.Name,
+            DeliverableTypes = [.. s.DeliverableTypes],
+            IsDefault = s.IsDefault,
+            Active = s.Active,
+            Sort = s.Sort,
         }));
         var originals = await db.ValueEntries.IgnoreQueryFilters().AsNoTracking()
             .Where(v => v.ProjectId == null && v.TenantId == project.TenantId && v.SetKey == listKey).ToListAsync(cancellationToken);
         db.ValueEntries.AddRange(originals.Select(v => new ValueEntry
         {
-            TenantId = v.TenantId, ProjectId = project.Id, SetKey = v.SetKey, Code = v.Code, Label = v.Label, Status = v.Status,
+            TenantId = v.TenantId,
+            ProjectId = project.Id,
+            SetKey = v.SetKey,
+            Code = v.Code,
+            Label = v.Label,
+            Status = v.Status,
             SetId = v.SetId is { } setId && newId.TryGetValue(setId, out var copied) ? copied : null,
-            Sort = v.Sort, Props = v.Props is null ? null : JsonDocument.Parse(v.Props.RootElement.GetRawText()),
+            Sort = v.Sort,
+            Props = v.Props is null ? null : JsonDocument.Parse(v.Props.RootElement.GetRawText()),
         }));
         project.OwnListKeys = [.. project.OwnListKeys, listKey];
         await db.SaveChangesAsync(cancellationToken);
@@ -228,7 +248,7 @@ public static class ProjectLists
     {
         if (db.ListsProject is not { } projectId) return null;
         if (!db.ListsOwnKeys.Contains(listKey)
-            && (OrganizationOnly.Contains(listKey) || !await Liberty.IsFreeAsync(db, Liberty.ListKey(listKey), cancellationToken))) return null;
+            && (OrganizationOnly.Contains(listKey) || !await Liberty.IsFreeAsync(db, Liberty.ListKey(listKey), projectId, cancellationToken))) return null;
         await EnsureOwnAsync(db, projectId, listKey, cancellationToken);
         return projectId;
     }
@@ -417,8 +437,11 @@ public static class ProjectLists
         {
             db.ListSets.AddRange(missing.Select(key => new ValueSet
             {
-                TenantId = level.TenantId, ProjectId = owned.Contains(key) ? level.ProjectId : null,
-                ListKey = key, Name = "Default", IsDefault = true,
+                TenantId = level.TenantId,
+                ProjectId = owned.Contains(key) ? level.ProjectId : null,
+                ListKey = key,
+                Name = "Default",
+                IsDefault = true,
             }));
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -428,8 +451,15 @@ public static class ProjectLists
             .Append(ValueSets.Phases).Append(ValueSets.ProjectKinds).Distinct().Where(k => k != ValueSets.ProjectCodes).ToList();
         // Where each list stands for a project: its own copy, the organization's it may change (a copy on its first
         // change), or the organization's alone (fixed, or describing projects).
-        var switches = (await Liberty.ReadAsync(db, cancellationToken)).ToDictionary(i => i.Key, i => i.Free);
-        bool Free(string key) => !OrganizationOnly.Contains(key) && (switches.TryGetValue(Liberty.ListKey(key), out var free) ? free : true);
+        var views = (await Liberty.ReadAsync(db, level.Project?.Id, cancellationToken)).ToDictionary(i => i.Key);
+        bool Free(string key) => !OrganizationOnly.Contains(key) && (views.TryGetValue(Liberty.ListKey(key), out var view) ? view.Free : true);
+        // Free here only by an exception (who, when, why): the list's own, or the numbering's for a list it reads.
+        LibertyExceptionView? ExceptionOf(string key)
+        {
+            if (level.Project is not { } here || !views.TryGetValue(Liberty.ListKey(key), out var view) || !view.ExceptHere) return null;
+            var from = view.Locked is null ? view : views[Liberty.Numbering];
+            return from.Except.FirstOrDefault(e => e.ProjectId == here.Id);
+        }
         var lists = keys.Select(key =>
         {
             var info = meta.GetValueOrDefault(key) ?? ListRules.ListMeta.Read(null);
@@ -450,6 +480,7 @@ public static class ProjectLists
                 count = counts.Where(c => c.SetKey == key).Sum(c => c.Active),
                 own = owned.Contains(key),
                 free = Free(key),
+                exception = ExceptionOf(key),
                 // A list filled before it had sets reads as its one default set, made on its first change.
                 sets = own.Count > 0
                     ? own.Select(s => new { Id = (Guid?)s.Id, s.Name, s.IsDefault, s.Active, s.DeliverableTypes, inUse = Count(s.Id, true), others = Count(s.Id, false) }).ToList()
@@ -501,7 +532,7 @@ public static class ProjectLists
         const string where = "an administrator changes it in the organization's Settings, for every project";
         if (OrganizationOnly.Contains(set))
             return Problems.Forbidden("ORGANIZATIONS_LIST", $"This list describes the projects themselves: {where}.");
-        if (!await Liberty.IsFreeAsync(db, Liberty.ListKey(set), cancellationToken))
+        if (!await Liberty.IsFreeAsync(db, Liberty.ListKey(set), project.Id, cancellationToken))
             return Problems.Forbidden("LIST_FIXED", $"Every project uses the organization's list: {where}.");
         return null;
     }
@@ -553,6 +584,21 @@ public static class ProjectLists
     /// <c>PUT /lists/{set}/values</c>: adds a value to a set (the default one unless named), or changes one: anything while it
     /// was never used, only its name (and retired or not, its place) once used.
     /// </summary>
+    /// <summary>
+    /// POST <c>/lists/values/many</c>: the Settings lists' workbook, every value written as one through the same change as
+    /// by hand (a list the organization keeps the same everywhere is refused, its first change copies it to the
+    /// project); a check (<c>dry</c>) undoes it all.
+    /// </summary>
+    private static async Task<IResult> ValuesAsync(ProjectValuesRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        CancellationToken cancellationToken)
+    {
+        if (request.Values is not { Length: > 0 } values) return Problems.Invalid("NO_LINES", "The workbook changes no value.");
+        if (values.Length > 5000) return Problems.Invalid("TOO_MANY_LINES", "Bring in at most 5000 values at a time.");
+        var lines = await Batch.RunAsync(db, values.Select(v => v.At).ToList(), i => ValueAsync(values[i].Set, values[i].Value, http, db, audit, cancellationToken),
+            request.Dry, cancellationToken);
+        return Batch.Answer(lines, request.Dry);
+    }
+
     private static async Task<IResult> ValueAsync(string set, ProjectValueRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
         CancellationToken cancellationToken)
     {
@@ -580,7 +626,13 @@ public static class ProjectLists
             var offered = await OfferedAsync(db, level.ProjectId, target, cancellationToken);
             value = new ValueEntry
             {
-                TenantId = level.TenantId, ProjectId = level.ProjectId, SetKey = set, SetId = target.Id, Code = code, Label = label, Sort = sort,
+                TenantId = level.TenantId,
+                ProjectId = level.ProjectId,
+                SetKey = set,
+                SetId = target.Id,
+                Code = code,
+                Label = label,
+                Sort = sort,
                 Status = status == ValueStatus.Retired ? ValueStatus.Retired : offered ? ValueStatus.Active : ValueStatus.Off,
                 Props = request.Props is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } p ? JsonDocument.Parse(p.GetRawText()) : null,
             };
@@ -815,7 +867,11 @@ public static class ProjectLists
             return Problems.Conflict("SET_EXISTS", $"This list already has a set called {name}.");
         var added = new ValueSet
         {
-            TenantId = level.TenantId, ProjectId = level.ProjectId, ListKey = set, Name = name, Active = request.Active ?? true,
+            TenantId = level.TenantId,
+            ProjectId = level.ProjectId,
+            ListKey = set,
+            Name = name,
+            Active = request.Active ?? true,
             Sort = (await db.ListSets.Where(s => s.ListKey == set).MaxAsync(s => (int?)s.Sort, cancellationToken) ?? 0) + 10,
         };
         var (types, problem) = await TypesForAsync(db, added, request.DeliverableTypes ?? [], added.Active, cancellationToken);

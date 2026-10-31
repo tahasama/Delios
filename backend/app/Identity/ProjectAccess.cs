@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using System.Security.Claims;
 using Delios.Host.Platform;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,8 @@ public sealed class ProjectAccess
     public required bool IsInternal { get; init; }
     /// <summary>Code of the party this person represents. Null: our own organization.</summary>
     public string? PartyCode { get; init; }
+    /// <summary>The party this person represents. Null: our own organization.</summary>
+    public Guid? PartyId { get; init; }
     /// <summary>Confidentiality levels above this person's clearance: read only where they are named on the document.</summary>
     public IReadOnlyList<string> AboveClearance { get; init; } = [];
 
@@ -44,14 +47,14 @@ public sealed class ProjectAccess
     /// <summary>What a function may do on a project, whoever holds it: for asking about someone other than the caller.</summary>
     public static ProjectAccess OfFunction(Project project, Function function, Guid userId = default, string userName = "",
         bool actsAsControl = false) => new()
-    {
-        Project = project,
-        UserId = userId,
-        UserName = userName,
-        Function = function,
-        IsInternal = true,
-        Rules = WithControl(function.Rules.Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole).ToList(), actsAsControl),
-    };
+        {
+            Project = project,
+            UserId = userId,
+            UserName = userName,
+            Function = function,
+            IsInternal = true,
+            Rules = WithControl(function.Rules.Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole).ToList(), actsAsControl),
+        };
 
     /// <summary>
     /// Someone named on the project to act as the control function holds CONTROL on every document of it, whatever
@@ -71,13 +74,39 @@ public sealed class ProjectAccess
 /// <summary>
 /// Loads a <c>ProjectAccess</c> from the database for the signed-in user. Used by <c>ProjectAccessFilter</c> on project endpoints.
 /// </summary>
-public sealed class ProjectAccessLoader(DeliosDbContext db)
+public sealed class ProjectAccessLoader(DeliosDbContext db, AccessVersions versions)
 {
+    /// <summary>
+    /// How long a kept copy may be used at most, whatever: a safety net only, should the number that leaves it unused
+    /// fail to be raised (<see cref="AccessVersions"/>). Access is never kept longer than this.
+    /// </summary>
+    public static readonly TimeSpan KeptAtMost = TimeSpan.FromMinutes(15);
+
     /// <summary>
     /// Null when the person holds no active function on an active project, which
     /// callers answer with 404: a project you are not on does not exist for you.
     /// </summary>
     public async Task<ProjectAccess?> LoadAsync(Guid projectId, ClaimsPrincipal principal, CancellationToken cancellationToken)
+    {
+        // Kept until how the organization works changes (owner: "static once done"): the number says whether it did.
+        var version = await versions.CurrentAsync(principal.TenantId());
+        var key = version is null ? null : $"access:{principal.TenantId():N}:{version}:{projectId:N}:{principal.UserId():N}:{principal.Identity?.Name}";
+        if (key is not null && versions.Kept.TryGetValue(key, out ProjectAccess? kept) && kept is not null)
+        {
+            db.UseListsOf(kept.Project.Id, kept.Project.OwnListKeys, kept.Project.OwnFunctions);
+            return kept;
+        }
+        var loaded = await ReadAsync(projectId, principal, cancellationToken);
+        if (key is not null && loaded is not null)
+            versions.Kept.Set(key, loaded, new Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = KeptAtMost,
+                Size = 1,
+            });
+        return loaded;
+    }
+
+    private async Task<ProjectAccess?> ReadAsync(Guid projectId, ClaimsPrincipal principal, CancellationToken cancellationToken)
     {
         var userId = principal.UserId();
         var membership = await db.Memberships.AsNoTracking()
@@ -89,7 +118,7 @@ public sealed class ProjectAccessLoader(DeliosDbContext db)
         if (membership is null) return null;
 
         var party = await db.Users.AsNoTracking().Where(u => u.Id == userId)
-            .Select(u => u.Party == null ? null : new { u.Party.Code, u.Party.IsInternal })
+            .Select(u => u.Party == null ? null : new { u.Party.Id, u.Party.Code, u.Party.IsInternal })
             .SingleAsync(cancellationToken);
         var project = membership.Project!;
         // Its lists from here on: its own copy once it has one, else the organization's.
@@ -109,6 +138,7 @@ public sealed class ProjectAccessLoader(DeliosDbContext db)
                 .ToList(), membership.ActsAsControl),
             IsInternal = party is null || party.IsInternal,
             PartyCode = party?.Code,
+            PartyId = party?.Id,
             AboveClearance = above,
         };
     }

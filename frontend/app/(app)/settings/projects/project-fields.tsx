@@ -1,6 +1,7 @@
 import { Select } from "@/components/select";
 import { Field } from "@/components/ui";
 import { fmtDate } from "@/lib/core/utils";
+import { PlaceFields } from "./place-fields";
 
 /** A field as on the new-document form: grey, no box, inside the sheet's `asking` body. */
 const field = "plain w-full";
@@ -8,12 +9,13 @@ const field = "plain w-full";
 export type ProjectLine = {
   id: string; code: string; name: string; kind: string; contractRole: string; startDate: string; endDate: string | null;
   scopeStatement?: string; description?: string; previousCode?: string | null; codeChangedByName?: string | null; codeChangedAt?: string | null;
+  timeZone: string; weekendDays: number[]; country: string | null;
 };
 
 /**
  * A project's line opened for editing, the same on the organization's Projects and on Settings → This project: name,
- * code (changed once in its life, for a mistake; then fixed and shown, not sent), type, our role, dates, scope, and
- * what the project is about in a few lines.
+ * code (changed once in its life, for a mistake; then fixed and shown, not sent), type, our role, dates, where its site
+ * is (country, time zone, days off), scope, and what the project is about in a few lines.
  */
 export function ProjectFields({ p, roles, kinds }: { p: ProjectLine; roles: { code: string; label: string }[]; kinds: { code: string; label: string }[] }) {
   const fixed = !!p.codeChangedAt;
@@ -43,6 +45,7 @@ export function ProjectFields({ p, roles, kinds }: { p: ProjectLine; roles: { co
       </Field>
       <Field label="Start"><input type="date" name="startDate" defaultValue={p.startDate.slice(0, 10)} className={field} /></Field>
       <Field label="End" hint="planned completion"><input type="date" name="endDate" defaultValue={p.endDate?.slice(0, 10) ?? ""} className={field} /></Field>
+      <PlaceFields place={{ timeZone: p.timeZone, weekendDays: p.weekendDays, country: p.country ?? null }} />
       <Field label="Scope" hint="what it controls; blank for the standard wording" className="sm:col-span-2">
         <input name="scopeStatement" defaultValue={p.scopeStatement ?? ""} className={field} />
       </Field>

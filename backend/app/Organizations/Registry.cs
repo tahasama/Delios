@@ -255,7 +255,11 @@ public static class Registry
         if (held is not null) return held.HolderId == holderId;
         db.ReservedValues.Add(new ReservedValue
         {
-            Kind = kind, Value = Key(value), Shown = value.Trim(), HolderId = holderId, TenantId = tenantId,
+            Kind = kind,
+            Value = Key(value),
+            Shown = value.Trim(),
+            HolderId = holderId,
+            TenantId = tenantId,
             ReservedAt = SystemClock.Instance.GetCurrentInstant(),
         });
         return true;
@@ -275,7 +279,11 @@ public static class Registry
         {
             var identity = new OrganizationIdentity
             {
-                Code = code, Name = name.Trim(), TenantId = ownTenant, CreatedByTenantId = tenantId, CreatedAt = SystemClock.Instance.GetCurrentInstant(),
+                Code = code,
+                Name = name.Trim(),
+                TenantId = ownTenant,
+                CreatedByTenantId = tenantId,
+                CreatedAt = SystemClock.Instance.GetCurrentInstant(),
             };
             db.OrganizationIdentities.Add(identity);
             await ReserveAsync(db, ReservedKinds.OrganizationCode, code, identity.Id, tenantId, cancellationToken);
@@ -477,6 +485,16 @@ public static class Registry
         number = number?.Trim();
         if (string.IsNullOrEmpty(number))
         {
+            // The country alone is kept too (owner: "i can choose the country, and save but choice do not keep showing"),
+            // while no identifier fixes it; once one is given, the country is the identifier's.
+            if (!string.IsNullOrEmpty(country) && identity.IdentifierNumber is null)
+            {
+                if (country.Length != 2 || !country.All(char.IsAsciiLetterUpper))
+                    return Problems.Invalid("COUNTRY_UNKNOWN", $"{country} is not a country code (two letters, such as FR or AE).", new { field = "country" });
+                if (identity.TenantId is { } mine && mine != tenantId)
+                    return Problems.Forbidden("THEIR_OWN", $"{identity.Name} is on DELIOS: only {identity.Name} gives its own country.");
+                if (identity.Country != country) { changes.Add($"country {identity.Country ?? "none"} → {country}"); identity.Country = country; }
+            }
             if (string.IsNullOrWhiteSpace(noReason) || identity.IdentifierNumber is not null) return null;
             if (identity.NoIdentifierReason != noReason.Trim()) { identity.NoIdentifierReason = noReason.Trim(); changes.Add($"no identifier: {noReason.Trim()}"); }
             return null;
@@ -579,7 +597,10 @@ public static class Registry
                 if (clash) party.Code = await FreeOrganizationCodeAsync(db, party.Code, cancellationToken);
                 identity = new OrganizationIdentity
                 {
-                    Code = Key(party.Code), Name = party.Name, TenantId = party.IsInternal ? tenantId : null, CreatedByTenantId = tenantId,
+                    Code = Key(party.Code),
+                    Name = party.Name,
+                    TenantId = party.IsInternal ? tenantId : null,
+                    CreatedByTenantId = tenantId,
                     CreatedAt = SystemClock.Instance.GetCurrentInstant(),
                 };
                 db.OrganizationIdentities.Add(identity);

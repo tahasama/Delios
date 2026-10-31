@@ -9,11 +9,15 @@ conversation, write it into the right one in the same commit as the code.
 |---|---|
 | `CLAUDE.md` (this file) | How to work with the owner, and the rules that must never break |
 | `docs/STANDARD-CHANGES.md` | What the original Document Management Standard must change to match what we built. Every new rule about controlling information goes here. |
+| `docs/APP-DECISIONS.md` | What used to sit in STANDARD-CHANGES but concerns only the app (settings levels, accounts, sign-in, storage, screens, code names), and what code each Standard change depends on. Nothing about the app goes into STANDARD-CHANGES (owner). |
 | `docs/REVIEW-MODEL.md` | The review model: routes, steps, advice, verdicts, release |
 | `docs/STRUCTURE.md` | Where everything is, by area; where to look when debugging or adding a feature |
 | `docs/ORGANIZATIONS.md` | Organizations working together (collaborator, guest, not on DELIOS), linked accounts, the organization's admin page |
 | `docs/BEHAVIOUR-CHANGES.md` | What behaves differently since the screens moved onto the backend |
 | `docs/DETAIL-STYLE.md` | The reference style (Schedule & actions, the action page): what "apply the same" means |
+| `docs/RUNNING-DELIOS.md` | Running DELIOS for many organizations: who runs it, our space, payments, legal (advice, not decided yet) |
+| `docs/SANDBOX.md` | The sandbox: DELIOS live for testing on free services, made-up data only |
+| `docs/HANDOVER.md` | Handing DELIOS over for real use: who runs it (`HOSTED`), the services to subscribe to, the steps |
 | `docs/gaps/*.md` | Known gaps per area |
 | `PRODUCT.md` | Product context and users |
 
@@ -38,9 +42,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Never send screenshots or pictures.
 - Never quote a bare document number as a reference.
 - Ask before choosing any code (status, verdict, type…). A code never changes once used.
-- Nothing is deleted except by the app owner. Exception: an empty package
-  that never went out may be deleted by whoever composes it (it holds no content;
-  removing a package never removes documents).
+- Nothing is deleted except by the app owner. Exception: a package never delivered or shared with anyone may be
+  removed by whoever looks after it, filled or not (owner: "even if it is filled, with a warning"), why not asked;
+  removing a package never removes documents (they stay in the register, go back into the package it sat in, or a
+  supplier's are filed again with that supplier).
 - **Two levels of settings** (owner, for every setting): the organization's level is everything the app gives by
   default, adapted by its administrator, and it is the default of every project; the project's level inherits it and
   changes only what the organization left free. **Two Settings with the same cards** (owner): the organization's
@@ -49,7 +54,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   the organization's Settings; in a project's Settings they act as that project's admin (the control function's
   rights), nothing more, and nothing there changes the organization's. Each card of the organization's Settings carries
   its switch on the page itself (`ProjectSwitches`; backend `Settings/Liberty.cs`, `LIBERTY:<key>`; the separate
-  page `/organization/liberty` only redirects), and lists the projects with their own copy (`ProjectCopies`): there,
+  page `/organization/liberty` only redirects; pressed, a switch asks first, "From now on… Instead of…", as the Control
+  room's answers, `LibertyRow`, and a refusal is said under it), and lists the projects with their own copy (`ProjectCopies`): there,
   and only there, one may be put back to the organization's, for a mess, always with why, logged (SETTING_RESET), the
   project's control function told. No reset inside a project, ever. **What a project changed is never overridden by the
   organization** (owner): a switch made Fixed later leaves it as it is; only that reset touches it. **A reset keeps a
@@ -59,10 +65,23 @@ a screen only words it. A new rule goes in the backend, never in a page.
   defaults (with what it fixes) → the organization's (the app's, as its administrator changed them; with what it
   fixes) → the project's (the organization's, as the project changed them where free). Nothing changed: both read the
   app's; the organization changed something: the project reads the organization's. The organization may reset to the
-  app's defaults, **keeping a copy of its own** (to build: put back like a project's kept copy, `docs/gaps/settings.md`);
+  app's defaults, **keeping a copy of its own** (built: replacing the defaults for new projects, from a project or back to
+  the app's own, asks why and keeps what they held first, `Settings/OrganizationDefaults.cs`, `PUT /api/admin/project-defaults`,
+  a kept copy with no project, kind DEFAULTS; listed on the defaults' page, "Kept when replaced", and put back with why,
+  which keeps what stands in its turn);
   a project goes back to the organization's ("Back to the defaults", Control room). **Fixed** (every project uses
   the organization's; only an administrator changes it, for all) or **Free** (a project may take its own copy; the
-  organization's later changes never touch it). Two degrees only, never a third. Made stricter later, what a project
+  organization's later changes never touch it). Two degrees only, never a third, with one exception (owner, "both"):
+  **Fixed, except on the projects named** (`LIBERTY_EXCEPT:<key>`, `PUT /api/liberty/{key}/except`, always with why,
+  LIBERTY_EXCEPTION, the project's control function told): only those projects may take their own copy; ended, what
+  the project changed stays; counted only while fixed; every check reads it per project (`Liberty.IsFreeAsync(db, key,
+  projectId)`, `RoomRefusalAsync(…, projectId)`, `GET /api/liberty?projectId=`, `projectLiberty`). Drawn under each
+  fixed switch (`LibertyRow`). A project's pages say it, with its reason ("Free here by an exception: the organization
+  keeps … the same on every other project", `ExceptionNote`; each project endpoint's `exception`, `Liberty.ExceptionHereAsync`;
+  a Control room answer's `Choice` `exception`). Which projects are exceptions, and why, only an administrator reads;
+  anyone else reads only the project asked about. **What a project changed** is read on the organization's Settings (`?project=<id>`,
+  `OneProject`, backend `ProjectDifferences`): its own copies, changed answers, exceptions, each opening its card; read
+  only, changed in the project's Settings. Made stricter later, what a project
   already changed stays, read as changed before the rule. Where each starts, and why, is in `Liberty.Items`, chosen
   from what depends on it (numbering, revisions, cross-project search and reports, the meanings the app reads, the
   law, security), never from an example. Each list of Types & sets has its own switch; a list a number part reads
@@ -91,11 +110,118 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - One control size everywhere, set once in `frontend/app/globals.css` on `:root`:
   `--control-h` (2rem), `--control-text` (13px), `--control-radius`. Every
   field, dropdown, button and file field stands that height with that text.
+- The brand's gold is one colour, `gold` / `gold-bright` (words on it `gold-ink`: warm dark brown on light, navy on dark) (`scripts/gen-theme.mjs` → `app/theme.css`), never typed as
+  a hex on a page.
 - Use the shared pieces only: `btn()` and `inputCls` (`frontend/components/ui.tsx`),
   `.ask`, `.plain`, `ActionForm`. Never give a field or button its own height,
   padding or text size on a page; never restyle the file button locally.
 - Every field and dropdown stands on the same hint of grey (owner): `inputCls` and every `.plain` control in a
   register (not only a register's question), its top corners barely rounded; a switch drawn as a plain button stays bare.
+- **A field that cannot be changed looks unavailable at once** (owner: "blocked fields must look unavailable"), never
+  only under the pointer: no grey behind it, a dashed rule, muted words, no caret, the pointer saying no (`globals.css`,
+  `.register .plain:disabled`; `inputCls` likewise). A form opened under a line sits on white, so its grey fields show
+  (owner: "fields are the same colour as the background").
+- **The menu never scrolls** (owner: "we can't have a scrolled menu, it should be fixed at all times";
+  `app/(app)/navigation.tsx`): it fits the window, tightening on a shorter one (`short:` under 880 pixels high: the lines
+  under the names go, smaller marks; `tiny:` under 740: tighter still; `tight:` under 680, rows and marks at their closest; variants in `globals.css`;
+  checked in a browser to fit, "+ More" open, down to about 540 pixels; owner, after rows too close: "add some space"), scrolling only as a
+  last resort on a very small screen. Opened, it is 258 pixels wide (owner: "10px less"; a width of 268 kept from
+  before reads as 258). It holds the work only: no "Create document" (the register's "New document" does
+  it), no Settings and no Help (owner: both are in the top bar, Settings as a gear beside Help, for whoever a Settings
+  page opens to; moved into the menu once and put back, owner); folding it to icons is the menu's last line, "Fold the menu" (owner: "now we can squeeze the expand
+  button into the bar"; it was a round button on the menu's edge). The rest of the
+  menu stays as it is (owner: no regrouping of its entries), but for Reviews and Packages, daily work, moved above
+  "+ More" (owner: "the separator should be after packages"). **One frame** (owner: "both side and top bar need a proper
+  update"): the menu's mark and the top bar are the same height (`h-16`) and closed by one line. **The page you are on is a light row** (owner: the gold, larger tile was bad), its icon the size of
+  every other; faint words at least slate-400 on the navy. **"+ More"** is one small line taking almost no room (owner:
+  no separator), "− Less" once open, remembered as it was left (cookie `nav-more`, read by the server), open by itself
+  while you are on one of its pages, named on hover when the menu is folded. **The top bar** (owner: "icon's order makes
+  no sense"): the project's name with its code faded beside it, nothing more (no function, no "we are …": who you are
+  and what we are on it, you know already), its width capped; then search · Help · Settings (lit while in them) · the
+  bell · your name alone with a small arrow (no initial disc), every tool and the search at the control height
+  (`top-tools.tsx`, `TOOL` / `ToolLink`). Light or dark is chosen in your name's menu, three plain choices, Light · Dark ·
+  Same as device (`ThemeChoice`); Help is not repeated there. The top bar's menus (`details[data-menu]`, your name's,
+  the project list) close on picking, on Escape and on a click outside (`components/menu-closer.tsx`); the project list
+  scrolls past a height; the phone's menu closes the same way and carries the search.
+- **A page never stands blank while it is read** (owner, "skeleton loaders"): each area's `loading.tsx` draws its outline
+  in quiet grey (`components/skeleton.tsx`: `RegisterSkeleton` for the registers, `DetailSkeleton` for one thing's page,
+  `PageSkeleton` for the rest, `(app)/loading.tsx` for any page without its own), saying "Reading …" to screen readers,
+  still for whoever asked for less motion. A filter changed on the same page keeps what is shown until the new answer.
+- **The ten states** (owner: empty, loading, error, no internet, slow network, no search result, permission denied, session
+  expired, form validation, success; `docs/gaps/states.md`, what is built once and what is still checked page by page).
+  Built once: **no internet** is a band at the top while offline ("Back online" after; `components/offline-band.tsx`), a
+  form sent offline refused before anything leaves, its words kept; **slow network** reads "Still sending…" after 3 s on
+  the form's button, and after 10 s that the request is on its way and nothing is lost (`ActionForm`); **session expired**
+  comes back to the same page, filters and all, after signing in (`proxy.ts` keeps the whole address in `next` and passes it
+  as `x-delios-path`; `signInAgain`, `lib/core/sign-in-again.ts`; the sign-in page says the session ended), and a form
+  refused for it (`SESSION_ENDED`, `lib/core/session-words.ts`, every 401) offers to sign in again in a new tab, its words
+  kept; **an address one may not open** reads "Not found, or not yours to open" inside the frame (`app/(app)/not-found.tsx`,
+  the same words whether it exists or not), one leading nowhere "Nothing at this address" (`app/not-found.tsx`); **an
+  error** reads in plain words with a reference to quote, never the server's message or code trace (development only);
+  **validation** focuses the first field the server named, as the screen does for what it found. **A part of a page reading
+  on its own** (`Part`, `components/part.tsx`) shows its own grey outline while it reads and, failing, its own line with
+  Try again, the rest of the page standing (Home's journal first). **An address refused by the server** (403, 404, 400 on
+  the page's own thing, `notYours`, `lib/client.ts`) reads "Not found, or not yours to open"; any other failure is the
+  error page. **Every act says what happened and what comes next** (its `ok` line), but switches and acts that open
+  another page.
+- **Motion** (owner: "smooth animations, not overdoing it… kill the static states… numbers incrementing / decrementing,
+  building up the progress, bigger to regular for success… keeping the professional elegance"; `globals.css`, the Motion
+  block): only transform, opacity and colour move, never what pushes the page; fast start, soft stop; about 150 ms for a
+  press (`btn()`: a press sinks to 0.98), 220 ms for what appears, 600 to 700 ms for what builds. **Figures count** from the
+  value last seen under the same id to the new one, up or down, from zero only the first time in a session
+  (`components/count-up.tsx`, `CountUp`, sessionStorage; the true figure drawn first and read by screen readers): Assurance's
+  rate and statement, report figures, a supplier package's counts; Home keeps its own (`tally.tsx`). **Bars build** from the
+  left and move to a new width (`.bar-build`: packages' readiness, an action's readiness, report bars). **A success
+  settles**, a breath larger then its size with a soft emerald ring fading (`.settle`, `ActionForm`'s line). **Rows rise**
+  into place, the first eight one after another (`.rows-rise`, `DataTable`). **The chosen tab's line draws itself out**
+  (`.strip-tab[aria-current]::after`). **Drawers slide** in over a fading veil (`.drawer-in`, `.veil-in`), the quick find grows
+  into place (`.pop-in`); a chip's colour crossfades (`Chip`). **Closing the gaps** (owner, after a review: "yes
+  please"): one curve, `--ease-out` (`cubic-bezier(0.23, 1, 0.32, 1)`); a list opened from a field grows out of it
+  (`Floating`, `.float-in`, 150 ms), the top bar's menus out of their button; what opens under a line (`.open-in` on its
+  cell) or a fold (`details`) comes down 4 px into place, 200 ms; a page arriving fades in, opacity only (`template.tsx`,
+  `.page-in`, 150 ms; a tab or filter on the same page does not); rows rise only when a table first appears, never on a
+  filter, sort or page; the quick find, opened from the keyboard, has no motion. **The switches slide** (owner: "it should
+  feel like a slide"): one raised thumb per `.seg`, placed and moved by `components/seg-slider.tsx` (mounted once in the
+  root layout), sliding at once to the segment pressed, before the page answers. No hover lifts, no bounce, no page
+  transitions. Everything is off for whoever asked for less motion: it is
+  simply there, already done. No animation library, no script written in the page.
+- **The quick find** (owner, "command menu" with its "shortcut hint"): Ctrl K (⌘ K on a Mac) anywhere opens one box
+  (`components/command-menu.tsx`, mounted once in the layout): pages by their name at once (only those the person may
+  open, as the menu), and documents, transmittals, actions and packages by number or name through the backend, a
+  handful of each (`quickFindAction`, `lib/core/forms-find.ts`: documents by number and title only, never their files;
+  each read as the person may read it). Arrows, Enter, Escape, a click beside it. The top bar's search shows the key
+  ("Ctrl K"), a click on it opening the box; typing in the search and Enter still searches the register.
+- **Two tab designs, no third** (owner, after a new tab design was tried and refused: "revert all the tabs… the switch
+  like tabs are for small things and decisions… the Schedule's tab design is what should be applied for actual TABS, like
+  assurance, reports"): the framed views (`.views` / `.view`) are no longer used (owner: "we do not use that anymore"):
+  a document's tabs, the organization's four (`org-tabs.tsx`) and the console's are on the tab strip, each its icon and
+  name, its line said on hover. **The tab strip** (owner: "a subtle greyish bg on tabs and a separator between each", then the
+  same on Assurance and the Schedule "to gain more vertical space"; then "not literal rectangles… not bigger… the grey on
+  the background, not the text"; `.strip` / `.strip-tab`, `globals.css`): one low greyish band, the tabs plain words on
+  it at its old height (owner: "bring back tabs original height"), a short hairline between each (never a box round a
+  tab), the words in ink, the chosen one bold with the brand's line along its foot, the band a light grey (owner:
+  "lighter"). Reports' tabs inside its plate, the whole width shared out; the Schedule's three framed as a sheet
+  (`.strip-card`), joined to the
+  answer under it as its head (owner: "stick it to the table under it"); Assurance's at the head of one sheet with the
+  line saying what the tab is and what the tab sets (`AssuranceHead` `children`: What is checked's measure and filters,
+  owner: "merge the 3 skinny cards"); the whole width shared equally (`.strip-full`), each its icon and name, no small
+  words after. What is checked is then one sheet, Types & sets' way (owner): its families down the side, its moments
+  as tabs above the checks, starting where they start, no space between. Types & sets the same: Find and the lists on
+  the left, the groups' tabs above the chosen list (owner: "match the content starting point"). **A tab never sends the
+  page back to its top** (owner: "fix the scroll reset on tabs"): `components/tab-link.tsx`, `TabLink`, notes where the
+  window stood and puts it back once the tab opened is lit (Reports, Assurance, its moments, the Schedule). **The switch** (`.seg` /
+  `.segment`, `.segment-n`, `.segment-late`) for small choices and decisions inside a page: Packages' two kinds beside
+  List · Tree (put back as they were: two designs side by side in one row read as inconsistent), Home's "What is waiting",
+  the organization's People, the imports' "Which lines", list or tree, light or dark, in use · retired · all. The checks'
+  moments, the rules' areas, Types & sets' groups and Help's roles are on the tab strip too (owner: "you forgot to update
+  the tabs styling"; the plain underlined tabs are gone). The Control room's navy console keeps its own tabs.
+- **The distribution matrix's "Who gets what"** (owner, "needs improving"): one sheet, the register's way: its band
+  (what is shown: disciplines × functions, which deliverable type, which document type), the narrowing on one line
+  (`matrix-filters.tsx`, `components/narrow.tsx` `Narrow` shared with the Schedule: Discipline · Deliverable type ·
+  Document type applying on pick, "Only the disciplines in use here" a switch applying at once, the Filters menu; no
+  Apply), then the key, strongest first, each letter with how many cells carry it in this view; the matrix in its own
+  sheet under it.
+- Long titles wrap into lines of even length (`text-wrap: balance` on headings, `globals.css`); body text is left as it is.
 - A card's side colour is its own left edge (`border-l-[3px] border-l-(--rail)`), never a bar laid over it: it
   follows the rounded corners. A sheet left open (`register-sheet-open`) rounds its first and last strip seen (a hidden field or a
   mark before it does not count; a form wrapping the strips passes it on), so no band's square corner stands out.
@@ -117,6 +243,19 @@ a screen only words it. A new rule goes in the backend, never in a page.
   including steps not yet reached.
 - The sender may change the people on each step for that review; that choice
   is what the review uses, and the record says so.
+- **Delegate and add in copy, in flow** (owner: "delegate existed already but was only visible to the person that has the step…
+  we could use the already existing one that appears in the verdict card"; "people need to understand they are not
+  delegating, just adding as cc… write cc'd"): **Delegate** is the answer card's one button, opened to the control
+  function and whoever holds Manage, of ours, too, who choose **whose step** (a seat on the open step not answered yet,
+  their own first when they sit there; `DelegateRequest.FromUserId`, CONTROL_OR_MANAGE) and hand it to anyone of ours on
+  the project, the control function included (the matrix's people first, anyone else flagged; nobody already on that
+  step, who answers their own seat), until a date, why optional; the control function's in force at once, Manage's
+  waiting for the control function where it carries out DELEGATE; both people told. **Add in copy** is a link in the
+  review's title, "Add in copy?", as Withdraw and Notify, its form folded under the document (`?open=copy`,
+  `change-people.tsx`; owner: "be smart", never "cc'd" on a screen): people added in copy like "Copy to (cc)" (`Reviews/StepPeople.cs`, `GET`/`POST /reviews/{id}/people`, REVIEW_PEOPLE_ADDED), told now
+  and of what comes of it, never asked to review, why optional. Adding someone to a step was built and taken out (owner:
+  "the same as delegate"): who answers a step changes only by a hand-over. The reviews register has no "Kind" column
+  (owner: it always read "decision"; every line is a whole review, which ends in its decision).
 - Sending for review opens the new review's page.
 - A review is only ever started from the Send for review form (route, people
   per step, copies). No "create and send" shortcut on the new-document or
@@ -164,6 +303,24 @@ a screen only words it. A new rule goes in the backend, never in a page.
   reason and comments; everyone on the route is told. The revision can then be
   sent again.
 - Revisions are never skipped, and an upload elsewhere never creates one.
+- **The box decides what a file is** (owner: "it should instead show user why simply"): the PDF box takes a PDF, the
+  source file box the editable original; a PDF in the source box, or a source file in the PDF box, is refused in plain
+  words naming the right box (`UploadRequest.Slot`, SOURCE_IS_PDF / NOT_A_PDF, the box outlined). On a new document the
+  register entry stays and its page says why the files were not attached ("Registered, without its files"). Under each
+  box of Edit rev, what it holds now ("Now: <name>", the source file with its kind) or "None yet" (owner).
+- **A draft is replaced, never kept** (owner: "those files have no value unless they are past that stage"): while a
+  revision is in preparation and nothing has looked at its files (none came on a transmittal or was checked on arrival,
+  no transmittal carried them, no review of the revision), a new file takes the place of the one of its kind, record and
+  bytes, with no new submission (`DocumentService.ReplaceDraftAsync`, DRAFT_REPLACED "PDF replaced: old → new" in
+  History); the bytes and previews go once committed (`DraftReplaced`, the worker); the same file sent again changes
+  nothing (SAME_FILES, said, the details still saved). The database allows deleting only such a draft or an upload never
+  used (`stored_files_kept_unless_draft`); every other file stays, every revision's. The copy elsewhere keeps what it
+  copied (the copier never deletes; a key gone before it was copied is skipped).
+- Past that, a new file replaces the one of its kind as a new submission; the other file is carried into it as a record of its own,
+  with its own copy in storage (`FileStorage.CopyAsync`): a storage key belongs to one record only (the shared key broke
+  adding a PDF beside a source file).
+- A fault of ours (a 5xx with no refusal code) never shows the server's own words: "Something went wrong on our side and
+  nothing was saved…" (`problemOf`, `lib/client.ts`).
 - Starting a revision asks one text, "What changed, and why" (never two fields
   saying the same), plus a PDF and a native file, both optional at start.
 - A withdrawn review is closed: no advice, verdict or comment can be given on
@@ -186,7 +343,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Criticality: the document type recommends a level (Settings, on the type);
   it is filled in on create and marked "(recommended)"; it is optional, and the
   person may choose another. A type naming none recommends the usual level (the list's default, else the level
-  types recommend most): one is always recommended. Required in Forms & fields, it is required on the form too.
+  types recommend most): one is always recommended. Required in Forms & fields, it is required on the form too; a
+  document registered with none where it is required (a requirements list's placeholder, what arrived registered, an
+  import line) takes the recommended level, worked out by the backend (`Catalog.RecommendedCriticality`).
 - A purchase order belongs to a supplier: the one it names (Settings, Purchase orders, "Supplier"), else the one
   whose supply package carries it. A document of another organization names only its own orders (or one tied to
   nobody); the form offers only those, the backend refuses another's (PO_OF_ANOTHER_SUPPLIER). "From another
@@ -276,15 +435,66 @@ a screen only words it. A new rule goes in the backend, never in a page.
   off); and the organization's words at its foot (`STAMP_NOTE`, what the review does not relieve the sender of, as its
   contracts say it; none unless written, 240 characters). **How large** (`STAMP_SIZE`, S · M · L · XL = 0.8 · 1 · 1.25
   · 1.5, Normal by default): frame and words grow or shrink together. **Where it sits** (`STAMP_PLACE`,
-  top right by default, or another corner). **The marks across the page**, as they were (owner): superseded, void, on
+  top right by default, or another corner). **Never over the drawing** (owner: "the usual placement might be filled"; "the stamp is automatic to prevent
+  falsification"): each page is looked at as a picture (PDFium, `Docnet.Core`, read only; `Reviews/StampPlacement.cs`)
+  and the stamp put on the first clear spot: the chosen corner, the others, then along the edges; none, the same search a
+  step smaller each time down to S; still none, the spot with the least drawing under it, at S. **Always on its page**
+  (owner: "the stamp would definitely find a room… no need to add a page"; `StampPlacement.Choose`). Before the release
+  or the send-back, the control function may move it and resize it by hand on the review's page ("Where the stamp
+  goes", the first page with the stamp's frame where and at the size the app found room; dragged, its corner dragged
+  for the size, half to twice its size; `stamp-placer.tsx`, `GET`/`PUT /reviews/{id}/stamp-place`,
+  `Revision.StampX/StampY/StampScale`, STAMP_PLACED with from → to; "Back to the app's place"): only its place and
+  size, never what it says; fixed once the stamp is made (STAMP_FIXED). No verification code on it (owner: it adds no authenticity). **The marks across the page**, as they were (owner): superseded, void, on
   hold (`STAMP:SUPERSEDED|VOID|HELD`, on). Beside the form, the stamp drawn on a page as it will read (22.5rem wide by default, owner: "50% wider"), dragged larger by its left edge (owner: "give more by making it
   resizable"; `ResizablePane`, cookie `pane-stamp`; the stamp drawn to the page's scale) (`Stamping.Stamp`,
   `StampFace`; a code with no name reads as words, "No comment", never the app's code). The Control room only reads it, one line on each step that stamps, with "change" to the card; the Defaults for
   new projects no longer carry it. The PDF opened from a document is its marked copy (`openCopy`, `lib/documents/copies.ts`), of its newest
   submission only. **The document's Preview follows the newest revision** (owner), whatever its state, named on its tab
   ("Preview · rev B"): just started, nothing until its PDF is in; prepared or in review, its own newest PDF; returned, its
-  returned copy; released, its stamped copy. The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
+  returned copy; released, its stamped copy. A file just uploaded shows by itself once the virus check passes it (owner: "the preview does not refresh"): while one of the newest is being checked the page says so and reads itself again every few seconds (`FilesChecking`, three minutes at most), on the document and the review. **The Preview shows the source file too where
+  the page can** (owner: "images, excel workbooks"; `components/file-preview.tsx`, `FilePreview`): a picture (JPG, PNG,
+  GIF, WebP, AVIF, BMP; SVG stays a download, it can carry code) as itself, an Excel workbook (.xlsx, .xlsm) as its sheets
+  (`components/workbook-view.tsx`; backend `Documents/WorkbookView.cs`, `GET /files/{id}/workbook`: each sheet's cells as
+  Excel shows them, last calculated values, bold, merged cells, widths; nothing in it runs; the first 2,000 rows and 100
+  columns of 30 sheets, said when cut), a CSV file as one sheet (`WorkbookView.ReadCsv`), a Primavera P6 export (.xer) as P6 lays it out (`components/schedule-file-view.tsx`;
+  `GET /files/{id}/schedule`, the same reading as the schedule's: each project on its tab, opened on the one the schedule reads (marked "the schedule"
+  when there are several, so it counts what the plan counts), its activities under their
+  WBS, each folded open or shut, ID · name · type · start · finish, "A" once it happened; what the schedule would make
+  of it said above when it would not read it); with a PDF too, "The PDF · The source file · <its kind>" above it, the PDF first, offered whenever both are
+  there (owner: "i have no way to visualize one or the other"): a source the page cannot draw says so with its download.
+  The bar above carries the file's name, a zoom (owner: "some control like a zoom"; − 50…300% +, the percentage back to
+  100%: the PDF opened at it, a picture, a workbook or a schedule scaled), its download, the **Full page** icon (owner: the same Preview, its bar and all, over the whole window in a new tab,
+  `/preview?pdf=…&source=…&show=…`, `app/(start)/preview`; the backend still checks every file), and over a PDF (an office file's too) the switch **Dark page** (owner, off by default: the page dark, its text light, hues kept so a stamp stays green or red; the file never changed; cookie `pdf-dark`). Switched on, the PDF is drawn by the page itself (pdf.js, `components/pdf-dark-view.tsx`, nothing in the file runs; its worker copied to `public/vendor/pdfjs`), pages on the app's surface and only the pages darkened (owner: darkening the browser's reader whole turned its own bar and side panel light), under a bar of its own (owner: "where is the bar?"): the pages' panel, page n / N, fit to the width or the whole page, turn, print (the PDF as it is). **Tabs read as tabs in the dark** (owner): the chosen `.segment`, and the chosen side of a `.choice`, stand raised in light. The PDF is never darkened by the theme alone (following the mode, the browser's reader darkened with its bar hidden, was tried and taken out: owner, "bring back this one"). **Every
+  other kind the owner asked for** (`docs/gaps/previews.md`): an old Excel .xls as its sheets (values only, ExcelDataReader);
+  plain text (.txt, .log, .json, .xml, .md, .yaml…) as text, its first 2 MB (`GET /files/{id}/text`); Word, PowerPoint
+  and their kin (.doc/.docx, .ppt/.pptx, .odt, .rtf, .vsdx…) as the PDF LibreOffice makes of them (Gotenberg service,
+  `GET /files/{id}/as-pdf`; **on standby** by the owner, compose profile `office`, off by default: offered to download,
+  their PDF being the revision's); drawings: DXF drawn in the page, DWG turned into DXF first (LibreDWG, the free route,
+  `deploy/dwg`, `GET /files/{id}/as-dxf`; a full DXF the viewer cannot draw is asked again once in its minimal form,
+  `?minimal=1`, `dwg2dxf -m`, kept apart; still failing, the viewer's own reason is said; above every drawing, "For viewing only": what the free reader leaves out,
+  the revision's PDF being the reference, owner), its layers switched on and off, text in DejaVu Sans, drawn on the theme's surface (light or dark, as the app; `use-dark.ts`); 3D models: IFC (web-ifc
+  in the browser, its kinds of element as parts, spaces and openings hidden at first), glTF/GLB, OBJ, STL (three.js),
+  turned, moved, zoomed, each part shown or hidden. A conversion is made once, the first time the file is opened, and
+  kept in storage beside it (`previews/…`); converters not installed or failing, the file is offered to download with
+  why (`Documents/Previews.cs`, `Previews__OfficeUrl` / `Previews__DwgUrl`). A drawing reads "For viewing only · the revision's PDF is the reference" above it
+  (owner: the long warning was "too long"), closed by its × for good (cookie `viewing-note`). **Every reader is a switch,
+  on two levels** (owner: "all readers in that card, that we can switch on and off"): Settings → **Viewing files**
+  (`Documents/Viewers.cs`, keys PICTURES, WORKBOOKS, SCHEDULES, TEXT, DXF, DWG, MODELS, OFFICE, DWG_CERTIFIED; settings
+  `VIEWER:<key>`, only "OFF" kept; VIEWER_SWITCHED). The organization's card (`/organization/settings/viewers`,
+  administrators; `/organization/settings/drawings` only redirects) lists every reader, free, heavy on the server
+  (Office) or paid (a certified DWG reader): one installed is switched at once; one not installed or not built is asked
+  of DELIOS by its switch, which opens the ask under its line (`POST /api/admin/product-requests`, PRODUCT_REQUESTED,
+  kept above every organization, `product_requests`, backend command `requests`, emailed to `DELIOS_CONTACT_EMAIL`).
+  A project's card (`/settings/viewers`, read by everyone of ours) shows only the readers the organization has on, the
+  control function switching them off and back on where the switch `VIEWERS` (area "Viewing files", Free by default)
+  leaves it free. A reader off: the Preview offers the file to download, saying so, and the backend refuses its preview
+  (VIEWER_OFF); the PDF is always shown. Under a DWG that does not open, only an administrator reads "A certified reader
+  opens these: see Settings → Viewing files". The viewers' WebAssembly and font are
+  copied from their packages at build (`scripts/copy-vendor.mjs` → `public/vendor`, not committed). The review's page shows the same copy of its revision; its document column is dragged wider by its right edge,
   the side cards going under it once there is no room beside it (owner; `ResizablePane`, cookie `pane-review`; a double-click puts it back).
+- **Not every type has a source file** (owner: "a calculation note" is a PDF only): each document type says "Source file"
+  (Types & sets, on the type, `native`: comes with one, or a PDF only); REV-03, released with no native file, asks it only
+  of types that come with one.
 - A check is only for what can still happen: what the app refuses or fills by itself is listed under "Refused on
   every project" (Default rules, tabs by area, `prevented.ts`), never checked.
 - Assurance: each finding points to the exact spot where it is put right: a document's tab, or else the thing
@@ -302,8 +512,97 @@ a screen only words it. A new rule goes in the backend, never in a page.
   a transmittal, "Received from outside the system"). The supplier's page: only
   what was sent to it, in its words, the comments to take in, a file field
   beside each document it holds, and "Send to <us>".
-- A supplier package is delivered by "Deliver" (The package): a new delivery package opens with its documents
-  in it (or they are added to one already open), then goes the delivery way (check, deliver, accept).
+- **Packages in packages** (owner: "a lot of orgs, especially clients, ask for an arborescence"; Standard-changes §81):
+  a package may sit in another (`Package.ParentId`), of the same kind (PARENT_OTHER_KIND), a supplier's only in the same
+  supplier's (PARENT_OTHER_SUPPLIER), the one it sits in still open (PARENT_CLOSED), as deep as wanted, beside its own
+  documents. **Its own number, place shown** (owner): the number never changes; the packages above it lead to its name
+  (`PackagePath`); moved inside another or to the top while open by the control function ("Where it sits",
+  `PUT /packages/{id}/place`, PACKAGE_MOVED with where it was; a supplier's until shared, PACKAGE_SHARED; never inside one
+  of its own branches, INSIDE_ITS_BRANCH). **Each delivers alone, counts add up** (owner): every package keeps its own
+  check, delivery and acceptance; "Packages in it" on its page (`Branches`, `arborescence.tsx`) lists the packages in it,
+  each counting everything under it, headed by the whole (`PackageView.Place`, backend `PackageService.PlaceAsync`:
+  path, branches, tally of packages below and still open, documents once each, ready at their package's status,
+  released), with "New package in it" (`/packages?category=…&parent=<number>#new`, a delivery branch starting from its
+  parent's status, recipients, people and date; a supplier's branch naming only its part, its supplier fixed). **Two ways
+  to read it, the same package page** (owner): Packages' **List** shows the packages at the top (each saying how many sit
+  in it), drilled into from their pages; **Tree** (`?view=tree`, `PackageTree`) shows every package under the one it sits
+  in, folded open, each counting everything under it. A package holding packages is not deleted (HAS_BRANCHES).
+  **One package per document** (owner: "adding a document to a branch… didn't work", then "one per tree"): within one
+  tree of delivery packages, and among a supplier's packages, a document sits in one package only (`SharingAsync`): a
+  rule never takes one another of them holds; added by hand, it leaves the other (which no longer takes it back), one
+  already delivered staying where it went (ALREADY_DELIVERED), one sent to the supplier where it was asked
+  (SENT_TO_SUPPLIER); held twice from before, it settles on the package's next reading into the lowest that holds it,
+  recorded (`HandDownAsync`, PACKAGE_MEMBERS_REMOVED by the system); a package moved into a tree already holding one of
+  its documents is refused (IN_BOTH); a supplier's branch deleted hands its documents back to the package it sat in.
+  Two separate delivery trees may still share a document.
+  Another organization reads only the packages shared with it, and in them only what was asked of it.
+- **Two kinds of package, both delivered the same way** (owner: "the naming 'to deliver' is confusing"): **Supplier
+  packages** (`SUPPLY`) are an exchange with a supplier (placeholders, its uploads, our check and review, handed back and
+  forth); **Our packages** (`DELIVERY`) file our documents, made, reviewed and released in our space. The codes stay;
+  only their names changed. **Either is delivered once complete, on a data transmittal, to whom we choose then**
+  (owner: "we reserve the right to deliver to whom we want… decide at the end, not at the package creation"): no
+  "Delivered to" is asked when a package is made or edited (an older package's recipients are only read). "Deliver"
+  (ours: once readiness is checked and any shortfall let go; a supplier's: once every document of its tree is released,
+  NOT_COMPLETE otherwise) opens the New transmittal form (`/transmittals/new?package=<number>`) with what goes, worked
+  out by the backend (`PackageService.GoingAsync`, `GET /packages/{id}/going`): **the package and every package under
+  it** ("the tree and all"), each document once, at its released revision, and, where the acceptance authority let it
+  go short, those not ready as they stand (named in the message, with whose responsibility); **fixed on the form**
+  (owner: "it is not possible to add documents to a package in transmittal": no "Add documents", no ×; the backend
+  refuses any other set, PACKAGE_CONTENTS); whom it goes to chosen there. Sent (`DeliveredAsync`, PACKAGE_DELIVERED),
+  every package of the tree records the organizations it went to (`Package.DeliveredTo`) and each open package of ours
+  is delivered, its contents fixed. It may be delivered again to someone else, as it stands ("Deliver it to someone
+  else"). Handed over outside the system, a package of ours is closed instead (`/deliver`, PACKAGE_CLOSED); the
+  acceptance authority letting a shortfall go no longer sends anything by itself. **Delivered, it is the receiver's to
+  read, never to change or return** (owner): their people read it as we do, its tree and every line
+  (`PackageService.ReadsWhole`, `Visible`; `PackageView.DeliveredToUs`; Packages' "Delivered to you" beside "Asked of
+  you"; the package page read only, "Ask about it" following the delivery), and what they send following it carries no
+  document (DELIVERED_READ_ONLY: an information transmittal). Another organization reads only the package's
+  transmittals to or from it.
+- **The full download** (owner: "the ultimate package that an org may download, having all their files… the filing
+  organisation might be as you suggest or tree/branches"; `/full-download`, linked from Packages' plate and the
+  organization's Projects plate): one zip of every document at its newest released revision (its PDF as released,
+  stamped where it was, and its source file), with, each a switch on by default, the register as Excel (every document
+  and its folder), each review beside its document as a PDF (verdicts, advice, comments standing), the transmittals as
+  letters, the audit trail as Excel (cut at 500,000 acts, said so), and "Read me.txt" saying what it holds and leaves out.
+  Folders chosen each time: the package tree (each package inside the one it sits in, "In no package" for the rest), the
+  levels in their order (project, deliverable type, discipline, document type, phase, originator; the project first when
+  several), or flat. **Who** (owner): an administrator takes the whole organization or one project, a project's control
+  function that project, ours only; clearance always applies: what the person may read is fixed when they ask, with
+  their own rights on each project (`DocumentQueries.Visible`, the transmittals' `Visible`), a project they are not on
+  named as left out. Made in the background (`Documents/FullDownload.cs`, `FullDownloadBuilder.cs`, queue
+  `delios.exports`, one at a time; `POST`/`GET /api/full-downloads`, FULL_DOWNLOAD_ASKED), the zip sealed in storage and
+  not sent to the second copy (made again on asking), the person told when ready or when it failed; only they open it
+  (`GET /api/full-downloads/{id}/file`, logged DOWNLOAD). One being made at a time per person (DOWNLOAD_BUSY); a newer
+  one takes the older's place (its zip removed, its record kept, REPLACED). It is also the export owed at a contract's end.
+- **Packages' ticks bring up the bottom bar** (owner: "a check box for every package that does absolutely nothing"):
+  `package-dock.tsx`, the register's dock: Open and Deliver (one ticked), Export (each ticked, its list), and for whoever
+  looks after them Move, only where there is somewhere to go (owner: "what good does move do here?": inside another open
+  package of the kind, a supplier's of the same supplier, or to the top for one sitting in another), and Remove (those
+  never delivered or shared; warned of the documents they hold; no why asked), the backend checking each.
+- **Taking a package out of a tree** (owner: "proper separate icons like a normal sane organisation does"): "Packages in
+  it" gives each open package two icons (`components/icon-act.tsx`, asked first, no why): move it out (up beside the
+  package it sat in, or to the top) and remove it (its documents and the packages in it back into the package it sat in,
+  nothing lost; PARENT_CLOSED when that one is closed). Any package never delivered or shared is removed the same way
+  from its own page, filled or not, with a warning (PACKAGE_HAS_GONE_OUT once a transmittal carried it; the letters
+  about it stay, no longer naming it).
+- **Ready at the status a package needs** (`PackageService.IsReady`): a package asking no status takes a document
+  released at any; a line not ready says why ("released at IFR; the package needs IFC", "nothing released yet").
+- **"Deliver the package" is always on our package while it is open** (owner: "there is no deliver button"). Complete,
+  it opens the delivery transmittal. **Not complete, it asks for a waiver first** (owner: "only the person who accepts
+  it… they can be requested that while trying to deliver it, thus the Ask first, keep it"; "keep the readiness check"):
+  "Ask <whoever accepts it> for a waiver" checks readiness now, freezing the list of what is missing, and sends it to them
+  on a transmittal (`askWaiverAction`: `/assess` then `/shortfall/issue`); until they answer, Deliver waits and says on
+  whom; they "Grant the waiver" on the package (recorded with their name and day); then Deliver opens the transmittal and
+  the outstanding documents go as they stand (released, else newest; none yet, named as not sent). Something else missing
+  since the waiver makes it stale: asked again (SHORTFALL_CHANGED). Worded as a waiver everywhere (owner: "on your
+  responsibility" was not professional): "Delivered with N document(s) outstanding (…), sent as they stand: waiver
+  granted by <name> on <day>." (`GoingAsync`). A supplier's package goes complete only (nobody accepts it, so nobody
+  waives): "Deliver once complete · n of m released". Handed over outside the system, "Close it" stays beside it, once
+  complete or under a waiver.
+- **Delete is its own button, one press, asked first** (owner: "is it good UX if delete is inside edit? … at least
+  make it one button instead of 2 nested"; then "should look like the others, not centered, outline red"): never inside
+  Edit and never opening a panel, drawn as the buttons beside it, left-aligned, in a red outline (`StepItem.act`,
+  `DangerAct`); a supplier's package's red bin (`IconAct`).
 - "Delivery list" downloads the package's own lines (`/api/packages/<n>/list`),
   never the schedule's requirements list.
 - "Share with <supplier>" is pressed once, for good: until then the supplier
@@ -331,15 +630,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - Document Control (and above) only, on supplier packages. A new supplier package asks the supplier and
   its order, and a status only if wanted: no single due date (each document is due on its own planned date)
   and nobody accepts it.
-- Delivery packages: "Needed at" (statuses) also says why they get it (`ReasonFor`, backend: the reason with
+- Our packages (delivery): "Needed at" (statuses) also says why they get it (`ReasonFor`, backend: the reason with
   the same purpose, else one for execution); no separate reason is asked. Those putting it together only add
   and take out its documents (and delete it while empty and never sent); Document Control (and above) does
   everything else and edits every field while it is open (backend CONTROL_ONLY / OWNER_ONLY). Ticked
-  documents are taken out from the bar under the list. What is missing is asked on a transmittal (Request) to
-  whoever accepts it; their confirmation (a warning first) answers it on a transmittal (Confirmation) and
-  delivers it at once on their responsibility, the documents not ready going as they stand (released
-  revision, else the newest), said on the delivery transmittal. "Export CSV" on Packages exports the one
-  package ticked.
+  documents are taken out from the bar under the list. What is missing goes, under a waiver from whoever accepts it
+  (above), as it stands (released revision, else the newest), said on the delivery transmittal with the waiver. "Export CSV" on Packages exports the one package ticked.
 - The side that does not hold it asks the holder to hand it back for an update
   (RETURN_FOR_UPDATE, with why): Document Control on our side, whoever of the
   supplier may upload on theirs. The holder accepts or refuses with why; the
@@ -500,7 +796,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   row ringed, Refuse's why open); anyone else reads who it waits for, or the answer with its reply. Postponements and a
   package's shortfall are still sent by their own acts (their letter is written by the app).
 
-### Organizations working together (docs/ORGANIZATIONS.md, Standard §55)
+### Organizations working together (docs/ORGANIZATIONS.md; docs/APP-DECISIONS.md §55)
 - Another organization works on our project in one of three ways: **collaborator** (its own DELIOS,
   linked; its people use their own sign-in), **guest** (accounts we make), **not on DELIOS** (a code; one of
   ours records for them). Nobody is forced to register. A collaborator is never chosen by hand: it is a party
@@ -562,8 +858,20 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **Defaults for new projects** and **What projects may change** are pages of their own (owner: "I did not say remove
   them… not reduced to 2 buttons no one sees"), each a card of the organization's Settings, group Organization, with its
   figure (where the defaults come from; n fixed · n free). Defaults (`/organization/defaults`, `PROJECT_DEFAULTS`):
-  the whole form of how a new project works (`components/how-it-works.tsx`), start from a project, the app's own
-  defaults, reset; the Projects plate's "Defaults for new projects" opens it. What projects may change
+  every answer a new project starts with on one page, in the app's one way of answering (owner: "rework… as the app's
+  styling"): each a `Choice` (`setRoomAnswerAction`, `target=defaults`, the same as the organization's Control room),
+  saved one at a time after "From now on… Instead of…"; an answer we changed carries "ours" with the app's own beside
+  it, one projects may not change "the same on every project". The plate (Projects' way): its line linking the Control
+  room and What projects may change, its two acts on its right, each opening a sheet under it that is its question
+  ("Start from a project", `?open=from`; "Back to the app's own", `?open=reset`, saying nothing of ours is kept), and
+  four figures (where they come from, answers of our own, who carries the acts out, projects may change n of m). The
+  side panel listing the app's own answers is gone: each answer says it where we changed it. The Projects plate's
+  "Defaults for new projects" opens it. The defaults hold only the answers that
+  page shows (`isDefaultsAnswer`: who carries each act out with its confirmations and acts left out, how a project
+  works, the days before a silent discipline is notified again): never the stamp, how other organizations' documents
+  come in, who answers for an organization; "Start from a project" takes only those, asked first ("From now on…
+  Instead of…"), and a new project is given only those. An act changed on its own makes the answer for every act "it
+  depends on the act", the others written down as they stood (nothing moves by itself). What projects may change
   (`/organization/settings/may-change`): every switch in one list, by card, each card's link above its switches (the
   same switches sit on each card too). The defaults keep only what differs from the app's own; copied when a project
   opens, never changing one already open; a joined project follows its owner. A project marks only an answer "changed
@@ -581,6 +889,136 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Roles stay exactly as they are (owner, settled): our role does not shift the project's starting defaults, no new
   roles are added, and what a role's verdict is worth is not a setting.
 
+### Running DELIOS: our console, contracts, legal (docs/RUNNING-DELIOS.md, owner: "I'd like all of that")
+- **We run DELIOS** for every organization (one platform: they link, claim and merge across it). **Our console**
+  (`/console`, backend `Operators/`, tables without row-level security) is the DELIOS team's space above every
+  organization: its own accounts only (`create-operator <email> <name>`, `DELIOS_OPERATOR_PASSWORD`), always password and
+  authenticator code, its own cookie (`delios_console`, screens `console_session`, `lib/console/client.ts`), every act in
+  its own log (`operator_events`). Tabs: Overview · Organizations · Requests · Plans & payments · Legal · Support access ·
+  Notices · Team · Log, in the app's design (plates, sheets, `.views` tabs).
+- **We never read an organization's documents.** The console counts (paid users, projects, storage, last active) and
+  names its administrators; its projects and people only while one of its administrators lets us in (Settings →
+  Contract & plan, 1 to 30 days, with why, ended whenever; `SupportGrant`), each reading written in its audit trail
+  (SUPPORT_READ).
+- **Where an organization stands is read when looked at** (`Subscriptions.Effective`, never a clock): Trying · Active ·
+  Reads only (trial over, 14 days past the period paid, cancelled and past it, or set by us) · Ended. Reading only, the
+  backend refuses every change (READ_ONLY) but signing in, notifications and the contract; every page says so
+  (`/api/standing`); **nothing is deleted**. Set in the console with why (SUBSCRIPTION_SET). Codes confirmed by the owner, 30 Oct 2026 (TRIAL,
+  ACTIVE, READ_ONLY, ENDED; CARD, INVOICE; invoices ISSUED, PAID, VOID).
+- **Paid per organization, per user working in it** (its own people; guests and linked accounts free), plans named and
+  priced in the console (a plan's code kept once used). Businesses only. Cancelling is one click (Contract & plan), no
+  harder than signing up, ending with the period paid. The seller of record is not connected yet: payments recorded by
+  hand (docs/gaps/running.md).
+- **Trying DELIOS, then choosing a plan** (owner: "add the 3"; "can i set how many days"): a new organization tries
+  DELIOS for the days set in the console (Plans & payments → Free trial, `TRIAL_DAYS`, 30 by default, 0 no end;
+  `Operators/Trials.cs`); its administrators are reminded 7 days before, the day before and on the day (notification
+  and email), the moment written by what sets the end, never looked for (`Subscription.RemindAt`, `TrialReminders`);
+  after it, it reads only. On Contract & plan an administrator chooses a plan and how many users ("Choose a plan",
+  PLAN_ASKED); DELIOS is emailed, the console shows it on Requests and on the organization's page (its form filled
+  in), and setting the plan answers it; the first invoice follows. **The console speaks plainly** (owner: "it went
+  technical, forgetting that non-devs will be running the app"): words for the people running the business, never the
+  developers' (no "seller of record", no provider names where a plain phrase says it).
+- **Legal texts are DELIOS's, versioned** (`Operators/LegalTexts.cs`, `/api/legal`, public `/legal/<slug>`, linked under
+  every sign-in page): written as the app works, **what only a lawyer may write marked `[[LAWYER: …]]` and drawn in red**
+  everywhere (`components/legal-text.tsx`; a public page with such parts says it is a draft binding nobody). A new
+  version is published, never an old one changed; the terms and the data processing agreement are accepted at sign-up
+  (backend TERMS_NOT_ACCEPTED) and again at each new version by an administrator (LEGAL_ACCEPTED), every acceptance kept.
+- **Every legal matter, must or may** (`LegalMatters.All`, console → Legal): by when (before the first paying customer,
+  while running, as it grows), each with where it stands (to do, placeholder text, with the lawyer, in force, not needed;
+  codes TO_DO, PLACEHOLDER, WITH_LAWYER, IN_FORCE, NOT_NEEDED confirmed by the owner, 30 Oct 2026; a must is never
+  "not needed") and our notes. A new legal matter goes in that list.
+- **Forget a person** (organization's People, an administrator of ours, with why; `ForgetPerson`, PERSON_FORGOTTEN): name
+  and email replaced ("Former user …"), account closed, sign-in, devices and pop-ups gone; what they did stays under the
+  name it was done by (GDPR 17(3)). A linked account is forgotten at home.
+- **How long activity is kept** (`TRACK_KEEP_DAYS`, Security & privacy): what was opened and downloaded past it is
+  removed by the next reading written (`audit_prune`, once a day per organization, rows outside the chain only).
+- **The console's sign-in sets up the authenticator by itself** (owner: "the real authenticator app"): `create-operator`
+  makes the account with a password only; the first sign-in shows a QR code (made on the screens by `qrcode`, a picture,
+  nothing in it runs) and the key to type, asks the first code, then gives 10 recovery codes once; a reset of the same
+  email asks it all again (a lost phone). Later sign-ins: password and the app's code, or a recovery code.
+- **Support enters as an administrator, told and recorded** (owner: "we would be just like an admin and that's it, and we
+  inform them, and their trail will show them what happened"): while the organization lets DELIOS in, the console's
+  "Enter as its administrator" opens it in that browser as "DELIOS support: <name>" (`User.IsSupport`, made or switched on
+  in that organization, never paid for, no sign-in name or password): its administrators are told at once, every act is
+  in its audit trail under that name (SUPPORT_ENTERED…), and its session ends with the access (`SessionStore` refuses it
+  once the access ended or ran out; ending it switches the account off).
+- **Renewals told by themselves** (owner): a paid plan not cancelled tells its administrators 30 days before the period
+  paid ends (notification and email), once per period, the moment written by what sets it (`Trials.NextReminder`,
+  `Renewals.Words`; a period paid, a plan set, a cancel or a resume writes it again), as the trial's reminders.
+- **Console accounts switched off from the console** (owner): Team, each account's "Switch off" with why
+  (`PUT /api/console/team/{id}/active`, OPERATOR_SWITCHED_OFF / ON), its sessions ended at once; never one's own
+  (OWN_ACCOUNT), never the last one on (LAST_OPERATOR). Added still by `create-operator` on the server.
+- **The price before the choice, the invoice with the plan** (owner): Contract & plan works out what a plan comes to as it
+  is chosen (users × price a month, a year, before tax; `plan-fields.tsx`); setting the plan in the console may make its
+  first invoice at once ("First invoice", months it covers: users × price × months, `BillingEndpoints.PrepareAsync`,
+  the organization told), else invoices stay by hand.
+- **Decided, nothing to build** (owner, 30 Oct 2026): an ended organization's data is deleted by the app owner or
+  whoever of our team they delegate, managed internally (never by the app on its own); a review rejected just before its
+  action is the organizations' to plan ("their own ways, not our problem"); Word and PowerPoint previews stay off, on
+  request only; reports are sent by hand, never emailed by themselves.
+- **Need support** (owner: "just have them write a message with object, we already know which org and which project,
+  and have a drawer with main type of requests"): a "Need support" button (owner: the register's first button, its size and icon, in our gold instead of blue; its words `gold-ink`: a warm dark brown on light, navy on dark) on the right of Help's plate and of the
+  organization's band opens a drawer from the right (`components/support.tsx`, `support-panel.tsx`): what it is about
+  (`SupportKinds`, codes confirmed: SIGN_IN, OPEN_FILE, UPLOAD, ACCESS, ERROR, SETUP, BILLING, OTHER), a subject, a
+  message, then what the person asked before, each a conversation (owner: back and forth; `support_messages`: the person
+  writes back, `POST /api/support/requests/{id}/messages`, support emailed; the console answers as often as needed, a
+  request waiting again once the person wrote last); who, the organization and the project are known
+  (`Operators/SupportRequests.cs`, `POST /api/support/requests`, `support_requests`, kept above every organization,
+  allowed while reading only; emailed to the support email). Answered in the console's **Support** tab, the person told
+  (notification and email, `/guide?support=1` opening the drawer). **How organizations reach support** (email, hours,
+  telephone; `platform_settings`, `/api/legal/support-contact`) is set on that same tab and shown at the top of Help, in
+  the organization's band, in the drawer, on Contract & plan and under the sign-in form ("Cannot sign in? Write to…",
+  for whoever cannot reach a page that needs signing in). The long "Something went wrong?" list is gone (owner: "that
+  full card is crazy"); an error page leads to the drawer.
+- **Billing, the cheapest and most reliable first** (owner: Morocco; "I don't think orgs would be paying by cards"):
+  invoices issued from the console (`Operators/Billing.cs`), numbered DLS-<year>-<n>, never deleted (voided with why),
+  buyer and seller written on them as they were, a PDF (PDFsharp) with how to pay by bank transfer; an organization's
+  administrators keep who they are made out to and download them on Contract & plan, and are told of each; a payment is
+  recorded when it arrives (bank transfer, CMI, Paddle, other: codes confirmed: TRANSFER, CMI, PADDLE, OTHER; states
+  ISSUED, PAID, VOID), the period it pays for then paid by itself. DELIOS's own details on every invoice (company, tax
+  and registration numbers, bank, tax rate, days to pay, mentions) set in the console's Plans & payments, what a Moroccan
+  invoice must carry marked for an accountant. CMI and Paddle are not connected (docs/gaps/running.md).
+- **Settings is a side menu** (owner: "settings would be better as side menu, than cards"), a project's and the
+  organization's alike (`components/settings-nav.tsx`): the overview, then every page the person opens by group, the one
+  you are on lit, standing in place the window's full height; the overview lists where each stands ("To do" in amber) in
+  one sheet. **Never a third column** (owner: "ended up with 3 side menus, back to back and few space for actual
+  thing"): on a page with a side menu of its own (the Audit trail, a person's activity, Types & sets, Forms & fields:
+  `OWN_MENU`) and on a window under 1440 pixels wide, it is one button above the page, "Settings · <page>", opening the
+  same list.
+- **The demo brings a console account** (owner: "console do not allow regular admin@demo.local"): the console never takes
+  an organization's account, so `seed-demo` adds `console@demo.local` with the demo password (`DemoSeed.ConsoleEmail`).
+- **The console's authenticator can be switched off for testing** (owner: "give me control over activating it or not"):
+  `CONSOLE_AUTHENTICATOR=false` in .env (`Console:RequireAuthenticator`, on by default) lets the password alone sign in,
+  and every console page says so in red until it is on again.
+- Moments and days go out and come in as ISO text (`Platform/NodaJson.cs`); before, a moment went out as an empty object.
+- **The shared tables are fenced too** (migration FenceSharedTables): inside an organization's transaction, sessions,
+  product requests, notice alarms and reply addresses show and take only its rows; sign-in names, reserved values and
+  organizations' identities and holders are read by all, written only for itself; across, only through
+  `Tenancy/Crossing.OpenAsync`, said where it is used.
+
+### Uncontrolled documents (docs/STANDARD-CHANGES.md §86)
+- **Kept as they came, never made here** (owner: "we will just keep them if we receive in a transmittal… that is as far
+  as we can do"): the register's switch **Controlled · Uncontrolled** (`register-plate.tsx`, our people only) opens
+  `/documents/uncontrolled`, every file the project keeps outside the register, marked "uncontrolled", each with its type,
+  what it came on (a link to it), from whom, by whom and when (backend `Documents/Uncontrolled.cs`,
+  `GET /projects/{id}/uncontrolled`, read from where each file sits, nothing stored; the transmittals' as the reader may
+  open them). Its types (owner: "make those types of docs for uncontrolled docs"; worked out on reading, never kept):
+  RECEIVED (on a transmittal, never registered nor matched), KEPT_WITH, COVERING_LETTER, SENT_PROOF, ANSWER_PROOF,
+  EMAIL_REPLY (set aside), LIST_FILE (uploaded on the Schedule); words in `lib/documents/uncontrolled.ts`. One that matters
+  is registered from its transmittal and leaves the list.
+
+### The training space (docs/APP-DECISIONS.md §84)
+- **One per organization** (owner: "they mostly work the same way for all projects"): a project marked
+  `Space = TRAINING` (`Identity/Spaces`, owner: "code TRAINING works"), its code `SB-<our code>` (then -2, -3: codes are
+  never given twice), opened and started again by administrators on the organization's Projects (`Organizations/Training.cs`,
+  `GET`/`POST /api/admin/training`, `POST /api/admin/training/again`; screens `lib/organization/forms-training.ts`), its
+  line apart from the projects (never counted). **Started again**: the old one archived, out of every list, nothing
+  deleted (owner: "Put away, open fresh"); a fresh one opens with the administrator on it as the control function.
+  **One made-up organization per role** (`Party.TrainingProjectId`): seen only inside it (query filter on `Party`; the
+  organization's list and other projects never show them), holding no code or name on DELIOS. **Left out of what spans
+  projects**: the organization's whole audit trail, the whole full download, the plan's paid users (someone only on it),
+  and email (an email of it is kept, marked off, `EmailSender`). Every page in it says so (a violet line, `(app)/layout.tsx`).
+
 ### Settings
 - **Settings are read by everyone of ours** (owner: "access without the editing liberty"): the Control room, Types &
   sets, Numbering, Revisions, Review routes, Forms & fields and Functions & permissions open read only for whoever may
@@ -597,6 +1035,48 @@ a screen only words it. A new rule goes in the backend, never in a page.
   carries a real figure, and what still needs doing reads "To do · …" in amber (an empty essential list, a
   deliverable type with no numbering, no revision scheme, a verdict without a meaning, only you on the project).
   Group icons take one neutral tint.
+- **Where a project's site is** (owner): each project keeps its **country** (`Project.Country`, ISO two letters, or none),
+  its **time zone** and its **days off each week** (`WeekendDays`), asked when it opens and on its line (organization's
+  Projects, This project; `PlaceFields`, `readPlace`); a new project starts with the organization's (Defaults for new
+  projects' place is on the Calendar card; `Settings/ProjectPlace.cs`, org settings `PROJECT_TIME_ZONE` /
+  `PROJECT_WEEKEND` / `PROJECT_COUNTRY`, `GET`/`PUT /api/admin/project-place`, PROJECT_PLACE_SET), never changing one already
+  open (on the organization's Calendar card, "Where a new project's site is"). Nothing set: UTC, Saturday and Sunday, no country.
+- **The calendar** (owner: "how about we create a calendar"; holidays are a calendar, never a list of Types & sets):
+  days nobody counts are kept on it (`Settings/Calendar.cs`, table `days_off`): the organization's **public holidays**
+  (each with its name and the country it is kept in, or every country) and a project's **own days off** (a site
+  shutdown, a local holiday; where the switch `CALENDAR`, area "Calendar", Free by default, leaves it free, ROOM_FIXED
+  otherwise). **One month at a time** (owner: "dont add a calendar for each month, apply the regular calendar", the date
+  picker's way): ‹ month › stepping through the span, « year » a year at a time and the year itself chosen beside
+  the month (owner: "a way to go by years easily"), "This month" back to today's, the organization's arrows going on into the
+  year before or after (`components/calendar.tsx`, `MonthsCalendar`): days off each week shaded,
+  holidays rose, a project's own amber, the schedule's action days highlighted (a bar under the day), today ringed; each
+  day is a square (96 pixels by default, 40–200) (owner: "double the height", then "we forgot the width"), each month exactly its seven
+  days wide, the whole calendar made larger or smaller by "Size − +" beside "Names in the days" (owner: "i cant find the resize"; "Normal" puts it back) or dragged by its corner, a marked handle at the month's own corner (cookie `calendar-day`; double-click
+  puts it back); "Names in the days", a tick (cookie `calendar-names`, on by default), writes each day off's and each
+  action's name inside its days, as many lines as the day holds; a
+  click on a day opens it under the months (what it holds, each action linking its page) and, for whoever keeps that
+  calendar, claims it (its name; the organization's also its country) or unclaims it, asked first (DAY_OFF_MARKED /
+  DAY_OFF_UNMARKED). **The organization's Calendar card** (`/organization/settings/calendar`, administrators): its
+  holidays a year at a time (`?year=`, `&month=`); **a country's public holidays filled in** (owner: "some recognise national
+  holidays"; the `date-holidays` package, `lib/settings/national-holidays.ts`, in English): the country chosen on the
+  calendar (kept in the address, `?country=`, ALL for every country; none: where a new project's site starts), its
+  year's public holidays are drawn dashed on the calendar until marked (a click on one opens it with its name filled in)
+  and listed under it with "Mark these N", asked first (`POST /api/admin/calendar/days/many`, each logged
+  DAY_OFF_MARKED, those already marked left); a project's calendar draws its country's the same way (`knownBetween`),
+  counted only once marked; the organization's calendar
+  draws no actions (they are a project's); how dates read, where a new project's site starts, and its switch. **A project's
+  Calendar card** (Settings → Calendar, read by everyone of ours, changed by the control function): where the site is
+  (`PUT /calendar/place`), its country's holidays and its own days off. **The calendar is a tab of the Schedule** (owner:
+  "make it a tab as the plan and the table"; `/schedule?view=calendar`, tabs The calendar · The plan · The table, the plan
+  in the middle and shown first; `/calendar` only redirects there, no menu item): its card the same height as the plan's
+  and the table's (owner), the days, however large, scrolling inside it; read only, drawing the actions the
+  Schedule's filters leave (another organization's people see only theirs, as on the Schedule), the months centred,
+  its key ending with "… in Settings → Calendar" for whoever opens that card. A project's calendar spans **from the month it starts
+  to the month it finishes** (owner; This project's dates, `PROJECT_INFO`; no end: twelve months on), widened to the
+  months of its first and last actions (owner: "show more months"); an action's name written in a day opens the action. Every count of working days (review steps, an answer's due day, warnings, a discipline notified
+  again) skips the days off each week and these (`WorkingCalendar.HolidaysAsync` → `Calendar.DaysOffAsync`).
+- **The app speaks English only**: every word is written in place; another language means moving each sentence into a
+  file of words per language, screens and backend alike (owner asked, not decided).
 - **A new email counts once its owner opens the link sent to it** (owner): an administrator changing someone's email
   (organization's People, a project's People & access) sends a link to the new address and a word to the old one; the
   account keeps its email until the link is opened (`EmailConfirmation.SendChange`, the same `/confirm-email` page,
@@ -634,7 +1114,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   forth, replies by email) is anyone of ours who may send or register; a delivery package is those putting it
   together. Ending a document is already its registrar's too; legal hold an administrator's.
 - People & access, in the reference style: masthead (on the project · waiting · refused, and how joining works here),
-  "Someone joins <project>" ("Add someone", "Ask for someone to join"), "Waiting to be confirmed" (with Remind), and
+  "Add someone" and "Ask for someone to join" as buttons on the plate's right (owner: "a button in the title card"; the
+  Project directory the same), the form opening under it (`SomeoneJoins` `plate`), the ask's message written already as
+  an invitation ("This is an invitation to <project>. From now on you have access to it as <function>: reading its
+  documents, …", from the function's rights, `lib/settings/access-words.ts`), changed as one likes, "Waiting to be confirmed" (with Remind), and
   Everyone (organization and project as search fields that apply at once, `JumpPick`, owner: chips grow with every
   organization; a field to find a name or email; "Other projects" only when someone shown
   is on another; acts as icons: activity, change, ask for them to join; each person's Change: function, department, name and email unless
@@ -684,7 +1167,12 @@ a screen only words it. A new rule goes in the backend, never in a page.
   The bottom bar for ticked values: Retire, Bring back, and for those never used, Move to another set and Delete.
 - **Every dropdown is the app's** (owner: "all drawers, lists of choices adopt this styling", the numbering's): `Select`
   (`components/select.tsx`) replaces every `<select>`: the chosen one ticked and bold, the one under the keys shaded,
-  groups under their names, a field to narrow a list longer than 12. The native select stays hidden in the form holding
+  groups under their names, a field to narrow a list longer than 12. **Every list that opens from a field is drawn over
+  the page** (owner: "drawers are blocked by their card… some show to the side and create an horizontal scroll";
+  `components/floating.tsx`, `Floating`, on the page's body): under its field, or above it when the window has no room,
+  held inside the window's width, followed as the page scrolls; a click outside it or Escape closes it. `Select`,
+  `JumpPick`, `Choice`, the recipient picker, "One of ours?", the date filter and the Filters menu use it (`SearchPick`
+  and the register's column menu were already so). Never an `absolute` list under a field again. The native select stays hidden in the form holding
   the value (name, `form`, `required`, `defaultValue`, `value`, `onChange` work as before; a pointer pick applies a
   filter at once, a keyboard one on leaving). Never a bare `<select>` again. The search fields' lists (`SearchPick`,
   `JumpPick`, the recipient picker, "One of ours?") take the same look, and every one lists on a click and narrows as
@@ -810,6 +1298,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Document Control keeps it) are the project's. Who answers is optional and never blocks a save. Its code, name and
   how it works with us change once each (above). An organization is never removed: "In use" unticked switches it off (no longer offered; its people no longer
   sign in; everything done under it stays). The "Remove this organization" button (which always failed) is gone.
+- **A failed read is never read as "nothing"** (owner, after the critique): on the organization's pages, where every
+  switch stands, the projects keeping their own copy and the defaults are read with `libertyOrFail`,
+  `orgSettingsOrFail` / `projectDefaults({ orFail: true })` and the copies readers, which throw; the page then says it
+  could not be read (`organization/error.tsx`), never "0 fixed", "None" or "the app's own". "Their own copy" counts each
+  project once, functions included ("3 projects, on 5 cards").
 - Layered settings: built as the two levels above (the switches). Being moved onto them card by card: the switches
   and the organization's Settings first, then Numbering (done), Revisions (done), Review routes (done), Types & sets (done, per list), Forms & fields (done, per form), Functions & permissions (done, owner: "we should be able to change functions on a
   project level": the functions themselves, name, code, clearance, in use, are the organization's, created and changed on
@@ -866,6 +1359,15 @@ a screen only words it. A new rule goes in the backend, never in a page.
   its state, set here, if it happens, ends here, shown below. Under it, "The days
   around an action" (needed before its day, at risk from) sets the project's lead and risk window once its schedule is
   named (`PUT /schedule/days`, the risk window following the organization where fixed; every action read again).
+  **The days around an action on two levels** (owner: "need both org and proj levels"; `Actions/ScheduleDays.cs`): the
+  organization's ("needed before the action's day", "at risk from"; org settings `SCHEDULE_LEAD_DAYS` / `SCHEDULE_RISK_DAYS`,
+  `GET`/`PUT /api/admin/schedule-days`, on its Control room and on Defaults for new projects) are every project's
+  default, read live (as the stamp's); a project keeps only what it changed (the same keys on the project), where its
+  switch leaves it free (`LEAD_DAYS`, new, and `RISK_WINDOW`, Free by default; an exception counting), set before its
+  schedule is named too, "changed here · the organization's: N" beside each, and "Follow the organization's days
+  again" (also done by "Back to the defaults"). Nothing set anywhere: the app's 7. Every reader goes through
+  `ScheduleDays.ForProjectAsync` (the 14 two screens fell back to is gone); numbers other than 7 kept on a schedule before
+  read as the project's own until it next sets its days.
 - **The Control room stands above every Settings page** (owner): not one card among them, but the panel at the top
   of the hub (`CONTROL_ROOM`), drawn as the console itself (owner: navy, `scene-deck`, to stand out): what it is, the
   four facts that say how the project works (control function, who does what, releasing, adding people), and "Open the
@@ -931,13 +1433,17 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (tiles: each list with how many values in use, or "not set up yet" in amber, the pages it reads and the form it asks; a tile only
   its keepers open is shown unlinked, never hidden). One method for every answer (`flow/choice.tsx`): its answers
   side by side, what the one in force means under it, another chosen asks "From now on… Instead of…" before saving
-  (`setRoomAnswerAction`, `setScheduleDaysAction`); read only for whoever may not change it, locked where the
+  (`setRoomAnswerAction`, `setScheduleDaysAction`); a number of days is its field on the same line with Save beside it
+  (owner: "no need for a full form for working days"), Save lit only once it differs; read only for whoever may not change it, locked where the
   organization keeps it. The masthead names who acts as the control function. **No second page of answers** (owner:
   "How this project works" is gone, `/settings/control` only redirects to the Control room): every answer is changed in
   the Control room and read as written sentences in the plan (the masthead's "Read it all as the plan"). Under the
   console sit what holds for the whole project (`flow/project-wide.tsx`): "Who acts as the control function"
   (`#control-people`, named there) and "Back to the defaults". What the states are called is the organization's card
-  (`/organization/settings/states`, administrators), read on a project.
+  (`/organization/settings/states`, administrators), read on a project: every state Help shows, by group (`STATE_GROUPS`):
+  the document's (planned, active, withdrawn, cancelled, archived), its latest revision's ("No revision yet" included)
+  and a supplier's stages (`docStateName`, `stateName`, `supplierStageName` read them everywhere); two of one group never
+  read the same, the app's own words aside.
 - **A person's activity** (owner): in People & access, a name opens `/settings/users/<id>`, and so do the clock icon on
   each line and "See what <name> did" in the opened line (owner: "I didn't know this page existed"): who they are, then everything
   they did in the app with its day and time (signed in, opened a document, downloaded, reviewed, released, sent…), read
@@ -947,10 +1453,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   Lawful as the register's integrity record, provided people are told it is kept (privacy notice), it is read only for
   that purpose, and the organization sets how long it is kept; some countries also ask staff representatives first.
   What is kept is the organization's choice (organization page, "What is kept about people's activity",
-  `Settings.Tracking`; shown read-only in the Control room): acts on documents always; reading (opened a document,
-  downloaded a file, `TRACK_READING`) kept unless switched off, read as two kinds, Opened and Downloaded (owner: opened
-  is not downloaded; `AuditKinds` READING / DOWNLOADED); sign-ins always kept for security, shown on a person's
-  activity only when switched on (`TRACK_SIGN_INS` = ON).
+  `Settings.Tracking`; shown read-only in the Control room): acts on documents always; opening a document
+  (`TRACK_READING`) kept unless switched off; **a file downloaded always** (owner, security review: the files are
+  protected; `Tracking.Reading` holds only DOCUMENT_VIEWED), and watched: one person past 200 files in an hour, our
+  administrators are told once that hour, by notification and email, with a link to their activity (`Audit/DownloadWatch.cs`,
+  DOWNLOADS_MANY, read with each download on its index actor · action · at); read as two kinds, Opened and Downloaded
+  (owner: opened is not downloaded; `AuditKinds` READING / DOWNLOADED); sign-ins always kept for security, shown on a
+  person's activity only when switched on (`TRACK_SIGN_INS` = ON).
+  **Reading is kept outside the locked chain** (owner: every reader waited behind every other act of the organization):
+  opened, downloaded and a person's activity read (`AuditKinds` READING / DOWNLOADED, `AuditLog.OutsideChain`) are written
+  by `audit_note`, with no lock and no link to the row before, each sealed by its own hash (`audit_events.chained` false);
+  every act that changes something stays in the chain (`audit_append`, one writer at a time). Same table, append-only,
+  the same readers; `audit_verify` checks the chain and each reading row's own seal.
 - **Audit trail** (Settings, administrators) keeps its logbook look (owner: the agreement was on content, not styling):
   the day as a rule, each act a slip, the kinds beside it. Shared with a person's activity (`components/logbook.tsx`).
   Beside the log: the whole log, then each kind of act with its count and every act it holds (plain words, counts), so
@@ -965,12 +1479,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   document's History): "<what>: […] → […]" too, a list of records as added / taken out / changed, each by its name,
   one line per field under it (owner: "don't condense, no fancy transformations": a code reads as itself, only not
   in capitals). An id is never shown: the backend puts each id in a detail as the name it stands for
-  (`AuditKinds.NamesInAsync` / `Readable`, on every audit reader), and new details are written with names. Home's Log tab is the same logbook for its project (backend `GET /log`,
-  the control function and administrators), the project's work only: sign-ins, opened and downloaded, and people and
+  (`AuditKinds.NamesInAsync` / `Readable`, on every audit reader), and new details are written with names. Home's Log tab is the same logbook for its project (backend `GET /log`),
+  read by everyone of ours on the project (owner): the control function and administrators every act, anyone else only
+  the acts on what they may open (a document, its revisions, files and reviews by its clearance, a transmittal they may
+  open; a document named inside a detail they may not open reads "a document you may not open"; `ActivityEndpoints.Readable`,
+  the journal beside Home the same), the names opening a person's activity only for those who read it; another
+  organization's people never. The project's work only: sign-ins, opened and downloaded, and people and
   settings are left out (the administrators' trail). Its menu is on the left (`LogbookSide categoriesOnly`: the kinds,
   not every act; then Find), the days beside it, the page's right column away while the log is open.
-  The log's menu: Find first, on a white box (words; the day and Show on one line; no labels), then the kinds, which
-  scroll on their own without a bar; on the Audit trail and a person's page each kind folds open on its acts.
+  The log's menu: Find first, on a white box (words; the day and Show on one line; no labels), then every kind, Opened,
+  Downloaded and Sign-ins included (owner: kinds scrolled out of sight without a bar went unseen), the whole side
+  scrolling with a thin bar only when taller than the window; on the Audit trail and a person's page each kind folds open
+  on its acts.
 - A form never sits in a box inside a box: a sheet that opens a form becomes that form (`SomeoneJoins`), and a line
   of a table opened for editing goes on as the row itself (grey fields, then the strip with Cancel and the act), the
   new-document form's way.
@@ -990,7 +1510,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   makes sure of it" (`prevented.ts` by area); "Set in" links on screen only. Every sentence is read from how the
   project is set up (`GET /management-plan`, `PlanEndpoints`, for what only the keepers read elsewhere); what is not set up is said
   where it belongs. Nothing on it is typed and nothing repeats a Settings page. Scope is said once (This project); the
-  target once (Assurance, "How it is measured", `MEASURE`; the checks run by themselves every day, so no interval). The
+  target once (Assurance, "How it is measured", `MEASURE`; the checks run when someone runs them, so no interval). The
   organization's name is its own. No exceptions register (it changed nothing): a check switched off, with why, is the
   departure that applies. `/settings/dmp` only redirects.
   **A plan, never a manual** (owner): it is the app's plan for this project, made of its switches, settings, the inputs
@@ -999,6 +1519,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   manual and belongs in Help. It includes what each form asks where the organization decided otherwise (Forms &
   fields: made required, left out, added), the acts left out, each reason's expected answer, delivery packages, and
   how fine the matrix is cut. A setting the app does not apply is never stated.
+  **A hint of colour, nothing more** (owner: the chapters "look hard on the eye"): each part's title in the brand's ink
+  with a short mark, a table's head on a light tint in the brand's ink, its rows striped, its first column in ink, a
+  fact's label in ink, the cover's figures in ink (the target reads "95% target"); who does an act reads the control
+  function in ink, whoever does the work in green (`plan/parts.tsx`).
   **Plan v1** (owner: "I like it; if the next one doesn't work we fall back to it") is commit `ef95589`
   (`frontend/app/(app)/conformance/plan/`, `backend/app/Checks/PlanEndpoints.cs`): restore those files from it.
 - **Assurance tabs share one top** (owner: tabs must not jump): `conformance/head.tsx` (`AssuranceHead`): the same plate
@@ -1042,8 +1566,13 @@ a screen only words it. A new rule goes in the backend, never in a page.
   band "Step N · <title>" (what is chosen there is that step's only); "Routes in use" heads the routes below; a route
   being changed is marked "being changed". "The status it releases at" is a dropdown (`SearchPick`), never pills.
 - A revision whose files are not through the virus check is refused in plain words by what happened (`FilesNotReady`):
-  still being checked (about a minute; if it stays, the worker or scanner is not running), set aside (replace it), or
-  no file yet.
+  still being checked (about a minute; if it stays, the worker or scanner is not running), refused (its Preview says
+  why: replace it), or no file yet.
+- **What the virus check cannot look into is refused** (owner: "refuse them with explanation"): a file locked by a password
+  (a zip, a PDF that needs one to open) or holding more than the scanner opens (clamd `AlertEncrypted`, `AlertExceedsMax`,
+  compose and Kubernetes), never passed as clean; said in plain words on the file and in the document's Preview
+  ("<name> was refused: It is locked by a password… Send it without the password", `FileScanning.CouldNotCheck`,
+  `refused` in `lib/documents/checking.ts`). A PDF that opens without a password, however it limits printing, is checked.
 - One status chosen on the last step: every document the route accepts is released at it, shown fixed on the verdict
   form ("the route releases at IFC, not IFA"), nothing to choose or confirm; several: the decider chooses. "It stays at
   <status>" is asked only when what the revision carries is one the step may give (owner: a verdict was blocked by a
@@ -1054,9 +1583,14 @@ a screen only words it. A new rule goes in the backend, never in a page.
   step does, "For approval" when it decides, "For review" when it advises (`ReviewSets.StepReason`, the codes APPROVAL /
   REVIEW), refused only when neither is published (STEP_REASON_REQUIRED).
 - **Every search field lists on a click and narrows as one types** (owner, everywhere): `SearchPick` (its `browse` no
-  longer differs) and the transmittal recipient picker; "Choose, or type to narrow".
+  longer differs) and the transmittal recipient picker; "Choose, or type to narrow". `SearchPick`'s list is drawn over the page
+  (a portal on the page's body, placed under its field, or above it when the window has no room), so no card or
+  scrolling row cuts it (owner: "drawer is blocked by card", the steps of Send for review).
 - A route's step is answered by all its people (any order) or by whoever gets to it first (`StepModes` ALL / ANY): no
-  other kind is offered. A step another organization answers goes to them on a transmittal whose reason is set by itself
+  other kind is offered. On the route form it is one tick on the step, "Wait for everyone's answer" (owner), ticked by
+  default (`RouteStep.Mode` ALL): the next step opens only once every one of its people has answered; unticked, the
+  first answer moves the review on. Said on the routes, Send for review, the review's plate ("1 of 3 answered, it waits
+  for every one") and the plan ("Moves on when"). A step another organization answers goes to them on a transmittal whose reason is set by itself
   (above). "Offer this route first" puts it first among
   routes equally specific. "From which organization" chooses among the organizations taking part (a document's
   originator is an organization's code).
@@ -1100,7 +1634,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   often as needed, each name kept its own. "How they work with us" changes once. The **contract** is between two
   organizations: the one signing it (the project's) is known by the project's code, the other by its contract number
   (`ProjectParty.ContractNumber`, Organizations, "On <project>"), unique on DELIOS, changed once.
-- **Sign-in & security** (administrators) is the organization's, on its Settings (`/organization/settings/security`; owner,
+- **Security & privacy** (administrators; owner: what is kept about activity "does not deserve an entire card": it is the
+  same card, its sheet under the sign-in's, `/organization/settings/tracking` only redirects there) is the organization's, on its Settings (`/organization/settings/security`; owner,
   after the critique; `/settings/security` only redirects there, and a project's Settings carry no such card):
   two-step sign-in asked of everyone or not; the organization's own account (owner: "explain the work with a progress
   diagram", then "look like what we have in the app") drawn as the app's own stage path (`StagePath`, as under a
@@ -1108,7 +1643,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   work account elsewhere; its form only once set up or asked for ("Set it up", `?sso=1`), never filled by the browser
   (autoComplete off), the address the provider sends people back to given in it, for step 1; the organization's own account
   (single sign-on, OpenID Connect: name on the button, provider's address, client id and secret kept encrypted, email
-  domains, in use); "Everyone may sign in with a password", which may be limited to administrators only once that
+  domains, in use: with none, only an email the provider says it verified is trusted, its account names only at the
+  domains set; an account standing for another organization's person is never entered by it); "Everyone may sign in with a password", which may be limited to administrators only once that
   account is in use (backend SSO_NOT_CONFIGURED otherwise; turning the account off opens passwords again): until then the
   switch is not offered, the line says why; a new account's "In use" starts off. The sign-in
   page folds "Sign in with your organization's account": its short name (shown to the administrator), then the
@@ -1118,17 +1654,83 @@ a screen only words it. A new rule goes in the backend, never in a page.
   text under 11px.
 
 ### Import & export
-- A file is always checked first; the check writes nothing and uses the backend's own rules (`POST /documents/check`,
-  the same as registering). Problems name the sheet and row the person sees. Writing names its count; rows with
-  problems are left out only after it is said and agreed, and they download to fix and import again.
-- A person is never given a password chosen by someone else: Team list (and `POST /api/admin/users` with `invite`)
+- A file is always checked first; the check writes nothing and uses the backend's own rules. Problems name the sheet and
+  row the person sees. Writing names its count; rows with problems are left out only after it is said and agreed.
+- **The deliverable list on two pages** (owner; backend `Documents/DeliverableImport.cs`, `POST /imports/deliverables/check`
+  and `/write`, one call each, never one per line; screens `lib/documents/forms-deliverables.ts`,
+  `app/(app)/import/deliverable-import.tsx`): the file is read into lines and checked, then every line says what it
+  would do (New document · Update, each field "was → now" · No change · Problem, with why; every line of the file is
+  listed, owner) before anything is written. One way to take a line off (owner: "I don't understand the switch, the leave
+  out, the keep"): its red × ("Take this line off the list"), back from "Taken off the list" with Put back; "Take every
+  line with a problem off". **Correcting a line is the document form itself** (owner: "the edit must be the very
+  create/update document form"): its pencil opens the form under the line (`LineForm`; fields read once for the template
+  and the form, `lib/documents/deliverable-fields.ts`: the same fields, order and names as registering, each list
+  offering only the values for its deliverable type, a field the backend names outlined; on an update what the number is
+  made of shown locked). The table is the register's (`DataTable`, its head ticking all, owner); lines ticked bring up the register's dock
+  at the bottom (owner: "use the bottom bar like we have in register"): Change them together (the same form, empty:
+  only what is filled in changes; lines of one deliverable type, opened just above the dock), Take them off the list,
+  Tick the problems, and clear. Every change is checked again at once (no "check again" button); then
+  one act writes the whole list, or nothing (a line that no longer passes undoes the rest, said line by line). A new document has **no number** (numbering is never
+  manual): it is given one when registered; a line with a number updates that document of this project, never creates
+  one (a number not in the register, or on two lines, is a problem). What the number is built from never changes, and a
+  document's details change only while a revision is prepared (DETAILS_NEED_A_REVISION, as by hand). **The file is the
+  project's**: the template carries the project's code on its hidden sheet `DELIOS` (with which field each column holds),
+  and a file made for another project is refused whole before a line is read (ANOTHER_PROJECT); a CSV may name its
+  project in a Project column, one project only. The template follows the app (`lib/documents/deliverable-workbook.ts`):
+  a sheet per deliverable type with the document form's fields (Forms & fields: left out, insisted on shaded, the
+  organization's own words, its own fields after), each list offering only the values of the set serving that type;
+  the empty template has no number column, "the register as it stands" has it first. Anyone of ours who may register
+  documents brings one in (owner: our people add and update documents as they wish); the backend checks each line as
+  registering or changing it by hand would. The columns AssetCode, ContractRef and ReceivedDate were dropped: the tag was
+  never kept, ContractRef said the same as PO, and the received date is never asked on registering.
+- **Settings lists are the project's** on its Import & export (owner): a workbook of the lists as this project reads
+  them, written through the project's lists (`PUT /projects/{id}/lists/{set}/values`): each list is the organization's
+  until the project changes it, by hand or by import, its first change making the project's own copy of that list; a
+  list the organization keeps the same on every project is left as it is, said once per sheet. The control function
+  brings it in (CONTROL_ONLY), as it changes the lists by hand.
+- **Every import on two pages** (owner: "not just deliverables, all of imports"): the team list, the distribution matrix
+  and the Settings lists go the deliverable list's way (`app/(app)/import/lines-import.tsx`, `lib/documents/forms-lines.ts`):
+  every line listed (New · Update with "was → now" · No change · Problem with why), its pencil correcting it in place, its
+  × taking it off the list, the register's tick-all and dock (change them together, take them off, tick the problems),
+  checked again at once; one act writes the whole list or nothing. The backend writes it whole: each line through the
+  very endpoint used by hand, in one transaction (`Platform/Batch.cs`; `POST /admin/projects/{id}/members/many`,
+  `/admin/functions/rules/many`, `/projects/{id}/lists/values/many`), the check being the same run undone (`dry`). The old
+  way (write the rows that pass, leave the others out, download the rows with problems) is gone: a line with a problem
+  is corrected or taken off. A person on the team list who has an account already is put on the project, or their
+  function and department changed. **A department is always chosen from the project's disciplines, never typed**
+  (owner): the team list's line offers them as a dropdown, a value that is none (by code or name) is a problem, and the
+  backend refuses it everywhere a membership is set (`MemberAsync`, DEPARTMENT_UNKNOWN; what someone already held stays
+  until changed). Each kind shows its register document (chosen in the register as the schedule's
+  lists) and "Bring in <number> rev X" reads its released revision's file into the same second page; what was brought in
+  last, and from where, is kept (`POST /lists/sources/{kind}/brought`), and a revision released since is on Home ("list
+  released", LIST_TO_BRING_IN) for whoever brings it in.
+- A person added is never given a password chosen by someone else: Team list (and `POST /api/admin/users` with `invite`)
   emails a link to choose their own (7 days, once); with email off, the link is handed back to whoever added them.
+  **An administrator may set someone's password** (owner: "as apps like this do"), on the organization's People, in the
+  person's opened panel ("Set a password", typed twice; `setPasswordAction`, `PUT /api/admin/users/{id}` `password`):
+  administrators only (ADMIN_ONLY), never one's own (OWN_PASSWORD: "Forgot password"), never a linked account; the person
+  is told at once by email and on Notifications, signed out everywhere, logged (PASSWORD_SET).
+- **A table's paging is in its bar, above the rows** (owner: "for all tables for consistency"): which rows of how many,
+  the steps, and Rows per page sit where the count was, beside the column and export icons (`components/table-paging.tsx`,
+  `TablePaging`, DataTable `paging`); no strip under the rows. The register, transmittals, reviews, the Schedule's table,
+  an action's documents, a transmittal's documents. The plan keeps its foot (its "Load more" adds bars at the end).
+- **Every register's card but the schedule's is 40 pixels taller than the plan's** (owner, after trying it on the
+  document register; `components/card-height.ts`).
 - Import & export follows the Schedule look; exports are grouped (the register, Assurance, the record).
 - Each import kind offers two downloads: the list as it stands now (the register, the team, the matrix, every Settings
   list) and an empty template. A register taken out and brought back corrects only what changed; what the number is
   built from may be carried as it is, never changed; a row that matches is counted, not listed.
 - Nothing is uploaded in Settings: Settings regulates. Lists come in on Import & export or the Schedule (Settings →
-  Controlled changes, an upload with approval, is removed).
+  Controlled changes, an upload with approval, is removed). **One exception** (owner): the organization's own lists come
+  in on the organization's Types & sets card (`/organization/settings/types`, "Bring the lists in from a workbook",
+  administrators; `LinesImport kind="org-sets"`, `POST /api/admin/lists/values/many`, the workbook `template-sets?level=organization`):
+  the same two pages, written whole or not at all, every project reading a list getting the change, a project's own copy
+  never touched.
+- Import & export (owner): the import (what is brought in, the file) and "Take a copy out" side by side; once a list is
+  checked, its lines take the page's whole width in a card of their own under them (`#import-results`, filled by
+  `InSlot`, `components/slot.tsx`); the setup Tip's steps
+  stand side by side as a path (`Tip row`); every import's lines in tabs by outcome (All · New · Update · No change ·
+  Problem), as the Schedule's check.
 - Every spreadsheet read (Schedule lists, Import & export) first passes `SheetGuard` (backend):
   it is what its name says (a workbook is a zip, a CSV is text), a workbook unpacks within 200 MB and 5000 parts and
   carries no macros, the virus check finds nothing (scanner down: refused, said so), a sheet spans at most 100,000
@@ -1137,11 +1739,22 @@ a screen only words it. A new rule goes in the backend, never in a page.
   `csvSafe` (frontend), `ReportEndpoints.Csv` (backend).
 - A tip is `Tip` (`components/ui.tsx`): dashed frame on the page's surface (light and dark), yellow bulb, "Tip", bold
   lead; an order that works is numbered `steps`, each a link to where it is done, the current one marked. Never a rule
-  or a warning. On Import & export it sits right of the title: the setup order, each step opening its import.
+  or a warning. On Import & export it sits under the title, its steps side by side (`row`): the setup order, each step
+  opening its import.
 
 ### Reports
 - No overview tab: a page repeating the tabs' figures was removed (the owner: no use to anyone). Every tab adds
   something of its own.
+- **A report is counted by hand, for everyone, as the checks are** (owner: "the refresh in assurance and reports is 100%
+  manual"; "mostly the control function… once a week per project"): counted the first time it is asked a way (its
+  window, how its chart is cut, its day), then kept in the database for everyone (`ReportCount`, `report_counts`, one per
+  report, way asked and audience: ours, or one other organization's own count), unchanged whatever happens on the
+  project, until anyone who reads it presses **Count again** (`POST /reports/{id}/count`, `CountAgainButton`), which counts
+  it for everybody. The plate says when and by whom ("counted 3 days ago by …; it stays so until counted again"). The
+  Excel download carries the same count. Words searched and a bar chosen narrow the kept count, never count again. The
+  screens keep it under `reports` only (no other change clears it). Each of our readers sees only the lines on what they
+  may open (`ReportEndpoints.ReadableAsync`: a document above their clearance, a transmittal they may not open, left
+  out; the control function and administrators read every line); the figures and the chart stay the project's counts.
 - DCIOM (governance measures, advice, health score) is on hold by the owner: build nothing of it until they come back
   to it; where the conversation stood is in `docs/gaps/dciom.md`. Where real projects differ from what the Standard
   assumes (plans move, obligations run both ways, waiting is never compliant…) is `docs/STANDARD-CHANGES.md` §58.
@@ -1151,7 +1764,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   legend then counts waits, never adds days), or "By reviewer".
 - **Progress by week** (`ProgressAsync`): each week (Monday to Sunday, this one so far) as the register stood at its end:
   registered, released (first time / a new revision), delivered on time or late, overdue (against the plan as it
-  stands now, only documents registered by then), reviews open by age, sent and received. Worked out from the dates
+  stood at each week's end: every move of a planned day kept by the database as it happens, `planned_date_changes`,
+  trigger `record_planned_date`; never moved since, read as it stands; only documents registered by then; on time and
+  late the same way), reviews open by age, sent and received. Worked out from the dates
   kept, so past weeks are there from day one; no snapshot is stored. The figures say how each moved since last week
   (`Figure.Change`, green or red by whether the move is good). The chart shows one of these at a time, chosen in its head.
 - **Who owes what** (`ExchangeAsync`): per other organization, what it owes us (asked and not sent, to correct, to
@@ -1205,6 +1820,10 @@ a screen only words it. A new rule goes in the backend, never in a page.
   that day". Nothing registered by then and nothing since: no chart, said so.
 
 ### Home
+- "N need you today" opens them (`/?view=today`, a tab "Today" beside All): decisions, releases, what came back, what is
+  owed, what must go out, the schedule (owner: "I see 3 need you today but I don't know which ones"; nothing listed under
+  the figure, "the tab is enough"). Every figure of Home's band opens what it counts (owner): all → every kind, the
+  longest wait → the kind it waits in, the fourth → Assurance or the Schedule.
 - Home's to-do lists everything the signed-in person has to do, whatever it
   is: reviews to decide or advise, releases, documents returned, things to send
   (asked for, left to them to say who, to dispatch), transmittals to check or
@@ -1249,6 +1868,11 @@ a screen only words it. A new rule goes in the backend, never in a page.
 ### Assets & tags
 - A tag is numbered by itself, as a package is: its scheme (Settings → Numbering, "Asset tags", `@ASSET`), by
   default P1001-TAG-0001; nobody types it, and it never changes. Tags made before keep theirs.
+- **Which documents describe an asset is said on the document type** (owner; Types & sets, on the type, "Describes
+  equipment — link it to an asset", `describesAsset`, also read by the requirements list): a tag's "Add or take out" opens
+  the register on those types (`docType=<a>,<b>`, the register's filter accepting several, offered as "Types that describe
+  equipment"), the tag page names them, and a linked document of another type reads "not a type that describes equipment".
+  None marked: every document is offered, and the page says where to mark them.
 - Assets & tags is a register, the Schedule's way: plate with counts, search and filters (area, system), the table
   (tag, name, area, system, unit, documents), "New tag" folded under it. Each tag has its own page, the action page's
   way: plate, "Documents that describe it" with "Add or take out" opening the register for it
@@ -1284,30 +1908,104 @@ a screen only words it. A new rule goes in the backend, never in a page.
   lifted hold or a reinstatement in Details beside the reason it answers.
   Taking something back never erases the reason it answers. No list in the
   Revisions tab repeats History or Reviews.
+- A document's recorded points (History, "as it stood") keep only what changed since the point before (owner: never the
+  whole document again on every change; `DocumentSnapshot.IsChange`, `SnapshotChanges`: fields changed, records of a list
+  by their id), a whole point every 20; read back whole, as before (`GET /documents/{id}/snapshots` rebuilds them).
+  Points kept whole before stay as they are.
 
 ### Schedule & actions
 - The schedule (SCH), disciplines per action (DPA) and requirements (RQL) are
   register documents, revised and released on the document page.
+- The schedule is read from a Primavera P6 export (.xer) too (owner: "extract data from it directly in addition to the
+  excel upload"; backend `Actions/XerReader.cs`): its TASK table, the planner's ID its `task_code`, start and finish as P6
+  shows them (actual, else early, else remaining, else planned), WBS summaries left out; no column is chosen (P6 names
+  its fields the same in every export); an export of several projects (a baseline among them) is read for the one chosen
+  on the upload ("Which P6 project is the schedule", offered once the .xer is picked, with each one's activities,
+  `app/(app)/actions/schedule-file.tsx`; ours by its code chosen first), the choice kept for the schedule's next
+  revisions (`ScheduleColumns.Sheet`), else the one whose P6 ID is our project's code, else refused naming them. The file is sent whole (server actions take 100 MB,
+  the upload endpoint 140 MB in base64). On upload
+  (`.xer` beside `.xlsx` and `.csv`, `SheetGuard` reading it as text) and on release (a revision's `.xer` first, as only it
+  carries the WBS and what happened, then `.xlsx`, then `.csv`). The disciplines and requirements lists stay Excel or CSV.
+  **The latest read stands** (owner: "the later is always the higher hand"): a list is read from its register document's
+  file (the native file of its released revision) or from a file uploaded on the Schedule, whichever came last. **The file
+  it was read from is downloadable as it is** (owner): an upload is kept exactly as it came (`ControlledVersion.ObjectKey`,
+  `lists/<project>/<version>/<name>`), a release read names its revision's file (`FileId`, `ScheduleImport.FileId`); a
+  download icon beside what is in force under each stage (`GET /schedule/lists/{kind}/source`, `…/source/file`, our people,
+  logged DOWNLOAD; screens `app/api/schedule/lists/[kind]/route.ts`).
+- **What the planner's file says is kept as the planner's word** (owner): each action keeps where it sits in the WBS
+  (`Activity.Wbs`, top down, and `WbsOrder`, P6's order; from an .xer) and whether its start and finish happened
+  (`StartAchieved` / `FinishAchieved`: P6's "A", "Achieved", from an .xer's actual dates or an Excel date written
+  "… A"). Achieved is the planner's word on the work, never ours on its documents ("achieved does not necessarily mean
+  our done"): it changes no state, readiness or "Went ahead?", and reads "A" beside the date (plan, table, action page,
+  "as the planner says"). Where the schedule has a WBS, the plan and the table follow the planner's order (sort `wbs`),
+  each WBS level a band across the plan (owner: the P6 preview's look, "cleaner"; its code, name and how many actions it
+  holds, folded open or shut), indented, the bars as they are. Each plan row: our number, the planner's ID beside it,
+  muted, the title under; the names take 16rem and the bars the rest (owner: "give enough space for the bars"). A
+  schedule read before its WBS was kept is read again by itself (owner: "users shouldn't have to do that"; no button):
+  each read keeps the version of the reading that made it (`ScheduleImport.ReadWith`, `ScheduleImporter.ReaderVersion`,
+  raised whenever the reading keeps more), and the released revision's .xer read by an older one is read again only
+  when needed (owner: "no full historical reprocessing merely because code was deployed"): the first time someone opens
+  that project's schedule (`AskCatchUpAsync` on `/plan` and `/plan/page`, message `schedule.catchup`, `CatchUpAsync` in
+  the worker), unless a list was uploaded since or it is no P6 export (then marked read, never asked again). Schedules
+  nobody opens are never read again. The plan says when no action has a WBS (an
+  Excel schedule carries none), and offers "Group by WBS" when sorted another way. The plan opens on two months around today, held inside the schedule's own span
+  (owner, "that applies as general": near or past its end, the window ends on the last action's day; near or before its
+  start, it starts on the first's), and "Show every date" draws the actions' own days only, never stretched to today; says "the schedule
+  runs <first month> → <last month>" on hover of the days drawn (owner: "date is repeated 3 times"; the head one line,
+  "today" its date on hover, the foot one line), and draws today only when inside; a read says its months too. The calendar tab
+  opens the same way (`calendarOpening`: today's month held inside the actions' first and last days). The Schedule's heading says the days around an action in force (a document needed N days before
+  its action's day, at risk from M), linking the Control room where they are set.
 - Their Excel is uploaded on Schedule & actions only by Document Control or a
   function with the Plan permission.
 - Released revision: "this file is rev X as released" is ticked by default;
   only when unticked is a reason obligatory. No released revision: a reason is
   obligatory. Always logged. Same on all three uploads.
+- **Each list's register document is chosen, never designated by the app** (owner): the control function ticks it in
+  the register, opened for it (`/documents?pick=src:<list>`, one tick, "Use it for the …"; backend `Actions/ListSources.cs`,
+  `list_sources`, `PUT /lists/sources/{kind}`, LIST_SOURCE_SET; one document holds one list, DOCUMENT_HOLDS_ANOTHER_LIST).
+  The same for the schedule's three lists and Import & export's four (deliverable list, team, matrix, Settings lists).
+  Until one is chosen, the app's old rule finds it (the schedule document named, else type SCH; DPA and RQL by their
+  type), said "found by its type, not chosen yet". **The latest stands**: a list comes from its register document's
+  released revision or from a file uploaded, whichever came last; whoever uploads vouches it matches the released
+  revision, or says why. **The control function or whoever holds Manage reads it again from the other source**
+  ("Read it again from the other source", always with why; `ListUploadRequest.From` DOCUMENT / UPLOAD, LIST_SOURCE_SWITCHED;
+  Manage sees the Schedule's list panels for this only, never to upload).
+- **Every schedule upload is checked before it is applied** (owner: every import shows what it would do first):
+  `POST /schedule/lists/check` reads the list exactly as applying it would, in a transaction always undone, and lists
+  every line (an action new, changed field by field "was → now", removed, or no change; for the requirements, each
+  discipline's need), with why the file cannot be read, in tabs by outcome (All · New · Changed · Removed · No change);
+  then "Apply it" sends the same file (`CheckedListForm`). **The schedule's lines are not corrected or taken off here**
+  (owner, kept: the planner's file is the planner's word, corrected in P6 or the file and sent again; actions are never
+  added or changed one by one in DELIOS). **The disciplines per action and the requirements are ours** (owner: "you
+  didn't do them like the others"): every row of the file is listed with what it does and what is wrong (backend
+  `ListSheetView`, rows mapped to the comparison, problems by the line the reading names; rows waiting while others have
+  problems read "Waits"), its pencil correcting it in place, its × taking it off, tick-all and the dock; checked again at
+  once; applied, the list as corrected is sent as a CSV (a row taken off left blank so every row keeps its line; the
+  requirements' inherited action and department written out on every row), kept as the file read, and why it differs
+  from the file is asked (no longer "as released"). Read again from the other source, it is applied as it is.
+- **Each list's source is a card of its own on the Schedule** (owner: "more visible"; `components/list-source-card.tsx`); on
+  Import & export it is one button in the explanation box (owner: "a card inside a card… it should be just a button";
+  `ListSourceButton`, on the box's left under "Checked first: you see every line; then you edit freely", a primary
+  "Choose its register document" while none is chosen), the box across the whole width and the same height whichever kind is chosen, its words short: its register document with its side colour (released emerald, nothing released amber,
+  none chosen grey), "found by its type, not chosen yet", what it was read from last, and "Choose it in the register".
+  The download of what a list was read from finds the released revision's file for reads kept before the file was named
+  (`LatestAsync`, by "<number> rev <value>"); with no file it says so in plain words, never as data.
 - Releasing a list document reads its Excel automatically (the schedule, when it
-  is the project's schedule; DPA and RQL by their type). The three uploads stay,
+  is the project's schedule; DPA and RQL by their type, or the document chosen for them). The three uploads stay,
   for no document, not released, no Excel attached, or a failed read. They are
   the stages Schedule, Disciplines and Requirements themselves, clickable (with
   an upload icon) only for whoever may upload; "open" is an underline, the fill
   stays "where it stands". Everyone else sees the plain row.
 - Actions get our own number (A00001…) and keep the planner's ID beside it.
+- The plan's foot counts what is drawn in garnet, of what there is ("50 of 159 actions in these days").
 - Actions with no date are always counted on the plan ("N with no date — in the
   table"), never silently left out of the window.
 - No "Responsible" on actions: the people concerned are those of the disciplines
   the action is tagged with, found through the distribution matrix (adjust the
   disciplines in the Excel before upload). Description shows only on the
   action's own page, not in the table.
-- "Went ahead?" (after the day): With documents / Missing documents / Postponed;
-  "not yet" before the day. Going ahead needs the concerned disciplines to
+- "Went ahead?" (after the day): With documents / Missing documents / Postponed, or "Went ahead" (nothing
+  listed: no document is listed for it, so nothing says what it had; never "With documents"); "not yet" before the day. Going ahead needs the concerned disciplines to
   confirm; confirming with any of that discipline's documents missing always
   needs an explanation (backend refuses otherwise).
 - Risk window: the requirements list may give each document "Risk window (days)";
@@ -1327,12 +2025,24 @@ a screen only words it. A new rule goes in the backend, never in a page.
   question in plain words ("Does Mechanical confirm going ahead with the action
   without it? Confirm, and say why"); then one row of buttons (Confirm, Notify,
   Request a document), an opened form taking the width under them.
-- Automatic notices (worker job, once each): at risk → each discipline still
-  short and not confirmed; day passed → the same. Confirmed disciplines and
-  postponed actions are not notified. A discipline still silent some working days
-  after the day (the Control room, Disciplines confirm, `ESCALATE_AFTER_DAYS`, 3 by
-  default) is escalated once: its people, Manage holders and Document Control
-  are all notified. Nothing marks the action "escalated"; the notice is the record.
+- **Automatic notices go at the project's notify hour, only on the days something was written down for it** (owner:
+  "09:00, and add it to settings as a choice"; "the changes are the ones who tell us"; `ActionNotices`, setting
+  `NOTIFY_AT`, 0–23 on the project's own clock, 09:00 by default; the Control room's "At risk" step, the organization's
+  Control room and Defaults for new projects, its switch `NOTIFY_AT` as every answer). Nothing sweeps the schedule and
+  nothing asks whether a day has something (owner: "most of it are states"): what changes an action (its documents,
+  confirmations, decisions), a review step, or how a project counts its days (settings, days off, the project) sends,
+  with its save, the notice days it moved (`NoticesMoved`, queue `delios.notices`); the worker writes them on the rows
+  (`Actions/NoticeDays.cs`: `Activity.NoticeOn`, the risk window opening, the day after the day, the day of notifying
+  again; `ReviewStep.WarnOn`) and each project's next moment (`notice_alarms`, no row-level security, its day at the
+  notify hour), and sleeps until the earliest of all (`NoticeAlarmBell` rings it when an earlier one is written). On
+  that moment it reads only what falls that day, then writes those days again. A day with nothing written runs
+  nothing. A failure tries again in an hour. Once each: at risk → each
+  discipline still short and not confirmed; still silent some working days after the day (the Control room, Disciplines
+  confirm, `ESCALATE_AFTER_DAYS`, 3 by default) → its people, Manage holders and the control function notified again;
+  a review step due today or the next working day (`ReviewWarnings.WarnProjectAsync`). Confirmed disciplines and
+  postponed actions are not notified. No notice for "all ready" or "day passed" (states, shown on the action and
+  Home). The automatic confirmation on the day is written in the first day's notices after it. A schedule read by an
+  older reading is read again when someone opens it, never on a clock.
 - Postponed: written with who decided and why; everyone concerned and whoever
   holds Plan are told; a Plan holder confirms it with what changes (a new
   schedule revision to follow); Document Control can take it back with a
@@ -1360,7 +2070,7 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (the disciplines saved) is the record. "Disciplines and documents" shows both as a
   list with one edit icon each, on the right.
 - A discipline whose documents are all released at their status, on an action
-  still ahead, is told so once, automatically ("nothing is asked of you").
+  still ahead, reads so on the action ("nothing is asked of you"); no notice is sent (owner: a state).
   A notice by hand says where the discipline stands: confirmed automatically, by
   hand (going ahead or not, with why), ready, short (still to come, at risk, day
   passed), or the action postponed.
@@ -1431,7 +2141,8 @@ a screen only words it. A new rule goes in the backend, never in a page.
   directly" (with the day) when a direct upload is newer, "Not released yet",
   or "None yet".
 - The plan is drawn as a planner's chart (owner): each month a column, every other one lightly shaded, a plain line
-  between them and between actions; each action's lead-in (from the day documents are needed) a lighter bar, its work
+  between them and between actions; each action's lead-in (from the day documents are needed: the earliest listed document's due day, else the project's
+  lead before its day, so it shows before any document is listed; backend `PlanAction.NeededFrom`) a lighter bar, its work
   (start → finish) a solid one in the same hue, a day of work with no finish a diamond; corners barely rounded.
 - An action whose dates the latest schedule read moved carries a "moved" stamp
   in the table and on the plan; its page says "Moved by rev C: was … , now …".
@@ -1442,19 +2153,231 @@ a screen only words it. A new rule goes in the backend, never in a page.
   of today, or the dates the user filtered on. Never the whole schedule.
 
 ### Backend — limits and steps that bit before
+- **A page never reads its lines one by one** (owner: "check every aspect for computing time, target the heaviest"): a
+  list's lines come from the backend in one read, worked out in a few queries whatever their number. A package's
+  documents with what its pages show (`GET /packages/{id}/lines`, `PackageService.LinesAsync`, `packageLines`), never
+  each document, its context and its reviews (it was three calls or more a document, and recorded every one as opened
+  by the reader); who a review still waits on comes with its row in the reviews list (`ReviewRow.WaitingOn`). A package
+  in no tree reads no other package (`PlaceAsync`, `SharingAsync`, `HandDownAsync` look once for packages under it). The
+  Packages list reads every package with what its view shows in a few reads (`PackageService.ListedAsync`, `Packages/PackageViews.cs`;
+  only a package in a tree reads its tree). Several documents a form starts with come in one read (`GET /documents/many?ids=`,
+  `backendDocuments`, not recorded as opened): New transmittal, Send for review, a supplier's sending, an action's links;
+  who may review is asked once per kind of document (`eligiblePeople`).
+  The same everywhere a page holds many of a thing: a document's reviews (`GET /reviews/many?ids=`, `backendReviews`), the
+  Schedule's list documents (`planLists`), Start a review (`preparingOf` / `preparingRevisions`), where a document got late
+  on an action (`LatenessAsync`, every need at once), the transmittal page's "one of ours?" (every loose number at once);
+  documents added to and taken off an action are one call, all or none, readiness worked out once
+  (`POST /activities/{id}/needs/many`). An action's page reads only its own action (`planActionRead`), never the whole plan.
+  Every check run on each opening has its index (whether someone opened a document in the last half hour: `audit_events`
+  actor · entity · at; the audit trail by act: action · id).
+- **A file the browser runs never imports `lib/client.ts`** (it is server-only: the production build fails, `npx tsc`
+  does not see it): types and plain helpers a client component needs live in a module of their own (the list sources'
+  in `lib/actions/list-source-kinds.ts`, re-exported by `list-sources.ts`). Before pushing a client component that
+  imports from `lib/`, check the chain.
+- **Kept answers, cleared by what changed** (owner: "huge misuse of Next.js built-in functions… whatever and whenever an
+  activity happens, it triggers whatever needed to be updated, partially"): a read that says what it depends on
+  (`api(path, { keep: { areas, doc?, fallback? } })`, `lib/core/kept.ts`) is kept by Next.js (`force-cache` with
+  `next.tags`), keyed by the person's session (Next keys a kept fetch by its headers: nobody reads another's kept
+  answer), labelled `p:<project>:<area>`, `area:<area>`, `doc:<id>` and `all`. Every save in the backend names the
+  labels it touched (`Platform/ScreenChanges.cs`, an EF Core save interceptor: a row's project, its own or through the
+  review, transmittal, package, action or revision it hangs from; an area by the part of the app it lives in; settings,
+  lists, people, functions and organizations clear `all`; audit, notifications, sessions and the outbox clear nothing):
+  on a screen's own act they come back on the answer (`X-Delios-Changed`) and `api()` clears them at once (`updateTag`,
+  read-your-own-writes); every change, once committed (`ScreenChangeCommits`, never before: a read in between would keep
+  the old answer), is also posted to the screens' route `/api/screens/changed` (`ScreensNotifier`,
+  gathered a quarter of a second; `Screens__Url`, the shared `SCREENS_SECRET`; Caddy refuses it from outside), which
+  clears them for every other session (`revalidateTag(tag, { expire: 0 })`). A write around the save (an `ExecuteUpdate`)
+  names its labels itself (the virus check finishing a file: its document). **Nothing expires** (owner: "the same old image unless something
+  changed"): a kept answer stands until a change names one of its labels; an answer the backend works out against today
+  (areas plan, reviews, transmittals: an action at risk, a step late, an answer overdue) is kept per day of its project
+  (`dayOf`, header `X-Delios-Day`, the project's own midnight); what a page words from a date needs none. Kept in Valkey,
+  not in the screens (owner: "copies in Redis"; `frontend/cache-handler.mjs`, `SCREENS_CACHE_REDIS`, database 1;
+  `cacheMaxMemorySize: 0`): it survives a restart and is shared by every screens server; each label keeps when it was
+  last named (`next:tags`), written by the screens' own acts and by the backend itself (`ScreensNotifier`,
+  `Screens__CacheDb`), so a change made while the screens are down is never missed; a screens server finding Valkey
+  again after losing it leaves every older answer unused (`next:epoch`). Valkey stays within 512 MB (`volatile-lru`: kept
+  answers, which carry an end of 30 days unused, go first; the labels' times and the access numbers carry none and stay).
+  Valkey unreachable: nothing is kept. Kept: every read a page draws from (owner: reports, cleared only by
+  Count again, the register,
+  documents, transmittals, packages, assets, reviews, Assurance and its plan, the Schedule and the calendar, Home and its
+  log, every Settings and organization page: a settings read keeps `areas: []`, cleared by `all`). Never kept, read fresh
+  every time: notifications and the account (saved without telling the screens), sign-in and security, what waits for a
+  result (a file's virus check, a sheet's check, an upload, a document's snapshots), the audit trail and a person's
+  activity, the notice log, and the Excel downloads. A failed sign-in counted or a lock clears nothing
+  (`ScreenChangeWatcher.Bookkeeping`); a row hanging from an action, wherever it is kept, also clears the plan. Opening a
+  document is still recorded once every half hour, sent after the page is drawn (`apiAfter`, Next.js `after`;
+  `POST /documents/{id}/viewed`). The search index is told which organization changed (`Search/SearchSignal.cs`, through
+  Redis), never asking every few seconds; it catches up once an hour, on its own index (documents tenant · updated · id).
+ (owner: "we do not want any surprises"): the Schedule carries up to 20,000
+  actions in one answer (`ScheduleEndpoints.MaxActions`; a P6 schedule runs to thousands) and past that says how many
+  there are in all (`PlanView.Total`, `planTotal`, a line above the Schedule); Assets & tags counts up to 20,000 tags
+  and draws the first 500, saying so; the Packages list reads up to 5,000. Never `Math.min(...list)` over a list that
+  grows (it overflows on thousands): fold it.
 - **Never hardcode a function or a job title** (owner): no "Document Control", "management", "project manager" in
   backend code, messages or comments. Functions are the organization's data. Say **the control function** (whoever
   holds CONTROL on the project) and **whoever holds Manage** (or another verb); a name shown is read from the data
   (the function's own name). The demo data's starter functions are data, not code.
+- **The person's own address reaches the API** (the sign-in limit counts per address): the site's Caddy sets it, the
+  screens pass it on, the API's Caddy trusts the private network (`trusted_proxies`), and the API walks back through
+  every hop of ours (`ForwardLimit = null`). Lost, every sign-in came from the screens' address: one limit for everybody.
+- An import reads what it compares once, never once a line, and keeps what it adds in hand: a query does not see what
+  this request added and has not saved (two lines naming one new tag made it twice, and the save failed).
+- **An act is done once, however often it is sent** (owner, "idempotency keys"): every `ActionForm` carries a `formKey`
+  made in the browser when the form is drawn, renewed once it went through (kept after a refusal, the backend having
+  kept nothing); server actions pass it on as `idempotencyKey: once(formData, "<act>")` (`lib/core/once.ts`, one name
+  per call when a form makes several), and the backend's `IdempotencyFilter` answers a second press or a retry with the
+  first answer. On: registering a document, starting a revision or a review, the review's answer, release, send-back,
+  sending to reviewers, the dispatch outside, withdrawing from review, the check on arrival, transmittals (composed,
+  received, issued, notified again), packages and a supplier's sendings, an action's decisions, postponement
+  confirmations, requests' check / confirm / answer, notices, asking someone to join. The same key on a different
+  request is refused in plain words (IDEMPOTENCY_KEY_REUSED: "This was already sent from this form…"). A new act that
+  must never happen twice gets the filter and the key.
+- **Limits per person** (owner, "rate limiting"; `PlatformSetup`, `AddRateLimiter`): beside the doors (sign-in,
+  password reset, email links, two-step codes, the organization's own sign-in), every call is counted per person signed in
+  (else per address), 600 a minute (`RateLimits:PerMinute`), and the heavy ones tighter, 120 a minute
+  (`RateLimits:HeavyPerMinute`, policy `heavy`): a file's bytes and every preview of it, exports, list files, uploads
+  asked, search (the quick find). Work never feels them; a runaway script or a stolen session is slowed at once (the
+  download watch still tells the administrators). A refusal is said in plain words (429, TOO_MANY_REQUESTS, "Too many
+  requests in a short time. Wait a moment and try again.", with Retry-After). Tests raise both (`DeliosFactory`). A new
+  call that sends files or many lines takes `.RequireRateLimiting("heavy")`.
+- **What the code scan (Semgrep) found is answered in the file** (owner, 27 Oct 2026): base images and CI actions are
+  pinned (Node at a patched release, `node:22.23.4-alpine`; each GitHub action at its commit, its version beside it),
+  every container runs as a user of its own or says why not beside it (`# nosemgrep: <rule>` with the reason: Postgres
+  and ClamAV start as root only to drop to their own user), and the assistant's skills are left out of the scan
+  (`.semgrepignore`).
+- **Known weaknesses in our packages are checked by themselves** (owner, "security checks"; `.github/workflows/security.yml`):
+  on every push touching the server or the screens' packages, and once a week (a weakness may be published about a
+  package already in use; the build's clock, not the app's). A high or critical one stops the check; moderate and low
+  ones are listed in its log. A weak package brought by another is raised under `overrides` in `package.json` when its
+  newer version still works for it (today `uuid` ^11.1.1 under `exceljs`, whose own fix would have downgraded it; drop the
+  override once `exceljs` asks for a safe `uuid` itself). Today: none found.
+- **Two saves of one thing at once** (owner): the second is refused in plain words, never as a fault of ours
+  (`Platform/ChangedMeanwhile.cs`: a version stamp changed since it was read, or Postgres stopping one of two clashing
+  transactions, 40001 / 40P01 → 409 CHANGED_MEANWHILE, "Someone else changed this at the same moment… send it again").
+  Nothing of it was kept (its transaction rolled back), so sending it again is safe.
+- **A sandbox** (owner: "a test production… fake companies, fake files… explaining to people this is a sandbox"):
+  `SANDBOX=true` in .env makes the site a testing area anyone may sign up to with made-up data: a band on every page
+  (`components/sandbox-band.tsx`, fixed at the window's foot, taking no room, letting clicks through), the full note on
+  sign-in and sign-up (`SandboxNotice`, in `AuthShell`), every email "[Sandbox] …" with a first line saying so
+  (`Email:Sandbox`). Production mode otherwise (no demo data).
+- **Who runs it** (owner: "build the production version and leave it ready to be used or sold… the owner role" an option,
+  not a must): `HOSTED` in .env (`Platform:Hosted`, `Platform/Hosting.cs`; screens `lib/core/hosting.ts`, the same
+  value). true (the default): DELIOS runs it for many organizations, trials, plans, invoices, renewals, "reads only".
+  false: an organization or a partner runs its own copy: no trial (`Trials.StartAsync`), never reads only
+  (`Subscriptions.Effective`), no reminders, plans, payments or invoices (NOT_HOSTED), the console without Plans &
+  payments nor an organization's plan and billing, the organization's card "Terms & support" (terms and support
+  access only). Guides: `docs/SANDBOX.md` (free test site), `docs/HANDOVER.md` (production, any developer).
+- **Every error reaches us** (owner, "error tracking"): the backend's own, and the screens' (`instrumentation.ts`
+  `onRequestError` on their server; in the browser the error pages, `app/global-error.tsx` and `ErrorWatch` in the root
+  layout, through `/api/client-errors`), written in the API's log by `POST /api/screens/errors` (`Platform/ScreenErrors.cs`,
+  open signed out, 30 a minute per caller) and sent on to Sentry once `SENTRY_DSN` is set in .env. Only the message,
+  where in the code, the page's address without its query and the account's id: never a name, an email or what a page
+  showed. A fault drawn on the server is reported once (the error page sees its digest and leaves it).
 - An outbox routing key is at most 16 characters; `ControlledVersion.VersionLabel` too.
 - Migrations: `dotnet ef migrations add Name -p app -s app -o Platform/Migrations`
   (from `backend/`). Each new table gets `RowLevelSecurity.Enable(migrationBuilder, "<table>")`.
 - Row-level security is forced, even for the table owner: a data backfill loops over
   `tenants` and sets `set_config('app.tenant_id', …)` for each.
 - Organization defaults are added through `DemoSeed.Ensure*SetupAsync`, which adds only what is missing.
+- **Only our own people keep the organization** (security review, docs/APP-DECISIONS.md §79): an account of another
+  organization never counts as administrator, control function or Manage holder for `/api/admin` and `/api/organization`
+  (`Keepers.OursAsync`); a function holding Configure is given by an administrator only (ADMIN_ONLY,
+  `Keepers.FunctionConfiguresAsync`: memberships and join requests); only an administrator sets someone's password (the person told, signed out).
+  Write a permission check with brackets around every `||` inside a rule's condition.
 - **Clearance is the one confidentiality rule** (owner): a document above a function's clearance is read by its people
   only if named on it, its registrar, or sent it; every function, the control function too. No level is "restricted"
   any more (the `restricted` prop is not read). The document page shows "Who may read this" when some function on the
   project has a lower clearance (`aboveSomeClearance`, backend).
 - A function's clearance limits what its holders read (Standard §46); visibility always goes
   through `DocumentQueries.Visible`.
+- **What another organization reads of a document** (security review, Standard-changes §82): `DocumentQueries.Visible` says
+  which documents; `Documents/OutsideReading.cs` says what of them. Of one of ours, only the revisions a transmittal
+  carried to them (`SentRevisions`), and of those only the files of their newest submission, never a draft replaced
+  while it was prepared, nor what was said of it (`OutsideReading.AsSent`): the document's view, `/documents/many`,
+  `/revisions/{id}`, every file and preview (`ReadableAsync`), and its context (no review, history only of those revisions, only the transmittals they may open,
+  only supplier packages shared with them; none of its recorded points, "as it stood", which hold every revision). Of their own (originator), everything. A review only of their own document
+  once decided, or with a step they answer (`OutsideReading.Reviews`: the review, `/reviews/many`, the reviews list);
+  hand-overs are ours only. The register and `/documents` read one of ours at its newest revision sent to them, no
+  verdict, decider or packages (`Register.RowsAsync(…, access)`). `/api/parties` gives them only their own organization.
+  Settings (`Settings.cs` `Readers`): `/api/settings` whole for an administrator and whoever keeps a project
+  (`Keepers.KeepsAProjectAsync`: control function, Manage), what applies on projects for the rest of ours (never
+  `PROJECT_DEFAULTS`, `LIBERTY…`, the new projects' place), only the words (`STATE_NAME:`, `SET:`, `DATE_FORMAT`, the
+  stamp's) for another organization's people, the same on a project's settings; `/api/liberty` none to them. The organization's controlled lists
+  (`/api/controlled`, no project) are an administrator's only. Any new reader of a document's parts goes through these.
+- **Answers the same for everyone of the organization** (owner: "shared reference data", "one read instead of 200"):
+  read once in each backend process for all who ask, until how the organization works changes
+  (`AccessVersions.SharedAsync`, under the same number as access): the values of lists (`/api/values`, read on every
+  page) and which set serves which type (`/api/values/serving`), per project lists. Never an answer that depends on
+  who asks (most Settings pages say who may change them: theirs stay per person).
+- **Who you are and what you may do is kept until it changes** (owner: "literally static once done"): each project's
+  access (`ProjectAccessLoader`) and `/api/me` are kept in each process's memory under the organization's number in Redis
+  (`Platform/AccessVersions.cs`, `access:v:<tenant>`), raised once committed by every change that clears `all` on the
+  screens (people, functions, rights, projects, organizations, settings, lists; `ScreenChangeWatcher`): a raised number
+  leaves every older copy unused. Every request still reads the number (one Redis read, never the database) and the
+  backend still checks every act. Never longer than 15 minutes (`KeptAtMost`), a safety net should a number fail to be
+  raised; Redis unreachable, nothing is kept. Sign-out and a session ended are checked by the session itself, never kept.
+- **The notices job reads once a pass** (`ActionNotices.ProjectAsync`): what was already sent about the actions it
+  reads, and the days off, once per project, never one query per action and discipline; it reads only the actions whose
+  notice day has come (`NoticeOn`), never the whole schedule.
+- **Packages move on a change, never on a reading** (owner): a document registered or changed in what a rule reads, a tag
+  linked, a package made, moved, given a rule or ended sends `PackagesMoved` with its save; the worker takes in what
+  rules admit and hands documents down trees (`PackageService.RestateAsync`). Opening a list or a package changes
+  nothing; a list reads its trees once (`TreeFactsAsync`, `PlaceOf`). Supplier documents in none of their packages are
+  filed by hand only, **Fill the package** on a supplier's package (`POST /packages/{id}/fill`, PACKAGE_FILLED).
+- **Files are never read** (owner: "never ever read the files, ever ever, forbidden forever, unless I get back on that
+  with a client's request"): search is a document's number and title only; text extraction and OCR cannot be switched
+  on (`ExtractionModes.Forbidden`, CONTENT_NOT_READ). The extraction code stays, locked off (owner: "it may be helpful
+  for future AI integration").
+- **Files are kept encrypted** (owner, security review: "those files should be PROTECTED"): every file is sealed by the
+  app before it is stored (`Documents/FileCipher.cs`: a key of its own per file, kept in its header under the
+  installation's key, AES-256-GCM, pieces of 64 KiB each checked, the last marked), so the store, its disk and every
+  copy hold only sealed bytes; the key lives apart (`Storage:EncryptionKey`, FILES_KEY in .env, made by deploy/init-env;
+  lost, nothing can be read again: kept also in a password manager or a safe). `FileStorage` seals on keeping an upload
+  (in from its waiting place, through a temporary file), on putting what the app makes (stamped copies, previews,
+  lists, replies by email) and opens on every read; a copy in the store keeps its seal; files kept before stay as they
+  were and are read so. **Nobody downloads from the store** (no signed download link any more): the bytes come through
+  `GET /files/{id}/download`, which checks who asks (`ReadableAsync`) and opens them, and the screens pass them on
+  (`app/api/files/[id]/route.ts`). Uploads still go to the waiting place by a signed link, through the screens' server.
+- **Each key holds no more than it needs** (owner, security review): the app's storage key reads, adds and removes files
+  and never administers the store (no bucket made or removed); the copier's only reads (`STORAGE_COPIER_KEY` /
+  `STORAGE_COPIER_SECRET`, SeaweedFS identities in compose). The app holds no key to the backup copy.
+- **Converters on a closed network** (owner, security review): the DWG reader, LibreOffice (Gotenberg) and Tika sit on
+  the compose network `converters` (internal: no way out), reached only by the API and the worker, never reaching the
+  database or the store. The files' store and their copier are pinned to a version (`seaweedfs:4.48@…`,
+  `rclone:1.75.2@…`), changed only when we choose.
+- **Downloads are prepared in the background** (owner: "people should expect big files to take time"): every link or
+  GET form to an export, a list or a report's Excel is fetched by `components/downloads.tsx` while the person works, a
+  tray saying so; from code, `startDownload(href, label)`. Exports match their lines in one pass (lookups, never a scan
+  per row).
+- **Kept until it changes, on the backend too**: the lists (`Catalog.LoadAsync`, not while the request changes a list),
+  which lists a request reads and how dates read (`PlatformSetup`), counts of acts (`Audit/AuditCounts.cs`, topped up
+  with what was written since), when people were last seen (`people_seen`, written by `audit_seen` with the act).
+- **Recorded as it happens, never swept for** (owner: "record the thing using the trigger that happens anyway"): a fact
+  derived from many rows is written by the act that makes it true and read back, never worked out by going back over
+  records on a page's reading. Where the app writes rows carrying a version stamp (documents, revisions, transmittals,
+  reviews, packages), the database records the fact in a table of its own (`Platform/Recorded.cs`): `revision_facts`
+  (a transmittal other than a review's first carried it: released with none is "not sent yet"; trigger
+  `record_carried` on `transmittal_items`), `transmittal_facts` (first answered or followed by someone else; trigger
+  `record_answered` on `transmittals`), `document_facts` (released and at what, the newest revision's verdict and
+  whether it waits to be released, its last file, when it first went out: what the register filters and sorts on,
+  worked out again for that one document by `refresh_document_facts` whenever its revisions, reviews, files, transmittal
+  lines or newest revision change), `values_used` (how many documents carry each discipline and document type, counted
+  up and down by `count_values_used`: the register's filters, `GET /register/used`). Read only by the app; `rebuild-recorded` (backend command, by hand) writes them
+  again from what exists. Opening and downloading are only said (who, what, when): no history point is taken for them.
+  **The Schedule reads where each action stands from what it keeps** (`Activity.NeedCount`, `MetCount`, `RiskFrom`,
+  `LastMetAt`, written by `Readiness.RestateAsync` when one of its documents or needs changes, or the days around an
+  action do; `ScheduleEndpoints.RecordedFacts`): its needs are read only for the actions shown (`RowsAsync`,
+  `InFullAsync`). Another organization's actions are still read with their needs, narrowed to what it sees.
+- **Nothing runs on a clock to find out what happened** (owner: "we do not send spies… we go outside and inform that it
+  just happened"): the outbox's relay runs in every process and sleeps until an act of that process, once committed with
+  a message, rings it (`OutboxWake`; on start it sends what was left waiting, a failure tries again after 5 seconds);
+  the checks run only when someone runs them (`CheckScheduler.RequestAsync`, no daily job); each stored file is copied to the
+  second place as it is stored, by the copier, never the app (owner, security review): `FileStorage` keeping, putting or
+  copying a file says its key on a Valkey list (`Documents/FileBackup.cs`, `files:to-copy`), the copier waits on it
+  (`deploy/file-backup`, its own image: rclone with Valkey's client, both pinned) and copies that one file, never
+  overwriting, never deleting, putting it back on the list when a copy fails; its full comparison runs once a
+  week as the safety net (`FILE_BACKUP_EVERY` 604800; alert past 8 days); notices fall on days written
+  by what changed them (above). What stays timed is a fallback, never the way to learn of a change: access kept 15 minutes at
+  most, the search index's hourly catch-up (OpenSearch only, off by default), a page re-reading itself
+  while a file it waits for is checked (three minutes at most). A state is never kept fresh by a
+  clock: it is read when looked at, or written by the act that changes it.

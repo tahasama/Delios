@@ -29,7 +29,7 @@ public sealed class TransmittalLogTests(Infrastructure infrastructure) : IClassF
         var reviewId = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"{p}/reviews/{reviewId}/answer", new { });
         await Flow.PostAsync(approver, $"{p}/reviews/{reviewId}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", new { });
+        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", await Flow.ReleaseBodyAsync(controller));
         var draft = await Flow.RevisionAsync(engineer, (await Api.RegisterAsync(engineer, released.Project, Api.Drawing("Not released yet"))).GetProperty("id").GetGuid());
 
         var addressees = await GetAsync(controller, $"{p}/addressees");
@@ -37,10 +37,10 @@ public sealed class TransmittalLogTests(Infrastructure infrastructure) : IClassF
         var client = addressees.GetProperty("parties").EnumerateArray().Single(x => x.GetProperty("code").GetString() == "NWU").GetProperty("id").GetGuid();
 
         var (notReleased, notReleasedBody) = await Flow.PostAsync(controller, $"{p}/transmittals",
-            new { revisionIds = new[] { released.Revision, draft.Revision }, userIds = new[] { victor }, reason = "INFORMATION" });
+            new { revisionIds = new[] { released.Revision, draft.Revision }, userIds = new[] { victor }, reason = "INFORMATION", subject = "For your files" });
         Assert.Equal((HttpStatusCode.Conflict, "NOT_RELEASED"), (notReleased, Flow.Code(notReleasedBody)));
         var (engineerTries, engineerBody) = await Flow.PostAsync(engineer, $"{p}/transmittals",
-            new { revisionIds = new[] { released.Revision }, userIds = new[] { victor }, reason = "INFORMATION" });
+            new { revisionIds = new[] { released.Revision }, userIds = new[] { victor }, reason = "INFORMATION", subject = "For your files" });
         Assert.Equal(HttpStatusCode.Forbidden, engineerTries);
 
         var (sentStatus, sent) = await Flow.PostAsync(controller, $"{p}/transmittals", new
@@ -49,6 +49,7 @@ public sealed class TransmittalLogTests(Infrastructure infrastructure) : IClassF
             userIds = new[] { victor },
             partyIds = new[] { client },
             reason = "INFORMATION",
+            subject = "For your files",
             message = "For your files.",
         });
         Assert.True(sentStatus == HttpStatusCode.OK, sent.ToString());

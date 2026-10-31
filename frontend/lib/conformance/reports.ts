@@ -29,6 +29,8 @@ export type Report = {
   rows: Cell[][];
   empty: string;
   countedAt: string;
+  /** Who counted it last: a report stays as it was counted, for everyone, until someone counts it again. */
+  countedBy: string | null;
   /** Where the same rows are worked on, as a list with its own filters. */
   workedOn?: { label: string; href: string };
 };
@@ -84,7 +86,7 @@ type BackendReport = {
   id: ReportId; title: string; question: string; audience: string;
   figures: { label: string; value: string; tone: Tone | null; change: string | null; changeTone: "good" | "bad" | null }[];
   chart: Chart;
-  columns: string[]; rows: BackendCell[][]; empty: string; countedAt: string;
+  columns: string[]; rows: BackendCell[][]; empty: string; countedAt: string; countedBy?: string | null;
 };
 
 /** Where the same rows are worked on, with their own filters. */
@@ -128,7 +130,7 @@ export function reportQuery(id: ReportId, q: ReportQuery): Record<string, string
 
 /** One report, counted now and narrowed as asked (the backend narrows the rows; the chart stays whole). */
 export async function buildReport(t: { projectId: string }, id: ReportId, q: ReportQuery = {}): Promise<Report> {
-  const report = await api<BackendReport>(projectPath(t, `/reports/${id}`), { query: reportQuery(id, q) });
+  const report = await api<BackendReport>(projectPath(t, `/reports/${id}`), { keep: { areas: ["docs", "reviews", "transmittals", "packages", "plan", "checks"] }, query: reportQuery(id, q) });
   return {
     id: report.id,
     title: report.title,
@@ -142,6 +144,7 @@ export async function buildReport(t: { projectId: string }, id: ReportId, q: Rep
     rows: report.rows.map((row) => row.map(cellOf)),
     empty: report.empty,
     countedAt: report.countedAt,
+    countedBy: report.countedBy ?? null,
     workedOn: WORKED_ON[id],
   };
 }

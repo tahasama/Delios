@@ -14,7 +14,6 @@ namespace Delios.Host.Actions;
 
 /// <summary>Request body for PUT /schedule: which document is the schedule, how to read its columns, and the default lead and risk-window days. Null fields keep their current value.</summary>
 /// <summary>Body of setting the days around an action: how long before its day a document is needed, and from when it is at risk.</summary>
-public sealed record ScheduleDaysRequest(int? DefaultLeadDays = null, int? RiskWindowDays = null);
 
 public sealed record SourceRequest(Guid DocumentId, ScheduleColumns? Columns = null, int? DefaultLeadDays = null, int? RiskWindowDays = null);
 
@@ -23,6 +22,9 @@ public sealed record SourceRequest(Guid DocumentId, ScheduleColumns? Columns = n
 public sealed record NeedRequest(
     Guid DocumentId, string? Purpose, string[]? RequiredStatuses = null, string? Anchor = null, int? OffsetDays = null,
     DateOnly? FixedDate = null, string? Department = null, Guid? TransmittalId = null, bool FromList = false);
+
+/// <summary>Several needs added and taken off an action at once (the register opened for it): all or none.</summary>
+public sealed record NeedsChange(NeedRequest[]? Add, Guid[]? Remove);
 
 /// <summary>The control function's answer to a request to add a document to an action, when nothing is added: why.</summary>
 public sealed record ActivityAskAnswer(string? Note);
@@ -123,29 +125,34 @@ public static partial class ScheduleEndpoints
                 ? await next(context)
                 : Problems.Forbidden("SCHEDULE_NOT_ALLOWED", "You do not read the schedule on this project."));
         everyone.MapGet("/plan", PlanAsync);
+        everyone.MapGet("/plan/page", PlanPageAsync);
+        everyone.MapGet("/plan/progress", PlanProgressAsync);
         everyone.MapGet("/plan/{code}", PlanActionAsync);
         everyone.MapGet("/activities/{activityId:guid}/lateness", LatenessAsync);
         project.MapGet("/schedule", SourceAsync);
         project.MapPut("/schedule", SetSourceAsync);
-        project.MapPut("/schedule/days", SetDaysAsync);
+        project.MapPut("/schedule/days", ScheduleDays.ProjectPutAsync);
         project.MapPost("/schedule/import", ImportAsync);
         project.MapGet("/activities", ActivitiesAsync);
+        project.MapGet("/activities/short", ShortAsync);
         project.MapGet("/activities/{activityId:guid}", ActivityAsync);
         project.MapPost("/activities/{activityId:guid}/needs", AddNeedAsync);
+        project.MapPost("/activities/{activityId:guid}/needs/many", ChangeNeedsAsync);
         project.MapDelete("/activities/{activityId:guid}/needs/{needId:guid}", RemoveNeedAsync);
         project.MapPost("/activities/{activityId:guid}/needs/{needId:guid}/waive", WaiveAsync);
         project.MapDelete("/activities/{activityId:guid}/needs/{needId:guid}/waive", UnwaiveAsync);
-        project.MapPost("/activities/{activityId:guid}/decisions", DecideAsync);
+        // Confirmations, postponements, notices and answers are never made twice by a second press or a retry.
+        project.MapPost("/activities/{activityId:guid}/decisions", DecideAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapGet("/notices", NoticesAsync);
         project.MapGet("/activities-work", ActionWorkAsync);
-        project.MapPost("/notices", SendNoticeAsync);
-        project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/confirm", ConfirmPostponementAsync);
+        project.MapPost("/notices", SendNoticeAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/confirm", ConfirmPostponementAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/activities/{activityId:guid}/decisions/{decisionId:guid}/reverse", ReverseDecisionAsync);
-        project.MapPost("/transmittals/{transmittalId:guid}/activity-answer", AnswerActivityAskAsync);
+        project.MapPost("/transmittals/{transmittalId:guid}/activity-answer", AnswerActivityAskAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapGet("/activities/{activityId:guid}/requests", ActivityRequestsAsync);
         project.MapPost("/activities/{activityId:guid}/departments/own", AddOwnDepartmentAsync);
-        project.MapPost("/transmittals/{transmittalId:guid}/activity-check", CheckActivityAskAsync);
-        project.MapPost("/transmittals/{transmittalId:guid}/activity-confirm", ConfirmActivityAskAsync);
+        project.MapPost("/transmittals/{transmittalId:guid}/activity-check", CheckActivityAskAsync).AddEndpointFilter<IdempotencyFilter>();
+        project.MapPost("/transmittals/{transmittalId:guid}/activity-confirm", ConfirmActivityAskAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/transmittals/{transmittalId:guid}/activity-refuse", RefuseActivityAskAsync);
     }
 }

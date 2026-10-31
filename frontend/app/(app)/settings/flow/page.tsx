@@ -11,14 +11,15 @@ import { holdersOf } from "@/lib/core/permissions";
 import { scheduleSource } from "@/lib/actions/api";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
-import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER } from "@/lib/actions/escalation";
+import { ESCALATE_AFTER_KEY, DEFAULT_ESCALATE_AFTER, NOTIFY_AT_KEY, DEFAULT_NOTIFY_AT, NOTIFY_AT_TITLE } from "@/lib/actions/escalation";
 import { SceneDeck, type Flow, type Scene } from "./scene-deck";
 import { STAGES, EXTRA, flowsFor, type Extra } from "./stages";
 import { StepPanel } from "./step-panel";
 import { IntakeChoice } from "./intake-choice";
 import { projectIntake } from "@/lib/packages/api";
 import { Choice } from "./choice";
-import { liberty } from "@/lib/organization/liberty";
+import { FollowOrganizationDays } from "./follow-days";
+import { projectLiberty } from "@/lib/organization/liberty";
 import { setRoomAnswerAction, setScheduleDaysAction } from "@/lib/settings/forms-how-it-works";
 import { setRouteVerdictsAction } from "@/lib/reviews/forms";
 import { adminFunctions, projectNumbering, partiesWithAnswers, routesForEditor } from "@/lib/settings/api-admin";
@@ -73,9 +74,9 @@ export default async function ControlRoomPage() {
       people: { id: string; name: string; partyId: string | null; function: string; control: boolean; actsAsControl: boolean }[];
       organizations: { id: string; kind: string }[];
       mayNameControl: boolean;
-    }>(projectPath(ctx, "/people/directory")).catch(() => null),
-    liberty(),
-    api<{ key: string; title: string; verdicts: { code: string; status: string }[] }[]>("/api/admin/verdict-lists").catch(() => null),
+    }>(projectPath(ctx, "/people/directory"), { keep: { areas: [] } }).catch(() => null),
+    projectLiberty(ctx.projectId),
+    api<{ key: string; title: string; verdicts: { code: string; status: string }[] }[]>("/api/admin/verdict-lists", { keep: { areas: [] } }).catch(() => null),
     // What is kept about people's activity is the organization's (What is kept), read here only.
     orgSettings().catch(() => null),
     optOutsOf(ctx.projectId).then((all) => all.length).catch(() => null),
@@ -94,8 +95,7 @@ export default async function ControlRoomPage() {
   const actRow = new Map(settings.rows.map((row) => [row.activity.key, row]));
   const setTitle = new Map(sets.map((one) => [one.key, one.title]));
   const inUse = (key: string) => values.filter((one) => one.setKey === key && one.status === "ACTIVE").length;
-  const lead = schedule.source?.defaultLeadDays ?? DEFAULT_LEAD_DAYS;
-  const risk = schedule.source?.riskWindowDays ?? DEFAULT_RISK_DAYS;
+  const { lead, risk } = schedule.days;
   const escalate = answers.get(ESCALATE_AFTER_KEY) ?? String(DEFAULT_ESCALATE_AFTER);
   const receives = functions?.reduce((n, f) => n + f.rules.filter((r) => r.verbs.includes("RECEIVE")).length, 0) ?? null;
   const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
@@ -113,6 +113,16 @@ export default async function ControlRoomPage() {
   const fixedItems = new Set(switches.filter((one) => one.area === "Control room" && !one.free).map((one) => one.key));
   const isFixed = (key: string) => fixedItems.has(roomItemOf(key) ?? key);
   const riskFixed = switches.some((one) => one.key === "RISK_WINDOW" && !one.free);
+  const leadFixed = switches.some((one) => one.key === "LEAD_DAYS" && !one.free);
+  /** Whose a number of days is: the project's own, with the organization's beside it, or the organization's. */
+  const daysMark = (own: boolean, organization: number) => (
+    <span className="text-[11px] font-normal text-slate-500">{own ? `changed here · the organization's: ${organization}` : "the organization's"}</span>
+  );
+  // An answer the organization keeps fixed on every other project, free here by an exception: its reason.
+  const exceptionOf = (key: string) => {
+    const item = switches.find((one) => one.key === (roomItemOf(key) ?? key));
+    return item?.exceptHere ? item.except.find((e) => e.projectId === ctx.projectId)?.reason : undefined;
+  };
   const clean = (label: string) => label.replace(/ — recommended$/, "").replace(/ \(recommended\)$/, "");
   const names = holders.map((one) => one.name);
 
@@ -145,11 +155,11 @@ export default async function ControlRoomPage() {
     }
     if (key === "TRACKING") {
       // The organization's choice for every project; changed on its Settings by an administrator.
-      const where = isAdmin(me) ? "/organization/settings/tracking" : undefined;
+      const where = isAdmin(me) ? "/organization/settings/security#tracking" : undefined;
       if (!organization) return fact(key, "What is kept about people's activity", "The organization's choice");
       return [
         fact("track-acts", "What people do to documents", "Always kept"),
-        fact("track-reading", "Opening a document, downloading a file", organization.get("TRACK_READING") === "OFF" ? "Not kept" : "Kept", where),
+        fact("track-reading", "Opening a document", organization.get("TRACK_READING") === "OFF" ? "Not kept" : "Kept", where),
         fact("track-signins", "Sign-ins, on a person's activity", organization.get("TRACK_SIGN_INS") === "ON" ? "Shown" : "Kept for security, not shown", where),
       ];
     }
@@ -175,7 +185,7 @@ export default async function ControlRoomPage() {
         ...(SKIPPABLE[key] ? [{ value: "OFF", label: "Left out", text: SKIPPABLE[key].off }] : []),
       ];
       const value = row?.off ? "OFF" : row?.controlDoes ? "CONTROL" : "SELF";
-      return <Choice key={key} title={act.title} options={options} value={value} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
+      return <Choice key={key} title={act.title} options={options} value={value} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} exception={exceptionOf(key)} />;
     }
     if (key.startsWith("CONFIRM:")) {
       const of = key.slice(8);
@@ -183,25 +193,32 @@ export default async function ControlRoomPage() {
         { value: "ON", label: "Yes", text: CONFIRMABLE[of] ?? "" },
         { value: "OFF", label: "No", text: of === PEOPLE_KEY ? "Nobody confirms: they are on the project at once." : "Nobody confirms: the control function applies it." },
       ];
-      return <Choice key={key} title="Confirmed by whoever holds Manage" options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
+      return <Choice key={key} title="Confirmed by whoever holds Manage" options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} exception={exceptionOf(key)} />;
     }
     if (key === "DAYS") {
-      const noSchedule = !schedule.source;
+      const days = schedule.days;
       return [
         <Choice key="lead" title="A document is needed before the action's day" value={String(lead)} unit="days" min={0} max={365} field="leadDays"
-          action={setScheduleDaysAction} hidden={{ riskDays: String(risk) }} readOnly={readOnly || noSchedule} />,
+          action={setScheduleDaysAction} hidden={{ riskDays: String(risk) }} readOnly={readOnly} fixed={leadFixed} exception={exceptionOf("LEAD_DAYS")}
+          mark={daysMark(days.ownLead, days.organizationLead)} />,
         <Choice key="risk" title="The action is at risk from" value={String(risk)} unit="days before" min={0} max={365} field="riskDays"
-          action={setScheduleDaysAction} hidden={{ leadDays: String(lead) }} readOnly={readOnly || noSchedule} fixed={riskFixed} />,
+          action={setScheduleDaysAction} hidden={{ leadDays: String(lead) }} readOnly={readOnly} fixed={riskFixed} exception={exceptionOf("RISK_WINDOW")}
+          mark={daysMark(days.ownRisk, days.organizationRisk)} />,
+        ...(!readOnly && (days.ownLead || days.ownRisk) ? [<FollowOrganizationDays key="follow" lead={days.organizationLead} risk={days.organizationRisk} />] : []),
       ];
+    }
+    if (key === "NOTIFY") {
+      return <Choice key={key} title={NOTIFY_AT_TITLE} value={answers.get(NOTIFY_AT_KEY) ?? String(DEFAULT_NOTIFY_AT)} unit=":00, the project's time" min={0} max={23}
+        action={setRoomAnswerAction} hidden={{ key: NOTIFY_AT_KEY }} readOnly={readOnly} fixed={isFixed(NOTIFY_AT_KEY)} exception={exceptionOf(NOTIFY_AT_KEY)} />;
     }
     if (key === "ESCALATE") {
       return <Choice key={key} title="A discipline still silent after the day is told again, with whoever holds Manage and the control function, after" value={escalate} unit="working days" min={1} max={60}
-        action={setRoomAnswerAction} hidden={{ key: ESCALATE_AFTER_KEY }} readOnly={readOnly} fixed={isFixed(ESCALATE_AFTER_KEY)} />;
+        action={setRoomAnswerAction} hidden={{ key: ESCALATE_AFTER_KEY }} readOnly={readOnly} fixed={isFixed(ESCALATE_AFTER_KEY)} exception={exceptionOf(ESCALATE_AFTER_KEY)} />;
     }
     const policy = POLICIES.find((one) => one.key === key);
     if (!policy) return null;
     const options = policy.options.map((one) => ({ value: one.value, label: clean(one.label), text: one.text }));
-    return <Choice key={key} title={policy.title} options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} />;
+    return <Choice key={key} title={policy.title} options={options} value={effectiveAnswer(key, answers.get(key))} action={setRoomAnswerAction} hidden={{ key }} readOnly={readOnly} fixed={isFixed(key)} exception={exceptionOf(key)} />;
   };
 
   const extraCount: Record<Extra, string> = {
@@ -219,7 +236,7 @@ export default async function ControlRoomPage() {
     "form:TRANSMITTAL": "what it asks", "form:PACKAGE": "what it asks", "form:ASSET": "what it asks",
     "form:PARTY": "the organization's", "form:PROJECT": "the organization's",
     assets: "what each tag describes",
-    checks: checksOff === null ? "what is checked every day" : checksOff ? `${checksOff} switched off, with why` : "none switched off",
+    checks: checksOff === null ? "what is checked when someone runs the checks" : checksOff ? `${checksOff} switched off, with why` : "none switched off",
     project: "what it is, our role, its dates",
   };
 

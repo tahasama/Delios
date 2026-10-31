@@ -38,7 +38,7 @@ public sealed class GovernanceTests(Infrastructure infrastructure) : IClassFixtu
     }
 
     [Fact]
-    public async Task Document_Control_withdraws_an_approval_and_a_comment_is_reclassified()
+    public async Task Document_Control_withdraws_an_approval()
     {
         await using var app = await TestApp.StartAsync(infrastructure);
         app.StartWorker();
@@ -49,19 +49,10 @@ public sealed class GovernanceTests(Infrastructure infrastructure) : IClassFixtu
         var path = $"/api/projects/{p.Project}";
         var (_, review) = await Flow.PostAsync(engineer, $"{path}/revisions/{p.Revision}/reviews", new { });
         var id = review.GetProperty("id").GetGuid();
-        var (_, comment) = await Flow.PostAsync(engineer, $"{path}/reviews/{id}/comments", new { text = "Datum missing.", @class = "NON_BLOCKING" });
-
-        // The author forces it to stop the release; what it was is kept.
-        var (re, reBody) = await Flow.PostAsync(engineer, $"{path}/reviews/{id}/comments/{comment.GetProperty("id")}/reclassify", new { blocking = true, note = "It changes the levels." });
-        Assert.True(re == HttpStatusCode.NoContent, reBody.ToString());
-        var after = (await engineer.GetFromJsonAsync<JsonElement>($"{path}/reviews/{id}")).GetProperty("comments")[0];
-        Assert.True(after.GetProperty("blocking").GetBoolean());
-        Assert.False(after.GetProperty("originalBlocking").GetBoolean());
-        await Flow.PostAsync(engineer, $"{path}/reviews/{id}/comments/{comment.GetProperty("id")}/close", new { resolution = "Added." });
-
+        // A comment's weight is never changed after it is written (owner: no reclassify), so only the approval is withdrawn here.
         await Flow.PostAsync(engineer, $"{path}/reviews/{id}/answer", new { });
         await Flow.PostAsync(approver, $"{path}/reviews/{id}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"{path}/reviews/{id}/release", new { });
+        await Flow.PostAsync(controller, $"{path}/reviews/{id}/release", await Flow.ReleaseBodyAsync(controller));
 
         var (notTheirs, _) = await Flow.PostAsync(engineer, $"{path}/revisions/{p.Revision}/withdraw-approval", new { reason = "x" });
         Assert.Equal(HttpStatusCode.Forbidden, notTheirs);
@@ -79,10 +70,12 @@ public sealed class GovernanceTests(Infrastructure infrastructure) : IClassFixtu
         var controller = await app.SignedInAsync("controller@demo.local");
         var project = await Api.ProjectIdAsync(controller);
         var p = $"/api/projects/{project}";
-        var (_, asset) = await Flow.PostAsync(controller, $"{p}/assets", new { code = "P-101", name = "Duty pump" });
+        // A tag is numbered by itself (its scheme): the test reads the number it was given.
+        var (_, asset) = await Flow.PostAsync(controller, $"{p}/assets", new { name = "Duty pump" });
+        var tag = asset.GetProperty("code").GetString();
         var tagged = (await Api.RegisterAsync(engineer, project, Api.Drawing("Pump house GA"))).GetProperty("id").GetGuid();
         await Api.RegisterAsync(engineer, project, Api.Drawing("Gate house GA"));
-        await Flow.PostAsync(engineer, $"{p}/documents/{tagged}/assets", new { assetCode = "P-101" });
+        await Flow.PostAsync(engineer, $"{p}/documents/{tagged}/assets", new { assetCode = tag });
         var people = await controller.GetFromJsonAsync<JsonElement>($"{p}/addressees");
         Guid Person(string name) => people.GetProperty("people").EnumerateArray().Single(x => x.GetProperty("name").GetString() == name).GetProperty("id").GetGuid();
         var ours = people.GetProperty("ours").GetProperty("id").GetGuid();

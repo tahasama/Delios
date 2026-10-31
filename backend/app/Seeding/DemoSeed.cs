@@ -11,8 +11,26 @@ namespace Delios.Host.Seeding;
 /// A demo tenant to try the system with: people in each function on one project.
 /// Every password is <c>demo1234</c>. Development only.
 /// </summary>
-public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.TenantContext tenantContext, ILogger<DemoSeed> logger)
+public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.TenantContext tenantContext, ILogger<DemoSeed> logger,
+    Microsoft.AspNetCore.Identity.IPasswordHasher<Operators.Operator> operatorHasher)
 {
+    /// <summary>The demo's account in the DELIOS console (console@demo.local, the demo password), to try it out.</summary>
+    public const string ConsoleEmail = "console@demo.local";
+
+    /// <summary>
+    /// A console account for the demo (owner: "console do not allow regular admin@demo.local"): the console never takes an
+    /// organization's account, so the demo brings one of its own. Demo data only: seed-demo refuses Production unless forced.
+    /// </summary>
+    private async Task EnsureConsoleAccountAsync(CancellationToken cancellationToken)
+    {
+        var normalized = ConsoleEmail.ToUpperInvariant();
+        if (await db.Set<Operators.Operator>().AnyAsync(o => o.NormalizedEmail == normalized, cancellationToken)) return;
+        var who = new Operators.Operator { Email = ConsoleEmail, NormalizedEmail = normalized, Name = "Demo console", PasswordHash = "" };
+        who.PasswordHash = operatorHasher.HashPassword(who, Password);
+        db.Add(who);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     /// <summary>The short name of the demo tenant.</summary>
     public const string Slug = "demo";
     /// <summary>The password of every demo user.</summary>
@@ -24,6 +42,7 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
     /// </summary>
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
+        await EnsureConsoleAccountAsync(cancellationToken);
         if (await db.Tenants.SingleOrDefaultAsync(t => t.Slug == Slug, cancellationToken) is { } existing)
         {
             // A demo created by an earlier version gains what it lacks; nothing it has is touched.
@@ -182,6 +201,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             db.Projects.Add(project);
             db.Memberships.Add(new Membership { TenantId = t, ProjectId = project.Id, UserId = admin.Id, FunctionId = control.Id });
         }
+        // Trying DELIOS starts now, for as long as the DELIOS team set (Operators/Trials.cs).
+        await Operators.Trials.StartAsync(db, t, NodaTime.SystemClock.Instance.GetCurrentInstant(), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await Organizations.Registry.EnsureTenantAsync(db, t, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -196,8 +217,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         Set(ValueSets.Disciplines,
             ("CI", "Civil", null), ("EL", "Electrical", null), ("ME", "Mechanical", null), ("PR", "Process", null),
             ("IN", "Instrumentation", null), ("ST", "Structural", null), ("GE", "General", null), ("PM", "Project Management", null));
+        // Each type recommends a criticality; whoever creates a document may choose another.
         Set(ValueSets.DocumentTypes,
-            // Each type recommends a criticality; whoever creates a document may choose another.
             ("DWG", "Drawing", new { criticality = "B" }), ("CAL", "Calculation", new { criticality = "A" }),
             ("SPC", "Specification", new { criticality = "B" }), ("DAS", "Datasheet", new { criticality = "B" }),
             ("PRO", "Procedure", new { criticality = "B" }), ("REP", "Report", new { criticality = "C" }), ("LST", "List", new { criticality = "C" }));
@@ -309,16 +330,16 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         db.NumberingSchemes.Add(reviewScheme);
         db.SchemeRoutings.Add(new SchemeRouting { TenantId = t, DeliverableType = RecordKinds.Review, SchemeId = reviewScheme.Id });
 
+        // IFU: work does not go ahead on it; it goes back to its author (or supplier) to update for the next revision.
         Set(ReviewSets.Statuses,
             ("IFI", "Issued for information", new { executes = false }),
             ("IFR", "Issued for review", new { executes = false }),
             ("IFA", "Issued for approval", new { executes = false }),
-            // Work does not go ahead on it: it goes back to its author (or supplier) to update for the next revision.
             ("IFU", "Issued for update", new { executes = false, update = true }),
             ("IFC", "Issued for construction", new { executes = true }),
             ("AFC", "Approved for construction", new { executes = true }));
+        // Each verdict says one of the four meanings (accepted, with comments, rejected, for information); the names are ours.
         Set(ReviewSets.Verdicts,
-            // Each says one of the four meanings (accepted, with comments, rejected, for information); the names are ours.
             ("C1", "Accepted", new { proceed = true, resubmit = false, information = false }),
             ("C2", "Accepted with comments", new { proceed = true, resubmit = true, information = false }),
             ("C3", "Rejected: revise and resubmit", new { proceed = false, resubmit = true, information = false }),
@@ -343,8 +364,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             Description = "The discipline engineer checks; the approver decides.",
             Steps =
             [
-                new() { Title = "Discipline check", FunctionCode = "ENG", Days = 5 },
-                new() { Title = "Approval", FunctionCode = "APP", Days = 3, GrantsStatuses = ["IFI", "IFR", "IFA", "IFU", "IFC", "AFC"] },
+                new() { Title = "Discipline check", FunctionCode = "ENG", Days = 5, Mode = StepModes.Any },
+                new() { Title = "Approval", FunctionCode = "APP", Days = 3, Mode = StepModes.Any, GrantsStatuses = ["IFI", "IFR", "IFA", "IFU", "IFC", "AFC"] },
             ],
         });
         return true;
@@ -417,8 +438,8 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
             Patterns = [new() { Criticality = "A" }],
             Steps =
             [
-                new() { Title = "Discipline check", FunctionCode = "ENG", Days = 5 },
-                new() { Title = "Client approval", PartyCode = "NWU", Reason = "APPROVAL", Days = 10, GrantsStatuses = ["AFC"] },
+                new() { Title = "Discipline check", FunctionCode = "ENG", Days = 5, Mode = StepModes.Any },
+                new() { Title = "Client approval", PartyCode = "NWU", Mode = StepModes.Any, Reason = "APPROVAL", Days = 10, GrantsStatuses = ["AFC"] },
             ],
         });
     }
@@ -723,7 +744,11 @@ public sealed class DemoSeed(DeliosDbContext db, TenantSetup setup, Tenancy.Tena
         foreach (var later in have.Where(v => v.Sort > after)) later.Sort++;
         db.ValueEntries.Add(new ValueEntry
         {
-            TenantId = t, SetKey = ReviewSets.Statuses, Code = "IFU", Label = "Issued for update", Sort = after + 1,
+            TenantId = t,
+            SetKey = ReviewSets.Statuses,
+            Code = "IFU",
+            Label = "Issued for update",
+            Sort = after + 1,
             Props = JsonSerializer.SerializeToDocument(new { executes = false, update = true }),
         });
         foreach (var step in (await db.ReviewRoutes.ToListAsync(cancellationToken)).SelectMany(r => r.Steps).Where(s => s.GrantsStatuses.Contains("IFR")))

@@ -32,12 +32,17 @@ const brandLight = {
   line: "#d7dde6", "line-strong": "#bcc6d4",
   brand: "#1e3a5f", "brand-hover": "#2d5480", "brand-strong": "#17324d", "brand-ink": "#1e3a5f",
   "brand-line": "#3b6389", link: "#2b5b80", tint: "#e4eef7", "tint-soft": "#f2f6fb",
+  // The brand's gold: the first act on a dark bar (Send for review, Send to…) and the menu's marks. The same in both
+  // themes, as it only ever sits on the dark chrome. "gold-ink" is the words on a gold button: a warm dark brown on
+  // light (owner: the navy read "cold" there), the navy on dark, where it looked right.
+  gold: "#d9a441", "gold-bright": "#e4b654", "gold-ink": "#3d2806",
 };
 const brandDark = {
   surface: BG, canvas: "#0a0f17", "canvas-deep": "#070b12",
   line: "#273245", "line-strong": "#37455c",
   brand: "#2f5e8e", "brand-hover": "#3a70a6", "brand-strong": "#28527d", "brand-ink": "#c6d9ec",
   "brand-line": "#5f8fbf", link: "#8db8de", tint: "#1a2a3c", "tint-soft": "#152131",
+  gold: "#d9a441", "gold-bright": "#e4b654", "gold-ink": "#102a43",
 };
 const decl = (o, prefix = "--color-") => Object.entries(o).map(([k, v]) => `  ${prefix}${k}: ${v};`).join("\n");
 

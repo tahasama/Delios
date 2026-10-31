@@ -142,20 +142,20 @@ public static class TransmittalEndpoints
         {
             var (sent, problem) = await s.IssueDraftAsync(ProjectAccessFilter.Of(h), transmittalId, c);
             return problem ?? Results.Ok(sent.Select(t => new { t.Id, t.Number, t.ToName }));
-        });
+        }).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/transmittals/{transmittalId:guid}/notify-again",
             async (Guid transmittalId, NotifyAgainRequest r, HttpContext h, TransmittalService s, CancellationToken c) =>
             {
                 var (t, problem) = await s.NotifyAgainAsync(ProjectAccessFilter.Of(h), transmittalId, r.RecipientIds, c);
                 return problem ?? Results.Ok(View(t!, await s.ItemFilesAsync(t!, c)));
-            });
+            }).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/transmittals/{transmittalId:guid}/recipients/{recipientId:guid}/dispatch", DispatchAsync);
         project.MapPost("/transmittals/{transmittalId:guid}/evidence", EvidenceAsync);
         project.MapPost("/incoming/uploads", async (LooseUploadRequest r, HttpContext h, IncomingService s, CancellationToken c) =>
         {
             var (ticket, problem) = await s.UploadAsync(ProjectAccessFilter.Of(h), r, c);
             return problem ?? Results.Ok(ticket);
-        });
+        }).RequireRateLimiting("heavy");
         project.MapPost("/transmittals/incoming", SendIncomingAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapPost("/transmittals/{transmittalId:guid}/attachments",
             async (Guid transmittalId, AttachFilesRequest r, HttpContext h, IncomingService s, TransmittalService t, CancellationToken c) =>
@@ -247,7 +247,8 @@ public static class TransmittalEndpoints
 
     /// <summary><c>POST /transmittals</c>: The control function issues released revisions directly; one transmittal per destination.</summary>
     private static async Task<IResult> ComposeAsync(
-        TransmittalService.ComposeRequest request, HttpContext http, TransmittalService transmittals, CancellationToken cancellationToken)
+        TransmittalService.ComposeRequest request, HttpContext http, TransmittalService transmittals, Packages.PackageService packages,
+        DeliosDbContext db, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
         if (request.Draft)
@@ -256,7 +257,18 @@ public static class TransmittalEndpoints
             return refused ?? Results.Ok(new[] { new { draft!.Id, Number = "Draft", ToName = draft.Subject } });
         }
         if (await transmittals.FormProblemAsync(access, request, cancellationToken) is { } formProblem) return formProblem;
+        // For a package: exactly what delivering it carries (none added, none taken out); sent, it is delivered.
+        if (request.PackageId is { } packageId
+            && await packages.SendableAsync(access, packageId, request.RevisionIds ?? [], cancellationToken) is { } packageProblem) return packageProblem;
+        // A package delivered to another organization is theirs to read, never to change or return (owner): what they send
+        // following its delivery asks by words alone, an information transmittal.
+        if (!access.IsInternal && (request.RevisionIds?.Length ?? 0) > 0 && (request.FollowsId ?? request.InReplyToId) is { } follows
+            && await db.Transmittals.AsNoTracking().AnyAsync(t => t.Id == follows && t.PackageId != null && t.ToPartyId == access.PartyId
+                && db.Packages.Any(p => p.Id == t.PackageId && p.DeliveredTo.Contains(t.ToPartyId!.Value)), cancellationToken))
+            return Problems.Invalid("DELIVERED_READ_ONLY",
+                "A package delivered to you is not returned or changed: ask what you need by an information transmittal, with no document.");
         var (sent, problem) = await transmittals.ComposeAsync(access, request, cancellationToken);
+        if (problem is null && request.PackageId is { } delivered) await packages.DeliveredAsync(access, delivered, sent, cancellationToken);
         return problem ?? Results.Ok(sent.Select(t => new { t.Id, t.Number, t.ToName }));
     }
 

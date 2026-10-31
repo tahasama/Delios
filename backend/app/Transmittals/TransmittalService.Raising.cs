@@ -84,7 +84,8 @@ public sealed partial class TransmittalService
         if (due is null && responseRequired
             && catalog.Prop(TransmittalSets.Reasons, raise.Reason, "responseDays") is { ValueKind: JsonValueKind.Number } days)
         {
-            due = WorkingCalendar.AddWorkingDays(WorkingCalendar.Today(clock, project.TimeZone), days.GetInt32(), project.WeekendDays);
+            due = WorkingCalendar.AddWorkingDays(WorkingCalendar.Today(clock, project.TimeZone), days.GetInt32(), project.WeekendDays,
+                await WorkingCalendar.HolidaysAsync(db, project, cancellationToken));
         }
 
         var transmittal = new Transmittal

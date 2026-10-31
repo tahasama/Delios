@@ -1,4 +1,5 @@
 import { Select } from "@/components/select";
+import { FilePreview } from "@/components/file-preview";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { notFound } from "next/navigation";
@@ -18,7 +19,8 @@ import { rewindRouteAction } from "@/lib/reviews/forms";
 import { requestChoices, authorOf, issuePolicy, decisionLetsItOut } from "@/lib/transmittals/issue-requests";
 import { DelegatePanel, DelegateForm, type DelegationRow } from "./delegate-panel";
 import { AnswerCard } from "./answer-card";
-import { delegateCandidates, delegationFlag, delegationsOn } from "@/lib/reviews/delegation";
+import { delegateCandidates, delegationFlag, delegationsOn, handOverForOthers, stepPeopleOptions } from "@/lib/reviews/delegation";
+import { CopyInForm } from "./change-people";
 import { controlDoes, actIsOff, matrixBinds } from "@/lib/settings/control-activities";
 import { RequestIssue } from "@/app/(app)/documents/[id]/request-issue";
 import { Timeline } from "@/components/timeline";
@@ -32,13 +34,18 @@ import { issueToReviewAction, withdrawRevisionAction, removeCommentAction, editC
 import { openCopy } from "@/lib/documents/copies";
 import { cookies } from "next/headers";
 import { PREF, paneWidth } from "@/lib/core/preferences";
+import { readersOn } from "@/lib/settings/viewers";
+import { FilesChecking } from "@/components/files-checking";
+import { stampPlan } from "@/lib/reviews/api";
+import { StampPlacer } from "./stamp-placer";
+import { checking } from "@/lib/documents/checking";
 import { ResizablePane } from "@/components/resizable-pane";
 import { ArrowLeft, Bell, ExternalLink, FileText, Pencil } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReviewCyclePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ open?: string }> }) {
-  // A link in the title opens one of the forms below the document: ?open=withdraw or ?open=notify.
+  // A link in the title opens one of the forms below the document: ?open=withdraw, notify or copy.
   const opened = (await searchParams).open ?? null;
   const ctx = await requireScope();
   const { user } = ctx;
@@ -88,6 +95,8 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   const doc = rev.document;
   // The PDF people open: the stamped copy once its review released (or returned) it, else the PDF as sent.
   const rendition = openCopy(rev.files);
+  const newestSubmission = Math.max(0, ...rev.files.map((f) => f.submission ?? 0));
+  const source = rev.files.find((f) => f.kind === "NATIVE" && (f.submission ?? 0) === newestSubmission && f.status === "CLEAN") ?? null;
   // The route this step belongs to, if any. Progress draws the whole of it, so
   // there is no separate picture of the route on this page.
   const run = await reviewRun(ctx, cycle.id).catch(() => null);
@@ -122,6 +131,11 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   // — is what may be handed over; the matrix recommends who (or decides, if
   // the project makes it the only rule).
   const handVerb: "REVIEW" | "APPROVE" = cycle.binding ? "APPROVE" : "REVIEW";
+  // The control function and whoever holds Manage change who answers in flow (the backend says whether this person may).
+  const [forOthers, peopleOptions] = cycle.status === "OPEN" && !cycle.withdrawn
+    ? await Promise.all([handOverForOthers(ctx, cycle.id), stepPeopleOptions(ctx, cycle.id)])
+    : [null, null];
+  const mayInform = Boolean(peopleOptions?.open && peopleOptions.people?.length);
   const [handCandidates, handThroughControl, handRows, handOff, handStrict] = await Promise.all([
     assigned && cycle.status === "OPEN" ? delegateCandidates(ctx, { target: doc, verb: handVerb, fromUserId: user.id }) : Promise.resolve([]),
     controlDoes(ctx, "DELEGATE"),
@@ -129,6 +143,10 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
     actIsOff(ctx, "DELEGATE"),
     matrixBinds(ctx),
   ]);
+  // The hand-over is the answer card's Delegate: the person's own seat, and, for the control function and whoever holds
+  // Manage, anyone's on the open step not answered yet (the backend lists them).
+  const othersSeats = forOthers?.seats ?? [];
+  const ownSeat = assigned && !handRows.some((row) => row.fromUserId === user.id && (row.status === "ACTIVE" || row.status === "OPEN"));
   const handOvers: DelegationRow[] = await Promise.all(handRows.map(async (row) => ({
     id: row.id,
     fromName: row.fromUser.name,
@@ -244,6 +262,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   // own release form, as from the document page (owner: "release do not appear in the review detail").
   const waitsRelease = controller && rev.state === "NOT_RELEASED";
   const letsItOut = waitsRelease ? await decisionLetsItOut(ctx, rev.id) : false;
+  const placing = waitsRelease ? await stampPlan(ctx, cycle.id) : null;
 
   const outcomeCheckRun = cycle.outcome ? null : await preflight("RECORD_OUTCOME", { cycleId: cycle.id });
   const outcomeChecks = outcomeCheckRun ? { ...outcomeCheckRun, warnings: outcomeCheckRun.warnings.filter((one) => one.id !== "OUT-SET") } : null;
@@ -269,7 +288,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
                 </span></>
               ) : null}
               {" · "}
-              {cycle.outcome ? `${verdictLabel(cycle.outcome)} — ${cycle.outcomeByName ?? ""}` : `${standing} · ${cycle.assignments.filter((assignment) => assignment.completedAt).length} of ${cycle.assignments.length} answered`}
+              {cycle.outcome ? `${verdictLabel(cycle.outcome)} — ${cycle.outcomeByName ?? ""}` : `${standing} · ${cycle.assignments.filter((assignment) => assignment.completedAt).length} of ${cycle.assignments.length} answered${cycle.assignments.length > 1 && here >= 0 ? (run?.steps[here]?.mode === "ALL" ? ", it waits for every one" : ", the first answer moves it on") : ""}`}
               {/* The status the revision carries. Whether it is in force is the
                   revision's state, not the status. */}
               {rev.statusCode ? <> &middot; <span className="font-mono font-semibold text-slate-700">{rev.statusCode}</span></> : null}
@@ -292,6 +311,7 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             {/* Each opens its folded section under the document. */}
             {mayWithdraw ? <Link href="?open=withdraw#withdraw" className="text-xs font-semibold text-red-700 hover:underline">Withdraw?</Link> : null}
             {notify ? <Link href="?open=notify#notify" className="text-xs font-semibold text-link hover:underline">Notify?</Link> : null}
+            {mayInform ? <Link href="?open=copy#copy" className="text-xs font-semibold text-link hover:underline">Add in copy?</Link> : null}
           </div>
         </div>
       </section>
@@ -306,6 +326,17 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             </p>
             <Link href={`/documents/${doc.id}#step-release`} data-on="true" className="ask">{letsItOut ? `Release rev ${rev.value}` : `Send rev ${rev.value} back`}</Link>
           </div>
+        </section>
+      ) : null}
+
+      {/* Where the stamp goes, before it is made: the app's clear spot, or put elsewhere by the control function. */}
+      {waitsRelease && placing?.open && placing.fileId && placing.page && placing.stamp && placing.found ? (
+        <section className="register register-sheet register-sheet-open" aria-labelledby="stamp-place-head">
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+            <h2 id="stamp-place-head" className="stencil mr-1 text-slate-500">Where the stamp goes</h2>
+            <span className="text-[11px] text-slate-500">on rev {rev.value}&rsquo;s PDF, once it is {letsItOut ? "released" : "sent back"}</span>
+          </div>
+          <StampPlacer reviewId={cycle.id} plan={{ ...placing, fileId: placing.fileId, page: placing.page, stamp: placing.stamp, found: placing.found }} />
         </section>
       ) : null}
 
@@ -325,7 +356,10 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
               <span className="text-[11px] text-slate-400">{rendition ? `revision ${rev.value}, as the reviewers see it` : "no PDF to review yet"}</span>
               {rendition ? <a href={`/api/files/${rendition.id}`} target="_blank" className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-link hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Open PDF</a> : null}
             </div>
-            {rendition ? <iframe src={`/api/files/${rendition.id}`} title={`${doc.docNumber} revision ${rev.value}`} className="block h-160 w-full bg-canvas"/> : <div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>}
+            {/* The same Preview as the document's: the PDF, and the source file where the page can show it. */}
+            {checking(rev.files).length ? <FilesChecking names={checking(rev.files)} /> : null}
+            <FilePreview pdf={rendition} source={source} title={`${doc.docNumber} revision ${rev.value}`} height="h-160" admin={isAdmin(user)} readers={await readersOn(ctx)} viewingNote={(await cookies()).get(PREF.viewingNote)?.value !== "0"} pdfDark={(await cookies()).get(PREF.pdfDark)?.value === "1"}
+              empty={<div className="grid h-48 place-items-center bg-canvas/50 p-6 text-center"><div><FileText className="mx-auto h-8 w-8 text-slate-400"/><p className="mt-2 text-sm font-semibold text-slate-700">No PDF attached</p><Link href={`/documents/${doc.id}#workflow`} className="mt-2 inline-block text-xs font-semibold text-link hover:underline">Attach it on the document →</Link></div></div>} />
           </section>
 
           {/* Whoever started the review, or the control function (and above), takes the revision back out of it to change
@@ -363,6 +397,20 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
                   history={notify.history}
                   bare
                 />
+              </div>
+            </details>
+          ) : null}
+
+
+
+          {mayInform ? (
+            <details id="copy" open={opened === "copy"} className="register register-sheet register-sheet-open scroll-mt-24">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
+                <span className="text-[13px] text-slate-600">Someone left out? Add them in copy: kept informed of what comes of it, never asked to review</span>
+                <span className="ask">Add in copy</span>
+              </summary>
+              <div className="border-t border-line px-5 py-4 sm:px-6">
+                <CopyInForm cycleId={cycle.id} people={peopleOptions!} />
               </div>
             </details>
           ) : null}
@@ -485,13 +533,16 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
             <DelegatePanel rows={handOvers} controller={controller} off={handOff} />
           ) : null}
 
+
+
           {/* A withdrawn review is closed: nothing more is answered on it. */}
           {cycle.withdrawn ? null : (
           <AnswerCard
             title={cycle.binding ? "Binding verdict" : "Advice"}
             answerLabel={cycle.binding ? "Give my verdict" : "Give my advice"}
-            delegate={cycle.status === "OPEN" && assigned && !cycle.outcome && !handOff && !handOvers.some((row) => row.status === "ACTIVE" || row.status === "OPEN")
-              ? <DelegateForm cycleId={cycle.id} verb={handVerb} candidates={handCandidates} throughControl={handThroughControl} strict={handStrict} />
+            delegate={cycle.status === "OPEN" && !cycle.outcome && !handOff && (ownSeat || othersSeats.length)
+              ? <DelegateForm cycleId={cycle.id} verb={handVerb} candidates={forOthers?.candidates.length ? forOthers.candidates : handCandidates}
+                  throughControl={handThroughControl && !controller} strict={handStrict} seats={othersSeats} self={ownSeat ? user.id : null} />
               : null}
           >
             {cycle.outcome ? <div><p className="text-sm font-semibold text-slate-900">{cycle.binding ? <><span className="font-mono">{cycle.outcome}</span> · {verdictLabel(cycle.outcome)}</> : verdictLabel(cycle.outcome)}</p><p className="mt-1 text-xs leading-5 text-slate-500">{verdictBlurb(cycle.outcome)}</p>              {/* What the verdict said. A verdict that reads "Comments" and

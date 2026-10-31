@@ -3,7 +3,8 @@ import { Select } from "@/components/select";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, Pin, PinOff, Search, X } from "lucide-react";
+import { TablePaging } from "@/components/table-paging";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { useCardHeight } from "@/components/card-height";
 
@@ -404,6 +405,7 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link, toget
       <div className={cardHeight ? "flex min-h-0 flex-1 flex-col" : undefined}>
         {shown.length ? (
           <DataTable
+            paging={<TablePaging from={ordered.length ? (here - 1) * perPage + 1 : 0} to={Math.min(here * perPage, ordered.length)} total={ordered.length} extra={ticked.length ? `${ticked.length} ticked` : undefined} page={here} pages={pages} onPage={setPage} perPage={perPage} sizes={SIZES} onSize={(size) => { setPerPage(size); setPage(1); }} />}
             id="action-needed"
             className="rounded-none border-0 shadow-none"
             defaultHidden={["Approved by", "Sending for review", "Route steps", "Released & issued", "Released", "Issued"]}
@@ -486,25 +488,6 @@ export function NeededTable({ rows, chips, plate, exportHref, empty, link, toget
         )}
       </div>
 
-      <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
-        <p className="font-mono text-[11px] tabular-nums text-slate-500">
-          {ordered.length ? `${(here - 1) * perPage + 1}–${Math.min(here * perPage, ordered.length)}` : 0}
-          <span className="ml-1.5 font-sans text-slate-500">of {ordered.length}{ticked.length ? `, ${ticked.length} ticked` : ""}</span>
-        </p>
-        {pages > 1 ? (
-          <span className="flex items-center gap-2">
-            <PageStep onClick={() => setPage(here - 1)} disabled={here === 1} label="Previous page"><ChevronLeft className="h-4 w-4" /></PageStep>
-            <span className="font-mono text-[11px] tabular-nums text-slate-500">{here} of {pages}</span>
-            <PageStep onClick={() => setPage(here + 1)} disabled={here === pages} label="Next page"><ChevronRight className="h-4 w-4" /></PageStep>
-          </span>
-        ) : <span />}
-        <label className="flex items-center justify-end gap-1.5">
-          <span className="stencil text-slate-500">Rows</span>
-          <Select className="plain" value={perPage} onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1); }}>
-            {SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
-          </Select>
-        </label>
-      </div>
     </section>
   </>;
 }
@@ -533,20 +516,6 @@ function Narrow({ value, onChange, empty, options }: {
   );
 }
 
-/** One step through the table. A step that leads nowhere is shown, and dead. */
-function PageStep({ onClick, disabled, label, children }: { onClick: () => void; disabled: boolean; label: string; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className="rounded-sm p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-ink disabled:cursor-default disabled:text-slate-300 disabled:hover:bg-transparent"
-    >
-      {children}
-    </button>
-  );
-}
 
 function SortButton({ label, on, onClick }: { label: string; on: "asc" | "desc" | null; onClick: () => void }) {
   return (

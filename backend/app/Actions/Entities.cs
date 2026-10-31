@@ -63,6 +63,8 @@ public sealed class ScheduleImport
     /// <summary>Why the import failed, when it did; null otherwise.</summary>
     public string? Error { get; set; }
     public Instant ImportedAt { get; set; }
+    /// <summary>Which version of the reading made it (<see cref="ScheduleImporter.ReaderVersion"/>); 0 before it was kept.</summary>
+    public int ReadWith { get; set; }
     /// <summary>How many activities were new in this revision. The next four counts work the same way for moved, changed, removed and unchanged ones.</summary>
     public int Added { get; set; }
     public int Moved { get; set; }
@@ -114,6 +116,16 @@ public sealed class Activity
     public required string Name { get; set; }
     public LocalDate? Start { get; set; }
     public LocalDate? Finish { get; set; }
+    /// <summary>
+    /// The planner says its start, its finish, happened (P6's "A", owner: "Achieved"). The planner's word on the work,
+    /// never ours on its documents: an achieved activity is not one whose documents are there.
+    /// </summary>
+    public bool StartAchieved { get; set; }
+    public bool FinishAchieved { get; set; }
+    /// <summary>Where it sits in the planner's WBS, from the top down ("CIV Civil works", "FDN Foundations"); empty when none.</summary>
+    public string[] Wbs { get; set; } = [];
+    /// <summary>Its WBS element's place in the planner's order, so the plan reads as P6 lays it out; null when none.</summary>
+    public int? WbsOrder { get; set; }
     /// <summary>The manager named in the schedule as responsible for the activity; null when the file gives none.</summary>
     public string? Responsible { get; set; }
     /// <summary>The departments concerned. A department is a discipline: these are published discipline codes.</summary>
@@ -147,7 +159,39 @@ public sealed class Activity
     /// of a document still missing. Null when nothing is missing. Written by Readiness.RestateAsync.
     /// </summary>
     public LocalDate? RiskFrom { get; set; }
+    /// <summary>When its last document came, once every one it needs is there; null otherwise. Written by Readiness.RestateAsync.</summary>
+    public Instant? LastMetAt { get; set; }
+    /// <summary>
+    /// The next day the project's notices have something to do about this activity (at risk, confirmed on the day after,
+    /// notified again), written by what changed it (<see cref="NoticeDays"/>); null: nothing to tell.
+    /// </summary>
+    public LocalDate? NoticeOn { get; set; }
     public List<Requirement> Requirements { get; set; } = [];
+}
+
+/// <summary>
+/// When a project's notices next go out: the earliest day written on its activities and review steps, at its notify
+/// hour (<see cref="NoticeDays"/>). Kept above every organization (no row-level security: it holds no content, only
+/// when to look), so the one alarm of the worker reads its next moment in one question.
+/// </summary>
+public sealed class NoticeAlarm
+{
+    public Guid ProjectId { get; set; }
+    public Guid TenantId { get; set; }
+    /// <summary>The next moment its notices go out; null: nothing to tell.</summary>
+    public Instant? DueAt { get; set; }
+    /// <summary>The project's day its notices last went out.</summary>
+    public LocalDate? LastRun { get; set; }
+}
+
+internal sealed class NoticeAlarmConfiguration : IEntityTypeConfiguration<NoticeAlarm>
+{
+    public void Configure(EntityTypeBuilder<NoticeAlarm> b)
+    {
+        b.ToTable("notice_alarms");
+        b.HasKey(x => x.ProjectId);
+        b.HasIndex(x => x.DueAt);
+    }
 }
 
 /// <summary>Whether an activity is still in the schedule (ACTIVE) or a later revision dropped it (REMOVED).</summary>
@@ -325,6 +369,7 @@ internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
         b.HasIndex(x => new { x.ProjectId, x.Code }).IsUnique();
         b.HasIndex(x => new { x.ProjectId, x.Start });
         b.HasIndex(x => new { x.ProjectId, x.NextNeededBy });
+        b.HasIndex(x => new { x.ProjectId, x.NoticeOn });
         b.Property(x => x.MovedIn).HasMaxLength(32);
         b.Property(x => x.Code).HasMaxLength(64);
         b.Property(x => x.ExternalId).HasMaxLength(64);

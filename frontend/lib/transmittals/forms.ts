@@ -9,6 +9,7 @@ import { api, projectPath, refusal } from "@/lib/client";
 import { filesOf, upload } from "@/lib/documents/api-uploads";
 import { addressees, dispatchOf, transmittalPage } from "@/lib/transmittals/api";
 import type { TransmittalView } from "@/lib/types";
+import { once } from "@/lib/core/once";
 
 /** A day the form says, as the backend takes it: empty when today's, which the backend stamps itself. */
 function dayOf(value: string): string | null {
@@ -47,12 +48,14 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
   const followKind = String(formData.get("followKind") ?? "").trim() || null;
   const activityId = String(formData.get("activityId") ?? "").trim() || null;
   const activityAsk = String(formData.get("activityAsk") ?? "").trim() || null;
+  const packageId = String(formData.get("packageId") ?? "").trim() || null;
 
   if (!reasonForIssue) return { error: "Every transmittal states its reason for issue." };
   if (!dateOfIssue) return { error: "Date of issue is required." };
   if (!revisionIds.length && !placeholderIds.length && !attachments.length && !message && !subject) return { error: "Enclose at least one revision, or write a subject and a message — a transmittal cannot be empty of both." };
   if (direction === "OUTGOING" && !recipientUsers.length && !partyTo.length) return { error: "Name at least one person to send it to — a company on its own is not a recipient." };
   if (direction === "OUTGOING" && !subject) return { error: "Give the transmittal a subject — it is the first thing the recipient reads." };
+  if (packageId && !issueNow) return { error: "A package's documents go when the transmittal is sent: send it now rather than keeping a draft." };
   if (askBackIds.length && !issueNow) return { error: "Asking for documents back goes with the transmittal: send it now rather than keeping a draft." };
   if (askBackIds.length && !message) return { error: "Say in the message why you need them back: the supplier reads it with the ask." };
   // Copies are our own people; an organization is sent to, never copied.
@@ -98,7 +101,7 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
           reason: reasonForIssue, message, revisionIds, unplanned, fromPartyId, note: notes || null, userIds: recipientUsers,
           receivedOn: dayOf(dateOfIssue), inReplyToId, extras: Object.keys(extras).length ? extras : null,
         },
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: once(formData, "incoming") ?? crypto.randomUUID(),
       });
       landing = `/transmittals/${t.id}`;
     } else {
@@ -107,12 +110,12 @@ export async function createTransmittalAction(_prev: { error?: string } | undefi
         body: {
           revisionIds, userIds: recipientUsers, partyIds: partyTo, reason: reasonForIssue, subject, message, copyUserIds: chosenCc,
           draft: !issueNow, inReplyToId, followsId, followKind, issuedOn: dayOf(dateOfIssue), extras: Object.keys(extras).length ? extras : null, activityId, activityAsk,
-          placeholderIds: placeholderIds.length ? placeholderIds : null,
+          placeholderIds: placeholderIds.length ? placeholderIds : null, packageId,
           // Asked for an answer: by the day given, else as the reason allows. Not ticked: none asked.
           responseRequired: formData.get("answerRequired") === "on",
           responseDue: formData.get("answerRequired") === "on" ? String(formData.get("responseDue") ?? "") || null : null,
         },
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: once(formData, "compose") ?? crypto.randomUUID(),
       });
       landing = sent.length === 1 ? `/transmittals/${sent[0].id}` : `/transmittals?q=${encodeURIComponent(sent.map((one) => one.number).join(","))}`;
       // The ask itself, on each document: the supplier accepts or refuses it there, and the transmittal is its record.
@@ -133,7 +136,7 @@ export async function issueTransmittalAction(_prev: { error?: string } | undefin
   const id = String(formData.get("transmittalId") ?? "");
   let sent: { id: string; number: string }[];
   try {
-    sent = await api(projectPath(ctx, `/transmittals/${id}/issue`), { method: "POST" });
+    sent = await api(projectPath(ctx, `/transmittals/${id}/issue`), { method: "POST", idempotencyKey: once(formData, "issue") });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -146,7 +149,7 @@ export async function issueTransmittalAction(_prev: { error?: string } | undefin
  * submission it carried is checked, and a return says why, for the sender to
  * read. Something unplanned is registered on its own, from its file.
  */
-export async function acceptTransmittalAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function acceptTransmittalAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const id = String(formData.get("transmittalId") ?? "");
   const reject = formData.get("decision") === "reject";
@@ -168,14 +171,14 @@ export async function acceptTransmittalAction(_prev: { error?: string } | undefi
   // Where the organization published no return outcome, it is returned to the sender all the same.
   try {
     for (const item of waiting) {
-      await api(projectPath(ctx, `/revisions/${item.revisionId}/arrival`), { body: { outcome, note: notes || null, return: reject && !outcome } });
+      await api(projectPath(ctx, `/revisions/${item.revisionId}/arrival`), { body: { outcome, note: notes || null, return: reject && !outcome }, idempotencyKey: once(formData, `arrival-${item.revisionId}`) });
     }
   } catch (e) {
     return { error: refusal(e).message };
   } finally {
     revalidatePath(`/transmittals/${id}`);
   }
-  return {};
+  return { ok: "Checked. Whoever sent it is told the answer." };
 }
 
 /**
@@ -202,7 +205,7 @@ export async function matchItemAction(_prev: { error?: string; ok?: string } | u
  * What came into a package taking documents as they come: accepted, each is in the register as it came (their number,
  * revision, status, review outcome); returned, nothing is registered and they are told why.
  */
-export async function checkAsReceivedAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function checkAsReceivedAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const id = String(formData.get("transmittalId") ?? "");
   const reject = formData.get("decision") === "reject";
@@ -215,7 +218,7 @@ export async function checkAsReceivedAction(_prev: { error?: string } | undefine
   } finally {
     revalidatePath(`/transmittals/${id}`);
   }
-  return {};
+  return { ok: "Checked. Whoever sent it is told the answer." };
 }
 
 /** Adding to what came with a received transmittal, after it was recorded. */
@@ -239,17 +242,17 @@ export async function attachTransmittalFilesAction(_prev: { error?: string; ok?:
 /**
  * Notifying again the people who have not opened it.
  */
-export async function chaseTransmittalAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function chaseTransmittalAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const id = String(formData.get("transmittalId") ?? "");
   const recipientIds = formData.getAll("recipientIds").map(String).filter(Boolean);
   try {
-    await api(projectPath(ctx, `/transmittals/${id}/notify-again`), { body: { recipientIds } });
+    await api(projectPath(ctx, `/transmittals/${id}/notify-again`), { body: { recipientIds }, idempotencyKey: once(formData, "notify") });
   } catch (e) {
     return { error: refusal(e).message };
   }
   revalidatePath(`/transmittals/${id}`);
-  return {};
+  return { ok: "Notified again. The notices sent on it are counted on this page." };
 }
 
 /**

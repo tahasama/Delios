@@ -6,13 +6,16 @@ type SettingRow = { key: string; value: string; updatedAt: string; updatedBy: st
 
 /** This project's answers about how it works (control activities, policies), read once a request. */
 export const projectSettings = cache(async (projectId: string): Promise<Map<string, string>> => {
-  const rows = await api<SettingRow[]>(`/api/projects/${projectId}/settings`).catch(() => [] as SettingRow[]);
+  const rows = await api<SettingRow[]>(`/api/projects/${projectId}/settings`, { keep: { areas: [] } }).catch(() => [] as SettingRow[]);
   return new Map(rows.map((row) => [row.key, row.value]));
 });
 
 /** The organization's own answers (what states are called…), read once a request. */
-export const orgSettings = cache(async (): Promise<Map<string, string>> => {
-  const rows = await api<SettingRow[]>("/api/settings").catch(() => [] as SettingRow[]);
+export const orgSettings = cache(async (): Promise<Map<string, string>> => orgSettingsOrFail().catch(() => new Map<string, string>()));
+
+/** The same, throwing when the read fails: where "nothing set" would be read as a fact (the organization's Settings). */
+export const orgSettingsOrFail = cache(async (): Promise<Map<string, string>> => {
+  const rows = await api<SettingRow[]>("/api/settings", { keep: { areas: [] } });
   return new Map(rows.map((row) => [row.key, row.value]));
 });
 
@@ -33,4 +36,4 @@ export const holders = cache(async (
   projectId: string, verb: string, deliverableType?: string | null, docType?: string | null, discipline?: string | null,
   criticality?: string | null, confidentiality?: string | null,
 ): Promise<Holder[]> =>
-  api<Holder[]>(`/api/projects/${projectId}/holders`, { query: { verb, deliverableType, docType, discipline, criticality, confidentiality } }));
+  api<Holder[]>(`/api/projects/${projectId}/holders`, { keep: { areas: [] }, query: { verb, deliverableType, docType, discipline, criticality, confidentiality } }));

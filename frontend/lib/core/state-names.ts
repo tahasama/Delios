@@ -18,16 +18,37 @@ import { REV_STATE_LABEL, type RevState } from "@/lib/core/standard";
  * register shows for a state is here.
  */
 export const STATE_NAMES = [
-  { code: "IN_PREPARATION", default: REV_STATE_LABEL.IN_PREPARATION, means: "Being written; nobody may act on it." },
-  { code: "IN_REVIEW", default: REV_STATE_LABEL.IN_REVIEW, means: "On its route, with its reviewers." },
-  { code: "NOT_RELEASED", default: REV_STATE_LABEL.NOT_RELEASED, means: "The route is finished; waiting for the control function to publish it." },
-  { code: "RETURNED", default: REV_STATE_LABEL.RETURNED, means: "The control function sent it back to a step of its route." },
-  { code: "RELEASED_ISSUED", default: "Released & issued", means: "In force and sent to the people named — where releasing sends it (the default)." },
-  { code: "RELEASED", default: "Released", means: "In force; people work from it — where releasing means go ahead." },
-  { code: "ON_HOLD", default: "On hold", means: "Released, then held: not for use until it is lifted." },
-  { code: "SUPERSEDED", default: REV_STATE_LABEL.SUPERSEDED, means: "A later revision replaced it." },
-  { code: "VOID", default: REV_STATE_LABEL.VOID, means: "Treated as never valid." },
+  // The document as a whole.
+  { group: "document", code: "PLANNED", default: "Planned", means: "The number is reserved; nothing has been released under it yet." },
+  { group: "document", code: "ACTIVE", default: "Active", means: "At least one revision was released; the document is in use." },
+  { group: "document", code: "WITHDRAWN", default: "Withdrawn", means: "It was released and is no longer valid; whoever had it is told." },
+  { group: "document", code: "CANCELLED", default: "Cancelled", means: "It will never be produced; nothing of it was released." },
+  { group: "document", code: "ARCHIVED", default: "Archived", means: "Put away with its project; it comes back if the project is reopened." },
+  // Its latest revision.
+  { group: "revision", code: "NONE", default: "No revision yet", means: "The number is reserved; nothing has been written under it yet." },
+  { group: "revision", code: "IN_PREPARATION", default: REV_STATE_LABEL.IN_PREPARATION, means: "Being written; nobody may act on it." },
+  { group: "revision", code: "IN_REVIEW", default: REV_STATE_LABEL.IN_REVIEW, means: "On its route, with its reviewers." },
+  { group: "revision", code: "NOT_RELEASED", default: REV_STATE_LABEL.NOT_RELEASED, means: "The route is finished; waiting for the control function to publish it." },
+  { group: "revision", code: "RETURNED", default: REV_STATE_LABEL.RETURNED, means: "The control function sent it back to a step of its route." },
+  { group: "revision", code: "RELEASED_ISSUED", default: "Released & issued", means: "In force and sent to the people named — where releasing sends it (the default)." },
+  { group: "revision", code: "RELEASED", default: "Released", means: "In force; people work from it — where releasing means go ahead." },
+  { group: "revision", code: "ON_HOLD", default: "On hold", means: "Released, then held: not for use until it is lifted." },
+  { group: "revision", code: "SUPERSEDED", default: REV_STATE_LABEL.SUPERSEDED, means: "A later revision replaced it." },
+  { group: "revision", code: "VOID", default: REV_STATE_LABEL.VOID, means: "Treated as never valid." },
+  // A document asked of a supplier, in its own stages (in review and released read as the revision's).
+  { group: "supplier", code: "SENT", default: "Sent", means: "Asked of the supplier, who holds it: theirs to send." },
+  { group: "supplier", code: "RECEIVED", default: "Received", means: "The supplier sent it; it waits for our check before it counts." },
+  { group: "supplier", code: "ACCEPTED", default: "Accepted", means: "Our check let it in: it is in the register, to send for review." },
+  { group: "supplier", code: "RETURNED_CHECK", default: "Returned", means: "Our check sent it back, with why: the supplier corrects it and sends it again." },
+  { group: "supplier", code: "RETURNED_REVIEW", default: "Returned", means: "Its review rejected it: back with the supplier, to revise." },
 ] as const;
+
+/** The groups of states, as Help shows them. */
+export const STATE_GROUPS: { key: "document" | "revision" | "supplier"; title: string; said: string }[] = [
+  { key: "document", title: "Document state", said: "the document as a whole" },
+  { key: "revision", title: "Revision state", said: "its latest revision, A, B, C…" },
+  { key: "supplier", title: "A supplier's document", said: "asked of a supplier from its package; in review and released read as a revision's" },
+];
 
 type StateNameCode = (typeof STATE_NAMES)[number]["code"];
 export type StateNames = Record<StateNameCode, string>;
@@ -117,7 +138,14 @@ export function supplierStage(
 
 /** The word for a supplier's stage; released reads as our released does (with the hold, and the project's policy). */
 export function supplierStageName(names: StateNames, stage: SupplierStage, released?: { together: boolean; held?: boolean }): string {
-  return stage === "RELEASED" ? stateName(names, "RELEASED", released) : SUPPLIER_STAGE_LABEL[stage];
+  if (stage === "RELEASED") return stateName(names, "RELEASED", released);
+  if (stage === "IN_REVIEW") return names.IN_REVIEW;
+  return names[stage] ?? SUPPLIER_STAGE_LABEL[stage];
+}
+
+/** The word for a document's state, the organization's (What the states are called). */
+export function docStateName(names: StateNames, state: string): string {
+  return names[state as StateNameCode] ?? state;
 }
 
 /**

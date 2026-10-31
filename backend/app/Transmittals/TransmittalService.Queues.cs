@@ -30,9 +30,9 @@ public sealed partial class TransmittalService
         var rows = await (
             from d in DocumentQueries.Visible(db, access)
             join r in db.Revisions on d.Id equals r.DocumentId
-            where r.State == RevisionStates.Released
-                && !db.TransmittalItems.Any(i => i.RevisionId == r.Id
-                    && db.Transmittals.Any(t => t.Id == i.TransmittalId && t.ReviewStepId == null))
+            // Recorded as it happens (revision_facts, written as a transmittal's line is added): never swept for.
+            where r.ProjectId == access.Project.Id && r.State == RevisionStates.Released
+                && !db.RevisionFacts.Any(f => f.RevisionId == r.Id)
             orderby r.ReleasedAt
             select new
             {

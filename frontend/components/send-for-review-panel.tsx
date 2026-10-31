@@ -2,7 +2,7 @@ import { requireScope } from "@/lib/core/scope";
 import { formPolicy } from "@/lib/settings/field-policy";
 import { eligiblePeople } from "@/lib/reviews/workflow";
 import { api, projectPath } from "@/lib/client";
-import { backendDocument, backendRevision } from "@/lib/documents/api";
+import { backendDocuments, backendRevision } from "@/lib/documents/api";
 import type { Distribution, RouteView } from "@/lib/types";
 import { SendForReviewForm, type SendRoute } from "./send-for-review";
 import { getActiveSet } from "@/lib/settings/config";
@@ -17,21 +17,23 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
   const ctx = await requireScope();
   const policy = await formPolicy(ctx, "REVIEW");
   // The documents, and the routes the backend offers for every one of them.
-  const revisions = (await Promise.all(revisionIds.map(async (id) => {
-    const revision = await backendRevision(ctx, id).catch(() => null);
-    const document = revision ? await backendDocument(ctx, revision.documentId) : null;
-    return revision && document ? { id: revision.id, document } : null;
-  }))).filter((one): one is NonNullable<typeof one> => !!one);
+  const found = (await Promise.all(revisionIds.map((id) => backendRevision(ctx, id).catch(() => null))))
+    .filter((one): one is NonNullable<typeof one> => !!one);
+  const read = new Map((await backendDocuments(ctx, found.map((r) => r.documentId))).map((d) => [d.id, d]));
+  const revisions = found.flatMap((revision) => {
+    const document = read.get(revision.documentId);
+    return document ? [{ id: revision.id, document }] : [];
+  });
   const docs = revisions.map((r) => r.document);
   if (!docs.length) return null;
 
   const [routeLists, reviewers, approvers, strict, directory] = await Promise.all([
-    Promise.all(docs.map((d) => api<RouteView[]>(projectPath(ctx, `/documents/${d.id}/routes`)))),
+    Promise.all(docs.map((d) => api<RouteView[]>(projectPath(ctx, `/documents/${d.id}/routes`), { keep: { areas: ["reviews", "docs"] } }))),
     eligiblePeople(ctx, docs, "REVIEW"),
     eligiblePeople(ctx, docs, "APPROVAL"),
     matrixBinds(ctx),
     // The organizations taking part and their people: a step another organization answers offers its own people.
-    api<{ organizations: { id: string; code: string; name: string; kind: string }[]; people: { id: string; name: string; partyId: string | null; function: string }[] }>(projectPath(ctx, "/people/directory"))
+    api<{ organizations: { id: string; code: string; name: string; kind: string }[]; people: { id: string; name: string; partyId: string | null; function: string }[] }>(projectPath(ctx, "/people/directory"), { keep: { areas: [] } })
       .catch(() => ({ organizations: [], people: [] })),
   ]);
   const applicable = routeLists[0].filter((route) => routeLists.every((list) => list.some((one) => one.id === route.id)));
@@ -107,7 +109,7 @@ export async function SendForReview({ revisionIds }: { revisionIds: string[] }) 
 
   const person = (p: { id: string; name: string; functionName: string }) => ({ id: p.id, name: p.name, functionName: p.functionName, inMatrix: true });
   // Anyone on the project may be copied in; being told is not reviewing.
-  const spread = await api<Distribution>(projectPath(ctx, `/documents/${docs[0].id}/distribution`)).catch(() => null);
+  const spread = await api<Distribution>(projectPath(ctx, `/documents/${docs[0].id}/distribution`), { keep: { areas: ["docs"] } }).catch(() => null);
   const everyone = [...(spread?.proposed ?? []), ...(spread?.others ?? [])]
     .map((one) => ({ id: one.id, name: one.name, functionName: one.function }))
     .sort((a, b) => a.name.localeCompare(b.name));

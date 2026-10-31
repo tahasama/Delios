@@ -6,8 +6,9 @@ import { revalidatePath } from "next/cache";
 import { getActiveSet } from "@/lib/settings/config";
 import { api, projectPath, refusal } from "@/lib/client";
 import { backendRevision, backendReview, reviewOfRevision } from "@/lib/documents/api";
-import { upload, filesOf } from "@/lib/documents/api-uploads";
+import { upload, filesOf, uploadRevisionFiles } from "@/lib/documents/api-uploads";
 import { requestFromForm, issueAsk } from "@/lib/transmittals/issue-requests";
+import { once } from "@/lib/core/once";
 
 /**
  * A revision's acts. The backend decides who may and whether the revision is
@@ -17,7 +18,7 @@ import { requestFromForm, issueAsk } from "@/lib/transmittals/issue-requests";
  * review's id.
  */
 
-type Result = { error?: string };
+type Result = { error?: string; ok?: string };
 const failed = (e: unknown): Result => ({ error: refusal(e).message });
 const text = (formData: FormData, name: string) => String(formData.get(name) ?? "").trim();
 
@@ -28,8 +29,7 @@ export async function prepareRevisionAction(_prev: Result | undefined, formData:
   const changeDescription = text(formData, "changeDescription");
   if (!changeDescription) return { error: "Say what changes in this revision, and why." };
   try {
-    const files = filesOf(formData, "renditionFile", "nativeFile");
-    const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
+    const fileIds = await uploadRevisionFiles(ctx, documentId, formData);
     await api(projectPath(ctx, `/documents/${documentId}/revisions`), {
       body: { fileIds, reasonForRevision: text(formData, "reasonForRevision") || changeDescription, changeDescription, filesLater: fileIds.length === 0, purpose: text(formData, "purpose") || null, phase: text(formData, "phase") || null },
     });
@@ -38,26 +38,34 @@ export async function prepareRevisionAction(_prev: Result | undefined, formData:
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "The new revision is started. Add or replace its files in Edit rev, then send it for review." };
 }
 
 /**
  * Edit a revision not yet released, in one go: its files and the document's
- * details. A new file replaces the one of its kind as a new submission of the
- * revision, the earlier one kept in its history; a revision without files yet
- * simply takes them. Its author or the control function only, for the files.
+ * details. While nothing has looked at its files (no review, no transmittal), a
+ * new file replaces the one of its kind outright, the earlier one gone (a draft
+ * has no value); past that, as a new submission, the earlier kept. A revision
+ * without files yet simply takes them. Its author or the control function only, for the files.
  */
 export async function editRevisionAction(_prev: Result | undefined, formData: FormData): Promise<Result & { ok?: string }> {
   const ctx = await requireScope();
   const revisionId = text(formData, "revisionId");
   const files = filesOf(formData, "nativeFile", "renditionFile");
   let documentId: string;
+  // The same file sent again changes nothing (backend SAME_FILES): said, and the details are still saved.
+  let same: string | null = null;
   try {
     documentId = (await backendRevision(ctx, revisionId)).documentId;
     if (files.length) {
-      const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId }, file)));
+      const fileIds = await uploadRevisionFiles(ctx, documentId, formData);
       const path = text(formData, "hasFiles") === "yes" ? "update" : "files";
-      await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/${path}`), { body: { fileIds } });
+      try {
+        await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/${path}`), { body: { fileIds } });
+      } catch (e) {
+        if (refusal(e).code !== "SAME_FILES") throw e;
+        same = refusal(e).message;
+      }
     }
   } catch (e) {
     return failed(e);
@@ -65,8 +73,8 @@ export async function editRevisionAction(_prev: Result | undefined, formData: Fo
   const { updateDocumentAction } = await import("@/lib/documents/forms");
   const details = await updateDocumentAction(undefined, formData);
   revalidatePath(`/documents/${documentId}`);
-  if (details.error) return { error: files.length ? `The files are in; the details were not saved: ${details.error}` : details.error };
-  return { ok: files.length ? "Saved: files and details." : details.ok ?? "Saved." };
+  if (details.error) return { error: files.length && !same ? `The files are in; the details were not saved: ${details.error}` : details.error };
+  return { ok: same ? `${same} The details are saved.` : files.length ? "Saved: files and details." : details.ok ?? "Saved." };
 }
 
 /** Take a revision out of its review to edit it: closed as withdrawn, everyone on it told, comments kept. */
@@ -78,13 +86,13 @@ export async function withdrawRevisionAction(_prev: Result | undefined, formData
   let documentId: string;
   try {
     documentId = (await backendRevision(ctx, revisionId)).documentId;
-    await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/withdraw`), { body: { changeDescription: reason } });
+    await api(projectPath(ctx, `/documents/${documentId}/revisions/${revisionId}/withdraw`), { body: { changeDescription: reason }, idempotencyKey: once(formData, "withdraw") });
   } catch (e) {
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
   revalidatePath("/reviews", "layout");
-  return {};
+  return { ok: "Withdrawn from review, with your reason. Everyone on the route is told; the revision can be changed and sent again." };
 }
 
 /** The control function sends a review waiting for it to its reviewers (where the project has it do so). */
@@ -92,13 +100,13 @@ export async function issueToReviewAction(_prev: Result | undefined, formData: F
   const ctx = await requireScope();
   const cycleId = text(formData, "cycleId");
   try {
-    await api(projectPath(ctx, `/reviews/${cycleId}/issue`), { method: "POST" });
+    await api(projectPath(ctx, `/reviews/${cycleId}/issue`), { method: "POST", idempotencyKey: once(formData, "issue") });
   } catch (e) {
     return failed(e);
   }
   revalidatePath(`/reviews/${cycleId}`);
   revalidatePath("/");
-  return {};
+  return { ok: "Sent to its reviewers. They are told, and whoever sent it for review too." };
 }
 
 /** Taking a comment back before the step is answered: until then it is a draft. */
@@ -113,7 +121,7 @@ export async function removeCommentAction(_prev: Result | undefined, formData: F
     return failed(e);
   }
   revalidatePath(`/reviews/${cycleId}`);
-  return {};
+  return { ok: "Comment taken back." };
 }
 
 /**
@@ -137,7 +145,7 @@ export async function editCommentAction(_prev: Result | undefined, formData: For
     return failed(e);
   }
   revalidatePath(`/reviews/${cycleId}`);
-  return {};
+  return { ok: "Comment changed. Until your step is answered it stays a draft; only its last version is shown." };
 }
 
 /** Answer the open step: a verdict and status on the deciding step, advice before it. */
@@ -162,13 +170,14 @@ export async function recordOutcomeAction(_prev: Result | undefined, formData: F
         note, issue, foreignAnswer: text(formData, "theirCode") || null, evidenceFileId,
         closesWithStep: Number(text(formData, "closesWithStep")) || null,
       },
+      idempotencyKey: once(formData, "answer"),
     });
   } catch (e) {
     return failed(e);
   }
   revalidatePath(`/reviews/${cycleId}`);
   revalidatePath("/");
-  return {};
+  return { ok: "Your answer is recorded. The review's progress shows where it stands now." };
 }
 
 /** the control function sends the decided revision back to its author. */
@@ -176,12 +185,12 @@ export async function returnToOriginatorAction(_prev: Result | undefined, formDa
   const ctx = await requireScope();
   const cycleId = text(formData, "cycleId");
   try {
-    await api(projectPath(ctx, `/reviews/${cycleId}/return`), { body: { note: text(formData, "reason") || text(formData, "note") || "Returned to its author." } });
+    await api(projectPath(ctx, `/reviews/${cycleId}/return`), { body: { note: text(formData, "reason") || text(formData, "note") || "Returned to its author." }, idempotencyKey: once(formData, "return") });
   } catch (e) {
     return failed(e);
   }
   revalidatePath(`/reviews/${cycleId}`);
-  return {};
+  return { ok: "Sent back to its author, who is told. Their next revision takes the comments in." };
 }
 
 // G.1 steps 11–13 — release at a status (§7.6), superseding the current revision (§7.5)
@@ -209,17 +218,17 @@ export async function releaseRevisionAction(_prev: Result | undefined, formData:
     if (!review) {
       // Never reviewed: only a type released without a review goes straight to release, at the status chosen.
       try {
-        review = await api<{ id: string; documentId: string; state: string }>(projectPath(ctx, `/revisions/${revisionId}/send-on`), { body: { status: statusCode } });
+        review = await api<{ id: string; documentId: string; state: string }>(projectPath(ctx, `/revisions/${revisionId}/send-on`), { body: { status: statusCode }, idempotencyKey: once(formData, "send-on") });
       } catch (e) {
         if (refusal(e).code === "TYPE_IS_REVIEWED") return { error: "This type of document is reviewed: send it for review first." };
         throw e;
       }
       documentId = review.documentId;
       // Where nobody acts as the control function it is already released.
-      if (review.state !== "RELEASED") await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue, kept } });
+      if (review.state !== "RELEASED") await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue, kept }, idempotencyKey: once(formData, "release") });
     } else {
       documentId = review.documentId;
-      await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue, kept } });
+      await api(projectPath(ctx, `/reviews/${review.id}/release`), { body: { status: statusCode, outcome: text(formData, "outcome") || null, issue, kept }, idempotencyKey: once(formData, "release") });
     }
   } catch (e) {
     return failed(e);
@@ -243,12 +252,13 @@ export async function returnAtGateAction(_prev: Result | undefined, formData: Fo
         note: reason || null, toStep: Number(formData.get("toStep") ?? "") || null,
         reason: text(formData, "returnReason") || null, outcome: text(formData, "outcome") || null,
       },
+      idempotencyKey: once(formData, "return"),
     });
   } catch (e) {
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "Not released, with your reason. It goes back as you chose, and they are told." };
 }
 
 /** §7.2 — void: the newest revision, released in error or never reviewed. */
@@ -267,7 +277,7 @@ export async function voidRevisionAction(_prev: Result | undefined, formData: Fo
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "Voided, with your reason. It stays on its row, marked void." };
 }
 
 /** Take a void back, with a reason: the revision counts again. The control function's. */
@@ -284,7 +294,7 @@ export async function unvoidRevisionAction(_prev: Result | undefined, formData: 
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "The void is taken back, with your reason. The revision counts again." };
 }
 
 /** §12.6 — the reassessment of work performed under a voided revision. */
@@ -299,7 +309,7 @@ export async function recordVoidReassessmentAction(_prev: Result | undefined, fo
     return failed(e);
   }
   revalidatePath("/exposures");
-  return {};
+  return { ok: "The reassessment is recorded beside the void it answers." };
 }
 
 /** An approval asked for after release came back yes: the hold is lifted and what waited is sent. */
@@ -314,7 +324,7 @@ export async function liftHoldAction(_prev: Result | undefined, formData: FormDa
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "The hold is lifted, and what waited for the approval is sent." };
 }
 
 /** An approval asked for after release came back no: it stays on hold for good, and goes back with a reason. */
@@ -331,5 +341,5 @@ export async function returnHeldAction(_prev: Result | undefined, formData: Form
     return failed(e);
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "It stays on hold for good, and goes back with your reason." };
 }

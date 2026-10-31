@@ -81,8 +81,8 @@ public sealed class RouteStep
     /// turn; the most severe verdict stands, and the status is the last one's.
     /// </summary>
     public bool Decides { get; set; }
-    /// <summary>ANY: the first answer closes the step. ALL: every holder answers.</summary>
-    public string Mode { get; set; } = StepModes.Any;
+    /// <summary>ALL (the default, owner): the next step waits for every holder's answer. ANY: the first answer closes the step.</summary>
+    public string Mode { get; set; } = StepModes.All;
     /// <summary>Working days, in the project's calendar, the step has once it opens.</summary>
     public int? Days { get; set; }
     /// <summary>On the last deciding step: the statuses it may grant. One: what every document it decides is released at. Empty means any published status.</summary>
@@ -181,6 +181,8 @@ public sealed class ReviewStep
     public Guid[] UserIds { get; set; } = [];
     /// <summary>When the people on the step were warned that it falls due the next working day.</summary>
     public Instant? WarnedAt { get; set; }
+    /// <summary>The day its people are warned it falls due, written when the step opens or changes (<see cref="Actions.NoticeDays"/>).</summary>
+    public LocalDate? WarnOn { get; set; }
     /// <summary>The outside party that answers, copied when the review starts.</summary>
     public Guid? PartyId { get; set; }
     public string? PartyName { get; set; }

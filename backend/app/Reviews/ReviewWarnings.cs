@@ -6,33 +6,13 @@ using NodaTime;
 namespace Delios.Host.Reviews;
 
 /// <summary>
-/// In the worker: the people on a step who have not answered are warned the working day before it falls due, once.
-/// The step is stamped when they were warned; reopening the step clears the stamp.
+/// The people on a step who have not answered are warned when it falls due today or the next working day, once, with the
+/// project's day's notices (<see cref="Actions.ActionNotices"/>, at its notify hour). The step is stamped when they were
+/// warned; reopening the step clears the stamp.
 /// </summary>
-public sealed class ReviewWarnings(IServiceScopeFactory scopes, ILogger<ReviewWarnings> logger) : BackgroundService
+public static class ReviewWarnings
 {
-    /// <summary>How long the job waits between looks (30 minutes).</summary>
-    private static readonly TimeSpan Pass = TimeSpan.FromMinutes(30);
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        await Task.Delay(TimeSpan.FromSeconds(45), stoppingToken);
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                var warned = await WarnDueAsync(scopes, stoppingToken);
-                if (warned > 0) logger.LogInformation("Warned the people on {Count} step(s) falling due", warned);
-            }
-            catch (Exception e) when (e is not OperationCanceledException)
-            {
-                logger.LogWarning(e, "Warning of steps falling due failed; trying again later");
-            }
-            await Task.Delay(Pass, stoppingToken);
-        }
-    }
-
-    /// <summary>Every active project of every active tenant: warns the steps due by the next working day. Returns how many steps were warned.</summary>
+    /// <summary>Every active project of every active tenant, now, whatever its hour: warns the steps due by the next working day.</summary>
     public static async Task<int> WarnDueAsync(IServiceScopeFactory scopes, CancellationToken cancellationToken)
     {
         List<Guid> tenants;
@@ -63,7 +43,7 @@ public sealed class ReviewWarnings(IServiceScopeFactory scopes, ILogger<ReviewWa
         return warned;
     }
 
-    private static async Task<int> WarnProjectAsync(IServiceProvider services, Guid projectId, CancellationToken cancellationToken)
+    public static async Task<int> WarnProjectAsync(IServiceProvider services, Guid projectId, CancellationToken cancellationToken)
     {
         var db = services.GetRequiredService<DeliosDbContext>();
         var clock = services.GetRequiredService<IClock>();
@@ -73,7 +53,7 @@ public sealed class ReviewWarnings(IServiceScopeFactory scopes, ILogger<ReviewWa
         await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtext({"review-warnings:" + projectId}))", cancellationToken);
         var project = await db.Projects.AsNoTracking().SingleAsync(p => p.Id == projectId, cancellationToken);
         var today = WorkingCalendar.Today(clock, project.TimeZone);
-        var until = WorkingCalendar.AddWorkingDays(today, 1, project.WeekendDays);
+        var until = WorkingCalendar.AddWorkingDays(today, 1, project.WeekendDays, await WorkingCalendar.HolidaysAsync(db, project, cancellationToken));
         var steps = await (from s in db.ReviewSteps.Include(s => s.Participants)
                            join r in db.Reviews on s.ReviewId equals r.Id
                            where r.ProjectId == projectId && r.State == ReviewStates.InProgress && s.State == StepStates.Open

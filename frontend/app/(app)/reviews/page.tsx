@@ -18,16 +18,10 @@ const PAGE_SIZES = [25, 50, 100, 250];
 
 type Search = {
   status?: string; q?: string; page?: string; per?: string;
-  kind?: string; verdict?: string; due?: string; sort?: string; dir?: string;
+  verdict?: string; due?: string; sort?: string; dir?: string;
   discipline?: string; docType?: string; supplier?: string; po?: string; deliverable?: string;
   on?: string; from?: string; to?: string;
 };
-
-/** A review is a decision or it is advice; the route says which. */
-const KINDS = [
-  { code: "DECISION", label: "Decision" },
-  { code: "ADVICE", label: "Advice" },
-];
 
 /** How it stands against the date the route gave it. */
 const DUES = [
@@ -69,7 +63,6 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const status = VIEWS.some((v) => v.id === sp.status) ? sp.status! : "ALL";
   const q = (sp.q ?? "").trim();
-  const kind = KINDS.some((one) => one.code === sp.kind) ? sp.kind! : "";
   const verdict = (sp.verdict ?? "").trim();
   const due = DUES.some((one) => one.code === sp.due) ? sp.due! : "";
   const dir = sp.dir === "desc" ? ("desc" as const) : ("asc" as const);
@@ -88,7 +81,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   // The backend sorts by these. A review's number is given in the order reviews
   // open, so it sorts as the day it opened; so does the document, for now.
   const SORTS: Record<string, string> = {
-    number: "opened", document: "opened", rev: "rev", kind: "kind", verdict: "verdict", due: "due",
+    number: "opened", document: "opened", rev: "rev", verdict: "verdict", due: "due",
     opened: "opened", closed: "closed", discipline: "discipline", docType: "docType",
   };
   const sort = sp.sort && SORTS[sp.sort] ? sp.sort : "";
@@ -96,10 +89,8 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const asked = Math.max(1, Number(sp.page) || 1);
 
   const [found, verdicts, adviceValues, disciplines, types, suppliers, pos, deliverables, inUse] = await Promise.all([
-    // Every review is a whole route that ends in its decision: none is advice alone.
-    kind === "ADVICE"
-      ? Promise.resolve({ total: 0, page: 1, pages: 1, per: perPage, sizes: PAGE_SIZES, rows: [] })
-      : reviewsPage(ctx, {
+    // Every review is a whole route that ends in its decision (owner: a "Kind" column always read "decision": gone).
+    reviewsPage(ctx, {
           status: status === "ALL" ? "" : status, q, verdict, due, discipline, docType, supplier, deliverable,
           on: from || to ? dateOn : "", from, to,
           // Newest first unless a column is asked for, as the list always read.
@@ -122,7 +113,8 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const cycles = found.rows;
   // Whoever a late review still waits on, so a reminder can be addressed to them.
   const lateOnes = cycles.filter((c) => c.open && c.dueDate && dueState(dueDay(c.dueDate), false) !== "on time");
-  const waiting = new Map(await Promise.all(lateOnes.map(async (c) => [c.id, await waitingOn(ctx, c.id)] as const)));
+  // Read with the row itself (it was one call per late review).
+  const waiting = new Map(lateOnes.map((c) => [c.id, { revisionId: c.revisionId ?? "", userIds: c.waitingOn ?? [] }] as const));
 
   const disciplineLabel = new Map(disciplines.map((one) => [one.code, one.label]));
   const typeLabel = new Map(types.map((one) => [one.code, one.label]));
@@ -136,7 +128,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const drop = (key: keyof Search) => {
     const params = new URLSearchParams();
     const held: [keyof Search, string][] = [
-      ["status", status === "ALL" ? "" : status], ["q", q], ["kind", kind], ["verdict", verdict],
+      ["status", status === "ALL" ? "" : status], ["q", q], ["verdict", verdict],
       ["due", due], ["discipline", discipline], ["docType", docType], ["supplier", supplier], ["po", po],
       ["deliverable", deliverable], ["on", dateOn], ["from", sp.from ?? ""], ["to", sp.to ?? ""],
     ];
@@ -150,7 +142,6 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const said = (options: { code: string; label: string }[], code: string) => options.find((one) => one.code === code)?.label ?? code;
   const facets: { key: string; label: string; without: string }[] = [];
   if (q) facets.push({ key: "search", label: q, without: drop("q") });
-  if (kind) facets.push({ key: "kind", label: said(KINDS, kind), without: drop("kind") });
   if (verdict) facets.push({ key: "verdict", label: verdict, without: drop("verdict") });
   if (due) facets.push({ key: "due", label: said(DUES, due), without: drop("due") });
   if (discipline) facets.push({ key: "discipline", label: disciplineLabel.get(discipline) ?? discipline, without: drop("discipline") });
@@ -169,7 +160,6 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const query = new URLSearchParams();
   if (status !== "ALL") query.set("status", status);
   if (q) query.set("q", q);
-  if (kind) query.set("kind", kind);
   if (verdict) query.set("verdict", verdict);
   if (due) query.set("due", due);
   if (discipline) query.set("discipline", discipline);
@@ -198,7 +188,6 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
       title: c.title,
       revision: c.revision,
       // Every review is a route that ends in its decision.
-      kind: "decision",
       verdict: c.verdict,
       verdictLabel: c.verdict ? verdictLabel.get(c.verdict) ?? c.verdict : null,
       verdictProceeds: c.verdict ? proceeds.get(c.verdict) ?? null : null,
@@ -235,17 +224,16 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
 
   // Every set's values under its name (owner), and the filters this person keeps shown.
   const inSets = await setGrouping(ctx);
-  const shownFilters = await keptFilters("reviews", ["status", "kind", "verdict", "due", "discipline", "docType", "supplier", "po", "deliverable", "date"]);
+  const shownFilters = await keptFilters("reviews", ["status", "verdict", "due", "discipline", "docType", "supplier", "po", "deliverable", "date"]);
   return (
     <ReviewsRegister
       shownFilters={shownFilters}
       plate={<ReviewsPlate canStart={!isReadOnly(ctx.user)} />}
       rows={rows}
       total={matching}
-      filters={{ q, status: status === "ALL" ? "" : status, kind, verdict, due, discipline, docType, supplier, po, deliverable, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }}
+      filters={{ q, status: status === "ALL" ? "" : status, verdict, due, discipline, docType, supplier, po, deliverable, on: dateOn, from: sp.from ?? "", to: sp.to ?? "" }}
       filterOptions={{
         statuses: VIEWS.filter((v) => v.id !== "ALL").map((v) => ({ code: v.id, label: v.label })),
-        kinds: KINDS,
         verdicts: inSets("REVIEW_OUTCOMES", verdicts, (one) => `${one.code} — ${one.label}`),
         dues: DUES,
         disciplines: inSets("DISCIPLINES", disciplines.filter((one) => usedDisciplines.has(one.code)), (one) => one.label),

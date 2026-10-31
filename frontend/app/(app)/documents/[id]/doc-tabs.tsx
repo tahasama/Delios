@@ -30,18 +30,19 @@ export function DocTabs({ tabs }: { tabs: DocTab[] }) {
 
   return (
     <section className="register register-sheet register-sheet-open overflow-hidden">
-      <nav role="tablist" aria-label="Document" className="scroll-thin flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line px-3">
+      <nav role="tablist" aria-label="Document" className="strip strip-full border-b border-line">
         {tabs.map((t) => (
           <button
             key={t.id}
             role="tab"
             type="button"
             aria-selected={active === t.id}
+            aria-current={active === t.id ? "page" : undefined}
             onClick={() => select(t.id)}
-            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold transition ${active === t.id ? "border-brand-line text-brand-ink" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+            className="strip-tab"
           >
             {t.label}
-            {t.count ? <span className="ml-1.5 rounded bg-slate-100 px-1.5 text-[10px] text-slate-600">{t.count}</span> : null}
+            {t.count ? <span className="font-normal tabular-nums text-slate-500">{t.count}</span> : null}
           </button>
         ))}
       </nav>

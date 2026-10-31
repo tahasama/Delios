@@ -150,3 +150,6 @@ Codes never change once used: new roles are added only with the owner's approval
 ```
 
 All five steps are built.
+
+- Our country on "Who we are on DELIOS" is kept on its own while no identifier is given (owner: the choice did not stay);
+  once an identifier is given, the country is the identifier's.

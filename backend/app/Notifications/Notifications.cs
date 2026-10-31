@@ -115,6 +115,10 @@ public sealed class EmailOptions
     public ReplyOptions Replies { get; set; } = new();
     /// <summary>The most a transmittal emailed to an organization not on DELIOS carries attached; beyond it, the files are listed.</summary>
     public long MaxAttachmentBytes { get; set; } = 15 * 1024 * 1024;
+    /// <summary>DELIOS's own address: what an organization asks of DELIOS (a certified DWG reader) is emailed there. Empty: kept only.</summary>
+    public string DeliosAddress { get; set; } = "";
+    /// <summary>A sandbox (SANDBOX=true): every email says it comes from a testing area, in its subject and first line.</summary>
+    public bool Sandbox { get; set; }
 
     /// <summary>Whether an email of this kind is sent now.</summary>
     public bool Sends(string kind) => Enabled && kind switch
@@ -282,7 +286,10 @@ public sealed class EmailSender(
         var email = await db.Set<EmailMessage>().SingleOrDefaultAsync(e => e.Id == message.EmailId, cancellationToken);
         if (email is null || email.State is not (EmailStates.Queued or EmailStates.Failed)) return;
         var settings = options.Value;
-        if (!settings.Sends(email.Kind))
+        // Nothing leaves the training space by email (docs/APP-DECISIONS.md §84): kept, marked off, as with email off.
+        var training = email.ProjectId is { } projectId
+            && await db.Projects.AnyAsync(p => p.Id == projectId && p.Space == Identity.Spaces.Training, cancellationToken);
+        if (training || !settings.Sends(email.Kind))
         {
             email.State = EmailStates.Off;
             await db.SaveChangesAsync(cancellationToken);
@@ -296,8 +303,10 @@ public sealed class EmailSender(
                 new System.Net.Mail.MailAddress(settings.From, settings.FromName),
                 new System.Net.Mail.MailAddress(email.ToAddress, email.ToName ?? email.ToAddress))
             {
-                Subject = email.Subject,
-                Body = email.Body,
+                Subject = settings.Sandbox ? $"[Sandbox] {email.Subject}" : email.Subject,
+                Body = settings.Sandbox
+                    ? "This comes from the DELIOS sandbox, a testing area: everything in it is made up.\n\n" + email.Body
+                    : email.Body,
             };
             if (email.ReplyTo is { } replyTo) mail.ReplyToList.Add(new System.Net.Mail.MailAddress(replyTo));
             // Attached as stored: only files scanned clean.
@@ -305,13 +314,10 @@ public sealed class EmailSender(
             {
                 var files = await db.StoredFiles.AsNoTracking()
                     .Where(f => email.FileIds.Contains(f.Id) && f.Status == Documents.FileStatuses.Clean).ToListAsync(cancellationToken);
+                // Read from storage as it is sent, never held whole in memory (a drawing may weigh hundreds of MB); the
+                // message disposes each stream with itself.
                 foreach (var file in files)
-                {
-                    var content = new MemoryStream();
-                    await using (var stored = await storage.OpenReadAsync(file.ObjectKey, cancellationToken)) await stored.CopyToAsync(content, cancellationToken);
-                    content.Position = 0;
-                    mail.Attachments.Add(new System.Net.Mail.Attachment(content, file.Name, file.ContentType));
-                }
+                    mail.Attachments.Add(new System.Net.Mail.Attachment(await storage.OpenReadAsync(file.ObjectKey, cancellationToken), file.Name, file.ContentType));
             }
             await transport.SendAsync(mail, settings, cancellationToken);
             email.State = EmailStates.Sent;
@@ -341,6 +347,8 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
         b.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.UserId, x.ReadAt, x.CreatedAt });
+        // A person's notifications on one project.
+        b.HasIndex(x => new { x.UserId, x.ProjectId, x.CreatedAt });
         b.Property(x => x.Kind).HasMaxLength(40);
         b.Property(x => x.Title).HasMaxLength(300);
         b.Property(x => x.Body).HasMaxLength(2000);
@@ -387,7 +395,7 @@ public static class NotificationEndpoints
 
     /// <summary><c>GET /api/me/notifications</c>: newest first, a page at a time, with how many are unread.</summary>
     private static async Task<IResult> ListAsync(HttpContext http, DeliosDbContext db, CancellationToken cancellationToken,
-        bool unread = false, int page = 1, int per = 50, Guid? projectId = null)
+        bool unread = false, int page = 1, int per = 50, Guid? projectId = null, bool bell = false)
     {
         var me = http.User.UserId();
         per = Math.Clamp(per, 1, 200);
@@ -395,6 +403,8 @@ public static class NotificationEndpoints
         var mine = db.Set<Notification>().AsNoTracking().Where(n => n.UserId == me);
         if (projectId is { } p) mine = mine.Where(n => n.ProjectId == p || n.ProjectId == null);
         var unreadCount = await mine.CountAsync(n => n.ReadAt == null, cancellationToken);
+        // The bell asks only how many are unread: one count, nothing else.
+        if (bell) return Results.Ok(new { unread = unreadCount });
         var query = unread ? mine.Where(n => n.ReadAt == null) : mine;
         var total = await query.CountAsync(cancellationToken);
         var rows = await query.OrderByDescending(n => n.CreatedAt).Skip((page - 1) * per).Take(per).ToListAsync(cancellationToken);

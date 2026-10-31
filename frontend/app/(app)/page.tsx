@@ -4,8 +4,10 @@ import Link from "next/link";
 import { btn } from "@/components/ui";
 import { api, projectPath } from "@/lib/client";
 import { actionWork } from "@/lib/actions/api";
-import type { ActivityRow, ActivitySummary, Work } from "@/lib/types";
+import type { ActivitySummary, Work } from "@/lib/types";
 import { requireScope } from "@/lib/core/scope";
+import { Part } from "@/components/part";
+import { HomeJournal } from "./home-journal";
 import { isAdmin } from "@/lib/core/auth";
 import { organizationLinks } from "@/lib/organization/api";
 import { emailReplies } from "@/lib/transmittals/api";
@@ -25,7 +27,7 @@ export const dynamic = "force-dynamic";
  * clean the register is. The page used to be a column of cards that listed the
  * reader's chores and never told them the news.
  */
-import { type Row, type Aspect, ACTIVITY, NEWS, ALIAS, read, daysOf, lastWorkingDay, weekday, when, greeting, Fig, Card, Queue } from "./home-parts";
+import { type Row, type Aspect, daysOf, greeting, Fig, Card, Queue } from "./home-parts";
 
 /** Home's log: the project's whole trail, a page at a time, with every act's count (backend `GET /log`). */
 type ProjectLog = { total: number; page: number; pages: number; actions: { action: string; count: number; kind: string }[]; rows: LogAct[] };
@@ -41,19 +43,22 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const invitations = isAdmin(ctx.user) ? (await organizationLinks()).filter((one) => one.side === "GUEST" && one.state === "INVITED") : [];
   // Replies by email from organizations not on DELIOS, waiting for the control function to record them.
   const repliesByEmail = ctx.can("CONTROL") ? await emailReplies(ctx) : [];
-  // The whole log is the control function's and the administrator's: they answer
-  // for what the record says. Anybody else asking for it gets their own page.
-  const view = sp.view === "log" && !controller ? undefined : sp.view;
+  // The log is everyone of ours on the project (owner), each reading only acts on what
+  // they may open (the backend narrows it); another organization's people get their own page.
+  const mayLog = user.isInternal && ctx.can("READ");
+  const view = sp.view === "log" && !mayLog ? undefined : sp.view;
   const at = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
-  const acts = (rows: ActivityRow[]) => rows.map((e) => ({ id: e.id, ts: new Date(e.at), action: ALIAS[e.action] ?? e.action, actorName: e.actorName, entityType: e.entityType, entityLabel: e.entityLabel, detail: e.detail }));
-  // The backend's names for the acts each kind of the journal covers.
-  const backendNames = (kinds: string[]) => Object.keys(ALIAS).filter((name) => kinds.includes(ALIAS[name])).concat(kinds).join(",");
 
   const [work, checks, criticalDefects, activities, neverSent, scheduleWork] = await Promise.all([
-    api<Work>(projectPath(session, "/work")),
-    controller ? api<{ lastRun: { integrity: number } | null }>(projectPath(session, "/checks")).catch(() => ({ lastRun: null })) : Promise.resolve({ lastRun: null }),
-    controller ? api<unknown[]>(projectPath(session, "/defects"), { query: { severity: "CRITICAL" } }).then((d) => d.length).catch(() => 0) : Promise.resolve(0),
-    user.isInternal ? api<ActivitySummary[]>(projectPath(session, "/activities")).catch(() => [] as ActivitySummary[]) : Promise.resolve([] as ActivitySummary[]),
+    api<Work>(projectPath(session, "/work"), { keep: { areas: ["reviews", "transmittals", "docs", "packages", "plan"] } }),
+    controller ? api<{ lastRun: { integrity: number } | null }>(projectPath(session, "/checks"), { keep: { areas: ["checks"] } }).catch(() => ({ lastRun: null })) : Promise.resolve({ lastRun: null }),
+    controller ? api<unknown[]>(projectPath(session, "/defects"), { keep: { areas: ["checks"] }, query: { severity: "CRITICAL" } }).then((d) => d.length).catch(() => 0) : Promise.resolve(0),
+    // The actions short of documents: how many, and the newest four, worked out by the backend (never the whole schedule).
+    user.isInternal && (controller || session.can("PLAN") || user.department)
+      ? api<{ count: number; top: ActivitySummary[] }>(projectPath(session, "/activities/short"), {
+          query: { department: controller || session.can("PLAN") ? null : user.department, take: 4 }, keep: { areas: ["plan"] },
+        }).catch(() => ({ count: 0, top: [] as ActivitySummary[] }))
+      : Promise.resolve({ count: 0, top: [] as ActivitySummary[] }),
     // Released, and nobody was ever told. Not a decision anybody owes: whoever
     // needed it sent did not ask, and this is where that stops being invisible.
     controller
@@ -69,20 +74,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // What moved while the reader was away: the last working day's worth of the
   // events that are news to somebody, not bookkeeping.
   //
-  // Project-wide, for everybody. A release, a rejection or a transmittal is a
-  // fact about the project, not about the person reading it; scoping the
-  // record by department is how people stop trusting it, because each of them
-  // ends up looking at a different project. What a reader may not see is
-  // already settled by the backend, not by this page.
-  const since = lastWorkingDay();
-  const news = acts(await api<ActivityRow[]>(projectPath(session, "/activity"), { query: { actions: backendNames(NEWS), since: since.toISOString(), take: 4 } }));
-  // A quiet day should not leave the panel empty or showing one lonely line:
-  // when the last working day produced almost nothing, the journal reaches
-  // further back and says so instead.
-  const older = news.length < 4
-    ? acts(await api<ActivityRow[]>(projectPath(session, "/activity"), { query: { actions: backendNames(NEWS), before: since.toISOString(), take: 4 - news.length } }))
-    : [];
-  const journal = [...news, ...older];
   // The whole log, when the reader asks for it. It carries the same kinds of
   // act as the journal beside the board — what the project did — and none of
   // what only an administrator should see: who signed in, who downloaded what,
@@ -92,7 +83,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // 3rd to the 3rd returns the 3rd.
   // The log: the project's whole trail on the logbook (kinds, every act, words, days), as the Audit trail reads it.
   const log = view === "log"
-    ? await api<ProjectLog>(projectPath(session, "/log"), {
+    ? await api<ProjectLog>(projectPath(session, "/log"), { keep: { areas: ["docs", "reviews", "transmittals", "packages", "plan", "checks", "assets"] },
         query: { kind: sp.kind || undefined, action: sp.action || undefined, q: sp.q || undefined, from: sp.from || undefined, to: sp.to || undefined, page: sp.page || undefined, per: 50 },
       }).catch(() => null)
     : null;
@@ -101,12 +92,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       .filter((e): e is [string, string] => !!e[1]));
     return `/?${next}`;
   };
-  // An audit label reads "P1001-60-CI-SPC-00001 rev B — route name", and a
-  // supplier's number runs half as long again. The panel measures its own
-  // entries: the widest number sets the column the revisions line up in, and
-  // when that number is long the kind is dropped rather than squeezed.
-  const widest = Math.max(20, ...journal.map((e) => read(e.entityLabel)?.number.length ?? 0));
-  const room = widest <= 26;
 
   // One list per kind of ask: advice on a route's earlier step, or the
   // binding verdict — the one decision, which is also the release approval.
@@ -117,24 +102,20 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // Schedule activities whose documents will not be ready in time, for the
   // people engaged in them. The control function and the planners are engaged in
   // all of them, because chasing the schedule is their work.
+  const shortCount = activities.count;
+  // Whoever keeps the whole schedule sees every action; the ones concerning their own discipline are marked "yours".
   const wholeSchedule = controller || session.can("PLAN");
-  const atRisk = activities
-    .map((a) => {
-      const total = a.needs;
-      const ready = a.met + a.waived;
-      const scheduledDate = at(a.start);
-      const late = scheduledDate ? scheduledDate.getTime() < Date.now() : false;
-      // Engaged in it: the action concerns the discipline this person answers for.
-      const mine = !!user.department && a.departments.includes(user.department);
-      return { id: a.id, code: a.code, name: a.name, scheduledDate, total, ready, short: total - ready, late, mine };
-    })
-    .filter((a) => a.total > 0 && a.short > 0 && a.scheduledDate)
-    .filter((a) => wholeSchedule || a.mine)
-    // Newest first, deliberately. Sorted by how late they are, one activity
-    // nobody intends to fix would sit at the top for months and hide every
-    // risk that appeared after it; sorted by date, what has just gone wrong is
-    // what the panel shows, and the standing failures are the schedule page's.
-    .sort((a, b) => (b.scheduledDate?.getTime() ?? 0) - (a.scheduledDate?.getTime() ?? 0));
+  // Newest first, deliberately. Sorted by how late they are, one activity nobody intends to fix would sit at the top
+  // for months and hide every risk that appeared after it; sorted by date, what has just gone wrong is what the panel
+  // shows, and the standing failures are the schedule page's.
+  const atRisk = activities.top.map((a) => {
+    const total = a.needs;
+    const ready = a.met + a.waived;
+    const scheduledDate = at(a.start);
+    const late = scheduledDate ? scheduledDate.getTime() < Date.now() : false;
+    const mine = !!user.department && a.departments.includes(user.department);
+    return { id: a.id, code: a.code, name: a.name, scheduledDate, total, ready, short: total - ready, late, mine };
+  });
 
   const revisionsOf = (kinds: string[]) => work.revisions.filter((w) => kinds.includes(w.kind));
   const issuesOf = (kinds: string[]) => work.issues.filter((w) => kinds.includes(w.kind));
@@ -249,6 +230,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         ? { href: `/actions/${w.code}#your-confirmation`, code: w.code ?? "", title: `${w.name}: ${w.ask === "DISCIPLINE" ? "a discipline" : "a document"} to add, checked by ${w.from ?? "the control function"} (${w.number})`, tag: "to confirm", tone: "amber", at: at(w.since), cta: "Confirm" }
         : w.kind === "ADD_TO_ACTION"
         ? { href: `/actions/${w.code}#asked`, code: w.code ?? "", title: `${w.name}: ${w.from ?? "someone"} asks for ${w.ask === "DISCIPLINE" ? "a missing discipline" : "a document"} to be added (${w.number})`, tag: "asked", tone: "sky", at: at(w.since), cta: "Answer" }
+        : w.kind === "LIST_TO_BRING_IN"
+        ? { href: `/import?kind=${({ DELIVERABLES: "deliverables", TEAM: "people", MATRIX: "matrix", LISTS: "sets" } as Record<string, string>)[w.department ?? ""] ?? "deliverables"}`, code: w.name ?? "", title: `${w.code ?? "a list"}: released since it was last brought in`, tag: "list released", tone: "sky", at: at(w.since), cta: "Bring it in" }
         : w.kind === "UNTAGGED"
           ? { href: "/schedule?view=table&untagged=1", code: `${w.count}`, title: `action${w.count === 1 ? "" : "s"} with no discipline tagged`, tag: "untagged", tone: "amber", at: null, cta: "Tag them" }
           : { href: "/schedule", code: w.code ?? "", title: `the schedule could not be read${w.name ? `: ${w.name}` : ""}`, tag: "read failed", tone: "amber", at: at(w.since), cta: "Upload" }),
@@ -296,8 +279,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   ];
 
   const all = Object.values(rows).flat();
-  const today = ["verdict", "release", "returned", "unsent", "owed", "requirements"].flatMap((id) => rows[id]);
-  const longest = Math.max(0, ...all.map((one) => daysOf(one.at) ?? 0));
+  // What cannot wait: decisions, releases, what came back, what is owed or must go out, and the schedule.
+  const TODAY = ["verdict", "release", "returned", "unsent", "owed", "requirements"];
+  const today = TODAY.flatMap((id) => rows[id]);
+  const todayAspects = ASPECTS.filter((one) => TODAY.includes(one.id) && rows[one.id].length);
+  // The longest wait, and the kind it is in: its figure opens that kind (folded, never spread over a long list).
+  const oldest = ASPECTS.reduce<{ id: string | null; days: number }>((best, one) => rows[one.id].reduce(
+    (b, row) => ((daysOf(row.at) ?? 0) > b.days ? { id: one.id, days: daysOf(row.at) ?? 0 } : b), best), { id: null, days: 0 });
+  const longest = oldest.days;
   // Asked for one kind, the page becomes that one kind, in full.
   const opened = view ? ASPECTS.find((one) => one.id === view) : null;
 
@@ -331,9 +320,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
 
         <div className="home-rule mt-4 grid grid-cols-2 gap-4 border-t pt-3.5 md:grid-cols-4">
-          <Fig value={today.length} label={today.length === 1 ? "needs you today" : "need you today"} index={0} />
-          <Fig value={all.length} label="waiting on you in all" index={1} />
-          <Fig value={longest} unit="d" label={longest ? "the longest has waited" : "nothing has been left"} index={2} />
+          <Fig value={today.length} label={today.length === 1 ? "needs you today" : "need you today"} index={0}
+            href={today.length ? "/?view=today" : undefined} />
+          <Fig value={all.length} label="waiting on you in all" index={1} href={all.length ? "/" : undefined} />
+          <Fig value={longest} unit="d" label={longest ? "the longest has waited" : "nothing has been left"} index={2}
+            href={oldest.id ? `/?view=${oldest.id}` : undefined} />
           {controller ? (
             <Fig
               href="/conformance"
@@ -343,7 +334,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               index={3}
             />
           ) : (
-            <Fig href="/schedule" value={atRisk.length} label="activities short of documents" index={3} />
+            <Fig href="/schedule" value={shortCount} label="activities short of documents" index={3} />
           )}
         </div>
 
@@ -355,6 +346,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <Link href="/" scroll={false} aria-current={!view ? "page" : undefined} className="segment">
           All <span className="segment-n">{all.length}</span>
         </Link>
+        {today.length ? (
+          <Link href="/?view=today" scroll={false} aria-current={view === "today" ? "page" : undefined} className="segment">
+            Today <span className="segment-n">{today.length}</span>
+          </Link>
+        ) : null}
         {ASPECTS.filter((one) => rows[one.id].length).map((one) => {
           const stale = rows[one.id].some((row) => (daysOf(row.at) ?? 0) >= 7);
           return (
@@ -373,7 +369,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         {/* The log is not work waiting on anybody, so it sits apart at the end
             and carries no count: a number here would join a total that means
             "what is owed by you". */}
-        {controller ? (
+        {mayLog ? (
           <Link
             href="/?view=log"
             scroll={false}
@@ -404,7 +400,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 <p className="slip-note">{readingLine({ from: sp.from, to: sp.to, kindLabel: AUDIT_KINDS.find((k) => k.key === sp.kind)?.label, q: sp.q })}</p>
               ) : null}
               {log ? (
-                <LogbookDays acts={log.rows} chosen={{ kind: sp.kind, action: sp.action }} href={logHref} paging={{ page: log.page, pages: log.pages, total: log.total }} />
+                <LogbookDays acts={log.rows} chosen={{ kind: sp.kind, action: sp.action }} href={logHref} paging={{ page: log.page, pages: log.pages, total: log.total }} whoLinks={controller} />
               ) : (
                 <p className="slip px-4 py-6 text-[13px] text-(--ink-soft)">The log could not be read just now. Try again in a moment.</p>
               )}
@@ -412,6 +408,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </section>
           ) : opened ? (
             <Queue aspect={opened} rows={rows[opened.id]} style={rise()} />
+          ) : view === "today" && todayAspects.length ? (
+            <div className="grid grid-cols-1 gap-3.5 @[38rem]:grid-cols-2">
+              {todayAspects.map((one) => <Card key={one.id} aspect={one} rows={rows[one.id]} style={rise()} />)}
+            </div>
           ) : all.length ? (
             <div className="grid grid-cols-1 gap-3.5 @[38rem]:grid-cols-2">
               {ASPECTS.filter((one) => rows[one.id].length).map((one) => (
@@ -426,44 +426,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </main>
 
         <aside className={`grid min-w-0 gap-3 xl:sticky xl:top-22 ${view === "log" ? "hidden" : ""}`}>
-          {journal.length && view !== "log" ? (
-            <section className="home-rise register register-sheet register-sheet-open px-4 py-3" style={rise()}>
-              <h2 className="mb-2.5 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">{older.length ? "Lately" : `Since ${weekday(since)}`}</h2>
-              <ul>
-                {journal.map((e, i) => {
-                  const kind = ACTIVITY[e.action];
-                  const shape = read(e.entityLabel);
-                  if (!kind || !shape) return null;
-                  return (
-                    <li key={e.id} className="relative min-w-0 pb-2.5 pl-4.5 last:pb-0">
-                      <span className={`absolute top-1.25 left-0 h-1.75 w-1.75 rounded-full border-2 bg-surface ${kind.mark}`} />
-                      {i < journal.length - 1 ? <span className="absolute top-3.5 -bottom-px left-0.75 w-px bg-line" /> : null}
-                      {/* The lines are held to the width of the longest number in
-                          the panel, so every revision lands in the same column
-                          instead of drifting out to the panel's edge. */}
-                      <span className="block min-w-0" style={{ maxWidth: `${widest}ch` }}>
-                        <span className="flex items-baseline gap-2">
-                          <span className="min-w-0 truncate font-mono text-[12.5px] font-semibold text-link">{shape.number}</span>
-                          {room ? <span className="ml-auto shrink-0 text-[11px] text-slate-400">{kind.kind}</span> : null}
-                        </span>
-                        <span className="flex items-baseline gap-2 text-[12.5px] text-slate-600">
-                          <span className="min-w-0 truncate">{kind.said}</span>
-                          {shape.rev ? <span className="ml-auto shrink-0 font-mono text-[11.5px] text-slate-400">rev {shape.rev}</span> : null}
-                        </span>
-                        <span className="block truncate text-[11px] text-slate-400">{e.actorName} · {when(e.ts)}</span>
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-                            {controller ? <Link href="/?view=log" scroll={false} className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">Everything that happened →</Link> : null}
-            </section>
+          {view !== "log" ? (
+            <Part name="what happened lately">
+              <HomeJournal scope={session} controller={controller} style={rise()} />
+            </Part>
           ) : null}
 
           {view !== "log" && user.isInternal && atRisk.length ? (
             <section className="home-rise register register-sheet register-sheet-open px-4 py-3" style={rise()}>
               <h2 className="mb-1 text-[11px] font-semibold tracking-[0.09em] text-slate-400 uppercase">Schedule</h2>
-              {atRisk.slice(0, 3).map((a) => {
+              {atRisk.map((a) => {
                 // An activity's name carries where it is after a dash — "Foundation
                 // concrete pour — clarifier TK-201, area 20" — and the place is
                 // what tells a reader whether it is theirs, so it gets its own line.
@@ -489,7 +461,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   </Link>
                 );
               })}
-                            <Link href="/schedule" className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">The whole schedule{atRisk.length > 3 ? ` · ${atRisk.length} at risk` : ""} →</Link>
+                            <Link href="/schedule" className="mt-2.5 inline-block text-xs font-semibold text-link hover:underline">The whole schedule{shortCount > atRisk.length ? ` · ${shortCount} at risk` : ""} →</Link>
             </section>
           ) : null}
 

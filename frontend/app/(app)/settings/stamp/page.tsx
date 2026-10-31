@@ -1,10 +1,11 @@
+import { ExceptionNote } from "@/lib/settings/exception";
 import { cookies } from "next/headers";
 import { PREF, paneWidth } from "@/lib/core/preferences";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
 import { projectSettings, orgSettings } from "@/lib/settings/api";
-import { liberty } from "@/lib/organization/liberty";
+import { projectLiberty } from "@/lib/organization/liberty";
 import { stampAnswers, stampOwn } from "@/lib/settings/stamp";
 import { StampCard } from "@/components/stamp-card";
 import { SETUP_PAGES, maySetup, mayChangeControlRoom } from "../setup-pages";
@@ -21,15 +22,21 @@ export const metadata = { title: "The stamp" };
 export default async function StampPage() {
   const ctx = await requireScope();
   if (!maySetup(ctx.user, SETUP_PAGES.find((p) => p.href === "/settings/stamp")!)) return <NoAccess title="The stamp" who="control" />;
-  const [own, organization, switches, jar] = await Promise.all([projectSettings(ctx.projectId), orgSettings(), liberty(), cookies()]);
-  const free = switches.find((one) => one.key === "POLICY_PDF_STAMP")?.free ?? true;
+  const [own, organization, switches, jar] = await Promise.all([projectSettings(ctx.projectId), orgSettings(), projectLiberty(ctx.projectId), cookies()]);
+  const item = switches.find((one) => one.key === "POLICY_PDF_STAMP");
+  const free = item?.free ?? true;
+  const exception = item?.exceptHere ? item.except.find((e) => e.projectId === ctx.projectId) : undefined;
   const mine = stampOwn(own);
   const project = ctx.project.code;
   const changes = mayChangeControlRoom(ctx.user);
   const lead = mine
     ? free
-      ? `${project}'s own stamp, changed here; what it leaves as the organization's goes on following it.`
+      ? exception
+        ? <>{project}&rsquo;s own stamp, changed here; what it leaves as the organization&rsquo;s goes on following it. <ExceptionNote project={project} what="the stamp" exception={exception} /></>
+        : `${project}'s own stamp, changed here; what it leaves as the organization's goes on following it.`
       : `${project}'s own stamp, changed here before the organization fixed it for every project: it stays as it is, and nothing more is changed here.`
+    : free && exception
+      ? <>The organization&rsquo;s stamp. <ExceptionNote project={project} what="the stamp" exception={exception} /> A change here is {project}&rsquo;s own, which the organization&rsquo;s later changes never touch.{changes ? null : " Whoever acts as the control function changes it."}</>
     : free
       ? <>The organization&rsquo;s stamp. Projects may change it: a change here is {project}&rsquo;s own, which the organization&rsquo;s later changes never touch.{changes ? null : " Whoever acts as the control function changes it."}</>
       : <>The organization&rsquo;s stamp, the same on every project.{" "}

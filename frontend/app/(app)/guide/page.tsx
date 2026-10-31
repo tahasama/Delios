@@ -1,3 +1,4 @@
+import { Support, SupportLine, supportContact } from "@/components/support";
 import Link from "next/link";
 import { RAILS } from "@/lib/core/rails";
 import { requireScope } from "@/lib/core/scope";
@@ -15,9 +16,9 @@ import { getMe } from "@/lib/account/api";
 import { SETUP_PAGES, maySetup } from "@/app/(app)/settings/setup-pages";
 import { cn } from "@/lib/core/utils";
 import { Chip } from "@/components/ui";
-import { stateNames, stateName, supplierStageName, SUPPLIER_STAGES, SUPPLIER_STAGE_MEANING } from "@/lib/core/state-names";
+import { stateNames, stateName, supplierStageName, docStateName, SUPPLIER_STAGES, SUPPLIER_STAGE_MEANING } from "@/lib/core/state-names";
 import { stateLook } from "@/lib/core/state-look";
-import { DOC_STATES, DOC_STATE_LABEL, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_MEANING } from "@/lib/core/standard";
+import { DOC_STATES, DOC_STATE_COLOR, DOC_MEANING, REV_STATES, REV_MEANING } from "@/lib/core/standard";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Help & orientation" };
@@ -35,7 +36,7 @@ const DAILY: Place[] = [
 ];
 
 const CONTROL: Place[] = [
-  { href: "/conformance", title: "Assurance", text: "The checks run every day, how far the register can be trusted, and what to put right.", icon: ShieldCheck },
+  { href: "/conformance", title: "Assurance", text: "The checks, run when you ask, how far the register can be trusted, and what to put right.", icon: ShieldCheck },
   { href: "/reports", title: "Reports", text: "Where the register stands, deliveries against plan, reviews waiting, progress week by week, who owes what, and the register on any day. Each prints.", icon: ListChecks },
   { href: "/exposures", title: "Use and copy exposure", text: "Copies that went out of a revision no longer valid, who holds them, and what is still to settle.", icon: Network },
   { href: "/import", title: "Import & export", text: "A deliverable list, a team, the matrix or a list, brought in from a template: each file is checked before anything is written.", icon: Import },
@@ -69,7 +70,7 @@ const CODES: (Place & { list?: string })[] = [
  * read a document number, then where each thing is done. How the project is set up is not repeated here (owner: "no more
  * redundancies"): the Settings pages are read by everyone of ours, and listed here as they open for the person.
  */
-export default async function GuidePage({ searchParams }: { searchParams: Promise<{ role?: string }> }) {
+export default async function GuidePage({ searchParams }: { searchParams: Promise<{ role?: string; support?: string }> }) {
   const ctx = await requireScope();
   const { user, project } = ctx;
   const sp = await searchParams;
@@ -80,7 +81,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
   };
   const [roleOptions, directory, me, familyList, typed] = await Promise.all([
     contractRoleOptions().then((all) => all.filter((r) => r.code !== "GENERIC")),
-    api<Directory>(projectPath(ctx, "/people/directory")).catch(() => null),
+    api<Directory>(projectPath(ctx, "/people/directory"), { keep: { areas: [] } }).catch(() => null),
     getMe(),
     families(ctx).catch(() => []),
     typesByFamily(ctx).catch(() => []),
@@ -113,12 +114,16 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
     { href: "#families", label: "Document families" },
     { href: "#places", label: "Where things are done" },
   ];
+  const contact = await supportContact();
 
   return (
     <div className="space-y-4">
       <section className="register register-sheet register-sheet-open">
         <div className="px-5 pt-6 pb-4 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="plate-title text-slate-950">Help &amp; orientation</h1>
+          <Support projectId={project.id} contact={contact} startOpen={sp.support === "1"} />
+          </div>
           <p className="plate-meta mt-2">{project.code} · {ours ? `we are ${ours.label}` : "our role is not stated"}</p>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
             What the colours down the side of a line say, what the codes mean, the roles an organization plays on a project, how this
@@ -127,6 +132,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
           <nav aria-label="On this page" className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
             {jumps.map((one) => <a key={one.href} href={one.href} className="font-semibold text-link hover:underline">{one.label}</a>)}
           </nav>
+          <div className="mt-3"><SupportLine contact={contact} /></div>
         </div>
       </section>
 
@@ -163,10 +169,10 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
         </div>
         <div className="space-y-5 px-5 py-4 sm:px-6">
           <States title="Document state" said="the document as a whole"
-            rows={DOC_STATES.map((s) => ({ key: s, name: DOC_STATE_LABEL[s], tone: DOC_STATE_COLOR[s], ...DOC_MEANING[s] }))} />
+            rows={DOC_STATES.map((s) => ({ key: s, name: docStateName(names, s), tone: DOC_STATE_COLOR[s], ...DOC_MEANING[s] }))} />
           <States title="Revision state" said="its latest revision, A, B, C…"
             rows={[
-              { key: "NONE", name: "No revision yet", tone: stateLook("NONE").pill, means: "The number is reserved; nothing has been written under it yet.", how: "A document registered without a file, or asked of a supplier." },
+              { key: "NONE", name: names.NONE, tone: stateLook("NONE").pill, means: "The number is reserved; nothing has been written under it yet.", how: "A document registered without a file, or asked of a supplier." },
               ...REV_STATES.map((s) => ({ key: s, name: stateName(names, s), tone: stateLook(s).pill, ...REV_MEANING[s] })),
             ]} />
           <States title="A supplier's document" said="asked of a supplier from its package: read in its own stages, in the same column"
@@ -181,17 +187,16 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
           <span className="stencil mr-1 text-slate-500">Roles on a project</span>
           <span className="text-[11px] text-slate-500">what an organization can be contracted to do, on any project: what it does, where approval sits, what its verdict is worth</span>
         </div>
-        <div className="border-b border-line px-3">
-        {/* Plain tabs on one line (owner: "simplistic tabs, inline"), the document page's: the chosen one underlined. */}
-        <nav aria-label="Roles" className="scroll-thin flex gap-1 overflow-x-auto overflow-y-hidden">
+        <div className="border-b border-line">
+        {/* On the tab strip, as every real tab (owner: "you forgot to update the tabs styling"). */}
+        <nav aria-label="Roles" className="strip">
           {roleOptions.map((r) => {
             const us = r.code === project.role;
             const here = playing.has(r.code);
             const on = shown?.code === r.code;
             return (
               <Link key={r.code} href={`/guide?role=${r.code}#roles`} scroll={false} title={r.label} aria-current={on ? "page" : undefined}
-                className={cn("-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold transition",
-                  on ? "border-brand-line text-brand-ink" : "border-transparent text-slate-500 hover:text-slate-800")}>
+                className="strip-tab">
                 {r.code}
                 {us ? <span className="rounded-sm bg-brand px-1 text-[10px] font-bold uppercase leading-4 text-white">us</span>
                   : here ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-label={`on ${project.code}`} /> : null}
@@ -285,6 +290,7 @@ export default async function GuidePage({ searchParams }: { searchParams: Promis
         {canControl ? <Places title="See the whole flow" said="for the control function: how the register stands, and what to put right" places={CONTROL} /> : null}
         {setup.length ? <Places title="How it is set up" said="read by everyone of ours; changed by whoever each page names" places={setup} /> : null}
       </div>
+
     </div>
   );
 }

@@ -30,13 +30,36 @@ export async function delegateReviewAction(_prev: State | undefined, formData: F
   let row: Delegation;
   try {
     row = await api<Delegation>(projectPath(ctx, `/reviews/${cycleId}/delegations`), {
-      body: { toUserId, endDate, reason: text(formData, "reason") || null },
+      body: { toUserId, endDate, reason: text(formData, "reason") || null, fromUserId: text(formData, "fromUserId") || null },
     });
   } catch (e) {
     return { error: refusal(e).message };
   }
   revalidatePath(`/reviews/${cycleId}`);
-  return { message: row.status === "OPEN" ? "Asked. It starts once the control function lets it." : `${row.toName} answers it in your place.` };
+  const forOther = Boolean(text(formData, "fromUserId"));
+  if (row.status === "OPEN") return { message: "Asked. It starts once the control function lets it." };
+  return { message: forOther ? `${row.toName} answers it in ${row.fromName}'s place; both are told.` : `${row.toName} answers it in your place.` };
+}
+
+/**
+ * Adds people in copy on a review in flow (the control function, whoever holds Manage): told now and of what comes of it, never
+ * asked to answer. Why is optional.
+ */
+export async function informReviewAction(_prev: State | undefined, formData: FormData): Promise<State> {
+  const ctx = await requireScope();
+  const cycleId = text(formData, "cycleId");
+  const copyUserIds = formData.getAll("copyUserIds").map(String).filter(Boolean);
+  if (!copyUserIds.length) return { error: "Choose who is added in copy." };
+  let done: { copied: number };
+  try {
+    done = await api<{ copied: number }>(projectPath(ctx, `/reviews/${cycleId}/people`), {
+      body: { copyUserIds, reason: text(formData, "reason") || null },
+    });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath(`/reviews/${cycleId}`);
+  return { message: `${done.copied} added in copy; each is told.` };
 }
 
 /** One act on a hand-over already made, by its id. */

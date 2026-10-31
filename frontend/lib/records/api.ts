@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { api, projectPath } from "@/lib/client";
+import { api, notYours, projectPath } from "@/lib/client";
 
 type Scope = { projectId: string };
 
@@ -11,20 +11,25 @@ type AssetRow = {
 
 /** The project's asset tags, by tag. */
 export const projectAssets = cache(async (scope: Scope, q?: string): Promise<AssetRow[]> =>
-  api<AssetRow[]>(projectPath(scope, "/assets"), { query: { q } }).catch(() => []));
+  api<AssetRow[]>(projectPath(scope, "/assets"), { keep: { areas: ["assets", "docs"] }, query: { q } }).catch(() => []));
+
+/** Assets & tags as its page shows it: the tags drawn, and of the rest only the counts and the areas and systems to filter by. */
+export const assetsPage = cache(async (scope: Scope, query: { q?: string; area?: string; system?: string; take: number }) =>
+  api<{ total: number; linked: number; bare: number; areas: string[]; systems: string[]; items: AssetRow[] }>(projectPath(scope, "/assets/page"),
+    { query, keep: { areas: ["assets", "docs"] } }));
 
 /** One asset and the documents (that the reader may see) describing it. */
 export async function projectAsset(scope: Scope, id: string) {
   return api<{
     asset: AssetRow;
     documents: { id: string; number: string; title: string; docType: string; discipline: string; state: string; current: { value: string; statusCode: string | null } | null }[];
-  }>(projectPath(scope, `/assets/${id}`)).catch(() => null);
+  }>(projectPath(scope, `/assets/${id}`), { keep: { areas: ["assets", "docs"] } }).catch((e) => { if (notYours(e)) return null; throw e; });
 }
 
 /** The assets a document is linked to. */
 export async function documentAssets(scope: Scope, documentId: string) {
   return api<{ id: string; assetId: string; code: string; name: string; createdBy: string; createdAt: string }[]>(
-    projectPath(scope, `/documents/${documentId}/assets`)).catch(() => []);
+    projectPath(scope, `/documents/${documentId}/assets`), { keep: { areas: ["assets", "docs"] } }).catch(() => []);
 }
 
 type CallRow = {
@@ -34,7 +39,7 @@ type CallRow = {
 
 /** Every call to a department so far, the newest first within each. */
 export const requirementCalls = cache(async (scope: Scope): Promise<CallRow[]> =>
-  api<CallRow[]>(projectPath(scope, "/requirement-calls")).catch(() => []));
+  api<CallRow[]>(projectPath(scope, "/requirement-calls"), { keep: { areas: ["assets", "plan", "transmittals"] } }).catch(() => []));
 
 /** Every department's readiness answer, per activity. */
 export const readinessAnswers = cache(async (scope: Scope) =>
@@ -42,7 +47,7 @@ export const readinessAnswers = cache(async (scope: Scope) =>
     activityId: string; department: string; available: boolean; note: string | null; confirmedByName: string; confirmedAt: string;
     automatic?: boolean; revokedAt?: string | null; revokedByName?: string | null; revokedReason?: string | null;
   }[]>(
-    projectPath(scope, "/readiness")).catch(() => []));
+    projectPath(scope, "/readiness"), { keep: { areas: ["assets", "plan"] } }).catch(() => []));
 export type ControlledRow = {
   id: string; projectId: string | null; kind: string; key: string; title: string; versionLabel: string; state: string; submittedById: string | null; rowCount: number;
   sourceName: string | null; sourceSize: number | null; sourceHash: string | null; notes: string | null; payload: unknown; diff: unknown;
@@ -53,5 +58,5 @@ export type ControlledRow = {
 /** Uploaded versions of a list, newest first: the project's own, or (no project) the organization's. */
 export async function controlledVersions(scope: Scope | null, kind?: string, key?: string): Promise<ControlledRow[]> {
   const path = scope ? projectPath(scope, "/controlled") : "/api/controlled";
-  return api<ControlledRow[]>(path, { query: { kind, key } }).catch(() => []);
+  return api<ControlledRow[]>(path, { keep: { areas: ["assets", "plan"] }, query: { kind, key } }).catch(() => []);
 }

@@ -2,7 +2,7 @@
  * On or off, as a switch: the one control for anything switched on and off (a set, a list, a person's sign-in…). It
  * submits the form it sits in, which carries what turning it means; its label says what it switches and how it stands.
  */
-export function Switch({ on, label, disabled, form, words = ["On", "Off"] }: {
+export function Switch({ on, label, disabled, form, words = ["On", "Off"], onToggle }: {
   on: boolean;
   /** How it reads on and off, when plain On / Off would say less ("Free" / "Fixed"). */
   words?: [string, string];
@@ -11,11 +11,14 @@ export function Switch({ on, label, disabled, form, words = ["On", "Off"] }: {
   disabled?: boolean;
   /** The form it submits, when it does not sit inside it. */
   form?: string;
+  /** Instead of submitting: what pressing it does (asking first, before anything is saved). */
+  onToggle?: () => void;
 }) {
   return (
     <button
-      type="submit"
-      form={form}
+      type={onToggle ? "button" : "submit"}
+      onClick={onToggle}
+      form={onToggle ? undefined : form}
       role="switch"
       aria-checked={on}
       aria-label={label}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { btn } from "@/components/ui";
+import { Floating } from "@/components/floating";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -45,11 +46,12 @@ export function DateWindow({ fields, on, from, to }: {
   const [end, setEnd] = useState(to || from);
   const [month, setMonth] = useState(() => parse(from) ?? new Date());
   const box = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setField(on || only); setStart(from); setEnd(to || from); }, [on, only, from, to]);
   useEffect(() => {
     if (!open) return;
-    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
+    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node)) setOpen(false); };
     const esc = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", away);
     document.addEventListener("keydown", esc);
@@ -96,7 +98,7 @@ export function DateWindow({ fields, on, from, to }: {
       </button>
 
       {open ? (
-        <div className="dt-menu absolute left-0 top-full z-40 mt-1 w-60 rounded-xl p-1.5">
+        <Floating anchor={box} panel={panel} width={240} className="dt-menu overflow-y-auto rounded-xl p-1.5">
           {!field ? (
             <>
               <p className="stencil px-2 pb-1 pt-1 text-slate-400">Which date</p>
@@ -167,7 +169,7 @@ export function DateWindow({ fields, on, from, to }: {
               </div>
             </>
           )}
-        </div>
+        </Floating>
       ) : null}
     </div>
   );

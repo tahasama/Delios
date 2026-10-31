@@ -54,7 +54,14 @@ type ScheduleImportView = {
   changes: { code: string; name: string; type: "NEW" | "MOVED" | "CHANGED" | "REMOVED"; oldStart: LocalDateJson; newStart: LocalDateJson; oldFinish: LocalDateJson; newFinish: LocalDateJson }[];
 };
 
-type ScheduleSourceView = { id: string; documentId: string; defaultLeadDays: number; riskWindowDays: number };
+type ScheduleSourceView = { id: string; documentId: string };
+
+/**
+ * The days around an action in force on the project (backend `ScheduleDays`): its own where it changed them, else the
+ * organization's (else the app's 7), with the organization's beside them.
+ */
+export type ScheduleDaysView = { lead: number; risk: number; ownLead: boolean; ownRisk: boolean; organizationLead: number; organizationRisk: number };
+const APP_DAYS: ScheduleDaysView = { lead: 7, risk: 7, ownLead: false, ownRisk: false, organizationLead: 7, organizationRisk: 7 };
 
 /** Another organization's people do not read the schedule: for them it is empty. */
 function orNothing<T>(fallback: T) {
@@ -66,20 +73,20 @@ function orNothing<T>(fallback: T) {
 
 /** The project's schedule document and its latest reads, newest first. */
 export const scheduleSource = cache(async (scope: Scope) =>
-  api<{ source: ScheduleSourceView | null; imports: ScheduleImportView[] }>(projectPath(scope, "/schedule"))
-    .catch(orNothing({ source: null as ScheduleSourceView | null, imports: [] as ScheduleImportView[] })));
+  api<{ source: ScheduleSourceView | null; imports: ScheduleImportView[]; days: ScheduleDaysView }>(projectPath(scope, "/schedule"), { keep: { areas: ["plan", "docs"] } })
+    .catch(orNothing({ source: null as ScheduleSourceView | null, imports: [] as ScheduleImportView[], days: APP_DAYS })));
 
 /** The schedule's activities in force, by start date. */
 export const activityList = cache(async (scope: Scope): Promise<ActivitySummary[]> =>
-  api<ActivitySummary[]>(projectPath(scope, "/activities")).catch(orNothing([] as ActivitySummary[])));
+  api<ActivitySummary[]>(projectPath(scope, "/activities"), { keep: { areas: ["plan"] } }).catch(orNothing([] as ActivitySummary[])));
 
 /** One activity with its needs and decisions, or null. */
 export const activityDetail = cache(async (scope: Scope, id: string): Promise<ActivityDetail | null> =>
-  api<ActivityDetail>(projectPath(scope, `/activities/${id}`)).catch(orNothing(null)));
+  api<ActivityDetail>(projectPath(scope, `/activities/${id}`), { keep: { areas: ["plan", "assets", "docs", "reviews", "transmittals"] } }).catch(orNothing(null)));
 
 /** For each need of an activity, the checkpoints its document went through and the first that slipped. */
 export const activityLateness = cache(async (scope: Scope, id: string): Promise<NeedLateness[]> =>
-  api<NeedLateness[]>(projectPath(scope, `/activities/${id}/lateness`)).catch(orNothing([] as NeedLateness[])));
+  api<NeedLateness[]>(projectPath(scope, `/activities/${id}/lateness`), { keep: { areas: ["plan", "docs", "reviews", "transmittals"] } }).catch(orNothing([] as NeedLateness[])));
 // ── The plan, as the schedule screens show it ─────────────────────────────────
 
 /** One thing an action needs: a document, for what (the statuses it names, or its purpose), by when, and where it stands. */
@@ -142,9 +149,21 @@ export type PlanAction = {
   /** …and the day it is at risk from: overall, and for each discipline (null when nothing is missing or there is no day). */
   riskFrom: Date | null;
   disciplineRiskFrom: Record<string, Date | null>;
+  /**
+   * The planner says its start, its finish, happened (P6's "A": "Achieved", owner). The planner's word on the work,
+   * never ours on its documents: an achieved action is not one whose documents are there.
+   */
+  startAchieved: boolean; finishAchieved: boolean;
+  /** Where it sits in the planner's WBS, from the top down ("CIV Civil works", "FDN Foundations"); empty when none. */
+  wbs: string[];
+  /** Its WBS element's place in the planner's order. */
+  wbsOrder: number | null;
+  /** From when its documents are needed: the earliest listed one's due day, else the project's lead before its day. */
+  neededFrom: Date | null;
 };
 
-type Plan = { versionInForce: string | null; actions: PlanAction[] };
+/** `total`: every action in force, when more than the backend sends at once; absent when all came. */
+type Plan = { versionInForce: string | null; actions: PlanAction[]; total?: number | null };
 
 /** The backend sends days and moments as text; the screens count with dates. Nothing else changes. */
 function datesOf(raw: Plan): Plan {
@@ -153,12 +172,13 @@ function datesOf(raw: Plan): Plan {
   type Raw = Record<string, unknown> & { [key: string]: never };
   return {
     versionInForce: raw.versionInForce,
+    total: raw.total ?? null,
     actions: raw.actions.map((a) => {
       const r = a as unknown as Raw & PlanAction;
       return {
         ...r,
         start: day(r.start as unknown as string), finish: day(r.finish as unknown as string), lastMetAt: at(r.lastMetAt as unknown as string),
-        riskFrom: day(r.riskFrom as unknown as string),
+        riskFrom: day(r.riskFrom as unknown as string), neededFrom: day(r.neededFrom as unknown as string),
         disciplineRiskFrom: Object.fromEntries(Object.entries(r.disciplineRiskFrom).map(([k, v]) => [k, day(v as unknown as string)])),
         moved: r.moved ? { ...r.moved, wasStart: day(r.moved.wasStart as unknown as string), wasFinish: day(r.moved.wasFinish as unknown as string) } : null,
         needs: r.needs.map((n) => ({ ...n, neededBy: day(n.neededBy as unknown as string)! })),
@@ -174,7 +194,31 @@ function datesOf(raw: Plan): Plan {
 
 /** Every action in force, in one answer from the backend; another organization's people get none. */
 const plan = cache(async (scope: Scope): Promise<Plan> =>
-  datesOf(await api<Plan>(projectPath(scope, "/plan")).catch(orNothing({ versionInForce: null, actions: [] } as Plan))));
+  datesOf(await api<Plan>(projectPath(scope, "/plan"), { keep: { areas: ["plan", "docs", "reviews", "transmittals"] } }).catch(orNothing({ versionInForce: null, actions: [] } as Plan))));
+
+/** An action as a list names it: the Action filter, the calendar's days. */
+export type PlanLight = { code: string; name: string; start: string | null; finish: string | null };
+
+/** The Schedule as its page shows it: the actions on screen in full, of the rest only what is counted (backend `/plan/page`). */
+export type PlanPage = {
+  versionInForce: string | null; actions: PlanAction[]; matching: number; undated: number; everywhere: number;
+  windowFrom: Date | null; windowTo: Date | null; spanFrom: Date | null; spanTo: Date | null;
+  hasWbs: boolean; sort: string; dir: "asc" | "desc"; withoutNote: number; codes: PlanLight[]; calendar: PlanLight[];
+};
+
+/** The Schedule's page for this question: its window or page, its counts; never the whole schedule in full. */
+export const planPage = cache(async (scope: Scope, query: Record<string, string | number | null>): Promise<PlanPage> => {
+  type Raw = Omit<PlanPage, "windowFrom" | "windowTo" | "spanFrom" | "spanTo" | "actions"> & {
+    actions: PlanAction[]; windowFrom: string | null; windowTo: string | null; spanFrom: string | null; spanTo: string | null;
+  };
+  const raw = await api<Raw>(projectPath(scope, "/plan/page"), { query, keep: { areas: ["plan", "docs", "reviews", "transmittals"] } });
+  const day = (iso: string | null) => (iso ? new Date(`${iso.slice(0, 10)}T00:00:00.000Z`) : null);
+  return {
+    ...raw,
+    actions: datesOf({ versionInForce: raw.versionInForce, actions: raw.actions }).actions,
+    windowFrom: day(raw.windowFrom), windowTo: day(raw.windowTo), spanFrom: day(raw.spanFrom), spanTo: day(raw.spanTo),
+  };
+});
 
 /** Every action in force, with its needs, decisions and confirmations. */
 export const planActions = cache(async (scope: Scope): Promise<PlanAction[]> => (await plan(scope)).actions);
@@ -183,10 +227,17 @@ export const planActions = cache(async (scope: Scope): Promise<PlanAction[]> => 
 export const planVersion = cache(async (scope: Scope): Promise<string | null> => (await plan(scope)).versionInForce);
 
 /** One action by its code, also one the schedule has since dropped; null when there is none. */
-export const planActionByCode = cache(async (scope: Scope, code: string): Promise<PlanAction | null> => {
-  const one = await api<Plan>(projectPath(scope, `/plan/${encodeURIComponent(code)}`)).catch(orNothing(null as Plan | null));
-  return one ? datesOf(one).actions[0] ?? null : null;
+export const planActionByCode = cache(async (scope: Scope, code: string): Promise<PlanAction | null> =>
+  (await planActionRead(scope, code)).action);
+
+/** One action by its code with the schedule read in force: its page, without reading the whole plan for the label. */
+export const planActionRead = cache(async (scope: Scope, code: string): Promise<{ action: PlanAction | null; version: string | null }> => {
+  const one = await api<Plan>(projectPath(scope, `/plan/${encodeURIComponent(code)}`), { keep: { areas: ["plan", "docs", "reviews", "transmittals"] } }).catch(orNothing(null as Plan | null));
+  return one ? { action: datesOf(one).actions[0] ?? null, version: one.versionInForce } : { action: null, version: null };
 });
+
+/** How many actions are in force when the plan holds more than one answer carries; null when every one came. */
+export const planTotal = cache(async (scope: Scope): Promise<number | null> => (await plan(scope)).total ?? null);
 
 // ── Schedule versions ────────────────────────────────────────────────────────
 // ── Notices ──────────────────────────────────────────────────────────────────
@@ -213,7 +264,7 @@ export function noticeHistory(notices: NoticeView[], now = new Date()): { count:
  * a postponement to confirm, a request to add a document to an action, the schedule's upkeep.
  */
 type ActionWork = {
-  kind: "CONFIRM_DOCUMENTS" | "CONFIRM_POSTPONEMENT" | "ADD_TO_ACTION" | "CONFIRM_ACTION_REQUEST" | "CONFIRM_PERSON" | "UNTAGGED" | "SCHEDULE_READ_FAILED";
+  kind: "CONFIRM_DOCUMENTS" | "CONFIRM_POSTPONEMENT" | "ADD_TO_ACTION" | "CONFIRM_ACTION_REQUEST" | "CONFIRM_PERSON" | "UNTAGGED" | "SCHEDULE_READ_FAILED" | "LIST_TO_BRING_IN";
   activityId: string | null; code: string | null; name: string | null; day: string | null; department: string | null;
   count: number; since: string | null; transmittalId: string | null; number: string | null; from: string | null;
   /** On a request about an action: a document to add, or a missing discipline to tag. */
@@ -221,7 +272,7 @@ type ActionWork = {
 };
 
 export const actionWork = cache(async (scope: Scope): Promise<ActionWork[]> =>
-  api<ActionWork[]>(projectPath(scope, "/activities-work")).catch(() => []));
+  api<ActionWork[]>(projectPath(scope, "/activities-work"), { keep: { areas: ["plan", "docs"] } }).catch(() => []));
 
 /** What a request will change once it is confirmed, as the control function checked it. */
 export type ActivityProposal = { documentIds: string[] | null; department: string | null; departments: string[] | null; purpose: string | null; statuses: string[] | null };
@@ -235,4 +286,4 @@ export type ActivityRequest = {
 };
 
 export const activityRequests = cache(async (scope: Scope, activityId: string): Promise<ActivityRequest[]> =>
-  api<ActivityRequest[]>(projectPath(scope, `/activities/${activityId}/requests`)).catch(() => []));
+  api<ActivityRequest[]>(projectPath(scope, `/activities/${activityId}/requests`), { keep: { areas: ["plan", "assets", "transmittals"] } }).catch(() => []));

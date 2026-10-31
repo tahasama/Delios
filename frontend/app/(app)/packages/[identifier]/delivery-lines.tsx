@@ -58,7 +58,15 @@ export function DeliveryLines({ packageId, packageNumber, lines, mayTakeOut, rul
                   <Td className="max-w-72 text-[12.5px] text-slate-500">{m.title}{m.missing && !m.ready ? <span className="block text-[11px] text-amber-700">not yet at required status</span> : null}</Td>
                   <Td className="whitespace-nowrap text-xs text-slate-600">{m.revision ? <>rev {m.revision} · {m.status}</> : "not released"}</Td>
                   <Td className="whitespace-nowrap text-xs text-slate-600" title={m.requiredMeaning ?? undefined}>{m.required.join(" or ")}</Td>
-                  <Td>{m.ready ? <ToneChip inRegister tone="done">ready</ToneChip> : <ToneChip inRegister tone="waiting">not ready</ToneChip>}</Td>
+                  <Td>
+                    {m.ready ? <ToneChip inRegister tone="done">ready</ToneChip> : <ToneChip inRegister tone="waiting">not ready</ToneChip>}
+                    {/* Why, in plain words: released, but at a status the package does not take; or nothing released yet. */}
+                    {m.ready ? null : (
+                      <span className="mt-0.5 block text-[11px] text-slate-500">
+                        {m.revision ? `released at ${m.status ?? "no status"}; the package needs ${m.required.join(" or ")}` : "nothing released yet"}
+                      </span>
+                    )}
+                  </Td>
                   <Td className="min-w-64 max-w-md text-xs text-slate-600">
                     {m.comments.length ? (
                       <ul className="space-y-1">

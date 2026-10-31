@@ -31,7 +31,7 @@ export default async function NewDocumentPage({ searchParams }: { searchParams: 
     getActiveSet("DISCIPLINES"),
     getActiveSet("SUBPROJECTS"),
     // Whose a document is: the outside organizations, as the register checks it.
-    api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name, props: {} }))).catch(() => []),
+    api<{ code: string; name: string }[]>("/api/parties", { keep: { areas: [] } }).then((rows) => rows.map((one) => ({ code: one.code, label: one.name, props: {} }))).catch(() => []),
     getActiveSet("PURCHASE_ORDERS"),
     getActiveSet("CRITICALITY"),
     getActiveSet("CONFIDENTIALITY"),

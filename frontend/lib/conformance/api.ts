@@ -48,14 +48,15 @@ async function orNothing<T>(load: () => Promise<T>, nothing: T): Promise<T> {
 
 /** Every check, its result in the last finished run, and what is switched off. Read once a request. */
 export const checksOf = cache(async (projectId: string): Promise<ChecksAnswer> =>
-  orNothing(() => api<ChecksAnswer>(projectPath({ projectId }, "/checks")), { lastRun: null, checks: [] }));
+  orNothing(() => api<ChecksAnswer>(projectPath({ projectId }, "/checks"), { keep: { areas: ["checks"] } }), { lastRun: null, checks: [] }));
 
 /** The defects not closed (open and accepted), most serious first. Read once a request. */
 export const liveDefects = cache(async (projectId: string): Promise<DefectView[]> =>
-  orNothing(() => api<DefectView[]>(projectPath({ projectId }, "/defects")), []));
+  orNothing(() => api<DefectView[]>(projectPath({ projectId }, "/defects"), { keep: { areas: ["checks", "docs"] } }), []));
 
 /** One run, as it stands now. */
 async function runOf(scope: { projectId: string }, runId: string): Promise<RunView> {
+  // Read fresh: a run waited on is a result to come, never a kept answer (a kept QUEUED answered every look).
   return api<RunView>(projectPath(scope, `/checks/runs/${runId}`));
 }
 
@@ -76,7 +77,7 @@ export async function runAndWait(scope: { projectId: string }, seconds = 25): Pr
 
 /** How many documents the project holds, in every state. */
 export const documentCount = cache(async (projectId: string): Promise<number> =>
-  (await api<RegisterPage>(projectPath({ projectId }, "/register"), { query: { view: "all", per: 25 } })).total);
+  (await api<RegisterPage>(projectPath({ projectId }, "/register"), { keep: { areas: ["docs"] }, query: { view: "all", per: 25 } })).total);
 
 /** Documents carrying an open or accepted Critical or Major defect: those not clear. */
 export function flawedDocuments(defects: DefectView[]): number {

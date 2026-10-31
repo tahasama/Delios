@@ -34,7 +34,7 @@ public sealed class RegisterQueryTests(Infrastructure infrastructure) : IClassFi
         var reviewId = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"{p}/reviews/{reviewId}/answer", new { });
         await Flow.PostAsync(approver, $"{p}/reviews/{reviewId}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", new { });
+        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", await Flow.ReleaseBodyAsync(controller));
         await Api.RegisterAsync(engineer, released.Project, Api.Drawing("Switchroom layout", "EL"));
         await Api.RegisterAsync(engineer, released.Project, Api.Drawing("Pump bay sections"));
 
@@ -43,7 +43,6 @@ public sealed class RegisterQueryTests(Infrastructure infrastructure) : IClassFi
         var row = all.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("revisionState").GetString() == "RELEASED");
         Assert.Equal(("IFC", "C1", "Approver"),
             (row.GetProperty("releasedStatus").GetString(), row.GetProperty("verdict").GetString(), row.GetProperty("decidedBy").GetString()));
-        Assert.Contains(all.GetProperty("lists").GetProperty("values").GetProperty("STATUSES").EnumerateArray(), v => v.GetProperty("code").GetString() == "IFC");
 
         // Alternatives with commas; every word of one must appear.
         Assert.Single(Numbers(await GetAsync(engineer, $"{p}/register?q=switchroom")));

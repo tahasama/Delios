@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireScope } from "@/lib/core/scope";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
+import { once } from "@/lib/core/once";
 import { formPolicy, checkForm } from "@/lib/settings/field-policy";
 import { isReadOnly } from "@/lib/core/auth";
 import { filterFromForm, isEmpty } from "@/lib/packages/package-rule";
@@ -29,8 +30,6 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
 
   // A package filled by a rule states it as a filter.
   const filter = filterFromForm(formData);
-  // Handed to one or more organizations on the project.
-  const partyIds = formData.getAll("recipientPartyIds").map(String).filter(Boolean);
   const completionDate = String(formData.get("completionDate") ?? "");
   // One status or several: a document is ready at any of them.
   const requiredStatuses = formData.getAll("requiredStatus").map(String).filter(Boolean);
@@ -38,7 +37,6 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   const ownerList = formData.getAll("compositionOwnerId").map(String).filter(Boolean);
   const acceptorList = formData.getAll("acceptanceAuthorityId").map(String).filter(Boolean);
  if (!title) return { error: "Give the package a title." };
- if (!partyIds.length) return { error: "Choose who it is delivered to — another organization, or us." };
  if (!completionDate) return { error: "The completion date is required — it triggers assessment." };
  if (!requiredStatuses.length) return { error: "State the status members shall have reached." };
  if (!ownerList.length || !acceptorList.length) return { error: "Say who puts it together and who accepts it." };
@@ -59,11 +57,13 @@ export async function createPackageAction(_prev: { error?: string } | undefined,
   try {
     const created = await api<PackageView>(projectPath(ctx, "/packages"), {
       body: {
-        title, description, reasons: purposes.length ? purposes : null, requiredStatuses, ownerIds: ownerList, acceptorIds: acceptorList, recipientPartyIds: partyIds,
+        title, description, reasons: purposes.length ? purposes : null, requiredStatuses, ownerIds: ownerList, acceptorIds: acceptorList,
         completionDate, kind: "DELIVERY", extras: Object.keys(extras).length ? extras : null,
+        // Inside another package: a branch of its arborescence.
+        parentId: String(formData.get("parentId") ?? "") || null,
         rule: isEmpty(filter) ? null : { disciplines: filter.disciplines ?? [], docTypes: filter.docTypes ?? [], originators: filter.originators ?? [], assetIds: filter.assetIds ?? [] },
       },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "create") ?? randomUUID(),
     });
     number = created.number;
     // Started from a supplier package (Deliver): it holds that package's documents.
@@ -91,7 +91,7 @@ async function onPackage(packageId: string, path: string, body: unknown, method:
   }
 }
 
-export async function addPackageMemberAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function addPackageMemberAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const packageId = String(formData.get("packageId") ?? "");
   const documentIds = formData.getAll("documentId").map(String).filter(Boolean);
   const requiredStatuses = formData.getAll("requiredStatus").map(String).filter(Boolean);
@@ -101,7 +101,7 @@ export async function addPackageMemberAction(_prev: { error?: string } | undefin
   if (error) return { error };
   // From the register's "Add to package": land on the package, where the result is.
   if (formData.get("redirect")) redirect(`/packages/${number}?added=${documentIds.length}`);
-  return {};
+  return { ok: "Added to the package." };
 }
 
 /**
@@ -172,7 +172,7 @@ export async function setPackageRuleAction(_prev: { error?: string } | undefined
  * Change a package while it is open: name and description; for a delivery package also its date, the statuses it
  * needs, who it goes to, who puts it together and who accepts it. The control function (and above); the backend checks.
  */
-export async function updatePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function updatePackageAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
   // Renumbered only before it was shared or sent; the backend refuses otherwise.
@@ -186,22 +186,27 @@ export async function updatePackageAction(_prev: { error?: string } | undefined,
     ? {
         title, description, number,
         completionDate: date || null, clearCompletionDate: !date,
-        requiredStatuses: list("requiredStatus"), recipientPartyIds: list("recipientPartyIds"),
+        requiredStatuses: list("requiredStatus"),
         ownerIds: list("compositionOwnerId"), acceptorIds: list("acceptanceAuthorityId"),
       }
     : { title, description, number };
   if (full && !body.requiredStatuses?.length) return { error: "Say the status its documents need." };
-  if (full && !body.recipientPartyIds?.length) return { error: "Say who it is delivered to." };
   if (full && (!body.ownerIds?.length || !body.acceptorIds?.length)) return { error: "Say who puts it together and who accepts it." };
   const { error, number: now } = await onPackage(String(formData.get("packageId") ?? ""), "", body, "PUT");
   if (error) return { error };
   if (now && was && now !== was) redirect(`/packages/${now}`);
-  return {};
+  return { ok: "Saved." };
 }
 
 /** the control function shares a supplier's package with that supplier: once, and for good. */
 export async function sharePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const { error } = await onPackage(String(formData.get("packageId") ?? ""), "/share", {});
+  return error ? { error } : {};
+}
+
+/** "Fill the package": its supplier's documents in none of its packages yet are filed, by hand only. */
+export async function fillPackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const { error } = await onPackage(String(formData.get("packageId") ?? ""), "/fill", {});
   return error ? { error } : {};
 }
 
@@ -212,17 +217,19 @@ export async function sharePackageAction(_prev: { error?: string } | undefined, 
 export async function deletePackageAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const ctx = await requireScope();
   const packageId = String(formData.get("packageId") ?? "");
+  // Why is not asked (owner: "remove obligatory why, we don't care"); written, it goes on the record.
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!reason) return { error: "Say why it is deleted — it goes on the record." };
   const pkg = await packageView(ctx, packageId);
   if (!pkg) return { error: "That package no longer exists." };
   try {
-    await api(projectPath(ctx, `/packages/${packageId}`), { method: "DELETE", query: { reason } });
+    await api(projectPath(ctx, `/packages/${packageId}`), { method: "DELETE", query: reason ? { reason } : {} });
   } catch (e) {
     return { error: refusal(e).message };
   }
-  revalidatePath("/packages");
-  redirect(`/packages?category=${pkg.kind === "SUPPLY" ? "SUPPLIER" : "DELIVERY"}`);
+  revalidatePath("/packages", "layout");
+  // Removed from the package it sat in (its "Packages in it"), the page stays on that package.
+  const back = String(formData.get("back") ?? "");
+  redirect(back.startsWith("/packages/") ? back : `/packages?category=${pkg.kind === "SUPPLY" ? "SUPPLIER" : "DELIVERY"}`);
 }
 
 /** The acceptance authority accepts the delivered package: the last step. */
@@ -242,3 +249,80 @@ export async function acceptShortfallAction(_prev: { error?: string } | undefine
  * Step 2 of the schedule process: whoever plans says which departments
  * an activity concerns. Until this is done nobody can list its documents.
  */
+
+/**
+ * Moves a package inside another one, or to the top, while it is open (the control function). Its number never changes;
+ * the backend refuses another kind, another supplier, a package delivered, or one of its own branches.
+ */
+export async function movePackageAction(_prev: { error?: string; message?: string } | undefined, formData: FormData): Promise<{ error?: string; message?: string }> {
+  const ctx = await requireScope();
+  const packageId = String(formData.get("packageId") ?? "");
+  const parentId = String(formData.get("parentId") ?? "");
+  try {
+    await api(projectPath(ctx, `/packages/${packageId}/place`), {
+      method: "PUT",
+      body: { parentId: parentId && parentId !== "TOP" ? parentId : null, reason: String(formData.get("reason") ?? "").trim() || null },
+    });
+  } catch (e) {
+    return { error: refusal(e).message };
+  }
+  revalidatePath("/packages", "layout");
+  return { message: parentId && parentId !== "TOP" ? "Moved." : "Moved to the top." };
+}
+
+/**
+ * Several packages ticked on Packages, moved inside another (or to the top) at once, each as "Where it sits" does it;
+ * the backend checks each. Stops at the first it refuses, naming it.
+ */
+export async function movePackagesAction(_prev: { error?: string; message?: string } | undefined, formData: FormData): Promise<{ error?: string; message?: string }> {
+  const ctx = await requireScope();
+  const ids = formData.getAll("packageId").map(String).filter(Boolean);
+  const parentId = String(formData.get("parentId") ?? "");
+  let moved = 0;
+  for (const id of ids) {
+    try {
+      await api(projectPath(ctx, `/packages/${id}/place`), { method: "PUT", body: { parentId: parentId && parentId !== "TOP" ? parentId : null, reason: null } });
+      moved++;
+    } catch (e) {
+      revalidatePath("/packages", "layout");
+      return { error: `${moved ? `${moved} moved; then ` : ""}${refusal(e).message}` };
+    }
+  }
+  revalidatePath("/packages", "layout");
+  return { message: `${moved} moved.` };
+}
+
+/**
+ * Several packages ticked on Packages, removed at once with one why, each as its own page's Delete does it (a package in
+ * another hands its documents and packages back up there; one at the top goes only empty). Stops at the first refused.
+ */
+export async function deletePackagesAction(_prev: { error?: string; message?: string } | undefined, formData: FormData): Promise<{ error?: string; message?: string }> {
+  const ctx = await requireScope();
+  const ids = formData.getAll("packageId").map(String).filter(Boolean);
+  const reason = String(formData.get("reason") ?? "").trim();
+  let removed = 0;
+  for (const id of ids) {
+    try {
+      await api(projectPath(ctx, `/packages/${id}`), { method: "DELETE", query: reason ? { reason } : {} });
+      removed++;
+    } catch (e) {
+      revalidatePath("/packages", "layout");
+      return { error: `${removed ? `${removed} removed; then ` : ""}${refusal(e).message}` };
+    }
+  }
+  revalidatePath("/packages", "layout");
+  return { message: `${removed} removed.` };
+}
+
+/**
+ * Ask whoever accepts a package of ours for a waiver (owner: "they can be requested that while trying to deliver it,
+ * thus the Ask first"): its readiness is checked now, freezing the list of what is missing, and that list is sent to them
+ * on a transmittal. Granted, the package may be delivered with those outstanding.
+ */
+export async function askWaiverAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const id = String(formData.get("packageId") ?? "");
+  const checked = await onPackage(id, "/assess", {});
+  if (checked.error) return { error: checked.error };
+  const asked = await onPackage(id, "/shortfall/issue", {});
+  return asked.error ? { error: asked.error } : {};
+}

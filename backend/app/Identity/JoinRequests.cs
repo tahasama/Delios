@@ -32,7 +32,7 @@ public static class JoinRequests
     {
         var project = app.MapGroup("/api/projects/{projectId:guid}").WithTags("People")
             .AddEndpointFilter<TransactionFilter>().AddEndpointFilter<ProjectAccessFilter>();
-        project.MapPost("/people/requests", AskAsync);
+        project.MapPost("/people/requests", AskAsync).AddEndpointFilter<IdempotencyFilter>();
         project.MapGet("/people/join-options", OptionsAsync);
     }
 
@@ -95,6 +95,9 @@ public static class JoinRequests
 
         // Who may add directly, and whether this project asks whoever holds Manage first.
         var admin = await Keepers.ConfiguresAsync(http);
+        if (!admin && await Keepers.FunctionConfiguresAsync(db, function.Id, cancellationToken))
+            return Problems.Forbidden("ADMIN_ONLY", $"{function.Name} may configure: whoever holds it administers the organization. Only an administrator gives it.",
+                new { field = "functionId" });
         var mayAdd = admin || await MayAddAsync(db, access, cancellationToken);
         var confirms = await Settings.ProjectAnswers.NeedsConfirmationAsync(db, project.Id, "PROJECT_PEOPLE", cancellationToken);
         var held = !admin && (!mayAdd || confirms);
@@ -136,7 +139,8 @@ public static class JoinRequests
                 if (refused is not null) return refused;
                 return Results.Ok(new
                 {
-                    Held = false, Brought = organization,
+                    Held = false,
+                    Brought = organization,
                     Said = linked
                         ? $"{organization} works with us already: it now takes part in {project.Code}; their administrator puts {name} on"
                         : $"{organization} is on DELIOS: it now takes part in {project.Code} and is invited to work with us; once their administrator accepts, they put {name} on",
@@ -197,8 +201,15 @@ public static class JoinRequests
         if (!held) await TellJoinedAsync(db, notifier, project, membership, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         // Asked on a transmittal: its page is where the answer is read (the New transmittal form opens it).
-        return Results.Ok(new { user.Id, Held = held, Said = said, Invited = !held && newAccount && link is null, Link = link,
-            TransmittalId = held ? membership.ConfirmTransmittalId : null });
+        return Results.Ok(new
+        {
+            user.Id,
+            Held = held,
+            Said = said,
+            Invited = !held && newAccount && link is null,
+            Link = link,
+            TransmittalId = held ? membership.ConfirmTransmittalId : null
+        });
     }
 
     /// <summary>

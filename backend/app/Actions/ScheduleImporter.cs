@@ -18,6 +18,15 @@ public sealed record ScheduleImportRequested(Guid TenantId, Guid RevisionId)
 }
 
 /// <summary>
+/// Asks the worker to read a project's schedule again with the newer reading, when someone opens it and an older
+/// reading made what it shows (<see cref="ScheduleImporter.AskCatchUpAsync"/>).
+/// </summary>
+public sealed record ScheduleCatchUp(Guid TenantId, Guid ProjectId)
+{
+    public const string RoutingKey = "schedule.catchup";
+}
+
+/// <summary>
 /// In the worker, after every release: a released revision of the project's
 /// schedule document is read into activities; any other release may complete what
 /// activities need. A revision is read once; what it changed is kept.
@@ -25,6 +34,37 @@ public sealed record ScheduleImportRequested(Guid TenantId, Guid RevisionId)
 public sealed class ScheduleImporter(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, AuditLog audit, IClock clock, ILogger<ScheduleImporter> logger)
 {
+    /// <summary>
+    /// The version of the reading. Raised whenever reading a file keeps more than before (1: the WBS and what happened,
+    /// from a P6 export): a released revision read by an older version is read again by itself, nobody asked to do it
+    /// (owner: "users shouldn't have to do that"), but only when it is needed: the first time someone opens that
+    /// project's schedule (<see cref="AskCatchUpAsync"/>). Schedules nobody opens are never read again.
+    /// </summary>
+    public const int ReaderVersion = 1;
+
+    /// <summary>The projects asked to be read again lately, so opening the schedule while it is being read asks once.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, DateTime> asked = new();
+
+    /// <summary>
+    /// Someone opened the project's schedule: if its released revision was read by an older reading, the worker is asked
+    /// to read it again (<see cref="CatchUpAsync"/>, which decides whether it is worth it). One indexed look otherwise.
+    /// </summary>
+    public static async Task AskCatchUpAsync(DeliosDbContext db, Identity.Project project, CancellationToken cancellationToken)
+    {
+        if (asked.TryGetValue(project.Id, out var at) && DateTime.UtcNow - at < TimeSpan.FromMinutes(10)) return;
+        var older = await (from source in db.ScheduleSources
+                           where source.ProjectId == project.Id
+                           join revision in db.Revisions on source.DocumentId equals revision.DocumentId
+                           where revision.State == RevisionStates.Released
+                           join read in db.ScheduleImports on revision.Id equals read.RevisionId
+                           where read.ReadWith < ReaderVersion && read.Status == ScheduleImportStatuses.Done
+                           select read.Id).AnyAsync(cancellationToken);
+        if (!older) return;
+        asked[project.Id] = DateTime.UtcNow;
+        db.Enqueue(ScheduleCatchUp.RoutingKey, new ScheduleCatchUp(project.TenantId, project.Id));
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     /// <summary>
     /// After any release: activities needing that document are restated; a release of
     /// the project's schedule asks for it to be read, on the checks queue, so reading a
@@ -75,14 +115,48 @@ public sealed class ScheduleImporter(
     }
 
     /// <summary>
+    /// In the worker, asked when someone opened the schedule: its released revision read by an older version of the
+    /// reading (<see cref="ReaderVersion"/>) is read again, the same file read as the app reads it now, so what the reading keeps since (the WBS, what happened)
+    /// comes in by itself. Only a P6 export is read again (the only file the reading keeps more of), only when that read is
+    /// what the activities stand on (no upload since), and never one that failed. Returns whether it read it.
+    /// </summary>
+    public async Task<bool> CatchUpAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({"schedule:" + projectId}))", cancellationToken);
+        var source = await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == projectId, cancellationToken);
+        if (source is null) return false;
+        var revision = await db.Revisions.AsNoTracking().Include(r => r.Files)
+            .SingleOrDefaultAsync(r => r.DocumentId == source.DocumentId && r.State == RevisionStates.Released, cancellationToken);
+        if (revision is null) return false;
+        var earlier = await db.ScheduleImports.SingleOrDefaultAsync(i => i.RevisionId == revision.Id, cancellationToken);
+        if (earlier is null || earlier.ReadWith >= ReaderVersion || earlier.Status != ScheduleImportStatuses.Done) return false;
+        // Not a P6 export (the newer reading keeps nothing more of it), or a list uploaded since stands (the activities are
+        // no longer this read's): marked as read by the newer reading, never asked again.
+        if (!revision.Files.Any(f => f.Submission == revision.Submission && f.Status == FileStatuses.Clean && XerReader.IsXer(f.Name))
+            || await db.Set<Records.ControlledVersion>().AnyAsync(v => v.ProjectId == projectId && v.Kind == "SCHEDULE" && v.CreatedAt > earlier.ImportedAt, cancellationToken))
+        {
+            earlier.ReadWith = ReaderVersion;
+        }
+        else
+        {
+            await ReadAsync(source, revision, cancellationToken, earlier);
+            logger.LogInformation("Schedule rev {Value} of project {Project} read again by the newer reading", revision.Value, projectId);
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    /// <summary>
     /// Reads one schedule revision: picks its .xlsx or .csv file, parses the activities, maps department names to discipline codes,
     /// then adds new activities, updates existing ones, marks missing ones removed, and records the changes in a <see cref="ScheduleImport"/>.
     /// Ends by recomputing the readiness of every activity of the project, since moved dates move the needs.
     /// </summary>
-    private async Task ReadAsync(ScheduleSource source, Revision revision, CancellationToken cancellationToken)
+    private async Task ReadAsync(ScheduleSource source, Revision revision, CancellationToken cancellationToken, ScheduleImport? earlier = null)
     {
         var now = clock.GetCurrentInstant();
-        var record = new ScheduleImport
+        var record = earlier ?? new ScheduleImport
         {
             TenantId = revision.TenantId,
             ProjectId = revision.ProjectId,
@@ -90,16 +164,28 @@ public sealed class ScheduleImporter(
             RevisionValue = revision.Value,
             ImportedAt = now,
         };
-        db.ScheduleImports.Add(record);
+        record.ReadWith = ReaderVersion;
+        if (earlier is null) db.ScheduleImports.Add(record);
+        else
+        {
+            // Read again: the read of the same revision is counted afresh, from what it says now.
+            record.ImportedAt = now;
+            record.Status = ScheduleImportStatuses.Done;
+            record.Error = null;
+            record.Added = record.Moved = record.Changed = record.Removed = record.Unchanged = 0;
+            record.Changes = [];
+            record.UnmatchedDepartments = [];
+        }
         var document = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == revision.DocumentId, cancellationToken);
         var label = $"{document.Number} rev {revision.Value}";
 
-        // The activity list is the export, not the printed PDF: Excel first, then CSV.
-        var file = revision.Files.Where(f => f.Submission == revision.Submission && f.Status == FileStatuses.Clean && ScheduleReader.CanRead(f.Name))
-            .OrderBy(f => f.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? 0 : 1).FirstOrDefault();
+        // The activity list is the export, not the printed PDF: a P6 export (.xer) first, since only it carries the WBS
+        // and what happened, then Excel, then CSV.
+        var file = revision.Files.Where(f => f.Submission == revision.Submission && f.Status == FileStatuses.Clean && ScheduleReader.CanReadSchedule(f.Name))
+            .OrderBy(f => XerReader.IsXer(f.Name) ? 0 : f.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ? 1 : 2).FirstOrDefault();
         if (file is null)
         {
-            Fail(record, "The released revision has no .xlsx or .csv file to read the activities from.");
+            Fail(record, "The released revision has no .xlsx, .xer or .csv file to read the activities from.");
             await audit.WriteAsync(Actor.System, "SCHEDULE_NOT_READ", "Revision", revision.Id, label, record.Error, revision.ProjectId, cancellationToken);
             return;
         }
@@ -108,7 +194,8 @@ public sealed class ScheduleImporter(
         string? error;
         await using (var content = await storage.OpenReadAsync(file.ObjectKey, cancellationToken))
         {
-            (parsed, error) = ScheduleReader.Read(content, file.Name, source.Columns);
+            var code = await db.Projects.AsNoTracking().Where(p => p.Id == revision.ProjectId).Select(p => p.Code).SingleAsync(cancellationToken);
+            (parsed, error) = ScheduleReader.Read(content, file.Name, source.Columns, code);
         }
         if (parsed is null)
         {
@@ -119,7 +206,7 @@ public sealed class ScheduleImporter(
 
         var unmatched = await ApplyAsync(revision.TenantId, revision.ProjectId, parsed, revision.Id, $"rev {revision.Value}", record, cancellationToken);
         await audit.WriteAsync(Actor.System, "SCHEDULE_READ", "Revision", revision.Id, label,
-            $"{parsed.Count} activities from {file.Name}: {record.Added} new, {record.Moved} moved, {record.Changed} changed, {record.Removed} removed."
+            $"{parsed.Count} activities from {file.Name}{Span(parsed)}: {record.Added} new, {record.Moved} moved, {record.Changed} changed, {record.Removed} removed."
             + (unmatched.Count > 0 ? $" Not a discipline, left off: {string.Join(", ", unmatched)}." : ""),
             revision.ProjectId, cancellationToken);
         logger.LogInformation("Schedule {Label} read: {Count} activities", label, parsed.Count);
@@ -130,18 +217,28 @@ public sealed class ScheduleImporter(
     /// once. Returns what changed, or why the file cannot be read. The caller records who did it and why.
     /// </summary>
     public async Task<(string? Summary, string? Error)> ReadUploadAsync(Guid tenantId, Guid projectId, string fileName, byte[] bytes,
-        Revision? revision, CancellationToken cancellationToken)
+        Revision? revision, CancellationToken cancellationToken, string? p6Project = null)
     {
-        if (!ScheduleReader.CanRead(fileName)) return (null, "The schedule must be an .xlsx or .csv export.");
+        if (!ScheduleReader.CanReadSchedule(fileName)) return (null, "The schedule must be an .xlsx or .csv export, or a Primavera P6 export (.xer).");
         var source = await db.ScheduleSources.AsNoTracking().SingleOrDefaultAsync(s => s.ProjectId == projectId, cancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({"schedule:" + projectId}))", cancellationToken);
         IReadOnlyList<ParsedActivity>? parsed;
         string? error;
-        using (var content = new MemoryStream(bytes)) (parsed, error) = ScheduleReader.Read(content, fileName, source?.Columns ?? new ScheduleColumns());
+        var code = await db.Projects.AsNoTracking().Where(p => p.Id == projectId).Select(p => p.Code).SingleAsync(cancellationToken);
+        // The P6 project chosen on the upload is read, and kept for the schedule's next revisions (owner: an export of
+        // several projects, its baseline among them).
+        var columns = source?.Columns ?? new ScheduleColumns();
+        if (p6Project is not null) columns = Copy(columns, p6Project);
+        using (var content = new MemoryStream(bytes)) (parsed, error) = ScheduleReader.Read(content, fileName, columns, code);
         if (parsed is null) return (null, $"{fileName}: {error}");
+        if (p6Project is not null && source is not null && source.Columns.Sheet != p6Project && XerReader.IsXer(fileName))
+        {
+            var kept = await db.ScheduleSources.SingleAsync(s => s.Id == source.Id, cancellationToken);
+            kept.Columns = Copy(kept.Columns, p6Project);
+        }
         // Counted the way a released revision's read is counted. The released revision the file belongs to keeps the read
         // as its own, the first time; a file with no revision, or read again, is kept among the uploaded lists instead.
-        var tally = new ScheduleImport { TenantId = tenantId, ProjectId = projectId, RevisionValue = "-", ImportedAt = clock.GetCurrentInstant() };
+        var tally = new ScheduleImport { TenantId = tenantId, ProjectId = projectId, RevisionValue = "-", ImportedAt = clock.GetCurrentInstant(), ReadWith = ReaderVersion };
         if (revision is not null)
         {
             // Released with no spreadsheet, its read failed: this file is that read, done now.
@@ -157,11 +254,12 @@ public sealed class ScheduleImporter(
                 earlier.Status = ScheduleImportStatuses.Done;
                 earlier.Error = null;
                 earlier.ImportedAt = tally.ImportedAt;
+                earlier.ReadWith = ReaderVersion;
                 tally = earlier;
             }
         }
         var unmatched = await ApplyAsync(tenantId, projectId, parsed, revision?.Id, revision is null ? "a direct upload" : $"rev {revision.Value}", tally, cancellationToken);
-        return ($"{parsed.Count} activities from {fileName}: {tally.Added} new, {tally.Moved} moved, {tally.Changed} changed, {tally.Removed} removed."
+        return ($"{parsed.Count} activities from {fileName}{Span(parsed)}: {tally.Added} new, {tally.Moved} moved, {tally.Changed} changed, {tally.Removed} removed."
             + (unmatched.Count > 0 ? $" Not a discipline, left off: {string.Join(", ", unmatched)}." : ""), null);
     }
 
@@ -207,6 +305,10 @@ public sealed class ScheduleImporter(
                     Finish = row.Finish,
                     Responsible = row.Responsible,
                     Departments = row.Departments ?? [],
+                    StartAchieved = row.StartAchieved,
+                    FinishAchieved = row.FinishAchieved,
+                    Wbs = row.Wbs ?? [],
+                    WbsOrder = row.WbsOrder,
                     SourceRevisionId = sourceRevisionId,
                     UpdatedAt = now,
                 });
@@ -241,6 +343,11 @@ public sealed class ScheduleImporter(
             activity.Start = row.Start;
             activity.Finish = row.Finish;
             activity.Responsible = row.Responsible;
+            // What the planner says happened, and where it sits in the WBS, follow each read as they are.
+            activity.StartAchieved = row.StartAchieved;
+            activity.FinishAchieved = row.FinishAchieved;
+            activity.Wbs = row.Wbs ?? [];
+            activity.WbsOrder = row.WbsOrder;
             // A schedule without a departments column leaves the planner's tags as they are.
             if (row.Departments is not null) activity.Departments = row.Departments;
             activity.State = ActivityStates.Active;
@@ -293,4 +400,26 @@ public sealed class ScheduleImporter(
         NewStart = after.Start,
         NewFinish = after.Finish,
     };
+
+    /// <summary>The same columns, reading another sheet or P6 project.</summary>
+    private static ScheduleColumns Copy(ScheduleColumns c, string sheet) => new()
+    {
+        Sheet = sheet,
+        Code = c.Code,
+        Name = c.Name,
+        Start = c.Start,
+        Finish = c.Finish,
+        Responsible = c.Responsible,
+        Departments = c.Departments,
+        DateOrder = c.DateOrder,
+    };
+
+    /// <summary>The months the schedule runs, said with its read (owner: "deduce first month and last month"): ", Mar 2022 → Jun 2023".</summary>
+    private static string Span(IReadOnlyList<ParsedActivity> parsed)
+    {
+        var days = parsed.SelectMany(p => new[] { p.Start, p.Finish }).OfType<LocalDate>().ToList();
+        if (days.Count == 0) return "";
+        string Month(LocalDate d) => d.ToString("MMM yyyy", CultureInfo.InvariantCulture);
+        return $", {Month(days.Min())} → {Month(days.Max())}";
+    }
 }

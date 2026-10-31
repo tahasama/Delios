@@ -17,7 +17,7 @@ public static partial class ScheduleEndpoints
     // ── Activities ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// GET /activities: lists the project's activities by start date, at most 2000, filtered by readiness, start date range, department or a text search on code and name.
+    /// GET /activities: lists the project's activities by start date, at most <see cref="MaxActions"/>, filtered by readiness, start date range, department or a text search on code and name.
     /// Removed activities are left out unless <paramref name="includeRemoved"/> is true.
     /// </summary>
     private static async Task<IResult> ActivitiesAsync(
@@ -41,10 +41,29 @@ public static partial class ScheduleEndpoints
             var pattern = "%" + q.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
             query = query.Where(a => EF.Functions.ILike(a.Code, pattern) || EF.Functions.ILike(a.Name, pattern));
         }
-        var rows = await query.OrderBy(a => a.Start).ThenBy(a => a.Code).Take(2000).ToListAsync(cancellationToken);
+        var rows = await query.OrderBy(a => a.Start).ThenBy(a => a.Code).Take(MaxActions).ToListAsync(cancellationToken);
         var views = rows.Select(a => Summary(a, today, window));
         if (readiness is not null) views = views.Where(v => v.Readiness == readiness);
         return Results.Ok(views.ToList());
+    }
+
+    /// <summary>
+    /// GET /activities/short?department=&amp;take=: the actions short of documents, for Home (owner: "we need top 4"):
+    /// how many, and the newest by their day, worked out in the database; never the whole schedule. A discipline narrows
+    /// them to the actions concerning it.
+    /// </summary>
+    private static async Task<IResult> ShortAsync(HttpContext http, DeliosDbContext db, IClock clock, CancellationToken cancellationToken,
+        string? department = null, int take = 4)
+    {
+        var access = ProjectAccessFilter.Of(http);
+        if (!access.IsInternal) return Results.Ok(new { count = 0, top = Array.Empty<ActivitySummary>() });
+        var (today, window) = await TodayAsync(db, clock, access.Project, cancellationToken);
+        var query = db.Activities.AsNoTracking().Where(a => a.ProjectId == access.Project.Id && a.State == ActivityStates.Active
+            && a.Start != null && a.NeedCount > 0 && a.MetCount + a.WaivedCount < a.NeedCount);
+        if (!string.IsNullOrWhiteSpace(department)) query = query.Where(a => a.Departments.Contains(department));
+        var count = await query.CountAsync(cancellationToken);
+        var top = await query.OrderByDescending(a => a.Start).ThenBy(a => a.Code).Take(Math.Clamp(take, 1, 20)).ToListAsync(cancellationToken);
+        return Results.Ok(new { count, top = top.Select(a => Summary(a, today, window)) });
     }
 
     /// <summary>GET /activities/{activityId}: one activity with its needs and recorded decisions. Also used by the other endpoints to send back the updated activity.</summary>

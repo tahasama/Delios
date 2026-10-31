@@ -227,8 +227,15 @@ public sealed class EmailReplies(
             var now = services.GetRequiredService<IClock>().GetCurrentInstant();
             var reply = new EmailReply
             {
-                TenantId = route.TenantId, ProjectId = route.ProjectId, TransmittalId = transmittal.Id, PartyId = party.Id,
-                FromAddress = from, FromName = Clip(fromName, 200), Subject = Clip(subject, 300) ?? "", Text = Clip(text.Trim(), 20000) ?? "", ReceivedAt = now,
+                TenantId = route.TenantId,
+                ProjectId = route.ProjectId,
+                TransmittalId = transmittal.Id,
+                PartyId = party.Id,
+                FromAddress = from,
+                FromName = Clip(fromName, 200),
+                Subject = Clip(subject, 300) ?? "",
+                Text = Clip(text.Trim(), 20000) ?? "",
+                ReceivedAt = now,
             };
             var store = services.GetRequiredService<FileStorage>();
             var limit = services.GetRequiredService<IOptions<StorageOptions>>().Value.MaxFileBytes;
@@ -237,11 +244,17 @@ public sealed class EmailReplies(
             {
                 var file = new StoredFile
                 {
-                    TenantId = route.TenantId, ProjectId = route.ProjectId, ObjectKey = "", Name = Clip(name, 200) ?? "file",
+                    TenantId = route.TenantId,
+                    ProjectId = route.ProjectId,
+                    ObjectKey = "",
+                    Name = Clip(name, 200) ?? "file",
                     ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
-                    Size = bytes.Length, Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
+                    Size = bytes.Length,
+                    Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
                     Kind = name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? FileKinds.Rendition : FileKinds.Native,
-                    UploadedById = Guid.Empty, UploadedByName = $"{party.Name}, by email", CreatedAt = now,
+                    UploadedById = Guid.Empty,
+                    UploadedByName = $"{party.Name}, by email",
+                    CreatedAt = now,
                 };
                 file.ObjectKey = FileStorage.KeyFor(file.TenantId, file.ProjectId, file.Id);
                 await store.PutAsync(file.ObjectKey, bytes, file.ContentType, cancellationToken);

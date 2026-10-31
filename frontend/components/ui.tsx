@@ -108,11 +108,14 @@ export function Tip({
   lead,
   children,
   steps,
+  row,
   className,
 }: {
   lead?: React.ReactNode;
   children?: React.ReactNode;
   steps?: { label: React.ReactNode; hint?: React.ReactNode; href?: string; current?: boolean }[];
+  /** The steps side by side, in order, as a path (owner: "horizontal, like steps"), not one under the other. */
+  row?: boolean;
   className?: string;
 }) {
   return (
@@ -128,7 +131,7 @@ export function Tip({
         </span>
       </p>
       {steps?.length ? (
-        <ol className="mt-2 space-y-1 pl-[1.875rem]">
+        <ol className={row ? "mt-2 grid gap-2 pl-[1.875rem] sm:grid-cols-2 lg:grid-flow-col lg:auto-cols-fr lg:grid-cols-none" : "mt-2 space-y-1 pl-[1.875rem]"}>
           {steps.map((step, index) => {
             const body = (
               <>
@@ -173,7 +176,7 @@ export function ToneChip({ tone, children, title, inRegister }: { tone: keyof ty
 
 export function Chip({ children, className, title }: { children: React.ReactNode; className?: string; title?: string }) {
   return (
-    <span title={title} className={cn("inline-flex items-center whitespace-nowrap rounded-[0.3rem] px-1.5 py-0.5 text-[11px] font-semibold leading-[1.35] ring-1 ring-inset", className ?? "bg-canvas-deep text-slate-700 ring-line")}>
+    <span title={title} className={cn("inline-flex items-center whitespace-nowrap rounded-[0.3rem] px-1.5 py-0.5 text-[11px] font-semibold leading-[1.35] ring-1 ring-inset transition-colors duration-300", className ?? "bg-canvas-deep text-slate-700 ring-line")}>
       {children}
     </span>
   );
@@ -194,7 +197,7 @@ export function SeverityChip({ severity }: { severity: string }) {
 }
 
 export function btn(variant: "primary" | "secondary" | "danger" | "ghost" = "primary", size: "sm" | "md" = "md") {
-  const base = "inline-flex items-center justify-center gap-1.5 rounded-(--control-radius) font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-link/20 disabled:cursor-not-allowed disabled:opacity-50";
+  const base = "inline-flex items-center justify-center gap-1.5 rounded-(--control-radius) font-semibold transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.98] motion-reduce:active:scale-100 outline-none focus-visible:ring-3 focus-visible:ring-link/20 disabled:cursor-not-allowed disabled:opacity-50";
   // The app's one control size (--control-h): every button stands the same
   // height as every field and every .ask. "sm" keeps a narrower side padding only.
   const sizes = size === "sm" ? "h-(--control-h) px-3 text-(length:--control-text)" : "h-(--control-h) px-3.5 text-(length:--control-text)";
@@ -259,7 +262,7 @@ export function Field({
 }
 
 export const inputCls =
-  "w-full min-h-(--control-h) rounded-t-[0.25rem] rounded-b-none border-0 border-b border-line-strong bg-[color-mix(in_oklab,var(--color-canvas)_60%,var(--color-surface))] px-1.5 py-1 text-(length:--control-text) text-slate-800 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 hover:bg-[color-mix(in_oklab,var(--color-canvas)_85%,var(--color-surface))] focus:border-brand-line disabled:cursor-not-allowed disabled:text-slate-500";
+  "w-full min-h-(--control-h) rounded-t-[0.25rem] rounded-b-none border-0 border-b border-line-strong bg-[color-mix(in_oklab,var(--color-canvas)_60%,var(--color-surface))] px-1.5 py-1 text-(length:--control-text) text-slate-800 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 hover:bg-[color-mix(in_oklab,var(--color-canvas)_85%,var(--color-surface))] focus:border-brand-line disabled:cursor-not-allowed disabled:border-dashed disabled:bg-transparent disabled:text-slate-500 disabled:hover:bg-transparent";
 
 export function EmptyState({ title, body, action }: { title: string; body?: string; action?: React.ReactNode }) {
   return (

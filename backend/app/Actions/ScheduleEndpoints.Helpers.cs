@@ -48,8 +48,15 @@ public static partial class ScheduleEndpoints
         Confirmations = [],
         Decisions = action.Decisions.Select(d => d with
         {
-            ResponsibleName = "", Reason = "", DelayOwedBy = null, DelayReason = null, RecordedBy = "",
-            ConfirmedBy = null, ConfirmNote = null, ReversedBy = null, ReversedReason = null,
+            ResponsibleName = "",
+            Reason = "",
+            DelayOwedBy = null,
+            DelayReason = null,
+            RecordedBy = "",
+            ConfirmedBy = null,
+            ConfirmNote = null,
+            ReversedBy = null,
+            ReversedReason = null,
         }).ToList(),
     };
 
@@ -59,11 +66,11 @@ public static partial class ScheduleEndpoints
         || (need.Department is not null && await db.Memberships.AnyAsync(m => m.ProjectId == access.Project.Id && m.UserId == access.UserId
             && m.Active && m.Department == need.Department, cancellationToken));
 
-    /// <summary>Today's date in the project's time zone, and the project's risk window in days (14 when no schedule is set up).</summary>
+    /// <summary>Today's date in the project's time zone, and the project's risk window in days (its own, else the organization's).</summary>
     private static async Task<(LocalDate Today, int Window)> TodayAsync(DeliosDbContext db, IClock clock, Project project, CancellationToken cancellationToken)
     {
-        var window = await db.ScheduleSources.Where(s => s.ProjectId == project.Id).Select(s => (int?)s.RiskWindowDays).SingleOrDefaultAsync(cancellationToken);
-        return (WorkingCalendar.Today(clock, project.TimeZone), window ?? 14);
+        var window = (await ScheduleDays.ForProjectAsync(db, project.Id, cancellationToken)).Risk;
+        return (WorkingCalendar.Today(clock, project.TimeZone), window);
     }
 
     /// <summary>Turns a stored activity into the list shape, adding its readiness label.</summary>

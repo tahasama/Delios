@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { Floating } from "@/components/floating";
 
 export type JumpItem = { href: string; label: string; detail?: string | null; on?: boolean };
 
@@ -18,10 +19,11 @@ export function JumpPick({ items, label, className }: { items: JumpItem[]; label
   const [query, setQuery] = useState("");
   const [hi, setHi] = useState(0);
   const box = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const current = items.find((one) => one.on);
 
   useEffect(() => {
-    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node)) { setOpen(false); setQuery(""); } };
+    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node)) { setOpen(false); setQuery(""); } };
     document.addEventListener("mousedown", away);
     return () => document.removeEventListener("mousedown", away);
   }, []);
@@ -59,7 +61,8 @@ export function JumpPick({ items, label, className }: { items: JumpItem[]; label
       />
       <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
       {open ? (
-        <ul role="listbox" className="scroll-thin absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
+        <Floating anchor={box} panel={panel} width="at-least">
+        <ul role="listbox" className="scroll-thin min-h-0 flex-1 overflow-y-auto py-1">
           {options.length === 0 ? (
             <li className="px-3 py-2 text-xs text-slate-400">Nothing matches that.</li>
           ) : options.map((one, i) => (
@@ -79,6 +82,7 @@ export function JumpPick({ items, label, className }: { items: JumpItem[]; label
             </li>
           ))}
         </ul>
+        </Floating>
       ) : null}
     </div>
   );

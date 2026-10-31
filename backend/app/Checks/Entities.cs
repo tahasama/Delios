@@ -13,7 +13,7 @@ public sealed class CheckRun
     public Guid ProjectId { get; set; }
     /// <summary>QUEUED, RUNNING, DONE or FAILED (see <see cref="CheckRunStatuses"/>).</summary>
     public string Status { get; set; } = CheckRunStatuses.Queued;
-    /// <summary>A person, or "Schedule" for the nightly run.</summary>
+    /// <summary>A person, or "Schedule" for a run of the daily job of before (the checks no longer run by themselves).</summary>
     public required string RequestedByName { get; set; }
     public Instant RequestedAt { get; set; }
     public Instant? StartedAt { get; set; }

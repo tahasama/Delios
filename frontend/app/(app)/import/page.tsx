@@ -3,6 +3,7 @@ import { Tip } from "@/components/ui";
 import { isAdmin } from "@/lib/core/auth";
 import { Download } from "lucide-react";
 import { BulkImportForm } from "./bulk-import-form";
+import { listSources } from "@/lib/actions/list-sources";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Import & export" };
@@ -43,32 +44,36 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   const ctx = await requireScope();
   const sp = await searchParams;
 
-  // Everything on this page changes the project wholesale (a register, a team, the matrix, the lists) or copies it
-  // out whole: the control function's, or whoever sets the project up.
-  const allowed = ctx.can("CONTROL") || ctx.can("CONFIGURE");
+  // The team, the matrix and the lists change the project wholesale: the control function's, or whoever sets the project
+  // up. The deliverable list is anyone's of ours who may register documents (owner: our people add and update documents
+  // as they wish): the backend checks each line as registering or changing it by hand would.
+  const keeps = ctx.can("CONTROL") || ctx.can("CONFIGURE");
+  const allowed = keeps || ctx.can("CREATE");
   const chosen = sp.kind ?? "deliverables";
+  // Each list's register document and what it was brought in from last.
+  const sources = allowed ? (await listSources(ctx)).filter((one) => one.where === "IMPORT") : [];
 
   return (
     <div className="space-y-4">
       <section className="register register-sheet register-sheet-open">
-        <div className="flex flex-col gap-4 px-5 pt-5 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1">
+        <div className="space-y-4 px-5 pt-5 pb-4 sm:px-6">
+          <div className="min-w-0">
             <h1 className="plate-title text-slate-950">Import &amp; export</h1>
             {allowed ? (
               <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-                Bring a spreadsheet in, or take a copy out. A file is always checked first: you see what it would do, row by row,
+                Bring a spreadsheet in, or take a copy out. A file is always checked first: you see what it would do, line by line,
                 before anything is written.
               </p>
             ) : (
               <p className="mt-2 max-w-2xl rounded-md bg-tint-soft px-2.5 py-1.5 text-xs leading-5 text-slate-700 ring-1 ring-line">
-                Importing and exporting whole lists is for the control function and administrators. Ask the control function for a copy of a
-                register, or to bring a list in.
+                Bringing lists in is for whoever may register documents, and the team, the matrix and the Settings lists for the control
+                function and administrators. Ask the control function for a copy of a register, or to bring a list in.
               </p>
             )}
           </div>
-          {/* The order that works, each step opening its import below. */}
+          {/* The order that works, side by side as a path, each step opening its import below. */}
           {allowed ? (
-            <Tip lead="Setting up a project?" className="lg:w-80 lg:shrink-0" steps={SETUP.map((step) => ({ ...step, href: `/import?kind=${step.kind}`, current: chosen === step.kind }))}>
+            <Tip lead="Setting up a project?" row steps={SETUP.map((step) => ({ ...step, href: `/import?kind=${step.kind}`, current: chosen === step.kind }))}>
               Import in this order:
             </Tip>
           ) : null}
@@ -76,43 +81,48 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
       </section>
 
       {allowed ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-          {/* A step chosen above opens its import: the form starts again on that kind. */}
-          <BulkImportForm key={chosen} initialKind={chosen} admin={isAdmin(ctx.user)} />
+        <>
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+            {/* A step chosen above opens its import: the form starts again on that kind. */}
+            <BulkImportForm key={chosen} initialKind={chosen} admin={isAdmin(ctx.user)} keeps={keeps} sources={sources} />
 
-          <aside className="min-w-0">
-            <section className="register register-sheet register-sheet-open" aria-labelledby="export-head">
-              <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5">
-                <span id="export-head" className="stencil mr-1 text-slate-500">Take a copy out</span>
-                <span className="text-[11px] text-slate-500">as it stands now (CSV)</span>
-              </div>
-              <ul className="divide-y divide-line">
-                {EXPORTS.map((group) => (
-                  <li key={group.group} className="px-5 py-3">
-                    <p className="mb-1 text-xs font-semibold text-slate-800">{group.group}</p>
-                    <ul>
-                      {group.items.map((item) => (
-                        <li key={item.kind}>
-                          <a
-                            href={`/api/export/${item.kind}`}
-                            className="-mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-[13px] text-slate-700 hover:bg-tint-soft hover:text-brand-ink"
-                          >
-                            <span className="min-w-0">
-                              {item.label}
-                              {item.note ? <span className="ml-1.5 text-xs text-slate-500">{item.note}</span> : null}
-                            </span>
-                            <Download className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ul>
-              <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500">Each file is named with the day and time it was made.</p>
-            </section>
-          </aside>
-        </div>
+            <aside className="min-w-0">
+              <section className="register register-sheet register-sheet-open" aria-labelledby="export-head">
+                <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5">
+                  <span id="export-head" className="stencil mr-1 text-slate-500">Take a copy out</span>
+                  <span className="text-[11px] text-slate-500">as it stands now (CSV)</span>
+                </div>
+                <ul className="divide-y divide-line">
+                  {EXPORTS.map((group) => (
+                    <li key={group.group} className="px-5 py-3">
+                      <p className="mb-1 text-xs font-semibold text-slate-800">{group.group}</p>
+                      <ul>
+                        {group.items.map((item) => (
+                          <li key={item.kind}>
+                            <a
+                              href={`/api/export/${item.kind}`}
+                              className="-mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-[13px] text-slate-700 hover:bg-tint-soft hover:text-brand-ink"
+                            >
+                              <span className="min-w-0">
+                                {item.label}
+                                {item.note ? <span className="ml-1.5 text-xs text-slate-500">{item.note}</span> : null}
+                              </span>
+                              <Download className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+                <p className="border-t border-line px-5 py-2.5 text-xs text-slate-500">Each file is named with the day and time it was made.</p>
+              </section>
+            </aside>
+          </div>
+
+          {/* Once a list is checked, its lines come here, the page's whole width (owner): `InSlot` in the imports. */}
+          <section id="import-results" className="register register-sheet register-sheet-open empty:hidden" />
+        </>
       ) : null}
     </div>
   );

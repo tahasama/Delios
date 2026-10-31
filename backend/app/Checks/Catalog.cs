@@ -23,7 +23,7 @@ public static class Phases
 {
     /// <summary>What has to be published before the register can be trusted: an administrator's, once.</summary>
     public const string Setup = "SETUP";
-    /// <summary>The register against itself, every day.</summary>
+    /// <summary>The register against itself, whenever the checks run.</summary>
     public const string Running = "RUNNING";
     /// <summary>What has to be settled before anything is handed over.</summary>
     public const string Handover = "HANDOVER";
@@ -185,12 +185,14 @@ public static class CheckCatalog
                     .Select(c => new Failure($"comment:{c.Id}", "Comment", c.Id, c.DocumentId, c.Number, $"Its weight {c.Class} is no longer published.")));
             }),
         new("REV-03", Phases.Running, "Released with no native file",
-            "Released revisions with no native file beside the PDF (it is optional; the editable original helps the next revision)", Severities.Advisory, "OR", async ctx =>
+            "Released revisions with no native file beside the PDF, of types that come with one (it is optional; the editable original helps the next revision)", Severities.Advisory, "OR", async ctx =>
             {
                 var released = ctx.Released.Select(r => r.Id).ToList();
                 var withNative = (await ctx.Db.StoredFiles.Where(f => f.RevisionId != null && released.Contains(f.RevisionId.Value)
                     && f.Kind == FileKinds.Native).Select(f => f.RevisionId!.Value).Distinct().ToListAsync(ctx.CancellationToken)).ToHashSet();
-                return Fail(ctx.Released.Where(r => !withNative.Contains(r.Id)).Select(r => Rev(ctx.DocumentOf(r), r)));
+                // A type made as a PDF only (Types & sets, on the type: "A PDF only") never has one: not asked of it.
+                bool pdfOnly(Document d) => ctx.Values.Prop(ValueSets.DocumentTypes, d.DocType, "native") is { ValueKind: JsonValueKind.False };
+                return Fail(ctx.Released.Where(r => !withNative.Contains(r.Id) && !pdfOnly(ctx.DocumentOf(r))).Select(r => Rev(ctx.DocumentOf(r), r)));
             }),
         new("STO-01", Phases.Running, "A file the register lists is missing from storage (outside the app)",
             "Asks storage for a sample of current files, 25 a run", Severities.Critical, "CF", async ctx =>
@@ -233,8 +235,8 @@ public static class CheckCatalog
                 return Fail(ctx.Released.Where(r => !sent.Contains(r.Id)).Select(r => Rev(ctx.DocumentOf(r), r)));
             }),
         new("STO-03", Phases.Running, "The history has a broken link (outside the app)",
-            "Recomputes the hash chain of the organization's audit trail", Severities.Critical, "CF", async ctx =>
-                await ctx.Audit.FirstBrokenLinkAsync(ctx.CancellationToken) is { } at
+            "Recomputes the hash chain of the organization's audit trail, once for all the projects checked in the hour", Severities.Critical, "CF", async ctx =>
+                await ctx.Audit.FirstBrokenLinkOnceAsync(ctx.CancellationToken) is { } at
                     ? Fail([new Failure("audit:chain", "Audit", null, null, "Audit trail", $"The chain breaks at entry {at}: something was altered.")])
                     : Pass),
 
@@ -294,7 +296,7 @@ public static class CheckCatalog
 
     /// <summary>The checks indexed by their id, for quick lookup by <see cref="Find"/>.</summary>
     private static readonly Dictionary<string, CheckDef> ById = All.ToDictionary(c => c.Id);
-    /// <summary>Finds a check by its id (for example "RV-08"), or null if there is none. Used by the endpoints that switch a check off.</summary>
+    /// <summary>Finds a check by its id (for example "REV-03"), or null if there is none. Used by the endpoints that switch a check off.</summary>
     public static CheckDef? Find(string id) => ById.GetValueOrDefault(id);
 
     /// <summary>True when the named document field is empty. Used by MD-03 to compare a document against the fields its deliverable type requires; an unknown field name counts as filled.</summary>

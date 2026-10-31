@@ -6,7 +6,37 @@ namespace Delios.Host.Packages;
 
 /// <summary>One row of the package list.</summary>
 public sealed record PackageSummary(Guid Id, string Number, string Title, string Reason, string State, int Members,
-    bool HasRule, DateOnly? CompletionDate, DateTimeOffset CreatedAt, string Kind, string? Supplier, string? PurchaseOrder);
+    bool HasRule, DateOnly? CompletionDate, DateTimeOffset CreatedAt, string Kind, string? Supplier, string? PurchaseOrder,
+    Guid? ParentId = null);
+
+/// <summary>A comment written in a review of a line's newest revision, as its package page shows it.</summary>
+public sealed record LineComment(string By, string Text, bool Blocking, bool Settled, string Review, string Rev);
+
+/// <summary>
+/// One document of a package with what its package page shows beside it, read for every document at once (owner: the
+/// heaviest computing found was each package page reading its documents one by one): its newest revision and where it
+/// stands, when it was first sent in and first issued, how many revisions were sent in, the last review's outcome and
+/// note, the transmittal it last came in on, and the comments its reviews hold.
+/// </summary>
+public sealed record PackageLineView(Guid DocumentId, string Number, string Title, bool IsPlaceholder,
+    Guid? RevisionId, string? Revision, string? RevisionState, DateTimeOffset? SubmittedAt, string? StatusCode,
+    string? ReturnedReason, DateTimeOffset? ReturnedAt, DateTimeOffset? ResentAt, DateTimeOffset? ReleasedAt, DateTimeOffset? IssuedAt,
+    int Submissions, string? Outcome, string? OutcomeNote, Guid? IncomingId, string? IncomingNumber, IReadOnlyList<LineComment> Comments);
+
+/// <summary>A package named in a path: its number and title, to open it.</summary>
+public sealed record PackageLink(Guid Id, string Number, string Title);
+
+/// <summary>
+/// A package and everything under it: packages below (and how many are still open), its documents once each, how many are
+/// released at the status their package needs, and how many are released at all.
+/// </summary>
+public sealed record PackageTally(int Packages, int Open, int Documents, int Ready, int Released);
+
+/// <summary>A package sitting inside another: its number, title and state, how many packages sit directly in it, and its whole tally.</summary>
+public sealed record BranchView(Guid Id, string Number, string Title, string State, int Branches, PackageTally Tally);
+
+/// <summary>Where a package sits (the packages above it, top first), its branches, and the whole: it and everything under it.</summary>
+public sealed record PackagePlace(Guid? ParentId, IReadOnlyList<PackageLink> Path, IReadOnlyList<BranchView> Branches, PackageTally Whole);
 
 /// <summary>
 /// One document in a package as returned to the browser: its released revision and status, the statuses it needs,
@@ -29,7 +59,7 @@ public sealed record PackageView(Guid Id, string Number, string Title, string? D
     IReadOnlyList<PackageTransmittal> Transmittals, string Kind, Guid? SupplierPartyId, string? Supplier, string? PurchaseOrder,
     IReadOnlyList<string>? Reasons = null, System.Text.Json.JsonElement? Extras = null, string? AcceptNote = null,
     DateTimeOffset? SharedAt = null, string? SharedBy = null, bool AutoCreated = false, IReadOnlyList<string>? SupplierPeople = null,
-    PackageNames? Names = null, AsReceivedView? AsReceived = null);
+    PackageNames? Names = null, AsReceivedView? AsReceived = null, PackagePlace? Place = null, bool DeliveredToUs = false);
 
 /// <summary>A supplier's package on a project taking documents as they come (<see cref="Intake"/>): what they are filed under.</summary>
 public sealed record AsReceivedView(string DeliverableType, string DocType, string Discipline);
@@ -65,6 +95,11 @@ public static class PackageEndpoints
         project.MapGet("/{packageId:guid}", GetAsync);
         project.MapGet("/views", ViewsAsync);
         project.MapGet("/by-number/{number}", ByNumberAsync);
+        project.MapGet("/{packageId:guid}/lines", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
+            await s.LinesAsync(ProjectAccessFilter.Of(h), packageId, c) is { } lines ? Results.Ok(lines) : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package."));
+        // What delivering it carries, for the New transmittal form; nothing is written.
+        project.MapGet("/{packageId:guid}/going", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
+            await s.GoingAsync(ProjectAccessFilter.Of(h), packageId, c) is var (going, problem) && problem is null ? Results.Ok(going) : problem!);
         project.MapPost("/{packageId:guid}/members", (Guid packageId, MembersRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.AddAsync(a, packageId, r, c)));
         project.MapPost("/{packageId:guid}/members/remove", (Guid packageId, MembersRequest r, HttpContext h, PackageService s, CancellationToken c) =>
@@ -82,8 +117,12 @@ public static class PackageEndpoints
             Act(h, s, (a) => s.AcceptAsync(a, packageId, r, c)));
         project.MapPost("/{packageId:guid}/share", (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.ShareAsync(a, packageId, c)));
+        project.MapPost("/{packageId:guid}/fill", (Guid packageId, HttpContext h, PackageService s, CancellationToken c) =>
+            Act(h, s, (a) => s.FillAsync(a, packageId, c)));
         project.MapPost("/{packageId:guid}/request", (Guid packageId, SupplyRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.RequestAsync(a, packageId, r, c)));
+        project.MapPut("/{packageId:guid}/place", (Guid packageId, MoveRequest r, HttpContext h, PackageService s, CancellationToken c) =>
+            Act(h, s, (a) => s.MoveAsync(a, packageId, r, c)));
         project.MapPut("/{packageId:guid}", (Guid packageId, RenameRequest r, HttpContext h, PackageService s, CancellationToken c) =>
             Act(h, s, (a) => s.RenameAsync(a, packageId, r, c)));
         project.MapDelete("/{packageId:guid}", async (Guid packageId, HttpContext h, PackageService s, CancellationToken c, string? reason) =>
@@ -107,20 +146,21 @@ public static class PackageEndpoints
     /// <summary>GET one package, brought up to date with its rule.</summary>
     private static async Task<IResult> GetAsync(Guid packageId, HttpContext http, PackageService packages, CancellationToken cancellationToken) =>
         await packages.ReadAsync(ProjectAccessFilter.Of(http), packageId, cancellationToken) is { } package
-            ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !ProjectAccessFilter.Of(http).IsInternal))
+            ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !ProjectAccessFilter.Of(http).IsInternal,
+                access: ProjectAccessFilter.Of(http)))
             : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package.");
 
     /// <summary>
     /// GET every package of one kind (DELIVERY or SUPPLY) in full, each brought up to date with its rule: soonest due
     /// first, those with no date last.
     /// </summary>
-    private static async Task<IResult> ViewsAsync(string? kind, HttpContext http, PackageService packages, CancellationToken cancellationToken)
+    private static async Task<IResult> ViewsAsync(string? kind, HttpContext http, PackageService packages, CancellationToken cancellationToken,
+        bool top = false, int? take = null)
     {
         var access = ProjectAccessFilter.Of(http);
-        var views = new List<PackageView>();
-        foreach (var row in (await packages.ListAsync(access, cancellationToken)).Where(r => kind is null || r.Kind == kind))
-            if (await packages.ReadAsync(access, row.Id, cancellationToken) is { } package)
-                views.Add(await ViewAsync(packages, package, cancellationToken, outside: !access.IsInternal));
+        // The list shows the packages at the top, a page at a time (owner: only what is seen first); the tree asks for all.
+        var views = (await packages.ListedAsync(access, kind, cancellationToken, top, take))
+            .Select(x => ViewOf(x.Package, x.Parts, outside: !access.IsInternal, access)).ToList();
         return Results.Ok(views.OrderBy(v => v.CompletionDate is null).ThenBy(v => v.CompletionDate).ToList());
     }
 
@@ -128,9 +168,9 @@ public static class PackageEndpoints
     private static async Task<IResult> ByNumberAsync(string number, HttpContext http, PackageService packages, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        var row = (await packages.ListAsync(access, cancellationToken)).FirstOrDefault(r => r.Number == number);
-        return row is not null && await packages.ReadAsync(access, row.Id, cancellationToken) is { } package
-            ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !access.IsInternal))
+        // One look by its number, never the whole list.
+        return await packages.IdOfAsync(access, number, cancellationToken) is { } id && await packages.ReadAsync(access, id, cancellationToken) is { } package
+            ? Results.Ok(await ViewAsync(packages, package, cancellationToken, outside: !access.IsInternal, access: access))
             : Problems.NotFound("PACKAGE_NOT_FOUND", "No such package.");
     }
 
@@ -155,15 +195,18 @@ public static class PackageEndpoints
     /// <summary>
     /// Builds the full package view, working out each member's readiness and looking up the transmittal numbers.
     /// </summary>
-    private static async Task<PackageView> ViewAsync(PackageService packages, Package p, CancellationToken cancellationToken, bool outside = false)
+    private static async Task<PackageView> ViewAsync(PackageService packages, Package p, CancellationToken cancellationToken, bool outside = false,
+        ProjectAccess? access = null) =>
+        ViewOf(p, await packages.PartsAsync(p, outside, access, cancellationToken), outside, access);
+
+    /// <summary>The package view from its parts.</summary>
+    private static PackageView ViewOf(Package p, PackageParts parts, bool outside, ProjectAccess? access = null)
     {
-        var readiness = await packages.ReadinessAsync(p, cancellationToken);
-        var transmittals = await packages.TransmittalsAsync(p, cancellationToken);
-        // Its supplier sees what was asked of it on a transmittal, and nothing else.
-        // Theirs to see: what was asked of them, and in a package taking documents as they come, what they sent.
-        var intake = p.Kind == PackageKinds.Supply ? await packages.IntakeAsync(p.ProjectId, cancellationToken) : null;
+        var intake = parts.Intake;
         var asReceived = intake?.Mode == Intake.AsReceived;
-        if (outside) readiness = readiness.Where(r => r.Member.RequestedAt is not null || asReceived).ToList();
+        // Its supplier sees what was asked of it on a transmittal, and in a package taking documents as they come, what they sent.
+        var whole = !outside || (access is not null && PackageService.ReadsWhole(access, p));
+        var readiness = whole ? parts.Readiness : parts.Readiness.Where(r => r.Member.RequestedAt is not null || asReceived).ToList();
         return new PackageView(p.Id, p.Number, p.Title, p.Description, p.Reason, p.RequiredStatuses, p.CompletionDate?.ToDateOnly(),
             p.Rule, p.Excluded, p.RecipientPartyIds, p.OwnerIds, p.AcceptorIds, p.State, p.AssessedAt?.ToDateTimeOffset(), p.Shortfall,
             p.ShortfallIssuedAt?.ToDateTimeOffset(), p.ShortfallAcceptedAt?.ToDateTimeOffset(), p.ShortfallAcceptedByName,
@@ -172,12 +215,11 @@ public static class PackageEndpoints
             readiness.Select(r => new MemberView(r.Member.DocumentId, r.DocumentNumber, r.Title, r.Revision, r.Status, r.Required,
                 r.Ready, r.Member.ByRule, r.Member.RequestedAt?.ToDateTimeOffset(), r.LatestRevision, r.LatestState,
                 r.DueDate?.ToDateOnly())).ToList(),
-            transmittals, p.Kind, p.SupplierPartyId,
-            await packages.SupplierNameAsync(p, cancellationToken), p.PurchaseOrder, [p.Reason, .. p.OtherReasons],
+            parts.Transmittals, p.Kind, p.SupplierPartyId, parts.SupplierName, p.PurchaseOrder, [p.Reason, .. p.OtherReasons],
             p.Extras is null ? null : System.Text.Json.JsonDocument.Parse(p.Extras).RootElement.Clone(), p.AcceptNote,
             p.SharedAt?.ToDateTimeOffset(), p.SharedByName, p.AutoCreated,
-            outside ? null : (await packages.SupplierPeopleAsync(p, cancellationToken)).Select(x => x.Name).ToList(),
-            await packages.NamesAsync(p, transmittals, cancellationToken),
-            asReceived ? new AsReceivedView(intake!.DeliverableType ?? "", intake.DocType ?? "", intake.Discipline ?? "") : null);
+            outside ? null : parts.SupplierPeople, outside && whole && parts.Names is { } named ? named with { To = "" } : parts.Names,
+            asReceived ? new AsReceivedView(intake!.DeliverableType ?? "", intake.DocType ?? "", intake.Discipline ?? "") : null,
+            parts.Place, DeliveredToUs: outside && whole);
     }
 }

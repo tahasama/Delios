@@ -15,7 +15,7 @@ public sealed class RecordKeepingTests(Infrastructure infrastructure) : IClassFi
         var id = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, P(p, $"/reviews/{id}/answer"), new { });
         await Flow.PostAsync(approver, P(p, $"/reviews/{id}/answer"), new { verdict = "C1", status = "IFC" });
-        var (released, body) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), new { });
+        var (released, body) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), await Flow.ReleaseBodyAsync(controller));
         Assert.True(released == HttpStatusCode.OK, body.ToString());
     }
 
@@ -154,7 +154,13 @@ public sealed class RecordKeepingTests(Infrastructure infrastructure) : IClassFi
         Assert.Equal("C3", view.GetProperty("extras").GetProperty("Room").GetString());
         Assert.Equal(JsonValueKind.Null, view.GetProperty("appVersion").ValueKind);
 
-        // The viewer cannot read it until the author names them.
+        // The viewer's function is cleared below it (clearance is the one confidentiality rule, owner): they cannot read
+        // it until the author names them.
+        var admin = await app.SignedInAsync("admin@demo.local");
+        var function = (await viewer.GetFromJsonAsync<JsonElement>("/api/me")).GetProperty("projects")[0]
+            .GetProperty("function").GetProperty("id").GetGuid();
+        using (var cleared = await admin.PutAsJsonAsync($"/api/admin/functions/{function}", new { clearance = "PUBLIC" }))
+            Assert.True(cleared.IsSuccessStatusCode, await cleared.Content.ReadAsStringAsync());
         using (var hidden = await viewer.GetAsync(path)) Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
         var people = await engineer.GetFromJsonAsync<JsonElement>($"/api/projects/{project}/holders?verb=READ");
         var victor = people.EnumerateArray().Single(x => x.GetProperty("name").GetString() == "Victor Viewer").GetProperty("id").GetGuid();

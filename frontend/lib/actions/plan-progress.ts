@@ -1,44 +1,32 @@
 import "server-only";
-import { departmentsOf } from "@/lib/actions/schedule";
-import { planActions, scheduleSource } from "@/lib/actions/api";
-import { type ActionState } from "@/lib/actions/action-state";
+import { scheduleSource } from "@/lib/actions/api";
+import { api, projectPath } from "@/lib/client";
 
 export const PLAN_STAGES = ["Schedule", "Disciplines", "Requirements", "Documents ready"];
 
-const HAS_EVERYTHING: ActionState[] = ["READY", "DONE", "LATE_RECEIPT"];
-
 /**
- * How far the project is from knowing what every action needs: the stage it
- * has reached, and the one count that says why for each stage.
+ * How far the project is from knowing what every action needs: the stage it has reached, and the one count that says
+ * why for each stage. Counted by the backend from the actions and their needs alone (`GET /plan/progress`), kept until
+ * the schedule changes; never the whole schedule read here.
  */
 export async function planProgress(scope: { projectId: string }, window?: { from: Date | null; to: Date | null }) {
-  const [actions, { source, imports }] = await Promise.all([planActions(scope), scheduleSource(scope)]);
+  const iso = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : null);
+  type Counts = { at: number; actions: number; untagged: number; answered: number; asked: number; complete: number; listed: number; from: string; to: string };
+  const [counts, { source, imports }] = await Promise.all([
+    api<Counts>(projectPath(scope, "/plan/progress"), { query: { from: iso(window?.from), to: iso(window?.to) }, keep: { areas: ["plan", "docs", "reviews", "transmittals"] } }),
+    scheduleSource(scope),
+  ]);
   const inForce = imports.find((one) => one.status === "DONE") ?? null;
-  const untagged = actions.filter((one) => !departmentsOf(one).length).map((one) => one.code);
-  const pairs = actions.flatMap((one) => departmentsOf(one).map((department) => ({ action: one, department })));
-  const answered = pairs.filter(({ action, department }) => action.needs.some((entry) => entry.department === department)).length;
-  // Every document ready is asked of the actions in a window, never the whole
-  // schedule: a month either side of today, or the dates the reader chose.
-  const day = 24 * 60 * 60 * 1000;
-  const from = window?.from ?? new Date(Date.now() - 30 * day);
-  const to = window?.to ?? new Date(Date.now() + 30 * day);
-  const inWindow = actions.filter((one) => one.start && one.start >= from && one.start <= to);
-  const listed = inWindow.filter((one) => one.needs.length);
-  const complete = listed.filter((one) => HAS_EVERYTHING.includes(one.state)).length;
-  const at = !actions.length ? 0
-    : untagged.length ? 1
-      : answered < pairs.length || !listed.length ? 2
-        : listed.length && complete === listed.length ? 4 : 3;
   return {
-    at,
-    schedule: source && actions.length ? { documentId: source.documentId, revision: inForce?.revisionValue ?? null, actions: actions.length } : null,
-    tagged: actions.length - untagged.length,
-    untagged,
-    actions: actions.length,
-    answered,
-    asked: pairs.length,
-    complete,
-    listed: listed.length,
-    window: { from, to, chosen: !!(window?.from || window?.to) },
+    at: counts.at,
+    schedule: source && counts.actions ? { documentId: source.documentId, revision: inForce?.revisionValue ?? null, actions: counts.actions } : null,
+    tagged: counts.actions - counts.untagged,
+    untagged: counts.untagged,
+    actions: counts.actions,
+    answered: counts.answered,
+    asked: counts.asked,
+    complete: counts.complete,
+    listed: counts.listed,
+    window: { from: new Date(`${counts.from}T00:00:00.000Z`), to: new Date(`${counts.to}T00:00:00.000Z`), chosen: !!(window?.from || window?.to) },
   };
 }

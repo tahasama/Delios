@@ -3,7 +3,8 @@ import Link from "next/link";
 import { inputCls } from "@/components/ui";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
-import { api } from "@/lib/client";
+import { api, notYours } from "@/lib/client";
+import { notFound } from "next/navigation";
 import { fmtDate } from "@/lib/core/utils";
 import { adminProjects, orEmpty } from "@/lib/settings/api-admin";
 import { Logbook, readingLine, type LogAct } from "@/components/logbook";
@@ -39,7 +40,7 @@ export default async function PersonActivityPage({ params, searchParams }: { par
   const query = new URLSearchParams(Object.entries({ projectId: sp.project, kind: sp.kind, action: sp.action, q: sp.q, from: sp.from, to: sp.to, page: String(page), per: "50" })
     .filter((e): e is [string, string] => !!e[1]));
   const [activity, projects] = await Promise.all([
-    api<Activity>(`/api/admin/users/${id}/activity?${query}`).catch(() => null),
+    api<Activity>(`/api/admin/users/${id}/activity?${query}`).catch((e) => { if (notYours(e)) notFound(); throw e; }),
     orEmpty(adminProjects),
   ]);
   const address = (q: Search) => {
@@ -69,7 +70,7 @@ export default async function PersonActivityPage({ params, searchParams }: { par
           {activity.first ? `First act ${fmtDate(activity.first)}. ` : "Nothing recorded yet. "}
           What {user.name} did in the app, day by day: their acts on documents
           {activity.keepsReading ? ", what they opened and downloaded" : ""}{activity.showsSignIns ? ", and their sign-ins" : ""}, as the organization chose to keep them
-          {isAdmin(me) ? <> (<Link href="/organization/settings/tracking" className="font-semibold text-link hover:underline">change it</Link>)</> : null}.
+          {isAdmin(me) ? <> (<Link href="/organization/settings/security#tracking" className="font-semibold text-link hover:underline">change it</Link>)</> : null}.
           Only an administrator or the control function reads this, and reading it is recorded too.
         </p>
       ) : <p>Their activity could not be read just now. Try again in a moment.</p>}

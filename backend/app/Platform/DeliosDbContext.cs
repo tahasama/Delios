@@ -22,6 +22,16 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     /// </summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
+    private Microsoft.EntityFrameworkCore.Infrastructure.CoreOptionsExtension? Core =>
+        Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptions>(this)
+            .FindExtension<Microsoft.EntityFrameworkCore.Infrastructure.CoreOptionsExtension>();
+
+    /// <summary>The organization this unit of work is for (the one its transactions are fenced to), if set.</summary>
+    public Guid? CurrentTenant => Core?.Interceptors?.OfType<Tenancy.TenantTransactionInterceptor>().FirstOrDefault()?.Tenant;
+
+    /// <summary>One of the application's services (for what is kept across requests, <see cref="AccessVersions"/>).</summary>
+    public T? AppService<T>() where T : class => Core?.ApplicationServiceProvider?.GetService(typeof(T)) as T;
+
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Party> Parties => Set<Party>();
     public DbSet<User> Users => Set<User>();
@@ -34,6 +44,7 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Function> Functions => Set<Function>();
     public DbSet<PermissionRule> PermissionRules => Set<PermissionRule>();
     public DbSet<Membership> Memberships => Set<Membership>();
+    public DbSet<PersonSeen> PeopleSeen => Set<PersonSeen>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<KnownDevice> KnownDevices => Set<KnownDevice>();
     public DbSet<IdentityProvider> IdentityProviders => Set<IdentityProvider>();
@@ -48,6 +59,10 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<RevisionSchemeRouting> RevisionSchemeRoutings => Set<RevisionSchemeRouting>();
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<Revision> Revisions => Set<Revision>();
+    public DbSet<RevisionFact> RevisionFacts => Set<RevisionFact>();
+    public DbSet<DocumentFact> DocumentFacts => Set<DocumentFact>();
+    public DbSet<ValueUsed> ValuesUsed => Set<ValueUsed>();
+    public DbSet<TransmittalFact> TransmittalFacts => Set<TransmittalFact>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<DocumentAccess> DocumentAccess => Set<DocumentAccess>();
     public DbSet<HandBackRequest> HandBackRequests => Set<HandBackRequest>();
@@ -83,6 +98,7 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
     public DbSet<Checks.CheckOptOut> CheckOptOuts => Set<Checks.CheckOptOut>();
     public DbSet<Documents.RegisterView> RegisterViews => Set<Documents.RegisterView>();
     public DbSet<Actions.ScheduleSource> ScheduleSources => Set<Actions.ScheduleSource>();
+    public DbSet<Actions.ListSource> ListSourceRows => Set<Actions.ListSource>();
     public DbSet<Actions.ScheduleImport> ScheduleImports => Set<Actions.ScheduleImport>();
     public DbSet<Actions.Activity> Activities => Set<Actions.Activity>();
     public DbSet<Actions.Requirement> Requirements => Set<Actions.Requirement>();
@@ -135,6 +151,9 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
         // What a function may do is read the same way: the project's own copy where it keeps one, else the organization's.
         modelBuilder.Entity<PermissionRule>().HasQueryFilter(r => r.ProjectId == RulesProject);
         modelBuilder.Entity<ValueSet>().HasQueryFilter(v => ListsOwnKeys.Contains(v.ListKey) ? v.ProjectId == ListsProject : v.ProjectId == null);
+        // A made-up organization of a training space is seen in that space only, never from a real project's pages; read
+        // with no project in hand (the organization's pages, the worker), it is there, and those pages leave it out.
+        modelBuilder.Entity<Party>().HasQueryFilter(p => p.TrainingProjectId == null || ListsProject == null || p.TrainingProjectId == ListsProject);
 
         // Every Guid id is made in code (Guid.CreateVersion7), never by the database.
         // Saying so lets a new row reached through a navigation be inserted rather

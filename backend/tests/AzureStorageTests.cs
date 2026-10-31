@@ -67,7 +67,7 @@ public sealed class AzureStorageTests(Infrastructure infrastructure, AzuriteFixt
         var id = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/reviews/{id}/answer", new { });
         await Flow.PostAsync(approver, $"/api/projects/{p.Project}/reviews/{id}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{id}/release", new { });
+        await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{id}/release", await Flow.ReleaseBodyAsync(controller));
 
         // The worker read the upload to scan it and wrote the stamped copy back.
         var document = await Flow.UntilAsync(engineer, p.Project, p.Document, d =>
@@ -76,11 +76,8 @@ public sealed class AzureStorageTests(Infrastructure infrastructure, AzuriteFixt
         var original = files.Single(f => f.GetProperty("kind").GetString() == "RENDITION");
         Assert.Equal("CLEAN", original.GetProperty("status").GetString());
 
-        // Downloaded through a signed link, byte for byte what was uploaded, named for saving.
-        var link = await engineer.GetFromJsonAsync<JsonElement>(
-            $"/api/projects/{p.Project}/files/{original.GetProperty("id").GetGuid()}/download");
-        using var raw = new HttpClient();
-        using var response = await raw.GetAsync(link.GetProperty("url").GetString());
+        // Downloaded through the app, opened from its seal: byte for byte what was uploaded, named for saving.
+        using var response = await engineer.GetAsync($"/api/projects/{p.Project}/files/{original.GetProperty("id").GetGuid()}/download");
         response.EnsureSuccessStatusCode();
         Assert.Equal(pdf, await response.Content.ReadAsByteArrayAsync());
         Assert.Contains("attachment", response.Content.Headers.ContentDisposition?.ToString());

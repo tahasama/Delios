@@ -26,4 +26,4 @@ export type ProjectPlan = {
 };
 
 export const projectPlan = cache(async (scope: { projectId: string }): Promise<ProjectPlan> =>
-  api<ProjectPlan>(projectPath(scope, "/management-plan")));
+  api<ProjectPlan>(projectPath(scope, "/management-plan"), { keep: { areas: ["checks"] } }));

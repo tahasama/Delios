@@ -44,7 +44,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var pdf = await Flow.UploadAsync(client, project, document, "Programme.pdf", Flow.Pdf(), "application/pdf");
         var export = await Flow.UploadAsync(client, project, document, "Programme.csv", Encoding.UTF8.GetBytes(csv), "text/csv");
         var (status, revision) = await Flow.PostAsync(client, $"/api/projects/{project}/documents/{document}/revisions",
-            new { fileIds = new[] { pdf, export } });
+            new { fileIds = new[] { pdf, export }, changeDescription = "Next issue" });
         Assert.True(status == HttpStatusCode.Created, revision.ToString());
         var id = revision.GetProperty("id").GetGuid();
         await Flow.UntilAsync(client, project, document, d => Flow.Revision(d, id).GetProperty("filesState").GetString() != "PROCESSING");
@@ -57,7 +57,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var id = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"/api/projects/{project}/reviews/{id}/answer", new { });
         await Flow.PostAsync(approver, $"/api/projects/{project}/reviews/{id}/answer", new { verdict = "C1", status });
-        var (released, body) = await Flow.PostAsync(controller, $"/api/projects/{project}/reviews/{id}/release", new { });
+        var (released, body) = await Flow.PostAsync(controller, $"/api/projects/{project}/reviews/{id}/release", await Flow.ReleaseBodyAsync(controller));
         Assert.True(released == HttpStatusCode.OK, body.ToString());
     }
 
@@ -117,24 +117,25 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var compaction = (await Api.RegisterAsync(engineer, project, Api.Drawing("Compaction test results"))).GetProperty("id").GetGuid();
         var a = (string code) => $"{p}/activities/{ByCode(activities, code).GetProperty("id").GetGuid()}";
 
-        var (unknown, unknownBody) = await Flow.PostAsync(engineer, $"{a("A100")}/needs", new { documentId = slab, purpose = "WHATEVER" });
+        // The control function adds documents to actions by hand (owner).
+        var (unknown, unknownBody) = await Flow.PostAsync(controller, $"{a("A100")}/needs", new { documentId = slab, purpose = "WHATEVER" });
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "VALUE_NOT_PUBLISHED"), (unknown, Flow.Code(unknownBody)));
-        var (_, slabNeed) = await Flow.PostAsync(engineer, $"{a("A100")}/needs", new { documentId = slab, purpose = "EXECUTION" });
+        var (_, slabNeed) = await Flow.PostAsync(controller, $"{a("A100")}/needs", new { documentId = slab, purpose = "EXECUTION" });
         Assert.Equal("AT_RISK", slabNeed.GetProperty("activity").GetProperty("readiness").GetString());
         Assert.Equal(DateOnly.FromDateTime(Today.AddDays(-2)), slabNeed.GetProperty("needs")[0].GetProperty("neededBy").Deserialize<DateOnly>());
-        var (again, againBody) = await Flow.PostAsync(engineer, $"{a("A100")}/needs", new { documentId = slab, purpose = "EXECUTION" });
+        var (again, againBody) = await Flow.PostAsync(controller, $"{a("A100")}/needs", new { documentId = slab, purpose = "EXECUTION" });
         Assert.Equal((HttpStatusCode.Conflict, "NEED_EXISTS"), (again, Flow.Code(againBody)));
 
-        var (plumbing, plumbingBody) = await Flow.PostAsync(engineer, $"{a("A200")}/needs",
+        var (plumbing, plumbingBody) = await Flow.PostAsync(controller, $"{a("A200")}/needs",
             new { documentId = layout, purpose = "INFORMATION", department = "Plumbing" });
         Assert.Equal((HttpStatusCode.UnprocessableEntity, "VALUE_NOT_PUBLISHED"), (plumbing, Flow.Code(plumbingBody)));
-        var (_, layoutNeed) = await Flow.PostAsync(engineer, $"{a("A200")}/needs",
+        var (_, layoutNeed) = await Flow.PostAsync(controller, $"{a("A200")}/needs",
             new { documentId = layout, purpose = "INFORMATION", department = "Electrical" });
         Assert.Equal("EL", layoutNeed.GetProperty("needs")[0].GetProperty("department").GetString());
         Assert.Equal("PENDING", layoutNeed.GetProperty("activity").GetProperty("readiness").GetString());
 
         // A test result is needed after the work: counted from the finish.
-        var (_, testNeed) = await Flow.PostAsync(engineer, $"{a("A300")}/needs",
+        var (_, testNeed) = await Flow.PostAsync(controller, $"{a("A300")}/needs",
             new { documentId = compaction, purpose = "RECORD", anchor = "FINISH", offsetDays = 7 });
         Assert.Equal(DateOnly.FromDateTime(Today.AddDays(47)), testNeed.GetProperty("needs")[0].GetProperty("neededBy").Deserialize<DateOnly>());
 
@@ -183,14 +184,15 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         });
         Assert.Equal("Site manager", decided.GetProperty("decisions")[0].GetProperty("responsibleName").GetString());
 
-        // How the slab drawing's chain went: sent for review, each step, released, issued.
+        // How the slab drawing's chain went, each checkpoint named for the act: sending for review, each step, then release
+        // and issue as one act (the project does not keep them apart).
         var lateness = await GetAsync(engineer, $"{a("A100")}/lateness");
         var chain = lateness[0].GetProperty("checkpoints").EnumerateArray().Select(c => c.GetProperty("name").GetString()).ToList();
-        Assert.Equal("Sent for review", chain[0]);
-        Assert.Equal(["Released", "Issued"], chain[^2..]);
+        Assert.Equal("Sending for review", chain[0]);
+        Assert.Equal("Release & issue", chain[^1]);
         // Needed two days ago with an eight-day route: it was late going in, and that is the cause.
         var cause = lateness[0].GetProperty("cause");
-        Assert.Equal(("Sent for review", "Eli Engineer"), (cause.GetProperty("name").GetString(), cause.GetProperty("owedBy").GetString()));
+        Assert.Equal(("Sending for review", "Eli Engineer"), (cause.GetProperty("name").GetString(), cause.GetProperty("owedBy").GetString()));
 
         // The next revision of the schedule: what moved, what is new, what went.
         var second = await ScheduleRevisionAsync(engineer, project, schedule,
@@ -247,18 +249,19 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
             subproject = "00",
         })).GetProperty("id").GetGuid();
         using (await controller.PutAsJsonAsync($"{p}/schedule", new { documentId = schedule })) { }
+        // Tagged Civil: only an action concerning a discipline takes that discipline's documents (owner).
         await ReleaseAsync(engineer, approver, controller, project, await ScheduleRevisionAsync(engineer, project, schedule,
-            $"Activity ID,Activity Name,Start\nB100,Excavate pump pit,{Day(-3)}\n"));
+            $"Activity ID,Activity Name,Start,Departments\nB100,Excavate pump pit,{Day(-3)},CI\n"));
         var activities = await UntilAsync(engineer, $"{p}/activities", a => a.GetArrayLength() == 1);
         var b100 = $"{p}/activities/{ByCode(activities, "B100").GetProperty("id").GetGuid()}";
         var drawing = (await Api.RegisterAsync(engineer, project, Api.Drawing("Pump pit excavation"))).GetProperty("id").GetGuid();
-        await Flow.PostAsync(engineer, $"{b100}/needs", new { documentId = drawing, purpose = "EXECUTION" });
+        await Flow.PostAsync(controller, $"{b100}/needs", new { documentId = drawing, purpose = "EXECUTION" });
 
         var run = await CheckTests.RunAsync(controller, project);
-        Assert.Equal(("FAIL", "PASS", "PASS"), (CheckTests.Result(run, "SC-02"), CheckTests.Result(run, "SC-01"), CheckTests.Result(run, "SC-04")));
+        Assert.Equal(("FAIL", "PASS", "PASS"), (CheckTests.Result(run, "SCH-02"), CheckTests.Result(run, "SCH-01"), CheckTests.Result(run, "SET-11")));
         await Flow.PostAsync(controller, $"{b100}/decisions", new { decision = "STOPPED", responsibleName = "Site manager", reason = "No drawing." });
         run = await CheckTests.RunAsync(controller, project);
-        Assert.Equal("PASS", CheckTests.Result(run, "SC-02"));
+        Assert.Equal("PASS", CheckTests.Result(run, "SCH-02"));
 
         // The next revision's export is not readable: the release stands, the check says so.
         var broken = await ScheduleRevisionAsync(engineer, project, schedule, "Task,When\nB100,soon\n");
@@ -266,7 +269,7 @@ public sealed class ScheduleTests(Infrastructure infrastructure) : IClassFixture
         var imports = await UntilAsync(controller, $"{p}/schedule", s => s.GetProperty("imports").GetArrayLength() == 2);
         Assert.Equal("FAILED", imports.GetProperty("imports")[0].GetProperty("status").GetString());
         run = await CheckTests.RunAsync(controller, project);
-        Assert.Equal("FAIL", CheckTests.Result(run, "SC-01"));
+        Assert.Equal("FAIL", CheckTests.Result(run, "SCH-01"));
     }
 
     [Fact]

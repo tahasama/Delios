@@ -10,11 +10,30 @@ export const PREF = {
   deviceDark: "theme-device-dark",
   /** The desktop sidebar's width in pixels. */
   sidebar: "sidebar",
+  /** "1" while "More" is left open in the menu. */
+  navMore: "nav-more",
   /** The review page's document column, in pixels (dragged wider, the side cards go under it). */
   reviewPane: "pane-review",
   /** The stamp card's preview, in pixels. */
   stampPane: "pane-stamp",
+  /** The calendar's day, its side in pixels (the whole calendar dragged larger or smaller by its corner). */
+  calendarDay: "calendar-day",
+  /** "0" when the names of the days off and the actions are not written inside the days. */
+  calendarNames: "calendar-names",
+  /** "0" once "For viewing only" above a drawing was closed. */
+  viewingNote: "viewing-note",
+  /** "1" while the PDF is shown as a dark page. */
+  pdfDark: "pdf-dark",
 } as const;
+
+/** How large a calendar's day is drawn, its side in pixels: 56 unless dragged, between 28 and 120. */
+export const CALENDAR_DAY = { normal: 96, min: 40, max: 200 } as const;
+
+/** The calendar's day size left by the person, read on the server from its cookie. */
+export function calendarDay(value: string | undefined): number {
+  const h = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(h) ? Math.min(CALENDAR_DAY.max, Math.max(CALENDAR_DAY.min, h)) : CALENDAR_DAY.normal;
+}
 
 export const SIDEBAR_LIMITS = { min: 76, max: 360, railBelow: 180 } as const;
 

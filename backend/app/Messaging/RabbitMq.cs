@@ -73,7 +73,7 @@ public static class Topology
 
     /// <summary>Scanning uploads and stamping releases: what people wait for.</summary>
     public static readonly WorkQueue Files = new(FilesQueue, FilesRetryQueue,
-        [Documents.FileUploaded.RoutingKey, Reviews.RevisionReleased.RoutingKey, Reviews.RevisionMarked.RoutingKey], Prefetch: 4);
+        [Documents.FileUploaded.RoutingKey, Documents.DraftReplaced.RoutingKey, Reviews.RevisionReleased.RoutingKey, Reviews.RevisionMarked.RoutingKey], Prefetch: 4);
 
     /// <summary>
     /// Reading text and OCR: slow, and nobody is waiting at a screen. A queue of
@@ -84,15 +84,21 @@ public static class Topology
 
     /// <summary>A project's checks and schedule reads: a few seconds to minutes each, never in the way of uploads.</summary>
     public static readonly WorkQueue Checks = new("delios.checks", "delios.checks.retry",
-        [Host.Checks.CheckRunRequested.RoutingKey, Host.Actions.ScheduleImportRequested.RoutingKey, Host.Actions.RequirementsImportRequested.RoutingKey,
+        [Host.Checks.CheckRunRequested.RoutingKey, Host.Actions.ScheduleImportRequested.RoutingKey, Host.Actions.ScheduleCatchUp.RoutingKey, Host.Actions.RequirementsImportRequested.RoutingKey,
             Host.Actions.DepartmentsImportRequested.RoutingKey], Prefetch: 1);
 
     /// <summary>Email: each one to the mail server on its own, apart from every other job.</summary>
     public static readonly WorkQueue Mail = new("delios.mail", "delios.mail.retry",
         [Host.Notifications.EmailRequested.RoutingKey, Host.Notifications.PushRequested.RoutingKey], Prefetch: 4);
 
+    /// <summary>After a change: notice days written again (<see cref="Actions.NoticeDays"/>), packages brought up to date (<see cref="Packages.PackagesMoved"/>); one at a time.</summary>
+    public static readonly WorkQueue Notices = new("delios.notices", "delios.notices.retry", [Host.Actions.NoticesMoved.RoutingKey, Host.Packages.PackagesMoved.RoutingKey, Host.Operators.TrialsMoved.RoutingKey], Prefetch: 1);
+
+    /// <summary>A full download (every file of a project or of the organization in one zip): long, one at a time, in nobody's way.</summary>
+    public static readonly WorkQueue Exports = new("delios.exports", "delios.exports.retry", [Host.Documents.FullDownloadRequested.RoutingKey], Prefetch: 1);
+
     /// <summary>Every work queue; the worker runs one <see cref="FileQueueConsumer"/> per entry.</summary>
-    public static readonly WorkQueue[] Queues = [Files, Extraction, Checks, Mail];
+    public static readonly WorkQueue[] Queues = [Files, Extraction, Checks, Mail, Notices, Exports];
 
     /// <summary>
     /// Creates the exchanges, the work queues with their retry queues and bindings, and the dead queue, if they do not exist yet.

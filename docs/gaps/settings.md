@@ -41,16 +41,15 @@ Each found wrong in the Settings review of 2026-10-16 (`.impeccable/critique/`),
 - ~~A Control room answer made fixed later~~ (decided, owner: what a project changed is never overridden by the
   organization; only a reset from the organization's card touches it, and a reset keeps a copy that can be put back).
 - Demo data: schemes seeded with documents are not marked as having given numbers (real use marks them).
-- The organization's "Reset to the app's defaults" keeps no copy yet (owner: three levels, app → organization →
-  project; the organization's reset keeps a copy of what it held, put back like a project's kept copy).
-- A review rejected a day before the action it serves leaves no time to put it right (owner: "still not resolved, it is
-  problematic"). Nothing yet warns at sending, or plans the days back from the action; to be decided.
+- ~~The organization's "Reset to the app's defaults" keeps no copy yet~~ (done: replacing the defaults, from a project
+  or back to the app's own, asks why and keeps a copy, put back from the defaults' page).
+- ~~A review rejected a day before the action it serves leaves no time to put it right~~ (decided by the owner, 30 Oct
+  2026: "their own ways, not our problem"; the organizations plan their reviews themselves, nothing is built for it).
 
 ## The organization's Control room (left to do)
 
 - It is drawn for any role: a project draws it for our role there. An organization working mostly in one role could
   choose the role its console is drawn for.
-- The risk window has no organization's value of its own: fixed, every project stays at the app's 7 days. Giving it
-  one (set on the organization's console, the default of every project) is left to do.
+- ~~The risk window has no organization's value of its own~~ (done: both days around an action are on two levels).
 - "Who acts as the control function", the schedule's days and how suppliers send are said on the organization's
   console, never changed there: they are each project's.

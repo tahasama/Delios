@@ -60,6 +60,10 @@ public sealed class FileQueueConsumer(
                     await scope.ServiceProvider.GetRequiredService<FileProcessor>().ProcessAsync(
                         Read<FileUploaded>(delivery), stoppingToken);
                     break;
+                case DraftReplaced.RoutingKey:
+                    await scope.ServiceProvider.GetRequiredService<FileProcessor>().RemoveAsync(
+                        Read<DraftReplaced>(delivery), stoppingToken);
+                    break;
                 case Reviews.RevisionReleased.RoutingKey:
                     var released = Read<Reviews.RevisionReleased>(delivery);
                     await scope.ServiceProvider.GetRequiredService<Reviews.Stamping>().ProcessAsync(released, stoppingToken);
@@ -85,6 +89,20 @@ public sealed class FileQueueConsumer(
                     await scope.ServiceProvider.GetRequiredService<Actions.ScheduleImporter>().OnRequestedAsync(
                         Read<Actions.ScheduleImportRequested>(delivery), stoppingToken);
                     break;
+                case Actions.ScheduleCatchUp.RoutingKey:
+                    var catchUp = Read<Actions.ScheduleCatchUp>(delivery);
+                    scope.ServiceProvider.GetRequiredService<Tenancy.TenantContext>().Set(catchUp.TenantId);
+                    await scope.ServiceProvider.GetRequiredService<Actions.ScheduleImporter>().CatchUpAsync(catchUp.ProjectId, stoppingToken);
+                    break;
+                case Actions.NoticesMoved.RoutingKey:
+                    await Actions.NoticeDays.OnMovedAsync(scope.ServiceProvider, Read<Actions.NoticesMoved>(delivery), stoppingToken);
+                    break;
+                case Operators.TrialsMoved.RoutingKey:
+                    scope.ServiceProvider.GetRequiredService<Operators.TrialBell>().Ring();
+                    break;
+                case Packages.PackagesMoved.RoutingKey:
+                    await Packages.PackagesMoved.OnMovedAsync(scope.ServiceProvider, Read<Packages.PackagesMoved>(delivery), stoppingToken);
+                    break;
                 case Checks.CheckRunRequested.RoutingKey:
                     await scope.ServiceProvider.GetRequiredService<Checks.CheckEngine>().ProcessAsync(
                         Read<Checks.CheckRunRequested>(delivery), stoppingToken);
@@ -92,6 +110,10 @@ public sealed class FileQueueConsumer(
                 case Extraction.FileExtract.RoutingKey:
                     await scope.ServiceProvider.GetRequiredService<Extraction.ExtractionProcessor>().ProcessAsync(
                         Read<Extraction.FileExtract>(delivery), stoppingToken);
+                    break;
+                case Documents.FullDownloadRequested.RoutingKey:
+                    await scope.ServiceProvider.GetRequiredService<Documents.FullDownloadBuilder>().ProcessAsync(
+                        Read<Documents.FullDownloadRequested>(delivery), stoppingToken);
                     break;
                 case Notifications.PushRequested.RoutingKey:
                     await scope.ServiceProvider.GetRequiredService<Notifications.PushSender>().ProcessAsync(

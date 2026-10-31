@@ -183,20 +183,22 @@ type FormView = {
  * Every form at one level: a project's (the forms it keeps its own copy of, whether the organization leaves forms free,
  * whether this person may change them) or the organization's (its Settings).
  */
-export type FormsAnswer = { level: "project" | "organization"; forms: FormView[]; owned: string[]; free: boolean; mayChange: boolean };
+export type FormsAnswer = { level: "project" | "organization"; forms: FormView[]; owned: string[]; free: boolean; mayChange: boolean;
+  /** Free here only by an exception (who, when, why). */
+  exception?: { reason: string; by: string; at: string } | null };
 
 /** The project's forms, read once a request (`GET /api/projects/{id}/forms`). */
 export const projectForms = cache(async (projectId: string): Promise<FormsAnswer | null> =>
-  api<FormsAnswer>(`/api/projects/${projectId}/forms`).catch(() => null));
+  api<FormsAnswer>(`/api/projects/${projectId}/forms`, { keep: { areas: [] } }).catch(() => null));
 
 /** The organization's forms, every one of them, as its Settings show them (`GET /api/admin/forms`, an administrator). */
 export const organizationForms = cache(async (): Promise<FormsAnswer | null> =>
-  api<FormsAnswer>("/api/admin/forms").catch(() => null));
+  api<FormsAnswer>("/api/admin/forms", { keep: { areas: [] } }).catch(() => null));
 
 /** One form: the project's when a project is open, else (opening a project, adding an organization) the organization's. */
 async function formView(t: Tenant, kind: FieldKind): Promise<FormView | null> {
   if (t.projectId && !ORGANIZATION_KINDS.includes(kind)) return (await projectForms(t.projectId))?.forms.find((f) => f.form === kind) ?? null;
-  return api<FormView>(`/api/forms/${kind}`).catch(() => null);
+  return api<FormView>(`/api/forms/${kind}`, { keep: { areas: [] } }).catch(() => null);
 }
 
 /** How the project (or the organization) answered, for one form. A field always asked stands as it is. */

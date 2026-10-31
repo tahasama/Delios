@@ -18,6 +18,15 @@ public sealed record FileUploaded(Guid TenantId, Guid FileId)
 }
 
 /// <summary>
+/// Drafts replaced while their revision was in preparation: their stored bytes and previews go, once the replacing is
+/// committed (never before: a save that rolled back would leave records with nothing behind them).
+/// </summary>
+public sealed record DraftReplaced(Guid TenantId, string[] Keys)
+{
+    public const string RoutingKey = "file.replaced";
+}
+
+/// <summary>
 /// The worker's part of an upload: read the stored bytes once, scanning them for
 /// viruses, checking them against the size and checksum the uploader declared,
 /// and identifying what they are. A revision is ready only when all its files pass.
@@ -25,7 +34,7 @@ public sealed record FileUploaded(Guid TenantId, Guid FileId)
 /// </summary>
 public sealed class FileProcessor(
     DeliosDbContext db, TenantContext tenant, FileStorage storage, IVirusScanner scanner,
-    AuditLog audit, IClock clock, ILogger<FileProcessor> logger)
+    AuditLog audit, IClock clock, ILogger<FileProcessor> logger, Platform.ScreensNotifier screens)
 {
     /// <summary>
     /// Checks one uploaded file and records the result, then updates its revision's files state
@@ -63,7 +72,8 @@ public sealed class FileProcessor(
             detected = FileSniffer.Detect(content.Head);
         }
 
-        var (status, detail) = scan.Infected ? (FileStatuses.Infected, $"Virus found: {scan.Signature}")
+        var (status, detail) = scan.Infected && FileScanning.CouldNotCheck(scan.Signature) is { } why ? (FileStatuses.Rejected, why)
+            : scan.Infected ? (FileStatuses.Infected, $"Virus found: {scan.Signature}")
             : size != file.Size ? (FileStatuses.Rejected, $"The stored file is {size} bytes; {file.Size} were declared.")
             : sha256 != file.Sha256 ? (FileStatuses.Rejected, "The stored bytes do not match the declared SHA-256.")
             : (FileStatuses.Clean, (string?)null);
@@ -80,15 +90,18 @@ public sealed class FileProcessor(
                 .SetProperty(x => x.StatusDetail, detail)
                 .SetProperty(x => x.DetectedType, detected)
                 .SetProperty(x => x.ScannedAt, now), cancellationToken);
-        if (updated == 0) return;
-        AppMetrics.FilesProcessed.WithLabels(status).Inc();
-        // Read for search straight away only where the organization chose so.
-        if (status == FileStatuses.Clean && file.DocumentId is not null && file.Kind is FileKinds.Native or FileKinds.Rendition
-            && await db.Projects.AnyAsync(p => p.Id == file.ProjectId && p.ContentExtraction == Extraction.ExtractionModes.Automatic, cancellationToken))
+        if (updated == 0)
         {
-            Extraction.ExtractionProcessor.Enqueue(db, file);
-            await db.SaveChangesAsync(cancellationToken);
+            // Replaced while it was checked: keeping it above put its bytes back, so they go again.
+            if (!await db.StoredFiles.AnyAsync(f => f.Id == file.Id, cancellationToken)) await storage.RemoveAsync(file.ObjectKey, cancellationToken);
+            return;
         }
+        AppMetrics.FilesProcessed.WithLabels(status).Inc();
+        // Written around the save: the screens are told the document's page changed (its Preview waits for this).
+        if (file.DocumentId is { } changedDocument)
+            screens.Post([$"doc:{changedDocument}", $"p:{file.ProjectId}:{Platform.Areas.Docs}"]);
+        else screens.Post([$"p:{file.ProjectId}:{Platform.Areas.Transmittals}"]);
+        // A file's content is never read for search (owner: forbidden, ExtractionModes.Forbidden).
 
         await audit.WriteAsync(Actor.System, status switch
         {
@@ -125,5 +138,11 @@ public sealed class FileProcessor(
             }
         }
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>Removes the bytes of drafts replaced (<see cref="DraftReplaced"/>). Safe to run twice: a key gone stays gone.</summary>
+    public async Task RemoveAsync(DraftReplaced message, CancellationToken cancellationToken)
+    {
+        foreach (var key in message.Keys) await storage.RemoveAsync(key, cancellationToken);
     }
 }

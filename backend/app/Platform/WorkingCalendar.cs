@@ -24,30 +24,39 @@ public static class WorkingCalendar
     /// Returns the date that is <c>days</c> working days after <c>start</c>, skipping the given weekend days (ISO numbers, 1 Monday to 7 Sunday).
     /// Used to work out due dates for reviews and transmittals.
     /// </summary>
-    public static LocalDate AddWorkingDays(LocalDate start, int days, IReadOnlyCollection<int> weekendDays)
+    public static LocalDate AddWorkingDays(LocalDate start, int days, IReadOnlyCollection<int> weekendDays,
+        IReadOnlySet<LocalDate>? holidays = null)
     {
         if (weekendDays.Count >= 7) throw new ArgumentException("A week needs at least one working day.", nameof(weekendDays));
         var date = start;
         for (var added = 0; added < days;)
         {
             date = date.PlusDays(1);
-            if (!weekendDays.Contains((int)date.DayOfWeek)) added++;
+            if (!weekendDays.Contains((int)date.DayOfWeek) && holidays?.Contains(date) != true) added++;
         }
         return date;
     }
 
     /// <summary>The working day that many working days before <paramref name="end"/>: counting back, as a deadline is.</summary>
-    public static LocalDate SubtractWorkingDays(LocalDate end, int days, IReadOnlyCollection<int> weekendDays)
+    public static LocalDate SubtractWorkingDays(LocalDate end, int days, IReadOnlyCollection<int> weekendDays,
+        IReadOnlySet<LocalDate>? holidays = null)
     {
         if (weekendDays.Count >= 7) throw new ArgumentException("A week needs at least one working day.", nameof(weekendDays));
         var date = end;
         for (var taken = 0; taken < days;)
         {
             date = date.PlusDays(-1);
-            if (!weekendDays.Contains((int)date.DayOfWeek)) taken++;
+            if (!weekendDays.Contains((int)date.DayOfWeek) && holidays?.Contains(date) != true) taken++;
         }
         return date;
     }
+
+    /// <summary>
+    /// The days a project's working days skip besides its days off each week: the organization's public holidays for its
+    /// country or for every country, and the project's own days off (the calendar, <see cref="Settings.Calendar"/>).
+    /// </summary>
+    public static Task<IReadOnlySet<LocalDate>> HolidaysAsync(DeliosDbContext db, Identity.Project project, CancellationToken cancellationToken) =>
+        Settings.Calendar.DaysOffAsync(db, project, cancellationToken);
 
     /// <summary>Today at the site.</summary>
     public static LocalDate Today(IClock clock, string timeZone) =>

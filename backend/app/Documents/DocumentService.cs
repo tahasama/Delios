@@ -49,6 +49,13 @@ public sealed class DocumentService(
             return Fail(Problems.Invalid("DISCIPLINE_REQUIRED", "Exactly one discipline is required."));
 
         var catalog = await Catalog.LoadAsync(db, cancellationToken);
+        // The type recommends a criticality (owner: one is always recommended). Where the document form insists on it and
+        // none is given (a list read, what arrived registered, an import line), the recommended level is taken, as the
+        // form fills it in: the rule lives here once, not in each screen.
+        if (Blank(request.Criticality) is null
+            && (await Settings.FormRules.ReadAsync(db, access.Project.Id, "DOCUMENT", cancellationToken)).Rules.GetValueOrDefault("criticality") == Settings.FormRules.Required
+            && catalog.RecommendedCriticality(request.DocType, request.DeliverableType) is { } recommended)
+            request = request with { Criticality = recommended };
         if (Titles.IsGeneric(title, catalog.GenericTitleWords()))
             return Fail(Problems.Invalid("TITLE_GENERIC",
                 "The title only repeats the document type. Say what it shows, and of what.", new { title }));
@@ -131,8 +138,10 @@ public sealed class DocumentService(
         // own: checked here, for every way a document is registered, an import included.
         var formGiven = new Dictionary<string, bool>
         {
-            ["subProject"] = Blank(request.Subproject) is not null, ["phase"] = Blank(request.Phase) is not null,
-            ["contractRef"] = Blank(request.ContractRef) is not null, ["criticality"] = Blank(request.Criticality) is not null,
+            ["subProject"] = Blank(request.Subproject) is not null,
+            ["phase"] = Blank(request.Phase) is not null,
+            ["contractRef"] = Blank(request.ContractRef) is not null,
+            ["criticality"] = Blank(request.Criticality) is not null,
             ["confidentiality"] = confidentiality is not null,
             ["retentionClass"] = (Blank(request.RetentionClass) ?? catalog.RetentionFor(Blank(request.Criticality), request.DeliverableType)) is not null,
             ["plannedDate"] = request.PlannedDate is not null,
@@ -225,7 +234,7 @@ public sealed class DocumentService(
     /// new value. Coded values must be published; the title must say what the document is.
     /// </summary>
     public async Task<(Document? Document, IResult? Problem)> UpdateAsync(
-        ProjectAccess access, Guid documentId, UpdateDocumentRequest request, CancellationToken cancellationToken)
+        ProjectAccess access, Guid documentId, UpdateDocumentRequest request, CancellationToken cancellationToken, bool checkOnly = false)
     {
         var document = await DocumentQueries.Visible(db, access)
             .SingleOrDefaultAsync(d => d.Id == documentId, cancellationToken);
@@ -328,14 +337,26 @@ public sealed class DocumentService(
         if (changes.Count == 0) return (document, null);
         // A change never empties what the project's document form insists on, and an answer to a list of one's own is
         // one of its values offered for the document's deliverable type.
-        var formKey = new Dictionary<string, string> { ["subproject"] = "subProject", ["phase"] = "phase", ["contractRef"] = "contractRef",
-            ["criticality"] = "criticality", ["confidentiality"] = "confidentiality", ["retentionClass"] = "retentionClass", ["plannedDate"] = "plannedDate" };
+        var formKey = new Dictionary<string, string>
+        {
+            ["subproject"] = "subProject",
+            ["phase"] = "phase",
+            ["contractRef"] = "contractRef",
+            ["criticality"] = "criticality",
+            ["confidentiality"] = "confidentiality",
+            ["retentionClass"] = "retentionClass",
+            ["plannedDate"] = "plannedDate"
+        };
         var touched = (request.Changes ?? []).Keys.Where(formKey.ContainsKey).Select(k => formKey[k]).ToList();
         var nowGiven = new Dictionary<string, bool>
         {
-            ["subProject"] = document.Subproject is not null, ["phase"] = document.Phase is not null, ["contractRef"] = document.ContractRef is not null,
-            ["criticality"] = document.Criticality is not null, ["confidentiality"] = document.Confidentiality is not null,
-            ["retentionClass"] = document.RetentionClass is not null, ["plannedDate"] = document.PlannedDate is not null,
+            ["subProject"] = document.Subproject is not null,
+            ["phase"] = document.Phase is not null,
+            ["contractRef"] = document.ContractRef is not null,
+            ["criticality"] = document.Criticality is not null,
+            ["confidentiality"] = document.Confidentiality is not null,
+            ["retentionClass"] = document.RetentionClass is not null,
+            ["plannedDate"] = document.PlannedDate is not null,
         };
         if (touched.Count > 0 && await Settings.FormRules.CheckAsync(db, document.ProjectId, "DOCUMENT", nowGiven, null, cancellationToken, touched) is { } formProblem)
             return Fail(formProblem);
@@ -354,6 +375,8 @@ public sealed class DocumentService(
         }
         // An order stays the document's supplier's, whichever of the two changed.
         if (await PurchaseOrderProblemAsync(catalog, document.ContractRef, document.Originator, cancellationToken) is { } poProblem) return Fail(poProblem);
+        // Checked as changing it would, and nothing written (a list checked before it is imported).
+        if (checkOnly) return (document, null);
         document.UpdatedAt = clock.GetCurrentInstant();
         await db.SaveChangesAsync(cancellationToken);
         foreach (var change in changes)
@@ -466,6 +489,14 @@ public sealed class DocumentService(
         var (declared, invalid) = Uploads.Check(request, storageOptions.Value.MaxFileBytes);
         if (invalid is not null) return (null, invalid);
         var (name, contentType, sha256, isPdf) = declared!;
+        // The box it was put in says what it is (owner: say why, simply): a PDF is what people read, the source file
+        // the editable original.
+        if (string.Equals(request.Slot, "SOURCE", StringComparison.OrdinalIgnoreCase) && isPdf)
+            return (null, Problems.Invalid("SOURCE_IS_PDF",
+                $"{name} is a PDF: put it in the PDF box. The source file is the editable original (.docx, .dwg, .xlsx…).", new { field = "nativeFile" }));
+        if (string.Equals(request.Slot, "PDF", StringComparison.OrdinalIgnoreCase) && !isPdf)
+            return (null, Problems.Invalid("NOT_A_PDF",
+                $"{name} is not a PDF: put it in the source file box. The PDF box takes the PDF people read.", new { field = "renditionFile" }));
         var file = new StoredFile
         {
             TenantId = access.Project.TenantId,
@@ -643,13 +674,14 @@ public sealed class DocumentService(
         }
         var (files, filesProblem) = await UploadedFilesAsync(access, document!, request.FileIds, cancellationToken);
         if (filesProblem is not null) return (null, filesProblem);
+        if (await ReplaceDraftAsync(access, document!, revision, files!, request.ChangeDescription, cancellationToken) is { } replaced) return replaced;
         Bind(files!, revision);
         revision.FilesState = FilesStates.Processing;
         document!.UpdatedAt = clock.GetCurrentInstant();
         await db.SaveChangesAsync(cancellationToken);
+        // Files added to a revision rather than a new one: the uploader's reason is kept with them.
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "FILE_UPLOADED", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}",
-            // Files added to a revision rather than a new one: the uploader's reason is kept with them.
             string.Join(", ", files!.Select(f => f.Name)) + (string.IsNullOrWhiteSpace(request.ChangeDescription) ? "" : $". Why: {request.ChangeDescription.Trim()}"),
             document.ProjectId, cancellationToken);
         return (revision, null);
@@ -675,6 +707,7 @@ public sealed class DocumentService(
         var (files, filesProblem) = await UploadedFilesAsync(access, document!, request.FileIds, cancellationToken);
         if (filesProblem is not null) return (null, filesProblem);
         if (files!.Count == 0) return (null, Problems.Invalid("FILES_REQUIRED", "Choose the new files."));
+        if (await ReplaceDraftAsync(access, document!, revision, files, request.ChangeDescription, cancellationToken) is { } drafted) return drafted;
         var now = clock.GetCurrentInstant();
         // A new file replaces the one of its kind; the other kind carries over as it was, already scanned.
         var replaced = files.Select(f => f.Kind).ToHashSet();
@@ -684,13 +717,16 @@ public sealed class DocumentService(
         revision.FilesState = FilesStates.Processing;
         foreach (var old in kept)
         {
-            db.StoredFiles.Add(new StoredFile
+            // The file carried over is a record of its own, with its own copy: a key belongs to one record only (it was
+            // shared before, and the second record broke the unique key: "an error occurred" on adding a PDF beside a
+            // source file, or the other way round).
+            var carried = new StoredFile
             {
                 TenantId = old.TenantId,
                 ProjectId = old.ProjectId,
                 DocumentId = old.DocumentId,
                 RevisionId = revision.Id,
-                ObjectKey = old.ObjectKey,
+                ObjectKey = "",
                 Name = old.Name,
                 ContentType = old.ContentType,
                 Size = old.Size,
@@ -704,7 +740,10 @@ public sealed class DocumentService(
                 UploadedByName = old.UploadedByName,
                 CreatedAt = old.CreatedAt,
                 ScannedAt = old.ScannedAt,
-            });
+            };
+            carried.ObjectKey = FileStorage.KeyFor(carried.TenantId, carried.ProjectId, carried.Id);
+            await storage.CopyAsync(old.ObjectKey, carried.ObjectKey, cancellationToken);
+            db.StoredFiles.Add(carried);
         }
         Bind(files, revision);
         document!.UpdatedAt = now;
@@ -815,6 +854,55 @@ public sealed class DocumentService(
         await audit.WriteAsync(new Actor(access.UserId, access.UserName), "RESUBMITTED", "Revision", revision.Id,
             $"{document.Number} rev {revision.Value}", $"Submission {revision.Submission}: {files!.Count} corrected file(s).",
             document.ProjectId, cancellationToken);
+        return (revision, null);
+    }
+
+    /// <summary>
+    /// A draft is replaced, never kept (owner: "those files have no value unless they are past that stage"): while the
+    /// revision is in preparation and nothing has looked at its files (none came on a transmittal, none was checked on
+    /// arrival, no transmittal carried them, no review of the revision), a new file takes the place of the one of its
+    /// kind, record and bytes (the bytes once committed, <see cref="DraftReplaced"/>; the database allows only this,
+    /// <c>stored_files_kept_unless_draft</c>), with no new submission. The same file sent again changes nothing.
+    /// Null when the files are no draft: then they are kept, as every file past preparation is.
+    /// </summary>
+    private async Task<(Revision? Revision, IResult? Problem)?> ReplaceDraftAsync(
+        ProjectAccess access, Document document, Revision revision, List<StoredFile> files, string? why, CancellationToken cancellationToken)
+    {
+        if (revision.State != RevisionStates.InPreparation) return null;
+        if (revision.Submissions.FirstOrDefault(x => x.Number == revision.Submission) is { Check: not null } or { Outcome: not null }) return null;
+        var current = revision.Files.Where(f => f.Submission == revision.Submission && f.Kind is FileKinds.Native or FileKinds.Rendition).ToList();
+        if (current.Any(f => f.TransmittalItemId is not null)) return null;
+        if (await db.Reviews.AnyAsync(r => r.RevisionId == revision.Id, cancellationToken)) return null;
+        if (await db.TransmittalItems.AnyAsync(i => i.RevisionId == revision.Id && (i.Submission == null || i.Submission == revision.Submission), cancellationToken))
+            return null;
+
+        // The same file again, of the same kind: nothing to replace (a refused one is replaced by itself all the same).
+        var repeated = files.Where(n => current.Any(o => o.Kind == n.Kind && o.Sha256 == n.Sha256
+            && o.Status is not (FileStatuses.Infected or FileStatuses.Rejected))).ToList();
+        var fresh = files.Except(repeated).ToList();
+        var gone = current.Where(o => fresh.Any(n => n.Kind == o.Kind)).ToList();
+        db.StoredFiles.RemoveRange(repeated);
+        db.StoredFiles.RemoveRange(gone);
+        var keys = repeated.Select(f => f.ObjectKey).Concat(gone.SelectMany(f => Previews.KeysOf(f).Prepend(f.ObjectKey))).ToArray();
+        if (keys.Length > 0) db.Enqueue(DraftReplaced.RoutingKey, new DraftReplaced(document.TenantId, keys));
+        if (fresh.Count == 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return (null, Problems.Conflict("SAME_FILES",
+                $"{string.Join(", ", repeated.Select(f => f.Name))} {(repeated.Count == 1 ? "is" : "are")} already what rev {revision.Value} holds: nothing changed."));
+        }
+        Bind(fresh, revision);
+        revision.FilesState = FilesStates.Processing;
+        document.UpdatedAt = clock.GetCurrentInstant();
+        await db.SaveChangesAsync(cancellationToken);
+        static string KindName(string kind) => kind == FileKinds.Rendition ? "PDF" : "source file";
+        var said = fresh.Select(n => gone.FirstOrDefault(o => o.Kind == n.Kind) is { } old
+            ? $"{KindName(n.Kind)} replaced: {old.Name} → {n.Name}" : $"{KindName(n.Kind)}: {n.Name}");
+        await audit.WriteAsync(new Actor(access.UserId, access.UserName), gone.Count > 0 ? "DRAFT_REPLACED" : "FILE_UPLOADED", "Revision", revision.Id,
+            $"{document.Number} rev {revision.Value}",
+            string.Join("; ", said) + (string.IsNullOrWhiteSpace(why) ? "" : $". Why: {why.Trim()}"),
+            document.ProjectId, cancellationToken);
+        revision.Files = [.. revision.Files.Except(gone)];
         return (revision, null);
     }
 

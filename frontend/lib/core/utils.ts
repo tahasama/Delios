@@ -1,20 +1,26 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { formatDay } from "@/lib/core/date-format";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** A day as the organization reads it (Settings, How dates read). */
 export function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  // Anything else than a date or its text (an object the server sent by mistake) reads as no date, never a broken page.
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "—";
+  return formatDay(date, undefined, typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d));
 }
 
+/** A day as the organization reads it, with its time (24 hours). */
 export function fmtDateTime(d: Date | string | null | undefined): string {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  if (Number.isNaN(date.getTime())) return "—";
+  return `${formatDay(date)}, ${date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 export function timeAgo(d: Date | string | null | undefined): string {

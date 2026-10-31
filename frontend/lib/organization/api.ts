@@ -35,29 +35,29 @@ export type Elsewhere = { tenantId: string; organization: string; home: boolean;
 
 /** Our links with other organizations, both ways. Administrators only; empty for anyone else. */
 export const organizationLinks = cache(async (): Promise<OrganizationLink[]> =>
-  api<OrganizationLink[]>("/api/organization/links").catch(() => []));
+  api<OrganizationLink[]>("/api/organization/links", { keep: { areas: [] } }).catch(() => []));
 
 /** The projects of other organizations' that we take part in. Administrators only; empty for anyone else. */
 export const joinedProjects = cache(async (): Promise<JoinedProject[]> =>
-  api<JoinedProject[]>("/api/organization/joined").catch(() => []));
+  api<JoinedProject[]>("/api/organization/joined", { keep: { areas: [] } }).catch(() => []));
 
 /** The organizations taking part in one of our projects. */
 export const projectOrganizations = cache(async (scope: { projectId: string }): Promise<ProjectOrganization[]> =>
-  api<ProjectOrganization[]>(projectPath(scope, "/organizations")).catch(() => []));
+  api<ProjectOrganization[]>(projectPath(scope, "/organizations"), { keep: { areas: [] } }).catch(() => []));
 
 /** Where the signed-in person can switch to: other organizations' projects they are on, or home. */
-export const elsewhere = cache(async (): Promise<Elsewhere[]> => api<Elsewhere[]>("/api/me/elsewhere").catch(() => []));
+export const elsewhere = cache(async (): Promise<Elsewhere[]> => api<Elsewhere[]>("/api/me/elsewhere", { keep: { areas: [] } }).catch(() => []));
 
 /** The guest accounts another organization made for our people before we linked, not yet brought over. */
 export const guestAccounts = cache(async (linkId: string): Promise<{ id: string; name: string; email: string; active: boolean }[]> =>
-  api<{ id: string; name: string; email: string; active: boolean }[]>(`/api/organization/joined/${linkId}/guests`).catch(() => []));
+  api<{ id: string; name: string; email: string; active: boolean }[]>(`/api/organization/joined/${linkId}/guests`, { keep: { areas: [] } }).catch(() => []));
 
 /** Our own organization as DELIOS knows it: its identifier (or why none) and the email domain it proved. */
 export type OwnIdentity = {
   id: string; code: string; name: string; country: string | null; kind: string | null; number: string | null; noIdentifierReason: string | null;
   identifierWas: { was: string; by: string; at: string } | null; domain: string | null; domainConfirmedAt: string | null;
 };
-export const ownIdentity = cache(async (): Promise<OwnIdentity | null> => api<OwnIdentity>("/api/organization/identity").catch(() => null));
+export const ownIdentity = cache(async (): Promise<OwnIdentity | null> => api<OwnIdentity>("/api/organization/identity", { keep: { areas: [] } }).catch(() => null));
 
 /** Entries other organizations made for us before we came onto DELIOS, at the domain we proved: each can be claimed. */
 export type Claims = {
@@ -68,7 +68,7 @@ export type Claims = {
   incoming: { id: string; claimedByName: string; createdAt: string;
     entry: { code: string; name: string } | null; claimer: { code: string; name: string; identifier: string | null; domain: string | null } | null }[];
 };
-export const claims = cache(async (): Promise<Claims> => api<Claims>("/api/organization/claims").catch(() => ({ candidates: [], incoming: [] })));
+export const claims = cache(async (): Promise<Claims> => api<Claims>("/api/organization/claims", { keep: { areas: [] } }).catch(() => ({ candidates: [], incoming: [] })));
 
 /** Merges asked by us or waiting on us. */
 export type MergeView = {
@@ -76,4 +76,4 @@ export type MergeView = {
   keep: { code: string; name: string }; merge: { code: string; name: string }; waitsOnUs: boolean;
   refusedByName: string | null; refusedWhy: string | null; doneAt: string | null;
 };
-export const merges = cache(async (): Promise<MergeView[]> => api<MergeView[]>("/api/organization/merges").catch(() => []));
+export const merges = cache(async (): Promise<MergeView[]> => api<MergeView[]>("/api/organization/merges", { keep: { areas: [] } }).catch(() => []));

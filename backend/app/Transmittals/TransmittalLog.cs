@@ -60,7 +60,7 @@ public static class TransmittalLogEndpoints
             .AddEndpointFilter<TransactionFilter>()
             .AddEndpointFilter<ProjectAccessFilter>();
         project.MapGet("/log", PageAsync);
-        project.MapGet("/log/export", ExportAsync);
+        project.MapGet("/log/export", ExportAsync).RequireRateLimiting("heavy");
     }
 
     /// <summary><c>GET /transmittals/log</c>: one page of matching transmittals and how many match.</summary>
@@ -109,7 +109,7 @@ public static class TransmittalLogEndpoints
     private static IQueryable<Transmittal> AnswerAwaited(DeliosDbContext db, IQueryable<Transmittal> query) =>
         query.Where(t => t.ResponseRequired && (t.ReviewStepId != null
             ? db.ReviewSteps.Any(s => s.Id == t.ReviewStepId && s.CompletedAt == null)
-            : !db.Transmittals.Any(a => a.InReplyToId == t.Id || (a.FollowsId == t.Id && a.IssuedById != t.IssuedById))));
+            : !db.TransmittalFacts.Any(a => a.TransmittalId == t.Id)));
 
     /// <summary>Applies every filter given. Each narrows; none widens.</summary>
     private static IQueryable<Transmittal> Filter(DeliosDbContext db, IQueryable<Transmittal> query, TransmittalFilter f, LocalDate today)
@@ -153,7 +153,7 @@ public static class TransmittalLogEndpoints
             States.Complete => query.Where(t => !t.Recipients.Any(r => (r.UserId == null && r.DispatchedAt == null) || (r.UserId != null && r.Kind == RecipientKinds.To && r.AcknowledgedAt == null))
                 && !(t.ResponseRequired && (t.ReviewStepId != null
                     ? db.ReviewSteps.Any(s => s.Id == t.ReviewStepId && s.CompletedAt == null)
-                    : !db.Transmittals.Any(a => a.InReplyToId == t.Id || (a.FollowsId == t.Id && a.IssuedById != t.IssuedById))))
+                    : !db.TransmittalFacts.Any(a => a.TransmittalId == t.Id)))
                 && !t.Items.Any(i => i.Kind == TransmittalItemKinds.Unplanned && i.RegisteredAt == null)),
             _ => query,
         };
@@ -205,15 +205,13 @@ public static class TransmittalLogEndpoints
         var stepIds = list.Values.Where(t => t.ReviewStepId != null).Select(t => t.ReviewStepId!.Value).ToList();
         var stepDone = (await db.ReviewSteps.AsNoTracking().Where(s => stepIds.Contains(s.Id) && s.CompletedAt != null)
             .Select(s => new { s.Id, s.CompletedAt }).ToListAsync(cancellationToken)).ToDictionary(s => s.Id, s => s.CompletedAt!.Value);
-        // The first transmittal answering each (or following it, by someone else): when its answer came.
+        // When each was first answered (or followed, by someone else): recorded as it happened (transmittal_facts).
         var listed = list.Keys.ToList();
-        var replies = (await db.Transmittals.AsNoTracking()
-            .Where(a => (a.InReplyToId != null && listed.Contains(a.InReplyToId.Value)) || (a.FollowsId != null && listed.Contains(a.FollowsId.Value)))
-            .Select(a => new { a.InReplyToId, a.FollowsId, a.IssuedById, a.IssuedAt }).ToListAsync(cancellationToken));
+        var answered = await db.TransmittalFacts.AsNoTracking().Where(a => listed.Contains(a.TransmittalId))
+            .ToDictionaryAsync(a => a.TransmittalId, a => a.AnsweredAt, cancellationToken);
         Instant? AnsweredAt(Transmittal t) => t.ReviewStepId is { } step
             ? (stepDone.TryGetValue(step, out var at) ? at : null)
-            : replies.Where(a => a.InReplyToId == t.Id || (a.FollowsId == t.Id && a.IssuedById != t.IssuedById))
-                .Select(a => (Instant?)a.IssuedAt).OrderBy(a => a).FirstOrDefault();
+            : answered.TryGetValue(t.Id, out var on) ? on : null;
         // What the control function's check said of what came in, read from each submission it carried (Arrivals).
         var sentIn = list.Values.Where(t => t.Direction == TransmittalDirections.Incoming)
             .SelectMany(t => t.Items).Where(i => i.Kind == TransmittalItemKinds.Submission && i.RevisionId != null)

@@ -3,7 +3,7 @@ import { PREF, paneWidth } from "@/lib/core/preferences";
 import Link from "next/link";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { orgSettings } from "@/lib/settings/api";
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { stampAnswers } from "@/lib/settings/stamp";
 import { StampCard } from "@/components/stamp-card";
 import { ProjectSwitches } from "../switches";
@@ -17,7 +17,7 @@ export const metadata = { title: "The stamp" };
  */
 export default async function OrganizationStampPage() {
   const scope = await requireOrgAdmin();
-  const [organization, switches, jar] = await Promise.all([orgSettings(), liberty(), cookies()]);
+  const [organization, switches, jar] = await Promise.all([orgSettings(), libertyOrFail(), cookies()]);
   return (
     <>
       <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">

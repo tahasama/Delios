@@ -48,7 +48,7 @@ export async function refuseLinkAction(_prev: Result | undefined, formData: Form
   }
   revalidatePath("/organization", "layout");
   revalidatePath("/");
-  return {};
+  return { ok: "Refused, with your reason. They are told." };
 }
 
 /** Either side ends a link (or takes back an invitation not answered yet), saying why. */
@@ -79,7 +79,7 @@ export async function joinPersonAction(_prev: Result | undefined, formData: Form
     return failed(e);
   }
   revalidatePath("/organization", "layout");
-  return {};
+  return { ok: "Saved." };
 }
 
 /** the control function says an organization takes part in this project (or no longer does), its role, and its people's starting function. */
@@ -132,26 +132,39 @@ export async function switchOrganizationAction(formData: FormData): Promise<void
   redirect("/");
 }
 
-/** The administrator makes one of our projects' choices (who does what, how it works) the defaults for projects opened afterwards. */
+/**
+ * The administrator makes one of our projects' choices (who does what, how it works) the defaults for projects opened
+ * afterwards. Always with why; the defaults as they stood are kept first (backend `OrganizationDefaults`), and may be
+ * put back from the defaults' page.
+ */
 export async function makeDefaultsAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const { requireOrgAdmin } = await import("@/lib/core/org-scope");
-  const { defaultsFrom, DEFAULTS_KEY } = await import("@/lib/organization/defaults");
-  const { setOrgSetting } = await import("@/lib/settings/api");
+  const { defaultsFrom } = await import("@/lib/organization/defaults");
   const { adminProjects } = await import("@/lib/settings/api-admin");
   const scope = await requireOrgAdmin();
   const projectId = text(formData, "projectId");
+  const reason = text(formData, "reason");
   const project = (await adminProjects().catch(() => [])).find((one) => one.id === projectId);
-  if (!project) return { error: "Choose one of our projects." };
+  if (!project) return { error: "Choose one of our projects.", fields: ["projectId"] };
+  if (!reason) return { error: "Say why the defaults are replaced.", fields: ["reason"] };
   try {
     const values = await defaultsFrom(projectId);
-    await setOrgSetting(DEFAULTS_KEY, JSON.stringify({ fromProject: project.code, at: new Date().toISOString(), by: scope.user.name, values }));
+    await api("/api/admin/project-defaults", {
+      method: "PUT",
+      body: { defaults: { fromProject: project.code, at: new Date().toISOString(), by: scope.user.name, values }, reason },
+    });
   } catch (e) {
     return failed(e);
   }
+  revalidateDefaults();
+  return { ok: `New projects now start with ${project.code}'s choices. The defaults as they stood are kept below. Projects already open keep theirs.` };
+}
+
+/** Everywhere the defaults for new projects are read. */
+function revalidateDefaults() {
   revalidatePath("/organization", "layout");
   revalidatePath("/organization/defaults");
   revalidatePath("/organization/settings/flow");
-  return { ok: `New projects now start with ${project.code}'s choices. Projects already open keep theirs.` };
 }
 
 /** A guest account another organization made for one of our people becomes theirs here: same email, same password. */
@@ -165,21 +178,33 @@ export async function bringOverAction(_prev: Result | undefined, formData: FormD
   return { ok: "Brought over. They sign in here from now on, with the same password, and keep their projects there." };
 }
 
-/** The defaults for new projects are forgotten: a project opened afterwards starts with the app's own. */
-export async function resetDefaultsAction(_prev: Result | undefined, _formData: FormData): Promise<Result> {
+/** The defaults go back to the app's own, with why; what they held is kept first, and may be put back. */
+export async function resetDefaultsAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const { requireOrgAdmin } = await import("@/lib/core/org-scope");
-  const { DEFAULTS_KEY } = await import("@/lib/organization/defaults");
-  const { setOrgSetting } = await import("@/lib/settings/api");
   await requireOrgAdmin();
+  const reason = text(formData, "reason");
+  if (!reason) return { error: "Say why the defaults go back to the app's own.", fields: ["reason"] };
   try {
-    await setOrgSetting(DEFAULTS_KEY, null);
+    await api("/api/admin/project-defaults", { method: "PUT", body: { defaults: null, reason } });
   } catch (e) {
     return failed(e);
   }
-  revalidatePath("/organization", "layout");
-  revalidatePath("/organization/defaults");
-  revalidatePath("/organization/settings/flow");
-  return { ok: "Back on the app's own defaults. Projects already open keep theirs." };
+  revalidateDefaults();
+  return { ok: "Back on the app's own defaults; ours are kept below. Projects already open keep theirs." };
+}
+
+/** A copy of the defaults kept when they were replaced becomes the defaults again, with why; what stands is kept in turn. */
+export async function putBackDefaultsAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const id = text(formData, "copyId");
+  const reason = text(formData, "reason");
+  if (!reason) return { error: "Say why these defaults come back.", fields: ["reason"] };
+  try {
+    await api(`/api/admin/kept-copies/${id}/put-back`, { body: { reason } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidateDefaults();
+  return { ok: "These are the defaults again; the ones they replace are kept below." };
 }
 
 /**
@@ -194,6 +219,9 @@ export async function setTrackingAction(_prev: Result | undefined, formData: For
   try {
     await api(`/api/settings/TRACK_READING`, { method: "PUT", body: { value: reading } });
     await api(`/api/settings/TRACK_SIGN_INS`, { method: "PUT", body: { value: signIns } });
+    // How long what was opened and downloaded is kept (empty: as long as the register); removed past it by the backend.
+    const keepDays = text(formData, "keepDays");
+    if (/^\d{0,5}$/.test(keepDays)) await api(`/api/settings/TRACK_KEEP_DAYS`, { method: "PUT", body: { value: keepDays } });
   } catch (e) {
     return failed(e);
   }
@@ -292,12 +320,39 @@ export async function confirmClaimAction(_prev: { error?: string; done?: string 
 }
 
 /** An administrator moves one switch of what projects may change (Fixed or Free). Projects' copies already made stay. */
-export async function setLibertyAction(formData: FormData): Promise<void> {
+export async function setLibertyAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const key = text(formData, "key");
-  if (!key) return;
-  await api(`/api/liberty/${encodeURIComponent(key)}`, { method: "PUT", body: { free: text(formData, "free") === "1" } }).catch(() => undefined);
+  if (!key) return { error: "Nothing to switch." };
+  const free = text(formData, "free") === "1";
+  try {
+    await api(`/api/liberty/${encodeURIComponent(key)}`, { method: "PUT", body: { free } });
+  } catch (e) {
+    return failed(e);
+  }
   revalidatePath("/organization/settings", "layout");
   revalidatePath("/organization", "layout");
+  return { ok: free ? "Free: a project may now take its own copy." : "Fixed: every project now uses the organization's." };
+}
+
+/**
+ * Leaves one project free to change what a fixed switch covers, or ends that (owner: "Fixed, except on these
+ * projects"). Always with why; the project's control function is told by the backend.
+ */
+export async function setLibertyExceptionAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const key = text(formData, "key");
+  const projectId = text(formData, "projectId");
+  const except = text(formData, "except") === "1";
+  const reason = text(formData, "reason");
+  if (!key) return { error: "Nothing to change." };
+  if (!projectId) return { error: "Choose the project.", fields: ["projectId"] };
+  if (!reason) return { error: except ? "Say why this project may change it." : "Say why the exception ends.", fields: ["reason"] };
+  try {
+    await api(`/api/liberty/${encodeURIComponent(key)}/except`, { method: "PUT", body: { projectId, except, reason } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization/settings", "layout");
+  return { ok: except ? "Done: that project may change it; the others still take the organization's." : "Done: the exception ended; what the project changed stays." };
 }
 
 /** The cards a project may have its own copy of, and their backend: what a reset puts back. */
@@ -409,6 +464,63 @@ export async function savePersonEverywhereAction(_prev: Result | undefined, form
   return { ok: `${text(formData, "name") || target.name} saved.${emailNote}` };
 }
 
+/** How dates read: the organization's one way of writing a day, on every screen of every project. */
+export async function setDateFormatAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const format = text(formData, "format");
+  try {
+    await api("/api/settings/DATE_FORMAT", { method: "PUT", body: { value: format === "DMY_SHORT" ? "" : format } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/", "layout");
+  return { ok: "Saved: every date reads this way from now on, on every project." };
+}
+
+/** Where every new project's site starts: its time zone, days off each week and country. Projects already open keep theirs. */
+export async function setProjectPlaceAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const { readPlace } = await import("@/lib/settings/place");
+  try {
+    await api("/api/admin/project-place", { method: "PUT", body: { timeZone: "UTC", weekendDays: [], country: null, ...readPlace(formData) } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization", "layout");
+  return { ok: "Saved. New projects start with these; projects already open keep their own." };
+}
+
+/**
+ * An administrator sets someone's password (owner: as apps of the kind do). The backend refuses anyone else, and one's
+ * own; the person is told at once, by email and on Notifications, and signed out everywhere.
+ */
+export async function setPasswordAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const userId = text(formData, "userId");
+  const password = String(formData.get("password") ?? "");
+  const again = String(formData.get("again") ?? "");
+  if (!password) return { error: "Type the new password.", fields: ["password"] };
+  if (password !== again) return { error: "The two passwords are not the same.", fields: ["again"] };
+  try {
+    await api(`/api/admin/users/${userId}`, { method: "PUT", body: { password } });
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization/people");
+  return { ok: "Password set. They were told by email and signed out everywhere: give them the password yourself." };
+}
+
+/** A person asked to be forgotten: their name and email replaced, the account closed; their acts stay (backend ForgetPerson). */
+export async function forgetPersonAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
+  const why = text(formData, "why");
+  if (!why) return { error: "Say why: who asked, and when.", fields: ["why"] };
+  let name = "";
+  try {
+    ({ name } = await api<{ name: string }>(`/api/admin/users/${text(formData, "userId")}/forget`, { body: { why } }));
+  } catch (e) {
+    return failed(e);
+  }
+  revalidatePath("/organization/people");
+  return { ok: `Forgotten: the account reads "${name}" now, and is closed.` };
+}
+
 /** Puts one of a project's lists back to the organization's (its Settings only, for a mess): always with why. */
 export async function resetListAction(_prev: Result | undefined, formData: FormData): Promise<Result> {
   const reason = text(formData, "reason");
@@ -454,3 +566,4 @@ export async function putBackCopyAction(_prev: Result | undefined, formData: For
   revalidatePath("/settings", "layout");
   return { ok: "It is the project's own again, as it was." };
 }
+

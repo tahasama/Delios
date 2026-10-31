@@ -223,6 +223,12 @@ In `.env`: `SITE_ADDRESS=app.example.com`, `HTTP_PORT=80`, `HTTPS_PORT=443`,
 Caddy obtains and renews the certificate itself. The API's own entrance (8080)
 stays on 127.0.0.1.
 
+## What organizations ask of DELIOS
+
+An administrator may ask DELIOS for a reader not installed here, Word and PowerPoint or a certified DWG reader (organization's Settings → Viewing files). Each ask is
+kept above every organization and listed by the backend command `requests`. Set `DELIOS_CONTACT_EMAIL` in `.env` to
+your own address to receive each one by email too (email on: `EMAIL_ENABLED=true` and the SMTP settings).
+
 ## Replies by email
 
 An organization not on DELIOS with "Their email for transmittals" (Settings → Organizations) gets our

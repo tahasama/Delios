@@ -64,6 +64,24 @@ public sealed class ClamAvScanner(IOptions<ClamAvOptions> options) : IVirusScann
     }
 }
 
+/// <summary>
+/// What the scanner could not look into is refused, never passed as clean (owner): a file locked by a password, or one
+/// holding more than the scanner opens (clamd <c>AlertEncrypted</c>, <c>AlertExceedsMax</c>, compose.yaml). A PDF that
+/// opens without a password, however it limits printing or copying, is checked like any other.
+/// </summary>
+public static class FileScanning
+{
+    /// <summary>Why the file could not be checked, in plain words, or null when what was found is a virus.</summary>
+    public static string? CouldNotCheck(string? signature) => signature switch
+    {
+        { } s when s.StartsWith("Heuristics.Encrypted.", StringComparison.Ordinal) =>
+            "It is locked by a password, so it could not be checked for viruses. Send it without the password.",
+        { } s when s.StartsWith("Heuristics.Limits.Exceeded", StringComparison.Ordinal) =>
+            "It holds too many files, or files packed too deep, to be checked for viruses in full. Send it unpacked, or in smaller parts.",
+        _ => null,
+    };
+}
+
 /// <summary>Counts and hashes what passes through it, and keeps the first bytes for type detection.</summary>
 public sealed class HashingStream(Stream inner) : Stream
 {

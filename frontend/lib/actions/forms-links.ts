@@ -8,12 +8,13 @@ import { getActiveSet } from "@/lib/settings/config";
 import { needDefaults } from "@/lib/actions/schedule";
 import { activityDetail } from "@/lib/actions/api";
 import { controlDoes } from "@/lib/settings/control-activities";
-import { backendDocument } from "@/lib/documents/api";
+import { backendDocuments } from "@/lib/documents/api";
+import { once } from "@/lib/core/once";
 
 /** Each document's own discipline: an action needs a document for that discipline, never another. */
 async function disciplinesOf(ctx: Awaited<ReturnType<typeof requireScope>>, ids: string[]): Promise<Map<string, string>> {
-  const docs = await Promise.all(ids.map((id) => backendDocument(ctx, id).catch(() => null)));
-  return new Map(docs.filter((d): d is NonNullable<typeof d> => !!d).map((d) => [d.id, d.discipline] as const));
+  const docs = await backendDocuments(ctx, ids).catch(() => []);
+  return new Map(docs.map((d) => [d.id, d.discipline] as const));
 }
 
 type State = { error?: string; ok?: string };
@@ -82,11 +83,10 @@ export async function addDocumentToActionAction(_prev: State | undefined, formDa
   const { purpose, status } = needDefaults(reasons, statuses);
   try {
     // The request is answered by the first document added for it.
-    for (const [i, documentId] of fresh.entries()) {
-      await api(projectPath(ctx, `/activities/${actionId}/needs`), {
-        body: { documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department: forOf(documentId), transmittalId: i === 0 ? transmittalId : null },
-      });
-    }
+    // All at once: the action's readiness is worked out once, not once a document.
+    await api(projectPath(ctx, `/activities/${actionId}/needs/many`), {
+      body: { add: fresh.map((documentId, i) => ({ documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department: forOf(documentId), transmittalId: i === 0 ? transmittalId : null })) },
+    });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -124,12 +124,14 @@ export async function setActionDocumentsAction(_prev: State | undefined, formDat
   const [reasons, statuses] = await Promise.all([getActiveSet("REASONS_FOR_ISSUE"), getActiveSet("STATUSES")]);
   const { purpose, status } = needDefaults(reasons, statuses);
   try {
-    for (const documentId of adding) {
-      await api(projectPath(ctx, `/activities/${actionId}/needs`), {
-        body: { documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department: disciplineOf.get(documentId) },
+    // All at once, all or none: the action's readiness is worked out once, not once a document.
+    if (adding.length || leaving.length)
+      await api(projectPath(ctx, `/activities/${actionId}/needs/many`), {
+        body: {
+          add: adding.map((documentId) => ({ documentId, purpose, requiredStatuses: status ? [status] : [], anchor: "START", department: disciplineOf.get(documentId) })),
+          remove: leaving.map((need) => need.id),
+        },
       });
-    }
-    for (const need of leaving) await api(projectPath(ctx, `/activities/${actionId}/needs/${need.id}`), { method: "DELETE" });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -147,7 +149,7 @@ export async function answerActionRequestAction(_prev: State | undefined, formDa
   const note = String(formData.get("note") ?? "").trim();
   if (!note) return { error: "Say why nothing is added; whoever asked reads it." };
   try {
-    await api(projectPath(ctx, `/transmittals/${transmittalId}/activity-answer`), { body: { note } });
+    await api(projectPath(ctx, `/transmittals/${transmittalId}/activity-answer`), { body: { note }, idempotencyKey: once(formData, "answer") });
   } catch (e) {
     return { error: refusal(e).message };
   }
@@ -178,6 +180,7 @@ export async function checkActionRequestAction(_prev: State | undefined, formDat
         departments: formData.has("departmentsGiven") ? formData.getAll("departments").map(String).filter(Boolean) : null,
         purpose, statuses: status ? [status] : [],
       },
+      idempotencyKey: once(formData, "check"),
     });
   } catch (e) {
     return { error: refusal(e).message };
@@ -192,7 +195,7 @@ export async function confirmActionRequestAction(_prev: State | undefined, formD
   const transmittalId = String(formData.get("transmittalId") ?? "");
   const code = String(formData.get("code") ?? "");
   try {
-    await api(projectPath(ctx, `/transmittals/${transmittalId}/activity-confirm`), { method: "POST" });
+    await api(projectPath(ctx, `/transmittals/${transmittalId}/activity-confirm`), { method: "POST", idempotencyKey: once(formData, "confirm") });
   } catch (e) {
     return { error: refusal(e).message };
   }

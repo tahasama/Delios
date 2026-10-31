@@ -78,7 +78,8 @@ async function main() {
     return;
   }
 
-  const register = (who, body) => who.post(`${p}/documents`, body);
+  // The form fills in the criticality its document type recommends; the demo says Medium unless it names one.
+  const register = (who, body) => who.post(`${p}/documents`, { criticality: "B", ...body });
   const uploadFile = async (who, documentId, name, bytes, contentType) => {
     const ticket = await who.post(`${p}/documents/${documentId}/uploads`, {
       fileName: name, size: bytes.length, contentType, sha256: createHash("sha256").update(bytes).digest("hex"),

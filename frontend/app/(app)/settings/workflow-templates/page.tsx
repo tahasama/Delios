@@ -1,3 +1,4 @@
+import { ExceptionNote } from "@/lib/settings/exception";
 import Link from "next/link";
 import { requireScope } from "@/lib/core/scope";
 import { projectRoutes } from "@/lib/settings/api-admin";
@@ -16,10 +17,15 @@ export default async function WorkflowTemplatesPage({ searchParams }: { searchPa
   const ctx = await requireScope();
   const routes = await projectRoutes();
   const project = ctx.project.code;
+  const exception = routes.exception;
   const lead = routes.own
     ? routes.free
-      ? `${project}'s own review routes, changed here${routes.mayChange ? "" : " by whoever acts as the control function"}. The organization's later changes do not touch them.`
+      ? exception
+        ? <>{project}&rsquo;s own review routes, changed here. <ExceptionNote project={project} what="the review routes" exception={exception} /></>
+        : `${project}'s own review routes, changed here${routes.mayChange ? "" : " by whoever acts as the control function"}. The organization's later changes do not touch them.`
       : `${project}'s own review routes, changed here before the organization fixed them for every project: they stay as they are, and nothing more is changed here.`
+    : routes.free && exception
+      ? <>The organization&rsquo;s review routes. <ExceptionNote project={project} what="the review routes" exception={exception} /> A change here gives {project} its own copy, which the organization&rsquo;s later changes never touch.{routes.mayChange ? null : " Whoever acts as the control function changes them."}</>
     : routes.free
       ? <>The organization&rsquo;s review routes. Projects may change them: a change here gives {project} its own copy, which the organization&rsquo;s later changes never touch.{routes.mayChange ? null : " Whoever acts as the control function changes them."}</>
       : <>The organization&rsquo;s review routes, the same on every project.{" "}

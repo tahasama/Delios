@@ -47,6 +47,8 @@ public static class PlatformSetup
     {
         var services = builder.Services;
         var config = builder.Configuration;
+        // Who runs this DELIOS: read first, as what is registered below depends on it (Hosting).
+        Hosting.Read(config);
         var role = config[$"{DeliosOptions.Section}:Role"] ?? Roles.Api;
 
         // A missing or malformed setting stops the process at start, not at first use.
@@ -72,24 +74,48 @@ public static class PlatformSetup
             preserveStaticLogger: true,
             writeToProviders: true);
 
-        if (!string.IsNullOrWhiteSpace(config["Sentry:Dsn"]))
+        // Errors go to Sentry only with a whole Sentry address: anything else (a note, a cut-off paste) would stop every
+        // process at start, migrations included; it is said in the log and left off instead.
+        var sentryDsn = config["Sentry:Dsn"]?.Trim();
+        if (!string.IsNullOrEmpty(sentryDsn)
+            && !(Uri.TryCreate(sentryDsn, UriKind.Absolute, out var dsn) && dsn.UserInfo.Length > 0 && dsn.AbsolutePath.Trim('/').Length > 0))
+        {
+            Log.Warning("SENTRY_DSN is not a Sentry address (https://<key>@<host>/<project>), so errors are not sent to Sentry, only written in this log");
+            sentryDsn = null;
+        }
+        if (!string.IsNullOrEmpty(sentryDsn))
         {
             builder.WebHost.UseSentry(o =>
             {
-                o.Dsn = config["Sentry:Dsn"];
+                o.Dsn = sentryDsn;
                 o.SendDefaultPii = false;
             });
         }
 
         services.AddSingleton<IClock>(NodaTime.SystemClock.Instance);
+        // Moments and days read and written as ISO text in every answer and request (NodaJson).
+        services.ConfigureHttpJsonOptions(o => NodaJson.Add(o.SerializerOptions.Converters));
         services.AddScoped<TenantContext>();
         services.AddScoped<TenantTransactionInterceptor>();
         services.AddScoped<ReadDatabase>();
+        // Every save names what the screens keep that it changed (ScreenChanges): on a screen's answer, or posted to them.
+        services.AddHttpContextAccessor();
+        services.AddOptions<ScreensOptions>().BindConfiguration(ScreensOptions.Section);
+        // A redirect (to the sign-in page) is a refusal, never the screens' answer.
+        services.AddHttpClient(nameof(ScreensNotifier), c => c.Timeout = TimeSpan.FromSeconds(5))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddSingleton<ScreensNotifier>();
+        services.AddHostedService(sp => sp.GetRequiredService<ScreensNotifier>());
+        services.AddSingleton<Search.SearchSignal>();
+        services.AddScoped<ScreenChanges>();
+        services.AddScoped<ScreenChangeWatcher>();
+        services.AddScoped<ScreenChangeCommits>();
         services.AddDbContext<DeliosDbContext>((sp, o) => o
             .UseNpgsql(sp.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Postgres,
                 npgsql => npgsql.UseNodaTime())
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(sp.GetRequiredService<TenantTransactionInterceptor>()));
+            .AddInterceptors(sp.GetRequiredService<TenantTransactionInterceptor>(), sp.GetRequiredService<ScreenChangeWatcher>(),
+                sp.GetRequiredService<ScreenChangeCommits>()));
 
         services.AddDataProtection()
             .SetApplicationName("delios")
@@ -108,6 +134,9 @@ public static class PlatformSetup
         services.AddOptions<RedisCacheOptions>().Configure<IServiceProvider>((o, sp) =>
             o.ConnectionMultiplexerFactory = () => Task.FromResult(sp.GetRequiredService<IConnectionMultiplexer>()));
         services.AddHybridCache();
+        // Who you are and what you may do, kept in each process until how the organization works changes.
+        services.AddSingleton<AccessVersions>();
+        services.AddSingleton<Audit.AuditCounts>();
 
         services.AddScoped<AuditLog>();
         services.AddScoped<SessionStore>();
@@ -126,6 +155,10 @@ public static class PlatformSetup
         services.AddScoped<Documents.DocumentService>();
         services.AddScoped<Organizations.OrganizationService>();
         services.AddScoped<Documents.FileStorage>();
+        // The files' key, apart from the files (Storage:EncryptionKey, FILES_KEY in .env): read once, refused at start when missing.
+        services.AddSingleton(sp => new Documents.FileCipher(sp.GetRequiredService<IOptions<StorageOptions>>().Value.EncryptionKey));
+        // The copier (deploy/file-backup) is told of each file stored; the app holds no key to the copy.
+        services.AddSingleton<Documents.FileBackup>();
         if (config.GetSection(StorageOptions.Section).Get<StorageOptions>()?.UsesAzure == true)
         {
             services.AddSingleton<Documents.IObjectStore, Documents.AzureObjectStore>();
@@ -150,8 +183,12 @@ public static class PlatformSetup
         services.AddOptions<Search.SearchOptions>().BindConfiguration(Search.SearchOptions.Section);
         services.AddScoped<Search.SearchService>();
         services.AddOptions<Extraction.ExtractionOptions>().BindConfiguration(Extraction.ExtractionOptions.Section);
+        services.AddOptions<Documents.PreviewOptions>().BindConfiguration(Documents.PreviewOptions.Section);
+        services.AddHttpClient(Documents.Previews.HttpClientName, (sp, c) =>
+            c.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<IOptions<Documents.PreviewOptions>>().Value.TimeoutSeconds));
         services.AddScoped<Extraction.ExtractionProcessor>();
         services.AddScoped<Checks.CheckEngine>();
+        services.AddScoped<Documents.FullDownloadBuilder>();
         services.AddScoped<Actions.ScheduleImporter>();
         services.AddScoped<Actions.RequirementsImporter>();
         services.AddScoped<Actions.DepartmentsImporter>();
@@ -172,11 +209,12 @@ public static class PlatformSetup
         var search = config.GetSection(Search.SearchOptions.Section).Get<Search.SearchOptions>() ?? new();
         services.AddSingleton<Documents.IVirusScanner, Documents.ClamAvScanner>();
         services.AddSingleton<Messaging.RabbitMqConnection>();
-        if (role == Roles.Api)
-        {
-            services.AddHostedService<Messaging.OutboxRelay>();
-        }
-        else
+        services.AddSingleton<Messaging.OutboxWake>();
+        services.AddSingleton<Actions.NoticeAlarmBell>();
+        services.AddSingleton<Operators.TrialBell>();
+        // Every process sends what its own acts put in the outbox, woken by them.
+        services.AddHostedService<Messaging.OutboxRelay>();
+        if (role != Roles.Api)
         {
             foreach (var queue in Messaging.Topology.Queues)
             {
@@ -184,21 +222,26 @@ public static class PlatformSetup
                     ActivatorUtilities.CreateInstance<Messaging.FileQueueConsumer>(sp, queue));
             }
             if (search.UsesOpenSearch) services.AddHostedService<Search.SearchIndexer>();
-            if (config.GetValue("Checks:Schedule", true)) services.AddHostedService<Checks.CheckScheduler>();
-            if (config.GetValue("Reviews:Warnings", true)) services.AddHostedService<Reviews.ReviewWarnings>();
             if (config.GetValue("Schedule:Notices", true)) services.AddHostedService<Actions.ActionNotices>();
+            if (config.GetValue("Trials:Reminders", true) && Hosting.ByDelios) services.AddHostedService<Operators.TrialReminders>();
         }
         services.AddScoped<Seeding.TenantSetup>();
         services.AddScoped<Seeding.DemoSeed>();
         services.AddScoped<Seeding.UnsharePackage>();
         services.AddScoped<Seeding.GrantAll>();
         services.AddScoped<Organizations.MergeOrganizations>();
+        services.AddScoped<Organizations.ListProductRequests>();
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+        services.AddSingleton<IPasswordHasher<Operators.Operator>, PasswordHasher<Operators.Operator>>();
+        services.AddScoped<Operators.CreateOperator>();
         services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null);
         // Every endpoint requires a signed-in person unless it says otherwise.
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+        // Calls per person per minute: every call, and the heavy ones (`RateLimits:PerMinute`, `RateLimits:HeavyPerMinute`).
+        var perMinute = Math.Max(1, config.GetValue("RateLimits:PerMinute", 600));
+        var heavyPerMinute = Math.Max(1, config.GetValue("RateLimits:HeavyPerMinute", 120));
         services.AddRateLimiter(o =>
         {
             o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -213,11 +256,47 @@ public static class PlatformSetup
             o.AddPolicy("my-codes", http => RateLimitPartition.GetFixedWindowLimiter(
                 http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+            // Every call, per person (owner, "rate limiting"): generous enough that work never feels it (a page is a
+            // dozen calls), close enough that a runaway script or a stolen session is slowed down at once.
+            o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
+                http.Request.Path.StartsWithSegments("/health") || http.Request.Path.StartsWithSegments("/metrics")
+                    ? RateLimitPartition.GetNoLimiter("probe")
+                    : RateLimitPartition.GetTokenBucketLimiter(Caller(http), _ => new TokenBucketRateLimiterOptions
+                    {
+                        TokenLimit = perMinute,
+                        TokensPerPeriod = perMinute,
+                        ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                    }));
+            // The heavy calls, per person: a file's bytes or its preview, an export, an upload asked, a search. A person
+            // reading files one by one never reaches it; a whole project pulled out in a loop does (DownloadWatch still
+            // tells the administrators past 200 files in an hour).
+            o.AddPolicy("heavy", http => RateLimitPartition.GetTokenBucketLimiter(Caller(http), _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = heavyPerMinute,
+                TokensPerPeriod = heavyPerMinute,
+                ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+            // What failed on the screens (ScreenErrors): a few a minute per caller, so one broken page cannot fill the log.
+            o.AddPolicy("screen-errors", http => RateLimitPartition.GetFixedWindowLimiter(Caller(http),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) }));
+            // Said in plain words, as every refusal is; the screens show it as it is.
+            o.OnRejected = async (context, cancellationToken) =>
+            {
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var wait))
+                    context.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString();
+                await Problems.Problem(StatusCodes.Status429TooManyRequests, "TOO_MANY_REQUESTS",
+                    "Too many requests in a short time. Wait a moment and try again.", null).ExecuteAsync(context.HttpContext);
+            };
         });
         // The proxy in front (Caddy, the load balancer) sits on a private network.
         services.Configure<ForwardedHeadersOptions>(o =>
         {
             o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            // Two hops of ours (the site's Caddy, the screens, then the API's Caddy): walked back while the address is
+            // one of ours, so the person's own address is the one counted (the sign-in limit, known devices).
+            o.ForwardLimit = null;
             foreach (var network in new[] { "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16" })
             {
                 o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
@@ -267,6 +346,8 @@ public static class PlatformSetup
         }
 
         services.AddProblemDetails();
+        // Two saves of the same thing at once: the second refused in plain words (409 CHANGED_MEANWHILE), not a 500.
+        services.AddExceptionHandler<ChangedMeanwhile>();
         services.AddValidation();
         services.AddOpenApi();
     }
@@ -311,22 +392,38 @@ public static class PlatformSetup
             if (http.User.Identity?.IsAuthenticated == true)
             {
                 var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
-                // In a transaction of its own: the tenant is set on a transaction, and row-level security shows nothing
-                // outside one (the lists would silently be read as the organization's).
-                await using var look = await db.Database.BeginTransactionAsync(http.RequestAborted);
-                var project = Guid.TryParse(http.Request.Headers["X-Delios-Project"].ToString(), out var projectId)
-                    ? await db.Projects.AsNoTracking().Where(p => p.Id == projectId)
-                        .Select(p => new { p.Id, p.OwnListKeys, p.OwnFunctions }).SingleOrDefaultAsync(http.RequestAborted)
-                    // None said: the project the screens open first, as /api/me lists them.
-                    : await db.Memberships.AsNoTracking()
-                        .Where(m => m.UserId == http.User.UserId() && m.Active && m.Project!.Status == "ACTIVE" && m.Function!.Active)
-                        .OrderBy(m => m.Project!.Code).Select(m => new { m.Project!.Id, m.Project.OwnListKeys, m.Project.OwnFunctions })
-                        .FirstOrDefaultAsync(http.RequestAborted);
-                await look.CommitAsync(http.RequestAborted);
-                if (project is not null) db.UseListsOf(project.Id, project.OwnListKeys, project.OwnFunctions);
+                var named = Guid.TryParse(http.Request.Headers["X-Delios-Project"].ToString(), out var projectId) ? projectId : (Guid?)null;
+                var userId = http.User.UserId();
+                // Kept until how the organization works changes (owner: "if that does not create a security
+                // vulnerability"): which lists a project reads and how dates read are the same for everyone who asks
+                // (nothing here grants anything: access is checked as before); the project opened first is per person.
+                var seen = await http.RequestServices.GetRequiredService<AccessVersions>().SharedAsync(http.User.TenantId(),
+                    named is { } id ? $"lists-of:{id}" : $"lists-of-first:{userId}", async () =>
+                    {
+                        // In a transaction of its own: the tenant is set on a transaction, and row-level security shows
+                        // nothing outside one (the lists would silently be read as the organization's).
+                        await using var look = await db.Database.BeginTransactionAsync(http.RequestAborted);
+                        // None said: the project the screens open first, as /api/me lists them.
+                        var project = named is { } one
+                            ? await db.Projects.AsNoTracking().Where(p => p.Id == one)
+                                .Select(p => new ListsOf(p.Id, p.OwnListKeys, p.OwnFunctions)).SingleOrDefaultAsync(http.RequestAborted)
+                            : await db.Memberships.AsNoTracking()
+                                .Where(m => m.UserId == userId && m.Active && m.Project!.Status == "ACTIVE" && m.Function!.Active)
+                                .OrderBy(m => m.Project!.Code).Select(m => new ListsOf(m.Project!.Id, m.Project.OwnListKeys, m.Project.OwnFunctions))
+                                .FirstOrDefaultAsync(http.RequestAborted);
+                        // How dates read: the organization's, carried on every answer for the screens to draw them so.
+                        var dates = await db.Set<Settings.Setting>().AsNoTracking()
+                            .Where(s => s.ProjectId == null && s.Key == Settings.DateFormat.Key).Select(s => s.Value).FirstOrDefaultAsync(http.RequestAborted);
+                        await look.CommitAsync(http.RequestAborted);
+                        return new RequestLists(project, dates);
+                    });
+                if (seen.Project is { } lists) db.UseListsOf(lists.Id, lists.OwnListKeys, lists.OwnFunctions);
+                http.Response.Headers[Settings.DateFormat.Header] = Settings.DateFormat.Codes.Contains(seen.Dates) ? seen.Dates : Settings.DateFormat.Default;
             }
             await next(http);
         });
+        // An organization that reads only (not paid, trial ended, contract ended) changes nothing (Operators/Contracts.cs).
+        app.Use((http, next) => Operators.Subscriptions.ReadOnlyGateAsync(http, () => next(http)));
         app.UseRateLimiter();
 
         app.MapHealthChecks("/health/live", new HealthCheckOptions
@@ -348,13 +445,22 @@ public static class PlatformSetup
         if (role == Roles.Api)
         {
             app.MapIdentityEndpoints();
+            Operators.OperatorAuth.MapOperatorAuthEndpoints(app);
+            Operators.ConsoleEndpoints.MapConsoleEndpoints(app);
+            Operators.ContractEndpoints.MapContractEndpoints(app);
+            Operators.SupportEndpoints.MapSupportEndpoints(app);
+            app.MapScreenErrorEndpoints();
+            Documents.FullDownloadEndpoints.MapFullDownloadEndpoints(app);
+            Operators.BillingEndpoints.MapBillingEndpoints(app);
+            Identity.ForgetPerson.MapForgetEndpoints(app);
             app.MapSsoEndpoints();
             app.MapPasswordResetEndpoints();
             app.MapEmailConfirmationEndpoints();
             app.MapAdminEndpoints();
             app.MapDirectoryEndpoints();
+            Organizations.Training.MapTrainingEndpoints(app);
             Identity.JoinRequests.MapJoinRequestEndpoints(app);
-        Identity.ProjectDirectory.MapProjectDirectoryEndpoints(app);
+            Identity.ProjectDirectory.MapProjectDirectoryEndpoints(app);
             Organizations.OrganizationEndpoints.MapOrganizationEndpoints(app);
             Organizations.RegistryEndpoints.MapRegistryEndpoints(app);
             Seeding.SignUpEndpoints.MapSignUpEndpoints(app);
@@ -366,11 +472,22 @@ public static class PlatformSetup
             Reviews.VerdictListEndpoints.MapVerdictListEndpoints(app);
             Documents.DocumentEndpoints.MapDocumentEndpoints(app);
             Documents.Equivalents.MapEquivalentEndpoints(app);
+            Documents.Uncontrolled.MapUncontrolledEndpoints(app);
+            Documents.DeliverableImport.MapDeliverableImportEndpoints(app);
             Packages.Intake.MapIntakeEndpoints(app);
             Settings.KeptCopies.MapKeptCopyEndpoints(app);
+            Settings.ProjectDifferences.MapProjectDifferenceEndpoints(app);
+            Actions.ScheduleDays.MapScheduleDaysEndpoints(app);
+            Settings.OrganizationDefaults.MapOrganizationDefaultsEndpoints(app);
+            Settings.ProjectPlace.MapProjectPlaceEndpoints(app);
+            Organizations.ProductRequests.MapProductRequestEndpoints(app);
+            Documents.Viewers.MapViewerEndpoints(app);
+            Settings.Calendar.MapCalendarEndpoints(app);
             Identity.ProjectFunctions.MapProjectFunctionEndpoints(app);
             Reviews.ReviewEndpoints.MapReviewEndpoints(app);
+            Reviews.StampPlaceEndpoints.MapStampPlaceEndpoints(app);
             Reviews.DelegationEndpoints.MapDelegationEndpoints(app);
+            Reviews.StepPeople.MapStepPeopleEndpoints(app);
             Documents.KeepingEndpoints.MapKeepingEndpoints(app);
             Documents.SnapshotEndpoints.MapSnapshotEndpoints(app);
             Documents.GovernanceEndpoints.MapGovernanceEndpoints(app);
@@ -385,6 +502,7 @@ public static class PlatformSetup
             Documents.ProjectLists.MapProjectListEndpoints(app);
             Actions.ScheduleEndpoints.MapScheduleEndpoints(app);
             Actions.ListUploadEndpoints.MapListUploadEndpoints(app);
+            Actions.ListSources.MapListSourceEndpoints(app);
             Documents.SheetGuard.MapSheetGuardEndpoints(app);
             Audit.ActivityEndpoints.MapActivityEndpoints(app);
             Settings.SettingEndpoints.MapSettingEndpoints(app);
@@ -406,4 +524,15 @@ public static class PlatformSetup
     /// </summary>
     private static void AddValidated<T>(IServiceCollection services, string section) where T : class =>
         services.AddOptions<T>().BindConfiguration(section).ValidateDataAnnotations().ValidateOnStart();
+
+    /// <summary>Who a limit counts: the person signed in, else the address the request came from (walked back through our proxies).</summary>
+    private static string Caller(HttpContext http) =>
+        http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value is { } person
+            ? "u:" + person
+            : "a:" + (http.Connection.RemoteIpAddress?.ToString() ?? "unknown");
 }
+
+/// <summary>Which lists a project reads (its own copies), as every request sets them.</summary>
+internal sealed record ListsOf(Guid Id, string[] OwnListKeys, bool OwnFunctions);
+/// <summary>What every request reads before its endpoint: the project's lists and how dates read.</summary>
+internal sealed record RequestLists(ListsOf? Project, string? Dates);

@@ -39,7 +39,7 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
         var id = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/reviews/{id}/answer", new { });
         await Flow.PostAsync(approver, $"/api/projects/{p.Project}/reviews/{id}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{id}/release", new { });
+        await Flow.PostAsync(controller, $"/api/projects/{p.Project}/reviews/{id}/release", await Flow.ReleaseBodyAsync(controller));
     }
 
     [Fact]
@@ -60,10 +60,10 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
         var run = await RunAsync(controller, project);
 
         Assert.Equal("DONE", run.GetProperty("status").GetString());
-        Assert.Equal("NOT_EXECUTABLE", Result(run, "SC-01"));
+        Assert.Equal("NOT_EXECUTABLE", Result(run, "SCH-01"));
         // Checks after it in the list still ran on a usable transaction.
-        Assert.Equal("PASS", Result(run, "RG-01"));
-        Assert.Contains(Result(run, "PK-06"), new[] { "PASS", "FAIL" });
+        Assert.Equal("PASS", Result(run, "STO-03"));
+        Assert.Contains(Result(run, "PKG-01"), new[] { "PASS", "FAIL" });
     }
 
     [Fact]
@@ -78,50 +78,47 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
         await ReleaseAsync(engineer, approver, controller, p);
         await Api.RegisterAsync(engineer, p.Project, Api.Drawing("Inlet works sections"));
 
-        // This project does not grade documents by criticality: it says so, and the check is not asked.
-        using (var noCriticality = await controller.PutAsJsonAsync($"/api/projects/{p.Project}/checks/CL-05/opt-out",
-            new { reason = "Criticality is not used on this project." }))
-            Assert.Equal(HttpStatusCode.NoContent, noCriticality.StatusCode);
-
         var (notControl, notControlBody) = await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/checks/run", new { });
         Assert.Equal((HttpStatusCode.Forbidden, "CONTROL_ONLY"), (notControl, Flow.Code(notControlBody)));
 
         var run = await RunAsync(controller, p.Project);
         Assert.Equal("DONE", run.GetProperty("status").GetString());
         // Only a PDF was kept, and the release went to nobody.
-        Assert.Equal("FAIL", Result(run, "FM-01"));
-        Assert.Equal("FAIL", Result(run, "IS-11"));
-        // The register holds together: one current revision, its decision on record, files intact, audit unbroken.
-        foreach (var id in new[] { "RV-08", "AP-01", "ST-03", "FM-06", "FM-07", "RG-01", "ST-04", "RO-01", "RV-01", "ID-05" })
+        Assert.Equal("FAIL", Result(run, "REV-03"));
+        Assert.Equal("FAIL", Result(run, "REV-04"));
+        // The register holds together: files intact, audit unbroken, the essential lists set up (what the app refuses
+        // by itself is no longer checked).
+        foreach (var id in new[] { "STO-01", "STO-02", "STO-03", "SET-02", "SET-04", "SET-01" })
             Assert.Equal("PASS", Result(run, id));
-        // One of two documents carries a Major defect.
-        Assert.Equal(50.0m, run.GetProperty("integrity").GetDecimal());
+        // Both findings are advisory (a native file is optional; released and never sent is a reminder): no document
+        // carries a Critical or Major defect, so the register's integrity stays whole.
+        Assert.Equal(100.0m, run.GetProperty("integrity").GetDecimal());
         Assert.Equal(0, run.GetProperty("openCritical").GetInt32());
 
         var defects = await DefectsAsync(controller, p.Project);
-        var missingNative = defects.Single(d => d.GetProperty("checkId").GetString() == "FM-01");
-        Assert.Equal(("MAJOR", "OPEN", p.Document), (missingNative.GetProperty("severity").GetString(),
+        var missingNative = defects.Single(d => d.GetProperty("checkId").GetString() == "REV-03");
+        Assert.Equal(("ADVISORY", "OPEN", p.Document), (missingNative.GetProperty("severity").GetString(),
             missingNative.GetProperty("status").GetString(), missingNative.GetProperty("documentId").GetGuid()));
 
         // The project decides it keeps PDFs only: the check is switched off, with the reason, and its finding closes.
-        using (var off = await controller.PutAsJsonAsync($"/api/projects/{p.Project}/checks/FM-01/opt-out",
+        using (var off = await controller.PutAsJsonAsync($"/api/projects/{p.Project}/checks/REV-03/opt-out",
             new { reason = "The client's contract asks for PDF only." }))
             Assert.Equal(HttpStatusCode.NoContent, off.StatusCode);
         // Never sent: accepted as it is, with a reason; it stays counted.
-        var unsent = defects.Single(d => d.GetProperty("checkId").GetString() == "IS-11");
+        var unsent = defects.Single(d => d.GetProperty("checkId").GetString() == "REV-04");
         var (accepted, acceptedBody) = await Flow.PostAsync(controller,
             $"/api/projects/{p.Project}/defects/{unsent.GetProperty("id").GetGuid()}/accept", new { reason = "Issued with the package next week." });
         Assert.True(accepted == HttpStatusCode.OK, acceptedBody.ToString());
 
         run = await RunAsync(controller, p.Project);
-        Assert.Equal("OFF", Result(run, "FM-01"));
+        Assert.Equal("OFF", Result(run, "REV-03"));
         Assert.Equal(100.0m, run.GetProperty("integrity").GetDecimal());
         defects = await DefectsAsync(controller, p.Project);
-        Assert.DoesNotContain(defects, d => d.GetProperty("checkId").GetString() == "FM-01");
-        Assert.Equal("ACCEPTED", defects.Single(d => d.GetProperty("checkId").GetString() == "IS-11").GetProperty("status").GetString());
+        Assert.DoesNotContain(defects, d => d.GetProperty("checkId").GetString() == "REV-03");
+        Assert.Equal("ACCEPTED", defects.Single(d => d.GetProperty("checkId").GetString() == "REV-04").GetProperty("status").GetString());
         var catalog = await controller.GetFromJsonAsync<JsonElement>($"/api/projects/{p.Project}/checks");
         Assert.Equal("The client's contract asks for PDF only.", catalog.GetProperty("checks").EnumerateArray()
-            .Single(c => c.GetProperty("id").GetString() == "FM-01").GetProperty("offBecause").GetString());
+            .Single(c => c.GetProperty("id").GetString() == "REV-03").GetProperty("offBecause").GetString());
     }
 
     [Fact]
@@ -138,40 +135,40 @@ public sealed class CheckTests(Infrastructure infrastructure) : IClassFixture<In
         {
             await using var scope = app.Factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<DeliosDbContext>();
-            scope.ServiceProvider.GetRequiredService<TenantContext>().Set(await db.Tenants.Select(t => t.Id).SingleAsync());
+            var tenant = await db.Tenants.Select(t => t.Id).SingleAsync();
+            scope.ServiceProvider.GetRequiredService<TenantContext>().Set(tenant);
             await using var tx = await db.Database.BeginTransactionAsync();
             await db.ValueEntries.Where(v => v.SetKey == ValueSets.Disciplines && v.Code == "CI")
                 .ExecuteUpdateAsync(v => v.SetProperty(x => x.Status, status));
             await tx.CommitAsync();
+            // Written around the app: the lists every process keeps until they change are told, as a save would.
+            scope.ServiceProvider.GetRequiredService<AccessVersions>().Raise([tenant]);
         }
 
         // Civil retired from the list while a document still carries it.
         await SetCivilAsync(ValueStatus.Retired);
-        Assert.Equal("FAIL", Result(await RunAsync(controller, project), "MD-06"));
-        var defect = (await DefectsAsync(controller, project, "?checkId=MD-06")).Single();
+        Assert.Equal("FAIL", Result(await RunAsync(controller, project), "DOC-04"));
+        var defect = (await DefectsAsync(controller, project, "?checkId=DOC-04")).Single();
         Assert.Contains("Discipline 'CI'", defect.GetProperty("description").GetString());
 
         await SetCivilAsync(ValueStatus.Active);
-        Assert.Equal("PASS", Result(await RunAsync(controller, project), "MD-06"));
-        Assert.Equal("CLOSED", (await DefectsAsync(controller, project, "?checkId=MD-06&status=CLOSED")).Single().GetProperty("status").GetString());
+        Assert.Equal("PASS", Result(await RunAsync(controller, project), "DOC-04"));
+        Assert.Equal("CLOSED", (await DefectsAsync(controller, project, "?checkId=DOC-04&status=CLOSED")).Single().GetProperty("status").GetString());
 
         await SetCivilAsync(ValueStatus.Retired);
         await RunAsync(controller, project);
-        var back = (await DefectsAsync(controller, project, "?checkId=MD-06")).Single();
+        var back = (await DefectsAsync(controller, project, "?checkId=DOC-04")).Single();
         Assert.Equal((defect.GetProperty("id").GetGuid(), "OPEN"), (back.GetProperty("id").GetGuid(), back.GetProperty("status").GetString()));
     }
 
     [Fact]
-    public async Task Every_project_is_checked_once_a_day_by_itself_and_never_queued_twice()
+    public async Task A_run_is_never_queued_twice()
     {
         await using var app = await TestApp.StartAsync(infrastructure);
-        var scopes = app.Factory.Services.GetRequiredService<IServiceScopeFactory>();
-
-        Assert.Equal(1, await CheckScheduler.QueueDueAsync(scopes, default));
-        Assert.Equal(0, await CheckScheduler.QueueDueAsync(scopes, default));
-
         var controller = await app.SignedInAsync("controller@demo.local");
-        var (busy, body) = await Flow.PostAsync(controller, $"/api/projects/{await Api.ProjectIdAsync(controller)}/checks/run", new { });
+        var path = $"/api/projects/{await Api.ProjectIdAsync(controller)}/checks/run";
+        await Flow.PostAsync(controller, path, new { });
+        var (busy, body) = await Flow.PostAsync(controller, path, new { });
         Assert.Equal((HttpStatusCode.Conflict, "CHECKS_ALREADY_RUNNING"), (busy, Flow.Code(body)));
     }
 }

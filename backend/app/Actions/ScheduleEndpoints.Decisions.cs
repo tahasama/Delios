@@ -88,7 +88,7 @@ public static partial class ScheduleEndpoints
             .Select(m => m.Department!).Distinct().ToListAsync(cancellationToken);
         if (mine.Count > 0)
         {
-            var window = await db.ScheduleSources.Where(x => x.ProjectId == projectId).Select(x => (int?)x.RiskWindowDays).SingleOrDefaultAsync(cancellationToken) ?? 7;
+            var window = (await ScheduleDays.ForProjectAsync(db, projectId, cancellationToken)).Risk;
             var activities = await db.Activities.AsNoTracking().Include(a => a.Requirements)
                 .Where(a => a.ProjectId == projectId && a.State == ActivityStates.Active && a.Start != null && a.Departments.Any(d => mine.Contains(d)))
                 .ToListAsync(cancellationToken);
@@ -161,6 +161,25 @@ public static partial class ScheduleEndpoints
             var last = await db.ScheduleImports.AsNoTracking().Where(i => i.ProjectId == projectId).OrderByDescending(i => i.ImportedAt).FirstOrDefaultAsync(cancellationToken);
             if (last is { Status: ScheduleImportStatuses.Failed })
                 work.Add(new ActionWork("SCHEDULE_READ_FAILED", null, $"rev {last.RevisionValue}", last.Error, null, null, 1, last.ImportedAt.ToDateTimeOffset()));
+        }
+        // A list of Import & export whose register document was released since it was last brought in: whoever brings it in
+        // (the deliverable list anyone of ours who registers documents; the others the control function).
+        if (access.IsInternal && (access.Holds(Verbs.Control) || access.Holds(Verbs.Create)))
+        {
+            var sources = await db.Set<ListSource>().AsNoTracking().Where(s => s.ProjectId == projectId && s.DocumentId != null).ToListAsync(cancellationToken);
+            var ids = sources.Select(s => s.DocumentId!.Value).ToList();
+            var released = (await db.Revisions.AsNoTracking().Where(r => ids.Contains(r.DocumentId) && r.State == RevisionStates.Released)
+                    .Join(db.Documents.AsNoTracking(), r => r.DocumentId, d => d.Id, (r, d) => new { r.DocumentId, r.Id, r.Value, r.ReleasedAt, d.Number })
+                    .ToListAsync(cancellationToken))
+                .GroupBy(r => r.DocumentId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ReleasedAt).First());
+            foreach (var source in sources)
+            {
+                var kind = ListSources.Kinds.FirstOrDefault(k => k.Kind == source.Kind);
+                if (kind.Where != "IMPORT" || !released.TryGetValue(source.DocumentId!.Value, out var rev)) continue;
+                if (source.Kind != ListSources.Deliverables && !access.Holds(Verbs.Control)) continue;
+                if (source.LastRevisionId == rev.Id || (source.LastAt is { } at && rev.ReleasedAt is { } on && on <= at)) continue;
+                work.Add(new ActionWork("LIST_TO_BRING_IN", null, kind.Title, $"{rev.Number} rev {rev.Value}", null, source.Kind, 1, rev.ReleasedAt?.ToDateTimeOffset()));
+            }
         }
         return Results.Ok(work);
     }
@@ -306,25 +325,36 @@ public static partial class ScheduleEndpoints
         var policy = await db.Settings.AsNoTracking().Where(s => s.Key == "POLICY_RELEASE" && (s.ProjectId == access.Project.Id || s.ProjectId == null))
             .Select(s => new { s.ProjectId, s.Value }).ToListAsync(cancellationToken);
         var together = (policy.FirstOrDefault(p => p.ProjectId == access.Project.Id)?.Value ?? policy.FirstOrDefault(p => p.ProjectId == null)?.Value ?? "TOGETHER") != "SEPARATE";
+        // Everything the checkpoints read, for every document at once (an action may need many).
+        var documentIds = activity.Requirements.Select(n => n.DocumentId).Distinct().ToList();
+        var documents = await db.Documents.AsNoTracking().Where(d => documentIds.Contains(d.Id))
+            .Select(d => new { d.Id, d.Number, d.Originator, d.CreatedByName }).ToDictionaryAsync(d => d.Id, cancellationToken);
+        var newest = (await db.Revisions.AsNoTracking().Where(r => documentIds.Contains(r.DocumentId))
+                .Select(r => new { r.Id, r.DocumentId, r.CreatedAt, r.AuthoredByParty, r.AuthoredByName, r.ReleasedAt }).ToListAsync(cancellationToken))
+            .GroupBy(r => r.DocumentId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.CreatedAt).First());
+        var revisionIds = newest.Values.Select(r => r.Id).ToList();
+        var reviewOf = (await db.Reviews.AsNoTracking().Include(r => r.Steps).Where(r => revisionIds.Contains(r.RevisionId)).ToListAsync(cancellationToken))
+            .GroupBy(r => r.RevisionId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.StartedAt).First());
+        var issuedOf = await (from i in db.TransmittalItems
+                              join t in db.Transmittals on i.TransmittalId equals t.Id
+                              where i.RevisionId != null && revisionIds.Contains(i.RevisionId.Value) && t.ReviewStepId == null
+                              group t by i.RevisionId!.Value into g
+                              select new { RevisionId = g.Key, First = g.Min(t => t.IssuedAt) }).ToDictionaryAsync(x => x.RevisionId, x => x.First, cancellationToken);
+        var originators = documents.Values.Select(d => d.Originator).OfType<string>().Distinct().ToList();
+        var outsiders = (await db.Parties.AsNoTracking().Where(p => originators.Contains(p.Code) && !p.IsInternal).Select(p => p.Code).ToListAsync(cancellationToken)).ToHashSet();
         foreach (var need in activity.Requirements)
         {
-            var document = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == need.DocumentId, cancellationToken);
-            var revision = await db.Revisions.AsNoTracking().Where(r => r.DocumentId == need.DocumentId)
-                .OrderByDescending(r => r.CreatedAt).FirstOrDefaultAsync(cancellationToken);
-            var review = revision is null ? null : await db.Reviews.AsNoTracking().Include(r => r.Steps)
-                .Where(r => r.RevisionId == revision.Id).OrderByDescending(r => r.StartedAt).FirstOrDefaultAsync(cancellationToken);
-            var issued = revision is null ? null : await (from i in db.TransmittalItems
-                                                          join t in db.Transmittals on i.TransmittalId equals t.Id
-                                                          where i.RevisionId == revision.Id && t.ReviewStepId == null
-                                                          orderby t.IssuedAt
-                                                          select (Instant?)t.IssuedAt).FirstOrDefaultAsync(cancellationToken);
+            if (!documents.TryGetValue(need.DocumentId, out var document)) continue;
+            var revision = newest.GetValueOrDefault(need.DocumentId);
+            var review = revision is null ? null : reviewOf.GetValueOrDefault(revision.Id);
+            Instant? issued = revision is not null && issuedOf.TryGetValue(revision.Id, out var first) ? first : null;
             var due = need.NeededBy;
             var released = actionDay ?? due;
             // Owed by an outside organization when its revision came from one, or, before any revision, when the document's
             // originator is an organization outside ours.
             var external = revision is not null
                 ? revision.AuthoredByParty is not null
-                : document.Originator is { } originator && await db.Parties.AnyAsync(p => p.Code == originator && !p.IsInternal, cancellationToken);
+                : document.Originator is { } originator && outsiders.Contains(originator);
             // Named for the act, not as if it happened: whether it did is the checkpoint's own date.
             var checkpoints = new List<Checkpoint>
             {

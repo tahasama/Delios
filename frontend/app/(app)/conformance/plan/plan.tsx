@@ -7,7 +7,7 @@ import { projectSettings, orgSettings } from "@/lib/settings/api";
 import { stampAnswers, stampSaid } from "@/lib/settings/stamp";
 import { controlSettings, effectiveAnswer, PROJECT_MODE_LABEL, SKIPPABLE } from "@/lib/settings/control-activities";
 import { KINDS, KIND_LABEL, fieldsOf, fieldRules, fieldLabels, storedOwnFields, type FieldRule } from "@/lib/settings/field-policy";
-import { ESCALATE_AFTER_KEY } from "@/lib/actions/escalation";
+import { ESCALATE_AFTER_KEY, NOTIFY_AT_KEY } from "@/lib/actions/escalation";
 import { DEFAULT_LEAD_DAYS } from "@/lib/actions/schedule";
 import { scheduleSource } from "@/lib/actions/api";
 import { stateNames } from "@/lib/core/state-names";
@@ -113,7 +113,7 @@ export async function DocumentManagementPlan() {
     scheduleSource(ctx),
     optOutsOf(ctx.projectId),
     scopeOf(ctx.projectId),
-    api<Directory>(projectPath(ctx, "/people/directory")).catch(() => null),
+    api<Directory>(projectPath(ctx, "/people/directory"), { keep: { areas: [] } }).catch(() => null),
     contractRoleOptions().catch(() => []),
     projectKinds(),
     getActiveSet("DELIVERABLE_TYPES"),
@@ -140,7 +140,7 @@ export async function DocumentManagementPlan() {
   const setTitle = (key: string) => sets.find((s) => s.key === key)?.title ?? key;
 
   // The sets of the review outcomes, each with whom it serves, the routes naming it, its verdicts and what each means.
-  const outcomeSets = (await api<{ lists: { key: string; sets: { id: string | null; name: string; isDefault: boolean; active: boolean; deliverableTypes: string[] }[] }[] }>(projectPath(ctx, "/lists"))
+  const outcomeSets = (await api<{ lists: { key: string; sets: { id: string | null; name: string; isDefault: boolean; active: boolean; deliverableTypes: string[] }[] }[] }>(projectPath(ctx, "/lists"), { keep: { areas: [] } })
     .catch(() => ({ lists: [] }))).lists.find((l) => l.key === "REVIEW_OUTCOMES")?.sets.filter((s) => s.active) ?? [];
   const outcomeValues = await getActiveSet("REVIEW_OUTCOMES");
   const defaultSetId = outcomeSets.find((s) => s.isDefault)?.id ?? null;
@@ -167,8 +167,9 @@ export async function DocumentManagementPlan() {
   const strictMatrix = answer("POLICY_MATRIX") === "STRICT";
   const readyMeans = answer("POLICY_READY") === "STATUS" ? "carrying the status the action needs" : "released and issued at the status the action needs";
   const escalateAfter = Number(answer(ESCALATE_AFTER_KEY));
-  const riskWindow = schedule.source?.riskWindowDays ?? 7;
-  const leadDays = schedule.source?.defaultLeadDays ?? DEFAULT_LEAD_DAYS;
+  const notifyAt = `${String(Number(answer(NOTIFY_AT_KEY))).padStart(2, "0")}:00`;
+  const riskWindow = schedule.days.risk;
+  const leadDays = schedule.days.lead;
   const peopleRow = reading.rows.find((r) => r.activity.key === "PROJECT_PEOPLE");
   /** Who carries an act out on this project, as the Control room answers it. */
   const whoDoes = (key: string) => {
@@ -223,10 +224,10 @@ export async function DocumentManagementPlan() {
               [hasControl ? String(control.length) : "none", hasControl ? "act as the control function" : "control function: the work does it"],
               [String(plan.numbering.length), plan.numbering.length === 1 ? "numbering" : "numberings"],
               [String(plan.routes.length), plan.routes.length === 1 ? "review route" : "review routes"],
-              [`${scope.integrityThreshold}%`, "of documents clear: the target"],
+              [`${scope.integrityThreshold}%`, "target"],
             ].map(([figure, words]) => (
               <div key={words} className="rounded-md bg-tint-soft px-3 py-2.5 ring-1 ring-line">
-                <p className="text-xl font-semibold leading-none tabular-nums text-slate-900">{figure}</p>
+                <p className="text-xl font-semibold leading-none tabular-nums text-brand-ink">{figure}</p>
                 <p className="mt-1 text-[11px] leading-4 text-slate-600">{words}</p>
               </div>
             ))}
@@ -294,11 +295,11 @@ export async function DocumentManagementPlan() {
           {/* Who first, in a word, so the column reads at a glance; how it is done after it, in a lighter voice. */}
           <Grid head={["Act", "Who", "How"]}
             rows={reading.rows.map((row) => [
-              <span key="a" className="font-semibold text-slate-800">{row.activity.title}</span>,
+              <span key="a" className="font-semibold">{row.activity.title}</span>,
               row.off
                 ? <span key="w" className="whitespace-nowrap text-slate-500">Nobody: left out</span>
                 : <span key="w" className="flex flex-col gap-0.5 whitespace-nowrap">
-                    <span className="font-semibold text-slate-800">{row.controlDoes ? "The control function" : "Whoever does the work"}</span>
+                    <span className={`font-semibold ${row.controlDoes ? "text-brand-ink" : "text-emerald-800 dark:text-emerald-300"}`}>{row.controlDoes ? "The control function" : "Whoever does the work"}</span>
                     {row.confirm ? <span className="text-[11px] text-slate-500">after whoever holds Manage confirms</span> : null}
                   </span>,
               row.off
@@ -465,7 +466,7 @@ export async function DocumentManagementPlan() {
               ? `for ${route.patterns.map((p) => [label(deliverables, p.deliverableType), label(docTypes, p.docType), label(disciplines, p.discipline), p.criticality ? `criticality ${p.criticality}` : null, orgName(p.originator)].filter(Boolean).join(" · ") || "any document").join("; ")}`
               : "for any document"}>
             {route.description ? <Say className="text-[12px] text-slate-500">{route.description}</Say> : null}
-            <Grid head={["Step", "Who answers", "Days", "Answered by"]}
+            <Grid head={["Step", "Who answers", "Days", "Moves on when"]}
               rows={route.steps.map((s, i) => [
                 <span key="t">{i + 1}. {s.title}{i === route.steps.length - 1 ? <span className="ml-1.5"><ToneChip tone="moving">decides</ToneChip></span> : null}</span>,
                 s.partyCode
@@ -474,7 +475,7 @@ export async function DocumentManagementPlan() {
                     ? <span>{list([...s.people, ...s.holders.filter((h) => !s.people.includes(h))])}{s.functionCode ? <span className="text-slate-500"> ({functionName(s.functionCode)})</span> : null}</span>
                     : <span className="text-amber-800">nobody yet{s.functionCode ? ` holds ${functionName(s.functionCode)}` : ""}</span>,
                 s.days ? `${s.days} working days` : "no limit",
-                s.mode === "ALL" ? "every one of them" : "the first to answer",
+                s.mode === "ALL" ? "every one has answered" : "the first has answered",
               ])} />
           </Part>
         )) : <Missing>No review route yet: nothing can be reviewed.</Missing>}
@@ -588,9 +589,9 @@ export async function DocumentManagementPlan() {
         <Flow steps={[
           { what: "The schedule and its lists are released", who: "Whoever plans (or the control function)", detail: "The schedule, the disciplines per action and the documents each discipline needs are register documents, read when released.", rail: "rail-released" },
           { what: "Each document gets its planned day", who: "By itself", detail: `The earliest day an action needs it; sending for review is due on that day, released & issued on the action's day (${leadDays} days ahead by default).`, rail: "rail-ahead" },
-          { what: "An action is at risk", when: `${riskWindow} days before its day, or the document's own risk window`, detail: "Each discipline still short is told.", rail: "rail-risk" },
+          { what: "An action is at risk", when: `${riskWindow} days before its day, or the document's own risk window`, detail: `Each discipline still short is told, once, with the day's notices at ${notifyAt}, the project's time.`, rail: "rail-risk" },
           { what: "Each discipline confirms", who: "Its people", detail: `All its documents ${readyMeans}: confirmed by itself. Otherwise it confirms by hand, always saying why it goes ahead without them.`, rail: "rail-ready" },
-          { what: "A silent discipline is notified again", when: `${escalateAfter} working days after the day`, detail: "Its people, whoever holds Manage and the control function are told, once.", rail: "rail-overdue" },
+          { what: "A silent discipline is notified again", when: `${escalateAfter} working days after the day`, detail: `Its people, whoever holds Manage and the control function are told, once, at ${notifyAt}.`, rail: "rail-overdue" },
         ]} />
         <Say className="text-[12px] text-slate-500">An action that will not go ahead is recorded as postponed, with who decided and why; whoever plans confirms it with what changes.</Say>
         <Ensured rules={ensured("Schedule")} />
@@ -639,18 +640,18 @@ export async function DocumentManagementPlan() {
         change={[{ href: "/organization", label: "The organization's page" }]}>
         <Always items={[
           "Every act on a document, review, transmittal, package and setting: always.",
-          trackReading ? "Opening a document and downloading a file: kept." : "Opening a document and downloading a file: not kept on this organization.",
+          (trackReading ? "Opening a document: kept." : "Opening a document: not kept on this organization.") + " Downloading a file: always kept; the administrators are told when one person downloads more than 200 files in an hour.",
           trackSignIns ? "Sign-ins: kept and shown on a person's activity." : "Sign-ins: kept for security, not shown on a person's activity.",
           "Every reason given is kept with its document, in full.",
         ]} />
       </Chapter>
 
       <Chapter n={n("assurance")} id="assurance" title="How it is checked"
-        why="The register checks itself every day, so its figures are always current, and some mistakes simply cannot happen."
+        why="The register checks itself whenever someone runs the checks, and its figures say when; some mistakes simply cannot happen."
         change={[{ href: "/conformance/checks", label: "Assurance" }]}>
         <Facts rows={[
           ["Target", `${scope.integrityThreshold}% of documents with nothing critical or major outstanding, and no critical finding open`],
-          ["How often", "Every day, by itself; anyone of the control function may run it again"],
+          ["How often", "When someone of the control function runs the checks (nothing runs by itself); the figures say when they last ran"],
           ["Checks", <span key="c">{CATALOG.length} questions the app answers from its own records <span className="text-slate-500">({checksBy.map((c) => `${c.count} ${PHASE_LABEL[c.phase].toLowerCase()}`).join(" · ")})</span></span>],
           ["Refused outright", `${PREVENTED.length} mistakes the app refuses at the moment someone tries (listed in each chapter)`],
         ]} />

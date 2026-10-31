@@ -15,7 +15,7 @@ import { ArrowLeft } from "lucide-react";
 import { getActiveSet } from "@/lib/settings/config";
 import { api } from "@/lib/client";
 import { holders } from "@/lib/settings/api";
-import { planActionByCode, planVersion, noticesAbout, noticeHistory } from "@/lib/actions/api";
+import { planActionRead, noticesAbout, noticeHistory } from "@/lib/actions/api";
 import { movedPhrase } from "../moved";
 import { stateLabel, isPostponed, type ActionState } from "@/lib/actions/action-state";
 import { mayUploadLists } from "@/lib/core/permissions";
@@ -38,13 +38,13 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const { dept, decide, as: chosen } = await searchParams;
   // Opened from a request transmittal (`Asks`): the decision it names is open, its choice made.
   const refusing = (key: string) => decide === key && chosen === "refuse";
-  const [action, version] = await Promise.all([planActionByCode(ctx, code), planVersion(ctx)]);
+  const { action, version } = await planActionRead(ctx, code);
   if (!action) notFound();
 
   const [disciplines, parties] = await Promise.all([
     getActiveSet("DISCIPLINES").then((rows) => [...rows].sort((a, b) => a.label.localeCompare(b.label))),
     // Suppliers are the organizations the project deals with.
-    api<{ code: string; name: string }[]>("/api/parties").then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
+    api<{ code: string; name: string }[]>("/api/parties", { keep: { areas: [] } }).then((rows) => rows.map((one) => ({ code: one.code, label: one.name }))).catch(() => []),
   ]);
   const deptLabel = (c: string | null) => (c ? disciplines.find((d) => d.code === c)?.label ?? c : "—");
   const partyLabel = (c: string | null) => (c ? parties.find((p) => p.code === c)?.label ?? c : "Us");
@@ -160,7 +160,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const happened = !postponed && action.passed;
   // Went ahead? Not yet before the day; after it, read from the documents unless postponed.
   const missingCount = action.needs.length - readyCount;
-  const wentAhead: WentAhead = postponed ? "POSTPONED" : !action.passed ? "NOT_YET" : missingCount > 0 ? "MISSING_DOCUMENTS" : "WITH_DOCUMENTS";
+  const wentAhead: WentAhead = postponed ? "POSTPONED" : !action.passed ? "NOT_YET" : action.needs.length === 0 ? "NOTHING_LISTED" : missingCount > 0 ? "MISSING_DOCUMENTS" : "WITH_DOCUMENTS";
 
   // One row per required document: what it is, whether it is there, and the
   // step where its time went. Dates are written here so the table stays a
@@ -246,9 +246,19 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               </p>
               <h1 className="plate-name mt-1 min-w-0">{action.name}</h1>
               <p className="plate-meta mt-2">
-                activity {fmtDate(action.start)} &middot; {readyCount} of {action.needs.length} documents ready
+                activity {fmtDate(action.start)}{action.startAchieved ? " A" : ""}
+                {action.finish && action.start && action.finish > action.start ? ` → ${fmtDate(action.finish)}${action.finishAchieved ? " A" : ""}` : ""}
+                {" "}&middot; {readyCount} of {action.needs.length} documents ready
                 {version ? ` \u00b7 schedule ${version}` : ""}
               </p>
+              {/* Where the planner files it, and what the planner says of it: their word on the work, never ours on its documents. */}
+              {action.wbs?.length ? <p className="mt-1 text-xs text-slate-500">{action.wbs.join(" › ")}</p> : null}
+              {action.startAchieved || action.finishAchieved ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  <span className="font-semibold text-slate-700">A</span> — {action.finishAchieved ? "achieved" : "started"}, as the planner says. That is the
+                  planner&rsquo;s word on the work, not on its documents: where they stand is below.
+                </p>
+              ) : null}
               {moved ? (
                 <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-amber-800">
                   <span className="stamp text-amber-700">moved</span> {moved}

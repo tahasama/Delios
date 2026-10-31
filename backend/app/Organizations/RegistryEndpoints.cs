@@ -85,8 +85,13 @@ public static class RegistryEndpoints
         // One already in our list carries our line for it, to put it on a project.
         return Results.Ok(found.Select(o => new
         {
-            o.Id, o.Code, o.Name, o.Country, Listed = listed.Any(l => l.Organization == o.Id),
-            PartyId = listed.FirstOrDefault(l => l.Organization == o.Id)?.Id, OnDelios = o.TenantId != null,
+            o.Id,
+            o.Code,
+            o.Name,
+            o.Country,
+            Listed = listed.Any(l => l.Organization == o.Id),
+            PartyId = listed.FirstOrDefault(l => l.Organization == o.Id)?.Id,
+            OnDelios = o.TenantId != null,
         }));
     }
 
@@ -97,9 +102,16 @@ public static class RegistryEndpoints
         if (o is null) return Problems.NotFound("NOT_REGISTERED", "Our organization is not in DELIOS's register yet: try again in a moment.");
         return Results.Ok(new
         {
-            o.Id, o.Code, o.Name, o.Country, Kind = o.IdentifierKind, Number = o.IdentifierNumber, o.NoIdentifierReason,
+            o.Id,
+            o.Code,
+            o.Name,
+            o.Country,
+            Kind = o.IdentifierKind,
+            Number = o.IdentifierNumber,
+            o.NoIdentifierReason,
             IdentifierWas = o.IdentifierChangedAt is null ? null : new { Was = o.PreviousIdentifier, By = o.IdentifierChangedByName, At = o.IdentifierChangedAt.Value.ToDateTimeOffset() },
-            o.Domain, DomainConfirmedAt = o.DomainConfirmedAt?.ToDateTimeOffset(),
+            o.Domain,
+            DomainConfirmedAt = o.DomainConfirmedAt?.ToDateTimeOffset(),
         });
     }
 
@@ -207,8 +219,11 @@ public static class RegistryEndpoints
             }),
             incoming = incoming.Select(c => new
             {
-                c.Id, c.ClaimedByName, CreatedAt = c.CreatedAt.ToDateTimeOffset(),
-                Entry = names.GetValueOrDefault(c.EntryId), Claimer = names.GetValueOrDefault(c.ClaimerIdentityId),
+                c.Id,
+                c.ClaimedByName,
+                CreatedAt = c.CreatedAt.ToDateTimeOffset(),
+                Entry = names.GetValueOrDefault(c.EntryId),
+                Claimer = names.GetValueOrDefault(c.ClaimerIdentityId),
             }),
         });
     }
@@ -237,8 +252,13 @@ public static class RegistryEndpoints
         }, cancellationToken) : null;
         var claim = new OrganizationClaim
         {
-            EntryId = entry.Id, ClaimerTenantId = me, ClaimerIdentityId = o.Id, ClaimedByName = actor.Name, MakerTenantId = maker,
-            Method = guest is null ? ClaimMethods.Vouch : ClaimMethods.GuestEmail, SentTo = guest?.Email,
+            EntryId = entry.Id,
+            ClaimerTenantId = me,
+            ClaimerIdentityId = o.Id,
+            ClaimedByName = actor.Name,
+            MakerTenantId = maker,
+            Method = guest is null ? ClaimMethods.Vouch : ClaimMethods.GuestEmail,
+            SentTo = guest?.Email,
             CreatedAt = SystemClock.Instance.GetCurrentInstant(),
         };
         db.OrganizationClaims.Add(claim);
@@ -353,8 +373,13 @@ public static class RegistryEndpoints
         var actor = await ActorAsync(http, db, cancellationToken);
         var asked = new OrganizationMerge
         {
-            KeepId = keep.Id, MergeId = merge.Id, RequestedByTenantId = me, RequestedByName = actor.Name, Why = why,
-            RequestedAt = SystemClock.Instance.GetCurrentInstant(), AgreedTenantIds = sides.Contains(me) ? [me] : [],
+            KeepId = keep.Id,
+            MergeId = merge.Id,
+            RequestedByTenantId = me,
+            RequestedByName = actor.Name,
+            Why = why,
+            RequestedAt = SystemClock.Instance.GetCurrentInstant(),
+            AgreedTenantIds = sides.Contains(me) ? [me] : [],
         };
         if (sides.All(asked.AgreedTenantIds.Contains)) asked.State = MergeStates.Agreed;
         db.OrganizationMerges.Add(asked);
@@ -380,10 +405,18 @@ public static class RegistryEndpoints
             .Where(x => x.m.RequestedByTenantId == me || x.sides.Contains(me))
             .Select(x => new
             {
-                x.m.Id, x.m.State, x.m.Why, x.m.RequestedByName, RequestedAt = x.m.RequestedAt.ToDateTimeOffset(), Ours = x.m.RequestedByTenantId == me,
-                Keep = new { orgs[x.m.KeepId].Code, orgs[x.m.KeepId].Name }, Merge = new { orgs[x.m.MergeId].Code, orgs[x.m.MergeId].Name },
+                x.m.Id,
+                x.m.State,
+                x.m.Why,
+                x.m.RequestedByName,
+                RequestedAt = x.m.RequestedAt.ToDateTimeOffset(),
+                Ours = x.m.RequestedByTenantId == me,
+                Keep = new { orgs[x.m.KeepId].Code, orgs[x.m.KeepId].Name },
+                Merge = new { orgs[x.m.MergeId].Code, orgs[x.m.MergeId].Name },
                 WaitsOnUs = x.m.State == MergeStates.Asked && x.sides.Contains(me) && !x.m.AgreedTenantIds.Contains(me),
-                x.m.RefusedByName, x.m.RefusedWhy, DoneAt = x.m.DoneAt?.ToDateTimeOffset(),
+                x.m.RefusedByName,
+                x.m.RefusedWhy,
+                DoneAt = x.m.DoneAt?.ToDateTimeOffset(),
             });
         return Results.Ok(rows);
     }

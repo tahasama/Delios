@@ -47,6 +47,7 @@ public static partial class ProjectRecordEndpoints
 
         // Assets
         p.MapGet("/assets", AssetsAsync);
+        p.MapGet("/assets/page", AssetsPageAsync);
         p.MapGet("/assets/{assetId:guid}", AssetAsync);
         p.MapPost("/assets", AddAssetAsync);
         p.MapPut("/assets/{assetId:guid}", UpdateAssetAsync);
@@ -95,7 +96,9 @@ public static partial class ProjectRecordEndpoints
         p.MapPost("/controlled", (ControlledUpload r, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken c) =>
             UploadAsync(h, db, audit, clock, ProjectAccessFilter.Of(h).Project.Id, r, c));
         var org = app.MapGroup("/api/controlled").WithTags("Records").RequireAuthorization().AddEndpointFilter<TransactionFilter>();
-        org.MapGet("", (DeliosDbContext db, CancellationToken c, string? kind, string? key) => ControlledListAsync(db, null, kind, key, c));
+        // The organization's controlled lists: an administrator's (OutsideReading, owner: only admin and a few authorized).
+        org.MapGet("", async (HttpContext h, DeliosDbContext db, CancellationToken c, string? kind, string? key) =>
+            await Keepers.ConfiguresAsync(h) || await Keepers.KeepsAProjectAsync(h) ? await ControlledListAsync(db, null, kind, key, c) : Results.Ok(Array.Empty<object>()));
         org.MapPost("", (ControlledUpload r, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken c) =>
             UploadAsync(h, db, audit, clock, null, r, c));
         org.MapPost("/{versionId:guid}/submit", SubmitAsync);

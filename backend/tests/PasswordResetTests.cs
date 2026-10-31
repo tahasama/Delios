@@ -83,6 +83,7 @@ public sealed class PasswordResetTests(Infrastructure infrastructure) : IClassFi
         var anonymous = app.Factory.CreateClient();
         var (made, madeBody) = await Flow.PostAsync(anonymous, "/api/auth/sign-up", new
         {
+            acceptTerms = true,
             organizationName = "Lakeside Power",
             name = "Lena Lake",
             email = "lena@lakeside.test",

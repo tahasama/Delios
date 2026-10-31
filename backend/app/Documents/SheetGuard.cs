@@ -36,8 +36,9 @@ public static class SheetGuard
         if (bytes.Length == 0) return Problems.Invalid("FILE_EMPTY", "The file is empty.");
         if (bytes.Length > MaxBytes) return Problems.Invalid("FILE_TOO_LARGE", "The file is larger than 20 MB.");
         var workbook = fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase);
-        var csv = fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
-        if (!workbook && !csv) return Problems.Invalid("FILE_TYPE", "Bring the list as a workbook (.xlsx) or a CSV.");
+        // A P6 export (.xer) is text, as a CSV is; only the schedule reads it.
+        var csv = fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".xer", StringComparison.OrdinalIgnoreCase);
+        if (!workbook && !csv) return Problems.Invalid("FILE_TYPE", "Bring the list as a workbook (.xlsx) or a CSV (the schedule also as a Primavera P6 export, .xer).");
 
         var kind = FileSniffer.Detect(bytes.AsSpan(0, Math.Min(bytes.Length, 16)));
         if (workbook)
@@ -48,7 +49,7 @@ public static class SheetGuard
         }
         else if (kind != "application/octet-stream" || LooksBinary(bytes))
         {
-            return Problems.Invalid("FILE_NOT_WHAT_IT_SAYS", $"{fileName} is not a text CSV, whatever its name says. Save it as CSV and try again.");
+            return Problems.Invalid("FILE_NOT_WHAT_IT_SAYS", $"{fileName} is not text, whatever its name says. Save it again (as CSV, or export the .xer again from P6) and try again.");
         }
 
         ScanResult scan;
@@ -68,7 +69,7 @@ public static class SheetGuard
     }
 
     /// <summary>A workbook's parts: within size, no macros, and the parts a workbook has.</summary>
-    private static string? WorkbookProblem(byte[] bytes)
+    internal static string? WorkbookProblem(byte[] bytes, bool macrosAllowed = false)
     {
         try
         {
@@ -82,7 +83,7 @@ public static class SheetGuard
                 if (unpacked > MaxUnpacked) return "The workbook unpacks to far more than a list holds. Save the list on its own and try again.";
                 var name = entry.FullName.Replace('\\', '/');
                 if (name.Equals("xl/workbook.xml", StringComparison.OrdinalIgnoreCase)) workbook = true;
-                if (name.EndsWith("vbaProject.bin", StringComparison.OrdinalIgnoreCase))
+                if (!macrosAllowed && name.EndsWith("vbaProject.bin", StringComparison.OrdinalIgnoreCase))
                     return "The workbook carries macros. Save it as a plain workbook (.xlsx, without macros) and try again.";
             }
             return workbook ? null : "This zip is not an Excel workbook. Save the list from Excel as .xlsx and try again.";

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Delios.Host.Seeding;
 
 namespace Delios.Host.Platform;
@@ -5,7 +6,7 @@ namespace Delios.Host.Platform;
 /// <summary>
 /// One-shot commands run with the same build and settings as the app:
 /// <c>migrate</c>, <c>create-tenant</c>, <c>seed-demo</c>, <c>reindex</c>, <c>grant-all</c>, <c>unshare-package</c>,
-/// <c>merge-organizations</c>.
+/// <c>merge-organizations</c>, <c>requests</c>, <c>rebuild-recorded</c>, <c>create-operator</c>.
 /// </summary>
 public static class Commands
 {
@@ -13,7 +14,8 @@ public static class Commands
     /// True when the first command-line argument names one of these commands. Program.cs then runs the command instead of starting the web server.
     /// </summary>
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0] is DatabaseMigrator.Command or "create-tenant" or "seed-demo" or "reindex" or "grant-all" or "unshare-package" or "merge-organizations";
+        args.Length > 0 && args[0] is DatabaseMigrator.Command or "create-tenant" or "seed-demo" or "reindex" or "grant-all" or "unshare-package" or "merge-organizations"
+            or "requests" or "rebuild-recorded" or "create-operator";
 
     /// <summary>
     /// Runs the command named by the first argument and returns the process exit code (0 success, 2 wrong usage or refused).
@@ -81,9 +83,32 @@ public static class Commands
                 await Console.Out.WriteLineAsync(merged);
                 return merged.StartsWith("No such") || merged.StartsWith("One of") ? 2 : 0;
 
+            case "requests" when args.Length == 1:
+                // What organizations asked of DELIOS (a certified DWG reader), for the app's owner.
+                await Console.Out.WriteLineAsync(await services.GetRequiredService<Organizations.ListProductRequests>().RunAsync());
+                return 0;
+
+            case "create-operator" when args.Length == 3:
+                // A member of the DELIOS team, for the console; the password from the environment, never in shell history.
+                var made = await services.GetRequiredService<Operators.CreateOperator>()
+                    .RunAsync(args[1], args[2], Environment.GetEnvironmentVariable("DELIOS_OPERATOR_PASSWORD") ?? "");
+                await Console.Out.WriteLineAsync(made);
+                return made.StartsWith("Created") || made.StartsWith("Reset") ? 0 : 2;
+
+            case "rebuild-recorded" when args.Length == 1:
+                // What the database records as it happens (Recorded), written again from what exists: only if it ever looks wrong.
+                var db = services.GetRequiredService<DeliosDbContext>();
+                await using (var tx = await db.Database.BeginTransactionAsync())
+                {
+                    await db.Database.ExecuteSqlRawAsync(Recorded.Rebuild);
+                    await tx.CommitAsync();
+                }
+                await Console.Out.WriteLineAsync("What is recorded as it happens was written again from what exists.");
+                return 0;
+
             default:
                 await Console.Error.WriteLineAsync(
-                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex | grant-all <email> | unshare-package <email> <package-number> | merge-organizations [<merge-id>]");
+                    "Usage: migrate | create-tenant <slug> <name> <admin-email> <admin-name> | seed-demo | reindex | grant-all <email> | unshare-package <email> <package-number> | merge-organizations [<merge-id>] | requests | rebuild-recorded | create-operator <email> <name>");
                 return 2;
         }
     }

@@ -20,34 +20,51 @@ public static class Outbox
 }
 
 /// <summary>
+/// The bell an act rings once its save is committed with a message in the outbox (<see cref="Platform.ScreenChangeWatcher"/>):
+/// the relay of this process wakes and sends it. Nothing asks the table whether something came.
+/// </summary>
+public sealed class OutboxWake
+{
+    private readonly SemaphoreSlim bell = new(0, 1);
+
+    public void Ring()
+    {
+        try { bell.Release(); }
+        catch (SemaphoreFullException) { /* already rung: one wake sends everything waiting */ }
+    }
+
+    public Task WaitAsync(CancellationToken cancellationToken) => bell.WaitAsync(cancellationToken);
+}
+
+/// <summary>
 /// Moves committed outbox messages to RabbitMQ, waiting for the broker to confirm
-/// each one before marking it sent. Several nodes can run it: each takes rows the
-/// others have not locked. A message may be sent twice; consumers are idempotent.
+/// each one before marking it sent. Every process runs it, woken by its own acts
+/// (<see cref="OutboxWake"/>); each takes rows the others have not locked. A message
+/// may be sent twice; consumers are idempotent.
 /// </summary>
 public sealed class OutboxRelay(
-    IServiceScopeFactory scopes, RabbitMqConnection rabbit, IClock clock, ILogger<OutboxRelay> logger)
+    IServiceScopeFactory scopes, RabbitMqConnection rabbit, OutboxWake wake, IClock clock, ILogger<OutboxRelay> logger)
     : BackgroundService
 {
-    /// <summary>How long the relay sleeps when it found nothing to send.</summary>
-    private static readonly TimeSpan Idle = TimeSpan.FromSeconds(1);
-    /// <summary>How often the relay updates the outbox backlog metrics.</summary>
-    private static readonly TimeSpan MeasureEvery = TimeSpan.FromSeconds(15);
     /// <summary>The RabbitMQ channel used for publishing, opened on first use and reopened after a failure; null when none is open.</summary>
     private IChannel? _channel;
-    private DateTime _measuredAt = DateTime.MinValue;
 
     /// <summary>
-    /// Runs for the life of the process: sends batches until the outbox is empty, then waits a second; refreshes the backlog metrics every 15 seconds.
-    /// On failure it drops the channel and retries after 5 seconds.
+    /// Runs for the life of the process: on start, sends what was left waiting (a stop between a save and its sending);
+    /// then sleeps until an act rings, sends everything waiting, and measures the backlog. Nothing runs while nobody acts.
+    /// On failure it drops the channel and tries again after 5 seconds.
     /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var rung = true;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                if (await RelayBatchAsync(stoppingToken) == 0) await Task.Delay(Idle, stoppingToken);
-                if (DateTime.UtcNow - _measuredAt > MeasureEvery) await MeasureAsync(stoppingToken);
+                if (!rung) await wake.WaitAsync(stoppingToken);
+                rung = false;
+                while (await RelayBatchAsync(stoppingToken) > 0) { }
+                await MeasureAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -59,6 +76,7 @@ public sealed class OutboxRelay(
                 if (_channel is not null) await _channel.DisposeAsync();
                 _channel = null;
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                rung = true;
             }
         }
     }
@@ -128,7 +146,6 @@ public sealed class OutboxRelay(
         AppMetrics.OutboxUnsent.Set(unsent?.Count ?? 0);
         AppMetrics.OutboxOldestUnsentSeconds.Set(
             unsent is null ? 0 : (clock.GetCurrentInstant() - unsent.Oldest).TotalSeconds);
-        _measuredAt = DateTime.UtcNow;
     }
 
     /// <summary>Returns the open publishing channel, or opens a new one with publisher confirms (the broker acknowledges each published message) and declares the exchanges and queues.</summary>

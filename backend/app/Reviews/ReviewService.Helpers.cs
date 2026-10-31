@@ -27,7 +27,22 @@ public sealed partial class ReviewService
     {
         var review = await LoadAsync(access, reviewId, cancellationToken);
         return review is not null && await VisibleDocumentAsync(access, review.DocumentId, cancellationToken) is not null
+            // Another organization reads a review of its own document, or one with a step it answers (OutsideReading).
+            && (access.IsInternal || await OutsideReading.Reviews(db, access, db.Reviews.Where(r => r.Id == review.Id)).AnyAsync(cancellationToken))
             ? review : null;
+    }
+
+    /// <summary>Several reviews for display at once (a document's page), those whose document the caller may see.</summary>
+    public async Task<List<Review>> ReadManyAsync(ProjectAccess access, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
+    {
+        var found = await OutsideReading.Reviews(db, access, db.Reviews.AsNoTracking())
+            .Include(r => r.Steps.OrderBy(s => s.Index)).ThenInclude(s => s.Participants)
+            .Include(r => r.Comments)
+            .AsSplitQuery()
+            .Where(r => ids.Contains(r.Id) && r.ProjectId == access.Project.Id).ToListAsync(cancellationToken);
+        var documents = found.Select(r => r.DocumentId).Distinct().ToList();
+        var visible = (await DocumentQueries.Visible(db, access).Where(d => documents.Contains(d.Id)).Select(d => d.Id).ToListAsync(cancellationToken)).ToHashSet();
+        return found.Where(r => visible.Contains(r.DocumentId)).ToList();
     }
 
     /// <summary>The document if the caller may see it (within their function's clearance, or named on it), otherwise null.</summary>
@@ -169,7 +184,7 @@ public sealed partial class ReviewService
     internal static IResult FilesNotReady(Revision revision) => Problems.Conflict("FILES_NOT_READY", revision.FilesState switch
     {
         FilesStates.Processing => $"Rev {revision.Value}'s files are still being checked for viruses, which takes about a minute: try again shortly. If it stays so, the virus check is not running (the worker or the scanner): whoever runs the app restarts it.",
-        FilesStates.Rejected => $"A file of rev {revision.Value} failed the virus check and was set aside: replace it in Edit rev {revision.Value}, then try again.",
+        FilesStates.Rejected => $"A file of rev {revision.Value} was refused by the virus check, its Preview says why (a virus, a password, too much inside to check): replace it in Edit rev {revision.Value}, then try again.",
         FilesStates.None => $"Rev {revision.Value} has no files yet: add its PDF in Edit rev {revision.Value}, then try again.",
         _ => $"Rev {revision.Value}'s files have not all passed the virus check yet.",
     }, new { filesState = revision.FilesState });

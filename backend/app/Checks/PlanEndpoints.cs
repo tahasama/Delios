@@ -51,20 +51,36 @@ public static class PlanEndpoints
         {
             Numbering = schemes.Select(s => new
             {
-                s.Name, s.Delimiter, s.Fields,
+                s.Name,
+                s.Delimiter,
+                s.Fields,
                 DeliverableTypes = routing.Where(r => r.SchemeId == s.Id).Select(r => r.DeliverableType).ToList(),
             }),
             Revisions = revisions.Select(s => new
             {
-                s.Name, s.IsDefault, s.ForwardOnly, s.Series,
+                s.Name,
+                s.IsDefault,
+                s.ForwardOnly,
+                s.Series,
                 DeliverableTypes = revisionRouting.Where(r => r.SchemeId == s.Id).Select(r => r.DeliverableType).ToList(),
             }),
             Routes = routes.Select(r => new
             {
-                r.Name, r.Description, r.IsDefault, VerdictSet = ReviewSets.Verdicts, r.Verdicts, r.Patterns,
+                r.Name,
+                r.Description,
+                r.IsDefault,
+                VerdictSet = ReviewSets.Verdicts,
+                r.Verdicts,
+                r.Patterns,
                 Steps = r.Steps.Select(s => new
                 {
-                    s.Title, s.FunctionCode, s.PartyCode, s.Reason, s.Mode, s.Days, s.GrantsStatuses,
+                    s.Title,
+                    s.FunctionCode,
+                    s.PartyCode,
+                    s.Reason,
+                    s.Mode,
+                    s.Days,
+                    s.GrantsStatuses,
                     People = s.UserIds.Where(names.ContainsKey).Select(id => names[id]).ToList(),
                     Holders = s.FunctionCode is null ? [] : members
                         .Where(m => functions.FirstOrDefault(f => f.Code == s.FunctionCode)?.Id == m.FunctionId).Select(m => m.Name).ToList(),
@@ -74,7 +90,9 @@ public static class PlanEndpoints
             Functions = functions
                 .Select(f => new
                 {
-                    f.Code, f.Name, f.Clearance,
+                    f.Code,
+                    f.Name,
+                    f.Clearance,
                     Rows = f.Rules.Where(r => r.ProjectRole is null || r.ProjectRole == project.ContractRole)
                         .Select(r => new { r.Verbs, r.DeliverableType, r.DocType, r.Discipline, r.Criticality, r.Confidentiality, r.Note }).ToList(),
                     Holders = members.Where(m => m.FunctionId == f.Id).Select(m => new { m.Name, m.Department }).ToList(),

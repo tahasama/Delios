@@ -170,8 +170,14 @@ public static class FormRules
 
     private static string Noun(string form) => form switch
     {
-        "DOCUMENT" => "document", "REVISION" => "revision", "TRANSMITTAL" => "transmittal", "PACKAGE" => "package",
-        "ASSET" => "tag", "PROJECT" => "project", "PARTY" => "organization", _ => "form",
+        "DOCUMENT" => "document",
+        "REVISION" => "revision",
+        "TRANSMITTAL" => "transmittal",
+        "PACKAGE" => "package",
+        "ASSET" => "tag",
+        "PROJECT" => "project",
+        "PARTY" => "organization",
+        _ => "form",
     };
 
     /// <summary>
@@ -221,7 +227,8 @@ public static class FormRules
                 level = "project",
                 forms,
                 owned = await OwnedAsync(db, access.Project.Id, c),
-                free = await Liberty.IsFreeAsync(db, Liberty.Forms, c),
+                free = await Liberty.IsFreeAsync(db, Liberty.Forms, access.Project.Id, c),
+                exception = await Liberty.ExceptionHereAsync(db, Liberty.Forms, access.Project.Id, c),
                 mayChange = await ProjectLists.MayChangeAsync(db, access, c),
             });
         });
@@ -239,7 +246,7 @@ public static class FormRules
             var owned = await OwnedAsync(db, access.Project.Id, cancellationToken);
             if (!owned.Contains(form))
             {
-                if (!await Liberty.IsFreeAsync(db, Liberty.Forms, cancellationToken))
+                if (!await Liberty.IsFreeAsync(db, Liberty.Forms, access.Project.Id, cancellationToken))
                     return Problems.Forbidden("FORMS_FIXED", $"Every project uses the organization's forms: {where}.");
                 await CopyAsync(db, access.Project.TenantId, access.Project.Id, form, owned, access.UserName, clock, cancellationToken);
             }

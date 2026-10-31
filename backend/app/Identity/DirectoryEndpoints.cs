@@ -22,15 +22,23 @@ public sealed record UpdateUserRequest(
 
 /// <summary>Body of creating a project.</summary>
 public sealed record CreateProjectRequest(string? Code, string? Name, string? ContractRole = null, string? TimeZone = null, string? Kind = null,
-    DateOnly? StartDate = null, DateOnly? EndDate = null, string? ScopeStatement = null);
+    DateOnly? StartDate = null, DateOnly? EndDate = null, string? ScopeStatement = null, int[]? WeekendDays = null, string? Country = null);
 
 /// <summary>Body of changing a project. A null field is left as it is.</summary>
 /// <remarks>A new <c>Code</c> shapes new numbers only; numbers already given keep the old one.</remarks>
 public sealed record UpdateProjectRequest(
     string? Code = null, string? Name = null, string? ContractRole = null, string? Status = null, string? TimeZone = null, int[]? WeekendDays = null,
-    string? Kind = null, string? Reason = null);
+    string? Kind = null, string? Reason = null, string? Country = null);
 
 /// <summary>Body of putting a person on a project, or changing their place on it: one function per person per project.</summary>
+/// <summary>A line of the team list: where it is in the file, the person, and what they do on the project.</summary>
+public sealed record TeamLine(string At, string? Name, string? Email, Guid? PartyId, Guid? FunctionId, string? Department);
+/// <summary>The team list, checked (<paramref name="Dry"/>: everything undone) or written whole.</summary>
+public sealed record TeamLinesRequest(TeamLine[]? People, bool Dry = false);
+/// <summary>A function's rules as a filled-in matrix leaves them, for writing several functions as one.</summary>
+public sealed record FunctionRulesLine(string At, Guid FunctionId, RuleRequest[] Rules);
+public sealed record FunctionRulesRequest(FunctionRulesLine[]? Functions, bool Dry = false);
+
 public sealed record MembershipRequest(Guid UserId, Guid? FunctionId, string? Department = null, bool Active = true, Guid? ConfirmerId = null);
 
 /// <summary>Body of creating a function.</summary>
@@ -89,6 +97,7 @@ public static class DirectoryEndpoints
         people.MapPost("/users", CreateUserAsync);
         people.MapPut("/users/{userId:guid}", UpdateUserAsync);
         people.MapPut("/projects/{projectId:guid}/members", MemberAsync);
+        people.MapPost("/projects/{projectId:guid}/members/many", TeamAsync);
         // Reading the functions and organizations is open to whoever holds Manage too: People & access chooses from them.
         people.MapGet("/functions", FunctionsAsync);
         keepers.MapGet("/users/{userId:guid}/activity", ActivityAsync);
@@ -99,6 +108,7 @@ public static class DirectoryEndpoints
             .AddEndpointFilter(Keepers.Configurers("An administrator changes the organization's functions, in its Settings, for every project."));
         functions.MapPost("/functions", CreateFunctionAsync);
         functions.MapPut("/functions/{functionId:guid}", UpdateFunctionAsync);
+        functions.MapPost("/functions/rules/many", FunctionRulesAsync);
         people.MapGet("/parties", PartiesAsync);
         keepers.MapPost("/parties", CreatePartyAsync);
         keepers.MapPut("/parties/{partyId:guid}", UpdatePartyAsync);
@@ -110,7 +120,8 @@ public static class DirectoryEndpoints
     /// a kind of act. An administrator or the control function only (Settings, never the directory): it is the record
     /// kept for the integrity of the register, read by those who answer for it.
     /// </summary>
-    private static async Task<IResult> ActivityAsync(Guid userId, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken,
+    private static async Task<IResult> ActivityAsync(Guid userId, HttpContext http, DeliosDbContext db, AuditLog audit, AuditCounts counts,
+        CancellationToken cancellationToken,
         Guid? projectId = null, string? kind = null, string? action = null, string? q = null, DateOnly? from = null, DateOnly? to = null,
         int page = 1, int per = 50)
     {
@@ -134,16 +145,17 @@ public static class DirectoryEndpoints
             var pattern = $"%{q.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
             query = query.Where(e => (e.EntityLabel != null && EF.Functions.ILike(e.EntityLabel, pattern)) || (e.Detail != null && EF.Functions.ILike(e.Detail, pattern)));
         }
+        // Everything they did, counted once, then only what they did since (AuditCounts).
+        var counted = await counts.ByActionAsync(http.User.TenantId(), $"person:{userId}:{string.Join(",", hidden)}", mine, cancellationToken);
         if (!string.IsNullOrWhiteSpace(kind))
         {
-            var codes = (await mine.Select(e => e.Action).Distinct().ToListAsync(cancellationToken)).Where(c => AuditKinds.Of(c) == kind).ToArray();
+            var codes = counted.Keys.Where(c => AuditKinds.Of(c) == kind).ToArray();
             query = query.Where(e => codes.Contains(e.Action));
         }
         if (!string.IsNullOrWhiteSpace(action)) query = query.Where(e => e.Action == action);
         var total = await query.CountAsync(cancellationToken);
         var rows = await query.OrderByDescending(e => e.Id).Skip((page - 1) * per).Take(per).ToListAsync(cancellationToken);
-        var kinds = (await mine.GroupBy(e => e.Action).Select(g => new { Action = g.Key, Count = g.Count() })
-            .OrderByDescending(g => g.Count).ToListAsync(cancellationToken)).Select(x => new { x.Action, x.Count, Kind = AuditKinds.Of(x.Action) });
+        var kinds = counted.OrderByDescending(x => x.Value).Select(x => new { Action = x.Key, Count = x.Value, Kind = AuditKinds.Of(x.Key) });
         var first = await mine.OrderBy(e => e.Id).Select(e => (Instant?)e.At).FirstOrDefaultAsync(cancellationToken);
         var lastSignIn = !showsSignIns ? null : await mine.Where(e => e.Action.StartsWith("SIGN_IN") && e.Action != "SIGN_IN_FAILED")
             .OrderByDescending(e => e.Id).Select(e => (Instant?)e.At).FirstOrDefaultAsync(cancellationToken);
@@ -167,7 +179,15 @@ public static class DirectoryEndpoints
             kinds,
             rows = rows.Select(e => new
             {
-                e.Id, At = e.At.ToDateTimeOffset(), e.Action, Kind = AuditKinds.Of(e.Action), e.EntityType, e.EntityId, e.EntityLabel, Detail = AuditKinds.Readable(e.Detail, names), e.ProjectId,
+                e.Id,
+                At = e.At.ToDateTimeOffset(),
+                e.Action,
+                Kind = AuditKinds.Of(e.Action),
+                e.EntityType,
+                e.EntityId,
+                e.EntityLabel,
+                Detail = AuditKinds.Readable(e.Detail, names),
+                e.ProjectId,
                 Project = e.ProjectId is { } pid ? projects.GetValueOrDefault(pid) : null,
                 DocumentId = e.EntityId is { } eid && documents.TryGetValue(eid, out var did) ? did : (Guid?)null,
             }),
@@ -189,7 +209,8 @@ public static class DirectoryEndpoints
     private static async Task<IResult> UsersAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {
         var users = await db.Users.AsNoTracking().Include(u => u.Party).OrderBy(u => u.Name).ToListAsync(cancellationToken);
-        var memberships = await db.Memberships.AsNoTracking().Include(m => m.Function).Include(m => m.Project).ToListAsync(cancellationToken);
+        var memberships = (await db.Memberships.AsNoTracking().Include(m => m.Function).Include(m => m.Project).ToListAsync(cancellationToken))
+            .ToLookup(m => m.UserId);
         var seen = await SeenAsync(db, cancellationToken);
         return Results.Ok(users.Select(u => new
         {
@@ -208,11 +229,11 @@ public static class DirectoryEndpoints
             LockedUntil = u.LockedUntil?.ToDateTimeOffset(),
             CreatedAt = u.CreatedAt.ToDateTimeOffset(),
             u.HomeFunction,
-            // The last time they signed in (or switched in from their own DELIOS), from the audit trail.
+            // The last time they signed in (or switched in from their own DELIOS), kept with the act.
             LastSignInAt = seen.SignIns.TryGetValue(u.Id, out var signedIn) ? signedIn.ToDateTimeOffset() : (DateTimeOffset?)null,
-            Memberships = memberships.Where(m => m.UserId == u.Id).Select(m => new
+            Memberships = memberships[u.Id].Select(m => new
             {
-                // On the project since: confirmed, else first put on it (the audit trail), else their account's day.
+                // On the project since: confirmed, else first put on it (kept with the act), else their account's day.
                 Since = (m.ConfirmedAt ?? (seen.Joined.TryGetValue((u.Id, m.ProjectId), out var joined) ? joined : u.CreatedAt)).ToDateTimeOffset(),
                 // Their last act on the project.
                 LastSeenAt = seen.Acts.TryGetValue((u.Id, m.ProjectId), out var last) ? last.ToDateTimeOffset() : (DateTimeOffset?)null,
@@ -246,18 +267,14 @@ public static class DirectoryEndpoints
         Dictionary<(Guid, Guid), Instant> FirstActs)>
         SeenAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {
-        string[] signIns = ["SIGN_IN", "SIGN_IN_MFA", "SIGN_IN_SSO", "LOGIN", "SWITCHED_IN"];
-        string[] joins = ["MEMBERSHIP_CHANGED", "PERSON_JOINED_PROJECT"];
-        var signedIn = await db.AuditEvents.AsNoTracking().Where(e => e.ActorId != null && signIns.Contains(e.Action))
-            .GroupBy(e => e.ActorId!.Value).Select(g => new { g.Key, At = g.Max(e => e.At) }).ToListAsync(cancellationToken);
-        var joined = await db.AuditEvents.AsNoTracking().Where(e => e.EntityType == "User" && e.EntityId != null && e.ProjectId != null && joins.Contains(e.Action))
-            .GroupBy(e => new { User = e.EntityId!.Value, Project = e.ProjectId!.Value }).Select(g => new { g.Key, At = g.Min(e => e.At) }).ToListAsync(cancellationToken);
-        var acts = await db.AuditEvents.AsNoTracking().Where(e => e.ActorId != null && e.ProjectId != null)
-            .GroupBy(e => new { User = e.ActorId!.Value, Project = e.ProjectId!.Value }).Select(g => new { g.Key, At = g.Max(e => e.At), First = g.Min(e => e.At) }).ToListAsync(cancellationToken);
-        return (signedIn.ToDictionary(r => r.Key, r => r.At),
-            joined.ToDictionary(r => (r.Key.User, r.Key.Project), r => r.At),
-            acts.ToDictionary(r => (r.Key.User, r.Key.Project), r => r.At),
-            acts.ToDictionary(r => (r.Key.User, r.Key.Project), r => r.First));
+        // Written with each act (people_seen, audit_seen): never worked out again from the whole trail (owner).
+        var rows = await db.PeopleSeen.AsNoTracking().ToListAsync(cancellationToken);
+        var signIns = rows.Where(r => r.ProjectId == PersonSeen.SignIns && r.LastAt is not null).ToDictionary(r => r.UserId, r => r.LastAt!.Value);
+        var onProjects = rows.Where(r => r.ProjectId != PersonSeen.SignIns).ToList();
+        return (signIns,
+            onProjects.Where(r => r.JoinedAt is not null).ToDictionary(r => (r.UserId, r.ProjectId), r => r.JoinedAt!.Value),
+            onProjects.Where(r => r.LastAt is not null).ToDictionary(r => (r.UserId, r.ProjectId), r => r.LastAt!.Value),
+            onProjects.Where(r => r.FirstAt is not null).ToDictionary(r => (r.UserId, r.ProjectId), r => r.FirstAt!.Value));
     }
 
     /// <summary><c>POST /api/admin/users</c>: a new person. Their email signs them in to this organization alone.</summary>
@@ -268,6 +285,9 @@ public static class DirectoryEndpoints
     {
         // Invited: a password nobody knows until they choose their own from the link.
         var invite = request.Invite && string.IsNullOrEmpty(request.Password);
+        // A person is never given a password chosen by someone else, unless an administrator does it.
+        if (!string.IsNullOrEmpty(request.Password) && !await Keepers.ConfiguresAsync(http))
+            return Problems.Forbidden("ADMIN_ONLY", "Only an administrator sets someone's password: invite them, and they choose their own.");
         if (invite) request = request with { Password = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)) };
         var name = Blank(request.Name);
         var email = Blank(request.Email)?.ToLowerInvariant();
@@ -357,20 +377,38 @@ public static class DirectoryEndpoints
             user.Active = active;
         }
         if (request.IsAdmin is { } isAdmin && isAdmin != user.IsAdmin) { changes.Add(isAdmin ? "administrator" : "not an administrator"); user.IsAdmin = isAdmin; }
+        var passwordSet = false;
         if (!string.IsNullOrEmpty(request.Password))
         {
+            // Set by an administrator only (owner: as apps of the kind do), the person told at once and signed out
+            // everywhere. Never one's own: that is "Forgot password", which proves the email.
+            if (!await Keepers.ConfiguresAsync(http)) return Problems.Forbidden("ADMIN_ONLY", "Only an administrator sets someone's password.");
+            if (self) return Problems.Conflict("OWN_PASSWORD", "Your own password is changed from the sign-in page: Forgot password sends you a link.");
             if (await http.RequestServices.GetRequiredService<PasswordPolicy>().RefusalAsync(request.Password, cancellationToken) is { } weak) return weak;
             user.PasswordHash = hasher.HashPassword(user, request.Password);
             user.FailedSignIns = 0;
             user.LockedUntil = null;
-            changes.Add("new password");
+            changes.Add("new password set by an administrator");
+            passwordSet = true;
         }
         if (changes.Count == 0) return Results.NoContent();
         await db.SaveChangesAsync(cancellationToken);
         // Switched off, they are out at once; with other rights, their next request carries them.
-        await sessions.ForgetAllAsync(user.Id, revoke: !user.Active, cancellationToken);
-        await audit.WriteAsync(await ActorAsync(http, db, cancellationToken), "USER_UPDATED", "User", user.Id, user.Name,
+        // Switched off, or given a new password, they are out at once; with other rights, their next request carries them.
+        await sessions.ForgetAllAsync(user.Id, revoke: !user.Active || passwordSet, cancellationToken);
+        var by = await ActorAsync(http, db, cancellationToken);
+        await audit.WriteAsync(by, passwordSet ? "PASSWORD_SET" : "USER_UPDATED", "User", user.Id, user.Name,
             string.Join("; ", changes), cancellationToken: cancellationToken);
+        if (passwordSet)
+        {
+            // Told at once, by email and on Notifications (one act, so one email): never left to find out at the next sign-in.
+            await notifier.NotifyAsync(user.TenantId, null, [user.Id], NotificationKinds.General, "Your DELIOS password was changed",
+                $"{by.Name}, an administrator, set a new password on your account. To choose your own, use \"Forgot password\" on the sign-in page.",
+                null, cancellationToken, EmailKinds.Account,
+                $"{by.Name}, an administrator of your organization, set a new password on your DELIOS account ({user.Email}).\n\n" +
+                "You were signed out everywhere. Sign in with the password they give you; to choose your own instead, use " +
+                "\"Forgot password\" on the sign-in page.\n\nIf you did not expect this, tell your administrator.");
+        }
         await db.SaveChangesAsync(cancellationToken);
         // Switched off (or back on) here: the accounts standing for them in our partners' organizations follow.
         if (user.Active != wasActive && user.HomeTenantId is null) await organizations.FollowPersonAsync(user.Id, user.Active, cancellationToken);
@@ -383,7 +421,9 @@ public static class DirectoryEndpoints
     /// <summary><c>GET /api/admin/projects</c>: every project, with how many people are on it.</summary>
     private static async Task<IResult> ProjectsAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {
-        var projects = await db.Projects.AsNoTracking().OrderBy(p => p.Code).ToListAsync(cancellationToken);
+        // A training space put away (started again) is out of every list; the one open is listed, marked by its Space.
+        var projects = await db.Projects.AsNoTracking().Where(p => !(p.Space == Spaces.Training && p.Status == "ARCHIVED"))
+            .OrderBy(p => p.Code).ToListAsync(cancellationToken);
         var counts = await db.Memberships.AsNoTracking().Where(m => m.Active).GroupBy(m => m.ProjectId)
             .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
         var documents = await db.Documents.AsNoTracking().GroupBy(d => d.ProjectId)
@@ -396,6 +436,7 @@ public static class DirectoryEndpoints
             p.ContractRole,
             p.Kind,
             p.Status,
+            p.Space,
             p.StatusReason,
             p.StatusChangedByName,
             StatusChangedAt = p.StatusChangedAt?.ToDateTimeOffset(),
@@ -404,6 +445,7 @@ public static class DirectoryEndpoints
             CodeChangedAt = p.CodeChangedAt?.ToDateTimeOffset(),
             p.TimeZone,
             p.WeekendDays,
+            p.Country,
             p.ContentExtraction,
             CreatedAt = p.CreatedAt.ToDateTimeOffset(),
             Members = counts.FirstOrDefault(c => c.Key == p.Id)?.Count ?? 0,
@@ -431,15 +473,22 @@ public static class DirectoryEndpoints
         var name = Blank(request.Name);
         if (code is null || name is null) return Problems.Invalid("CODE_AND_NAME_REQUIRED", "A project has a code and a name.");
         if (code.Length > 32) return Problems.Invalid("CODE_TOO_LONG", "A project code has at most 32 characters.");
-        var zone = Blank(request.TimeZone) ?? "UTC";
-        if (DateTimeZoneProviders.Tzdb.GetZoneOrNull(zone) is null) return Problems.Invalid("TIME_ZONE_UNKNOWN", $"{zone} is not a time zone.");
+        // Where the site is: what was said, else the organization's defaults for new projects, else the app's.
+        var place = await Settings.ProjectPlace.OrganizationAsync(db, cancellationToken);
+        var zone = Blank(request.TimeZone) ?? place.TimeZone;
+        if (DateTimeZoneProviders.Tzdb.GetZoneOrNull(zone) is null) return Problems.Invalid("TIME_ZONE_UNKNOWN", $"{zone} is not a time zone.", new { field = "timeZone" });
+        var weekend = request.WeekendDays ?? place.WeekendDays;
+        if (Settings.ProjectPlace.WeekendRefusal(weekend) is { } badWeekend) return badWeekend;
+        var country = request.Country is null ? place.Country : Blank(request.Country)?.ToUpperInvariant();
+        if (Settings.ProjectPlace.CountryRefusal(country) is { } badCountry) return badCountry;
         if (await KindRefusedAsync(db, request.Kind, cancellationToken) is { } refusedKind) return refusedKind;
         // What the organization's form for opening a project insists on (Settings, Forms & fields).
         if (await Settings.FormRules.CheckAsync(db, null, "PROJECT", new Dictionary<string, bool>
-            {
-                ["startDate"] = request.StartDate is not null, ["endDate"] = request.EndDate is not null,
-                ["scopeStatement"] = !string.IsNullOrWhiteSpace(request.ScopeStatement),
-            }, null, cancellationToken) is { } formProblem) return formProblem;
+        {
+            ["startDate"] = request.StartDate is not null,
+            ["endDate"] = request.EndDate is not null,
+            ["scopeStatement"] = !string.IsNullOrWhiteSpace(request.ScopeStatement),
+        }, null, cancellationToken) is { } formProblem) return formProblem;
         var project = new Project
         {
             TenantId = http.User.TenantId(),
@@ -448,6 +497,8 @@ public static class DirectoryEndpoints
             ContractRole = Blank(request.ContractRole)?.ToUpperInvariant() ?? "GENERIC",
             Kind = Blank(request.Kind)?.ToUpperInvariant() ?? "GENERIC",
             TimeZone = zone,
+            WeekendDays = weekend.Distinct().Order().ToArray(),
+            Country = country,
             OpenedById = http.User.UserId(),
         };
         // A project's code and name are its own across DELIOS, for good: never given to another.
@@ -542,11 +593,18 @@ public static class DirectoryEndpoints
             changes.Add($"time zone → {zone}");
             project.TimeZone = zone;
         }
-        if (request.WeekendDays is { } days && !days.SequenceEqual(project.WeekendDays))
+        if (request.WeekendDays is { } days && !days.Distinct().Order().SequenceEqual(project.WeekendDays))
         {
-            if (days.Any(d => d is < 1 or > 7)) return Problems.Invalid("WEEKEND_INVALID", "Weekend days are numbered 1 (Monday) to 7 (Sunday).");
-            changes.Add($"weekend → {string.Join(",", days)}");
+            if (Settings.ProjectPlace.WeekendRefusal(days) is { } badWeekend) return badWeekend;
             project.WeekendDays = days.Distinct().Order().ToArray();
+            changes.Add($"weekend → {Settings.ProjectPlace.WeekendWords(project.WeekendDays)}");
+        }
+        // An empty country takes it off: the project then skips only the holidays kept for every country.
+        if (request.Country is { } said && (Blank(said)?.ToUpperInvariant() ?? null) is var country && country != project.Country)
+        {
+            if (Settings.ProjectPlace.CountryRefusal(country) is { } badCountry) return badCountry;
+            changes.Add($"country → {country ?? "none"}");
+            project.Country = country;
         }
         if (changes.Count == 0) return Results.NoContent();
         await db.SaveChangesAsync(cancellationToken);
@@ -588,6 +646,38 @@ public static class DirectoryEndpoints
         return Results.NoContent();
     }
 
+    /// <summary>
+    /// POST <c>/api/admin/projects/{projectId}/members/many</c>: the team list (owner: written whole, or not at all). Each
+    /// line goes the way adding someone by hand goes: a new account is invited to choose its password, then put on the
+    /// project with its function and department (held for confirmation where the project asks it); someone with an
+    /// account already is put on it, or their function and department changed. A check (<c>dry</c>) undoes it all.
+    /// </summary>
+    private static async Task<IResult> TeamAsync(Guid projectId, TeamLinesRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        IPasswordHasher<User> hasher, PasswordPolicy passwords, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider protection, Notifications.Notifier notifier,
+        CancellationToken cancellationToken)
+    {
+        if (request.People is not { Length: > 0 } people) return Problems.Invalid("NO_LINES", "The list has nobody on it.");
+        if (people.Length > 2000) return Problems.Invalid("TOO_MANY_LINES", "Bring in at most 2000 people at a time.");
+        var lines = await Batch.RunAsync(db, people.Select(p => p.At).ToList(), async i =>
+        {
+            var one = people[i];
+            var email = Blank(one.Email)?.ToLowerInvariant();
+            var known = email is null ? null : await db.Users.AsNoTracking().Where(u => u.Email == email).Select(u => (Guid?)u.Id).FirstOrDefaultAsync(cancellationToken);
+            object? made = null;
+            if (known is null)
+            {
+                var created = await CreateUserAsync(new CreateUserRequest(one.Name, email, null, one.PartyId, Invite: true), http, db, audit, hasher, passwords, protection, notifier, cancellationToken);
+                if (created is IStatusCodeHttpResult { StatusCode: >= 400 }) return created;
+                known = Batch.IdOf(created);
+                made = (created as IValueHttpResult)?.Value;
+            }
+            if (one.FunctionId is null) return Problems.Invalid("FUNCTION_REQUIRED", "Give the function they have on the project.");
+            var member = await MemberAsync(projectId, new MembershipRequest(known!.Value, one.FunctionId, Blank(one.Department)), http, db, audit, cancellationToken);
+            return member is IStatusCodeHttpResult { StatusCode: >= 400 } ? member : Results.Ok(made ?? new { Id = known });
+        }, request.Dry, cancellationToken);
+        return Batch.Answer(lines, request.Dry);
+    }
+
     private static async Task<IResult> MemberAsync(
         Guid projectId, MembershipRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
@@ -598,6 +688,15 @@ public static class DirectoryEndpoints
         var function = request.FunctionId is { } fid ? await db.Functions.AsNoTracking().SingleOrDefaultAsync(f => f.Id == fid && f.Active, cancellationToken) : null;
         if (request.FunctionId is not null && function is null) return Problems.Invalid("FUNCTION_UNKNOWN", "Choose one of the organization's functions.");
         var membership = await db.Memberships.SingleOrDefaultAsync(m => m.ProjectId == projectId && m.UserId == request.UserId, cancellationToken);
+        // A department is a discipline of the project's list, chosen, never typed (owner): a new one is refused unless it is
+        // one; what someone already held stays as it is until changed.
+        if (Blank(request.Department) is { } asked && asked != membership?.Department)
+        {
+            var catalog = await Documents.Catalog.LoadAsync(db, cancellationToken);
+            if (catalog.Find(ValueSets.Disciplines, asked) is not { } discipline)
+                return Problems.Invalid("DEPARTMENT_UNKNOWN", $"\"{asked}\" is not a discipline of this project: choose one from its list (Settings → Types & sets).");
+            request = request with { Department = discipline };
+        }
         // Who keeps the people here: the control function; where the project lets everyone add, whoever holds Manage
         // too (everyone else adds from the project directory). An administrator always may, and is never held for
         // confirmation: they set the project up.
@@ -608,6 +707,8 @@ public static class DirectoryEndpoints
         var withControl = await Settings.ProjectAnswers.ControlDoesAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken);
         if (!admin && !(await holds(Verbs.Control) || (!withControl && await holds(Verbs.Manage))))
             return Problems.Forbidden("PEOPLE_NOT_YOURS", $"On {project.Code} the control function keeps who is on the project.");
+        if (!admin && function is not null && function.Id != membership?.FunctionId && await Keepers.FunctionConfiguresAsync(db, function.Id, cancellationToken))
+            return Problems.Forbidden("ADMIN_ONLY", $"{function.Name} may configure: whoever holds it administers the organization. Only an administrator gives it.");
         // Joining waits for the confirmation of whoever holds Manage, where the project asks for it.
         var confirming = !admin && await Settings.ProjectAnswers.NeedsConfirmationAsync(db, projectId, "PROJECT_PEOPLE", cancellationToken);
         var changes = new List<string>();
@@ -735,6 +836,20 @@ public static class DirectoryEndpoints
     }
 
     /// <summary><c>PUT /api/admin/functions/{id}</c>: name, in use or not, and its matrix rows (replaced as a whole).</summary>
+    /// <summary>
+    /// POST <c>/api/admin/functions/rules/many</c>: a filled-in distribution matrix, every function it changes written as
+    /// one, through the same change as by hand; a check (<c>dry</c>) undoes it all.
+    /// </summary>
+    private static async Task<IResult> FunctionRulesAsync(FunctionRulesRequest request, HttpContext http, DeliosDbContext db, AuditLog audit,
+        CancellationToken cancellationToken)
+    {
+        if (request.Functions is not { Length: > 0 } functions) return Problems.Invalid("NO_LINES", "The matrix changes nothing.");
+        var lines = await Batch.RunAsync(db, functions.Select(f => f.At).ToList(),
+            i => UpdateFunctionAsync(functions[i].FunctionId, new UpdateFunctionRequest(Rules: functions[i].Rules), http, db, audit, cancellationToken),
+            request.Dry, cancellationToken);
+        return Batch.Answer(lines, request.Dry);
+    }
+
     private static async Task<IResult> UpdateFunctionAsync(
         Guid functionId, UpdateFunctionRequest request, HttpContext http, DeliosDbContext db, AuditLog audit, CancellationToken cancellationToken)
     {
@@ -799,7 +914,9 @@ public static class DirectoryEndpoints
         CancellationToken cancellationToken)
     {
         var links = await organizations.PartyLinksAsync(cancellationToken);
-        var parties = await db.Parties.AsNoTracking().OrderBy(p => p.Name).ToListAsync(cancellationToken);
+        // A training space's made-up organizations are read on that space only, never on the organization's list.
+        var parties = await db.Parties.AsNoTracking().Where(p => p.TrainingProjectId == null || p.TrainingProjectId == db.ListsProject)
+            .OrderBy(p => p.Name).ToListAsync(cancellationToken);
         var identityIds = parties.Where(p => p.OrganizationId != null).Select(p => p.OrganizationId!.Value).ToList();
         var identities = await db.OrganizationIdentities.AsNoTracking().Where(o => identityIds.Contains(o.Id)).ToDictionaryAsync(o => o.Id, cancellationToken);
         var people = await db.Users.AsNoTracking().Where(u => u.PartyId != null && u.Active).GroupBy(u => u.PartyId)
@@ -832,7 +949,8 @@ public static class DirectoryEndpoints
         var peopleOf = (await db.Users.AsNoTracking().Where(u => u.PartyId != null).Select(u => new { u.Id, u.PartyId }).ToListAsync(cancellationToken))
             .GroupBy(u => u.PartyId!.Value).ToDictionary(g => g.Key, g => g.Select(u => u.Id).ToList());
         // Joined a project: the earliest of the day it was put on it and the day its people first came or acted there.
-        var seats = await db.Memberships.AsNoTracking().Select(m => new { m.UserId, m.ProjectId, m.ConfirmedAt }).ToListAsync(cancellationToken);
+        var seats = (await db.Memberships.AsNoTracking().Where(m => m.ConfirmedAt != null).Select(m => new { m.UserId, m.ProjectId, m.ConfirmedAt })
+            .ToListAsync(cancellationToken)).GroupBy(m => (m.UserId, m.ProjectId)).ToDictionary(g => g.Key, g => g.Min(m => m.ConfirmedAt!.Value));
         DateTimeOffset Joined(Guid partyId, Guid projectId, Instant added)
         {
             var earliest = added;
@@ -841,7 +959,7 @@ public static class DirectoryEndpoints
                 {
                     if (seen.Joined.TryGetValue((id, projectId), out var j) && j < earliest) earliest = j;
                     if (seen.FirstActs.TryGetValue((id, projectId), out var f) && f < earliest) earliest = f;
-                    if (seats.FirstOrDefault(m => m.UserId == id && m.ProjectId == projectId)?.ConfirmedAt is { } c && c < earliest) earliest = c;
+                    if (seats.TryGetValue((id, projectId), out var c) && c < earliest) earliest = c;
                 }
             return earliest.ToDateTimeOffset();
         }
@@ -854,6 +972,7 @@ public static class DirectoryEndpoints
             p.Code,
             p.Name,
             p.IsInternal,
+            p.TrainingProjectId,
             p.Active,
             p.Participation,
             p.CustodianFunction,
@@ -884,7 +1003,13 @@ public static class DirectoryEndpoints
             LinkedAt = linkedAt.TryGetValue(p.Id, out var at) ? at : (DateTimeOffset?)null,
             Projects = taking.Where(r => r.PartyId == p.Id).OrderBy(r => r.AddedAt).Select(r => new
             {
-                Id = r.ProjectId, r.Code, r.Name, r.Status, r.Role, r.Active, r.ContractNumber,
+                Id = r.ProjectId,
+                r.Code,
+                r.Name,
+                r.Status,
+                r.Role,
+                r.Active,
+                r.ContractNumber,
                 JoinedAt = Joined(p.Id, r.ProjectId, r.AddedAt),
                 StartDate = Day(infos.GetValueOrDefault(r.ProjectId), "startDate"),
                 EndDate = Day(infos.GetValueOrDefault(r.ProjectId), "endDate"),
@@ -905,10 +1030,11 @@ public static class DirectoryEndpoints
         var actor = await ActorAsync(http, db, cancellationToken);
         // What the organization's form for adding an organization insists on (Settings, Forms & fields), for one created here.
         if (request.IdentityId is null && await Settings.FormRules.CheckAsync(db, null, "PARTY", new Dictionary<string, bool>
-            {
-                ["contactId"] = request.ContactId is not null, ["backupId"] = request.BackupId is not null,
-                ["liaisonFunction"] = !string.IsNullOrWhiteSpace(request.CarriedBy),
-            }, null, cancellationToken) is { } formProblem) return formProblem;
+        {
+            ["contactId"] = request.ContactId is not null,
+            ["backupId"] = request.BackupId is not null,
+            ["liaisonFunction"] = !string.IsNullOrWhiteSpace(request.CarriedBy),
+        }, null, cancellationToken) is { } formProblem) return formProblem;
         Party party;
         Organizations.OrganizationIdentity identity;
         if (request.IdentityId is { } known)
@@ -1121,6 +1247,7 @@ public static class Keepers
         if (http.User.IsAdmin()) return true;
         var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
         var me = http.User.UserId();
+        if (!await OursAsync(db, me, http.RequestAborted)) return false;
         return await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
             && db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Configure)), http.RequestAborted);
     }
@@ -1136,8 +1263,9 @@ public static class Keepers
         if (await ConfiguresAsync(http)) return await next(context);
         var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
         var me = http.User.UserId();
-        var keeps = await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
-            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control) || r.Verbs.Contains(Verbs.Manage))), http.RequestAborted);
+        var keeps = await OursAsync(db, me, http.RequestAborted) && await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
+            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null)
+                && (r.Verbs.Contains(Verbs.Control) || r.Verbs.Contains(Verbs.Manage)))), http.RequestAborted);
         return keeps
             ? await next(context)
             : Problems.Forbidden("ADMIN_OR_CONTROL", "An administrator, the control function or whoever holds Manage keeps the project's people.");
@@ -1149,10 +1277,39 @@ public static class Keepers
         if (await ConfiguresAsync(http)) return await next(context);
         var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
         var me = http.User.UserId();
-        var control = await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
+        var control = await OursAsync(db, me, http.RequestAborted) && await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
             && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null) && r.Verbs.Contains(Verbs.Control))), http.RequestAborted);
         return control
             ? await next(context)
             : Problems.Forbidden("ADMIN_OR_CONTROL", "An administrator, or the control function, keeps the organization's people and functions.");
     }
+
+    /// <summary>Whether the person signed in is one of our own people (not another organization's).</summary>
+    public static Task<bool> IsOursAsync(HttpContext http) =>
+        OursAsync(http.RequestServices.GetRequiredService<DeliosDbContext>(), http.User.UserId(), http.RequestAborted);
+
+    /// <summary>One of ours who keeps a project: acts as its control function, or holds Control or Manage there.</summary>
+    public static async Task<bool> KeepsAProjectAsync(HttpContext http)
+    {
+        var db = http.RequestServices.GetRequiredService<DeliosDbContext>();
+        var me = http.User.UserId();
+        return await OursAsync(db, me, http.RequestAborted) && await db.Memberships.AnyAsync(m => m.UserId == me && m.Active && m.Function!.Active
+            && (m.ActsAsControl || db.PermissionRules.IgnoreQueryFilters().Any(r => r.FunctionId == m.FunctionId && r.ProjectId == (m.Project!.OwnFunctions ? (Guid?)m.ProjectId : null)
+                && (r.Verbs.Contains(Verbs.Control) || r.Verbs.Contains(Verbs.Manage)))), http.RequestAborted);
+    }
+
+    /// <summary>
+    /// One of our own people: not an account standing for someone of another organization's DELIOS, nor one we made
+    /// for another organization's people. Only ours keep the organization's people, organizations and settings, whatever
+    /// function they hold on a project.
+    /// </summary>
+    private static Task<bool> OursAsync(DeliosDbContext db, Guid userId, CancellationToken cancellationToken) =>
+        db.Users.AnyAsync(u => u.Id == userId && u.HomeTenantId == null && (u.Party == null || u.Party.IsInternal), cancellationToken);
+
+    /// <summary>
+    /// Whether a function may configure: on the organization's rules or on any project's own copy. Holding it makes its
+    /// holders administrators of the organization, so only an administrator gives it to someone.
+    /// </summary>
+    public static Task<bool> FunctionConfiguresAsync(DeliosDbContext db, Guid functionId, CancellationToken cancellationToken) =>
+        db.PermissionRules.IgnoreQueryFilters().AnyAsync(r => r.FunctionId == functionId && r.Verbs.Contains(Verbs.Configure), cancellationToken);
 }

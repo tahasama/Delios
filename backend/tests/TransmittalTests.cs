@@ -32,7 +32,8 @@ public sealed class TransmittalTests(Infrastructure infrastructure) : IClassFixt
         Assert.True(status == HttpStatusCode.OK, decided.ToString());
         if (controller is not null)
         {
-            var (released, body) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), new { });
+            // The decider said who receives it: the release sends it there; else whoever releases names someone.
+            var (released, body) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), issue is null ? await Flow.ReleaseBodyAsync(controller) : new { });
             Assert.True(released == HttpStatusCode.OK, body.ToString());
         }
         return id;
@@ -61,7 +62,16 @@ public sealed class TransmittalTests(Infrastructure infrastructure) : IClassFixt
         var controller = await app.SignedInAsync("controller@demo.local");
         var viewer = await app.SignedInAsync("viewer@demo.local");
         var p = await Flow.RevisionAsync(engineer);
-        await ReleasedAsync(engineer, approver, controller, p);
+        // Here released and issued are kept apart (POLICY_RELEASE = SEPARATE): released, it waits to be asked for.
+        var keeper = await app.SignedInAsync("admin@demo.local");
+        using (var separate = await keeper.PutAsJsonAsync($"/api/projects/{p.Project}/settings/POLICY_RELEASE", new { value = "SEPARATE" }))
+            Assert.True(separate.IsSuccessStatusCode, await separate.Content.ReadAsStringAsync());
+        var (_, review) = await Flow.PostAsync(engineer, P(p, $"/revisions/{p.Revision}/reviews"), new { });
+        var reviewId = review.GetProperty("id").GetGuid();
+        await Flow.PostAsync(engineer, P(p, $"/reviews/{reviewId}/answer"), new { });
+        await Flow.PostAsync(approver, P(p, $"/reviews/{reviewId}/answer"), new { verdict = "C1", status = "IFC" });
+        var (releasedApart, releasedApartBody) = await Flow.PostAsync(controller, P(p, $"/reviews/{reviewId}/release"), new { });
+        Assert.True(releasedApart == HttpStatusCode.OK, releasedApartBody.ToString());
 
         // Released, never sent: in use, and nobody told.
         var notIssued = await GetAsync(controller, P(p, "/not-issued"));
@@ -229,7 +239,7 @@ public sealed class TransmittalTests(Infrastructure infrastructure) : IClassFixt
         Assert.Equal("Northwater Utility (recorded by Carla Control)", recorded.GetProperty("comments")[0].GetProperty("author").GetString());
         Assert.Equal("DECIDED", recorded.GetProperty("state").GetString());
 
-        var (_, released) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), new { });
+        var (_, released) = await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), await Flow.ReleaseBodyAsync(controller));
         Assert.Equal("RELEASED", released.GetProperty("state").GetString());
 
         // The proof is filed against the revision and scanned; the revision's own files are untouched.
@@ -288,7 +298,7 @@ public sealed class TransmittalTests(Infrastructure infrastructure) : IClassFixt
 
         // A review transmittal is not an issue: the release is still not sent.
         var controller = await app.SignedInAsync("controller@demo.local");
-        await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), new { });
+        await Flow.PostAsync(controller, P(p, $"/reviews/{id}/release"), await Flow.ReleaseBodyAsync(controller));
         var notIssued = await GetAsync(controller, P(p, "/not-issued"));
         Assert.Contains(notIssued.EnumerateArray(), x => x.GetProperty("revisionId").GetGuid() == p.Revision);
     }

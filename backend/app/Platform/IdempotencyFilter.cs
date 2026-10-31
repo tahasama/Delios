@@ -45,7 +45,7 @@ public sealed class IdempotencyFilter(DeliosDbContext db, IOptions<JsonOptions> 
         {
             if (earlier.Endpoint != endpoint || earlier.RequestHash != requestHash)
             {
-                return Problems.Invalid("IDEMPOTENCY_KEY_REUSED", "This Idempotency-Key was used for a different request.");
+                return Problems.Invalid("IDEMPOTENCY_KEY_REUSED", "This was already sent from this form. Open the page again to see what it did.");
             }
             http.Response.Headers["Idempotent-Replayed"] = "true";
             return Results.Content(earlier.Body ?? "null", "application/json", Encoding.UTF8, earlier.StatusCode);

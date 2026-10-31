@@ -7,11 +7,15 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Delios.Tests;
 
-/// <summary>Reading inside files: off unless the project's client allows it, and nothing kept once switched off.</summary>
+/// <summary>
+/// Files are never read (owner: "never ever read the files… forbidden forever, unless I get back on that with a
+/// client's request"): no switch turns reading on, nothing is asked of the extraction service, and search finds a
+/// document by its number and title only.
+/// </summary>
 public sealed class ExtractionTests(Infrastructure infrastructure) : IClassFixture<Infrastructure>
 {
-    private static Task<TestApp> StartAsync(Infrastructure infrastructure, FakeTika tika, bool installed = true) =>
-        TestApp.StartAsync(infrastructure, s => { if (installed) s["Extraction:Url"] = "http://tika.test"; },
+    private static Task<TestApp> StartAsync(Infrastructure infrastructure, FakeTika tika) =>
+        TestApp.StartAsync(infrastructure, s => s["Extraction:Url"] = "http://tika.test",
             s => s.AddHttpClient(ExtractionProcessor.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => tika));
 
     private static async Task<IReadOnlyList<string>> FoundAsync(HttpClient client, Guid project, string q)
@@ -20,25 +24,8 @@ public sealed class ExtractionTests(Infrastructure infrastructure) : IClassFixtu
         return result.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("title").GetString()!).ToList();
     }
 
-    private static async Task<IReadOnlyList<string>> UntilFoundAsync(HttpClient client, Guid project, string q)
-    {
-        for (var i = 0; i < 100; i++)
-        {
-            var found = await FoundAsync(client, project, q);
-            if (found.Count > 0) return found;
-            await Task.Delay(200);
-        }
-        return [];
-    }
-
-    private static async Task<HttpStatusCode> ModeAsync(HttpClient admin, Guid project, string mode)
-    {
-        using var response = await admin.PutAsJsonAsync($"/api/admin/projects/{project}/extraction", new { mode });
-        return response.StatusCode;
-    }
-
     [Fact]
-    public async Task Files_are_read_only_once_the_project_allows_it_and_forgotten_when_it_stops()
+    public async Task Files_are_never_read_whatever_is_asked_and_search_reads_the_number_and_title()
     {
         var tika = new FakeTika("Duty pump curve: duty point 42 m head at 120 l/s.");
         await using var app = await StartAsync(infrastructure, tika);
@@ -46,61 +33,24 @@ public sealed class ExtractionTests(Infrastructure infrastructure) : IClassFixtu
         var engineer = await app.SignedInAsync("engineer@demo.local");
         var admin = await app.SignedInAsync("admin@demo.local");
         var p = await Flow.RevisionAsync(engineer);
-        var extract = $"/api/projects/{p.Project}/revisions/{p.Revision}/extract";
 
-        // Off by default: nothing is read, and asking is refused.
-        var (off, offBody) = await Flow.PostAsync(engineer, extract, new { });
-        Assert.Equal((HttpStatusCode.Conflict, "EXTRACTION_OFF"), (off, Flow.Code(offBody)));
+        // No switch turns reading on.
+        foreach (var mode in new[] { "ON_DEMAND", "AUTOMATIC" })
+        {
+            using var switched = await admin.PutAsJsonAsync($"/api/admin/projects/{p.Project}/extraction", new { mode });
+            Assert.Equal((HttpStatusCode.Conflict, "CONTENT_NOT_READ"), await Api.ProblemAsync(switched));
+        }
+
+        // Asking for a revision or the whole project to be read is refused.
+        var (one, oneBody) = await Flow.PostAsync(engineer, $"/api/projects/{p.Project}/revisions/{p.Revision}/extract", new { });
+        Assert.Equal((HttpStatusCode.Conflict, "CONTENT_NOT_READ"), (one, Flow.Code(oneBody)));
+        var (all, allBody) = await Flow.PostAsync(admin, $"/api/projects/{p.Project}/extract", new { });
+        Assert.Equal((HttpStatusCode.Conflict, "CONTENT_NOT_READ"), (all, Flow.Code(allBody)));
+
+        // Nothing was sent to the service; search finds the title, never what the file says.
         Assert.Empty(tika.Requests);
-        Assert.Equal(HttpStatusCode.Forbidden, await ModeAsync(engineer, p.Project, "ON_DEMAND"));
-
-        // On demand: read when somebody asks, then found by what it says.
-        Assert.Equal(HttpStatusCode.OK, await ModeAsync(admin, p.Project, "ON_DEMAND"));
-        var (queued, body) = await Flow.PostAsync(engineer, extract, new { });
-        Assert.Equal(HttpStatusCode.Accepted, queued);
-        Assert.Equal(1, body.GetProperty("queued").GetInt32());
-        Assert.Equal(["Inlet works general arrangement"], await UntilFoundAsync(engineer, p.Project, "duty point"));
-        var request = tika.Requests.Single();
-        Assert.Equal(("auto", "eng"), (request.OcrStrategy, request.Language));
-
-        // Asking again reads nothing twice.
-        var (_, again) = await Flow.PostAsync(engineer, extract, new { });
-        Assert.Equal(0, again.GetProperty("queued").GetInt32());
-
-        // Switched off: every text read is deleted, and searches stop finding it.
-        using var switched = await admin.PutAsJsonAsync($"/api/admin/projects/{p.Project}/extraction", new { mode = "OFF" });
-        Assert.Equal(1, (await switched.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("purged").GetInt32());
+        Assert.Equal(["Inlet works general arrangement"], await FoundAsync(engineer, p.Project, "inlet works"));
         Assert.Empty(await FoundAsync(engineer, p.Project, "duty point"));
-    }
-
-    [Fact]
-    public async Task On_automatic_every_new_file_is_read_once_it_has_passed_scanning()
-    {
-        var tika = new FakeTika("Cable schedule for the inlet switchroom.");
-        await using var app = await StartAsync(infrastructure, tika);
-        app.StartWorker();
-        var admin = await app.SignedInAsync("admin@demo.local");
-        var engineer = await app.SignedInAsync("engineer@demo.local");
-        Assert.Equal(HttpStatusCode.OK, await ModeAsync(admin, await Api.ProjectIdAsync(engineer), "AUTOMATIC"));
-        var p = await Flow.RevisionAsync(engineer);
-
-        Assert.Equal(["Inlet works general arrangement"], await UntilFoundAsync(engineer, p.Project, "switchroom"));
-    }
-
-    [Fact]
-    public async Task Without_the_extraction_service_installed_asking_says_so()
-    {
-        await using var app = await StartAsync(infrastructure, new FakeTika(""), installed: false);
-        var admin = await app.SignedInAsync("admin@demo.local");
-        var engineer = await app.SignedInAsync("engineer@demo.local");
-        var project = await Api.ProjectIdAsync(engineer);
-        await ModeAsync(admin, project, "ON_DEMAND");
-        var status = await admin.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{project}/extraction");
-        Assert.False(status.GetProperty("installed").GetBoolean());
-
-        var (refused, body) = await Flow.PostAsync(engineer, $"/api/projects/{project}/revisions/{Guid.NewGuid()}/extract", new { });
-
-        Assert.Equal((HttpStatusCode.Conflict, "EXTRACTION_NOT_INSTALLED"), (refused, Flow.Code(body)));
     }
 }
 

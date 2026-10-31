@@ -51,13 +51,13 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
     getActiveSet("REASONS_FOR_ISSUE"),
     getActiveSet("STATUSES"),
     getActiveSet("REVIEW_ADVICE"),
-    (level === "organization" ? api<ListSets>("/api/admin/lists") : requireScope().then((scope) => api<ListSets>(projectPath(scope, "/lists")))).catch(() => ({ lists: [] }) as ListSets),
+    (level === "organization" ? api<ListSets>("/api/admin/lists", { keep: { areas: [] } }) : requireScope().then((scope) => api<ListSets>(projectPath(scope, "/lists"), { keep: { areas: [] } }))).catch(() => ({ lists: [] }) as ListSets),
   ]);
   const organizations = outsideParties.map((p) => ({ code: p.code, name: p.name }));
   const parties = outsideParties.map((p) => ({ id: p.id, name: p.name, participation: p.participation }));
   // The sets of the review outcomes (each verdict with its meaning) and of the review advice; none named, a route
   // answers from the set serving each document's deliverable type.
-  const outcomeSets = await api<{ key: string; title: string; verdicts: { code: string; label: string; status: string; meaning: string | null }[] }[]>("/api/admin/verdict-lists").catch(() => []);
+  const outcomeSets = await api<{ key: string; title: string; verdicts: { code: string; label: string; status: string; meaning: string | null }[] }[]>("/api/admin/verdict-lists", { keep: { areas: [] } }).catch(() => []);
   const adviceSets = (lists.lists.find((l) => l.key === "REVIEW_ADVICE")?.sets ?? []).map((s) => ({ key: s.name, title: s.name }));
   const classOptions = {
     documentTypes: classValues.filter((value) => value.setKey === "DOCUMENT_TYPES").map(({ code, label }) => ({ code, label })),
@@ -207,7 +207,7 @@ export async function RoutesBoard({ level, editable, lead, editing, adding }: {
                           <p className="mt-1 text-[13px] font-semibold text-slate-900">{s.title || (decides ? "Decision" : `Review ${i + 1}`)}</p>
                           <p className={`mt-1 text-[11px] leading-4 ${who.length ? "text-slate-700" : "text-amber-700"}`}>{who.length ? who.join(", ") : "Nobody named: the sender names them"}</p>
                           {party && s.reason ? <p className="mt-0.5 text-[11px] text-slate-500">on a transmittal, {reasonChoices.find((r) => r.code === s.reason)?.label ?? s.reason}</p> : null}
-                          {who.length > 1 ? <p className="mt-0.5 text-[11px] text-slate-500">{s.mode === "ANY_OF" ? "whoever gets to it first" : "all of them, any order"}</p> : null}
+                          {who.length > 1 ? <p className="mt-0.5 text-[11px] text-slate-500">{s.mode === "ANY_OF" ? "the first answer moves it on" : "waits for every one, any order"}</p> : null}
                           <p className="mt-1.5 border-t border-line pt-1.5 text-[11px] text-slate-500">
                             {s.days ? `${s.days} working day${s.days === 1 ? "" : "s"}` : "no days: no due date"}
                             {last && s.grantsStatuses?.length ? <> · {s.grantsStatuses.length === 1 ? "releases at" : "releases at one of"} {s.grantsStatuses.join(", ")}</> : null}

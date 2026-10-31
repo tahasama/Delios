@@ -13,6 +13,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra
 WORKDIR /app
 COPY --from=build /out .
 EXPOSE 8080 9091
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# Each check starts the app once more to ask it: often while starting, then every 5 minutes.
+HEALTHCHECK --interval=5m --timeout=10s --start-period=60s --start-interval=3s --retries=3 \
   CMD ["dotnet", "Delios.Host.dll", "healthcheck"]
+# Said outright, though the chiseled image already runs as this user (1654).
+USER $APP_UID
 ENTRYPOINT ["dotnet", "Delios.Host.dll"]

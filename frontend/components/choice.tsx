@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { inputCls } from "@/components/ui";
+import { Floating } from "@/components/floating";
 
 export type ChoiceOption = { value: string; label: string; hint?: string };
 
@@ -28,12 +29,13 @@ export function Choice({ name, options, defaultValue = "", placeholder = "Choose
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const box = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const list = useId();
   const chosen = options.find((one) => one.value === value);
 
   useEffect(() => {
     if (!open) return;
-    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node)) setOpen(false); };
+    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", away);
     return () => document.removeEventListener("mousedown", away);
   }, [open]);
@@ -72,8 +74,9 @@ export function Choice({ name, options, defaultValue = "", placeholder = "Choose
         <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform duration-150", open && "rotate-180")} aria-hidden="true" />
       </button>
       {open ? (
+        <Floating anchor={box} panel={panel} width="at-least">
         <ul id={list} role="listbox" aria-label={label}
-          className="scroll-thin absolute left-0 z-30 mt-1 max-h-80 min-w-full overflow-y-auto rounded-md bg-surface py-1 shadow-lg ring-1 ring-line">
+          className="scroll-thin min-h-0 flex-1 overflow-y-auto py-1">
           {options.map((one, index) => {
             const on = one.value === value;
             return (
@@ -88,6 +91,7 @@ export function Choice({ name, options, defaultValue = "", placeholder = "Choose
             );
           })}
         </ul>
+        </Floating>
       ) : null}
     </div>
   );

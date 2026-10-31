@@ -32,6 +32,8 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
   const guest = takeGuestAccount ? { host: String(formData.get("guestHost") ?? ""), organization: String(formData.get("guestOrganization") ?? "") } : undefined;
 
   if (!organizationName) return { error: "Your organization needs a name.", values };
+  const acceptTerms = formData.get("acceptTerms") === "on";
+  if (!acceptTerms) return { error: "Accept the terms of service and the data processing agreement to register your organization.", values, guest };
   if (!name || !email) return { error: "Your name and email are required.", values };
   if (!takeGuestAccount) {
     if (password.length < 8) return { error: "A password has at least 8 characters.", values };
@@ -45,7 +47,7 @@ export async function signupAction(_prev: SignupState | undefined, formData: For
       method: "POST",
       device: await deviceId(),
       body: {
-        organizationName, name, email, password, takeGuestAccount, turnstile: String(formData.get("cf-turnstile-response") ?? "") || undefined,
+        organizationName, name, email, password, takeGuestAccount, acceptTerms, turnstile: String(formData.get("cf-turnstile-response") ?? "") || undefined,
       },
     });
   } catch {

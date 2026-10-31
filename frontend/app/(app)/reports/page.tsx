@@ -1,14 +1,18 @@
 import Link from "next/link";
+import { CountUp } from "@/components/count-up";
+import { TabLink } from "@/components/tab-link";
 import { Download, X, FileSpreadsheet } from "lucide-react";
 import { requireScope } from "@/lib/core/scope";
 import { DataTable, Th, Td, ToneChip, inputCls, btn } from "@/components/ui";
 import { when } from "@/app/(app)/home-parts";
 import { FindBox } from "./find-box";
 import { PrintButton } from "./print-button";
+import { CountAgainButton } from "./count-again";
 import { fromToday } from "@/lib/core/days";
 import {
   buildReport, CUTS, OUTSIDE_REPORT_IDS, REPORT_IDS, REPORT_TITLES, WINDOWS,
   type Bar, type Cell, type Chart, type ReportId, type ReportQuery, type Segment,
+  reportQuery,
 } from "@/lib/conformance/reports";
 
 export const dynamic = "force-dynamic";
@@ -34,16 +38,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // A day to come is refused by the backend; the page asks for one before it counts.
   const needsDay = current === "asof" && !asked.on;
   const tabs = offered.map((id) => ({ id, title: REPORT_TITLES[id] }));
-  const tabClass = (on: boolean) =>
-    `-mb-px shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 text-[12px] leading-4 transition ${
-      on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"
-    }`;
+  // The tabs as they were, on a quiet band with a hairline between each (owner); the open one on the page's surface.
   const nav = (on: string) => tabs.length > 1 ? (
-    <nav aria-label="Reports" className="no-print scroll-thin flex gap-x-5 overflow-x-auto border-t border-line px-5 pt-3 sm:px-6">
+    <nav aria-label="Reports" className="strip strip-full no-print">
       {tabs.map((t) => (
-        <Link key={t.id} href={`/reports?r=${t.id}`} scroll={false} aria-current={on === t.id ? "page" : undefined} className={tabClass(on === t.id)}>
+        <TabLink key={t.id} href={`/reports?r=${t.id}`} active={on === t.id} className="strip-tab">
           {t.title}
-        </Link>
+        </TabLink>
       ))}
     </nav>
   ) : null;
@@ -87,12 +88,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <p className="mt-0.5 max-w-2xl text-xs leading-5 text-slate-500">
               {report?.audience ?? "Audits, claims and “what did we build from?”: the register as it stood at the end of that day."}
               {report ? <> · counted <span className="no-print">{when(new Date(report.countedAt))}</span>
-                <span className="print-only">{new Date(report.countedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</span></> : null}
+                <span className="print-only">{new Date(report.countedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</span>
+                {report.countedBy ? <> by {report.countedBy}</> : null}; it stays so until counted again</> : null}
               {!ctx.user.isInternal ? <> · your organization&rsquo;s documents only</> : null}
             </p>
           </div>
           {report ? (
             <div className="no-print flex shrink-0 flex-wrap items-center gap-2">
+              <CountAgainButton id={current} query={Object.fromEntries(Object.entries(reportQuery(current, asked)).filter(([k]) => k !== "q" && k !== "bar"))} />
               {/* An icon says it (owner); Excel's green, faintly, says which file. */}
               <a href={download("xlsx")} title={narrowed ? "Download the lines shown, in Excel" : "Download the lines below, in Excel"}
                 aria-label="Download in Excel" className="ask inline-flex items-center"><FileSpreadsheet className="h-3.5 w-3.5 text-emerald-700" aria-hidden="true" /></a>
@@ -120,7 +123,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             {report.figures.map((f) => (
               <div key={f.label} className="rounded-md px-3 py-2.5 ring-1 ring-line">
                 <p className="text-xs text-slate-600">{f.label}</p>
-                <p className={`mt-0.5 text-xl font-semibold tabular-nums ${TEXT[f.tone ?? ""] ?? "text-slate-900"}`}>{f.value}</p>
+                <p className={`mt-0.5 text-xl font-semibold tabular-nums ${TEXT[f.tone ?? ""] ?? "text-slate-900"}`}><CountUp id={`report:${ctx.projectId}:${current}:${f.label}`} value={f.value} /></p>
                 {f.change ? <p className={`mt-0.5 text-[11px] ${f.changeTone ? TEXT[f.changeTone] : "text-slate-500"}`}>{f.change}</p> : null}
               </div>
             ))}
@@ -310,7 +313,7 @@ function BarChart({ chart, chosen, hrefOf }: ChartProps) {
                 {b.label}
               </Link>
               <span className="flex h-4 overflow-hidden rounded-sm bg-tint-soft" role="img" aria-label={`${b.label}: ${counts}`}>
-                <span className="flex h-full" style={{ width: `${(total / max) * 100}%` }}><Stack segments={segments} bar={b} /></span>
+                <span className="bar-build flex h-full" style={{ width: `${(total / max) * 100}%` }}><Stack segments={segments} bar={b} /></span>
               </span>
               <span className="w-10 text-right font-semibold tabular-nums text-slate-700">{chart.unit === "days" ? `${total} d` : total}</span>
             </li>

@@ -22,6 +22,7 @@ import { noticesAbout, noticeHistory } from "@/lib/actions/api";
 import { NotifyPanel } from "@/components/notify-panel";
 import { fromToday } from "@/lib/core/days";
 import { NoAccess } from "../no-access";
+import { accessWords } from "@/lib/settings/access-words";
 import { SomeoneJoins } from "./join-form";
 import { JumpPick } from "@/components/jump-pick";
 
@@ -59,7 +60,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
     projectSettings(projectId).catch(() => new Map<string, string>()),
     holdersOf(ctx, "MANAGE").catch(() => []),
     projectOrganizations(ctx).catch(() => []),
-    api<Pending[]>(projectPath(ctx, "/people/pending")).catch(() => [] as Pending[]),
+    api<Pending[]>(projectPath(ctx, "/people/pending"), { keep: { areas: [] } }).catch(() => [] as Pending[]),
   ]);
 
   // Whether someone put on here goes straight on, or is asked first (the backend decides the same way).
@@ -112,10 +113,11 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-4">
-      {/* The masthead: who is here, and how someone joins. */}
-      <section className="register register-sheet register-sheet-open">
-        <div className="flex flex-col gap-3 px-5 pt-6 pb-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1">
+      {/* The masthead: who is here, and how someone joins; its acts on its right, the form opening under it. */}
+      <SomeoneJoins
+        projectCode={project.code}
+        projectName={project.name}
+        plate={<>
             <h1 className="plate-title text-slate-950">People &amp; access</h1>
             <p className="plate-meta mt-2">
               {onProject.length} on {project.code}
@@ -130,22 +132,14 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
               {admin ? " As an administrator, what you add goes straight on." : ""}
               {" "}<Link href="/settings/flow#join/join-asked" className="font-semibold text-link hover:underline">Change it in the Control room</Link>.
             </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Link href="/import?kind=people" className="ask">Add a whole team from a spreadsheet</Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Someone joins: one sheet; the act chosen turns it into its form. */}
-      <SomeoneJoins
-        projectCode={project.code}
+          </>}
+        plateActs={<Link href="/import?kind=people" className="ask">Add a whole team from a spreadsheet</Link>}
         sentence={asks ? "asked first; confirmed, they are put on and told" : "they are put on at once and told"}
         mayAdd={mayAdd}
         people={notHere.map((u) => ({ id: u.id, name: u.name, detail: [u.partyName, u.email].filter(Boolean).join(" · ") }))}
         ourParties={ourParties.map((p) => ({ value: p.id, label: p.name }))}
         guestParties={guestParties.map((p) => ({ value: p.id, label: `${p.name}${takesPart.has(p.id) ? "" : ` (not taking part in ${project.code} yet)`}` }))}
-        functions={functions.map((f) => ({ value: f.id, label: f.name }))}
+        functions={functions.map((f) => ({ value: f.id, label: f.name, allows: accessWords(f.rules.flatMap((r) => r.verbs)) }))}
         disciplines={disciplines.map((d) => ({ value: d.code, label: d.label }))}
         confirmers={confirmers}
         asks={asks}
@@ -295,7 +289,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
                   // The person's line opened under it: the row itself goes on, the new-document form's way (grey
                   // fields side by side, then the strip with Cancel and Save), never a box inside the table.
                   <tr>
-                    <td colSpan={columns} className="border-b border-line p-0">
+                    <td colSpan={columns} className="open-in border-b border-line p-0">
                       <ActionForm id={`person-form-${u.id}`} action={savePersonAction} hideSubmit hidden={{ userId: u.id, partyId: u.partyId ?? "" }}
                         className="asking space-y-5 px-5 py-5 sm:px-6">
                         {u.linked ? (

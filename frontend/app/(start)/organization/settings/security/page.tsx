@@ -9,9 +9,11 @@ import { adminUsers } from "@/lib/settings/api-admin";
 import { setMfaRequiredAction, resetMfaAction, setSsoAction, setPasswordSignInAction } from "@/lib/account/forms-security";
 import { SwitchField } from "@/components/switch";
 import { Field, inputCls } from "@/components/ui";
+import { orgSettings } from "@/lib/settings/api";
+import { TrackingSheet } from "../../tracking";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Sign-in & security" };
+export const metadata = { title: "Security & privacy" };
 
 type Security = {
   slug: string; mfaRequired: boolean; passwordSignIn: boolean; mfaEnrolled: { enrolled: number; of: number };
@@ -26,7 +28,7 @@ type Security = {
 export default async function SecurityPage({ searchParams }: { searchParams: Promise<{ sso?: string }> }) {
   const { sso: opening } = await searchParams;
   await requireOrgAdmin();
-  const security = await api<Security>("/api/admin/security");
+  const [security, settings] = await Promise.all([api<Security>("/api/admin/security"), orgSettings().catch(() => new Map<string, string>())]);
   const people = (await adminUsers().catch(() => [])).filter((u) => u.active).sort((a, b) => a.name.localeCompare(b.name));
   const withMfa = people.filter((u) => u.mfa);
   const { enrolled, of } = security.mfaEnrolled;
@@ -51,7 +53,7 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
         <Field label="Client secret" hint={security.sso ? "kept; type a new one only to change it" : "given by the provider"}>
           <input name="clientSecret" type="password" autoComplete="new-password" required={!security.sso} className={inputCls} />
         </Field>
-        <Field label="Email domains" hint="who may sign in this way, e.g. company.com; empty: any"><input name="domains" autoComplete="off" defaultValue={security.sso?.allowedDomains.join(", ") ?? ""} placeholder="company.com" className={inputCls} /></Field>
+        <Field label="Email domains" hint="who may sign in this way, e.g. company.com; empty: only an email the provider says it verified"><input name="domains" autoComplete="off" defaultValue={security.sso?.allowedDomains.join(", ") ?? ""} placeholder="company.com" className={inputCls} /></Field>
       </div>
       <div className="w-full"><SwitchField name="enabled" defaultChecked={security.sso?.enabled ?? false}>In use: offered on the sign-in page</SwitchField></div>
     </ActionForm>
@@ -160,6 +162,8 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
           Turning it off is written in the log. A locked account (too many wrong passwords) opens again by itself after 15 minutes, or when the person resets their password.
         </p>
       </section>
+      {/* What is kept about people's activity: privacy, on the same card (owner: it did not deserve one of its own). */}
+      <TrackingSheet reading={settings.get("TRACK_READING") !== "OFF"} signIns={settings.get("TRACK_SIGN_INS") === "ON"} keepDays={settings.get("TRACK_KEEP_DAYS") ?? ""} />
     </div>
   );
 }

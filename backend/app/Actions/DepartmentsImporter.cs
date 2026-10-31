@@ -33,11 +33,15 @@ public sealed class DepartmentsImporter(
     /// <summary>How the list is filed among the uploaded lists, so its history reads in one place.</summary>
     public const string Kind = "ACTION_DEPARTMENTS";
 
-    private static readonly string[] ActionHeadings = ["action code", "activity code", "activity id"];
-    private static readonly string[] DepartmentHeadings = ["departments", "department", "disciplines", "discipline"];
+    internal static readonly string[] ActionHeadings = ["action code", "activity code", "activity id"];
+    internal static readonly string[] DepartmentHeadings = ["departments", "department", "disciplines", "discipline"];
 
     /// <summary>Whether a released revision is a disciplines-per-action list, by its document's type.</summary>
-    public static async Task<bool> IsListAsync(DeliosDbContext db, Guid documentId, CancellationToken cancellationToken)
+    public static async Task<bool> IsListAsync(DeliosDbContext db, Guid documentId, CancellationToken cancellationToken) =>
+        // The document the control function chose, once one is chosen; before that, a document whose type is marked so.
+        await ListSources.IsChosenAsync(db, documentId, Kind, () => ByTypeAsync(db, documentId, cancellationToken), cancellationToken);
+
+    private static async Task<bool> ByTypeAsync(DeliosDbContext db, Guid documentId, CancellationToken cancellationToken)
     {
         var docType = await db.Documents.AsNoTracking().Where(d => d.Id == documentId).Select(d => d.DocType).SingleOrDefaultAsync(cancellationToken);
         if (docType is null) return false;
@@ -187,6 +191,7 @@ public sealed class DepartmentsImporter(
             SourceName = label,
             SourceSize = file?.Size,
             SourceHash = file?.Sha256,
+            FileId = file?.Id,
             Notes = failed ? null : summary,
             CreatedById = revision.AuthoredById,
             CreatedByName = "Released revision",

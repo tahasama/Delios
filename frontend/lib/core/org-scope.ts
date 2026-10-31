@@ -1,4 +1,5 @@
 import "server-only";
+import { signInAgain } from "@/lib/core/sign-in-again";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isAdmin, type SessionUser } from "@/lib/core/auth";
@@ -29,7 +30,7 @@ const getOrgScope = cache(async (): Promise<OrgScope | null> => {
  */
 export async function requireOrgAdmin(): Promise<OrgScope> {
   const scope = await getOrgScope();
-  if (!scope) redirect("/login");
+  if (!scope) return signInAgain();
   if (!isAdmin(scope.user)) redirect("/?denied=1");
   return scope;
 }

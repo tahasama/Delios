@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { randomBytes } from "crypto";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { signInAgain } from "@/lib/core/sign-in-again";
 import { getMe } from "@/lib/account/api";
 import type { Role } from "@/lib/core/standard";
 import { heldVerbs } from "@/lib/core/permissions";
@@ -92,7 +92,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
 
 export async function requireUser(): Promise<SessionUser> {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) return signInAgain();
   return user;
 }
 

@@ -44,9 +44,14 @@ public static class ProjectDirectory
                             orderby u.Name
                             select new
                             {
-                                u.Id, u.Name, u.Email, u.PartyId,
+                                u.Id,
+                                u.Name,
+                                u.Email,
+                                u.PartyId,
                                 // A linked account reads in its own organization's words: "ACME / Lead Engineer".
-                                Function = u.HomeFunction != null ? p.Code + " / " + u.HomeFunction : f.Name, m.Department, m.ActsAsControl,
+                                Function = u.HomeFunction != null ? p.Code + " / " + u.HomeFunction : f.Name,
+                                m.Department,
+                                m.ActsAsControl,
                                 ControlByFunction = f.Rules.Any(r => r.Verbs.Contains(Verbs.Control)),
                                 Manages = f.Rules.Any(r => r.Verbs.Contains(Verbs.Manage)),
                             }).ToListAsync(cancellationToken);
@@ -78,7 +83,9 @@ public static class ProjectDirectory
                 .OrderByDescending(p => p.IsInternal).ThenBy(p => p.Name)
                 .Select(p => new
                 {
-                    p.Id, p.Code, p.Name,
+                    p.Id,
+                    p.Code,
+                    p.Name,
                     Role = taking.GetValueOrDefault(p.Id),
                     Kind = p.IsInternal ? "OURS"
                         : links.TryGetValue(p.Id, out var l) && l.State == Organizations.LinkStates.Linked ? "COLLABORATOR"
@@ -89,10 +96,16 @@ public static class ProjectDirectory
                 }),
             People = people.Select(p => new
             {
-                p.Id, p.Name, Email = ours ? p.Email : null, p.PartyId,
+                p.Id,
+                p.Name,
+                Email = ours ? p.Email : null,
+                p.PartyId,
                 Organization = p.PartyId is { } pid ? parties.FirstOrDefault(x => x.Id == pid)?.Name : parties.FirstOrDefault(x => x.IsInternal)?.Name,
-                p.Function, p.Department,
-                Control = p.ActsAsControl || p.ControlByFunction, p.ActsAsControl, p.Manages,
+                p.Function,
+                p.Department,
+                Control = p.ActsAsControl || p.ControlByFunction,
+                p.ActsAsControl,
+                p.Manages,
             }),
             MayNameControl = await MayNameControlAsync(http, access),
         });

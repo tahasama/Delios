@@ -65,6 +65,7 @@ internal sealed class ReviewStepConfiguration : IEntityTypeConfiguration<ReviewS
         b.HasMany(x => x.Participants).WithOne().HasForeignKey(x => x.StepId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.ReviewId, x.Index }).IsUnique();
         b.HasIndex(x => new { x.TenantId, x.State });
+        b.HasIndex(x => x.WarnOn);
         b.Property(x => x.Title).HasMaxLength(200);
         b.Property(x => x.FunctionCode).HasMaxLength(32);
         b.Property(x => x.Mode).HasMaxLength(8);

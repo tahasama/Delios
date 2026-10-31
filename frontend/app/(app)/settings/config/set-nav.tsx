@@ -9,8 +9,8 @@ export type SetNavSet = { id: string | null; name: string; active: boolean; isDe
 export type SetNavGroup = { title: string; sets: { key: string; title: string; count: number; takesSets: boolean; parts: SetNavSet[] }[] };
 
 /**
- * The lists as tabs by purpose (they wrap, never scroll); under a tab, its lists on the left and the chosen list on the
- * right, flush in the same sheet. Typing in Find searches every tab at once.
+ * The lists as tabs by purpose (they wrap, never scroll), above the chosen list where its content starts; the tab's
+ * lists on the left under Find, flush in the same sheet. Typing in Find searches every tab at once.
  */
 export function SetNav({ page = "/settings/config", groups, current, currentSet, mayAddSets, children }: {
   /** The page the lists are on: a project's Settings, or the organization's. */
@@ -36,35 +36,17 @@ export function SetNav({ page = "/settings/config", groups, current, currentSet,
     : groups[tab]?.sets ?? [];
 
   return (
-    // As tall as the window under the top bar (h-18) less the page's margins above and below it (py-6): the title above
+    // As tall as the window under the top bar (h-16) less the page's margins above and below it (py-6): the title above
     // scrolls away, then this sheet fills the window and only its table and its list of lists scroll. A narrow screen flows.
-    <div className="register register-sheet register-sheet-open flex flex-col lg:h-[calc(100dvh-7rem)]">
-      <div className="asking flex shrink-0 flex-wrap items-stretch justify-between gap-x-4 border-b border-line px-5 sm:px-6">
-        <div role="tablist" className="-mb-px flex flex-wrap items-stretch gap-x-5">
-          {groups.map((g, i) => {
-            const on = !needle && i === tab;
-            return (
-              <button
-                key={g.title}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                onClick={() => { setTab(i); setQ(""); }}
-                className={`inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-0.5 text-[12px] leading-4 transition ${on ? "border-brand-ink font-semibold text-slate-900" : "border-transparent text-slate-500 hover:border-line-strong hover:text-slate-800"}`}
-              >
-                {g.title} <span className="ml-1 font-normal tabular-nums text-slate-500">{g.sets.length}</span>
-              </button>
-            );
-          })}
-        </div>
-        <label className="search-field relative w-full self-center py-1.5 sm:w-56">
+    <div className="register register-sheet register-sheet-open grid grid-cols-1 lg:h-[calc(100dvh-6.5rem)] lg:grid-cols-[230px_minmax(0,1fr)] lg:grid-rows-1">
+      {/* The lists on the left, Find above them; the tabs start where the chosen list does (owner). */}
+      <div className="flex min-h-0 flex-col border-b border-line lg:border-b-0 lg:border-r">
+        <label className="asking search-field relative flex min-h-11 shrink-0 items-center border-b border-line px-3">
           <span className="sr-only">Find a list</span>
-          <Search className="pointer-events-none absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a list…" className="plain w-full pl-6!" />
         </label>
-      </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[230px_minmax(0,1fr)] lg:grid-rows-1" role="tabpanel">
-        <nav aria-label="Lists" className="scroll-quiet min-h-0 overflow-y-auto border-b border-line p-2 lg:border-b-0 lg:border-r">
+        <nav aria-label="Lists" className="scroll-quiet min-h-0 flex-1 overflow-y-auto p-2">
           <ul className="space-y-px">
             {sets.map((one) => {
               const on = one.key === current;
@@ -130,7 +112,27 @@ export function SetNav({ page = "/settings/config", groups, current, currentSet,
             {!sets.length ? <li className="px-2.5 py-2 text-xs text-slate-500">No list matches “{q}”.</li> : null}
           </ul>
         </nav>
-        <div className="flex min-h-0 min-w-0 flex-col">{children}</div>
+      </div>
+      <div className="flex min-h-0 min-w-0 flex-col">
+        <div role="tablist" className="strip strip-full shrink-0 border-b border-line">
+          {groups.map((g, i) => {
+            const on = !needle && i === tab;
+            return (
+              <button
+                key={g.title}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                aria-current={on ? "page" : undefined}
+                onClick={() => { setTab(i); setQ(""); }}
+                className="strip-tab"
+              >
+                {g.title} <span className="font-normal tabular-nums text-slate-500">{g.sets.length}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col" role="tabpanel">{children}</div>
       </div>
     </div>
   );

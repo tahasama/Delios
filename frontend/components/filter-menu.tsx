@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Floating } from "@/components/floating";
 import { useRouter } from "next/navigation";
 import { SlidersHorizontal } from "lucide-react";
 import { filterCookie } from "@/lib/core/filter-cookie";
@@ -16,6 +17,16 @@ export function FilterMenu({ page, filters, shown }: { page: string; filters: Fi
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [kept, setKept] = useState(shown);
+  const box = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: MouseEvent) => { if (!box.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node)) setOpen(false); };
+    const esc = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", esc); };
+  }, [open]);
   const toggle = (key: string) => {
     const next = kept.includes(key) ? kept.filter((k) => k !== key) : [...kept, key];
     setKept(next);
@@ -23,7 +34,7 @@ export function FilterMenu({ page, filters, shown }: { page: string; filters: Fi
     router.refresh();
   };
   return (
-    <div className="relative">
+    <div ref={box} className="relative">
       <button
         type="button"
         onClick={() => setOpen((was) => !was)}
@@ -36,7 +47,7 @@ export function FilterMenu({ page, filters, shown }: { page: string; filters: Fi
         Filters
       </button>
       {open ? (
-        <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-md border border-line bg-surface p-2 shadow-[0_8px_24px_rgb(0_0_0/0.12)]" onMouseLeave={() => setOpen(false)}>
+        <Floating anchor={box} panel={panel} width={224} className="overflow-y-auto p-2">
           <p className="stencil px-1.5 pb-1.5 text-slate-500">Show these filters</p>
           {filters.map((f) => (
             <label key={f.key} className="flex cursor-pointer items-center gap-2 rounded-sm px-1.5 py-1 text-[12.5px] text-slate-700 hover:bg-tint-soft">
@@ -45,7 +56,7 @@ export function FilterMenu({ page, filters, shown }: { page: string; filters: Fi
               {f.held ? <span className="ml-auto text-[11px] text-slate-400">in use</span> : null}
             </label>
           ))}
-        </div>
+        </Floating>
       ) : null}
     </div>
   );

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireOrgAdmin } from "@/lib/core/org-scope";
 import { getActiveSet } from "@/lib/settings/config";
 import { adminNumbering, revisionCopies } from "@/lib/settings/api-admin";
-import { liberty } from "@/lib/organization/liberty";
+import { libertyOrFail } from "@/lib/organization/liberty";
 import { RevisionBoard } from "@/app/(app)/settings/revisions/board";
 import { ProjectCopies, KeptCopies } from "../copies";
 import { ProjectSwitches } from "../switches";
@@ -18,7 +18,7 @@ export const metadata = { title: "Revisions" };
 export default async function OrganizationRevisionsPage() {
   const scope = await requireOrgAdmin();
   const [{ revisionSchemes, revisionRouting }, deliverables, phaseValues, switches, copies] = await Promise.all([
-    adminNumbering(), getActiveSet("DELIVERABLE_TYPES"), getActiveSet("PHASES"), liberty(), revisionCopies(),
+    adminNumbering(), getActiveSet("DELIVERABLE_TYPES"), getActiveSet("PHASES"), libertyOrFail(), revisionCopies(),
   ]);
 
   return (

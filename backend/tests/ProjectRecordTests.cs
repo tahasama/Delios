@@ -20,19 +20,19 @@ public sealed class ProjectRecordTests(Infrastructure infrastructure) : IClassFi
         var project = await Api.ProjectIdAsync(controller);
         var p = $"/api/projects/{project}";
 
-        var (refused, _) = await Flow.PostAsync(engineer, $"{p}/assets", new { code = "P-101", name = "Duty pump" });
+        var (refused, _) = await Flow.PostAsync(engineer, $"{p}/assets", new { name = "Duty pump" });
         Assert.Equal(HttpStatusCode.Forbidden, refused);
-        var (added, asset) = await Flow.PostAsync(controller, $"{p}/assets", new { code = "p-101", name = "Duty pump", area = "Pump house" });
+        // A tag is numbered by itself, as a package is (its scheme, P1001-TAG-0001 by default); nobody types it.
+        var (added, asset) = await Flow.PostAsync(controller, $"{p}/assets", new { name = "Duty pump", area = "Pump house" });
         Assert.True(added == HttpStatusCode.Created, asset.ToString());
-        Assert.Equal("P-101", asset.GetProperty("code").GetString());
-        var (twice, twiceBody) = await Flow.PostAsync(controller, $"{p}/assets", new { code = "P-101", name = "Again" });
-        Assert.Equal((HttpStatusCode.Conflict, "ASSET_EXISTS"), (twice, Flow.Code(twiceBody)));
+        var tag = asset.GetProperty("code").GetString();
+        Assert.Equal("P1001-TAG-0001", tag);
 
         var document = (await Api.RegisterAsync(engineer, project, Api.Drawing("Pump house GA"))).GetProperty("id").GetGuid();
-        var (linked, linkedBody) = await Flow.PostAsync(engineer, $"{p}/documents/{document}/assets", new { assetCode = "P-101" });
+        var (linked, linkedBody) = await Flow.PostAsync(engineer, $"{p}/documents/{document}/assets", new { assetCode = tag });
         Assert.True(linked == HttpStatusCode.NoContent, linkedBody.ToString());
         var links = await engineer.GetFromJsonAsync<JsonElement>($"{p}/documents/{document}/assets");
-        Assert.Equal("P-101", links[0].GetProperty("code").GetString());
+        Assert.Equal(tag, links[0].GetProperty("code").GetString());
         var detail = await engineer.GetFromJsonAsync<JsonElement>($"{p}/assets/{asset.GetProperty("id")}");
         Assert.Equal(document, detail.GetProperty("documents")[0].GetProperty("id").GetGuid());
 
@@ -77,14 +77,14 @@ public sealed class ProjectRecordTests(Infrastructure infrastructure) : IClassFi
             "Activity ID,Activity Name,Start,Finish,Responsible,Departments\n"
             + $"A100,Pour inlet base slab,{Day(20)},{Day(25)},Site team,CI\n"
             + $"A200,Install switchgear,{Day(40)},{Day(45)},Electrical,\n"), "text/csv");
-        var (_, revision) = await Flow.PostAsync(engineer, $"{p}/documents/{schedule}/revisions", new { fileIds = new[] { pdf, csv } });
+        var (_, revision) = await Flow.PostAsync(engineer, $"{p}/documents/{schedule}/revisions", new { fileIds = new[] { pdf, csv }, changeDescription = "Next issue" });
         var revisionId = revision.GetProperty("id").GetGuid();
         await Flow.UntilAsync(engineer, project, schedule, d => Flow.Revision(d, revisionId).GetProperty("filesState").GetString() != "PROCESSING");
         var (_, review) = await Flow.PostAsync(engineer, $"{p}/revisions/{revisionId}/reviews", new { });
         var reviewId = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"{p}/reviews/{reviewId}/answer", new { });
         await Flow.PostAsync(approver, $"{p}/reviews/{reviewId}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", new { });
+        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", await Flow.ReleaseBodyAsync(controller));
         JsonElement activities = default;
         for (var i = 0; i < 150 && activities.ValueKind != JsonValueKind.Array | (activities.ValueKind == JsonValueKind.Array && activities.GetArrayLength() < 2); i++)
         {

@@ -10,7 +10,7 @@ type Sets = { id: string | null; name: string; isDefault: boolean; deliverableTy
  */
 export async function setGrouping(scope: { projectId: string }) {
   const [lists, deliverables] = await Promise.all([
-    api<{ lists: { key: string; sets: Sets }[] }>(projectPath(scope, "/lists")).catch(() => ({ lists: [] })),
+    api<{ lists: { key: string; sets: Sets }[] }>(projectPath(scope, "/lists"), { keep: { areas: [] } }).catch(() => ({ lists: [] })),
     getSet("DELIVERABLE_TYPES"),
   ]);
   const listSets = new Map(lists.lists.map((l) => [l.key, l.sets]));

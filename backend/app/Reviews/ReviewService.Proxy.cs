@@ -44,7 +44,8 @@ public sealed partial class ReviewService
         step.DispatchRef = request.Reference?.Trim() is { Length: > 0 } reference ? reference : null;
         step.DispatchedByName = access.UserName;
         step.DueDate = step.Days is { } days
-            ? WorkingCalendar.AddWorkingDays(WorkingCalendar.Today(clock, project.TimeZone), days, project.WeekendDays) : null;
+            ? WorkingCalendar.AddWorkingDays(WorkingCalendar.Today(clock, project.TimeZone), days, project.WeekendDays,
+                await WorkingCalendar.HolidaysAsync(db, project, cancellationToken)) : null;
         var transmittal = await transmittals.RaiseAsync(new TransmittalService.Raise(project, Actor(access), step.Reason!,
             $"{TransmittalService.Label(document, revision)}: {step.Title}", null, party, party.Name, [(document, revision)],
             [new TransmittalService.Addressee(null, party.Id, party.Name, party.Name)], ReviewStepId: step.Id,

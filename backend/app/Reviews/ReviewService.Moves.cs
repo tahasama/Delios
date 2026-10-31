@@ -30,7 +30,8 @@ public sealed partial class ReviewService
         step.State = StepStates.Open;
         step.OpenedAt = clock.GetCurrentInstant();
         // By proxy the clock starts when it goes to them, not before.
-        step.DueDate = step.Days is { } days && !step.ByProxy ? WorkingCalendar.AddWorkingDays(today, days, project.WeekendDays) : null;
+        step.DueDate = step.Days is { } days && !step.ByProxy ? WorkingCalendar.AddWorkingDays(today, days, project.WeekendDays,
+            await WorkingCalendar.HolidaysAsync(db, project, cancellationToken)) : null;
         step.Answer = null;
         step.CompletedAt = null;
         step.WarnedAt = null;

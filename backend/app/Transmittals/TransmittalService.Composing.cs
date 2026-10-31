@@ -17,13 +17,15 @@ public sealed partial class TransmittalService
 
     /// <summary>
     /// Body of a transmittal the control function composes itself: released revisions, the people and outside parties
-    /// it goes to, why (a reason for issue), a subject, a message, and when an answer is due if one is wanted.
+    /// it goes to, why (a reason for issue), a subject, a message, when an answer is due if one is wanted, and the package
+    /// whose documents it carries (owner: delivering a package is a data transmittal; checked, and a package we deliver
+    /// marked delivered, by the endpoint: PackageService.SendableAsync / DeliveredAsync).
     /// </summary>
     public sealed record ComposeRequest(
         Guid[]? RevisionIds, Guid[]? UserIds, Guid[]? PartyIds, string? Reason, string? Subject = null, string? Message = null,
         DateOnly? ResponseDue = null, Guid[]? CopyUserIds = null, bool Draft = false, Guid? InReplyToId = null, Guid? FollowsId = null,
         string? FollowKind = null, DateOnly? IssuedOn = null, Dictionary<string, string?>? Extras = null, Guid? ActivityId = null,
-        string? ActivityAsk = null, Guid[]? PlaceholderIds = null, bool? ResponseRequired = null);
+        string? ActivityAsk = null, Guid[]? PlaceholderIds = null, bool? ResponseRequired = null, Guid? PackageId = null);
 
     /// <summary>A compose request checked: what it carries, to whom, and when it is dated.</summary>
     private sealed record Prepared(
@@ -48,7 +50,7 @@ public sealed partial class TransmittalService
         Raise Of(Party? to, string toName, IReadOnlyList<Addressee> recipients) => new(access.Project, actor, p.Reason, p.Subject, p.Message,
             to, toName, p.Items, recipients, ResponseDue: p.Due, Copies: p.Copies, IssuedAt: p.IssuedAt, InReplyToId: p.InReplyToId,
             FollowsId: p.FollowsId, FollowKind: p.FollowKind, Extras: p.Extras, ActivityId: p.ActivityId, ActivityAsk: p.ActivityAsk,
-            Placeholders: p.Placeholders, ResponseRequired: request.ResponseRequired);
+            Placeholders: p.Placeholders, ResponseRequired: request.ResponseRequired, PackageId: request.PackageId);
         // Placeholders go to the supplier that owes them, alone: one transmittal, to its people named (or all of them).
         if (p.Supplier is { } supplier)
         {
@@ -80,7 +82,8 @@ public sealed partial class TransmittalService
     public Task<IResult?> FormProblemAsync(ProjectAccess access, ComposeRequest request, CancellationToken cancellationToken) =>
         Settings.FormRules.CheckAsync(db, access.Project.Id, "TRANSMITTAL", new Dictionary<string, bool>
         {
-            ["subject"] = !string.IsNullOrWhiteSpace(request.Subject), ["message"] = !string.IsNullOrWhiteSpace(request.Message),
+            ["subject"] = !string.IsNullOrWhiteSpace(request.Subject),
+            ["message"] = !string.IsNullOrWhiteSpace(request.Message),
             ["cc"] = request.CopyUserIds is { Length: > 0 },
         }, request.Extras, cancellationToken);
 

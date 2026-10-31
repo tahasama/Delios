@@ -9,7 +9,7 @@ const SSO_ERRORS: Record<string, string> = {
   SSO_STATE_INVALID: "The sign-in took too long, or was started in another browser. Try again.",
   SSO_PROVIDER_REFUSED: "Your organization's account did not let you in. Try again, or ask your administrator.",
   SSO_TOKEN_INVALID: "Your organization's answer could not be checked. Ask your administrator.",
-  SSO_EMAIL_NOT_VERIFIED: "Your organization has not confirmed your email address yet.",
+  SSO_EMAIL_NOT_VERIFIED: "Your organization's account did not confirm your email address. Ask your administrator to set its email domains.",
   SSO_NO_EMAIL: "Your organization's account gave no email address.",
   SSO_DOMAIN_NOT_ALLOWED: "Your email address is not one your organization signs in with here.",
   SSO_NO_ACCOUNT: "Nobody here has that email address yet: your administrator adds you first.",

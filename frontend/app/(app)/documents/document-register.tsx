@@ -1,4 +1,5 @@
 "use client";
+import { startDownload } from "@/components/downloads";
 import { Select } from "@/components/select";
 
 import { setAssetDocumentsAction } from "@/lib/records/forms";
@@ -7,10 +8,11 @@ import Link from "next/link";
 import { saveRegisterView, deleteRegisterView } from "@/lib/documents/forms-register-views";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, GitPullRequestArrow, PackagePlus, Pin, PinOff, Search, Send, X } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, ArrowUp, ArrowUpDown, Download, GitPullRequestArrow, PackagePlus, Pin, PinOff, Search, Send, X } from "lucide-react";
 import { FilterMenu } from "@/components/filter-menu";
 import { FilterOptions } from "@/components/filter-options";
 import { sendSupplierFromRegisterAction as sendFromRegister } from "@/lib/packages/forms-supplier";
+import { TablePaging } from "@/components/table-paging";
 import { DataTable } from "@/components/data-table";
 import { DateWindow } from "@/components/date-window";
 import { Th, Td, Info } from "@/components/ui";
@@ -18,6 +20,7 @@ import { stateLook, stateHref } from "@/lib/core/state-look";
 import { useCardHeight } from "@/components/card-height";
 import { ActionForm } from "@/components/form";
 import { setActionDocumentsAction } from "@/lib/actions/forms-links";
+import { chooseListSourceAction } from "@/lib/actions/forms-lists";
 import { CalendarCheck } from "lucide-react";
 
 /** Available from the Columns menu; off until someone wants them. */
@@ -122,9 +125,11 @@ type Column = {
 
 /** The register opened for one action: what it needs now, ticked; its disciplines, for what is added. */
 /** The register opened for something to choose documents for: an action (tick to add, untick to take off), or a supplier's package (tick to add). */
-type Picking = { kind: "action" | "package" | "transmittal" | "review" | "asset"; actionId: string; packageId: string; code: string; name: string; linked: string[]; disciplines: { code: string; label: string }[];
+type Picking = { kind: "action" | "package" | "transmittal" | "review" | "asset" | "source"; actionId: string; packageId: string; code: string; name: string; linked: string[]; disciplines: { code: string; label: string }[];
   /** For a form being filled (a transmittal, a review): where "Continue" goes back to, with the ticks as `docs`. */
   back?: string;
+  /** For a list's register document: the page the list is brought in on, gone back to once chosen. */
+  returnTo?: string;
   /** In a supplier's package and already sent to the supplier: they stay, so they cannot be unticked. */
   locked?: string[] };
 
@@ -277,6 +282,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   function toggle(id: string) {
     if (picking?.locked?.includes(id)) return;
     setAllMatching(false);
+    // A list is read from one document: ticking one unticks the other.
+    if (picking?.kind === "source") { setSelected((current) => current.includes(id) ? [] : [id]); return; }
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   }
 
@@ -351,8 +358,8 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
   return <>
     {picking ? (
       <section className="register register-sheet register-sheet-open mb-4 px-5 py-3.5 sm:px-6">
-        {picking.back ? (
-          <p className="text-sm font-semibold text-slate-800">{picking.name}</p>
+        {picking.back || picking.kind === "source" ? (
+          <p className="text-sm font-semibold text-slate-800">{picking.kind === "source" ? `The register document the ${picking.name.toLowerCase()} is read from` : picking.name}</p>
         ) : (
           <p className="text-sm font-semibold text-slate-800">
             Documents for <Link href={picking.kind === "asset" ? `/assets/${picking.packageId}` : picking.kind === "package" ? `/packages/${picking.code}` : `/actions/${picking.code}`} className="font-mono text-brand-ink hover:underline">{picking.code}</Link>
@@ -360,7 +367,9 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           </p>
         )}
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          {picking.back
+          {picking.kind === "source"
+            ? "Tick the one document that holds it: its released revision's file is what the list is read from, unless a file uploaded since stands. Search and filter freely, the tick stays. Then save below."
+            : picking.back
             ? "Tick what goes with it; search and filter freely, the ticks stay. Then continue below."
             : picking.kind === "asset"
             ? "Ticked are the documents that describe it. Tick a document to link it, untick one to unlink it; search and filter freely, the ticks stay. Then save below."
@@ -528,10 +537,10 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       ) : null}
 
       <div className={`${cardHeight ? "flex min-h-0 flex-1 flex-col" : ""} ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
-        {rows.length ? <DataTable id="register" className="rounded-none border-0 shadow-none" stretch={!!cardHeight} defaultHidden={OPTIONAL} onMove={move} onReorder={moveTo} forced={forced} fill tools={
+        {rows.length ? <DataTable id="register" className="rounded-none border-0 shadow-none" stretch={!!cardHeight} paging={paging && total > 0 ? <TablePaging from={paging.from} to={paging.to} total={total} page={paging.page} pages={paging.pages} onPage={(page) => go(pageHref({ page }))} perPage={paging.perPage} sizes={paging.sizes} onSize={(per) => go(pageHref({ per, page: 1 }))} /> : undefined} defaultHidden={OPTIONAL} onMove={move} onReorder={moveTo} forced={forced} fill tools={
           <a
             href={exportHref}
-            onClick={(event) => { event.preventDefault(); window.location.href = exportWith(exportHref); }}
+            onClick={(event) => { event.preventDefault(); startDownload(exportWith(exportHref), "The register"); }}
             className="dt-tool"
             title="The rows these filters match, in the columns you are looking at, as CSV"
           >
@@ -547,6 +556,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
               onChange={() => {
                 setAllMatching(false);
                 const page = rows.map((row) => row.id);
+                if (picking?.kind === "source") return;
                 if (picking) setSelected((now) => pageSelected ? now.filter((id) => !page.includes(id) || !!picking.locked?.includes(id)) : [...new Set([...now, ...page])]);
                 else setSelected(pageSelected ? [] : page);
               }}
@@ -614,34 +624,11 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           </tr>;
         })}</DataTable> : <div className="px-6 py-20 text-center">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-slate-400">no entries</p>
-          <p className="mt-2 text-sm text-slate-700">Nothing in the register matches these filters.</p>
+          <p className="mt-2 text-sm text-slate-700">{facets.length ? "Nothing in the register matches these filters." : "No documents registered yet. “Create document” registers the first; a deliverable list brings many in at once (Import & export)."}</p>
           {facets.length ? <button type="button" onClick={() => go("/documents")} className="mt-3 text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
         </div>}
       </div>
 
-      {paging && total > 0 ? (
-        <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line bg-surface px-5 py-2.5 sm:px-6">
-          <p className="font-mono text-[11px] tabular-nums text-slate-500">
-            {paging.from.toLocaleString("en-GB")}–{paging.to.toLocaleString("en-GB")}
-            <span className="ml-1.5 font-sans text-slate-400">of {total.toLocaleString("en-GB")}</span>
-          </p>
-
-          {paging.pages > 1 ? (
-            <span className="flex items-center justify-center gap-1">
-              <PageStep onClick={() => go(pageHref({ page: paging.page - 1 }))} disabled={paging.page === 1} label="Previous page"><ChevronLeft className="h-4 w-4" /></PageStep>
-              <span className="px-2 font-mono text-[11px] tabular-nums text-slate-600">{paging.page} <span className="text-slate-400">/ {paging.pages}</span></span>
-              <PageStep onClick={() => go(pageHref({ page: paging.page + 1 }))} disabled={paging.page === paging.pages} label="Next page"><ChevronRight className="h-4 w-4" /></PageStep>
-            </span>
-          ) : <span />}
-
-          <label className="flex items-center justify-end gap-1.5">
-            <span className="stencil text-slate-400">Rows</span>
-            <Select className="plain" value={paging.perPage} onChange={(event) => go(pageHref({ per: Number(event.target.value), page: 1 }))}>
-              {paging.sizes.map((size) => <option key={size} value={size}>{size}</option>)}
-            </Select>
-          </label>
-        </div>
-      ) : null}
     </section>
 
     {picking?.back ? (
@@ -650,8 +637,20 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
           <span className="font-mono text-sm tabular-nums">{selected.length}</span>
           <span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked</span>
         </span>
-        <Link href={withDocs(picking.back, selected)} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink">Continue with {selected.length}</Link>
+        <Link href={withDocs(picking.back, selected)} className="inline-flex items-center gap-1.5 rounded-sm bg-gold px-3 py-2 text-xs font-semibold text-brand-ink">Continue with {selected.length}</Link>
         <Link href={withDocs(picking.back, picking.linked)} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without changing</Link>
+      </div>
+    ) : picking?.kind === "source" ? (
+      <div className="dock palette-light sticky bottom-4 z-30 mx-auto w-fit max-w-full rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
+        <ActionForm action={chooseListSourceAction} submitLabel={`Use it for the ${picking.name.toLowerCase()}`} size="sm"
+          hidden={{ kind: picking.code, documentId: selected[0] ?? "", back: picking.returnTo === "/import" ? "import" : "schedule" }} className="flex flex-wrap items-center gap-2 space-y-0">
+          <span className="px-2 text-xs">
+            <span className="font-mono text-sm tabular-nums">{selected.length}</span>
+            <span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked</span>
+            {selected.length ? null : <span className="ml-2 text-white/60">tick the document that holds it</span>}
+          </span>
+          <Link href={picking.returnTo ?? "/schedule"} className="ml-auto rounded-sm px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/10 hover:text-white">Back without saving</Link>
+        </ActionForm>
       </div>
     ) : picking?.kind === "asset" ? (
       <div className="dock palette-light sticky bottom-4 z-30 mx-auto w-fit max-w-full rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
@@ -693,14 +692,14 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       </div>
     ) : selected.length ? <div className="dock palette-light sticky bottom-4 z-30 mx-auto flex w-fit max-w-full flex-wrap items-center gap-2 rounded-sm border border-white/10 bg-brand-strong p-2.5 text-white shadow-[0_8px_30px_rgb(0_0_0/0.18)]">
       <span className="px-2 font-mono text-sm tabular-nums">{allMatching ? total.toLocaleString("en-GB") : selected.length}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">selected</span></span>
-      {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : null) : null}
+      {userCanAct ? (selectedRevisionIds.length ? <Link href={`/reviews/send?revisions=${encodeURIComponent(selectedRevisionIds.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-gold px-3 py-2 text-xs font-semibold text-brand-ink"><GitPullRequestArrow className="h-4 w-4" /> Send for review ({selectedRevisionIds.length})</Link> : null) : null}
       {transmittableRows.length + placeholderRows.length ? <Link href={transmittalHref} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><ArrowLeftRight className="h-4 w-4" /> Create transmittal ({transmittableRows.length + placeholderRows.length})</Link> : null}
       {supplier && !supplier.readOnly ? (() => {
         const sendable = selectedRows.map((row) => row.sendRevisionId).filter((id): id is string => !!id);
         return sendable.length ? (
           <form action={sendFromRegister}>
             {sendable.map((id) => <input key={id} type="hidden" name="revisionId" value={id} />)}
-            <button type="submit" className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><Send className="h-4 w-4" /> Send to {supplier.to} ({sendable.length})</button>
+            <button type="submit" className="inline-flex items-center gap-1.5 rounded-sm bg-gold px-3 py-2 text-xs font-semibold text-brand-ink"><Send className="h-4 w-4" /> Send to {supplier.to} ({sendable.length})</button>
           </form>
         ) : null;
       })() : null}
@@ -708,7 +707,7 @@ export function DocumentRegister({ rows, total, userCanAct, filters, filterOptio
       {mayAddToAction ? <Link href={`/actions/add?docs=${encodeURIComponent(selected.join(","))}`} className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><CalendarCheck className="h-4 w-4" /> Add to action</Link> : null}
       <a
         href={selectedExportHref}
-        onClick={(event) => { event.preventDefault(); window.location.href = exportWith(selectedExportHref); }}
+        onClick={(event) => { event.preventDefault(); startDownload(exportWith(selectedExportHref), "The register"); }}
         className="inline-flex items-center gap-1.5 rounded-sm bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"
       >
         <Download className="h-4 w-4" /> Export {allMatching ? "all matching" : "selected"}
@@ -922,10 +921,5 @@ function SortButton({ label, on, onClick }: { label: string; on: "asc" | "desc" 
 
 function Muted() { return <span className="text-slate-300">·</span>; }
 
-/** One step through the register. A step that leads nowhere is shown, and dead. */
-function PageStep({ onClick, disabled, label, children }: { onClick: () => void; disabled: boolean; label: string; children: React.ReactNode }) {
-  if (disabled) return <span aria-disabled className="rounded-sm p-1 text-slate-300">{children}</span>;
-  return <button type="button" onClick={onClick} aria-label={label} className="rounded-sm p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-ink">{children}</button>;
-}
 
 function date(value: string | null) { return value ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value)) : "—"; }

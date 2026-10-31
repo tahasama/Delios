@@ -143,7 +143,9 @@ type DocClass = { deliverableType: string; docType: string; discipline: string; 
 export async function eligiblePeople(t: Tenant, docs: DocClass[], act: "REVIEW" | "APPROVAL") {
   const { holders } = await import("@/lib/settings/api");
   const verb = act === "APPROVAL" ? "APPROVE" : "REVIEW";
-  const lists = await Promise.all(docs.map((d) => holders(t.projectId, verb, d.deliverableType, d.docType, d.discipline, d.criticality, d.confidentiality)));
+  // Documents of the same class have the same holders: asked once per class, never once per document.
+  const classes = [...new Map(docs.map((d) => [[d.deliverableType, d.docType, d.discipline, d.criticality, d.confidentiality].join("\u0001"), d])).values()];
+  const lists = await Promise.all(classes.map((d) => holders(t.projectId, verb, d.deliverableType, d.docType, d.discipline, d.criticality, d.confidentiality)));
   const out = (lists[0] ?? [])
     .filter((one) => lists.every((list) => list.some((other) => other.id === one.id)))
     .map((one) => ({ id: one.id, name: one.name, functionId: one.functionCode, functionName: one.functionName, department: one.department }));

@@ -56,25 +56,33 @@ public static class SettingEndpoints
     public static void MapSettingEndpoints(this IEndpointRouteBuilder app)
     {
         var org = app.MapGroup("/api/settings").WithTags("Settings").RequireAuthorization().AddEndpointFilter<TransactionFilter>();
-        org.MapGet("", (HttpContext h, DeliosDbContext db, CancellationToken c, string? prefix) => ListAsync(db, null, prefix, c));
+        // The organization's settings (owner): an administrator and those of ours who keep a project read them whole; the
+        // rest of ours read what applies on their projects, never what is the organization's alone; another organization's
+        // people read only the words the screens show (Readers).
+        org.MapGet("", async (HttpContext h, DeliosDbContext db, CancellationToken c, string? prefix) =>
+            await ListAsync(db, null, prefix, c, await Keepers.ConfiguresAsync(h) || await Keepers.KeepsAProjectAsync(h) ? Readers.Whole
+                : await Keepers.IsOursAsync(h) ? Readers.OnProjects : Readers.Words));
         org.MapPut("/{key}", async (string key, SettingRequest r, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken c) =>
         {
             var me = await db.Users.AsNoTracking().SingleAsync(u => u.Id == h.User.UserId(), c);
             if (!await Keepers.ConfiguresAsync(h)) return Problems.Forbidden("ADMIN_ONLY", "An administrator answers for the organization.");
+            if (key.Trim() == DateFormat.Key && !string.IsNullOrWhiteSpace(r.Value) && !DateFormat.Codes.Contains(r.Value.Trim()))
+                return Problems.Invalid("DATE_FORMAT_UNKNOWN", $"Dates read as one of {string.Join(", ", DateFormat.Codes)}.");
             return await SetAsync(db, audit, clock, h.User.TenantId(), null, key, r.Value, me.Id, me.Name, c);
         });
 
         var project = app.MapGroup("/api/projects/{projectId:guid}/settings").WithTags("Settings")
             .AddEndpointFilter<TransactionFilter>().AddEndpointFilter<ProjectAccessFilter>();
+        // Another organization's people read only the words the screens show; how the project works is ours.
         project.MapGet("", (HttpContext h, DeliosDbContext db, CancellationToken c, string? prefix) =>
-            ListAsync(db, ProjectAccessFilter.Of(h).Project.Id, prefix, c));
+            ListAsync(db, ProjectAccessFilter.Of(h).Project.Id, prefix, c, ProjectAccessFilter.Of(h).IsInternal ? Readers.Whole : Readers.Words));
         project.MapPut("/{key}", async (string key, SettingRequest r, HttpContext h, DeliosDbContext db, AuditLog audit, IClock clock, CancellationToken c) =>
         {
             var access = ProjectAccessFilter.Of(h);
             if (!await Keepers.ConfiguresAsync(h) && !access.Holds(Verbs.Control))
                 return Problems.Forbidden("CONTROL_ONLY", "An administrator or the control function answers for the project.");
             // What the organization keeps fixed is the same on every project (owner: two levels of settings).
-            if (await Liberty.RoomRefusalAsync(db, key.Trim(), r.Value, c) is { } fixedHere) return fixedHere;
+            if (await Liberty.RoomRefusalAsync(db, key.Trim(), r.Value, access.Project.Id, c) is { } fixedHere) return fixedHere;
             // How documents come in has its own checks (one way or the other, its warning read): PUT /intake.
             if (key.Trim() is Packages.Intake.Key or Packages.Intake.FilingKey)
                 return Problems.Invalid("USE_INTAKE", "How other organizations' documents come in is chosen in the Control room.");
@@ -89,11 +97,27 @@ public static class SettingEndpoints
         });
     }
 
-    private static async Task<IResult> ListAsync(DeliosDbContext db, Guid? projectId, string? prefix, CancellationToken cancellationToken)
+    /// <summary>How much of the settings a reader gets.</summary>
+    private enum Readers { Whole, OnProjects, Words }
+
+    /// <summary>What every screen shows anyone: the names of states and lists, how dates read, whether a PDF is stamped.</summary>
+    private static readonly string[] WordKeys = ["STATE_NAME:", "SET:", DateFormat.Key, "POLICY_PDF_STAMP", "STAMP"];
+
+    /// <summary>The organization's alone, never a project's: its defaults for new projects and what projects may change.</summary>
+    private static readonly string[] OrganizationOnly = ["PROJECT_DEFAULTS", "LIBERTY", "PROJECT_TIME_ZONE", "PROJECT_WEEKEND", "PROJECT_COUNTRY"];
+
+    private static async Task<IResult> ListAsync(DeliosDbContext db, Guid? projectId, string? prefix, CancellationToken cancellationToken,
+        Readers readers = Readers.Whole)
     {
         var query = db.Set<Setting>().AsNoTracking().Where(s => s.ProjectId == projectId);
         if (!string.IsNullOrEmpty(prefix)) query = query.Where(s => s.Key.StartsWith(prefix));
-        var rows = await query.OrderBy(s => s.Key).ToListAsync(cancellationToken);
+        var rows = (await query.OrderBy(s => s.Key).ToListAsync(cancellationToken))
+            .Where(s => readers switch
+            {
+                Readers.Words => WordKeys.Any(k => s.Key.StartsWith(k, StringComparison.Ordinal)),
+                Readers.OnProjects => !OrganizationOnly.Any(k => s.Key.StartsWith(k, StringComparison.Ordinal)),
+                _ => true,
+            }).ToList();
         return Results.Ok(rows.Select(s => new SettingView(s.Key, s.Value, s.UpdatedAt.ToDateTimeOffset(), s.UpdatedByName)));
     }
 
@@ -129,7 +153,7 @@ public static class SettingEndpoints
 /// <summary>
 /// What is kept about people's activity (owner): the organization's choice, never a project's, since a privacy policy is
 /// the organization's. Acts on documents (registered, reviewed, released, sent) are always kept: they are the
-/// register's own record. Reading (a document opened, a file downloaded) is kept unless switched off
+/// register's own record. A document opened is kept unless switched off; a file downloaded always is
 /// (<c>TRACK_READING</c> = OFF). Sign-ins are always kept for security, and shown on a person's activity only when
 /// switched on (<c>TRACK_SIGN_INS</c> = ON).
 /// </summary>
@@ -137,8 +161,11 @@ public static class Tracking
 {
     public const string ReadingKey = "TRACK_READING";
     public const string SignInsKey = "TRACK_SIGN_INS";
-    /// <summary>The acts that are reading, kept or not by <see cref="ReadingKey"/>.</summary>
-    public static readonly string[] Reading = ["DOCUMENT_VIEWED", "DOWNLOAD"];
+    /// <summary>
+    /// The acts that are reading, kept or not by <see cref="ReadingKey"/>: a document opened. A file downloaded is always
+    /// kept (owner: the files are protected), and watched (<c>Audit.DownloadWatch</c>).
+    /// </summary>
+    public static readonly string[] Reading = ["DOCUMENT_VIEWED"];
     /// <summary>The sign-ins, always kept, shown or not by <see cref="SignInsKey"/>.</summary>
     public static readonly string[] SignIns = ["SIGN_IN", "SIGN_IN_MFA", "SIGN_IN_SSO", "SIGN_IN_FAILED", "ACCOUNT_LOCKED", "LOGIN"];
 

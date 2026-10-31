@@ -7,10 +7,11 @@ import { revalidatePath } from "next/cache";
 import { mayCreateDocument } from "@/lib/core/auth";
 import { getActiveSet } from "@/lib/settings/config";
 import { ownFields, takeExtras } from "@/lib/settings/field-policy";
-import { api, refusalForForm, projectPath, refusal } from "@/lib/client";
+import { api, ApiProblem, refusalForForm, projectPath, refusal } from "@/lib/client";
 import { backendDocument } from "@/lib/documents/api";
-import { upload, filesOf } from "@/lib/documents/api-uploads";
+import { filesOf, uploadRevisionFiles } from "@/lib/documents/api-uploads";
 import type { TransmittalView } from "@/lib/types";
+import { once } from "@/lib/core/once";
 
 // G.1 — Creating a new document. "No controlled information shall be produced
 // without a register entry" (§3.9). Number is system-generated (§3.7).
@@ -95,7 +96,7 @@ export async function createDocumentAction(_prev: { error?: string; fields?: str
   try {
     doc = await api<{ id: string; number: string }>(projectPath(ctx, "/documents"), {
       body,
-      idempotencyKey: String(formData.get("formKey") ?? "") || undefined,
+      idempotencyKey: once(formData, "register"),
     });
   } catch (e) {
     return refusalForForm(e);
@@ -104,16 +105,18 @@ export async function createDocumentAction(_prev: { error?: string; fields?: str
   // Initial files create the first revision immediately: the PDF people read
   // and the editable native file, either or both.
   const files = kind === "DOCUMENT" ? filesOf(formData, "renditionFile", "nativeFile") : [];
+  let filesRefused: string | null = null;
   if (files.length) {
     try {
-      const fileIds = await Promise.all(files.map((file) => upload(ctx, { documentId: doc.id }, file)));
+      const fileIds = await uploadRevisionFiles(ctx, doc.id, formData);
       // The review is sent from the document's page, where the route and its people are chosen.
       await api(projectPath(ctx, `/documents/${doc.id}/revisions`), { body: { fileIds } });
-    } catch {
-      // file failure must not lose the register entry — the author can attach from the page
+    } catch (e) {
+      // A file refused must not lose the register entry: the page says why, and the files are attached from it.
+      filesRefused = e instanceof ApiProblem ? e.message : "The files could not be attached.";
     }
   }
-  redirect(`/documents/${doc.id}?created=1`);
+  redirect(`/documents/${doc.id}?created=1${filesRefused ? `&filesRefused=${encodeURIComponent(filesRefused)}` : ""}`);
 }
 
 const EDITABLE_FIELDS = [
@@ -158,7 +161,7 @@ export async function updateDocumentAction(_prev: { error?: string; ok?: string 
 }
 
 /** Associate the document with the asset it describes (§5.8). */
-export async function linkAssetAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+export async function linkAssetAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const ctx = await requireScope();
   const documentId = String(formData.get("documentId") ?? "");
   const assetCode = String(formData.get("assetCode") ?? "").trim();
@@ -169,7 +172,7 @@ export async function linkAssetAction(_prev: { error?: string } | undefined, for
     return { error: refusal(e).message };
   }
   revalidatePath(`/documents/${documentId}`);
-  return {};
+  return { ok: "Linked. The tag's page lists this document among those that describe it." };
 }
 
 export async function unlinkRelationshipAction(formData: FormData) {

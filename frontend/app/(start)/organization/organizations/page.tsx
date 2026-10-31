@@ -171,7 +171,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                 {shown ? (
                   // Its card, open under its line: since when we work with it, and every project it worked on with us.
                   <tr>
-                    <td colSpan={5} className="border-b border-line bg-tint-soft p-0">
+                    <td colSpan={5} className="open-in border-b border-line bg-tint-soft p-0">
                       <PartyCard worked={worked} linkedAt={p.linkedAt ?? null} roleLabel={roleLabel} />
                     </td>
                   </tr>
@@ -179,7 +179,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
                 {open ? (
                   // The line goes on as the form: grey fields, then the strip with Cancel and Save.
                   <tr>
-                    <td colSpan={5} className="border-b border-line p-0">
+                    <td colSpan={5} className="open-in border-b border-line p-0">
                       {c?.theirs ? (
                         // Its own DELIOS: its details are its own; we see them, and switch it off for us if need be.
                         <ActionForm id={`party-form-${p.id}`} action={savePartyAction} hideSubmit

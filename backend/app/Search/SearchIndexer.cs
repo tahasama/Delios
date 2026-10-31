@@ -33,11 +33,12 @@ internal sealed class SearchWatermarkConfiguration : IEntityTypeConfiguration<Se
 }
 
 /// <summary>
-/// In the worker, when OpenSearch is switched on: sends every document that
-/// changed since the last pass, organization by organization. The register in
-/// Postgres stays the truth; the index can be dropped and rebuilt from it at any time.
+/// In the worker, when OpenSearch is switched on: sends the documents that changed, organization by organization, when
+/// it is told one changed (<see cref="SearchSignal"/>), never by asking every few seconds. A change is sent at once and
+/// looked at again a minute later (a change is stamped before its transaction commits); everything is caught up once
+/// an hour, and at start. The register in Postgres stays the truth; the index can be dropped and rebuilt from it.
 /// </summary>
-public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOptions> options, ILogger<SearchIndexer> logger)
+public sealed class SearchIndexer(IServiceScopeFactory scopes, SearchSignal signal, ILogger<SearchIndexer> logger)
     : BackgroundService
 {
     /// <summary>Most documents sent to the index in one request.</summary>
@@ -45,24 +46,40 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOp
 
     /// <summary>How long after a change it is certain to be committed and visible; the mark stays this far behind.</summary>
     private static readonly Duration Settle = Duration.FromMinutes(1);
-    /// <summary>Most characters of file text sent per document; the rest is left out of the index.</summary>
-    private const int MaxContent = 1_000_000;
+    /// <summary>The catch-up of every organization, in case a word was lost.</summary>
+    private static readonly TimeSpan CatchUp = TimeSpan.FromHours(1);
 
-    /// <summary>
-    /// The worker's loop: makes sure the index exists, sends what changed, then waits <c>SyncSeconds</c> and repeats
-    /// until shutdown. Started by the host as a background service.
-    /// </summary>
+    private readonly System.Threading.Channels.Channel<Guid> heard = System.Threading.Channels.Channel.CreateUnbounded<Guid>();
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await signal.SubscribeAsync(id => heard.Writer.TryWrite(id));
+        var lastCatchUp = DateTimeOffset.MinValue;
+        // What was sent at once, to look at again once it has settled.
+        var again = new Dictionary<Guid, DateTimeOffset>();
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
                 var client = scope.ServiceProvider.GetRequiredService<OpenSearchClient>();
-                // Every pass: after a reindex the index is gone and is made again with its mapping.
+                // After a reindex the index is gone and is made again with its mapping.
                 await client.EnsureIndexAsync(stoppingToken);
-                var sent = await SyncAllAsync(scopes, client, refresh: false, stoppingToken);
+                var now = DateTimeOffset.UtcNow;
+                var sent = 0;
+                if (now - lastCatchUp >= CatchUp)
+                {
+                    sent += await SyncAllAsync(scopes, client, refresh: false, stoppingToken);
+                    lastCatchUp = now;
+                    again.Clear();
+                }
+                else
+                {
+                    var tenants = new HashSet<Guid>();
+                    while (heard.Reader.TryRead(out var id)) { tenants.Add(id); again[id] = now + Settle.ToTimeSpan() + TimeSpan.FromSeconds(5); }
+                    foreach (var (id, at) in again.Where(x => x.Value <= now).ToList()) { tenants.Add(id); again.Remove(id); }
+                    foreach (var tenantId in tenants) sent += await SyncTenantAsync(scopes, client, tenantId, refresh: false, stoppingToken);
+                }
                 AppMetrics.SearchLastSync.SetToCurrentTimeUtc();
                 if (sent > 0) logger.LogInformation("Sent {Count} document(s) to the search index", sent);
             }
@@ -71,7 +88,25 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOp
                 // The register works without the index; this pass is retried.
                 logger.LogWarning(e, "Search index sync failed; retrying");
             }
-            await Task.Delay(TimeSpan.FromSeconds(options.Value.SyncSeconds), stoppingToken);
+            // Asleep until told, the next look at what was sent, or the hourly catch-up.
+            var wake = again.Count > 0 ? again.Values.Min() - DateTimeOffset.UtcNow : lastCatchUp + CatchUp - DateTimeOffset.UtcNow;
+            if (wake < TimeSpan.FromSeconds(1)) wake = TimeSpan.FromSeconds(1);
+            using var nap = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            nap.CancelAfter(wake);
+            try { await heard.Reader.WaitToReadAsync(nap.Token); }
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested) { }
+        }
+    }
+
+    /// <summary>Every change of one organization not sent yet.</summary>
+    private static async Task<int> SyncTenantAsync(IServiceScopeFactory scopes, OpenSearchClient client, Guid tenantId, bool refresh, CancellationToken cancellationToken)
+    {
+        var sent = 0;
+        while (true)
+        {
+            var count = await SyncBatchAsync(scopes, client, tenantId, refresh, cancellationToken);
+            sent += count;
+            if (count < Batch) return sent;
         }
     }
 
@@ -118,17 +153,10 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOp
             .ToListAsync(cancellationToken);
         if (changed.Count == 0) return 0;
 
-        // The text read from the latest revision's files, where the organization lets them be read.
-        var latest = changed.Where(d => d.LatestRevisionId != null).Select(d => d.LatestRevisionId!.Value).ToList();
-        var texts = (await db.FileTexts.AsNoTracking().Where(t => t.RevisionId != null && latest.Contains(t.RevisionId.Value))
-                .Select(t => new { t.DocumentId, t.RevisionId, t.Text }).ToListAsync(cancellationToken))
-            .GroupBy(t => t.DocumentId)
-            .ToDictionary(g => g.Key, g => Cap(string.Join('\n', g.Select(t => t.Text))));
-
+        // A document's details only: a file's content is never read (owner).
         await client.BulkAsync(changed.Select(d => new IndexedDocument(d.Id, d.TenantId, d.ProjectId, d.Number, d.Title,
             d.DeliverableType, d.DocType, d.Discipline, d.Originator, d.Subproject, d.State, d.LatestRevisionValue,
-            d.LatestRevisionState, d.Confidentiality, d.UpdatedAt.ToDateTimeOffset(),
-            texts.GetValueOrDefault(d.Id))).ToList(), refresh, cancellationToken);
+            d.LatestRevisionState, d.Confidentiality, d.UpdatedAt.ToDateTimeOffset())).ToList(), refresh, cancellationToken);
 
         // Moved only once the index has them: a failed pass sends the same documents again.
         // And never past a minute ago: a change is stamped before its transaction commits,
@@ -151,9 +179,6 @@ public sealed class SearchIndexer(IServiceScopeFactory scopes, IOptions<SearchOp
         // Reaching recent changes means this pass has caught up.
         return upTo == changed[^1] ? changed.Count : Math.Min(changed.Count, Batch - 1);
     }
-
-    /// <summary>Cuts text to <c>MaxContent</c> characters.</summary>
-    private static string Cap(string text) => text.Length > MaxContent ? text[..MaxContent] : text;
 
     /// <summary>Forget what was sent, so the next pass sends everything again.</summary>
     public static async Task ResetAsync(IServiceScopeFactory scopes, CancellationToken cancellationToken)

@@ -192,6 +192,7 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
         await using var app = await TestApp.StartAsync(infrastructure, settings => settings["SignUp:Enabled"] = "true");
         var (taken, takenBody) = await Flow.PostAsync(app.Factory.CreateClient(), "/api/auth/sign-up", new
         {
+            acceptTerms = true,
             organizationName = "Twin Ltd",
             name = "Twin",
             email = "engineer@demo.local",
@@ -201,6 +202,7 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
 
         var (made, madeBody) = await Flow.PostAsync(app.Factory.CreateClient(), "/api/auth/sign-up", new
         {
+            acceptTerms = true,
             organizationName = "Riverside Water",
             name = "Rita River",
             email = "rita@riverside.test",
@@ -219,6 +221,7 @@ public sealed class AdminTests(Infrastructure infrastructure) : IClassFixture<In
         var registered = await Api.RegisterAsync(rita, project, new { title = "Intake screen general arrangement", deliverableType = "ENG", docType = "DWG", discipline = "CI", subproject = "00" });
         Assert.StartsWith("RW1-", registered.GetProperty("number").GetString());
         var parties = await rita.GetFromJsonAsync<JsonElement>("/api/admin/parties");
-        Assert.Equal(["OUR-ORG"], parties.EnumerateArray().Select(p => p.GetProperty("code").GetString()));
+        // Only itself, under its own name (one code and one name everywhere, owner), never a placeholder of ours.
+        Assert.Equal("Riverside Water", Assert.Single(parties.EnumerateArray()).GetProperty("name").GetString());
     }
 }

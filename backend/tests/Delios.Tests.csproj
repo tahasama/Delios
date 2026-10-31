@@ -21,6 +21,12 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- Build files left in a folder below this one (an older layout, another tool) are never compiled again: compiling
+       them twice made every assembly attribute a duplicate (CS0579). -->
+  <ItemGroup>
+    <Compile Remove="**/obj/**;**/bin/**" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\app\Delios.Host.csproj" />
   </ItemGroup>

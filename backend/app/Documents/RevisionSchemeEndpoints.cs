@@ -57,14 +57,16 @@ public static class RevisionSchemeEndpoints
         {
             var access = ProjectAccessFilter.Of(h);
             var scope = await ScopeAsync(db, access.Project.Id, c);
-            var free = await Liberty.IsFreeAsync(db, Liberty.Revisions, c);
+            var free = await Liberty.IsFreeAsync(db, Liberty.Revisions, access.Project.Id, c);
             var schemes = await db.RevisionSchemes.AsNoTracking().Where(s => s.ProjectId == scope).OrderBy(s => s.Name).ToListAsync(c);
             var routing = await db.RevisionSchemeRoutings.AsNoTracking().Where(r => r.ProjectId == scope).ToListAsync(c);
             return Results.Ok(new
             {
                 RevisionSchemes = schemes.Select(s => new { s.Id, s.Name, s.IsDefault, s.ForwardOnly, s.Series }),
                 RevisionRouting = routing.Select(r => new { r.DeliverableType, r.SchemeId }),
-                Own = scope is not null, Free = free,
+                Own = scope is not null,
+                Free = free,
+                Exception = await Liberty.ExceptionHereAsync(db, Liberty.Revisions, access.Project.Id, c),
                 MayChange = free && await ProjectLists.MayChangeAsync(db, access, c),
                 MayChangeOrganization = await Keepers.ConfiguresAsync(h),
             });
@@ -82,7 +84,7 @@ public static class RevisionSchemeEndpoints
         Func<Guid?, Task<IResult>> act, Guid? schemeId = null)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!await Liberty.IsFreeAsync(db, Liberty.Revisions, cancellationToken))
+        if (!await Liberty.IsFreeAsync(db, Liberty.Revisions, access.Project.Id, cancellationToken))
             return Problems.Forbidden("REVISIONS_FIXED", "Revision naming is the organization's, the same on every project: an administrator changes it in the organization's Settings.");
         if (!await ProjectLists.MayChangeAsync(db, access, cancellationToken))
             return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes its revision naming (on a project with none, whoever opened it).");
@@ -102,11 +104,22 @@ public static class RevisionSchemeEndpoints
         {
             var copy = new RevisionScheme
             {
-                TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Name = scheme.Name, IsDefault = scheme.IsDefault, ForwardOnly = scheme.ForwardOnly,
+                TenantId = access.Project.TenantId,
+                ProjectId = access.Project.Id,
+                Name = scheme.Name,
+                IsDefault = scheme.IsDefault,
+                ForwardOnly = scheme.ForwardOnly,
                 Series = scheme.Series.Select(r => new RevisionSeriesRule
                 {
-                    Code = r.Code, Label = r.Label, Phase = r.Phase, Kind = r.Kind, Prefix = r.Prefix, Start = r.Start, Width = r.Width,
-                    Lowercase = r.Lowercase, ExcludedLetters = [.. r.ExcludedLetters],
+                    Code = r.Code,
+                    Label = r.Label,
+                    Phase = r.Phase,
+                    Kind = r.Kind,
+                    Prefix = r.Prefix,
+                    Start = r.Start,
+                    Width = r.Width,
+                    Lowercase = r.Lowercase,
+                    ExcludedLetters = [.. r.ExcludedLetters],
                 }).ToList(),
             };
             db.RevisionSchemes.Add(copy);
@@ -117,8 +130,12 @@ public static class RevisionSchemeEndpoints
                 db.RevisionSchemeRoutings.Add(new RevisionSchemeRouting { TenantId = access.Project.TenantId, ProjectId = access.Project.Id, DeliverableType = route.DeliverableType, SchemeId = schemeId });
         db.Add(new Setting
         {
-            TenantId = access.Project.TenantId, ProjectId = access.Project.Id, Key = OwnKey, Value = "ON",
-            UpdatedAt = clock.GetCurrentInstant(), UpdatedByName = access.UserName,
+            TenantId = access.Project.TenantId,
+            ProjectId = access.Project.Id,
+            Key = OwnKey,
+            Value = "ON",
+            UpdatedAt = clock.GetCurrentInstant(),
+            UpdatedByName = access.UserName,
         });
         await db.SaveChangesAsync(cancellationToken);
         return map;

@@ -105,14 +105,21 @@ export function DelegatePanel({ rows, controller, off = false }: {
 /**
  * The hand-over form on its own: opened from the answer card's Delegate
  * button, in place of the verdict, so the step is either answered or handed on.
+ * The control function and whoever holds Manage open it too (owner: "we could use the already existing one"), and
+ * choose whose seat on the open step they hand over (`seats`); the person's own seat is chosen first when they sit there.
  */
-export function DelegateForm({ cycleId, verb, candidates, throughControl, strict = false }: {
+export function DelegateForm({ cycleId, verb, candidates, throughControl, strict = false, seats = [], self = null }: {
   cycleId: string;
   verb: "REVIEW" | "APPROVE";
   candidates: { id: string; name: string; functionName: string; inMatrix: boolean }[];
   throughControl: boolean;
   strict?: boolean;
+  /** For the control function and whoever holds Manage: the seats on the open step not answered yet. */
+  seats?: { id: string; name: string }[];
+  /** The person's own seat, when they sit on the open step and have not handed it over. */
+  self?: string | null;
 }) {
+  const forOthers = seats.some((one) => one.id !== self);
   const act = verb === "APPROVE" ? "decide" : "advise";
   const tomorrow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   return candidates.length ? (
@@ -122,6 +129,10 @@ export function DelegateForm({ cycleId, verb, candidates, throughControl, strict
       size="sm"
       hidden={{ cycleId, verb }}
     >
+      {forOthers ? (
+        <SearchPick name="fromUserId" single required initial={self ? [self] : []} label="Whose step"
+          hint="on the open step, not answered yet" items={seats.map((one) => ({ id: one.id, name: one.name, detail: one.id === self ? "you" : null }))} />
+      ) : null}
       <SearchPick
         name="toUserId"
         items={candidates.map((one) => ({
@@ -130,7 +141,8 @@ export function DelegateForm({ cycleId, verb, candidates, throughControl, strict
           detail: one.inMatrix ? one.functionName : `${one.functionName} · not in the matrix for this`,
           note: one.inMatrix ? null : `The matrix does not name ${one.name} to ${act} on this kind of document. You can still choose them: it is flagged, and the record says you handed it to them.`,
         }))}
-        label="Who answers it" 
+        label="Who answers it"
+        single
         required
         hint={strict ? "only people the matrix names for this" : "the matrix's people first — anyone else is flagged"}
       />
@@ -141,8 +153,8 @@ export function DelegateForm({ cycleId, verb, candidates, throughControl, strict
         <input name="reason" className={inputCls} />
       </Field>
       <p className="text-[11px] leading-4 text-slate-500">
-        {throughControl ? "It starts once the control function lets it; until then, the step is still yours." : "It takes effect at once."}
-        {" "}The record says you delegated it to them, and you answer for that choice.
+        {throughControl ? `It starts once the control function lets it; until then, the step is still ${forOthers ? "theirs" : "yours"}.` : "It takes effect at once."}
+        {" "}{forOthers ? "Both are told. " : ""}The record says you delegated it to them, and you answer for that choice.
       </p>
     </ActionForm>
   ) : (

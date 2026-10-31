@@ -4,7 +4,8 @@ import { Select } from "@/components/select";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, Pin, PinOff, Search, X, Bell } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, Pin, PinOff, Search, X, Bell } from "lucide-react";
+import { TablePaging } from "@/components/table-paging";
 import { DataTable, Th, Td, Chip, Info } from "@/components/ui";
 import { useCardHeight } from "@/components/card-height";
 import { DateWindow } from "@/components/date-window";
@@ -33,7 +34,6 @@ export type ReviewRow = {
   docNumber: string;
   title: string;
   revision: string;
-  kind: "decision" | "advice" | "client review";
   verdict: string | null;
   verdictLabel: string | null;
   verdictProceeds: boolean | null;
@@ -64,7 +64,6 @@ type Opt = { code: string; label: string; group?: string };
 /** The filters a person may show or hide here (the Filters menu, `components/filter-menu.tsx`), in the order they stand. */
 const FILTERS = [
   { key: "status", label: "Review state" },
-  { key: "kind", label: "Kind" },
   { key: "verdict", label: "Verdict" },
   { key: "due", label: "Due" },
   { key: "discipline", label: "Discipline" },
@@ -81,8 +80,8 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
   plate: React.ReactNode;
   rows: ReviewRow[];
   total: number;
-  filters: { q: string; status: string; kind: string; verdict: string; due: string; discipline: string; docType: string; supplier: string; po: string; deliverable: string; on: string; from: string; to: string };
-  filterOptions: { statuses: Opt[]; kinds: Opt[]; verdicts: Opt[]; dues: Opt[]; disciplines: Opt[]; types: Opt[]; suppliers: Opt[]; pos: Opt[]; deliverables: Opt[]; dateFields: Opt[] };
+  filters: { q: string; status: string; verdict: string; due: string; discipline: string; docType: string; supplier: string; po: string; deliverable: string; on: string; from: string; to: string };
+  filterOptions: { statuses: Opt[]; verdicts: Opt[]; dues: Opt[]; disciplines: Opt[]; types: Opt[]; suppliers: Opt[]; pos: Opt[]; deliverables: Opt[]; dateFields: Opt[] };
   facets: { key: string; label: string; without: string }[];
   paging: { page: number; pages: number; perPage: number; sizes: number[]; from: number; to: number; query: string };
   sort?: { key: string; dir: "asc" | "desc" };
@@ -202,7 +201,6 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
 
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3 md:grid-cols-5">
           {show("status") ? <Narrow name="status" value={filters.status} empty="Review state" options={filterOptions.statuses} /> : null}
-          {show("kind") ? <Narrow name="kind" value={filters.kind} empty="Kind" options={filterOptions.kinds} /> : null}
           {show("verdict") ? <Narrow name="verdict" value={filters.verdict} empty="Verdict" options={verdicts} /> : null}
           {show("due") ? <Narrow name="due" value={filters.due} empty="Due" options={filterOptions.dues} /> : null}
           {show("discipline") ? <Narrow name="discipline" value={filters.discipline} empty="Discipline" options={filterOptions.disciplines} /> : null}
@@ -261,6 +259,7 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
       <div className={`${cardHeight ? "flex min-h-0 flex-1 flex-col" : ""} ${pending ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
         {rows.length ? (
           <DataTable
+            paging={total > 0 ? <TablePaging from={paging.from} to={paging.to} total={total} page={paging.page} pages={paging.pages} onPage={(page) => go(step(page))} perPage={paging.perPage} sizes={paging.sizes} onSize={(per) => go(sized(per))} /> : undefined}
             id="reviews"
             className="rounded-none border-0 shadow-none"
             defaultHidden={["Opened by", "Closed", "Produced by", "Contract", "Type", "Comments"]}
@@ -347,33 +346,12 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
         ) : (
           <div className="px-6 py-20 text-center">
             <p className="font-mono text-xs tracking-[0.2em] text-slate-400 uppercase">no reviews</p>
-            <p className="mt-2 text-sm text-slate-700">Nothing in the reviews matches these filters.</p>
+            <p className="mt-2 text-sm text-slate-700">{facets.length ? "Nothing in the reviews matches these filters." : "No reviews yet. A review starts from a document being prepared: “Send for review” on its page."}</p>
             {facets.length ? <button type="button" onClick={() => go("/reviews")} className="mt-3 text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
           </div>
         )}
       </div>
 
-      {total > 0 ? (
-        <div data-dt-foot className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-line px-5 py-2.5 sm:px-6">
-          <p className="font-mono text-[11px] tabular-nums text-slate-500">
-            {paging.from.toLocaleString("en-GB")}–{paging.to.toLocaleString("en-GB")}
-            <span className="ml-1.5 font-sans text-slate-400">of {total.toLocaleString("en-GB")}</span>
-          </p>
-          {paging.pages > 1 ? (
-            <span className="flex items-center gap-2">
-              <PageStep onClick={() => go(step(paging.page - 1))} disabled={paging.page === 1} label="Previous page"><ChevronLeft className="h-4 w-4" /></PageStep>
-              <span className="font-mono text-[11px] tabular-nums text-slate-500">{paging.page} of {paging.pages}</span>
-              <PageStep onClick={() => go(step(paging.page + 1))} disabled={paging.page === paging.pages} label="Next page"><ChevronRight className="h-4 w-4" /></PageStep>
-            </span>
-          ) : <span />}
-          <label className="flex items-center justify-end gap-1.5">
-            <span className="stencil text-slate-400">Rows</span>
-            <Select className="plain" value={paging.perPage} onChange={(event) => go(sized(Number(event.target.value)))}>
-              {paging.sizes.map((size) => <option key={size} value={size}>{size}</option>)}
-            </Select>
-          </label>
-        </div>
-      ) : null}
     </section>
   </>;
 }
@@ -391,20 +369,6 @@ function Narrow({ name, value, empty, options }: { name: string; value: string; 
   );
 }
 
-/** One step through the register. A step that leads nowhere is shown, and dead. */
-function PageStep({ onClick, disabled, label, children }: { onClick: () => void; disabled: boolean; label: string; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className="rounded-sm p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-ink disabled:cursor-default disabled:text-slate-300 disabled:hover:bg-transparent"
-    >
-      {children}
-    </button>
-  );
-}
 
 /**
  * The rail down the left of a row, in the colour of where the step stands: open
@@ -438,16 +402,6 @@ type Column = {
 /** The columns, in the order they start in. */
 const COLUMNS: Column[] = [
   { key: "revision", label: "Rev", sort: "rev", cellClass: "font-mono text-xs font-semibold text-slate-800", cell: (row) => row.revision },
-  {
-    key: "kind", label: "Kind", sort: "kind",
-    note: "A decision is the last step of a route and releases the revision or sends it back. Advice is any earlier step. A client review happens after we released it, and is answered by a new revision.",
-    cellClass: "whitespace-nowrap",
-    cell: (row) => (
-      <Chip className={row.kind === "client review" ? "bg-violet-100 text-violet-800 ring-violet-300" : row.kind === "decision" ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-sky-100 text-sky-800 ring-sky-300"}>
-        {row.kind}
-      </Chip>
-    ),
-  },
   {
     key: "verdict", label: "Verdict", sort: "verdict",
     note: "On a decision, the code the decider gave. On an advisory step, what that person's comments amounted to — advisers are not asked for a code.",

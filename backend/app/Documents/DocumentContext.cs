@@ -28,11 +28,16 @@ public static class DocumentContextEndpoints
     {
         var access = ProjectAccessFilter.Of(http);
         if (!access.Holds(Verbs.Read)) return Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register.");
-        if (!await DocumentQueries.Visible(db, access).AnyAsync(d => d.Id == documentId, cancellationToken))
-            return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
+        var seen = await DocumentQueries.Visible(db, access).Where(d => d.Id == documentId).Select(d => new { d.Originator }).SingleOrDefaultAsync(cancellationToken);
+        if (seen is null) return Problems.NotFound("DOCUMENT_NOT_FOUND", "No such document.");
+        // Another organization reads, of one of our documents, only what was sent to it: those revisions, the transmittals
+        // it may open, the packages shared with it, and no review but one it answers (OutsideReading).
+        var whole = OutsideReading.Whole(access, seen.Originator);
+        var readable = await OutsideReading.RevisionsAsync(db, access, documentId, seen.Originator, cancellationToken);
 
         var revisionIds = await db.Revisions.Where(r => r.DocumentId == documentId).Select(r => r.Id).ToListAsync(cancellationToken);
-        var reviews = await (from r in db.Reviews
+        if (readable is not null) revisionIds = revisionIds.Where(readable.Contains).ToList();
+        var reviews = await (from r in OutsideReading.Reviews(db, access, db.Reviews)
                              join v in db.Revisions on r.RevisionId equals v.Id
                              where r.DocumentId == documentId
                              orderby r.StartedAt descending
@@ -70,12 +75,22 @@ public static class DocumentContextEndpoints
                                   p.Kind,
                                   Required = m.RequiredStatuses.Length > 0 ? m.RequiredStatuses : p.RequiredStatuses,
                                   p.RecipientPartyIds,
-                                  p.SupplierPartyId
+                                  p.SupplierPartyId,
+                                  Shared = p.SharedAt != null
                               }).AsNoTracking().ToListAsync(cancellationToken);
         var partyNames = await db.Parties.AsNoTracking().ToDictionaryAsync(p => p.Id, p => p.Name, cancellationToken);
         var transmittalIds = transmittals.Select(t => t.Id).Distinct().ToList();
-        // The reader opens only the transmittals they may see; the others are listed, not linked.
+        // The reader opens only the transmittals they may see; the others are listed, not linked (to our own people).
         var mayOpen = (await sending.Visible(access).Where(t => transmittalIds.Contains(t.Id)).Select(t => t.Id).ToListAsync(cancellationToken)).ToHashSet();
+        if (!access.IsInternal)
+        {
+            // Another organization: only the transmittals it may open, and the supplier packages shared with it.
+            transmittals = transmittals.Where(t => mayOpen.Contains(t.Id)).ToList();
+            transmittalIds = transmittalIds.Where(mayOpen.Contains).ToList();
+            var code = access.PartyCode ?? "\u0000";
+            var mine = (await db.Parties.AsNoTracking().Where(p => p.Code == code).Select(p => p.Id).ToListAsync(cancellationToken)).ToHashSet();
+            packages = packages.Where(p => p.Kind == Packages.PackageKinds.Supply && p.Shared && p.SupplierPartyId is { } s && mine.Contains(s)).ToList();
+        }
         var recipients = (await db.TransmittalRecipients.AsNoTracking().Where(r => transmittalIds.Contains(r.TransmittalId))
             .Select(r => new { r.TransmittalId, r.Name, r.Organization, Person = r.UserId != null, r.OpenedAt, r.AcknowledgedAt, r.DispatchedAt })
             .ToListAsync(cancellationToken)).ToLookup(r => r.TransmittalId);
@@ -86,8 +101,10 @@ public static class DocumentContextEndpoints
                                 select new { ActivityId = a.Id, a.Code, a.Name, n.Purpose, n.NeededBy, n.State, n.WaiverNote, NeedId = n.Id, n.RequiredStatuses, a.Start })
             .AsNoTracking().ToListAsync(cancellationToken);
         // The document's own events and its revisions'. Another organization sees what happened, not who did it inside.
+        // One list of the items it is about, read by its index (entity, id).
+        var about = whole ? revisionIds.Append(documentId).ToList() : revisionIds.ToList();
         var history = await db.AuditEvents.AsNoTracking()
-            .Where(e => e.EntityId == documentId || (e.EntityId != null && revisionIds.Contains(e.EntityId.Value)))
+            .Where(e => e.EntityId != null && about.Contains(e.EntityId.Value))
             .OrderByDescending(e => e.Id).Take(200)
             .Select(e => new { e.At, Actor = access.IsInternal ? e.ActorName : null, e.Action, e.EntityType, e.EntityId, e.EntityLabel, e.Detail })
             .ToListAsync(cancellationToken);

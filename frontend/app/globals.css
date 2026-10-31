@@ -4,9 +4,15 @@
 @custom-variant dark (&:where(.dark, .dark *));
 /* The desktop sidebar collapsed to icons (SIDEBAR in navigation.tsx). */
 @custom-variant rail (&:where([data-sidebar="rail"] .sidebar-desktop, [data-sidebar="rail"] .sidebar-desktop *));
+/* The menu fits the window, never scrolls (owner): on a shorter screen it tightens, then drops the lines under the names. */
+@custom-variant short (@media (max-height: 880px));
+@custom-variant tiny (@media (max-height: 740px));
+@custom-variant tight (@media (max-height: 680px));
 
 :root {
-  --sidebar-w: 268px;
+  --sidebar-w: 258px;
+  /* Motion's one curve: starts at once, settles softly (the Motion block at the end). */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   /* The one control size, used everywhere: every field, dropdown, button and
      file field in the app stands this height, with this text and these
      corners. Locked in: change it here, never per page. */
@@ -57,6 +63,10 @@ table {
    cursor set on the element itself — grab on a row being dragged, help on a
    hover note — still wins. */
 @layer base {
+  /* Long titles wrap into lines of even length, never one word left alone on the last (owner, "balanced headlines");
+     body text is left as it is. */
+  h1, h2, h3, h4 { text-wrap: balance; }
+
   /* Every native field takes the control size unless a component sets it. */
   input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="hidden"]),
   select {
@@ -568,6 +578,14 @@ summary::-webkit-details-marker {
     color: var(--color-slate-900);
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1), 0 1px 1px rgba(15, 23, 42, 0.06);
   }
+  /* In the dark the chosen one stands raised in light (owner: "the dark mode tabs are not really that obvious"). */
+  :root.dark .segment[aria-current="page"], :root.dark .segment[aria-pressed="true"] {
+    background: var(--color-slate-300);
+    color: var(--color-slate-950);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong), 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+  :root.dark .segment:not([aria-current="page"]):not([aria-pressed="true"]) { color: var(--color-slate-400); }
+  :root.dark .segment:not([aria-current="page"]):not([aria-pressed="true"]):hover { color: var(--color-slate-800); }
   .segment-n {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -586,6 +604,134 @@ summary::-webkit-details-marker {
     background: color-mix(in srgb, var(--color-amber-500) 26%, transparent);
     color: var(--color-amber-700);
   }
+
+  /* A tablist's open tab reads as the chosen segment too (`aria-selected`), as does a link marked current. */
+  .segment[aria-selected="true"], .segment[aria-current="true"] {
+    background: var(--color-surface);
+    color: var(--color-slate-900);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1), 0 1px 1px rgba(15, 23, 42, 0.06);
+  }
+  :root.dark .segment[aria-selected="true"], :root.dark .segment[aria-current="true"] {
+    background: var(--color-slate-300);
+    color: var(--color-slate-950);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong), 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+  .segment[aria-selected="true"] .segment-n, .segment[aria-current="true"] .segment-n { background: var(--color-tint); color: var(--color-brand-ink); }
+  .segment-hint { font-size: 11px; font-weight: 400; color: var(--color-slate-500); }
+
+  /* ── The Schedule's views (owner: the panel tabs of before, "the one we had previously on schedule"): one frame
+     split into equal sides, the chosen side lit with the brand's line along its foot, the others drawn as the
+     controls they are, each carrying its icon, a few words, and an arrow saying it can be gone to. For the few
+     tabs a page is read in (the Schedule, Assurance, Reports, a document, the organization, Packages); the switch
+     (`.seg`) is for small choices and decisions inside them. */
+  .views {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(max-content, 1fr);
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-surface);
+  }
+  .view {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 0;
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    background: var(--color-slate-100);
+    color: var(--color-slate-600);
+    box-shadow: inset 0 -3px 0 0 color-mix(in srgb, var(--color-brand) 20%, transparent);
+    transition: color 160ms, background-color 160ms, box-shadow 160ms;
+  }
+  .view + .view { border-left: 1px solid var(--color-line); }
+  .view svg { width: 1rem; height: 1rem; flex-shrink: 0; }
+  .view:hover { background: var(--color-surface); color: var(--color-brand-ink); }
+  .view[aria-current="page"], .view[aria-selected="true"] {
+    background: var(--color-surface);
+    color: var(--color-brand-ink);
+    box-shadow: inset 0 -3px 0 0 var(--color-brand);
+  }
+  .views::-webkit-scrollbar { display: none; }
+
+  /* ── The tab strip (owner: Reports' plain tabs "with a subtle greyish background and a separator between each";
+     Assurance and the Schedule the same, full width with their icons; then "not literal rectangles, separators… not
+     bigger… the grey on the background, not the text"): one quiet grey band, the tabs plain words on it as before, a
+     short hairline between each (never a box round a tab), the open one bold with the brand's ink line at its foot.
+     `.strip` inside a card (Reports, across its plate); `.strip-card` a band of its own, rounded; `.strip-full` shares
+     the width out between the tabs. */
+  .strip {
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: color-mix(in srgb, var(--color-slate-500) 4%, var(--color-surface));
+  }
+  .strip::-webkit-scrollbar { display: none; }
+  /* On the grey page a band of its own is framed as every sheet is (owner: the grey band "works because it sits on a
+     white background", then "a light subtle grey"): the band's own light grey, the sheet's frame and shadow. */
+  .strip-card {
+    border: 1px solid var(--color-line);
+    border-radius: 0.875rem;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 12px 28px -24px rgb(15 23 42 / 45%);
+    overflow: hidden;
+  }
+  .strip-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    padding: 0.625rem 0.9rem;
+    font-size: 12px;
+    line-height: 1rem;
+    color: var(--color-slate-700);
+    box-shadow: inset 0 -2px 0 0 transparent;
+    transition: color 140ms, box-shadow 140ms;
+  }
+  .strip-tab + .strip-tab::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    height: 0.9rem;
+    width: 1px;
+    transform: translateY(-50%);
+    background: var(--color-line-strong);
+  }
+  .strip-tab svg { width: 0.9rem; height: 0.9rem; flex-shrink: 0; color: var(--color-slate-500); }
+  .strip-tab:hover { color: var(--color-slate-900); box-shadow: inset 0 -2px 0 0 var(--color-line-strong); }
+  .strip-tab[aria-current="page"] {
+    color: var(--color-slate-900);
+    font-weight: 600;
+    box-shadow: inset 0 -2px 0 0 var(--color-brand-ink);
+  }
+  .strip-tab[aria-current="page"] svg { color: var(--color-brand-ink); }
+  .strip-full .strip-tab { flex: 1 1 0; justify-content: center; }
+
+  .view-hint { font-size: 11px; font-weight: 400; color: var(--color-slate-500); }
+  .view-n {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25rem;
+    min-width: 1.25rem;
+    text-align: center;
+    border-radius: 99px;
+    padding: 0 0.3rem;
+    background: color-mix(in srgb, var(--color-slate-400) 22%, transparent);
+    color: var(--color-slate-600);
+  }
+  .view[aria-current="page"] .view-n, .view[aria-selected="true"] .view-n { background: var(--color-tint); color: var(--color-brand-ink); }
+  .view .view-go { width: 0.875rem; height: 0.875rem; color: var(--color-slate-400); transition: transform 160ms; }
+  .view:hover .view-go { transform: translateX(2px); }
+  .view[aria-current="page"] .view-go, .view[aria-selected="true"] .view-go { display: none; }
 }
 
 
@@ -1117,6 +1263,9 @@ summary::-webkit-details-marker {
     border-bottom-left-radius: calc(0.875rem - 1px);
     border-bottom-right-radius: calc(0.875rem - 1px);
   }
+  /* A plate's figures (a grid of cells at the sheet's foot): its cells keep their square corners unless the grid clips
+     them, and a corner cell then stood out past the rounding (owner: "this corner flaw"). Nothing opens from figures. */
+  .register-sheet-open > dl:nth-last-child(1 of :not(input[type="hidden"], [aria-hidden="true"], script, template, style)) { overflow: hidden; }
 
   /* A hint of grey behind each control, and nothing else: no box, no border.
      An underlined field on white reads as a word until the pointer finds it;
@@ -1139,6 +1288,24 @@ summary::-webkit-details-marker {
   }
   .register select.plain[data-on="true"],
   .register button.plain[data-on="true"]:not([data-caret="none"]) { background-color: var(--color-tint); }
+  /* A field that cannot be changed reads so at once, not only under the pointer (owner): no grey behind it, a dashed
+     rule, muted words, no caret, and the pointer saying no. Every plain control of the app, and inputCls (ui.tsx). */
+  .register select.plain:disabled,
+  .register button.plain:disabled,
+  .register input.plain:disabled,
+  .register textarea.plain:disabled,
+  .register select.plain:disabled:hover,
+  .register button.plain:disabled:hover,
+  .register input.plain:disabled:hover,
+  .register textarea.plain:disabled:hover {
+    background-color: transparent;
+    background-image: none;
+    border-bottom-style: dashed;
+    border-bottom-color: var(--color-line-strong);
+    color: var(--color-slate-500);
+    cursor: not-allowed;
+  }
+  .register button.plain:disabled svg { display: none; }
 
 
   /* The kept views are a way back to a question, so they sit quieter than the
@@ -1368,6 +1535,8 @@ summary::-webkit-details-marker {
   .choice-side:hover:not(:disabled) { color: var(--color-slate-900); }
   .choice-side:disabled { cursor: default; }
   .choice-on { background: var(--color-surface); color: var(--color-slate-900); box-shadow: 0 1px 2px rgb(15 23 42 / 0.12); }
+  /* The same in the dark as the tabs: the chosen side raised in light. */
+  :root.dark .choice-on { background: var(--color-slate-300); color: var(--color-slate-950); box-shadow: inset 0 0 0 1px var(--color-line-strong), 0 1px 2px rgba(0, 0, 0, 0.4); }
   .choice-asked { outline: 1.5px dashed var(--color-amber-500); outline-offset: 1px; }
   .choice-confirm { background: var(--color-tint-soft); box-shadow: inset 0 0 0 1px var(--color-line); }
 
@@ -1387,3 +1556,109 @@ summary::-webkit-details-marker {
 /* A state on Help opened from a list (`/guide#state-<code>`): its line lit, so the eye lands on it. */
 .state-line { scroll-margin-top: 6rem; transition: background-color 0.4s ease-out; }
 .state-line:target { background: var(--color-tint); box-shadow: inset 3px 0 0 0 var(--color-brand); }
+
+/* ── Motion (owner: "smooth animations, not overdoing it… numbers incrementing, building up the progress, bigger to
+   regular for success… keeping the professional elegance") ────────────────────────────────────────────────────────
+   Only transform, opacity and colour move, never what pushes the page; fast start, soft stop; 150 ms for a press,
+   about 220 ms for what appears, 600 to 700 ms for what builds. Figures count up in `components/count-up.tsx`.
+   Everything here is off for whoever asked for less motion: it is then simply there, already done. */
+@layer components {
+  /* A bar of progress builds from the left when it arrives, and moves to a new width when it changes. */
+  .bar-build {
+    transform-origin: left center;
+    animation: bar-build 700ms var(--ease-out) both;
+    transition: width 600ms var(--ease-out);
+  }
+  @keyframes bar-build { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  /* What was just confirmed settles: a breath larger, then its size, a soft emerald ring fading out. */
+  .settle { animation: settle 260ms var(--ease-out) both; }
+  @keyframes settle {
+    from { transform: scale(1.03); box-shadow: 0 0 0 3px rgb(16 185 129 / 0.35); }
+    to { transform: scale(1); box-shadow: 0 0 0 0 rgb(16 185 129 / 0); }
+  }
+
+  /* A list's first rows rise into place, one after another; the rest are simply there. */
+  .rows-rise > tr:nth-child(-n + 8) { animation: row-rise 260ms var(--ease-out) both; }
+  .rows-rise > tr:nth-child(2) { animation-delay: 30ms; }
+  .rows-rise > tr:nth-child(3) { animation-delay: 60ms; }
+  .rows-rise > tr:nth-child(4) { animation-delay: 90ms; }
+  .rows-rise > tr:nth-child(5) { animation-delay: 120ms; }
+  .rows-rise > tr:nth-child(6) { animation-delay: 150ms; }
+  .rows-rise > tr:nth-child(7) { animation-delay: 180ms; }
+  .rows-rise > tr:nth-child(8) { animation-delay: 210ms; }
+  @keyframes row-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  /* The chosen tab's line draws itself out from its middle. */
+  .strip-tab[aria-current="page"] { box-shadow: none; }
+  .strip-tab[aria-current="page"]::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 2px;
+    background: var(--color-brand-ink);
+    animation: tab-line 220ms var(--ease-out) both;
+  }
+  @keyframes tab-line { from { transform: scaleX(0.3); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+
+  /* A drawer slides in from its edge over a veil that fades; a box opened in the middle grows into place. */
+  .drawer-in { animation: drawer-in 240ms var(--ease-out) both; }
+  @keyframes drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .veil-in { animation: veil-in 200ms ease-out both; }
+  @keyframes veil-in { from { opacity: 0; } to { opacity: 1; } }
+  .pop-in { animation: pop-in 180ms var(--ease-out) both; }
+  @keyframes pop-in { from { transform: scale(0.98) translateY(-4px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* A page arriving fades in (`template.tsx`); opacity only, and nothing kept once done, so fixed bars stay fixed. */
+  .page-in { animation: page-in 150ms ease-out backwards; }
+  @keyframes page-in { from { opacity: 0; } }
+
+  /* A list opened from a field grows out of it (`Floating`: from its top, or its foot when it opens above). */
+  .float-in { animation: float-in 150ms var(--ease-out) backwards; }
+  @keyframes float-in { from { opacity: 0; transform: scale(0.97); } }
+
+  /* The top bar's menus (your name, the projects) come out of their button. */
+  details[data-menu][open] > :not(summary) { transform-origin: top; animation: float-in 150ms var(--ease-out) backwards; }
+
+  /* What opens under a line (a line edited, a person, an organization, a function) or a fold comes down into place;
+     the room it takes is made at once, only what is in it moves. */
+  .open-in > *, details:not([data-menu])[open] > :not(summary) { animation: open-in 200ms var(--ease-out) backwards; }
+  @keyframes open-in { from { opacity: 0; transform: translateY(-4px); } }
+
+  /* The switches slide (owner: "it should feel like a slide"): one raised thumb under the chosen segment, moved by
+     `SegSlider` to the one chosen next; the segments themselves then carry no raised look of their own. */
+  .seg { position: relative; isolation: isolate; }
+  .seg[data-thumb]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    width: var(--thumb-w);
+    height: var(--thumb-h);
+    transform: translate(var(--thumb-x), var(--thumb-y));
+    border-radius: 0.55rem;
+    background: var(--color-surface);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1), 0 1px 1px rgba(15, 23, 42, 0.06);
+    pointer-events: none;
+  }
+  :root.dark .seg[data-thumb]::before {
+    background: var(--color-slate-300);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong), 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+  .seg[data-thumb="on"]::before {
+    transition: transform 240ms var(--ease-out), width 240ms var(--ease-out), height 240ms var(--ease-out);
+  }
+  :root .seg[data-thumb] .segment { background: transparent; box-shadow: none; }
+  /* Pressed, the words go with the thumb at once; the one it left goes quiet. */
+  :root .seg[data-thumb] .segment[data-pick] { color: var(--color-slate-900); }
+  :root .seg[data-thumb]:has(.segment[data-pick]) .segment:not([data-pick]) { color: var(--color-slate-500); }
+  :root.dark .seg[data-thumb] .segment[data-pick] { color: var(--color-slate-950); }
+  :root.dark .seg[data-thumb]:has(.segment[data-pick]) .segment:not([data-pick]) { color: var(--color-slate-400); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bar-build, .settle, .rows-rise > tr, .strip-tab[aria-current="page"]::after, .drawer-in, .veil-in, .pop-in,
+    .page-in, .float-in, details[data-menu][open] > :not(summary), .open-in > *, details:not([data-menu])[open] > :not(summary) { animation: none; }
+    .bar-build, .seg[data-thumb]::before { transition: none; }
+  }
+}

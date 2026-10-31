@@ -4,11 +4,12 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireScope } from "@/lib/core/scope";
 import { randomUUID } from "node:crypto";
+import { once } from "@/lib/core/once";
 import { isController, isAdmin, hasVerb } from "@/lib/core/auth";
 import { supplyReason, submittedFor } from "@/lib/packages/supplier-status";
 import { api, projectPath, refusal } from "@/lib/client";
 import { upload } from "@/lib/documents/api-uploads";
-import { backendDocument, backendRevision } from "@/lib/documents/api";
+import { backendDocument, backendDocuments, backendRevision } from "@/lib/documents/api";
 import { addressees, packageView } from "@/lib/packages/api";
 import type { PackageView, TransmittalView } from "@/lib/types";
 
@@ -33,11 +34,13 @@ export async function createSupplierPackageAction(_prev: { error?: string } | un
   try {
     const created = await api<PackageView>(projectPath(ctx, "/packages"), {
       body: {
-        title: `${party.name}${po ? ` — ${po}` : ""}`, kind: "SUPPLY", supplierPartyId: party.id, purchaseOrder: po,
+        // A branch carries its own name ("Mechanical"); a package at the top is named after its supplier.
+        title: String(formData.get("title") ?? "").trim() || `${party.name}${po ? ` — ${po}` : ""}`, kind: "SUPPLY", supplierPartyId: party.id, purchaseOrder: po,
+        parentId: String(formData.get("parentId") ?? "") || null,
         reason: (await supplyReason()).code, requiredStatuses: requiredStatus ? [requiredStatus] : [],
         ownerIds: [user.id], acceptorIds: [],
       },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "send") ?? randomUUID(),
     });
     number = created.number;
   } catch (e) {
@@ -76,7 +79,7 @@ export async function submitSupplierPackageAction(_prev: { error?: string; ok?: 
     })));
     sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
       body: { reason: pkg.reason, subject: `${pkg.number}: ${planned.length} document${planned.length === 1 ? "" : "s"}`, planned, fromPartyId: onBehalf ? pkg.supplierPartyId : null },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "send") ?? randomUUID(),
     });
   } catch (e) {
     return { error: refusal(e).message };
@@ -113,7 +116,7 @@ export async function sendAsReceivedAction(_prev: { error?: string; ok?: string 
         reason: pkg.reason, subject: `${pkg.number}: ${[number, revision && `rev ${revision}`].filter(Boolean).join(" ") || title}`, packageId: pkg.id,
         unplanned: [{ title, reference: number || null, revision: revision || null, status: text("status") || null, outcome: text("outcome") || null, fileIds }],
       },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "send") ?? randomUUID(),
     });
     revalidatePath(`/packages/${pkg.number}`);
     return { ok: `Sent on ${sent.number}. It is checked, then in the register as you sent it.` };
@@ -143,7 +146,7 @@ export async function attachSupplierFileAction(_prev: { error?: string; ok?: str
     const fileIds = [await upload(ctx, { documentId }, file)];
     const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
       body: { reason: reason.code, planned: [{ documentId, fileIds, status }], fromPartyId },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "send") ?? randomUUID(),
     });
     revalidatePath(`/documents/${documentId}`);
     return { ok: `Sent on ${sent.number}. The control function has been notified.` };
@@ -162,7 +165,8 @@ async function sendSupplierDocumentsAction(_prev: { error?: string; ok?: string 
   const ids = [...new Set(formData.getAll("revisionId").map(String).filter(Boolean))];
   const revs = (await Promise.all(ids.map((id) => backendRevision(ctx, id).catch(() => null))))
     .filter((r): r is NonNullable<typeof r> => !!r && r.state === "IN_PREPARATION");
-  const docs = await Promise.all(revs.map((r) => backendDocument(ctx, r.documentId)));
+  const read = new Map((await backendDocuments(ctx, revs.map((r) => r.documentId))).map((d) => [d.id, d]));
+  const docs = revs.map((r) => read.get(r.documentId) ?? null);
   // Only what has a file and is not yet on its way.
   const ready = revs.map((r, i) => ({ r, doc: docs[i], files: docs[i]?.revisions.find((one) => one.id === r.id)?.files.length ?? 0 }))
     .filter((one) => one.doc && one.files > 0);
@@ -174,7 +178,7 @@ async function sendSupplierDocumentsAction(_prev: { error?: string; ok?: string 
   try {
     const sent = await api<TransmittalView>(projectPath(ctx, "/transmittals/incoming"), {
       body: { reason: (await supplyReason()).code, revisionIds: ready.map((one) => one.r.id), fromPartyId: await partyIdFor(ctx, user, parties[0]) },
-      idempotencyKey: randomUUID(),
+      idempotencyKey: once(formData, "send") ?? randomUUID(),
     });
     number = sent.number;
   } catch (e) {

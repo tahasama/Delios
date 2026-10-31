@@ -38,7 +38,7 @@ public sealed class ReportTests(Infrastructure infrastructure) : IClassFixture<I
         var reviewId = review.GetProperty("id").GetGuid();
         await Flow.PostAsync(engineer, $"{p}/reviews/{reviewId}/answer", new { });
         await Flow.PostAsync(approver, $"{p}/reviews/{reviewId}/answer", new { verdict = "C1", status = "IFC" });
-        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", new { });
+        await Flow.PostAsync(controller, $"{p}/reviews/{reviewId}/release", await Flow.ReleaseBodyAsync(controller));
         var inReview = await Flow.RevisionAsync(engineer, await Api.RegisterAsync(engineer, released.Project, Api.Drawing("Inlet works sections"))
             .ContinueWith(t => t.Result.GetProperty("id").GetGuid()));
         await Flow.PostAsync(engineer, $"{p}/revisions/{inReview.Revision}/reviews", new { });
@@ -55,7 +55,7 @@ public sealed class ReportTests(Infrastructure infrastructure) : IClassFixture<I
         var lateNumber = late.GetProperty("number").GetString()!;
 
         var list = await GetAsync(engineer, $"{p}/reports");
-        Assert.Equal(["register", "deliveries", "reviews", "transmittals", "readiness"], list.EnumerateArray().Select(r => r.GetProperty("id").GetString()));
+        Assert.Equal(["register", "deliveries", "reviews", "transmittals", "readiness", "progress", "exchange", "asof"], list.EnumerateArray().Select(r => r.GetProperty("id").GetString()));
 
         var register = await GetAsync(engineer, $"{p}/reports/register");
         Assert.Equal(("3", "33%", "1", "1"),
@@ -70,7 +70,7 @@ public sealed class ReportTests(Infrastructure infrastructure) : IClassFixture<I
 
         var deliveries = await GetAsync(engineer, $"{p}/reports/deliveries");
         var overdue = Rows(deliveries).Single();
-        Assert.Equal((lateNumber, "Overdue", "1 d"), (overdue[0], overdue[6], overdue[5]));
+        Assert.Equal((lateNumber, "Overdue", "1 d"), (overdue[0], overdue[7], overdue[6]));
         Assert.Equal("1", Figure(deliveries, "Overdue now"));
 
         var reviews = await GetAsync(engineer, $"{p}/reports/reviews");

@@ -19,6 +19,8 @@ internal sealed class PackageConfiguration : IEntityTypeConfiguration<Package>
         b.HasMany(x => x.Members).WithOne().HasForeignKey(x => x.PackageId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.ProjectId, x.Number }).IsUnique();
         b.HasIndex(x => new { x.ProjectId, x.State });
+        b.HasOne<Package>().WithMany().HasForeignKey(x => x.ParentId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.ParentId);
         b.Property(x => x.Number).HasMaxLength(64);
         b.Property(x => x.Kind).HasMaxLength(16);
         b.HasOne<Party>().WithMany().HasForeignKey(x => x.SupplierPartyId).OnDelete(DeleteBehavior.Restrict);

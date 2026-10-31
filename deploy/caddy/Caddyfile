@@ -10,6 +10,15 @@
 # SITE_ADDRESS to the domain (app.example.com) and Caddy obtains and renews the
 # TLS certificate itself.
 
+{
+	# The screens pass on the address the person came from (X-Forwarded-For, set by the site below). Caddy replaces
+	# that header when the request is not from a proxy it trusts, which made every sign-in come from the screens'
+	# own address: one limit of sign-in attempts for everybody. Only the private network reaches :8080.
+	servers :8080 {
+		trusted_proxies static private_ranges
+	}
+}
+
 (api) {
 	reverse_proxy {
 		dynamic a api 8080 {
@@ -44,6 +53,11 @@
 
 {$SITE_ADDRESS::80} {
 	encode zstd gzip
+
+	# The backend tells the screens what changed on the internal network only; never from outside.
+	handle /api/screens/* {
+		respond 404
+	}
 
 	handle /api/auth/sso/* {
 		import api

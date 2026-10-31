@@ -51,11 +51,16 @@ public static class ProjectFunctions
         return Results.Ok(new
         {
             Own = own,
-            Free = await Liberty.IsFreeAsync(db, Liberty.Functions, cancellationToken),
+            Free = await Liberty.IsFreeAsync(db, Liberty.Functions, access.Project.Id, cancellationToken),
+            Exception = await Liberty.ExceptionHereAsync(db, Liberty.Functions, access.Project.Id, cancellationToken),
             MayChange = await ProjectLists.MayChangeAsync(db, access, cancellationToken),
             Functions = functions.Select(f => new
             {
-                f.Id, f.Code, f.Name, f.Active, f.Clearance,
+                f.Id,
+                f.Code,
+                f.Name,
+                f.Active,
+                f.Clearance,
                 Holders = held.FirstOrDefault(h => h.Key == f.Id)?.Count ?? 0,
                 Rules = rules.Where(r => r.FunctionId == f.Id)
                     .Select(r => new { r.Id, r.Verbs, r.DeliverableType, r.DocType, r.Discipline, r.Criticality, r.Confidentiality, r.ProjectRole, r.Family, r.Note }),
@@ -73,7 +78,7 @@ public static class ProjectFunctions
         IClock clock, CancellationToken cancellationToken)
     {
         var access = ProjectAccessFilter.Of(http);
-        if (!await Liberty.IsFreeAsync(db, Liberty.Functions, cancellationToken))
+        if (!await Liberty.IsFreeAsync(db, Liberty.Functions, access.Project.Id, cancellationToken))
             return Problems.Forbidden("FUNCTIONS_FIXED", "What each function may do is the organization's, the same on every project: an administrator changes it on the organization's page.");
         if (!await ProjectLists.MayChangeAsync(db, access, cancellationToken))
             return Problems.Forbidden("CONTROL_ONLY", "Whoever acts as the control function on this project changes what each function may do here (on a project with none, whoever opened it).");
@@ -93,9 +98,18 @@ public static class ProjectFunctions
         // Configure where the function held it, on the same documents, kept whatever else changes.
         var kept = mine.Where(r => r.Verbs.Contains(Verbs.Configure)).Select(r => new PermissionRule
         {
-            TenantId = project.TenantId, ProjectId = project.Id, FunctionId = functionId, Verbs = [Verbs.Configure],
-            DeliverableType = r.DeliverableType, DocType = r.DocType, Discipline = r.Discipline, Criticality = r.Criticality,
-            Confidentiality = r.Confidentiality, ProjectRole = r.ProjectRole, Family = r.Family, Note = r.Note,
+            TenantId = project.TenantId,
+            ProjectId = project.Id,
+            FunctionId = functionId,
+            Verbs = [Verbs.Configure],
+            DeliverableType = r.DeliverableType,
+            DocType = r.DocType,
+            Discipline = r.Discipline,
+            Criticality = r.Criticality,
+            Confidentiality = r.Confidentiality,
+            ProjectRole = r.ProjectRole,
+            Family = r.Family,
+            Note = r.Note,
         }).ToList();
         db.PermissionRules.RemoveRange(mine);
         db.PermissionRules.AddRange(kept);
@@ -130,9 +144,18 @@ public static class ProjectFunctions
         foreach (var r in organization)
             db.PermissionRules.Add(new PermissionRule
             {
-                TenantId = project.TenantId, ProjectId = project.Id, FunctionId = r.FunctionId, Verbs = r.Verbs,
-                DeliverableType = r.DeliverableType, DocType = r.DocType, Discipline = r.Discipline, Criticality = r.Criticality,
-                Confidentiality = r.Confidentiality, ProjectRole = r.ProjectRole, Family = r.Family, Note = r.Note,
+                TenantId = project.TenantId,
+                ProjectId = project.Id,
+                FunctionId = r.FunctionId,
+                Verbs = r.Verbs,
+                DeliverableType = r.DeliverableType,
+                DocType = r.DocType,
+                Discipline = r.Discipline,
+                Criticality = r.Criticality,
+                Confidentiality = r.Confidentiality,
+                ProjectRole = r.ProjectRole,
+                Family = r.Family,
+                Note = r.Note,
             });
         project.OwnFunctions = true;
         await db.SaveChangesAsync(cancellationToken);
@@ -152,7 +175,9 @@ public static class ProjectFunctions
             .OrderBy(e => e.At).Select(e => new { e.ProjectId, e.ActorName }).ToListAsync(cancellationToken);
         return Results.Ok(projects.Select(p => new
         {
-            p.Id, p.Code, p.Name,
+            p.Id,
+            p.Code,
+            p.Name,
             Since = since.FirstOrDefault(s => s.Key == p.Id)?.At.ToDateTimeOffset(),
             By = by.FirstOrDefault(b => b.ProjectId == p.Id)?.ActorName ?? "",
         }));
@@ -202,9 +227,18 @@ public static class ProjectFunctions
         foreach (var r in copy.Rules.Where(r => live.Contains(r.FunctionId)))
             db.PermissionRules.Add(new PermissionRule
             {
-                TenantId = project.TenantId, ProjectId = project.Id, FunctionId = r.FunctionId, Verbs = r.Verbs, DeliverableType = r.DeliverableType,
-                DocType = r.DocType, Discipline = r.Discipline, Criticality = r.Criticality, Confidentiality = r.Confidentiality,
-                ProjectRole = r.ProjectRole, Family = r.Family, Note = r.Note,
+                TenantId = project.TenantId,
+                ProjectId = project.Id,
+                FunctionId = r.FunctionId,
+                Verbs = r.Verbs,
+                DeliverableType = r.DeliverableType,
+                DocType = r.DocType,
+                Discipline = r.Discipline,
+                Criticality = r.Criticality,
+                Confidentiality = r.Confidentiality,
+                ProjectRole = r.ProjectRole,
+                Family = r.Family,
+                Note = r.Note,
             });
         project.OwnFunctions = true;
         await db.SaveChangesAsync(cancellationToken);

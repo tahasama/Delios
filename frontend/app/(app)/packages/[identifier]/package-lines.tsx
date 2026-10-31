@@ -134,7 +134,7 @@ export function PackageLines({ packageId, packageNumber, supplier, shared, lines
           <span className="px-2 font-mono text-sm tabular-nums">{chosen.length}<span className="ml-1.5 text-[10px] uppercase tracking-[0.12em] text-white/60">ticked</span></span>
           {toSend.length ? (
             shared
-              ? <Link href={`/transmittals/new?placeholders=${encodeURIComponent(toSend.map((one) => one.id).join(","))}&pkg=${encodeURIComponent(packageNumber)}`} className="inline-flex items-center gap-1.5 rounded-sm bg-[#d9a441] px-3 py-2 text-xs font-semibold text-brand-ink"><Send className="h-4 w-4" /> Send to {supplier} ({toSend.length})</Link>
+              ? <Link href={`/transmittals/new?placeholders=${encodeURIComponent(toSend.map((one) => one.id).join(","))}&pkg=${encodeURIComponent(packageNumber)}`} className="inline-flex items-center gap-1.5 rounded-sm bg-gold px-3 py-2 text-xs font-semibold text-brand-ink"><Send className="h-4 w-4" /> Send to {supplier} ({toSend.length})</Link>
               : <span className="px-2 text-xs text-white/70">Share the package before sending anything to {supplier}.</span>
           ) : null}
           {toAskBack.length ? (

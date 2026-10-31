@@ -29,7 +29,8 @@ public sealed record ReviewRow(
     bool Open, int? CurrentStep, string? StepTitle, string? Verdict, string? GrantedStatus, string? DecidedBy,
     IReadOnlyList<ReviewerView> Reviewers, DateOnly? DueDate, DateOnly? RouteDueDate, DateTimeOffset StartedAt, string StartedBy,
     DateTimeOffset? ClosedAt, string Discipline, string DocType, string DeliverableType, string? Originator, string? ContractRef,
-    DateTimeOffset? ReceivedAt, IReadOnlyList<ReviewCommentLine> Comments, DateTimeOffset? WarnedAt = null, string? Note = null);
+    DateTimeOffset? ReceivedAt, IReadOnlyList<ReviewCommentLine> Comments, DateTimeOffset? WarnedAt = null, string? Note = null,
+    Guid RevisionId = default, IReadOnlyList<Guid>? WaitingOn = null);
 
 /// <summary>
 /// Every review on the project, one row per review: filters, sorting, page
@@ -49,7 +50,7 @@ public static class ReviewListEndpoints
                 ? await next(context)
                 : Problems.Forbidden("READ_NOT_ALLOWED", "Your function cannot read this register."));
         project.MapGet("", PageAsync);
-        project.MapGet("/export", ExportAsync);
+        project.MapGet("/export", ExportAsync).RequireRateLimiting("heavy");
     }
 
     /// <summary><c>GET /reviews</c>: one page of matching reviews and how many match.</summary>
@@ -106,7 +107,8 @@ public static class ReviewListEndpoints
     {
         var documents = DocumentQueries.Visible(db, access).Select(d => d.Id);
         // A revision of a type that is not reviewed is released through a review with no steps: not a review to list.
-        return db.Reviews.AsNoTracking().Where(r => r.ProjectId == access.Project.Id && documents.Contains(r.DocumentId) && r.Steps.Any());
+        return OutsideReading.Reviews(db, access, db.Reviews.AsNoTracking())
+            .Where(r => r.ProjectId == access.Project.Id && documents.Contains(r.DocumentId) && r.Steps.Any());
     }
 
     /// <summary>Applies every filter given. Each narrows; none widens.</summary>
@@ -217,7 +219,9 @@ public static class ReviewListEndpoints
                 (r.ClosedAt ?? r.DecidedAt)?.ToDateTimeOffset(), d.Discipline, d.DocType, d.DeliverableType, d.Originator, d.ContractRef,
                 v.AuthoredByParty is null ? null : v.Submissions.OrderBy(s => s.Number).FirstOrDefault()?.SubmittedAt.ToDateTimeOffset(),
                 r.Comments.Where(c => c.Status != CommentStatuses.Withdrawn).OrderBy(c => c.CreatedAt).Select(c => new ReviewCommentLine(c.AuthorName, c.Text, c.Blocking, c.Status != CommentStatuses.Open)).ToList(),
-                open?.WarnedAt?.ToDateTimeOffset(), r.ReturnNote);
+                open?.WarnedAt?.ToDateTimeOffset(), r.ReturnNote,
+                // Who the open step still waits on, for a reminder addressed to them (read with the row, not review by review).
+                v.Id, open is null || open.ByProxy ? [] : open.Participants.Where(p => p.AnsweredAt is null).Select(p => p.UserId).ToList());
         }).ToList();
     }
 }

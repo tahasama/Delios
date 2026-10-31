@@ -8,7 +8,7 @@ import { ActionForm } from "@/components/form";
 import { Switch, SwitchControl } from "@/components/switch";
 import { getActiveSet } from "@/lib/settings/config";
 import { adminUsers, adminFunctions, adminProjects } from "@/lib/settings/api-admin";
-import { setSignInAction, savePersonEverywhereAction } from "@/lib/organization/forms";
+import { setSignInAction, savePersonEverywhereAction, setPasswordAction, forgetPersonAction } from "@/lib/organization/forms";
 import { cn, fmtDate, fmtDateTime, timeAgo } from "@/lib/core/utils";
 
 export const dynamic = "force-dynamic";
@@ -127,7 +127,7 @@ export default async function OrganizationPeoplePage({ searchParams }: { searchP
                 </tr>
                 {open ? (
                   <tr>
-                    <td colSpan={6} className="border-b border-line bg-tint-soft p-0">
+                    <td colSpan={6} className="open-in border-b border-line bg-tint-soft p-0">
                       <PersonPanel user={u} me={me} functions={functions} projects={projects} disciplines={disciplines} close={href({ who }, `person-${u.id}`)} />
                     </td>
                   </tr>
@@ -249,6 +249,37 @@ function PersonPanel({ user: u, me, functions, projects, disciplines, close }: {
           </div>
         ) : null}
       </ActionForm>
+      {!u.linked && !me ? (
+        <ActionForm action={setPasswordAction} hidden={{ userId: u.id }} submitLabel="Set password" resetOnSuccess
+          className="asking space-y-3 border-t border-line bg-surface px-5 py-4 sm:px-6">
+          <p className="stencil text-slate-500">Set a password</p>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+            <Field label="New password" hint="the organization's password rules apply">
+              <input type="password" name="password" autoComplete="new-password" className={field} />
+            </Field>
+            <Field label="Once more"><input type="password" name="again" autoComplete="new-password" className={field} /></Field>
+          </div>
+          <p className="text-[11px] leading-4 text-slate-500">
+            {u.name} is told at once, by email and on Notifications, and signed out everywhere. Give them the password yourself; they may choose their own with &ldquo;Forgot password&rdquo;.
+          </p>
+        </ActionForm>
+      ) : null}
+      {/* Asked to be forgotten (GDPR Article 17): their name and email replaced, the account closed; what they did stays. */}
+      {!u.linked && !me ? (
+        <details className="border-t border-line bg-surface">
+          <summary className="cursor-pointer px-5 py-3 text-xs font-semibold text-slate-500 hover:text-slate-800 sm:px-6">Forget {u.name}…</summary>
+          <ActionForm action={forgetPersonAction} hidden={{ userId: u.id }} submitLabel={`Forget ${u.name}`} variant="danger"
+            confirmText={`${u.name}'s name and email are replaced for good and the account is closed. It cannot be undone.`}
+            className="asking space-y-3 px-5 pb-4 sm:px-6">
+            <p className="text-[11px] leading-4 text-slate-500">
+              For a person who asked to be forgotten. Their name and email are replaced (&ldquo;Former user …&rdquo;), the account is closed, their sign-in,
+              devices and pop-ups go. What they did stays in the records, under the name it was done by: the register has to prove who did what (GDPR
+              Article 17(3)). Tell them so in your answer.
+            </p>
+            <Field label="Why" required hint="who asked, and when"><input name="why" required className={field} /></Field>
+          </ActionForm>
+        </details>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-tint-soft px-5 py-3 sm:px-6">
         <Link href={close} scroll={false} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Close</Link>
         <button type="submit" form={`person-form-${u.id}`} data-on="true" className="ask">Save</button>
