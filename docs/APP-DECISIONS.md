@@ -208,7 +208,7 @@ The Standard asks that controlled information be kept safe; it says nothing of t
 - **What opens drawings and office files is shut in**: on a network of its own, it reaches neither the register, the
   store nor the internet.
 
-## 84 · A training space per organization (decided, not built)
+## 84 · A training space per organization
 
 The owner (31 Oct 2026): "we should have a sand box for trainees too"; then "the training is per organisation as they
 mostly work the same way for all projects, and customization of the later would never be 100% different from it".
@@ -219,9 +219,12 @@ mostly work the same way for all projects, and customization of the later would 
 - **Everything can be tried there**: register documents, send them for review and decide, release, send transmittals,
   and **make made-up organizations for the different roles** (a client, a supplier, a contractor…) to try working with
   others, all without touching a real project.
-- **It follows the organization's settings live** (owner): what the organization changes, the training space reads at
-  once, as a project that changed nothing does.
-- **It can be started again clean, by the organization's administrators** (owner).
+- **It follows the organization's settings live** (owner): its lists, numbering, revisions, forms, routes and functions
+  are the organization's, read at once, as a project that changed nothing reads them. Like every new project, it takes
+  the organization's answers for new projects (the Control room's) when it opens; starting it again takes them anew.
+- **It can be started again clean, by the organization's administrators** (owner): the old one is put away (archived,
+  out of every list, its made-up organizations switched off) and a fresh one opens; nothing is deleted (owner: "Put away,
+  open fresh"), so the database's guards on every real project's files and trail stay whole.
 - **Its people never count towards the plan's users** (owner: "agreed").
 - **Marked TRAINING** (owner: "code TRAINING works"): the mark, never the project's code, decides what leaves it out (a
   real project's code may start with anything). Its code reads `SB-<the organization's code>`, so it is seen at once.

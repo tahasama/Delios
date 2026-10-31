@@ -33,6 +33,8 @@ type AdminUser = {
 type AdminProject = {
   id: string; code: string; name: string; contractRole: string; kind?: string; status: string; timeZone: string; weekendDays: number[]; country: string | null;
   contentExtraction: string; createdAt: string; members: number; documents: number;
+  /** "TRAINING" for the organization's training space, listed apart (docs/APP-DECISIONS.md §84); none for a real project. */
+  space?: string | null;
   /** Why it was last archived or reopened, by whom, when. */
   statusReason?: string | null; statusChangedByName?: string | null; statusChangedAt?: string | null;
   /** Its code before its one change, by whom, when: once changed, the code is fixed. */
@@ -50,6 +52,8 @@ export type AdminFunction = { id: string; code: string; name: string; active: bo
 
 type AdminParty = {
   id: string; code: string; name: string; isInternal: boolean; active: boolean; participation: string; custodianFunction: string | null;
+  /** A training space's made-up organization: read on that space only, never on the organization's list. */
+  trainingProjectId?: string | null;
   /** The person of ours who works for it (one nobody of which signs in); null: the control function. */
   carriedByUserId?: string | null;
   externalSystem: string | null; evidenceRequired: boolean; people: number;
@@ -284,7 +288,8 @@ export async function partiesWithAnswers(projectId?: string) {
     const one = id ? users.find((u) => u.id === id) : null;
     return one ? { id: one.id, name: one.name, email: one.email } : null;
   };
-  return [...parties]
+  // A training space's made-up organizations belong to that space only: never on the organization's list, nor another project's.
+  return parties.filter((p) => !p.trainingProjectId || p.trainingProjectId === projectId)
     .sort((a, b) => Number(b.isInternal) - Number(a.isInternal) || a.name.localeCompare(b.name))
     .map((p) => {
       let said: PartyAnswers = {};

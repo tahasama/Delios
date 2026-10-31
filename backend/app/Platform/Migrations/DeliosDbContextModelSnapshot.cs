@@ -2834,11 +2834,18 @@ namespace Delios.Host.Platform.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<Guid?>("TrainingProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("training_project_id");
+
                     b.HasKey("Id")
                         .HasName("pk_parties");
 
                     b.HasIndex("OrganizationId")
                         .HasDatabaseName("ix_parties_organization_id");
+
+                    b.HasIndex("TrainingProjectId")
+                        .HasDatabaseName("ix_parties_training_project_id");
 
                     b.HasIndex("TenantId", "Code")
                         .IsUnique()
@@ -3026,6 +3033,11 @@ namespace Delios.Host.Platform.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("previous_code");
+
+                    b.Property<string>("Space")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("space");
 
                     b.Property<string>("Status")
                         .IsRequired()

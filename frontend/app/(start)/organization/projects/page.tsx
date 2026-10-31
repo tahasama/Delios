@@ -18,6 +18,8 @@ import { projectSettings } from "@/lib/settings/api";
 import { ProjectFields } from "@/app/(app)/settings/projects/project-fields";
 import { joinedProjects } from "@/lib/organization/api";
 import { JoinedProjects } from "../joined";
+import { api } from "@/lib/client";
+import { openTrainingAction, trainingAgainAction } from "@/lib/organization/forms-training";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects" };
@@ -52,7 +54,10 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   /** I am on this project: its code and name open it. */
   const onIt = (id: string) => users.some((one) => one.id === scope.user.id && one.memberships.some((m) => m.active && m.projectId === id));
 
-  const projects = await Promise.all(all
+  // The training space is listed apart (docs/APP-DECISIONS.md §84): never counted among the organization's projects.
+  const training = await api<{ training: { id: string; code: string; name: string; openedAt: string; people: number; documents: number; organizations: { id: string; code: string; name: string; role: string }[] } | null }>(
+    "/api/admin/training", { keep: { areas: [] } }).then((r) => r.training).catch(() => null);
+  const projects = await Promise.all(all.filter((one) => one.space !== "TRAINING")
     // By code only: changing where a project stands never moves its line.
     .sort((a, b) => a.code.localeCompare(b.code))
     .map(async (one) => {
@@ -122,6 +127,49 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           ))}
         </dl>
       </header>
+
+      {/* The training space: one per organization, nothing in it real, started again whenever wanted (owner). */}
+      <section className="register register-sheet register-sheet-open" aria-labelledby="training-head">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-line bg-tint-soft px-5 py-2.5 sm:px-6">
+          <span id="training-head" className="stencil mr-1 text-slate-500">Training space</span>
+          <span className="text-[11px] text-slate-500">
+            One for the organization, set up its way: try documents, reviews and transmittals with made-up organizations. Nothing in it is real, no email leaves it, its people are not counted on the plan.
+          </span>
+        </div>
+        {training ? (
+          <div className="grid gap-4 px-5 py-4 sm:px-6 lg:grid-cols-[1fr_auto]">
+            <div className="min-w-0">
+              <p className="text-[13px] text-slate-800">
+                {onIt(training.id) ? (
+                  <form action={switchProjectAction} className="inline">
+                    <input type="hidden" name="projectId" value={training.id} />
+                    <button type="submit" className="font-mono font-semibold text-link hover:underline" title={`Open ${training.code}`}>{training.code}</button>
+                  </form>
+                ) : <span className="font-mono font-semibold">{training.code}</span>}
+                <span className="ml-2">{training.name}</span>
+                <span className="ml-2 text-[11.5px] text-slate-500">open since {fmtDate(new Date(training.openedAt))} · {training.people} {training.people === 1 ? "person" : "people"} · {training.documents} {training.documents === 1 ? "document" : "documents"}</span>
+              </p>
+              <p className="mt-1.5 text-[11.5px] text-slate-500">
+                Made-up organizations, one for each role: {training.organizations.map((o) => o.name).join(", ") || "none (the organization's list of roles is empty)"}.
+                {" "}Put trainees on it from People, as on any project.
+              </p>
+            </div>
+            <ActionForm action={trainingAgainAction} submitLabel="Start it again" variant="secondary" size="sm"
+              confirmText={`Start the training space again? ${training.code} is put away (archived, out of every list, nothing deleted) and a fresh, empty one opens. Its people are not carried over.`}
+              className="flex flex-wrap items-end gap-2">
+              <Field label="Why (optional)" hint="kept on the old one's line">
+                <input name="reason" maxLength={500} className={field} placeholder="e.g. a new group of trainees" />
+              </Field>
+            </ActionForm>
+          </div>
+        ) : (
+          <div className="px-5 py-4 sm:px-6">
+            <ActionForm action={openTrainingAction} submitLabel="Open the training space" size="sm">
+              <p className="text-[12.5px] text-slate-600">None yet. It opens empty, with a made-up organization for each role, and you on it as the control function.</p>
+            </ActionForm>
+          </div>
+        )}
+      </section>
 
       {/* A new project: one sheet, opened from the plate; it becomes the form. */}
       {opening ? (

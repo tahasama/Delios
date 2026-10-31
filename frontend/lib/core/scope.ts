@@ -29,6 +29,8 @@ export type ProjectSummary = {
   /** What this organization is contracted to do on it. */
   role: string;
   status: string;
+  /** "TRAINING" for the organization's training space (docs/APP-DECISIONS.md §84); none for a real project. */
+  space?: string | null;
 };
 
 export type Scope = {
@@ -79,14 +81,14 @@ export const getScope = cache(async (): Promise<Scope | null> => {
   const wanted = jar.get(PROJECT_COOKIE)?.value;
   const chosen = me.projects.find((p) => p.id === wanted) ?? me.projects[0];
   const summary = (p: (typeof me.projects)[number]): ProjectSummary =>
-    ({ id: p.id, orgId: me.tenant.slug, code: p.code, name: p.name, kind: p.kind ?? "GENERIC", role: p.contractRole, status: p.status });
+    ({ id: p.id, orgId: me.tenant.slug, code: p.code, name: p.name, kind: p.kind ?? "GENERIC", role: p.contractRole, status: p.status, space: p.space ?? null });
   const available = me.projects.map(summary);
   // An administrator may open any project their organization runs, whether or not they were put on it: joining
   // happens on the switch, so there is still exactly one way to be in a project — a membership.
   if (await configures(me)) {
     const held = new Set(available.map((p) => p.id));
     const rest = (await organizationProjects()).filter((p) => p.status === "ACTIVE" && !held.has(p.id));
-    available.push(...rest.map((p): ProjectSummary => ({ id: p.id, orgId: me.tenant.slug, code: p.code, name: p.name, kind: p.kind ?? "GENERIC", role: p.contractRole, status: p.status })));
+    available.push(...rest.map((p): ProjectSummary => ({ id: p.id, orgId: me.tenant.slug, code: p.code, name: p.name, kind: p.kind ?? "GENERIC", role: p.contractRole, status: p.status, space: p.space ?? null })));
     available.sort((a, b) => a.code.localeCompare(b.code));
   }
 
@@ -183,7 +185,7 @@ async function configures(me: NonNullable<Awaited<ReturnType<typeof getMe>>>): P
 
 /** The organization's projects, as an administrator sees them. */
 const organizationProjects = cache(async () =>
-  api<{ id: string; code: string; name: string; contractRole: string; kind?: string; status: string }[]>("/api/admin/projects", { keep: { areas: [] } }).catch(() => []));
+  api<{ id: string; code: string; name: string; contractRole: string; kind?: string; status: string; space?: string | null }[]>("/api/admin/projects", { keep: { areas: [] } }).catch(() => []));
 
 /** Remembers the project to open next, one the backend already put this person on (after switching organization). */
 export async function rememberProject(projectId: string) {

@@ -151,6 +151,9 @@ public sealed class DeliosDbContext(DbContextOptions<DeliosDbContext> options)
         // What a function may do is read the same way: the project's own copy where it keeps one, else the organization's.
         modelBuilder.Entity<PermissionRule>().HasQueryFilter(r => r.ProjectId == RulesProject);
         modelBuilder.Entity<ValueSet>().HasQueryFilter(v => ListsOwnKeys.Contains(v.ListKey) ? v.ProjectId == ListsProject : v.ProjectId == null);
+        // A made-up organization of a training space is seen in that space only, never from a real project's pages; read
+        // with no project in hand (the organization's pages, the worker), it is there, and those pages leave it out.
+        modelBuilder.Entity<Party>().HasQueryFilter(p => p.TrainingProjectId == null || ListsProject == null || p.TrainingProjectId == ListsProject);
 
         // Every Guid id is made in code (Guid.CreateVersion7), never by the database.
         // Saying so lets a new row reached through a navigation be inserted rather

@@ -178,7 +178,8 @@ public static class FullDownloadEndpoints
         else
         {
             if (!admin) return Problems.Forbidden("ADMIN_ONLY", "An administrator takes the whole organization's download; the control function takes its project's.");
-            projects = await db.Projects.AsNoTracking().OrderBy(p => p.Code).ToListAsync(cancellationToken);
+            // The training space is not the organization's work: left out of the whole (docs/APP-DECISIONS.md §84).
+            projects = await db.Projects.AsNoTracking().Where(p => p.Space == null || p.Space != Identity.Spaces.Training).OrderBy(p => p.Code).ToListAsync(cancellationToken);
         }
 
         // What the person may read on each project, with their own rights: clearance always applies.

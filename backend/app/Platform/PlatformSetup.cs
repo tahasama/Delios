@@ -458,6 +458,7 @@ public static class PlatformSetup
             app.MapEmailConfirmationEndpoints();
             app.MapAdminEndpoints();
             app.MapDirectoryEndpoints();
+            Organizations.Training.MapTrainingEndpoints(app);
             Identity.JoinRequests.MapJoinRequestEndpoints(app);
             Identity.ProjectDirectory.MapProjectDirectoryEndpoints(app);
             Organizations.OrganizationEndpoints.MapOrganizationEndpoints(app);

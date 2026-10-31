@@ -101,6 +101,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </header>
         <main className="mx-auto max-w-[1560px] px-4 py-5 lg:px-7 lg:py-6">
+          {project.space === "TRAINING" ? (
+            <p role="status" className="no-print mb-4 rounded-md bg-violet-50 px-4 py-2.5 text-[13px] text-violet-900 ring-1 ring-violet-200 dark:bg-violet-950 dark:text-violet-100 dark:ring-violet-800">
+              <strong>Training space.</strong> Nothing here is real: try anything, with the made-up organizations on it. No email leaves it, and an administrator may start it again.
+            </p>
+          ) : null}
           {standing?.readsOnly ? (
             <p role="status" className="no-print mb-4 rounded-md bg-amber-50 px-4 py-2.5 text-[13px] text-amber-900 ring-1 ring-amber-200">
               <strong>The organization reads only.</strong> {standing.why} Everyone keeps reading and exporting; nothing is deleted.{" "}

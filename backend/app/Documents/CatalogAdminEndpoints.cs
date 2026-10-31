@@ -469,6 +469,8 @@ public static class CatalogAdminEndpoints
         var query = db.AuditEvents.AsNoTracking();
         if (Blank(entityType) is { } t) query = query.Where(e => e.EntityType == t);
         if (projectId is { } p) query = query.Where(e => e.ProjectId == p);
+        // The whole trail is the organization's work: the training space's acts are read only on that space, asked for by name.
+        else query = query.Where(e => e.ProjectId == null || !db.Projects.Any(t => t.Id == e.ProjectId && t.Space == Identity.Spaces.Training));
         if (actorId is { } who) query = query.Where(e => e.ActorId == who);
         if (from is { } f) { var start = LocalDate.FromDateOnly(f).AtStartOfDayInZone(DateTimeZone.Utc).ToInstant(); query = query.Where(e => e.At >= start); }
         if (to is { } u) { var end = LocalDate.FromDateOnly(u).PlusDays(1).AtStartOfDayInZone(DateTimeZone.Utc).ToInstant(); query = query.Where(e => e.At < end); }

@@ -377,6 +377,7 @@ public static class IdentityEndpoints
                 m.Project.ContractRole,
                 m.Project.Kind,
                 m.Project.Status,
+                m.Project.Space,
                 m.Department,
                 Function = new { m.Function!.Id, m.Function.Code, m.Function.Name, m.Function.Clearance },
                 // Each project's own copy of what the function may do where it keeps one, else the organization's.

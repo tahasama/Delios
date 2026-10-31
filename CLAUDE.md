@@ -996,6 +996,18 @@ a screen only words it. A new rule goes in the backend, never in a page.
   organizations' identities and holders are read by all, written only for itself; across, only through
   `Tenancy/Crossing.OpenAsync`, said where it is used.
 
+### The training space (docs/APP-DECISIONS.md §84)
+- **One per organization** (owner: "they mostly work the same way for all projects"): a project marked
+  `Space = TRAINING` (`Identity/Spaces`, owner: "code TRAINING works"), its code `SB-<our code>` (then -2, -3: codes are
+  never given twice), opened and started again by administrators on the organization's Projects (`Organizations/Training.cs`,
+  `GET`/`POST /api/admin/training`, `POST /api/admin/training/again`; screens `lib/organization/forms-training.ts`), its
+  line apart from the projects (never counted). **Started again**: the old one archived, out of every list, nothing
+  deleted (owner: "Put away, open fresh"); a fresh one opens with the administrator on it as the control function.
+  **One made-up organization per role** (`Party.TrainingProjectId`): seen only inside it (query filter on `Party`; the
+  organization's list and other projects never show them), holding no code or name on DELIOS. **Left out of what spans
+  projects**: the organization's whole audit trail, the whole full download, the plan's paid users (someone only on it),
+  and email (an email of it is kept, marked off, `EmailSender`). Every page in it says so (a violet line, `(app)/layout.tsx`).
+
 ### Settings
 - **Settings are read by everyone of ours** (owner: "access without the editing liberty"): the Control room, Types &
   sets, Numbering, Revisions, Review routes, Forms & fields and Functions & permissions open read only for whoever may

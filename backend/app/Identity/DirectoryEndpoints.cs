@@ -421,7 +421,9 @@ public static class DirectoryEndpoints
     /// <summary><c>GET /api/admin/projects</c>: every project, with how many people are on it.</summary>
     private static async Task<IResult> ProjectsAsync(DeliosDbContext db, CancellationToken cancellationToken)
     {
-        var projects = await db.Projects.AsNoTracking().OrderBy(p => p.Code).ToListAsync(cancellationToken);
+        // A training space put away (started again) is out of every list; the one open is listed, marked by its Space.
+        var projects = await db.Projects.AsNoTracking().Where(p => !(p.Space == Spaces.Training && p.Status == "ARCHIVED"))
+            .OrderBy(p => p.Code).ToListAsync(cancellationToken);
         var counts = await db.Memberships.AsNoTracking().Where(m => m.Active).GroupBy(m => m.ProjectId)
             .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(cancellationToken);
         var documents = await db.Documents.AsNoTracking().GroupBy(d => d.ProjectId)
@@ -434,6 +436,7 @@ public static class DirectoryEndpoints
             p.ContractRole,
             p.Kind,
             p.Status,
+            p.Space,
             p.StatusReason,
             p.StatusChangedByName,
             StatusChangedAt = p.StatusChangedAt?.ToDateTimeOffset(),
@@ -911,7 +914,9 @@ public static class DirectoryEndpoints
         CancellationToken cancellationToken)
     {
         var links = await organizations.PartyLinksAsync(cancellationToken);
-        var parties = await db.Parties.AsNoTracking().OrderBy(p => p.Name).ToListAsync(cancellationToken);
+        // A training space's made-up organizations are read on that space only, never on the organization's list.
+        var parties = await db.Parties.AsNoTracking().Where(p => p.TrainingProjectId == null || p.TrainingProjectId == db.ListsProject)
+            .OrderBy(p => p.Name).ToListAsync(cancellationToken);
         var identityIds = parties.Where(p => p.OrganizationId != null).Select(p => p.OrganizationId!.Value).ToList();
         var identities = await db.OrganizationIdentities.AsNoTracking().Where(o => identityIds.Contains(o.Id)).ToDictionaryAsync(o => o.Id, cancellationToken);
         var people = await db.Users.AsNoTracking().Where(u => u.PartyId != null && u.Active).GroupBy(u => u.PartyId)
@@ -967,6 +972,7 @@ public static class DirectoryEndpoints
             p.Code,
             p.Name,
             p.IsInternal,
+            p.TrainingProjectId,
             p.Active,
             p.Participation,
             p.CustodianFunction,

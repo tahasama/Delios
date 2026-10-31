@@ -286,7 +286,10 @@ public sealed class EmailSender(
         var email = await db.Set<EmailMessage>().SingleOrDefaultAsync(e => e.Id == message.EmailId, cancellationToken);
         if (email is null || email.State is not (EmailStates.Queued or EmailStates.Failed)) return;
         var settings = options.Value;
-        if (!settings.Sends(email.Kind))
+        // Nothing leaves the training space by email (docs/APP-DECISIONS.md §84): kept, marked off, as with email off.
+        var training = email.ProjectId is { } projectId
+            && await db.Projects.AnyAsync(p => p.Id == projectId && p.Space == Identity.Spaces.Training, cancellationToken);
+        if (training || !settings.Sends(email.Kind))
         {
             email.State = EmailStates.Off;
             await db.SaveChangesAsync(cancellationToken);

@@ -49,7 +49,10 @@ public static class Subscriptions
 
     /// <summary>The people an organization pays for: its own, working in it. Guests and accounts standing for other organizations are free.</summary>
     public static IQueryable<User> Paid(DeliosDbContext db, Guid tenantId) =>
-        db.Users.Where(u => u.TenantId == tenantId && u.Active && !u.IsSupport && u.HomeTenantId == null && (u.Party == null || u.Party.IsInternal));
+        db.Users.Where(u => u.TenantId == tenantId && u.Active && !u.IsSupport && u.HomeTenantId == null && (u.Party == null || u.Party.IsInternal)
+            // Someone on the training space and nowhere else is never paid for (docs/APP-DECISIONS.md §84).
+            && !(db.Memberships.Any(m => m.UserId == u.Id && m.Active)
+                && db.Memberships.Where(m => m.UserId == u.Id && m.Active).All(m => m.Project!.Space == Spaces.Training)));
 
     /// <summary>
     /// A signed-in person of an organization that reads only: anything but reading is refused, except signing in and out,
