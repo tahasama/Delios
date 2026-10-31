@@ -221,15 +221,19 @@ mostly work the same way for all projects, and customization of the later would 
   others, all without touching a real project.
 - **It follows the organization's settings live** (owner): what the organization changes, the training space reads at
   once, as a project that changed nothing does.
-- **It can be wiped and started again**, by whoever has the authority (owner): the one exception to "nothing is deleted
-  but by the app owner", because nothing in it is real.
+- **It can be started again clean, by the organization's administrators** (owner).
 - **Its people never count towards the plan's users** (owner: "agreed").
+- **Marked TRAINING** (owner: "code TRAINING works"): the mark, never the project's code, decides what leaves it out (a
+  real project's code may start with anything). Its code reads `SB-<the organization's code>`, so it is seen at once.
 - **Kept apart from the real work** (owner: "search and audit trail are by project"): it is a project of its own, so the
-  register, search, reports and a project's trail are already apart. What spans projects must leave it out: the
-  organization's whole audit trail and whole full download, the projects' figures, the organization's list of
-  organizations and the names and codes reserved across DELIOS (made-up organizations must not take a real company's
-  code or name), and email (nothing in it is sent outside the app).
-- Still to settle: who wipes it, and the code that marks a project as the training space.
+  register, search, reports and a project's trail are already apart. What spans projects leaves it out: the
+  organization's whole audit trail and whole full download, the projects' figures on the organization's Projects
+  (owner: "yes").
+- **One made-up organization for each role** (owner: "we will create a fake org for each role that they can use"): a
+  client, a supplier, a contractor… made with the training space and used there only, never in the organization's list
+  of organizations and never taking a code or name across DELIOS.
+- **No email leaves it** (owner: "we could block emails in sandbox"): its notifications stay in the app; an email it
+  would send is kept, marked off, as with email switched off.
 
 ## Passages taken out of sections that stay in the Standard-changes file
 
