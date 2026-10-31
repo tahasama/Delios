@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { api, ApiProblem, projectPath, type Query } from "@/lib/client";
+import { api, notYours, projectPath, type Query } from "@/lib/client";
 import { getMe } from "@/lib/account/api";
 import { holders } from "@/lib/settings/api";
 import type { Addressees, TransmittalLog, TransmittalPage, TransmittalView, Work } from "@/lib/types";
@@ -19,7 +19,7 @@ export const backendTransmittal = cache(async (scope: Scope, id: string): Promis
   try {
     return await api<TransmittalView>(projectPath(scope, `/transmittals/${id}`), { keep: { areas: ["transmittals", "docs"] } });
   } catch (e) {
-    if (e instanceof ApiProblem && (e.status === 404 || e.status === 400)) return null;
+    if (notYours(e)) return null;
     throw e;
   }
 });
@@ -45,7 +45,7 @@ export const transmittalPage = cache(async (scope: Scope, id: string): Promise<T
   try {
     return await api<TransmittalPage>(projectPath(scope, `/transmittals/${id}/page`), { keep: { areas: ["transmittals", "docs", "reviews", "packages"] } });
   } catch (e) {
-    if (e instanceof ApiProblem && (e.status === 404 || e.status === 400)) return null;
+    if (notYours(e)) return null;
     throw e;
   }
 });

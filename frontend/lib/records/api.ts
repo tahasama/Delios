@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { api, projectPath } from "@/lib/client";
+import { api, notYours, projectPath } from "@/lib/client";
 
 type Scope = { projectId: string };
 
@@ -23,7 +23,7 @@ export async function projectAsset(scope: Scope, id: string) {
   return api<{
     asset: AssetRow;
     documents: { id: string; number: string; title: string; docType: string; discipline: string; state: string; current: { value: string; statusCode: string | null } | null }[];
-  }>(projectPath(scope, `/assets/${id}`), { keep: { areas: ["assets", "docs"] } }).catch(() => null);
+  }>(projectPath(scope, `/assets/${id}`), { keep: { areas: ["assets", "docs"] } }).catch((e) => { if (notYours(e)) return null; throw e; });
 }
 
 /** The assets a document is linked to. */

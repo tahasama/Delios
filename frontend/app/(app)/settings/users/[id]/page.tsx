@@ -3,7 +3,8 @@ import Link from "next/link";
 import { inputCls } from "@/components/ui";
 import { requireScope } from "@/lib/core/scope";
 import { isAdmin } from "@/lib/core/auth";
-import { api } from "@/lib/client";
+import { api, notYours } from "@/lib/client";
+import { notFound } from "next/navigation";
 import { fmtDate } from "@/lib/core/utils";
 import { adminProjects, orEmpty } from "@/lib/settings/api-admin";
 import { Logbook, readingLine, type LogAct } from "@/components/logbook";
@@ -39,7 +40,7 @@ export default async function PersonActivityPage({ params, searchParams }: { par
   const query = new URLSearchParams(Object.entries({ projectId: sp.project, kind: sp.kind, action: sp.action, q: sp.q, from: sp.from, to: sp.to, page: String(page), per: "50" })
     .filter((e): e is [string, string] => !!e[1]));
   const [activity, projects] = await Promise.all([
-    api<Activity>(`/api/admin/users/${id}/activity?${query}`).catch(() => null),
+    api<Activity>(`/api/admin/users/${id}/activity?${query}`).catch((e) => { if (notYours(e)) notFound(); throw e; }),
     orEmpty(adminProjects),
   ]);
   const address = (q: Search) => {

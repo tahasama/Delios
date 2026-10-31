@@ -376,7 +376,7 @@ export function TransmittalRegister({ rows, total, filters, filterOptions, expor
         ) : (
           <div className="px-6 py-20 text-center">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-slate-400">no entries</p>
-            <p className="mt-2 text-sm text-slate-700">Nothing in the log matches these filters.</p>
+            <p className="mt-2 text-sm text-slate-700">{facets.length ? "Nothing in the log matches these filters." : "No transmittals yet. “New transmittal” sends the first; what arrives from other organizations is listed here too."}</p>
             {facets.length ? <button type="button" onClick={() => go("/transmittals")} className="mt-3 text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
           </div>
         )}

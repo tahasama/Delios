@@ -346,7 +346,7 @@ export function ReviewsRegister({ plate, rows, total, filters, filterOptions, fa
         ) : (
           <div className="px-6 py-20 text-center">
             <p className="font-mono text-xs tracking-[0.2em] text-slate-400 uppercase">no reviews</p>
-            <p className="mt-2 text-sm text-slate-700">Nothing in the reviews matches these filters.</p>
+            <p className="mt-2 text-sm text-slate-700">{facets.length ? "Nothing in the reviews matches these filters." : "No reviews yet. A review starts from a document being prepared: “Send for review” on its page."}</p>
             {facets.length ? <button type="button" onClick={() => go("/reviews")} className="mt-3 text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
           </div>
         )}

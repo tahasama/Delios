@@ -596,7 +596,7 @@ export function PlanRegister({
             ) : (
               <div className="px-6 py-20 text-center">
                 <p className="font-mono text-xs tracking-[0.2em] text-slate-500 uppercase">no actions</p>
-                <p className="mt-2 text-sm text-slate-700">Nothing in the schedule matches these filters.</p>
+                <p className="mt-2 text-sm text-slate-700">{facets.length ? "Nothing in the schedule matches these filters." : "The schedule has no actions yet. They come from the schedule's file: its register document released, or uploaded here."}</p>
                 {facets.length ? <button type="button" onClick={() => go("/schedule?view=table")} className="mt-3 text-xs font-semibold text-link hover:underline">Clear the {facets.length} filter{facets.length === 1 ? "" : "s"} →</button> : null}
               </div>
             )}

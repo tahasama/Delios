@@ -199,6 +199,15 @@ export async function forgetShortLived(): Promise<void> {
   for (const key of shortLived.keys()) if (key.startsWith(`${session}\n`)) shortLived.delete(key);
 }
 
+/**
+ * A page's own thing refused as not there, or not the reader's (404, 403, or an id that is no id: 400): the page then
+ * reads "Not found, or not yours to open" (`notFound()`), the same words whether it exists or not. Anything else is a
+ * fault, and goes on to the error page.
+ */
+export function notYours(error: unknown): boolean {
+  return error instanceof ApiProblem && (error.status === 404 || error.status === 403 || error.status === 400);
+}
+
 /** For actions: the problem's message to show, or rethrows anything that is not a refusal. */
 export function refusal(error: unknown): { message: string; code: string | null; params: unknown } {
   if (error instanceof ApiProblem) return { message: error.message, code: error.code, params: error.params };

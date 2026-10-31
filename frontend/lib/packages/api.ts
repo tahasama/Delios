@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { api, ApiProblem, projectPath } from "@/lib/client";
+import { api, ApiProblem, notYours, projectPath } from "@/lib/client";
 import type { Addressees, PackageView, RegisterPage } from "@/lib/types";
 
 /**
@@ -16,7 +16,7 @@ export const packageView = cache(async (scope: Scope, id: string): Promise<Packa
   try {
     return await api<PackageView>(projectPath(scope, `/packages/${id}`), { keep: { areas: ["packages", "docs", "reviews", "transmittals"] } });
   } catch (e) {
-    if (e instanceof ApiProblem && (e.status === 404 || e.status === 400)) return null;
+    if (notYours(e)) return null;
     throw e;
   }
 });
@@ -70,7 +70,7 @@ export const packageByNumber = cache(async (scope: Scope, number: string): Promi
   try {
     return await api<PackageView>(projectPath(scope, `/packages/by-number/${encodeURIComponent(number)}`), { keep: { areas: ["packages", "docs", "reviews", "transmittals"] } });
   } catch (e) {
-    if (e instanceof ApiProblem && (e.status === 404 || e.status === 400)) return null;
+    if (notYours(e)) return null;
     throw e;
   }
 });

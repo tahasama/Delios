@@ -19,15 +19,15 @@ state must show.
 | No search result | quick find, `Select`, `JumpPick`, Assets | "Nothing matches that."; the quick find names the words searched and how to find more |
 | Success | `ActionForm` (`ok`, `link`) | A line in emerald under the form, with the next step's link where the action gives one |
 | Empty | `EmptyState` (`components/ui.tsx`) | Why it is empty and the one act that fills it |
+| Permission denied by the server | `notYours` (`lib/client.ts`) in the readers of a document, package, transmittal, review, action, tag and a person's activity | A 403, 404 or 400 on the page's own thing reads "Not found, or not yours to open" (`notFound()`), the same words whether it exists or not; any other failure goes to the error page, never read as "not found" |
 | Not at any address | `app/not-found.tsx` | "Nothing at this address", back to Home |
 
 ## Still to check page by page
 
-- **Empty:** every list and tab uses `EmptyState` (or the register's own empty line), never a bare "None"; a list
-  narrowed to nothing says so and offers to clear the filters.
+- **Empty:** the four registers (documents, reviews, transmittals, the Schedule's table) are done: narrowed to nothing,
+  they say so and offer to clear the filters; empty with no filter, they say what fills them. Still to check: the other
+  lists and tabs (`EmptyState` or a line saying why and the act that fills it, never a bare "None").
 - **Success:** every act's action returns its `ok` line (what happened, what comes next); acts that open a new page
   (sending for review opens the review) say it there.
 - **Error in place:** a failing part of a page (a panel, a tab) shows its own error and leaves the rest of the page.
 - **Loading inside a page:** a tab or panel that loads on its own shows its own outline.
-- **Permission denied by a 403 while a page is drawn:** today it reads as an error (the reason is hidden in production);
-  pages that may be refused call `notFound()` on 403 and 404 so the person reads "Not found, or not yours to open".

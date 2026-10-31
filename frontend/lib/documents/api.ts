@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { api, ApiProblem, projectPath } from "@/lib/client";
+import { api, notYours, projectPath } from "@/lib/client";
 import type { DocumentView, ReviewView, RevisionView, Written, HandBack } from "@/lib/types";
 
 /**
@@ -106,7 +106,7 @@ export const backendDocument = cache(async (scope: Scope, id: string): Promise<D
   try {
     return await api<DocumentView>(projectPath(scope, `/documents/${id}`), { keep: { areas: [], doc: id, fallback: ["reviews", "transmittals"] } });
   } catch (e) {
-    if (e instanceof ApiProblem && (e.status === 404 || e.status === 400)) return null;
+    if (notYours(e)) return null;
     throw e;
   }
 });
