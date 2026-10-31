@@ -1033,7 +1033,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
   (never back and forth); the next move of the address settles it on what the page then marks (Cancel: back), an address
   elsewhere, eight seconds with no answer, or a press on what really stands puts it back (`seg-slider.tsx`, `letGo`).
 - **A page that fails reads in the app's look** (owner: the bare page "even 2001 php looks better"): `components/error-page.tsx`
-  for a whole frame (`app/error.tsx`, `app/global-error.tsx` with the brand's fonts), `(app)/error.tsx` inside the frame;
+  for a whole frame (`app/error.tsx`, `app/global-error.tsx` with the brand's fonts), drawn inside the app's own frame,
+  the navy menu with its mark and the top bar, the sheet where a page's plate stands (owner: the card alone "looks like it
+  doesn't belong to the app"), `(app)/error.tsx` inside the frame;
   **Try again reads the page afresh** (owner: "does absolutely nothing unless manually clicking on refresh"):
   `useTryAgain` (`components/try-again.ts`), a refresh with the boundary let go; the last resort reloads the window.
 - The register's **Controlled · Uncontrolled** switch is a small one (`.seg-sm`) under "Create document", on the plate's
