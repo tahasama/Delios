@@ -146,7 +146,7 @@ export default async function AdminDistributionPage({ searchParams }: { searchPa
       </section>
 
       <section className="register register-sheet">
-        <DataTable
+        <DataTable empty={"No discipline to show. Disciplines are a list of Types & sets; once there, each row says who gets what."}
           id="distribution-matrix"
           head={
             <tr>

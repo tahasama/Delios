@@ -82,3 +82,17 @@ Everything else is the same app. Switching later is only that line and a restart
 - Who deletes an organization's data once its contract ends, and after how long (DELIOS's rule: the app owner or whoever
   of their team they delegate, never the app by itself).
 - Support: who answers, when, and how organizations reach them (set in the console).
+
+---
+
+## Left for production, with the subscriptions (owner, 31 Oct 2026)
+
+Built once DELIOS runs for paying organizations (`HOSTED=true`), with the services they need; nothing of it is needed to
+test or to run it for one company.
+
+- **Card payments, CMI and Paddle**: not connected. Invoices, their PDFs and payments recorded by hand (bank transfer,
+  CMI, Paddle, other) work today; connecting one means its account, its keys in `.env`, and the payment written by
+  itself when it arrives (`Operators/Billing.cs`, `PaymentWays`). See `docs/gaps/running.md`.
+- **Support replies by email**: support is a conversation inside the app; a reply sent by email to the support address
+  does not come back into it yet. Needs the inbound mail the email service gives (as the transmittals' replies by email
+  use), then each reply filed on its request (`Operators/SupportRequests.cs`).

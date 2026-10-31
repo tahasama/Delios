@@ -86,7 +86,7 @@ export async function SupplierPackage({ pkg }: { pkg: PackageView }) {
     const holds = mine.filter((r) => WITH_SUPPLIER.includes(r.state));
     const where = packageStage(pkg, rows, "theirs");
     const table = (
-      <DataTable className="rounded-none border-0 shadow-none" exportName={pkg.number} id="supplier-package-theirs" head={<tr><Th>Document</Th><Th>Where it stands</Th><Th>Submit by</Th><Th>Released &amp; issued</Th><Th>Comments to take in</Th><Th>Your file</Th></tr>}>
+      <DataTable empty={"Nothing has been asked of you in this package yet. Each document comes here when it is sent to you on a transmittal."} className="rounded-none border-0 shadow-none" exportName={pkg.number} id="supplier-package-theirs" head={<tr><Th>Document</Th><Th>Where it stands</Th><Th>Submit by</Th><Th>Released &amp; issued</Th><Th>Comments to take in</Th><Th>Your file</Th></tr>}>
         {mine.map((r) => {
           const stage = lineStage(r, true, "theirs");
           return (

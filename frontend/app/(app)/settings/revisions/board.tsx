@@ -61,7 +61,7 @@ export function RevisionBoard({ level, editable, schemes, routing, deliverables,
         </div>
         {editable ? (
         <ActionForm action={routeRevisionSchemeAction} submitLabel="Save" size="sm" hidden={hidden} className="space-y-3 pb-4 [&>button]:ml-5 [&>p]:mx-5 [&>div[role=alert]]:mx-5 sm:[&>button]:ml-6">
-          <DataTable className="rounded-none border-0 shadow-none" id="revision-routing"
+          <DataTable empty={"No deliverable type yet. Add them in Types & sets; each then follows the default scheme until chosen here."} className="rounded-none border-0 shadow-none" id="revision-routing"
             head={<tr><Th>Deliverable type</Th><Th>Follows</Th></tr>}>
             {deliverables.map((d) => (
               <tr key={d.code}>
@@ -81,7 +81,7 @@ export function RevisionBoard({ level, editable, schemes, routing, deliverables,
           </DataTable>
         </ActionForm>
         ) : (
-          <DataTable className="rounded-none border-0 shadow-none" id="revision-routing" head={<tr><Th>Deliverable type</Th><Th>Follows</Th></tr>}>
+          <DataTable empty={"No deliverable type yet. Types & sets holds them; each follows the default scheme until another is chosen."} className="rounded-none border-0 shadow-none" id="revision-routing" head={<tr><Th>Deliverable type</Th><Th>Follows</Th></tr>}>
             {deliverables.map((d) => (
               <tr key={d.code}>
                 <Td>

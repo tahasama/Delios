@@ -19,7 +19,7 @@ export async function PlanCards({ from = null, to = null }: { from?: Date | null
   // Who uploads the lists: the control function, or a function given Plan. The backend refuses anyone else.
   // Who uploads the lists: one rule, the backend's (Control or Plan held outright).
   const plans = mayUploadLists(ctx.user.verbs);
-  const [progress, lists] = await Promise.all([planProgress(ctx, { from, to }), planLists(ctx).catch(() => [])]);
+  const [progress, lists] = await Promise.all([planProgress(ctx, { from, to }), planLists(ctx)]);
   const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
   // Under each list stage: the revision in force, linked to its document, that it was uploaded

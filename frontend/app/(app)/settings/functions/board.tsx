@@ -171,7 +171,7 @@ export async function FunctionsBoard({ level, open, adding }: { level: "project"
               : "a tick is a permission on every document; a half one, on certain documents only (its name opens them)"}
           </span>
         </div>
-        <DataTable id="functions-grid" toolbar={false} className="rounded-none border-0 shadow-none"
+        <DataTable empty={"No function yet. Functions are made in the organization's Settings, then given what they may do here."} id="functions-grid" toolbar={false} className="rounded-none border-0 shadow-none"
           head={
               <tr>
                 <Th className="sticky left-0 z-4 min-w-44 bg-surface align-bottom">Function</Th>

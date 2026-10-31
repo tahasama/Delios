@@ -11,7 +11,10 @@ import { ADVICE_LABEL, OUTCOME_CONSEQUENCES } from "@/lib/core/standard";
 import { verdictEffect, VERDICT_EFFECT_BLURB } from "@/lib/reviews/verdict-effect";
 import { fmtDate, fmtDateTime } from "@/lib/core/utils";
 import { myAdvice, dueState } from "@/lib/reviews/workflow";
-import { reviewCycle, reviewRun, earlierSteps, routeSteps, waitingOn } from "@/lib/reviews/api";
+import { reviewCycle, reviewRun, routeSteps, waitingOn } from "@/lib/reviews/api";
+import { Part } from "@/components/part";
+import { PartSkeleton } from "@/components/skeleton";
+import { EarlierSteps } from "./earlier-steps";
 import { holders } from "@/lib/settings/api";
 import { noticesAbout, noticeHistory } from "@/lib/actions/api";
 import { NotifyPanel } from "@/components/notify-panel";
@@ -105,7 +108,6 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
   const earlierIds = run
     ? run.steps.slice(0, run.steps.findIndex((step) => step.cycleId === cycle.id)).map((step) => step.cycleId).filter((one): one is string => !!one)
     : [];
-  const earlier = earlierIds.length ? await earlierSteps(ctx, cycle.id) : [];
   // The deciding step is offered the first request: the person who settles what
   // a revision is for is the likeliest to know who needs it.
   const askWho = (await issuePolicy(ctx)).asked;
@@ -595,34 +597,11 @@ export default async function ReviewCyclePage({ params, searchParams }: { params
 
           {!cycle.issuedToReviewAt ? <Card title="Send to reviewers">{mayIssueToReviewers ? <ActionForm action={issueToReviewAction} submitLabel="Send to reviewers" hidden={{ cycleId: cycle.id }}/> : <p className="text-xs text-slate-500">{issueIsControl ? "Waiting for the control function." : "Waiting for whoever sent it for review."}</p>}</Card> : null}
 
-          {earlier.length ? (
-            <Card title="What the earlier steps said" description="Their verdicts and their comments, in order.">
-              <ul className="-my-4 divide-y divide-line">
-                {earlier.map((one) => (
-                  <li key={one.id} className="py-3">
-                    <p className="text-xs font-semibold text-slate-800">
-                      {one.number ? <span className="mr-2 font-mono text-slate-400">{one.number}</span> : null}
-                      {one.outcome ? verdictLabel(one.outcome) : <span className="text-slate-400">not answered yet</span>}
-                    </p>
-                    {one.outcomeByName ? <p className="mt-0.5 text-[11px] text-slate-400">{one.outcomeByName}, {fmtDateTime(one.outcomeAt)}</p> : null}
-                    {one.comments.length ? (
-                      <ul className="mt-2 space-y-1.5">
-                        {one.comments.map((comment) => (
-                          <li key={comment.id} className={`rounded-md px-2.5 py-1.5 text-xs ${comment.progressionPreventing && comment.status === "OPEN" ? "bg-red-50 text-red-900 ring-1 ring-red-200" : "bg-canvas text-slate-700"}`}>
-                            {comment.text}
-                            <span className="ml-1 text-[11px] text-slate-400">— {comment.authorName}{comment.progressionPreventing
-                              ? comment.status === "OPEN"
-                                ? comment.closesWith === "STEP" && comment.closesWithStep ? `, settled when step ${comment.closesWithStep} answers` : ", settled by the next revision"
-                                : ", settled"
-                              : ""}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            </Card>
+          {/* What the earlier steps said reads on its own: the page stands while it reads, and its failure is said in its place. */}
+          {earlierIds.length ? (
+            <Part name="what the earlier steps said" outline={<PartSkeleton what="what the earlier steps said" lines={2} />}>
+              <EarlierSteps ctx={ctx} cycleId={cycle.id} labels={Object.fromEntries([...Object.entries(ADVICE_LABEL), ...adviceCodes.map((one) => [one.code, one.label] as const), ...outcomes.map((one) => [one.code, one.label] as const)])} />
+            </Part>
           ) : null}
 
           {rewindTo.length ? (

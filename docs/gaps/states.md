@@ -25,8 +25,11 @@ state must show.
 ## Still to check page by page
 
 - **Empty:** the four registers (documents, reviews, transmittals, the Schedule's table) are done: narrowed to nothing,
-  they say so and offer to clear the filters; empty with no filter, they say what fills them. Still to check: the other
-  lists and tabs (`EmptyState` or a line saying why and the act that fills it, never a bare "None").
+  they say so and offer to clear the filters; empty with no filter, they say what fills them. Every other table now says
+  something too (`DataTable` `empty`, owner, 31 Oct 2026): why it is empty and what fills it, with the act where there is
+  one (the Project directory, People & access, the organization's People and Organizations, the console's organizations,
+  a supplier's package, the distribution matrix, the functions' grid, revisions' routing); a table given no words reads
+  "Nothing to show here yet.", never a bare header. Lists that are not tables keep their own lines.
 - **Success:** done for the acts that ended silently (about forty: the checks, records, legal hold, numbers taken back,
   tags, organization links, asks to send, the check on arrival, notifying again, packages, every act on a revision and a
   review): each returns its line, what happened and what comes next. Left silent on purpose: switches (they show their
@@ -35,6 +38,8 @@ state must show.
 - **A part of a page on its own** (`components/part.tsx`, `Part`; `PartSkeleton` in `components/skeleton.tsx`): an async
   server component wrapped in it reads on its own: its grey outline while it reads, the rest of the page drawn already;
   if it fails, "<what> could not be shown. The rest of the page is fine, and nothing was lost." with Try again, the
-  failure reported to us. Used on Home's journal ("what happened lately", `app/(app)/home-journal.tsx`). Next candidates,
-  one at a time as each page is touched: the document page's side reads (other numbers, who it may go to), the review
-  page's people and its run, the action page's lateness, the Schedule's list sources.
+  failure reported to us; `failed` keeps what still stands drawn above the line. Try again reads the part afresh. Used on
+  Home's journal; the document page's other numbers and who may read it (`documents/[id]/side-parts.tsx`; before, a
+  failed read showed as "no other number"); the review page's "What the earlier steps said" (`reviews/[id]/earlier-steps.tsx`);
+  an action's documents, drawn at once and filled with where each got late when it comes, staying without it if it
+  fails (`actions/[code]/needed-with-lateness.tsx`); the Schedule's lists' stages (before, a failed read showed "None yet").

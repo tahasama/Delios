@@ -14,6 +14,8 @@ import { api } from "@/lib/client";
 import { backendDocument } from "@/lib/documents/api";
 import { planPage, scheduleSource, type PlanAction } from "@/lib/actions/api";
 import { PlanCards } from "@/app/(app)/actions/plan-cards";
+import { Part } from "@/components/part";
+import { PartSkeleton } from "@/components/skeleton";
 import { PlanPlate } from "@/app/(app)/actions/plan-plate";
 import { PlanTimeline } from "@/app/(app)/actions/plan-timeline";
 import { movedPhrase } from "@/app/(app)/actions/moved";
@@ -344,7 +346,12 @@ export default async function ActionsPage({ searchParams }: { searchParams: Prom
             days={ctx.user.isInternal ? { lead: source.days.lead, risk: source.days.risk, own: source.days.ownLead || source.days.ownRisk } : null}
           />
         }
-        uploads={<PlanCards from={dateOn === "date" ? fromDay : null} to={dateOn === "date" ? toDay : null} />}
+        uploads={
+          // The lists' stages read on their own: the Schedule stands while they read, and a failure says so in their place.
+          <Part name="the schedule's lists" outline={<PartSkeleton what="the schedule's lists" lines={1} />}>
+            <PlanCards from={dateOn === "date" ? fromDay : null} to={dateOn === "date" ? toDay : null} />
+          </Part>
+        }
         cardHeight={PLAN_CARD_HEIGHT}
         view={view}
         more={

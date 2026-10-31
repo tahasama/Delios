@@ -33,7 +33,7 @@ export default async function Organizations({ searchParams }: { searchParams: Pr
           </span>
         }
       >
-        <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
+        <DataTable empty={state ? "No organization stands so. Choose another, or all of them." : "No organization has signed up yet."} className="rounded-none border-0 shadow-none" toolbar={false}
           head={<tr><Th>Organization</Th><Th>With us</Th><Th>Plan</Th><Th>Paid until</Th><Th>Paid users</Th><Th>Projects</Th><Th>Storage</Th><Th>Last active</Th><Th>Since</Th></tr>}>
           {shown.map((o) => (
             <tr key={o.id} className={cn(!o.active && "opacity-60")}>

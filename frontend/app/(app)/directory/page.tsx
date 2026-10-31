@@ -103,7 +103,7 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
               <span id="orgs-head" className="stencil mr-1 text-slate-500">Organizations taking part</span>
               <span className="text-[11px] text-slate-500">{directory.organizations.length} · a name shows only its people</span>
             </div>
-            <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
+            <DataTable empty={"No other organization takes part yet. The control function adds them in Settings → Organizations."} className="rounded-none border-0 shadow-none" toolbar={false}
               head={<tr><Th>Organization</Th><Th>Role on {project.code}</Th><Th>How it works with us</Th><Th>Answers for it</Th><Th>People</Th></tr>}>
               {directory.organizations.map((o) => (
                 <tr key={o.id} className="align-top">
@@ -129,7 +129,7 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
               <span className="text-[11px] text-slate-500">{people.length}</span>
               {shownOrg ? <Link href="/directory" className="ml-1 text-[11px] font-semibold text-link hover:underline">only {shownOrg.name} ×</Link> : null}
             </div>
-            <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
+            <DataTable empty={shownOrg ? `Nobody of ${shownOrg.name} is on the project yet.` : "Nobody is on the project yet. Ask for someone to join, above."} className="rounded-none border-0 shadow-none" toolbar={false}
               head={<tr><Th>Person</Th><Th>Organization</Th><Th>Function</Th><Th>Department</Th><Th></Th></tr>}>
               {people.map((p) => (
                 <tr key={p.id} className="align-top">

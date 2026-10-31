@@ -112,7 +112,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
       {/* Every organization: the pencil opens its line as the form. */}
       <section className="register register-sheet register-sheet-open" aria-labelledby="orgs-head">
         {band("orgs-head", "Every organization", `${parties.length} · its code, name, identifier and how it works with us change once each`)}
-        <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
+        <DataTable empty={"No organization in our list yet. Add one DELIOS knows, or create one, above."} className="rounded-none border-0 shadow-none" toolbar={false}
           head={<tr><Th>Organization</Th><Th>How they work with us</Th><Th>Projects</Th><Th className="text-right">Active</Th><Th></Th></tr>}>
           {parties.map((p) => {
             const c = p.changed;

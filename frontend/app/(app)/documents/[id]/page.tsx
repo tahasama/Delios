@@ -2,9 +2,10 @@ import { Select } from "@/components/select";
 import { plannedState, plannedProgress } from "@/lib/actions/planned-state";
 import { OwnFields } from "@/app/(app)/documents/new/own-fields";
 import { DEFAULT_RISK_DAYS } from "@/lib/actions/action-state";
-import { ReadersPanel } from "./readers-panel";
+import { OtherNumbers, WhoMayRead } from "./side-parts";
+import { Part } from "@/components/part";
+import { PartSkeleton } from "@/components/skeleton";
 import { documentAssets, projectAssets } from "@/lib/records/api";
-import { documentReaders, projectReaders } from "@/lib/documents/api-readers";
 import { controlDoes, policy as controlPolicy } from "@/lib/settings/control-activities";
 import { notFound } from "next/navigation";
 import { requireScope } from "@/lib/core/scope";
@@ -56,7 +57,6 @@ import { activityList, scheduleSource } from "@/lib/actions/api";
 import { addDocumentToActionAction } from "@/lib/actions/forms-links";
 import { sendToSupplierAction, askBackAction, answerAskAction } from "@/lib/packages/forms-supplier";
 import { addressees } from "@/lib/transmittals/api";
-import { AlsoKnownAs, type Equivalent } from "./numbers";
 import { AsReceivedWarning } from "@/components/as-received-warning";
 import { api, apiAfter, projectPath } from "@/lib/client";
 
@@ -128,8 +128,6 @@ export default async function DocumentDetailPage({
   const openAsk = asks.find((one) => !one.answeredAt) ?? null;
   const controller = isController(user) || isAdmin(user);
   // Equivalence: its numbers with other organizations, ours only; kept by the control function (or, with none, whoever exchanges).
-  const numbers = user.isInternal
-    ? await api<Equivalent[]>(projectPath(ctx, `/documents/${doc.id}/numbers`), { keep: { areas: ["docs"], doc: doc.id } }).catch(() => [] as Equivalent[]) : [];
   const mayKeepNumbers = user.isInternal && (controller || standsInForControl(user));
   // The control function adds it to a schedule action from here too: the actions with a discipline tagged that do not need it yet.
   const mayAddToAction = ctx.can("CONTROL") && !["WITHDRAWN", "CANCELLED"].includes(doc.state);
@@ -160,12 +158,6 @@ export default async function DocumentDetailPage({
     && (isAdmin(user)
       || doc.createdById === user.id
       || doc.revisions.some((r) => r.authoredById === user.id || r.uploadedById === user.id));
-  const [namedReaders, projectPeople] = closed
-    ? await Promise.all([
-        documentReaders(ctx, doc.id),
-        projectReaders(ctx),
-      ])
-    : [[], []] as [{ id: string; userId: string; user: { name: string }; addedByName: string; reason: string | null; createdAt: Date }[], { user: { id: string; name: string }; function: { name: string } | null }[]];
   const inPrep = doc.revisions.find((r) => r.state === "IN_PREPARATION");
   const inReview = doc.revisions.find((r) => r.state === "IN_REVIEW");
   // Decided, waiting for the control function. Still the revision in hand, and the
@@ -796,18 +788,18 @@ export default async function DocumentDetailPage({
                     </div>
                   ))}
                 </dl>
-                <AlsoKnownAs documentId={doc.id} numbers={numbers} mayKeep={mayKeepNumbers} />
+                {/* Each side read stands on its own: the page is there while it reads, and a failure says so in its place. */}
+                {user.isInternal ? (
+                  <Part name="its numbers with other organizations" outline={<span />}>
+                    <OtherNumbers ctx={ctx} documentId={doc.id} mayKeep={mayKeepNumbers} />
+                  </Part>
+                ) : null}
                 {closed ? (
-                  <ReadersPanel
-                    documentId={doc.id}
-                    confidentiality={label(confidentialities, doc.confidentiality) ?? doc.confidentiality ?? "closed"}
-                    readers={namedReaders.map((row) => ({ id: row.id, name: row.user.name, addedByName: row.addedByName, reason: row.reason, at: row.createdAt }))}
-                    candidates={projectPeople
-                      .filter((one) => !namedReaders.some((row) => row.userId === one.user.id) && one.user.id !== doc.createdById)
-                      .map((one) => ({ id: one.user.id, name: one.user.name, functionName: one.function?.name ?? null }))}
-                    mayName={mayNameReaders}
-                    answerable={answerableFor}
-                  />
+                  <Part name="who may read it" outline={<PartSkeleton what="who may read it" lines={2} className="mt-5" />}>
+                    <WhoMayRead ctx={ctx} documentId={doc.id} createdById={doc.createdById}
+                      confidentiality={label(confidentialities, doc.confidentiality) ?? doc.confidentiality ?? "closed"}
+                      mayName={mayNameReaders} answerable={answerableFor} />
+                  </Part>
                 ) : null}
                 {editing ? (
                   // One place to change a revision being prepared: its edit step, files and details together.

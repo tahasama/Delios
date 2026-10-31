@@ -1,5 +1,7 @@
 import { ActionNotes, type WentAhead } from "./lateness";
 import { NeededTable, type NeededRow } from "./needed-table";
+import { NeededWithLateness } from "./needed-with-lateness";
+import { Part } from "@/components/part";
 import { latenessOf } from "@/lib/actions/action-lateness";
 import { carrierRefusal, actIsOff } from "@/lib/settings/control-activities";
 import Link from "next/link";
@@ -61,9 +63,6 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   const ownConcerned = !!me.department && depts.includes(me.department);
   const mayRequestDocument = control || ownConcerned;
   const entries = dept ? action.needs.filter((e) => e.department === dept) : action.needs;
-  // Which of the three moments slipped, for each document, and who writes the
-  // note about what was decided.
-  const lateness = await latenessOf(ctx, action.id);
   // Left out by the organization: the notes already written are still read.
   const mayNote = inside && !(await actIsOff(ctx, "ACTION_NOTE")) && !(await carrierRefusal(ctx, "ACTION_NOTE", { control, standing: true }));
   // The latest schedule read moved its dates: said once, under the date.
@@ -165,7 +164,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
   // One row per required document: what it is, whether it is there, and the
   // step where its time went. Dates are written here so the table stays a
   // client component without carrying Date objects across.
-  const delayOf = new Map(lateness.rows.map((row) => [row.docNumber, row]));
+  // Where each one got late is read on its own (`Part`): the table stands without it while it reads, or if it fails.
+  type Slip = Awaited<ReturnType<typeof latenessOf>>["rows"][number];
   // Where each needed document stands, in the organization's own words for its states: it is listed whatever its
   // state, so people know it exists even before it is ready.
   const { policy } = await import("@/lib/settings/control-activities");
@@ -177,7 +177,7 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     const name = stateName(names, latest.state, { together, held: latest.held });
     return `rev ${latest.value}${latest.statusCode ? ` · ${latest.statusCode}` : ""} · ${name.toLowerCase()}`;
   };
-  const needed: NeededRow[] = entries.map((e) => {
+  const rowsOf = (delayOf: Map<string, Slip>): NeededRow[] => entries.map((e) => {
     const ready = e.state === "MET";
     const slip = delayOf.get(e.document.number) ?? null;
     return {
@@ -216,17 +216,11 @@ export default async function ActionDetailPage({ params, searchParams }: { param
     };
   });
 
-  return (
-    <div className="space-y-4">
-      {/* The name of the activity, what it is asking of the reader, and the
-          narrowing — one sheet, because they are read in that order and then
-          answered in the table under them. */}
-      <NeededTable
-        rows={needed}
-        together={together}
-        exportHref={`/api/export/baseline?ids=${action.id}`}
-        empty={depts.length || !inside ? undefined : "Tag the disciplines first, under Disciplines and documents."}
-        chips={depts.length > 1 ? (
+  const table: Omit<React.ComponentProps<typeof NeededTable>, "rows"> = {
+    together,
+    exportHref: `/api/export/baseline?ids=${action.id}`,
+    empty: depts.length || !inside ? undefined : "Tag the disciplines first, under Disciplines and documents.",
+    chips: depts.length > 1 ? (
           <>
             <Link href={`/actions/${action.code}`} className={`facet ${!dept ? "font-semibold text-brand-ink" : ""}`}>All</Link>
             {depts.map((d) => (
@@ -236,8 +230,8 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               </Link>
             ))}
           </>
-        ) : undefined}
-        plate={
+        ) : undefined,
+    plate: (
           <div className="flex flex-col-reverse gap-3 border-b border-line px-5 pt-6 pb-3 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 flex-1">
               <p className="font-mono text-[12.5px] font-semibold tracking-tight text-slate-500">
@@ -273,8 +267,18 @@ export default async function ActionDetailPage({ params, searchParams }: { param
               <ReadinessChip readiness={readiness} />
             </div>
           </div>
-        }
-      />
+        ),
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* The name of the activity, what it is asking of the reader, and the
+          narrowing — one sheet, because they are read in that order and then
+          answered in the table under them. */}
+      <Part name="where each document got late" outline={<NeededTable rows={rowsOf(new Map())} {...table} />}
+        failed={<NeededTable rows={rowsOf(new Map())} {...table} />}>
+        <NeededWithLateness ctx={ctx} actionId={action.id} rowsOf={rowsOf} table={table} />
+      </Part>
 
       {/* A request checked by the control function, waiting on this person's confirmation. */}
       {mine.length ? (

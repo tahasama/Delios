@@ -73,7 +73,7 @@ export default async function OrganizationPeoplePage({ searchParams }: { searchP
       </header>
 
       <section className="register register-sheet register-sheet-open" aria-label="People">
-        <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
+        <DataTable empty={who === "all" ? "Nobody has an account here yet. People are put on a project from its People & access." : who === "ours" ? "None of our own people have an account yet." : who === "guests" ? "No account made for another organization yet: they are made when such an organization's people are put on a project." : "Nobody works here from their own DELIOS yet: they come once an organization is linked and its administrator puts them on a project."} className="rounded-none border-0 shadow-none" toolbar={false}
           head={<tr><Th>Name</Th><Th>Organization</Th><Th>Projects</Th><Th>Account since</Th><Th>Last sign-in</Th><Th className="text-right">Can sign in</Th></tr>}>
           {shown.map((u) => {
             const open = sp.open === u.id;

@@ -232,7 +232,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
             {sp.q ? <Link href={chip({ org: shownOrg?.id, project: projectFilter || undefined, q: undefined })} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Clear</Link> : null}
           </form>
         </div>
-        <DataTable className="rounded-none border-0 shadow-none" toolbar={false}
+        <DataTable empty={words || shownOrg ? "Nobody matches that. Clear the search or the organization to see everyone." : "Nobody is on the project yet. Add someone, or ask for someone to join, above."} className="rounded-none border-0 shadow-none" toolbar={false}
           head={<tr><Th>Person</Th><Th>Organization</Th><Th>On {project.code}</Th><Th>Department</Th>{showElsewhere ? <Th>Other projects</Th> : null}<Th></Th></tr>}>
           {shown.map((u) => {
             const here = u.seats.find((m) => m.projectId === projectId);

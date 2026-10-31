@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Children, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Columns3, GripVertical, RotateCcw, Check, Download } from "lucide-react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/core/utils";
@@ -65,7 +65,13 @@ export function DataTable({
   capHeight,
   stretch,
   exportName,
+  empty,
 }: {
+  /**
+   * What the table says when it has no row (owner, the ten states: never a bare "None"): why it is empty and what fills
+   * it, ideally with the act that does. Every table says something; without it, a plain line.
+   */
+  empty?: React.ReactNode;
   /**
    * Offers "Export" for a table that has no register export of its own: the
    * columns that are showing and the rows as drawn, as a CSV named so.
@@ -458,7 +464,15 @@ export function DataTable({
       >
         <table ref={tableRef} className="min-w-full">
           <thead>{head}</thead>
-          <tbody className={rise ? "rows-rise" : undefined}>{children}</tbody>
+          <tbody className={rise ? "rows-rise" : undefined}>
+            {Children.toArray(children).length ? children : (
+              <tr data-empty>
+                <td colSpan={100} className="px-5 py-6 text-[13px] leading-5 text-slate-500 sm:px-6">
+                  {empty ?? "Nothing to show here yet."}
+                </td>
+              </tr>
+            )}
+          </tbody>
         </table>
       </div>
     </div>
@@ -478,7 +492,7 @@ function exportShown(table: HTMLTableElement | null, name: string) {
       : items.length ? items.map((one) => (one as HTMLElement).innerText.trim()).join("\n") : (cell as HTMLElement).innerText.trim();
     return `"${raw.replace(/"/g, '""')}"`;
   };
-  const lines = [...table.querySelectorAll("tr")].map((row) => [...row.children].filter(shown).map(text).join(","));
+  const lines = [...table.querySelectorAll("tr:not([data-empty])")].map((row) => [...row.children].filter(shown).map(text).join(","));
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
