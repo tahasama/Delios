@@ -1031,8 +1031,9 @@ a screen only words it. A new rule goes in the backend, never in a page.
 - **A switch pressed slides at once, and comes back** (owner: "the switches hang up, can't come and go"): a press waits
   for the page; the page moving on without choosing it (a choice that first asks why, then Cancel), four seconds with no
   answer, or a press on what really stands puts the thumb back on it (`seg-slider.tsx`, `letGo`).
-- The register's **Controlled · Uncontrolled** switch sits beside its title, never beside "Create document" (owner: "the
-  switch here is competing with the button").
+- The register's **Controlled · Uncontrolled** switch is a small one (`.seg-sm`) on the line under its title, right
+  after the words saying what the register holds (owner: beside the button "competing", beside the title "still not
+  feeling it", then "a smaller one next to" the line).
 
 ### Settings
 - **Settings are read by everyone of ours** (owner: "access without the editing liberty"): the Control room, Types &
